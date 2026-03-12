@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/grantshapiro/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/ae7eb560-3244-4da2-b8b2-604d34043791/db68cabc-3641-42d8-9539-32b590423ba0/skills/docx/**)",
+      "Bash(pandoc --track-changes=all \"/Users/grantshapiro/Downloads/Family_Organiser_Spec_and_Build_Plan.docx\" -o /tmp/family_spec.md)",
+      "Read(//tmp/**)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(npm test:*)",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
+      "Bash(npm create:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''version''''\\)\\); print\\(list\\(d.get\\(''''bin'''',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(echo '@import \"\"tailwindcss\"\";')",
+      "Bash(timeout 8 npm run dev)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
