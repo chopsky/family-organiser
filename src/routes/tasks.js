@@ -9,6 +9,20 @@ const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const VALID_PRIORITIES   = ['low', 'medium', 'high'];
 
 /**
+ * GET /api/tasks/recent
+ * Returns tasks completed in the last 24 hours (for undo/restore).
+ */
+router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const tasks = await db.getRecentlyCompletedTasks(req.householdId);
+    return res.json({ tasks });
+  } catch (err) {
+    console.error('GET /api/tasks/recent error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/tasks
  * Query params:
  *   all=true              → all incomplete tasks

@@ -12,6 +12,7 @@ const CATEGORY_EMOJI = {
 
 export default function Shopping() {
   const [items, setItems]           = useState([]);
+  const [recentDone, setRecentDone] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
   const [filter, setFilter]         = useState('');          // category filter
@@ -22,14 +23,19 @@ export default function Shopping() {
   const [addCat, setAddCat]         = useState('groceries');
   const [adding, setAdding]         = useState(false);
   const [toggling, setToggling]     = useState(new Set());
+  const [restoring, setRestoring]   = useState(new Set());
 
   const load = useCallback(async () => {
     try {
       const params = {};
       if (filter) params.category = filter;
       if (showCompleted) params.completed = 'true';
-      const { data } = await api.get('/shopping', { params });
-      setItems(data.items ?? []);
+      const [itemsRes, recentRes] = await Promise.all([
+        api.get('/shopping', { params }),
+        api.get('/shopping/recent'),
+      ]);
+      setItems(itemsRes.data.items ?? []);
+      setRecentDone(recentRes.data.items ?? []);
     } catch {
       setError('Could not load shopping list.');
     } finally {
@@ -52,6 +58,26 @@ export default function Shopping() {
     } finally {
       setAdding(false);
     }
+  }
+
+  async function restore(item) {
+    setRestoring((s) => new Set([...s, item.id]));
+    try {
+      await api.patch(`/shopping/${item.id}`, { completed: false });
+      await load();
+    } catch {
+      setError('Could not restore item.');
+    } finally {
+      setRestoring((s) => { const n = new Set(s); n.delete(item.id); return n; });
+    }
+  }
+
+  function timeAgo(dateStr) {
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ago`;
   }
 
   async function toggle(item) {
@@ -155,6 +181,40 @@ export default function Shopping() {
                 ))}
               </ul>
             </>
+          )}
+
+          {/* Recently Completed (last 24h) */}
+          {recentDone.length > 0 && (
+            <div className="mt-6">
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Recently completed
+              </h2>
+              <ul className="space-y-2">
+                {recentDone.map((item) => (
+                  <li key={item.id} className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 text-xs font-bold">
+                      ✓
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-500 line-through">{item.item}</p>
+                      <div className="flex gap-x-3 mt-0.5">
+                        <span className="text-xs text-gray-400">
+                          {CATEGORY_EMOJI[item.category]} {item.category}
+                        </span>
+                        <span className="text-xs text-gray-400">{timeAgo(item.completed_at)}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => restore(item)}
+                      disabled={restoring.has(item.id)}
+                      className="shrink-0 text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      {restoring.has(item.id) ? '…' : 'Restore'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </>
       )}

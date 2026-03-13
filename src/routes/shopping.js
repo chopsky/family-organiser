@@ -7,6 +7,20 @@ const router = Router();
 const VALID_CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'other'];
 
 /**
+ * GET /api/shopping/recent
+ * Returns shopping items completed in the last 24 hours (for undo/restore).
+ */
+router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const items = await db.getRecentlyCompletedShopping(req.householdId);
+    return res.json({ items });
+  } catch (err) {
+    console.error('GET /api/shopping/recent error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/shopping
  * Query params: category, completed (boolean string)
  */

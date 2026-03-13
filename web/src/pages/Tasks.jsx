@@ -15,10 +15,12 @@ function daysOverdue(dueDate) {
 
 export default function Tasks() {
   const [tasks, setTasks]       = useState([]);
+  const [recentDone, setRecentDone] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [showAll, setShowAll]   = useState(false);
   const [toggling, setToggling] = useState(new Set());
+  const [restoring, setRestoring] = useState(new Set());
 
   // Add form
   const [title, setTitle]         = useState('');
@@ -37,8 +39,12 @@ export default function Tasks() {
   const load = useCallback(async () => {
     try {
       const params = showAll ? { all: 'true' } : {};
-      const { data } = await api.get('/tasks', { params });
-      setTasks(data.tasks ?? []);
+      const [tasksRes, recentRes] = await Promise.all([
+        api.get('/tasks', { params }),
+        api.get('/tasks/recent'),
+      ]);
+      setTasks(tasksRes.data.tasks ?? []);
+      setRecentDone(recentRes.data.tasks ?? []);
     } catch {
       setError('Could not load tasks.');
     } finally {
@@ -82,6 +88,26 @@ export default function Tasks() {
     } finally {
       setToggling((s) => { const n = new Set(s); n.delete(task.id); return n; });
     }
+  }
+
+  async function restore(task) {
+    setRestoring((s) => new Set([...s, task.id]));
+    try {
+      await api.patch(`/tasks/${task.id}`, { completed: false });
+      await load();
+    } catch {
+      setError('Could not restore task.');
+    } finally {
+      setRestoring((s) => { const n = new Set(s); n.delete(task.id); return n; });
+    }
+  }
+
+  function timeAgo(dateStr) {
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ago`;
   }
 
   return (
@@ -230,6 +256,40 @@ export default function Tasks() {
             );
           })}
         </ul>
+      )}
+
+      {/* Recently Completed (last 24h) */}
+      {!loading && recentDone.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            Recently completed
+          </h2>
+          <ul className="space-y-2">
+            {recentDone.map((task) => (
+              <li key={task.id} className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 text-xs font-bold">
+                  ✓
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-500 line-through">{task.title}</p>
+                  <div className="flex gap-x-3 mt-0.5">
+                    {task.assigned_to_name && (
+                      <span className="text-xs text-gray-400">👤 {task.assigned_to_name}</span>
+                    )}
+                    <span className="text-xs text-gray-400">{timeAgo(task.completed_at)}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => restore(task)}
+                  disabled={restoring.has(task.id)}
+                  className="shrink-0 text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {restoring.has(task.id) ? '…' : 'Restore'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

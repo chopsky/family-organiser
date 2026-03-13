@@ -404,6 +404,66 @@ function createBot(token) {
     }
   });
 
+  // ── /undo ──────────────────────────────────────────────────────────────────
+  bot.command('undo', async (ctx) => {
+    if (isGroupMessage(ctx) && !isBotAddressed(ctx)) return;
+    if (!ctx.familyUser) return ctx.reply('Please set up your household first. Send /start for instructions.');
+
+    try {
+      const [recentTasks, recentShopping] = await Promise.all([
+        db.getRecentlyCompletedTasks(ctx.household.id),
+        db.getRecentlyCompletedShopping(ctx.household.id),
+      ]);
+
+      if (!recentTasks.length && !recentShopping.length) {
+        return ctx.reply('✅ Nothing was completed in the last 24 hours to undo.');
+      }
+
+      const lines = ['*Recently Completed (last 24h)*\n'];
+      const allItems = [];
+      let index = 1;
+
+      if (recentTasks.length) {
+        lines.push('📋 *Tasks:*');
+        for (const t of recentTasks) {
+          const who = t.assigned_to_name ? ` (${t.assigned_to_name})` : '';
+          lines.push(`  ${index}. ~~${t.title}~~${who}`);
+          allItems.push({ type: 'task', id: t.id, name: t.title });
+          index++;
+        }
+        lines.push('');
+      }
+
+      if (recentShopping.length) {
+        lines.push('🛒 *Shopping:*');
+        for (const i of recentShopping) {
+          const cat = CATEGORY_EMOJI[i.category] || '📦';
+          lines.push(`  ${index}. ~~${i.item}~~ ${cat}`);
+          allItems.push({ type: 'shopping', id: i.id, name: i.item });
+          index++;
+        }
+      }
+
+      lines.push('\nReply with a number to restore, or "all" to restore everything.');
+
+      // Store the undo context for the reply handler
+      ctx.familyUser._undoItems = allItems;
+
+      // Save undo context in a simple in-memory store keyed by chat id
+      if (!bot.context) bot.context = {};
+      if (!bot.context.undoSessions) bot.context.undoSessions = {};
+      bot.context.undoSessions[ctx.from.id] = {
+        items: allItems,
+        expires: Date.now() + 5 * 60 * 1000, // 5 min expiry
+      };
+
+      return ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error('/undo error:', err);
+      return ctx.reply('Could not fetch recent completions. Please try again.');
+    }
+  });
+
   // ── /help ─────────────────────────────────────────────────────────────────
   bot.command('help', async (ctx) => {
     return ctx.reply(
@@ -419,7 +479,8 @@ function createBot(token) {
       `/tasks all — All pending tasks\n` +
       `/mytasks — Your tasks only (DM)\n` +
       `/outstanding [name] — What's outstanding for you or someone\n` +
-      `/done — What was completed this week\n\n` +
+      `/done — What was completed this week\n` +
+      `/undo — Restore accidentally completed items\n\n` +
       `*Settings (admin, DM only)*\n` +
       `/settings — Adjust household settings\n\n` +
       `*Or just chat naturally!* 💬\n` +
@@ -592,6 +653,45 @@ function createBot(token) {
       return ctx.reply(
         `Hi! I don't know you yet. Please send /start to set up or join a household first.`
       );
+    }
+
+    // Handle /undo reply (number or "all")
+    const undoSession = bot.context?.undoSessions?.[ctx.from.id];
+    if (undoSession && undoSession.expires > Date.now()) {
+      const input = ctx.message.text.trim().toLowerCase();
+      if (input === 'all' || /^\d+$/.test(input)) {
+        try {
+          let toRestore = [];
+          if (input === 'all') {
+            toRestore = undoSession.items;
+          } else {
+            const idx = parseInt(input, 10) - 1;
+            if (idx >= 0 && idx < undoSession.items.length) {
+              toRestore = [undoSession.items[idx]];
+            } else {
+              return ctx.reply(`Please pick a number between 1 and ${undoSession.items.length}, or "all".`);
+            }
+          }
+
+          const restored = [];
+          for (const item of toRestore) {
+            if (item.type === 'task') {
+              await db.uncompleteTask(item.id, ctx.household.id);
+            } else {
+              await db.uncompleteShoppingItem(item.id, ctx.household.id);
+            }
+            restored.push(item.name);
+          }
+
+          // Clear the session
+          delete bot.context.undoSessions[ctx.from.id];
+
+          return ctx.reply(`♻️ Restored: ${restored.join(', ')}`);
+        } catch (err) {
+          console.error('Undo restore error:', err);
+          return ctx.reply('Could not restore. Please try again.');
+        }
+      }
     }
 
     // Strip bot @mention from group messages before sending to AI

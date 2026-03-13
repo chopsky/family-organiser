@@ -460,6 +460,58 @@ async function getCompletedThisWeek(householdId) {
   return { tasks: tasks || [], shoppingItems: items || [] };
 }
 
+async function getRecentlyCompletedTasks(householdId, hours = 24) {
+  const since = new Date();
+  since.setHours(since.getHours() - hours);
+  const { data, error } = await supabase
+    .from('tasks')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', true)
+    .gte('completed_at', since.toISOString())
+    .order('completed_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function getRecentlyCompletedShopping(householdId, hours = 24) {
+  const since = new Date();
+  since.setHours(since.getHours() - hours);
+  const { data, error } = await supabase
+    .from('shopping_items')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', true)
+    .gte('completed_at', since.toISOString())
+    .order('completed_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function uncompleteTask(taskId, householdId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ completed: false, completed_at: null })
+    .eq('id', taskId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function uncompleteShoppingItem(itemId, householdId) {
+  const { data, error } = await supabase
+    .from('shopping_items')
+    .update({ completed: false, completed_at: null })
+    .eq('id', itemId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function getOverdueTasksForUser(householdId, userId) {
   const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase
@@ -528,4 +580,8 @@ module.exports = {
   getCompletedThisWeek,
   getOverdueTasksForUser,
   getTasksForUser,
+  getRecentlyCompletedTasks,
+  getRecentlyCompletedShopping,
+  uncompleteTask,
+  uncompleteShoppingItem,
 };
