@@ -297,3 +297,38 @@ describe('PATCH /api/settings', () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ─── DELETE /api/household/members/:userId ──────────────────────────────────
+
+describe('DELETE /api/household/members/:userId', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('admin can remove a member', async () => {
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    db.deleteUser.mockResolvedValue();
+
+    const res = await request(app).delete('/api/household/members/u-2').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Member removed.');
+    expect(db.deleteUser).toHaveBeenCalledWith('u-2', 'hh-1');
+  });
+
+  test('non-admin gets 403', async () => {
+    const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
+    const res = await request(app).delete('/api/household/members/u-1')
+      .set({ Authorization: `Bearer ${memberToken}` });
+    expect(res.status).toBe(403);
+  });
+
+  test('admin cannot remove themselves', async () => {
+    const res = await request(app).delete('/api/household/members/u-1').set(AUTH);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('cannot remove yourself');
+  });
+
+  test('returns 404 for member not in household', async () => {
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    const res = await request(app).delete('/api/household/members/u-999').set(AUTH);
+    expect(res.status).toBe(404);
+  });
+});

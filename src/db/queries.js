@@ -98,6 +98,15 @@ async function findUserByName(householdId, name) {
   return data || null;
 }
 
+async function deleteUser(userId, householdId) {
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', userId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
 // ─── Shopping Items ───────────────────────────────────────────────────────────
 
 async function addShoppingItems(householdId, items, addedByUserId) {
@@ -335,6 +344,7 @@ module.exports = {
   getUserByTelegramId,
   getHouseholdMembers,
   findUserByName,
+  deleteUser,
   addShoppingItems,
   getShoppingList,
   completeShoppingItemsByName,

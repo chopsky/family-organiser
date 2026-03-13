@@ -47,4 +47,31 @@ router.patch('/settings', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/household/members/:userId
+ * Remove a member from the household. Admin only.
+ */
+router.delete('/members/:userId', requireAuth, requireAdmin, async (req, res) => {
+  const { userId } = req.params;
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ error: 'You cannot remove yourself from the household.' });
+  }
+
+  try {
+    // Verify target user belongs to the same household
+    const members = await db.getHouseholdMembers(req.householdId);
+    const target = members.find((m) => m.id === userId);
+    if (!target) {
+      return res.status(404).json({ error: 'Member not found in this household.' });
+    }
+
+    await db.deleteUser(userId, req.householdId);
+    return res.json({ message: 'Member removed.' });
+  } catch (err) {
+    console.error('DELETE /api/household/members error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

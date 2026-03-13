@@ -18,12 +18,24 @@ export default function Settings() {
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
-  useEffect(() => {
-    api.get('/household')
+  function loadMembers() {
+    return api.get('/household')
       .then(({ data }) => setMembers(data.members ?? []))
       .catch(() => setError('Could not load members.'))
       .finally(() => setLoadingMembers(false));
-  }, []);
+  }
+
+  useEffect(() => { loadMembers(); }, []);
+
+  async function handleRemoveMember(member) {
+    if (!window.confirm(`Remove ${member.name} from the household?`)) return;
+    try {
+      await api.delete(`/household/members/${member.id}`);
+      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove member.');
+    }
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -128,6 +140,14 @@ export default function Settings() {
                 </div>
                 {m.id === user?.id && (
                   <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">You</span>
+                )}
+                {isAdmin && m.id !== user?.id && m.role !== 'admin' && (
+                  <button
+                    onClick={() => handleRemoveMember(m)}
+                    className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    Remove
+                  </button>
                 )}
               </li>
             ))}
