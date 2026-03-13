@@ -6,7 +6,7 @@ const {
   RECEIPT_MATCHING_SYSTEM,
 } = require('./prompts');
 
-const MODEL = 'claude-opus-4-6';
+const MODEL = 'claude-sonnet-4-6';
 
 function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
