@@ -1,10 +1,10 @@
-const sgMail = require('@sendgrid/mail');
+const postmark = require('postmark');
 
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+const client = process.env.POSTMARK_SERVER_TOKEN
+  ? new postmark.ServerClient(process.env.POSTMARK_SERVER_TOKEN)
+  : null;
 
-const FROM = process.env.SENDGRID_FROM_EMAIL || 'noreply@curata.app';
+const FROM = process.env.POSTMARK_FROM_EMAIL || 'noreply@curata.app';
 const BASE_URL = process.env.WEB_URL || 'http://localhost:5173';
 const API_URL = process.env.API_URL || process.env.WEB_URL || 'http://localhost:3000';
 
@@ -34,6 +34,14 @@ function button(text, url) {
   return `<a href="${url}" style="display:inline-block;background:#059669;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;font-size:16px;margin:16px 0;">${text}</a>`;
 }
 
+async function sendEmail(to, subject, html) {
+  if (!client) {
+    console.warn('Postmark not configured — skipping email to', to);
+    return;
+  }
+  await client.sendEmail({ From: FROM, To: to, Subject: subject, HtmlBody: html });
+}
+
 async function sendVerificationEmail(to, name, token) {
   const url = `${API_URL}/api/auth/verify-email?token=${token}`;
   const html = emailTemplate('Verify your email', `
@@ -42,7 +50,7 @@ async function sendVerificationEmail(to, name, token) {
     <div style="text-align:center;">${button('Verify email', url)}</div>
     <p style="color:#9ca3af;font-size:13px;">This link expires in 24 hours.</p>
   `);
-  await sgMail.send({ to, from: FROM, subject: 'Verify your email for Curata', html });
+  await sendEmail(to, 'Verify your email for Curata', html);
 }
 
 async function sendInviteEmail(to, inviterName, householdName, token) {
@@ -53,7 +61,7 @@ async function sendInviteEmail(to, inviterName, householdName, token) {
     <div style="text-align:center;">${button('Join household', url)}</div>
     <p style="color:#9ca3af;font-size:13px;">This invite expires in 7 days.</p>
   `);
-  await sgMail.send({ to, from: FROM, subject: `Join ${householdName} on Curata`, html });
+  await sendEmail(to, `Join ${householdName} on Curata`, html);
 }
 
 async function sendPasswordResetEmail(to, name, token) {
@@ -64,7 +72,7 @@ async function sendPasswordResetEmail(to, name, token) {
     <div style="text-align:center;">${button('Reset password', url)}</div>
     <p style="color:#9ca3af;font-size:13px;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
   `);
-  await sgMail.send({ to, from: FROM, subject: 'Reset your password for Curata', html });
+  await sendEmail(to, 'Reset your password for Curata', html);
 }
 
 module.exports = { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail };
