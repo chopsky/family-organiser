@@ -106,7 +106,7 @@ export default function Dashboard() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. Buy milk and remind Jake to do homework"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
           <button
             type="button"
@@ -119,7 +119,7 @@ export default function Dashboard() {
           <button
             type="submit"
             disabled={sending || !text.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
           >
             {sending ? '…' : 'Add'}
           </button>
@@ -147,7 +147,7 @@ export default function Dashboard() {
             ))}
           </ul>
           {outstandingCount > 5 && (
-            <Link to="/tasks" className="text-indigo-600 text-sm mt-2 block hover:underline">
+            <Link to="/tasks" className="text-emerald-600 text-sm mt-2 block hover:underline">
               + {outstandingCount - 5} more →
             </Link>
           )}
@@ -162,10 +162,10 @@ export default function Dashboard() {
             {digest.members.map((m) => (
               <span
                 key={m.id}
-                className="bg-indigo-50 text-indigo-700 rounded-full px-3 py-1 text-sm font-medium"
+                className="bg-emerald-50 text-emerald-700 rounded-full px-3 py-1 text-sm font-medium"
               >
                 {m.name}
-                {m.role === 'admin' && <span className="ml-1 text-indigo-400 text-xs">admin</span>}
+                {m.role === 'admin' && <span className="ml-1 text-emerald-400 text-xs">admin</span>}
               </span>
             ))}
           </div>

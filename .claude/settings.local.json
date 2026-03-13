@@ -16,7 +16,8 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''version''''\\)\\); print\\(list\\(d.get\\(''''bin'''',{}\\).keys\\(\\)\\)\\)\")",
       "Bash(echo '@import \"\"tailwindcss\"\";')",
       "Bash(timeout 8 npm run dev)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebFetch(domain:docs.anthropic.com)"
     ]
   }
 }

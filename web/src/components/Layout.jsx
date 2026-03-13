@@ -21,15 +21,16 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top bar */}
-      <header className="bg-indigo-600 text-white shadow">
+      <header className="bg-emerald-600 text-white shadow">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <span className="font-bold text-lg">{household?.name ?? 'Family Organiser'}</span>
-            {user && <span className="ml-2 text-indigo-200 text-sm">· {user.name}</span>}
+          <div className="flex items-center gap-2">
+            <img src="/Curata-Logo.svg" alt="Curata" className="h-7 invert" />
+            <span className="font-bold text-lg">{household?.name ?? 'Curata'}</span>
+            {user && <span className="ml-2 text-emerald-200 text-sm">· {user.name}</span>}
           </div>
           <button
             onClick={handleLogout}
-            className="text-indigo-200 hover:text-white text-sm transition-colors"
+            className="text-emerald-200 hover:text-white text-sm transition-colors"
           >
             Sign out
           </button>
@@ -50,7 +51,7 @@ export default function Layout({ children }) {
               to={to}
               className={({ isActive }) =>
                 `flex-1 text-center py-3 text-xs font-medium transition-colors ${
-                  isActive ? 'text-indigo-600 border-t-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                  isActive ? 'text-emerald-600 border-t-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'
                 }`
               }
             >

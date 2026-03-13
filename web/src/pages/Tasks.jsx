@@ -91,13 +91,13 @@ export default function Tasks() {
         <div className="flex gap-3">
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="text-sm text-indigo-600 hover:underline"
+            className="text-sm text-emerald-600 hover:underline"
           >
             {showAll ? 'Due today' : 'All tasks'}
           </button>
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
           >
             + Add
           </button>
@@ -108,7 +108,7 @@ export default function Tasks() {
 
       {/* Add task form */}
       {showForm && (
-        <form onSubmit={addTask} className="bg-white rounded-xl shadow-sm border border-indigo-100 p-4 space-y-3">
+        <form onSubmit={addTask} className="bg-white rounded-xl shadow-sm border border-emerald-100 p-4 space-y-3">
           <h2 className="font-semibold text-gray-800">New task</h2>
           <input
             type="text"
@@ -116,7 +116,7 @@ export default function Tasks() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Task title"
             required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -125,7 +125,7 @@ export default function Tasks() {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div>
@@ -133,7 +133,7 @@ export default function Tasks() {
               <select
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="">Everyone</option>
                 {members.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
@@ -144,7 +144,7 @@ export default function Tasks() {
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="low">🟢 Low</option>
                 <option value="medium">🟡 Medium</option>
@@ -156,7 +156,7 @@ export default function Tasks() {
               <select
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {RECURRENCES.map((r) => <option key={r} value={r}>{r || 'Never'}</option>)}
               </select>
@@ -173,7 +173,7 @@ export default function Tasks() {
             <button
               type="submit"
               disabled={adding || !title.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               {adding ? 'Adding…' : 'Add task'}
             </button>
@@ -198,7 +198,7 @@ export default function Tasks() {
                   className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                     task.completed
                       ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-gray-300 hover:border-indigo-400'
+                      : 'border-gray-300 hover:border-emerald-400'
                   }`}
                 >
                   {task.completed && '✓'}

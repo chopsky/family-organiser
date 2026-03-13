@@ -68,7 +68,7 @@ export default function Receipt() {
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => inputRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 hover:border-indigo-400 rounded-xl p-8 text-center cursor-pointer transition-colors bg-white"
+            className="border-2 border-dashed border-gray-300 hover:border-emerald-400 rounded-xl p-8 text-center cursor-pointer transition-colors bg-white"
           >
             {preview ? (
               <img
@@ -107,7 +107,7 @@ export default function Receipt() {
               <button
                 onClick={handleUpload}
                 disabled={uploading}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg py-3 font-medium transition-colors"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white rounded-lg py-3 font-medium transition-colors"
               >
                 {uploading ? 'Scanning…' : '🔍 Scan receipt'}
               </button>
@@ -115,9 +115,9 @@ export default function Receipt() {
           )}
 
           {uploading && (
-            <div className="bg-indigo-50 rounded-xl p-5 text-center">
+            <div className="bg-emerald-50 rounded-xl p-5 text-center">
               <Spinner />
-              <p className="text-indigo-600 text-sm mt-2">Analysing your receipt with AI…</p>
+              <p className="text-emerald-600 text-sm mt-2">Analysing your receipt with AI…</p>
             </div>
           )}
         </>
@@ -170,7 +170,7 @@ export default function Receipt() {
 
           <button
             onClick={reset}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-3 font-medium transition-colors"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-3 font-medium transition-colors"
           >
             Scan another receipt
           </button>

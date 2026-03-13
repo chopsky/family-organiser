@@ -37,12 +37,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Logo / hero */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🏠</div>
-          <h1 className="text-3xl font-bold text-gray-900">Family Organiser</h1>
+          <img src="/Curata-Logo.svg" alt="Curata" className="h-16 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900">Curata</h1>
           <p className="text-gray-500 mt-2">Shopping lists, tasks & reminders — together.</p>
         </div>
 
@@ -62,7 +62,7 @@ export default function Login() {
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="e.g. ABC123"
                 maxLength={10}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-lg font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-lg font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 autoComplete="off"
                 autoCapitalize="characters"
               />
@@ -80,7 +80,7 @@ export default function Login() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Sarah"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 autoComplete="given-name"
               />
             </div>
@@ -88,7 +88,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 rounded-lg transition-colors mt-2"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-lg transition-colors mt-2"
             >
               {loading ? 'Joining…' : 'Join household →'}
             </button>

@@ -66,7 +66,7 @@ export default function Settings() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div>
@@ -75,14 +75,14 @@ export default function Settings() {
                 type="time"
                 value={reminderTime}
                 onChange={(e) => setReminderTime(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <p className="text-xs text-gray-400 mt-1">Telegram reminders are sent at this time each day.</p>
             </div>
             <button
               type="submit"
               disabled={saving}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
@@ -102,8 +102,8 @@ export default function Settings() {
         <p className="text-sm text-gray-500 mb-3">
           Share this code with family members so they can join your household.
         </p>
-        <div className="bg-indigo-50 rounded-lg px-5 py-4 text-center">
-          <span className="text-3xl font-mono font-bold tracking-widest text-indigo-700">
+        <div className="bg-emerald-50 rounded-lg px-5 py-4 text-center">
+          <span className="text-3xl font-mono font-bold tracking-widest text-emerald-700">
             {household?.join_code ?? '—'}
           </span>
         </div>
@@ -116,7 +116,7 @@ export default function Settings() {
           <ul className="space-y-2">
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm shrink-0">
+                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">
                   {m.name[0].toUpperCase()}
                 </div>
                 <div className="flex-1">
@@ -127,7 +127,7 @@ export default function Settings() {
                   </p>
                 </div>
                 {m.id === user?.id && (
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">You</span>
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">You</span>
                 )}
               </li>
             ))}
