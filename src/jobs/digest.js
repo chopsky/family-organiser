@@ -1,4 +1,5 @@
 const db = require('../db/queries');
+const email = require('../services/email');
 
 // ─── Message builder ──────────────────────────────────────────────────────────
 
@@ -110,4 +111,43 @@ async function sendWeeklyDigest(bot, householdId) {
   }
 }
 
-module.exports = { buildWeeklyDigestMessage, sendWeeklyDigest };
+/**
+ * Send the weekly digest via email to all members with an email address.
+ *
+ * @param {string} householdId
+ */
+async function sendWeeklyDigestEmail(householdId) {
+  const today = new Date().toISOString().split('T')[0];
+  const household = await db.getHouseholdById(householdId);
+  const members = await db.getHouseholdMembers(householdId);
+
+  const { tasks: completedTasks, shoppingItems: completedShopping } = await db.getCompletedThisWeek(householdId);
+
+  const { data: outstandingTasks } = await require('../db/client').supabase
+    .from('tasks')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false)
+    .lte('due_date', today)
+    .order('due_date');
+
+  const upcomingTasks = await db.getTasksDueNextWeek(householdId);
+
+  for (const member of members) {
+    if (!member.email) continue;
+
+    try {
+      await email.sendWeeklyDigestEmail(member.email, member.name, household.name, {
+        completedTasks,
+        completedShopping,
+        outstandingTasks: outstandingTasks || [],
+        upcomingTasks,
+        members,
+      });
+    } catch (err) {
+      console.error(`Failed to send digest email to ${member.name} (${member.email}):`, err.message);
+    }
+  }
+}
+
+module.exports = { buildWeeklyDigestMessage, sendWeeklyDigest, sendWeeklyDigestEmail };

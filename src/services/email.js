@@ -75,4 +75,122 @@ async function sendPasswordResetEmail(to, name, token) {
   await sendEmail(to, 'Reset your password for Curata', html);
 }
 
-module.exports = { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail };
+/**
+ * Build and send the weekly digest email.
+ *
+ * @param {string} to - Recipient email
+ * @param {string} memberName - Recipient's first name
+ * @param {string} householdName
+ * @param {object} data - { completedTasks, completedShopping, outstandingTasks, upcomingTasks, members }
+ */
+async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
+  const { completedTasks, completedShopping, outstandingTasks, upcomingTasks, members } = data;
+
+  // ── Completed section ─────────────────────────────────────────────────────
+  const byPerson = {};
+  for (const t of completedTasks) {
+    const key = t.assigned_to_name || 'Everyone';
+    byPerson[key] = (byPerson[key] || 0) + 1;
+  }
+  const completedRows = Object.entries(byPerson)
+    .map(([name, count]) => `<tr><td style="padding:4px 12px 4px 0;color:#374151;">${name}</td><td style="padding:4px 0;color:#059669;font-weight:600;">${count} task${count !== 1 ? 's' : ''}</td></tr>`)
+    .join('');
+
+  // ── Outstanding / carrying over ───────────────────────────────────────────
+  const today = new Date().toISOString().split('T')[0];
+  const outstandingRows = outstandingTasks.slice(0, 10).map((t) => {
+    const who = t.assigned_to_name || 'Everyone';
+    const daysOverdue = Math.max(0, Math.floor((new Date(today) - new Date(t.due_date)) / 86400000));
+    const badge = daysOverdue > 0
+      ? `<span style="background:#FEE2E2;color:#DC2626;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">${daysOverdue}d overdue</span>`
+      : `<span style="background:#FEF3C7;color:#D97706;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">due today</span>`;
+    return `<tr>
+      <td style="padding:8px 12px 8px 0;color:#374151;border-bottom:1px solid #F3F4F6;">${t.title}</td>
+      <td style="padding:8px 8px 8px 0;color:#6B7280;border-bottom:1px solid #F3F4F6;font-size:13px;">${who}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #F3F4F6;text-align:right;">${badge}</td>
+    </tr>`;
+  }).join('');
+
+  // ── Upcoming next week ────────────────────────────────────────────────────
+  const upcomingRows = upcomingTasks.slice(0, 8).map((t) => {
+    const who = t.assigned_to_name || 'Everyone';
+    const dayName = new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    const rec = t.recurrence ? ` <span style="color:#9CA3AF;font-size:11px;">(${t.recurrence})</span>` : '';
+    return `<tr>
+      <td style="padding:6px 12px 6px 0;color:#374151;border-bottom:1px solid #F3F4F6;">${t.title}${rec}</td>
+      <td style="padding:6px 8px 6px 0;color:#6B7280;border-bottom:1px solid #F3F4F6;font-size:13px;">${who}</td>
+      <td style="padding:6px 0;border-bottom:1px solid #F3F4F6;color:#6B7280;font-size:13px;text-align:right;">${dayName}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+
+    <!-- Header -->
+    <div style="background:#059669;padding:32px 24px;text-align:center;">
+      <h1 style="color:#fff;margin:0 0 4px;font-size:24px;">Curata</h1>
+      <p style="color:#D1FAE5;margin:0;font-size:14px;">Weekly Digest for ${householdName}</p>
+    </div>
+
+    <div style="padding:32px 24px;">
+      <p style="color:#374151;line-height:1.6;margin:0 0 24px;">Hi ${memberName}, here's your week in review:</p>
+
+      <!-- ✅ Completed This Week -->
+      <div style="margin-bottom:28px;">
+        <div style="display:flex;align-items:center;margin-bottom:12px;">
+          <span style="font-size:20px;margin-right:8px;">✅</span>
+          <h2 style="color:#111827;margin:0;font-size:16px;font-weight:700;">Completed This Week</h2>
+        </div>
+        <div style="background:#F0FDF4;border-radius:12px;padding:16px;">
+          <p style="color:#059669;font-size:24px;font-weight:700;margin:0 0 4px;">${completedTasks.length} task${completedTasks.length !== 1 ? 's' : ''} + ${completedShopping.length} shopping item${completedShopping.length !== 1 ? 's' : ''}</p>
+          ${completedRows ? `<table style="margin-top:8px;font-size:13px;">${completedRows}</table>` : '<p style="color:#6B7280;font-size:13px;margin:4px 0 0;">Nothing completed yet — next week is a fresh start!</p>'}
+        </div>
+      </div>
+
+      <!-- ⏳ Carrying Over -->
+      <div style="margin-bottom:28px;">
+        <div style="display:flex;align-items:center;margin-bottom:12px;">
+          <span style="font-size:20px;margin-right:8px;">⏳</span>
+          <h2 style="color:#111827;margin:0;font-size:16px;font-weight:700;">Carrying Over</h2>
+          <span style="background:#FEE2E2;color:#DC2626;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-left:8px;">${outstandingTasks.length}</span>
+        </div>
+        ${outstandingTasks.length
+          ? `<table style="width:100%;font-size:14px;">${outstandingRows}</table>${outstandingTasks.length > 10 ? `<p style="color:#9CA3AF;font-size:13px;margin:8px 0 0;">… and ${outstandingTasks.length - 10} more</p>` : ''}`
+          : '<div style="background:#F0FDF4;border-radius:12px;padding:16px;text-align:center;"><p style="color:#059669;font-size:14px;margin:0;">All caught up! 🎉</p></div>'
+        }
+      </div>
+
+      <!-- 📅 Coming Up Next Week -->
+      <div style="margin-bottom:28px;">
+        <div style="display:flex;align-items:center;margin-bottom:12px;">
+          <span style="font-size:20px;margin-right:8px;">📅</span>
+          <h2 style="color:#111827;margin:0;font-size:16px;font-weight:700;">Coming Up Next Week</h2>
+        </div>
+        ${upcomingTasks.length
+          ? `<table style="width:100%;font-size:14px;">${upcomingRows}</table>${upcomingTasks.length > 8 ? `<p style="color:#9CA3AF;font-size:13px;margin:8px 0 0;">… and ${upcomingTasks.length - 8} more</p>` : ''}`
+          : '<div style="background:#F9FAFB;border-radius:12px;padding:16px;text-align:center;"><p style="color:#6B7280;font-size:14px;margin:0;">Nothing scheduled — enjoy the week! ☀️</p></div>'
+        }
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align:center;margin-top:24px;">
+        ${button('Open Curata', BASE_URL)}
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 24px;background:#f9fafb;text-align:center;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Curata — shopping lists, tasks & reminders, together.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await sendEmail(to, `Weekly Digest — ${householdName}`, html);
+}
+
+module.exports = { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail, sendWeeklyDigestEmail };

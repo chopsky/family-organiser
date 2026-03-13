@@ -460,6 +460,33 @@ async function getCompletedThisWeek(householdId) {
   return { tasks: tasks || [], shoppingItems: items || [] };
 }
 
+async function getOverdueTasksForUser(householdId, userId) {
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('tasks')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false)
+    .eq('assigned_to', userId)
+    .lt('due_date', today)
+    .order('due_date');
+  if (error) throw error;
+  return data;
+}
+
+async function getTasksForUser(householdId, userId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false)
+    .eq('assigned_to', userId)
+    .order('due_date')
+    .order('created_at');
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -499,4 +526,6 @@ module.exports = {
   completeTasksByName,
   generateNextRecurrence,
   getCompletedThisWeek,
+  getOverdueTasksForUser,
+  getTasksForUser,
 };

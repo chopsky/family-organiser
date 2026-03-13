@@ -302,6 +302,83 @@ function createBot(token) {
     }
   });
 
+  // ── /outstanding [name] ──────────────────────────────────────────────────────
+  bot.command('outstanding', async (ctx) => {
+    if (isGroupMessage(ctx) && !isBotAddressed(ctx)) return;
+    if (!ctx.familyUser) return ctx.reply('Please set up your household first. Send /start for instructions.');
+
+    const nameArg = ctx.message.text.replace(/^\/outstanding\s*/i, '').trim();
+
+    try {
+      let targetMember;
+
+      if (nameArg) {
+        // Look up the named member
+        targetMember = ctx.household.members.find(
+          (m) => m.name.toLowerCase() === nameArg.toLowerCase()
+        );
+        if (!targetMember) {
+          const memberNames = ctx.household.members.map((m) => m.name).join(', ');
+          return ctx.reply(
+            `I couldn't find "${nameArg}" in your household.\n\nMembers: ${memberNames}\n\nTry: /outstanding ${ctx.household.members[0]?.name || 'Name'}`
+          );
+        }
+      } else {
+        // Default to the sender
+        targetMember = ctx.familyUser;
+      }
+
+      const tasks = await db.getTasksForUser(ctx.household.id, targetMember.id);
+      const today = new Date().toISOString().split('T')[0];
+
+      if (!tasks.length) {
+        const who = targetMember.id === ctx.familyUser.id ? "You don't" : `${targetMember.name} doesn't`;
+        return ctx.reply(`✅ ${who} have any outstanding tasks!`);
+      }
+
+      const overdue = tasks.filter((t) => t.due_date < today);
+      const dueToday = tasks.filter((t) => t.due_date === today);
+      const upcoming = tasks.filter((t) => t.due_date > today);
+
+      const who = targetMember.id === ctx.familyUser.id ? 'Your' : `${targetMember.name}'s`;
+      const lines = [`📋 *${who} Outstanding Tasks* (${tasks.length} total)\n`];
+
+      if (overdue.length) {
+        lines.push(`🔴 *Overdue (${overdue.length}):*`);
+        for (const t of overdue) {
+          const daysOverdue = Math.floor((new Date(today) - new Date(t.due_date)) / 86400000);
+          const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
+          lines.push(`  • ${t.title}${rec} — ${daysOverdue}d overdue`);
+        }
+        lines.push('');
+      }
+
+      if (dueToday.length) {
+        lines.push(`🟡 *Due Today (${dueToday.length}):*`);
+        for (const t of dueToday) {
+          const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
+          lines.push(`  • ${t.title}${rec}`);
+        }
+        lines.push('');
+      }
+
+      if (upcoming.length) {
+        lines.push(`⚪ *Upcoming (${upcoming.length}):*`);
+        for (const t of upcoming.slice(0, 8)) {
+          const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
+          const dayName = new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' });
+          lines.push(`  • ${t.title}${rec} — ${dayName} ${t.due_date}`);
+        }
+        if (upcoming.length > 8) lines.push(`  … and ${upcoming.length - 8} more`);
+      }
+
+      return ctx.reply(lines.join('\n').trim(), { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error('/outstanding error:', err);
+      return ctx.reply('Could not fetch outstanding tasks. Please try again.');
+    }
+  });
+
   // ── /done ──────────────────────────────────────────────────────────────────
   bot.command('done', async (ctx) => {
     if (isGroupMessage(ctx) && !isBotAddressed(ctx)) return;
@@ -341,6 +418,7 @@ function createBot(token) {
       `/tasks — Tasks due today and overdue\n` +
       `/tasks all — All pending tasks\n` +
       `/mytasks — Your tasks only (DM)\n` +
+      `/outstanding [name] — What's outstanding for you or someone\n` +
       `/done — What was completed this week\n\n` +
       `*Settings (admin, DM only)*\n` +
       `/settings — Adjust household settings\n\n` +

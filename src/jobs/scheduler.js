@@ -1,7 +1,8 @@
 const cron = require('node-cron');
 const db = require('../db/queries');
 const { sendDailyReminders } = require('./reminders');
-const { sendWeeklyDigest } = require('./digest');
+const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
+const { sendOverdueNudges } = require('./overdue-nudge');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -52,8 +53,30 @@ async function runDailyReminderCheck(bot) {
 }
 
 /**
+ * Run overdue nudge check for every household.
+ * Sends at 14:00 in the household's timezone (6 hours after default reminder).
+ * Called every minute by cron.
+ */
+async function runOverdueNudgeCheck(bot) {
+  try {
+    const households = await db.getAllHouseholds();
+    for (const household of households) {
+      // Nudge at 14:00 in the household's timezone
+      const nowInTZ = currentHHMMInTZ(household.timezone || 'Africa/Johannesburg');
+      if (nowInTZ === '14:00') {
+        console.log(`[scheduler] Sending overdue nudges for "${household.name}" (${household.id})`);
+        await sendOverdueNudges(bot, household.id);
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] Overdue nudge check failed:', err.message);
+  }
+}
+
+/**
  * Run weekly digest for all households.
  * Called once on Sunday at the configured time (default 20:00).
+ * Sends via both Telegram and email.
  */
 async function runWeeklyDigest(bot) {
   console.log('[scheduler] Sending weekly digests to all households');
@@ -61,6 +84,7 @@ async function runWeeklyDigest(bot) {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       await sendWeeklyDigest(bot, household.id);
+      await sendWeeklyDigestEmail(household.id);
     }
   } catch (err) {
     console.error('[scheduler] Weekly digest failed:', err.message);
@@ -77,6 +101,10 @@ function startScheduler(bot) {
   cron.schedule('* * * * *', () => runDailyReminderCheck(bot));
   console.log('✓ Daily reminder scheduler started (checks every minute)');
 
+  // ── Overdue nudges: check every minute (fires at 14:00 per household TZ) ───
+  cron.schedule('* * * * *', () => runOverdueNudgeCheck(bot));
+  console.log('✓ Overdue nudge scheduler started (14:00 per household timezone)');
+
   // ── Weekly digest: Sunday evenings ──────────────────────────────────────────
   const digestDay  = process.env.WEEKLY_DIGEST_DAY  ?? '0';   // 0 = Sunday
   const digestHour = parseInt((process.env.DAILY_REMINDER_HOUR || '20:00').split(':')[0], 10);
@@ -90,8 +118,9 @@ function startScheduler(bot) {
   return {
     // Expose manual triggers for testing / admin use
     triggerDailyReminders: (householdId) => sendDailyReminders(bot, householdId),
+    triggerOverdueNudges:  (householdId) => sendOverdueNudges(bot, householdId),
     triggerWeeklyDigest:   (householdId) => sendWeeklyDigest(bot, householdId),
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runWeeklyDigest, currentHHMMInTZ };
+module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, currentHHMMInTZ };

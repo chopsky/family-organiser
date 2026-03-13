@@ -32,20 +32,22 @@ async function classify(message, memberNames = []) {
     .replace(/{{DATE}}/g, today)
     .replace(/{{MEMBERS}}/g, membersStr);
 
-  const client = getClient();
-  const stream = client.messages.stream({
-    model: MODEL,
-    max_tokens: 2048,
-    thinking: { type: 'adaptive' },
-    system: systemPrompt,
-    messages: [{ role: 'user', content: message }],
+  return withRetry(async () => {
+    const client = getClient();
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: 2048,
+      thinking: { type: 'adaptive' },
+      system: systemPrompt,
+      messages: [{ role: 'user', content: message }],
+    });
+
+    const response = await stream.finalMessage();
+    const textBlock = response.content.find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('No text in classification response');
+
+    return parseJSON(textBlock.text, 'classification');
   });
-
-  const response = await stream.finalMessage();
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No text in classification response');
-
-  return parseJSON(textBlock.text, 'classification');
 }
 
 /**
@@ -65,31 +67,33 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg') {
     ? imageData.toString('base64')
     : imageData;
 
-  const client = getClient();
-  const stream = client.messages.stream({
-    model: MODEL,
-    max_tokens: 2048,
-    thinking: { type: 'adaptive' },
-    system: RECEIPT_EXTRACTION_SYSTEM,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64 },
-          },
-          { type: 'text', text: 'Please extract all items from this receipt.' },
-        ],
-      },
-    ],
+  return withRetry(async () => {
+    const client = getClient();
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: 2048,
+      thinking: { type: 'adaptive' },
+      system: RECEIPT_EXTRACTION_SYSTEM,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64 },
+            },
+            { type: 'text', text: 'Please extract all items from this receipt.' },
+          ],
+        },
+      ],
+    });
+
+    const response = await stream.finalMessage();
+    const textBlock = response.content.find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('No text in receipt extraction response');
+
+    return parseJSON(textBlock.text, 'receipt extraction');
   });
-
-  const response = await stream.finalMessage();
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No text in receipt extraction response');
-
-  return parseJSON(textBlock.text, 'receipt extraction');
 }
 
 /**
@@ -118,20 +122,51 @@ async function matchReceiptToList(receiptItems, shoppingList) {
 
   const userMessage = `RECEIPT ITEMS:\n${receiptStr}\n\nSHOPPING LIST:\n${listStr}`;
 
-  const client = getClient();
-  const stream = client.messages.stream({
-    model: MODEL,
-    max_tokens: 2048,
-    thinking: { type: 'adaptive' },
-    system: RECEIPT_MATCHING_SYSTEM,
-    messages: [{ role: 'user', content: userMessage }],
+  return withRetry(async () => {
+    const client = getClient();
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: 2048,
+      thinking: { type: 'adaptive' },
+      system: RECEIPT_MATCHING_SYSTEM,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const response = await stream.finalMessage();
+    const textBlock = response.content.find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('No text in receipt matching response');
+
+    return parseJSON(textBlock.text, 'receipt matching');
   });
+}
 
-  const response = await stream.finalMessage();
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No text in receipt matching response');
+/**
+ * Retry a function up to `maxRetries` times with a delay between attempts.
+ * Only retries on transient errors (overloaded, rate limit, network).
+ */
+async function withRetry(fn, { maxRetries = 2, delayMs = 2000 } = {}) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isTransient =
+        err.status === 429 ||
+        err.status === 529 ||
+        err.error?.type === 'overloaded_error' ||
+        err.message?.includes('Overloaded') ||
+        err.message?.includes('overloaded') ||
+        err.code === 'ECONNRESET' ||
+        err.code === 'ETIMEDOUT';
 
-  return parseJSON(textBlock.text, 'receipt matching');
+      if (isTransient && attempt < maxRetries) {
+        const wait = delayMs * (attempt + 1); // linear backoff
+        console.warn(`[ai] Transient error (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${wait}ms:`, err.message || err.error?.message);
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /**
