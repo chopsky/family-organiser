@@ -5,16 +5,18 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Security headers
-app.use(helmet());
-
-// CORS — allow the web app origin in production, everything in dev
+// CORS must come before helmet so preflight OPTIONS requests are handled correctly
 const allowedOrigins = process.env.CORS_OPEN === 'true'
   ? true
   : process.env.WEB_URL
     ? [process.env.WEB_URL]
     : true; // allow all in development
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+const corsOptions = { origin: allowedOrigins, credentials: true };
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions)); // explicitly handle preflight for all routes
+
+// Security headers (after CORS so helmet doesn't block preflight)
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Body parsing — 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
 app.use(express.json({ limit: '10mb' }));
