@@ -745,7 +745,6 @@ function createBot(token) {
     }
 
     // Strip bot @mention from group messages before sending to AI
-    const botUsername = ctx.botInfo?.username;
     let text = ctx.message.text;
     if (botUsername) text = text.replace(new RegExp(`@${botUsername}`, 'gi'), '').trim();
     if (!text) return;
