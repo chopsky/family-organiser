@@ -31,7 +31,11 @@ router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async 
   }
 
   try {
-    const extracted = await scanReceipt(req.file.buffer, req.file.mimetype);
+    // Start scanning receipt and fetching shopping list in parallel
+    const [extracted, shoppingList] = await Promise.all([
+      scanReceipt(req.file.buffer, req.file.mimetype),
+      db.getShoppingList(req.householdId),
+    ]);
 
     if (!extracted.items?.length) {
       return res.json({
@@ -43,17 +47,14 @@ router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async 
       });
     }
 
-    const shoppingList = await db.getShoppingList(req.householdId);
     const matchResult = await matchReceiptToList(extracted.items, shoppingList);
 
-    // Complete matched items (confidence ≥ 0.7)
-    const checkedOff = [];
-    for (const match of matchResult.matches || []) {
-      if (match.confidence >= 0.7) {
-        await db.completeShoppingItemById(match.list_item_id);
-        checkedOff.push({ id: match.list_item_id, name: match.list_item_name, confidence: match.confidence });
-      }
-    }
+    // Complete matched items (confidence ≥ 0.7) in parallel
+    const toCheckOff = (matchResult.matches || []).filter((m) => m.confidence >= 0.7);
+    await Promise.all(toCheckOff.map((m) => db.completeShoppingItemById(m.list_item_id)));
+    const checkedOff = toCheckOff.map((m) => ({
+      id: m.list_item_id, name: m.list_item_name, confidence: m.confidence,
+    }));
 
     return res.json({
       extracted,

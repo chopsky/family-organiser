@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
@@ -113,12 +113,7 @@ export default function Receipt() {
             </div>
           )}
 
-          {uploading && (
-            <div className="bg-emerald-50 rounded-xl p-5 text-center">
-              <Spinner />
-              <p className="text-emerald-600 text-sm mt-2">Analysing your receipt with AI…</p>
-            </div>
-          )}
+          {uploading && <ScanProgress />}
         </>
       ) : (
         /* Results */
@@ -134,7 +129,7 @@ export default function Receipt() {
               <ul className="space-y-1">
                 {result.checkedOff.map((item, i) => (
                   <li key={i} className="text-sm text-green-700 flex items-center gap-2">
-                    <span>✓</span> {item.item ?? item}
+                    <span>✓</span> {item.name ?? item}
                   </li>
                 ))}
               </ul>
@@ -175,6 +170,37 @@ export default function Receipt() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+const SCAN_STEPS = [
+  { label: 'Uploading receipt…', delay: 0 },
+  { label: 'Reading items with AI…', delay: 2000 },
+  { label: 'Matching against your shopping list…', delay: 8000 },
+  { label: 'Almost done…', delay: 15000 },
+];
+
+function ScanProgress() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const timers = SCAN_STEPS.slice(1).map((s, i) =>
+      setTimeout(() => setStep(i + 1), s.delay)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div className="bg-emerald-50 rounded-xl p-5 text-center space-y-3">
+      <Spinner />
+      <p className="text-emerald-700 text-sm font-medium">{SCAN_STEPS[step].label}</p>
+      <div className="w-full bg-emerald-100 rounded-full h-1.5">
+        <div
+          className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000"
+          style={{ width: `${((step + 1) / SCAN_STEPS.length) * 100}%` }}
+        />
+      </div>
     </div>
   );
 }
