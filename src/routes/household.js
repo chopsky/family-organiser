@@ -27,14 +27,15 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * PATCH /api/settings
  * Update household settings. Admin only.
  *
- * Body: { name?: string, reminder_time?: string }
+ * Body: { name?: string, reminder_time?: string, timezone?: string }
  */
 router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, reminder_time } = req.body;
+  const { name, reminder_time, timezone } = req.body;
   const updates = {};
 
   if (name !== undefined) updates.name = name.trim();
   if (reminder_time !== undefined) updates.reminder_time = reminder_time;
+  if (timezone !== undefined) updates.timezone = timezone;
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update' });

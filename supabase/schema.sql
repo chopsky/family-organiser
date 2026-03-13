@@ -10,6 +10,7 @@ create table if not exists households (
   name         text not null,
   join_code    text unique not null,
   reminder_time time not null default '08:00:00',
+  timezone     text not null default 'Africa/Johannesburg',
   created_at   timestamp with time zone default now()
 );
 

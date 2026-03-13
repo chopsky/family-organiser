@@ -4,11 +4,30 @@ const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest } = require('./digest');
 
 /**
- * Returns the current local time as "HH:MM" (zero-padded).
+ * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
+ * Falls back to 'Africa/Johannesburg' if the timezone is invalid.
  */
-function currentHHMM() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+function currentHHMMInTZ(timezone) {
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return formatter.format(now);
+  } catch {
+    // Invalid timezone string — fall back
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Johannesburg',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return formatter.format(now);
+  }
 }
 
 /**
@@ -16,13 +35,13 @@ function currentHHMM() {
  * Called every minute by cron.
  */
 async function runDailyReminderCheck(bot) {
-  const now = currentHHMM();
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       // reminder_time comes back as "HH:MM:SS" from Postgres — compare first 5 chars
       const reminderHHMM = (household.reminder_time || '08:00:00').substring(0, 5);
-      if (reminderHHMM === now) {
+      const nowInTZ = currentHHMMInTZ(household.timezone || 'Africa/Johannesburg');
+      if (reminderHHMM === nowInTZ) {
         console.log(`[scheduler] Sending daily reminders for "${household.name}" (${household.id})`);
         await sendDailyReminders(bot, household.id);
       }
@@ -75,4 +94,4 @@ function startScheduler(bot) {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runWeeklyDigest, currentHHMM };
+module.exports = { startScheduler, runDailyReminderCheck, runWeeklyDigest, currentHHMMInTZ };
