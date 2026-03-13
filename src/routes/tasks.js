@@ -100,15 +100,19 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * PATCH /api/tasks/:id
- * Toggle task completion. Generates next recurrence when completing a recurring task.
+ * Update task fields: completion status and/or priority.
  *
- * Body: { completed: boolean }
+ * Body: { completed?: boolean, priority?: 'low'|'medium'|'high' }
  */
 router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
-  const { completed } = req.body;
+  const { completed, priority } = req.body;
 
-  if (typeof completed !== 'boolean') {
-    return res.status(400).json({ error: '"completed" (boolean) is required' });
+  if (typeof completed !== 'boolean' && !priority) {
+    return res.status(400).json({ error: '"completed" (boolean) or "priority" is required' });
+  }
+
+  if (priority && !VALID_PRIORITIES.includes(priority)) {
+    return res.status(400).json({ error: `Invalid priority "${priority}"` });
   }
 
   try {
@@ -122,9 +126,16 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 
     if (fetchErr || !task) return res.status(404).json({ error: 'Task not found' });
 
-    const updateData = completed
-      ? { completed: true,  completed_at: new Date().toISOString() }
-      : { completed: false, completed_at: null };
+    const updateData = {};
+
+    if (typeof completed === 'boolean') {
+      updateData.completed = completed;
+      updateData.completed_at = completed ? new Date().toISOString() : null;
+    }
+
+    if (priority) {
+      updateData.priority = priority;
+    }
 
     const { data: updated, error: updateErr } = await supabase
       .from('tasks')

@@ -4,6 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 
 const PRIORITIES = { high: '🔴', medium: '🟡', low: '🟢' };
+const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
 function daysOverdue(dueDate) {
@@ -21,6 +22,7 @@ export default function Tasks() {
   const [showAll, setShowAll]   = useState(false);
   const [toggling, setToggling] = useState(new Set());
   const [restoring, setRestoring] = useState(new Set());
+  const [updating, setUpdating] = useState(new Set());
 
   // Add form
   const [title, setTitle]         = useState('');
@@ -99,6 +101,19 @@ export default function Tasks() {
       setError('Could not restore task.');
     } finally {
       setRestoring((s) => { const n = new Set(s); n.delete(task.id); return n; });
+    }
+  }
+
+  async function cyclePriority(task) {
+    const next = PRIORITY_CYCLE[task.priority] || 'medium';
+    setUpdating((s) => new Set([...s, task.id]));
+    try {
+      await api.patch(`/tasks/${task.id}`, { priority: next });
+      await load();
+    } catch {
+      setError('Could not update priority.');
+    } finally {
+      setUpdating((s) => { const n = new Set(s); n.delete(task.id); return n; });
     }
   }
 
@@ -231,7 +246,15 @@ export default function Tasks() {
                 </button>
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                    {PRIORITIES[task.priority]} {task.title}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); cyclePriority(task); }}
+                      disabled={updating.has(task.id) || task.completed}
+                      className="inline-flex items-center mr-1 hover:scale-125 transition-transform disabled:hover:scale-100"
+                      title={`Priority: ${task.priority} (tap to change)`}
+                    >
+                      {updating.has(task.id) ? '⏳' : PRIORITIES[task.priority]}
+                    </button>
+                    {task.title}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                     {task.assigned_to_name && (

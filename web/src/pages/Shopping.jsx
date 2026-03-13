@@ -24,6 +24,7 @@ export default function Shopping() {
   const [adding, setAdding]         = useState(false);
   const [toggling, setToggling]     = useState(new Set());
   const [restoring, setRestoring]   = useState(new Set());
+  const [deleting, setDeleting]     = useState(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -78,6 +79,19 @@ export default function Shopping() {
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     return `${hrs}h ago`;
+  }
+
+  async function confirmDelete(item) {
+    if (!window.confirm(`Delete "${item.item}"? This can't be undone.`)) return;
+    setDeleting((s) => new Set([...s, item.id]));
+    try {
+      await api.delete(`/shopping/${item.id}`);
+      await load();
+    } catch {
+      setError('Could not delete item.');
+    } finally {
+      setDeleting((s) => { const n = new Set(s); n.delete(item.id); return n; });
+    }
   }
 
   async function toggle(item) {
@@ -204,13 +218,27 @@ export default function Shopping() {
                         <span className="text-xs text-gray-400">{timeAgo(item.completed_at)}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => restore(item)}
-                      disabled={restoring.has(item.id)}
-                      className="shrink-0 text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      {restoring.has(item.id) ? '…' : 'Restore'}
-                    </button>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => restore(item)}
+                        disabled={restoring.has(item.id)}
+                        className="text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        {restoring.has(item.id) ? '…' : 'Restore'}
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(item)}
+                        disabled={deleting.has(item.id)}
+                        className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                        title="Delete permanently"
+                      >
+                        {deleting.has(item.id) ? '…' : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

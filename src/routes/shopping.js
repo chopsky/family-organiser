@@ -112,4 +112,18 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/shopping/:id
+ * Permanently delete a shopping item.
+ */
+router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    await db.deleteShoppingItem(req.params.id, req.householdId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/shopping/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

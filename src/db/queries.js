@@ -512,6 +512,15 @@ async function uncompleteShoppingItem(itemId, householdId) {
   return data;
 }
 
+async function deleteShoppingItem(itemId, householdId) {
+  const { error } = await supabase
+    .from('shopping_items')
+    .delete()
+    .eq('id', itemId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
 async function getOverdueTasksForUser(householdId, userId) {
   const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase
@@ -584,4 +593,5 @@ module.exports = {
   getRecentlyCompletedShopping,
   uncompleteTask,
   uncompleteShoppingItem,
+  deleteShoppingItem,
 };
