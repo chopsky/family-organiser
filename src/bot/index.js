@@ -403,10 +403,13 @@ function createBot(token) {
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
-      console.error('Voice handler error:', err);
-      const msg = err.message?.includes('OPENAI_API_KEY')
-        ? '⚠️ Voice transcription is not configured yet.'
-        : '❌ Sorry, I had trouble with that voice note. Please try typing your message.';
+      console.error('Voice handler error:', err.message, err.stack);
+      let msg;
+      if (err.message?.includes('OPENAI_API_KEY')) {
+        msg = '⚠️ Voice transcription is not configured yet.';
+      } else {
+        msg = `❌ Voice note error: ${err.message?.substring(0, 150) || 'Unknown error'}`;
+      }
       await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null, msg);
     }
   });
