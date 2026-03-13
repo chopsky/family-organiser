@@ -6,11 +6,9 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 
 // CORS must come before helmet so preflight OPTIONS requests are handled correctly
-const allowedOrigins = process.env.CORS_OPEN === 'true'
-  ? true
-  : process.env.WEB_URL
-    ? [process.env.WEB_URL]
-    : true; // allow all in development
+const allowedOrigins = process.env.WEB_URL
+  ? [process.env.WEB_URL]
+  : true; // allow all in development
 const corsOptions = { origin: allowedOrigins, credentials: true };
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions)); // explicitly handle preflight for all routes
