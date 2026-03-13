@@ -45,6 +45,21 @@ async function start() {
 
       startScheduler(bot);
     }
+
+    // Add 404 and error handlers AFTER webhook route so they don't intercept it
+    app.use((req, res) => {
+      res.status(404).json({ error: 'Not found' });
+    });
+    app.use((err, req, res, next) => {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum size is 10 MB.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: 'Unexpected file field.' });
+      }
+      console.error(err.stack);
+      res.status(500).json({ error: 'Internal server error' });
+    });
   } catch (err) {
     console.error('Failed to start server:', err.message);
     process.exit(1);

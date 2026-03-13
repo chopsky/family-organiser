@@ -54,20 +54,6 @@ app.use('/api/digest',   require('./routes/digest'));
 // but also available as PATCH /api/settings for convenience:
 app.use('/api/settings', require('./routes/household'));
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-
-// Multer file-size errors
-app.use((err, req, res, next) => {
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ error: 'File too large. Maximum size is 10 MB.' });
-  }
-  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return res.status(400).json({ error: 'Unexpected file field.' });
-  }
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// 404 and error handlers are added in server.js AFTER the webhook route is registered
 
 module.exports = app;
