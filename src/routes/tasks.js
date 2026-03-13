@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { supabase } = require('../db/client');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
@@ -15,7 +15,7 @@ const VALID_PRIORITIES   = ['low', 'medium', 'high'];
  *   assignee=<userId>     → tasks for this user + everyone tasks
  *   completed=true        → include completed tasks
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     let tasks;
 
@@ -54,7 +54,7 @@ router.get('/', requireAuth, async (req, res) => {
  * Body: { tasks: [{ title, assigned_to_name?, due_date?, recurrence?, priority? }] }
  *    or: { title, ... } (single task shorthand)
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireHousehold, async (req, res) => {
   let tasksInput = req.body.tasks;
   if (!tasksInput && req.body.title) {
     tasksInput = [req.body];
@@ -90,7 +90,7 @@ router.post('/', requireAuth, async (req, res) => {
  *
  * Body: { completed: boolean }
  */
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   const { completed } = req.body;
 
   if (typeof completed !== 'boolean') {

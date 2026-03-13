@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { classify } = require('../services/ai');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
@@ -12,7 +12,7 @@ const router = Router();
  * Body: { text: string }
  * Returns: { result, saved: { shopping, tasks } }
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireHousehold, async (req, res) => {
   const { text } = req.body;
   if (!text?.trim()) {
     return res.status(400).json({ error: '"text" is required' });

@@ -20,22 +20,24 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json({ limit: '10mb' }));
 
 // Global rate limiter: 100 requests per 15 minutes per IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Please slow down.' },
-});
-app.use('/api', limiter);
+if (process.env.NODE_ENV !== 'test') {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please slow down.' },
+  });
+  app.use('/api', limiter);
 
-// Stricter limiter for auth endpoint (prevent brute-force on join codes)
-const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20,
-  message: { error: 'Too many join attempts. Please try again in an hour.' },
-});
-app.use('/api/auth', authLimiter);
+  // Stricter limiter for auth endpoint (prevent brute-force on join codes)
+  const authLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 20,
+    message: { error: 'Too many join attempts. Please try again in an hour.' },
+  });
+  app.use('/api/auth', authLimiter);
+}
 
 // Health check
 app.get('/health', (req, res) => {

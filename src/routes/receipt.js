@@ -2,7 +2,7 @@ const { Router } = require('express');
 const multer = require('multer');
 const db = require('../db/queries');
 const { scanReceipt, matchReceiptToList } = require('../services/ai');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
@@ -25,7 +25,7 @@ const upload = multer({
  *
  * Returns: { extracted, matches, checkedOff, unmatched }
  */
-router.post('/', requireAuth, upload.single('receipt'), async (req, res) => {
+router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image uploaded. Use field name "receipt".' });
   }

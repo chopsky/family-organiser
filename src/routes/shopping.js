@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
@@ -10,7 +10,7 @@ const VALID_CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets'
  * GET /api/shopping
  * Query params: category, completed (boolean string)
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const includeCompleted = req.query.completed === 'true';
     let items = await db.getShoppingList(req.householdId, { includeCompleted });
@@ -33,7 +33,7 @@ router.get('/', requireAuth, async (req, res) => {
  * Body: { items: [{ item, category?, quantity? }] }
  *    or: { item, category?, quantity? }   (single item shorthand)
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireHousehold, async (req, res) => {
   let itemsInput = req.body.items;
   if (!itemsInput && req.body.item) {
     // single-item shorthand
@@ -66,7 +66,7 @@ router.post('/', requireAuth, async (req, res) => {
  *
  * Body: { completed: boolean }
  */
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   const { completed } = req.body;
 
   if (typeof completed !== 'boolean') {

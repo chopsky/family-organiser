@@ -14,6 +14,15 @@ jest.mock('../db/client', () => ({
   },
 }));
 jest.mock('../services/ai');
+jest.mock('../services/email', () => ({
+  sendVerificationEmail: jest.fn().mockResolvedValue(),
+  sendInviteEmail: jest.fn().mockResolvedValue(),
+  sendPasswordResetEmail: jest.fn().mockResolvedValue(),
+}));
+jest.mock('bcrypt', () => ({
+  hash: jest.fn().mockResolvedValue('$2b$12$hashedpassword'),
+  compare: jest.fn().mockResolvedValue(true),
+}));
 
 const request = require('supertest');
 const app = require('../app');
@@ -330,5 +339,356 @@ describe('DELETE /api/household/members/:userId', () => {
     db.getHouseholdMembers.mockResolvedValue(MEMBERS);
     const res = await request(app).delete('/api/household/members/u-999').set(AUTH);
     expect(res.status).toBe(404);
+  });
+});
+
+// ─── POST /api/auth/register ──────────────────────────────────────────────
+
+describe('POST /api/auth/register', () => {
+  const bcrypt = require('bcrypt');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('registers new user and returns verification message', async () => {
+    db.getUserByEmail.mockResolvedValue(null);
+    db.createUserWithEmail.mockResolvedValue({ id: 'u-new', name: 'Alice', role: 'member', household_id: null });
+    db.createEmailVerificationToken.mockResolvedValue();
+
+    const res = await request(app).post('/api/auth/register')
+      .send({ email: 'alice@test.com', password: 'password123', name: 'Alice' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.message).toContain('Check your email');
+    expect(db.createUserWithEmail).toHaveBeenCalled();
+  });
+
+  test('returns 409 for duplicate email', async () => {
+    db.getUserByEmail.mockResolvedValue({ id: 'u-existing', email: 'alice@test.com' });
+
+    const res = await request(app).post('/api/auth/register')
+      .send({ email: 'alice@test.com', password: 'password123', name: 'Alice' });
+
+    expect(res.status).toBe(409);
+  });
+
+  test('returns 400 when fields are missing', async () => {
+    const res = await request(app).post('/api/auth/register').send({ email: 'a@b.com' });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 for short password', async () => {
+    const res = await request(app).post('/api/auth/register')
+      .send({ email: 'a@b.com', password: 'short', name: 'Bob' });
+    expect(res.status).toBe(400);
+  });
+
+  test('auto-joins household with valid invite token', async () => {
+    db.getUserByEmail.mockResolvedValue(null);
+    db.getInviteByToken.mockResolvedValue({ id: 'inv-1', household_id: 'hh-1' });
+    db.createUserWithEmail.mockResolvedValue({ id: 'u-new', name: 'Bob', role: 'member', household_id: 'hh-1' });
+    db.markInviteAccepted.mockResolvedValue();
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+
+    const res = await request(app).post('/api/auth/register')
+      .send({ email: 'bob@test.com', password: 'password123', name: 'Bob', inviteToken: 'valid-token' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.token).toBeTruthy();
+    expect(res.body.household.name).toBe('The Smiths');
+    expect(db.markInviteAccepted).toHaveBeenCalledWith('inv-1');
+  });
+
+  test('returns 400 for invalid invite token', async () => {
+    db.getUserByEmail.mockResolvedValue(null);
+    db.getInviteByToken.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/auth/register')
+      .send({ email: 'bob@test.com', password: 'password123', name: 'Bob', inviteToken: 'bad-token' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── POST /api/auth/login ────────────────────────────────────────────────
+
+describe('POST /api/auth/login', () => {
+  const bcrypt = require('bcrypt');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns JWT for valid credentials', async () => {
+    db.getUserByEmail.mockResolvedValue({
+      id: 'u-1', name: 'Sarah', role: 'admin', household_id: 'hh-1',
+      password_hash: '$2b$12$hash', email_verified: true,
+    });
+    bcrypt.compare.mockResolvedValue(true);
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+
+    const res = await request(app).post('/api/auth/login')
+      .send({ email: 'sarah@test.com', password: 'password123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeTruthy();
+    expect(res.body.user.name).toBe('Sarah');
+  });
+
+  test('returns 401 for wrong password', async () => {
+    db.getUserByEmail.mockResolvedValue({
+      id: 'u-1', name: 'Sarah', password_hash: '$2b$12$hash', email_verified: true,
+    });
+    bcrypt.compare.mockResolvedValue(false);
+
+    const res = await request(app).post('/api/auth/login')
+      .send({ email: 'sarah@test.com', password: 'wrongpassword' });
+
+    expect(res.status).toBe(401);
+  });
+
+  test('returns 401 for unknown email', async () => {
+    db.getUserByEmail.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/auth/login')
+      .send({ email: 'unknown@test.com', password: 'password123' });
+
+    expect(res.status).toBe(401);
+  });
+
+  test('returns 403 for unverified email', async () => {
+    db.getUserByEmail.mockResolvedValue({
+      id: 'u-1', name: 'Sarah', password_hash: '$2b$12$hash', email_verified: false,
+    });
+    bcrypt.compare.mockResolvedValue(true);
+
+    const res = await request(app).post('/api/auth/login')
+      .send({ email: 'sarah@test.com', password: 'password123' });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('returns 400 when fields are missing', async () => {
+    const res = await request(app).post('/api/auth/login').send({ email: 'a@b.com' });
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/auth/verify-email ──────────────────────────────────────────
+
+describe('GET /api/auth/verify-email', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('redirects to login with verified=true for valid token', async () => {
+    db.getEmailVerificationToken.mockResolvedValue({ id: 'evt-1', user_id: 'u-1' });
+    db.markEmailVerificationTokenUsed.mockResolvedValue();
+    db.updateUser.mockResolvedValue();
+
+    const res = await request(app).get('/api/auth/verify-email?token=valid-token');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('verified=true');
+  });
+
+  test('redirects with error for invalid token', async () => {
+    db.getEmailVerificationToken.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/auth/verify-email?token=bad-token');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('error=invalid-token');
+  });
+
+  test('redirects with error when token is missing', async () => {
+    const res = await request(app).get('/api/auth/verify-email');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('error=missing-token');
+  });
+});
+
+// ─── POST /api/auth/create-household ─────────────────────────────────────
+
+describe('POST /api/auth/create-household', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('creates household and makes user admin', async () => {
+    const noHouseholdToken = signToken({ userId: 'u-3', householdId: null, name: 'New User', role: 'member' });
+    db.createHousehold.mockResolvedValue({ id: 'hh-new', name: 'New Fam' });
+    db.updateUser.mockResolvedValue({ id: 'u-3', name: 'New User', role: 'admin', household_id: 'hh-new' });
+    db.getHouseholdById.mockResolvedValue({ id: 'hh-new', name: 'New Fam', join_code: 'XYZ789', reminder_time: '08:00:00' });
+
+    const res = await request(app).post('/api/auth/create-household')
+      .set({ Authorization: `Bearer ${noHouseholdToken}` })
+      .send({ name: 'New Fam' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.token).toBeTruthy();
+    expect(res.body.household.name).toBe('New Fam');
+  });
+
+  test('returns 400 if user already has a household', async () => {
+    const res = await request(app).post('/api/auth/create-household')
+      .set(AUTH).send({ name: 'Another' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('already belong');
+  });
+
+  test('returns 400 when name is missing', async () => {
+    const noHouseholdToken = signToken({ userId: 'u-3', householdId: null, name: 'New User', role: 'member' });
+    const res = await request(app).post('/api/auth/create-household')
+      .set({ Authorization: `Bearer ${noHouseholdToken}` })
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 401 without auth', async () => {
+    const res = await request(app).post('/api/auth/create-household').send({ name: 'Test' });
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── POST /api/auth/forgot-password ──────────────────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('always returns 200 regardless of email existence', async () => {
+    db.getUserByEmail.mockResolvedValue(null);
+    const res = await request(app).post('/api/auth/forgot-password')
+      .send({ email: 'nonexistent@test.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('reset link');
+  });
+
+  test('sends reset email for existing user', async () => {
+    const emailService = require('../services/email');
+    db.getUserByEmail.mockResolvedValue({ id: 'u-1', email: 'sarah@test.com', name: 'Sarah' });
+    db.createPasswordResetToken.mockResolvedValue();
+
+    const res = await request(app).post('/api/auth/forgot-password')
+      .send({ email: 'sarah@test.com' });
+
+    expect(res.status).toBe(200);
+    expect(emailService.sendPasswordResetEmail).toHaveBeenCalled();
+  });
+
+  test('returns 200 even with empty email', async () => {
+    const res = await request(app).post('/api/auth/forgot-password').send({});
+    expect(res.status).toBe(200);
+  });
+});
+
+// ─── POST /api/auth/reset-password ───────────────────────────────────────
+
+describe('POST /api/auth/reset-password', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('resets password with valid token', async () => {
+    db.getPasswordResetToken.mockResolvedValue({ id: 'prt-1', user_id: 'u-1' });
+    db.updateUser.mockResolvedValue();
+    db.markPasswordResetTokenUsed.mockResolvedValue();
+
+    const res = await request(app).post('/api/auth/reset-password')
+      .send({ token: 'valid-token', password: 'newpassword123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('Password updated');
+  });
+
+  test('returns 400 for invalid token', async () => {
+    db.getPasswordResetToken.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/auth/reset-password')
+      .send({ token: 'bad-token', password: 'newpassword123' });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 for short password', async () => {
+    const res = await request(app).post('/api/auth/reset-password')
+      .send({ token: 'valid-token', password: 'short' });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 when fields are missing', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({});
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── POST /api/auth/telegram-link-token ──────────────────────────────────
+
+describe('POST /api/auth/telegram-link-token', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns deep link for authenticated user', async () => {
+    db.createTelegramLinkToken.mockResolvedValue();
+
+    const res = await request(app).post('/api/auth/telegram-link-token').set(AUTH);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deepLink).toContain('https://t.me/');
+    expect(res.body.token).toBeTruthy();
+  });
+
+  test('returns 401 without auth', async () => {
+    const res = await request(app).post('/api/auth/telegram-link-token');
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── POST /api/household/invite ──────────────────────────────────────────
+
+describe('POST /api/household/invite', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('admin can send invite', async () => {
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.createInvite.mockResolvedValue();
+
+    const res = await request(app).post('/api/household/invite').set(AUTH)
+      .send({ email: 'newmember@test.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Invite sent.');
+    expect(db.createInvite).toHaveBeenCalled();
+  });
+
+  test('non-admin gets 403', async () => {
+    const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
+    const res = await request(app).post('/api/household/invite')
+      .set({ Authorization: `Bearer ${memberToken}` })
+      .send({ email: 'someone@test.com' });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('returns 400 when email is missing', async () => {
+    const res = await request(app).post('/api/household/invite').set(AUTH).send({});
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/household/invites ──────────────────────────────────────────
+
+describe('GET /api/household/invites', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('admin can list pending invites', async () => {
+    db.getPendingInvites.mockResolvedValue([
+      { id: 'inv-1', email: 'pending@test.com', expires_at: '2026-03-20T00:00:00Z' },
+    ]);
+
+    const res = await request(app).get('/api/household/invites').set(AUTH);
+
+    expect(res.status).toBe(200);
+    expect(res.body.invites).toHaveLength(1);
+  });
+
+  test('non-admin gets 403', async () => {
+    const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
+    const res = await request(app).get('/api/household/invites')
+      .set({ Authorization: `Bearer ${memberToken}` });
+
+    expect(res.status).toBe(403);
   });
 });

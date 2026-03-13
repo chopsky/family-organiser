@@ -38,4 +38,15 @@ function requireAdmin(req, res, next) {
   return next();
 }
 
-module.exports = { signToken, requireAuth, requireAdmin };
+/**
+ * Middleware: requires the user to belong to a household.
+ * Must be chained after requireAuth. Blocks users who signed up but haven't joined/created a household yet.
+ */
+function requireHousehold(req, res, next) {
+  if (!req.householdId) {
+    return res.status(403).json({ error: 'You must join or create a household first.' });
+  }
+  return next();
+}
+
+module.exports = { signToken, requireAuth, requireAdmin, requireHousehold };

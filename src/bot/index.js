@@ -113,6 +113,28 @@ function createBot(token) {
   // ── /start ──────────────────────────────────────────────────────────────────
   bot.command('start', async (ctx) => {
     if (isGroupMessage(ctx)) return; // /start is DM only
+
+    // Handle deep link for account linking: /start link_<token>
+    const startParam = ctx.message.text.replace(/^\/start\s*/i, '').trim();
+    if (startParam.startsWith('link_')) {
+      const linkToken = startParam.replace('link_', '');
+      try {
+        const tokenRecord = await db.getTelegramLinkToken(linkToken);
+        if (!tokenRecord) {
+          return ctx.reply('This link has expired or is invalid. Please generate a new one from the Curata app Settings page.');
+        }
+        await db.updateUser(tokenRecord.user_id, {
+          telegram_chat_id: String(ctx.from.id),
+          telegram_username: ctx.from.username || null,
+        });
+        await db.markTelegramLinkTokenUsed(tokenRecord.id);
+        return ctx.reply('✅ Your Telegram account has been linked to Curata! You can now use the bot to manage your household.');
+      } catch (err) {
+        console.error('/start link error:', err);
+        return ctx.reply('Something went wrong linking your account. Please try again from the app.');
+      }
+    }
+
     if (ctx.familyUser) {
       return ctx.reply(
         `Welcome back, ${ctx.familyUser.name}! 👋\n\nYour household is set up and ready.\n\n` +
@@ -120,11 +142,12 @@ function createBot(token) {
       );
     }
     return ctx.reply(
-      `👋 *Welcome to Family Organiser!*\n\n` +
+      `👋 *Welcome to Curata!*\n\n` +
       `I help your whole household manage shopping lists and tasks through chat.\n\n` +
       `To get started:\n` +
-      `• *Create a new household:* /create YourFamilyName\n` +
-      `• *Join an existing household:* /join XXXXXX\n\n` +
+      `• *Sign up at the Curata app* and link your Telegram from Settings\n` +
+      `• *Or create a household here:* /create YourFamilyName\n` +
+      `• *Or join one:* /join XXXXXX\n\n` +
       `Once set up, just message me naturally — _"We need milk and remind Jake to do homework by Friday"_ — and I'll sort it out.`,
       { parse_mode: 'Markdown' }
     );

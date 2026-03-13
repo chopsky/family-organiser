@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
@@ -10,7 +10,7 @@ const router = Router();
  *
  * Returns: { completed, outstanding, upcoming, household, members }
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const [
       { tasks: completedTasks, shoppingItems: completedShopping },

@@ -98,6 +98,133 @@ async function findUserByName(householdId, name) {
   return data || null;
 }
 
+async function getUserByEmail(email) {
+  const { data, error } = await supabase
+    .from('users')
+    .select()
+    .ilike('email', email)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member' }) {
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      email,
+      password_hash: passwordHash,
+      name,
+      household_id: householdId,
+      email_verified: emailVerified,
+      role,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateUser(userId, fields) {
+  const { data, error } = await supabase
+    .from('users')
+    .update(fields)
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── Token helpers (verification, reset, telegram link) ─────────────────────
+
+async function createToken(table, { userId, token, expiresAt }) {
+  const { data, error } = await supabase
+    .from(table)
+    .insert({ user_id: userId, token, expires_at: expiresAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getValidToken(table, token) {
+  const { data, error } = await supabase
+    .from(table)
+    .select()
+    .eq('token', token)
+    .eq('used', false)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function markTokenUsed(table, tokenId) {
+  const { error } = await supabase
+    .from(table)
+    .update({ used: true })
+    .eq('id', tokenId);
+  if (error) throw error;
+}
+
+// Convenience wrappers
+const createEmailVerificationToken = (userId, token, expiresAt) => createToken('email_verification_tokens', { userId, token, expiresAt });
+const getEmailVerificationToken = (token) => getValidToken('email_verification_tokens', token);
+const markEmailVerificationTokenUsed = (id) => markTokenUsed('email_verification_tokens', id);
+
+const createPasswordResetToken = (userId, token, expiresAt) => createToken('password_reset_tokens', { userId, token, expiresAt });
+const getPasswordResetToken = (token) => getValidToken('password_reset_tokens', token);
+const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens', id);
+
+const createTelegramLinkToken = (userId, token, expiresAt) => createToken('telegram_link_tokens', { userId, token, expiresAt });
+const getTelegramLinkToken = (token) => getValidToken('telegram_link_tokens', token);
+const markTelegramLinkTokenUsed = (id) => markTokenUsed('telegram_link_tokens', id);
+
+// ─── Invites ────────────────────────────────────────────────────────────────
+
+async function createInvite({ householdId, email, token, invitedBy, expiresAt }) {
+  const { data, error } = await supabase
+    .from('invites')
+    .insert({ household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getInviteByToken(token) {
+  const { data, error } = await supabase
+    .from('invites')
+    .select()
+    .eq('token', token)
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function markInviteAccepted(inviteId) {
+  const { error } = await supabase
+    .from('invites')
+    .update({ accepted_at: new Date().toISOString() })
+    .eq('id', inviteId);
+  if (error) throw error;
+}
+
+async function getPendingInvites(householdId) {
+  const { data, error } = await supabase
+    .from('invites')
+    .select()
+    .eq('household_id', householdId)
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 async function deleteUser(userId, householdId) {
   const { error } = await supabase
     .from('users')
@@ -344,7 +471,23 @@ module.exports = {
   getUserByTelegramId,
   getHouseholdMembers,
   findUserByName,
+  getUserByEmail,
+  createUserWithEmail,
+  updateUser,
   deleteUser,
+  createEmailVerificationToken,
+  getEmailVerificationToken,
+  markEmailVerificationTokenUsed,
+  createPasswordResetToken,
+  getPasswordResetToken,
+  markPasswordResetTokenUsed,
+  createTelegramLinkToken,
+  getTelegramLinkToken,
+  markTelegramLinkTokenUsed,
+  createInvite,
+  getInviteByToken,
+  markInviteAccepted,
+  getPendingInvites,
   addShoppingItems,
   getShoppingList,
   completeShoppingItemsByName,
