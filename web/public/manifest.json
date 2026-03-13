@@ -9,9 +9,9 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/Curata-Logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/Curata-Symbol-white.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

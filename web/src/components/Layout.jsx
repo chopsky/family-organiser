@@ -24,7 +24,7 @@ export default function Layout({ children }) {
       <header className="bg-emerald-600 text-white shadow">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/Curata-Logo.svg" alt="Curata" className="h-7 invert" />
+            <img src="/Curata-Symbol-white.png" alt="Curata" className="h-7" />
             <span className="font-bold text-lg">{household?.name ?? 'Curata'}</span>
             {user && <span className="ml-2 text-emerald-200 text-sm">· {user.name}</span>}
           </div>

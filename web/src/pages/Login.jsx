@@ -41,7 +41,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo / hero */}
         <div className="text-center mb-8">
-          <img src="/Curata-Logo.svg" alt="Curata" className="h-16 mx-auto mb-4" />
+          <img src="/Curata-Symbol-white.png" alt="Curata" className="h-16 mx-auto mb-4 bg-emerald-600 rounded-2xl p-2" />
           <h1 className="text-3xl font-bold text-gray-900">Curata</h1>
           <p className="text-gray-500 mt-2">Shopping lists, tasks & reminders — together.</p>
         </div>
