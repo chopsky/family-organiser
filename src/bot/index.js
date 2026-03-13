@@ -108,6 +108,21 @@ function isBotAddressed(ctx) {
 function createBot(token) {
   const bot = new Telegraf(token);
 
+  // Normalise "@botname /command" → "/command@botname" so Telegraf's
+  // command middleware can match it in group chats.
+  bot.use((ctx, next) => {
+    const text = ctx.message?.text;
+    if (text && ctx.botInfo?.username) {
+      const mention = `@${ctx.botInfo.username}`;
+      const pattern = new RegExp(`^${mention}\\s+/([a-z_]+)(.*)$`, 'i');
+      const match = text.match(pattern);
+      if (match) {
+        ctx.message.text = `/${match[1]}${mention}${match[2]}`;
+      }
+    }
+    return next();
+  });
+
   bot.use(loadUserContext);
 
   // ── /start ──────────────────────────────────────────────────────────────────
