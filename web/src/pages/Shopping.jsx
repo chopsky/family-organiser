@@ -183,11 +183,11 @@ export default function Shopping() {
             </>
           )}
 
-          {/* Recently Completed (last 24h) */}
+          {/* Previously Purchased (last 24h) */}
           {recentDone.length > 0 && (
             <div className="mt-6">
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                Recently completed
+                Previously purchased
               </h2>
               <ul className="space-y-2">
                 {recentDone.map((item) => (
@@ -196,7 +196,7 @@ export default function Shopping() {
                       ✓
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-500 line-through">{item.item}</p>
+                      <p className="text-sm text-gray-600">{item.item}</p>
                       <div className="flex gap-x-3 mt-0.5">
                         <span className="text-xs text-gray-400">
                           {CATEGORY_EMOJI[item.category]} {item.category}
