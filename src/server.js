@@ -1,5 +1,16 @@
 require('dotenv').config();
 
+// Temporary debug: log which env vars are set (not their values)
+console.log('ENV CHECK:', {
+  SUPABASE_URL: !!process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+  SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+  TELEGRAM_TOKEN: !!process.env.TELEGRAM_TOKEN,
+  JWT_SECRET: !!process.env.JWT_SECRET,
+  ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+  PORT: process.env.PORT,
+});
+
 const app = require('./app');
 const { testConnection } = require('./db/client');
 const { createBot } = require('./bot');
