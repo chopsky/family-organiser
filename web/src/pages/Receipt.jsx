@@ -162,7 +162,7 @@ export default function Receipt() {
             </h2>
             <ul className="space-y-1">
               {(result.extracted?.items ?? []).map((item, i) => (
-                <li key={i} className="text-sm text-gray-600">• {item.name ?? item}</li>
+                <li key={i} className="text-sm text-gray-600">• {item.normalised_name ?? item.name ?? String(item)}{item.price ? ` — ${item.price}` : ''}</li>
               ))}
             </ul>
           </div>
