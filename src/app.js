@@ -9,9 +9,11 @@ const app = express();
 app.use(helmet());
 
 // CORS — allow the web app origin in production, everything in dev
-const allowedOrigins = process.env.WEB_URL
-  ? [process.env.WEB_URL]
-  : true; // allow all in development
+const allowedOrigins = process.env.CORS_OPEN === 'true'
+  ? true
+  : process.env.WEB_URL
+    ? [process.env.WEB_URL]
+    : true; // allow all in development
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 // Body parsing — 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
