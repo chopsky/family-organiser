@@ -158,10 +158,10 @@ export default function Receipt() {
           {/* All extracted items */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
             <h2 className="font-semibold text-gray-700 mb-3">
-              🧾 Extracted from receipt ({result.extracted?.length ?? 0})
+              🧾 Extracted from receipt ({result.extracted?.items?.length ?? 0})
             </h2>
             <ul className="space-y-1">
-              {(result.extracted ?? []).map((item, i) => (
+              {(result.extracted?.items ?? []).map((item, i) => (
                 <li key={i} className="text-sm text-gray-600">• {item.name ?? item}</li>
               ))}
             </ul>
