@@ -68,7 +68,7 @@ export default function Receipt() {
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => inputRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 hover:border-emerald-400 rounded-xl p-8 text-center cursor-pointer transition-colors bg-white"
+            className="border-2 border-dashed border-gray-300 hover:border-orange-400 rounded-xl p-8 text-center cursor-pointer transition-colors bg-white"
           >
             {preview ? (
               <img
@@ -106,7 +106,7 @@ export default function Receipt() {
               <button
                 onClick={handleUpload}
                 disabled={uploading}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white rounded-lg py-3 font-medium transition-colors"
+                className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg py-3 font-medium transition-colors"
               >
                 {uploading ? 'Scanning…' : '🔍 Scan receipt'}
               </button>
@@ -164,7 +164,7 @@ export default function Receipt() {
 
           <button
             onClick={reset}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-3 font-medium transition-colors"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-3 font-medium transition-colors"
           >
             Scan another receipt
           </button>
@@ -192,12 +192,12 @@ function ScanProgress() {
   }, []);
 
   return (
-    <div className="bg-emerald-50 rounded-xl p-5 text-center space-y-3">
+    <div className="bg-orange-50 rounded-xl p-5 text-center space-y-3">
       <Spinner />
-      <p className="text-emerald-700 text-sm font-medium">{SCAN_STEPS[step].label}</p>
-      <div className="w-full bg-emerald-100 rounded-full h-1.5">
+      <p className="text-orange-600 text-sm font-medium">{SCAN_STEPS[step].label}</p>
+      <div className="w-full bg-orange-100 rounded-full h-1.5">
         <div
-          className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000"
+          className="bg-orange-400 h-1.5 rounded-full transition-all duration-1000"
           style={{ width: `${((step + 1) / SCAN_STEPS.length) * 100}%` }}
         />
       </div>

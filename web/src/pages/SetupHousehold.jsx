@@ -28,10 +28,10 @@ export default function SetupHousehold() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/Curata-Symbol-white.png" alt="Curata" className="h-16 mx-auto mb-4 bg-emerald-600 rounded-2xl p-2" />
+          <img src="/Curata-favicon.png" alt="Curata" className="h-16 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-2xl font-bold text-gray-900">Welcome to Curata!</h1>
           <p className="text-gray-500 mt-2">Create your household to get started.</p>
         </div>
@@ -50,13 +50,13 @@ export default function SetupHousehold() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. The Shapiros"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               autoFocus
             />
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-lg transition-colors"
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-lg transition-colors"
             >
               {loading ? 'Creating...' : 'Create household'}
             </button>

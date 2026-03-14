@@ -19,20 +19,20 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-amber-50/40 flex flex-col">
       {/* Top bar */}
-      <header className="bg-emerald-600 text-white shadow">
+      <header className="bg-orange-500 text-white shadow">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <img src="/Curata-Symbol-white.png" alt="Curata" className="h-7" />
+              <img src="/Curata-favicon.png" alt="Curata" className="h-7" />
               <span className="font-bold text-lg">{household?.name ?? 'Curata'}</span>
             </Link>
-            {user && <span className="ml-2 text-emerald-200 text-sm">· {user.name}</span>}
+            {user && <span className="ml-2 text-orange-200 text-sm">· {user.name}</span>}
           </div>
           <button
             onClick={handleLogout}
-            className="text-emerald-200 hover:text-white text-sm transition-colors"
+            className="text-orange-200 hover:text-white text-sm transition-colors"
           >
             Sign out
           </button>
@@ -53,7 +53,7 @@ export default function Layout({ children }) {
               to={to}
               className={({ isActive }) =>
                 `flex-1 text-center py-3 text-xs font-medium transition-colors ${
-                  isActive ? 'text-emerald-600 border-t-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'
+                  isActive ? 'text-orange-500 border-t-2 border-orange-500' : 'text-gray-500 hover:text-gray-700'
                 }`
               }
             >

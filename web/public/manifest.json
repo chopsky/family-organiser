@@ -4,8 +4,8 @@
   "description": "Shopping lists, tasks and reminders — together.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f9fafb",
-  "theme_color": "#059669",
+  "background_color": "#FFFBF5",
+  "theme_color": "#F97316",
   "orientation": "portrait",
   "icons": [
     {

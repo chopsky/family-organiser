@@ -115,7 +115,7 @@ export default function Shopping() {
         <h1 className="text-2xl font-bold text-gray-900">🛒 Shopping</h1>
         <button
           onClick={() => setShowCompleted((v) => !v)}
-          className="text-sm text-emerald-600 hover:underline"
+          className="text-sm text-orange-500 hover:underline"
         >
           {showCompleted ? 'Hide done' : 'Show done'}
         </button>
@@ -130,12 +130,12 @@ export default function Shopping() {
           value={addText}
           onChange={(e) => setAddText(e.target.value)}
           placeholder="Add item…"
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
         <select
           value={addCat}
           onChange={(e) => setAddCat(e.target.value)}
-          className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+          className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
@@ -144,7 +144,7 @@ export default function Shopping() {
         <button
           type="submit"
           disabled={adding || !addText.trim()}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
         >
           {adding ? '…' : '+ Add'}
         </button>
@@ -155,7 +155,7 @@ export default function Shopping() {
         <button
           onClick={() => setFilter('')}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            !filter ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            !filter ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
           All
@@ -165,7 +165,7 @@ export default function Shopping() {
             key={c}
             onClick={() => setFilter(c === filter ? '' : c)}
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              filter === c ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              filter === c ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {CATEGORY_EMOJI[c]} {c}
@@ -259,7 +259,7 @@ function ItemRow({ item, toggle, loading }) {
         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
           item.completed
             ? 'bg-green-500 border-green-500 text-white'
-            : 'border-gray-300 hover:border-emerald-400'
+            : 'border-gray-300 hover:border-orange-400'
         }`}
       >
         {item.completed && '✓'}

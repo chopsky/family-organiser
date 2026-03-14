@@ -57,13 +57,13 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/Curata-Symbol-white.png" alt="Curata" className="h-16 mx-auto mb-4 bg-emerald-600 rounded-2xl p-2" />
+          <img src="/Curata-favicon.png" alt="Curata" className="h-16 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-3xl font-bold text-gray-900">Create your account</h1>
           {inviteToken && (
-            <p className="text-emerald-600 mt-2 font-medium">You've been invited to join a household!</p>
+            <p className="text-orange-500 mt-2 font-medium">You've been invited to join a household!</p>
           )}
         </div>
 
@@ -85,7 +85,7 @@ export default function Signup() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Sarah"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                 autoComplete="given-name"
               />
             </div>
@@ -96,7 +96,7 @@ export default function Signup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                 autoComplete="email"
               />
             </div>
@@ -107,14 +107,14 @@ export default function Signup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                 autoComplete="new-password"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-lg transition-colors"
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-lg transition-colors"
             >
               {loading ? 'Creating account...' : 'Create account'}
             </button>
@@ -122,7 +122,7 @@ export default function Signup() {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          Already have an account? <Link to="/login" className="text-emerald-600 font-medium hover:underline">Log in</Link>
+          Already have an account? <Link to="/login" className="text-orange-500 font-medium hover:underline">Log in</Link>
         </p>
       </div>
     </div>

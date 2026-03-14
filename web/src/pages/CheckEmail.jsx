@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 
 export default function CheckEmail() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md text-center">
         <div className="mb-8">
-          <img src="/Curata-Symbol-white.png" alt="Curata" className="h-16 mx-auto mb-4 bg-emerald-600 rounded-2xl p-2" />
+          <img src="/Curata-favicon.png" alt="Curata" className="h-16 mx-auto mb-4 rounded-2xl" />
         </div>
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <div className="text-5xl mb-4">📧</div>
@@ -15,7 +15,7 @@ export default function CheckEmail() {
           </p>
           <Link
             to="/login"
-            className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors"
+            className="inline-block bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-8 rounded-lg transition-colors"
           >
             Go to login
           </Link>
