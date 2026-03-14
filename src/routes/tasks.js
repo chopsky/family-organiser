@@ -159,4 +159,18 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/tasks/:id
+ * Permanently delete a task.
+ */
+router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    await db.deleteTask(req.params.id, req.householdId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/tasks/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

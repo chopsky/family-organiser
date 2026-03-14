@@ -512,6 +512,15 @@ async function uncompleteShoppingItem(itemId, householdId) {
   return data;
 }
 
+async function deleteTask(taskId, householdId) {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
 async function deleteShoppingItem(itemId, householdId) {
   const { error } = await supabase
     .from('shopping_items')
@@ -594,4 +603,5 @@ module.exports = {
   uncompleteTask,
   uncompleteShoppingItem,
   deleteShoppingItem,
+  deleteTask,
 };
