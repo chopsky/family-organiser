@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck } from '../components/Icons';
 
 const EVENT_COLORS = {
-  orange: { bg: 'bg-orange-100', border: 'border-orange-400', dot: 'bg-orange-400', text: 'text-orange-700' },
-  blue:   { bg: 'bg-blue-100',   border: 'border-blue-400',   dot: 'bg-blue-400',   text: 'text-blue-700' },
-  green:  { bg: 'bg-green-100',  border: 'border-green-400',  dot: 'bg-green-400',  text: 'text-green-700' },
-  purple: { bg: 'bg-purple-100', border: 'border-purple-400', dot: 'bg-purple-400', text: 'text-purple-700' },
-  red:    { bg: 'bg-red-100',    border: 'border-red-400',    dot: 'bg-red-400',    text: 'text-red-700' },
-  gray:   { bg: 'bg-gray-100',   border: 'border-gray-400',   dot: 'bg-gray-400',   text: 'text-gray-700' },
+  orange: { bg: 'bg-orange-100', border: 'border-orange-400', dot: 'bg-orange-400', text: 'text-orange-700', darkBg: 'bg-orange-200' },
+  blue:   { bg: 'bg-blue-100',   border: 'border-blue-400',   dot: 'bg-blue-400',   text: 'text-blue-700',   darkBg: 'bg-blue-200' },
+  green:  { bg: 'bg-green-100',  border: 'border-green-400',  dot: 'bg-green-400',  text: 'text-green-700',  darkBg: 'bg-green-200' },
+  purple: { bg: 'bg-purple-100', border: 'border-purple-400', dot: 'bg-purple-400', text: 'text-purple-700', darkBg: 'bg-purple-200' },
+  red:    { bg: 'bg-red-100',    border: 'border-red-400',    dot: 'bg-red-400',    text: 'text-red-700',    darkBg: 'bg-red-200' },
+  gray:   { bg: 'bg-gray-100',   border: 'border-gray-400',   dot: 'bg-gray-400',   text: 'text-gray-700',   darkBg: 'bg-gray-200' },
 };
 
 const PRIORITY_COLORS = { high: 'bg-rose-400', medium: 'bg-amber-400', low: 'bg-emerald-400' };
@@ -18,6 +18,7 @@ const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const RECURRENCE_LABELS = { '': 'Never', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', yearly: 'Yearly' };
 const COLOR_OPTIONS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 // ── Date helpers ────────────────────────────────────────────
 
@@ -53,33 +54,75 @@ function formatTime(iso) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatHour(hour) {
+  if (hour === 0) return '12 AM';
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return '12 PM';
+  return `${hour - 12} PM`;
+}
+
 function buildCalendarDays(year, month) {
   const firstDay = new Date(year, month, 1);
-  const startOffset = mondayBasedDay(firstDay); // leading blanks (Mon-based)
+  const startOffset = mondayBasedDay(firstDay);
   const total = daysInMonth(year, month);
 
   const days = [];
-
-  // Previous month trailing days
   const prevTotal = daysInMonth(year, month - 1);
   for (let i = startOffset - 1; i >= 0; i--) {
     days.push({ date: new Date(year, month - 1, prevTotal - i), currentMonth: false });
   }
-
-  // Current month
   for (let d = 1; d <= total; d++) {
     days.push({ date: new Date(year, month, d), currentMonth: true });
   }
-
-  // Next month leading days to fill last row
   const remaining = 7 - (days.length % 7);
   if (remaining < 7) {
     for (let d = 1; d <= remaining; d++) {
       days.push({ date: new Date(year, month + 1, d), currentMonth: false });
     }
   }
-
   return days;
+}
+
+/** Get Monday of the week containing the given date */
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day; // Monday-based
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Get array of 7 dates for the week starting from Monday */
+function getWeekDays(weekStart) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+}
+
+/** Get event position within hour grid (top offset & height in pixels) */
+function getEventPosition(event, hourHeight) {
+  const start = new Date(event.start_time);
+  const end = new Date(event.end_time);
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
+  const duration = Math.max(endMinutes - startMinutes, 15); // minimum 15 min display
+  const top = (startMinutes / 60) * hourHeight;
+  const height = (duration / 60) * hourHeight;
+  return { top, height: Math.max(height, 20) }; // minimum 20px height
+}
+
+/** Get months to fetch for a given date range */
+function getMonthsForRange(startDate, endDate) {
+  const months = new Set();
+  const d = new Date(startDate);
+  while (d <= endDate) {
+    months.add(monthParam(d));
+    d.setMonth(d.getMonth() + 1);
+  }
+  return [...months];
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -88,6 +131,7 @@ export default function Calendar() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const [viewMode, setViewMode] = useState('month'); // 'day', 'week', 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(new Date(today));
   const [events, setEvents] = useState([]);
@@ -113,24 +157,52 @@ export default function Calendar() {
 
   const [toggling, setToggling] = useState(new Set());
   const formRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+
+  const HOUR_HEIGHT = 60; // pixels per hour
 
   // ── Data loading ────────────────────────────────────────
 
   const load = useCallback(async () => {
     try {
-      const mp = monthParam(currentMonth);
-      const [evRes, tkRes] = await Promise.all([
-        api.get('/calendar/events', { params: { month: mp } }),
-        api.get('/calendar/tasks', { params: { month: mp } }),
-      ]);
-      setEvents(evRes.data.events ?? []);
-      setTasks(tkRes.data.tasks ?? []);
+      // Determine which months to fetch based on view mode
+      let monthsToFetch;
+      if (viewMode === 'week') {
+        const weekStart = getWeekStart(selectedDate);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        monthsToFetch = getMonthsForRange(weekStart, weekEnd);
+      } else if (viewMode === 'day') {
+        monthsToFetch = [monthParam(selectedDate)];
+      } else {
+        monthsToFetch = [monthParam(currentMonth)];
+      }
+
+      // Fetch all needed months
+      const results = await Promise.all(
+        monthsToFetch.map(mp =>
+          Promise.all([
+            api.get('/calendar/events', { params: { month: mp } }),
+            api.get('/calendar/tasks', { params: { month: mp } }),
+          ])
+        )
+      );
+
+      const allEvents = results.flatMap(([evRes]) => evRes.data.events ?? []);
+      const allTasks = results.flatMap(([, tkRes]) => tkRes.data.tasks ?? []);
+
+      // Deduplicate by id
+      const uniqueEvents = [...new Map(allEvents.map(e => [e.id, e])).values()];
+      const uniqueTasks = [...new Map(allTasks.map(t => [t.id, t])).values()];
+
+      setEvents(uniqueEvents);
+      setTasks(uniqueTasks);
     } catch {
       setError('Could not load calendar data.');
     } finally {
       setLoading(false);
     }
-  }, [currentMonth]);
+  }, [currentMonth, selectedDate, viewMode]);
 
   useEffect(() => {
     setLoading(true);
@@ -148,19 +220,75 @@ export default function Calendar() {
     }
   }, [showForm]);
 
-  // ── Month navigation ───────────────────────────────────
+  // Scroll to current time in day/week view
+  useEffect(() => {
+    if ((viewMode === 'day' || viewMode === 'week') && scrollContainerRef.current) {
+      const now = new Date();
+      const scrollTo = Math.max(0, (now.getHours() - 1) * HOUR_HEIGHT);
+      setTimeout(() => {
+        scrollContainerRef.current?.scrollTo({ top: scrollTo, behavior: 'smooth' });
+      }, 100);
+    }
+  }, [viewMode]);
 
-  function prevMonth() {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  // ── Navigation ────────────────────────────────────────────
+
+  function navigatePrev() {
+    if (viewMode === 'month') {
+      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    } else if (viewMode === 'week') {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() - 7);
+      setSelectedDate(d);
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    } else {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() - 1);
+      setSelectedDate(d);
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
   }
-  function nextMonth() {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+
+  function navigateNext() {
+    if (viewMode === 'month') {
+      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    } else if (viewMode === 'week') {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + 7);
+      setSelectedDate(d);
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    } else {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + 1);
+      setSelectedDate(d);
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
   }
+
   function goToday() {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    setSelectedDate(new Date(now));
   }
+
+  // ── Navigation label ──────────────────────────────────────
+
+  const navigationLabel = useMemo(() => {
+    if (viewMode === 'month') {
+      return currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    }
+    if (viewMode === 'week') {
+      const weekStart = getWeekStart(selectedDate);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const startStr = weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const endStr = weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      return `${startStr} – ${endStr}`;
+    }
+    // day
+    return selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }, [viewMode, currentMonth, selectedDate]);
 
   // ── Items for a given date ─────────────────────────────
 
@@ -176,6 +304,16 @@ export default function Calendar() {
   function tasksForDate(date) {
     const ds = toDateStr(date);
     return tasks.filter(t => t.due_date === ds);
+  }
+
+  /** Get timed (non-all-day) events for a date */
+  function timedEventsForDate(date) {
+    return eventsForDate(date).filter(e => !e.all_day);
+  }
+
+  /** Get all-day events for a date */
+  function allDayEventsForDate(date) {
+    return eventsForDate(date).filter(e => e.all_day);
   }
 
   // ── Form helpers ───────────────────────────────────────
@@ -194,8 +332,13 @@ export default function Calendar() {
     setFormRecurrence('');
   }
 
-  function openAddForm() {
+  function openAddForm(date, hour) {
     resetForm();
+    if (date) setFormDate(toDateStr(date));
+    if (hour !== undefined) {
+      setFormStart(`${String(hour).padStart(2, '0')}:00`);
+      setFormEnd(`${String(Math.min(hour + 1, 23)).padStart(2, '0')}:00`);
+    }
     setShowForm(true);
   }
 
@@ -279,167 +422,346 @@ export default function Calendar() {
   // ── Calendar grid data ─────────────────────────────────
 
   const calendarDays = buildCalendarDays(currentMonth.getFullYear(), currentMonth.getMonth());
-  const monthLabel = currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   const selectedEvents = selectedDate ? eventsForDate(selectedDate) : [];
   const selectedTasks = selectedDate ? tasksForDate(selectedDate) : [];
 
-  // ── Render ─────────────────────────────────────────────
+  // Week view data
+  const weekStart = getWeekStart(selectedDate);
+  const weekDays = getWeekDays(weekStart);
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
+  // ── Current time indicator position ────────────────────
 
-      {/* ── Month Navigation Header ──────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <IconCalendar className="h-6 w-6" /> Calendar
-        </h1>
-        <button onClick={openAddForm} className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-1">
-          <IconPlus className="h-4 w-4" /> Add
-        </button>
-      </div>
+  const now = new Date();
+  const currentTimeTop = (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
 
-      <div className="flex items-center justify-center gap-3">
-        <button onClick={prevMonth} className="border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 text-sm transition-colors">&larr;</button>
-        <span className="text-lg font-semibold text-gray-800 min-w-[180px] text-center">{monthLabel}</span>
-        <button onClick={nextMonth} className="border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 text-sm transition-colors">&rarr;</button>
-        <button onClick={goToday} className="border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 text-sm transition-colors">Today</button>
-      </div>
+  // ── Time Grid (shared by Day & Week views) ─────────────
 
-      {/* ── Monthly Grid ─────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-5">
-        {/* Day-of-week headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {DAY_HEADERS.map(d => (
-            <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
-          ))}
-        </div>
+  function renderTimeGrid(dates, isSingleDay = false) {
+    const allDayEventsByDate = dates.map(d => allDayEventsForDate(d));
+    const hasAllDay = allDayEventsByDate.some(evs => evs.length > 0);
+    const colCount = dates.length;
 
-        {/* Day cells */}
-        <div className="grid grid-cols-7">
-          {loading && events.length === 0 ? (
-            // Skeleton grid while loading
-            Array.from({ length: 35 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="min-h-[56px] sm:min-h-[68px] p-1 border border-gray-50 rounded animate-pulse"
-              >
-                <div className="w-5 h-3 bg-gray-100 rounded" />
-              </div>
-            ))
-          ) : (
-            calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
-              const isToday = isSameDay(date, today);
-              const isSelected = selectedDate && isSameDay(date, selectedDate);
-              const dayEvents = eventsForDate(date);
-              const dayTasks = tasksForDate(date);
-              const totalItems = dayEvents.length + dayTasks.length;
-              const maxShow = 3;
-
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Day headers */}
+        <div className="border-b border-gray-200 sticky top-0 bg-white z-20">
+          <div className="flex">
+            {/* Time gutter header */}
+            <div className="w-16 sm:w-20 shrink-0" />
+            {/* Day columns */}
+            {dates.map((date, i) => {
+              const isToday_ = isSameDay(date, today);
               return (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedDate(new Date(date))}
-                  className={`
-                    relative min-h-[56px] sm:min-h-[68px] p-1 border border-gray-50 text-left transition-all rounded
-                    ${!isCurrent ? 'text-gray-300' : 'text-gray-700'}
-                    ${isToday ? 'bg-orange-50 font-bold text-orange-600' : ''}
-                    ${isSelected ? 'ring-2 ring-orange-400' : ''}
-                    hover:bg-gray-50
-                  `}
+                <div
+                  key={i}
+                  className={`flex-1 text-center py-2 border-l border-gray-100 ${isToday_ ? 'bg-orange-50' : ''}`}
                 >
-                  <span className="text-xs sm:text-sm">{date.getDate()}</span>
-                  <div className="flex flex-wrap gap-0.5 mt-0.5">
-                    {dayEvents.slice(0, maxShow).map(ev => (
-                      <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-orange-400'}`} title={ev.title} />
-                    ))}
-                    {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => (
-                      <span key={tk.id} className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[tk.priority] || 'bg-amber-400'}`} title={tk.title} />
-                    ))}
+                  <div className="text-xs text-gray-500 font-medium">
+                    {date.toLocaleDateString('en-GB', { weekday: 'short' })}
                   </div>
-                  {totalItems > maxShow && (
-                    <span className="text-[10px] text-gray-400 leading-none">+{totalItems - maxShow}</span>
-                  )}
-                </button>
+                  <button
+                    onClick={() => { setSelectedDate(new Date(date)); setViewMode('day'); }}
+                    className={`text-lg font-semibold leading-tight ${
+                      isToday_
+                        ? 'bg-orange-500 text-white w-8 h-8 rounded-full inline-flex items-center justify-center'
+                        : 'text-gray-800 hover:text-orange-500'
+                    }`}
+                  >
+                    {date.getDate()}
+                  </button>
+                </div>
               );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ── Day Detail Panel ─────────────────────────────── */}
-      {selectedDate && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">{formatLongDate(selectedDate)}</h2>
-            <button onClick={openAddForm} className="text-sm text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
-              <IconPlus className="h-4 w-4" /> Add event
-            </button>
+            })}
           </div>
 
-          {/* Events */}
-          {selectedEvents.length > 0 ? (
-            <div className="space-y-2">
-              <h3 className="text-xs text-gray-500 uppercase tracking-wide font-medium">Events</h3>
-              {selectedEvents.map(ev => {
-                const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+          {/* All-day events row */}
+          {hasAllDay && (
+            <div className="flex border-t border-gray-100">
+              <div className="w-16 sm:w-20 shrink-0 text-[10px] text-gray-400 py-1 pr-2 text-right">all-day</div>
+              {dates.map((date, i) => {
+                const dayAllDay = allDayEventsByDate[i];
                 return (
-                  <div key={ev.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-lg px-3 py-2`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className={`font-medium ${colors.text}`}>{ev.title}</p>
-                        <p className="text-xs text-gray-500">
-                          {ev.all_day ? 'All day' : `${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
-                          {ev.location ? ` · ${ev.location}` : ''}
-                        </p>
-                        {ev.assigned_to_name && (
-                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                            <IconUser className="h-3 w-3" /> {ev.assigned_to_name}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button onClick={() => openEditForm(ev)} className="text-xs text-gray-400 hover:text-gray-600 px-1">Edit</button>
-                        <button onClick={() => deleteEvent(ev.id)} className="text-xs text-red-400 hover:text-red-600 px-1">Delete</button>
-                      </div>
-                    </div>
+                  <div key={i} className="flex-1 border-l border-gray-100 p-0.5 min-h-[28px]">
+                    {dayAllDay.map(ev => {
+                      const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                      return (
+                        <button
+                          key={ev.id}
+                          onClick={() => openEditForm(ev)}
+                          className={`block w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate ${colors.bg} ${colors.text} hover:opacity-80`}
+                        >
+                          {ev.title}
+                        </button>
+                      );
+                    })}
                   </div>
                 );
               })}
             </div>
-          ) : selectedTasks.length === 0 ? (
-            <p className="text-sm text-gray-400">No events or tasks for this day</p>
-          ) : null}
-
-          {/* Tasks */}
-          {selectedTasks.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs text-gray-500 uppercase tracking-wide font-medium">Tasks</h3>
-              {selectedTasks.map(tk => (
-                <div key={tk.id} className="flex items-center gap-3 py-1.5">
-                  <button
-                    onClick={() => toggleTask(tk)}
-                    disabled={toggling.has(tk.id)}
-                    className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                      tk.completed
-                        ? 'bg-orange-500 border-orange-500 text-white'
-                        : 'border-gray-300 hover:border-orange-400'
-                    }`}
-                  >
-                    {tk.completed && <IconCheck className="h-3 w-3" />}
-                  </button>
-                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_COLORS[tk.priority] || 'bg-amber-400'}`} />
-                  <span className={`text-sm flex-1 ${tk.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>{tk.title}</span>
-                  {tk.assigned_to_name && (
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <IconUser className="h-3 w-3" /> {tk.assigned_to_name}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
           )}
         </div>
+
+        {/* Scrollable time grid */}
+        <div ref={scrollContainerRef} className="overflow-y-auto" style={{ maxHeight: '600px' }}>
+          <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
+            {/* Hour lines and labels */}
+            {HOURS.map(hour => (
+              <div
+                key={hour}
+                className="absolute w-full flex"
+                style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+              >
+                <div className="w-16 sm:w-20 shrink-0 text-[10px] sm:text-xs text-gray-400 pr-2 text-right -mt-2">
+                  {hour > 0 ? formatHour(hour) : ''}
+                </div>
+                <div className="flex-1 border-t border-gray-100" />
+              </div>
+            ))}
+
+            {/* Event columns */}
+            <div className="absolute left-16 sm:left-20 right-0 top-0 bottom-0 flex">
+              {dates.map((date, colIdx) => {
+                const dayTimedEvents = timedEventsForDate(date);
+                const isToday_ = isSameDay(date, today);
+
+                return (
+                  <div key={colIdx} className={`flex-1 relative border-l border-gray-100 ${isToday_ ? 'bg-orange-50/30' : ''}`}>
+                    {/* Click to add event */}
+                    {HOURS.map(hour => (
+                      <button
+                        key={hour}
+                        onClick={() => openAddForm(date, hour)}
+                        className="absolute w-full hover:bg-orange-50/50 transition-colors"
+                        style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+                        title={`Add event at ${formatHour(hour)}`}
+                      />
+                    ))}
+
+                    {/* Events */}
+                    {dayTimedEvents.map(ev => {
+                      const pos = getEventPosition(ev, HOUR_HEIGHT);
+                      const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                      return (
+                        <button
+                          key={ev.id}
+                          onClick={(e) => { e.stopPropagation(); openEditForm(ev); }}
+                          className={`absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded ${colors.bg} border-l-2 ${colors.border} px-1 py-0.5 overflow-hidden hover:opacity-80 z-10 cursor-pointer text-left`}
+                          style={{ top: `${pos.top}px`, height: `${pos.height}px` }}
+                          title={`${ev.title}\n${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
+                        >
+                          <p className={`text-[10px] sm:text-xs font-medium ${colors.text} truncate leading-tight`}>{ev.title}</p>
+                          {pos.height > 30 && (
+                            <p className="text-[9px] sm:text-[10px] text-gray-500 truncate leading-tight">
+                              {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
+                            </p>
+                          )}
+                          {pos.height > 50 && ev.location && (
+                            <p className="text-[9px] text-gray-400 truncate leading-tight">{ev.location}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                    {/* Current time indicator */}
+                    {isToday_ && (
+                      <div
+                        className="absolute left-0 right-0 z-20 pointer-events-none"
+                        style={{ top: `${currentTimeTop}px` }}
+                      >
+                        <div className="flex items-center">
+                          <div className="w-2.5 h-2.5 bg-red-500 rounded-full -ml-1.5" />
+                          <div className="flex-1 h-0.5 bg-red-500" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
+
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <IconCalendar className="h-6 w-6" /> Calendar
+        </h1>
+        <div className="flex items-center gap-2">
+          <select
+            value={viewMode}
+            onChange={e => setViewMode(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+          >
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+          </select>
+          <button onClick={() => openAddForm(selectedDate)} className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-1">
+            <IconPlus className="h-4 w-4" /> Add
+          </button>
+        </div>
+      </div>
+
+      {/* ── Navigation ──────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-3">
+        <button onClick={navigatePrev} className="border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 text-sm transition-colors">&larr;</button>
+        <span className="text-lg font-semibold text-gray-800 min-w-[180px] text-center">{navigationLabel}</span>
+        <button onClick={navigateNext} className="border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 text-sm transition-colors">&rarr;</button>
+        <button onClick={goToday} className="border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 text-sm transition-colors">Today</button>
+      </div>
+
+      {/* ── Day View ────────────────────────────────────────── */}
+      {viewMode === 'day' && renderTimeGrid([selectedDate], true)}
+
+      {/* ── Week View ───────────────────────────────────────── */}
+      {viewMode === 'week' && renderTimeGrid(weekDays)}
+
+      {/* ── Month View ──────────────────────────────────────── */}
+      {viewMode === 'month' && (
+        <>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-5">
+            {/* Day-of-week headers */}
+            <div className="grid grid-cols-7 mb-1">
+              {DAY_HEADERS.map(d => (
+                <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="grid grid-cols-7">
+              {loading && events.length === 0 ? (
+                Array.from({ length: 35 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="min-h-[56px] sm:min-h-[68px] p-1 border border-gray-50 rounded animate-pulse"
+                  >
+                    <div className="w-5 h-3 bg-gray-100 rounded" />
+                  </div>
+                ))
+              ) : (
+                calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
+                  const isToday_ = isSameDay(date, today);
+                  const isSelected = selectedDate && isSameDay(date, selectedDate);
+                  const dayEvents = eventsForDate(date);
+                  const dayTasks = tasksForDate(date);
+                  const totalItems = dayEvents.length + dayTasks.length;
+                  const maxShow = 3;
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedDate(new Date(date))}
+                      className={`
+                        relative min-h-[56px] sm:min-h-[68px] p-1 border border-gray-50 text-left transition-all rounded
+                        ${!isCurrent ? 'text-gray-300' : 'text-gray-700'}
+                        ${isToday_ ? 'bg-orange-50 font-bold text-orange-600' : ''}
+                        ${isSelected ? 'ring-2 ring-orange-400' : ''}
+                        hover:bg-gray-50
+                      `}
+                    >
+                      <span className="text-xs sm:text-sm">{date.getDate()}</span>
+                      <div className="flex flex-wrap gap-0.5 mt-0.5">
+                        {dayEvents.slice(0, maxShow).map(ev => (
+                          <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-orange-400'}`} title={ev.title} />
+                        ))}
+                        {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => (
+                          <span key={tk.id} className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[tk.priority] || 'bg-amber-400'}`} title={tk.title} />
+                        ))}
+                      </div>
+                      {totalItems > maxShow && (
+                        <span className="text-[10px] text-gray-400 leading-none">+{totalItems - maxShow}</span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ── Day Detail Panel (Month view only) ────────────── */}
+          {selectedDate && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-800">{formatLongDate(selectedDate)}</h2>
+                <button onClick={() => openAddForm(selectedDate)} className="text-sm text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
+                  <IconPlus className="h-4 w-4" /> Add event
+                </button>
+              </div>
+
+              {/* Events */}
+              {selectedEvents.length > 0 ? (
+                <div className="space-y-2">
+                  <h3 className="text-xs text-gray-500 uppercase tracking-wide font-medium">Events</h3>
+                  {selectedEvents.map(ev => {
+                    const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                    return (
+                      <div key={ev.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-lg px-3 py-2`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className={`font-medium ${colors.text}`}>{ev.title}</p>
+                            <p className="text-xs text-gray-500">
+                              {ev.all_day ? 'All day' : `${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
+                              {ev.location ? ` · ${ev.location}` : ''}
+                            </p>
+                            {ev.assigned_to_name && (
+                              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                                <IconUser className="h-3 w-3" /> {ev.assigned_to_name}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button onClick={() => openEditForm(ev)} className="text-xs text-gray-400 hover:text-gray-600 px-1">Edit</button>
+                            <button onClick={() => deleteEvent(ev.id)} className="text-xs text-red-400 hover:text-red-600 px-1">Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : selectedTasks.length === 0 ? (
+                <p className="text-sm text-gray-400">No events or tasks for this day</p>
+              ) : null}
+
+              {/* Tasks */}
+              {selectedTasks.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xs text-gray-500 uppercase tracking-wide font-medium">Tasks</h3>
+                  {selectedTasks.map(tk => (
+                    <div key={tk.id} className="flex items-center gap-3 py-1.5">
+                      <button
+                        onClick={() => toggleTask(tk)}
+                        disabled={toggling.has(tk.id)}
+                        className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                          tk.completed
+                            ? 'bg-orange-500 border-orange-500 text-white'
+                            : 'border-gray-300 hover:border-orange-400'
+                        }`}
+                      >
+                        {tk.completed && <IconCheck className="h-3 w-3" />}
+                      </button>
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_COLORS[tk.priority] || 'bg-amber-400'}`} />
+                      <span className={`text-sm flex-1 ${tk.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>{tk.title}</span>
+                      {tk.assigned_to_name && (
+                        <span className="text-xs text-gray-400 flex items-center gap-1">
+                          <IconUser className="h-3 w-3" /> {tk.assigned_to_name}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Event Form ───────────────────────────────────── */}
