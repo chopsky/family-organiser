@@ -10,7 +10,7 @@ const EVENT_COLORS = {
   green:  { bg: 'bg-success/20',  border: 'border-success',  dot: 'bg-success',  text: 'text-success',  darkBg: 'bg-success/30' },
   purple: { bg: 'bg-purple-100', border: 'border-purple-400', dot: 'bg-purple-400', text: 'text-purple-700', darkBg: 'bg-purple-200' },
   red:    { bg: 'bg-error/20',    border: 'border-error',    dot: 'bg-error',    text: 'text-error',    darkBg: 'bg-error/30' },
-  gray:   { bg: 'bg-linen',   border: 'border-cream-border',   dot: 'bg-cocoa',   text: 'text-cocoa',   darkBg: 'bg-linen' },
+  gray:   { bg: 'bg-sand',   border: 'border-cream-border',   dot: 'bg-cocoa',   text: 'text-cocoa',   darkBg: 'bg-sand' },
 };
 
 const PRIORITY_COLORS = { high: 'bg-error', medium: 'bg-warn', low: 'bg-success' };
@@ -599,7 +599,7 @@ export default function Calendar() {
           <select
             value={viewMode}
             onChange={e => setViewMode(e.target.value)}
-            className="border border-cream-border rounded-2xl px-3 py-2 text-sm text-bark focus:outline-none focus:ring-2 focus:ring-accent bg-linen"
+            className="border border-cream-border rounded-2xl px-3 py-2 text-sm text-bark focus:outline-none focus:ring-2 focus:ring-accent bg-oat"
           >
             <option value="day">Day</option>
             <option value="week">Week</option>
@@ -644,7 +644,7 @@ export default function Calendar() {
                     key={idx}
                     className="min-h-[56px] sm:min-h-[68px] p-1 border border-oat rounded animate-pulse"
                   >
-                    <div className="w-5 h-3 bg-linen rounded" />
+                    <div className="w-5 h-3 bg-sand rounded" />
                   </div>
                 ))
               ) : (

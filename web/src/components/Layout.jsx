@@ -23,7 +23,7 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-oat flex flex-col">
       {/* Top bar */}
-      <header className="bg-linen border-b border-cream-border shadow-sm">
+      <header className="bg-oat border-b border-cream-border shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link to="/dashboard" className="flex items-center gap-2">

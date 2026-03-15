@@ -117,7 +117,7 @@ export default function Dashboard() {
             type="button"
             onClick={startVoice}
             title="Voice input"
-            className="bg-linen hover:bg-linen text-bark rounded-2xl px-3 py-2 transition-colors"
+            className="bg-oat hover:bg-sand text-bark rounded-2xl px-3 py-2 transition-colors"
           >
             <IconMic className="h-5 w-5" />
           </button>

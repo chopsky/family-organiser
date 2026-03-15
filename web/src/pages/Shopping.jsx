@@ -156,7 +156,7 @@ export default function Shopping() {
         <button
           onClick={() => setFilter('')}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            !filter ? 'bg-primary text-white' : 'bg-linen text-cocoa hover:bg-secondary/30'
+            !filter ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
           }`}
         >
           All
@@ -166,7 +166,7 @@ export default function Shopping() {
             key={c}
             onClick={() => setFilter(c === filter ? '' : c)}
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              filter === c ? 'bg-primary text-white' : 'bg-linen text-cocoa hover:bg-secondary/30'
+              filter === c ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
             }`}
           >
             {CATEGORY_EMOJI[c]} {c}
