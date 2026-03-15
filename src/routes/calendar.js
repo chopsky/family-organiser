@@ -35,7 +35,7 @@ const feedLimiter = rateLimit({
   max: 60,
   keyGenerator: (req) => `${req.params.token}`,
   message: { error: 'Too many requests, please try again later' },
-  validate: { xForwardedForHeader: false, default: true },
+  validate: false,
 });
 
 /**
