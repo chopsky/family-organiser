@@ -1,12 +1,13 @@
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { IconHome, IconCart, IconCheck, IconCamera, IconSettings } from './Icons';
 
 const nav = [
-  { to: '/dashboard',  label: '🏠 Home'     },
-  { to: '/shopping',   label: '🛒 Shopping'  },
-  { to: '/tasks',      label: '✅ Tasks'     },
-  { to: '/receipt',    label: '📷 Receipt'   },
-  { to: '/settings',   label: '⚙️ Settings'  },
+  { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
+  { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
+  { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
+  { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
+  { to: '/settings',   label: 'Settings',  Icon: IconSettings  },
 ];
 
 export default function Layout({ children }) {
@@ -47,16 +48,17 @@ export default function Layout({ children }) {
       {/* Bottom nav */}
       <nav className="bg-white border-t border-gray-200 sticky bottom-0">
         <div className="max-w-4xl mx-auto flex">
-          {nav.map(({ to, label }) => (
+          {nav.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex-1 text-center py-3 text-xs font-medium transition-colors ${
-                  isActive ? 'text-orange-500 border-t-2 border-orange-500' : 'text-gray-500 hover:text-gray-700'
+                `flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors ${
+                  isActive ? 'text-orange-500 border-t-2 border-orange-500' : 'text-gray-400 hover:text-gray-600'
                 }`
               }
             >
+              <Icon className="h-5 w-5" />
               {label}
             </NavLink>
           ))}

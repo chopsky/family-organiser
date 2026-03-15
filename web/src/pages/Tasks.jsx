@@ -2,10 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
+import { IconCheck, IconUser, IconCalendar } from '../components/Icons';
 
-const PRIORITIES = { high: '🔴', medium: '🟡', low: '🟢' };
+const PRIORITY_COLORS = { high: 'bg-rose-400', medium: 'bg-amber-400', low: 'bg-emerald-400' };
+const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
 const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
+
+function PriorityDot({ priority, className = 'w-3 h-3' }) {
+  return <span className={`${className} rounded-full inline-block ${PRIORITY_COLORS[priority] || PRIORITY_COLORS.medium}`} />;
+}
 
 function daysOverdue(dueDate) {
   const due  = new Date(dueDate + 'T00:00:00');
@@ -142,7 +148,9 @@ export default function Tasks() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">✅ Tasks</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <IconCheck className="h-6 w-6" /> Tasks
+        </h1>
         <div className="flex gap-3">
           <button
             onClick={() => setShowAll((v) => !v)}
@@ -201,9 +209,9 @@ export default function Tasks() {
                 onChange={(e) => setPriority(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
               >
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
               </select>
             </div>
             <div>
@@ -230,7 +238,7 @@ export default function Tasks() {
               disabled={adding || !title.trim()}
               className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              {adding ? 'Adding…' : 'Add task'}
+              {adding ? 'Adding...' : 'Add task'}
             </button>
           </div>
         </form>
@@ -238,7 +246,7 @@ export default function Tasks() {
 
       {loading ? <Spinner /> : tasks.length === 0 ? (
         <p className="text-center text-gray-400 py-10">
-          {showAll ? '🎉 All tasks complete!' : '✅ Nothing due today!'}
+          {showAll ? 'All tasks complete!' : 'Nothing due today!'}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -259,30 +267,35 @@ export default function Tasks() {
                   {task.completed && '✓'}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                  <p className={`text-sm font-medium flex items-center gap-1.5 ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                     <button
                       onClick={(e) => { e.stopPropagation(); cyclePriority(task); }}
                       disabled={updating.has(task.id) || task.completed}
-                      className="inline-flex items-center mr-1 hover:scale-125 transition-transform disabled:hover:scale-100"
-                      title={`Priority: ${task.priority} (tap to change)`}
+                      className="inline-flex items-center hover:scale-125 transition-transform disabled:hover:scale-100"
+                      title={`Priority: ${PRIORITY_LABELS[task.priority]} (tap to change)`}
                     >
-                      {updating.has(task.id) ? '⏳' : PRIORITIES[task.priority]}
+                      {updating.has(task.id)
+                        ? <span className="w-3 h-3 rounded-full bg-gray-300 animate-pulse" />
+                        : <PriorityDot priority={task.priority} />
+                      }
                     </button>
                     {task.title}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                     {task.assigned_to_name && (
-                      <span className="text-xs text-gray-400">👤 {task.assigned_to_name}</span>
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <IconUser className="h-3 w-3" /> {task.assigned_to_name}
+                      </span>
                     )}
-                    <span className={`text-xs font-medium ${
+                    <span className={`text-xs font-medium flex items-center gap-1 ${
                       task.completed ? 'text-gray-400' :
                       overdue > 0   ? 'text-red-500' :
                       dueToday      ? 'text-amber-500' : 'text-gray-400'
                     }`}>
-                      {task.completed ? `Done` :
-                       overdue > 0   ? `🔴 ${overdue}d overdue` :
-                       dueToday      ? '🟡 Due today' :
-                       `📅 ${task.due_date}`}
+                      {task.completed ? 'Done' :
+                       overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> {overdue}d overdue</> :
+                       dueToday      ? <><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Due today</> :
+                       <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
                     </span>
                     {task.recurrence && (
                       <span className="text-xs text-gray-400">[{task.recurrence}]</span>
@@ -311,7 +324,9 @@ export default function Tasks() {
                   <p className="text-sm text-gray-500 line-through">{task.title}</p>
                   <div className="flex gap-x-3 mt-0.5">
                     {task.assigned_to_name && (
-                      <span className="text-xs text-gray-400">👤 {task.assigned_to_name}</span>
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <IconUser className="h-3 w-3" /> {task.assigned_to_name}
+                      </span>
                     )}
                     <span className="text-xs text-gray-400">{timeAgo(task.completed_at)}</span>
                   </div>
@@ -322,7 +337,7 @@ export default function Tasks() {
                     disabled={restoring.has(task.id)}
                     className="text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    {restoring.has(task.id) ? '…' : 'Restore'}
+                    {restoring.has(task.id) ? '...' : 'Restore'}
                   </button>
                   <button
                     onClick={() => confirmDelete(task)}
@@ -330,7 +345,7 @@ export default function Tasks() {
                     className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
                     title="Delete permanently"
                   >
-                    {deleting.has(task.id) ? '…' : (
+                    {deleting.has(task.id) ? '...' : (
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>

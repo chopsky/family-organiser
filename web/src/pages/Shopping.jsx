@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
+import { IconCart } from '../components/Icons';
 
 const CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'other'];
 
@@ -112,7 +113,7 @@ export default function Shopping() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">🛒 Shopping</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IconCart className="h-6 w-6" /> Shopping</h1>
         <button
           onClick={() => setShowCompleted((v) => !v)}
           className="text-sm text-orange-500 hover:underline"
@@ -177,7 +178,7 @@ export default function Shopping() {
         <>
           {/* Incomplete items */}
           {incomplete.length === 0 && !showCompleted && (
-            <p className="text-center text-gray-400 py-8">✅ All done! Nothing left to buy.</p>
+            <p className="text-center text-gray-400 py-8">All done! Nothing left to buy.</p>
           )}
           <ul className="space-y-2">
             {incomplete.map((item) => (

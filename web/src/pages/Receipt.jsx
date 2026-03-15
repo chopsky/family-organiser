@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
+import { IconCamera, IconReceipt, IconSearch, IconCheck, IconClipboard } from '../components/Icons';
 
 export default function Receipt() {
   const [file, setFile]         = useState(null);
@@ -54,7 +55,7 @@ export default function Receipt() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-gray-900">📷 Receipt Scanner</h1>
+      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IconCamera className="h-6 w-6" /> Receipt Scanner</h1>
       <p className="text-sm text-gray-500">
         Upload a receipt photo to automatically check off matching items from your shopping list.
       </p>
@@ -78,7 +79,7 @@ export default function Receipt() {
               />
             ) : (
               <div className="space-y-2">
-                <p className="text-4xl">📄</p>
+                <IconReceipt className="h-10 w-10 mx-auto text-gray-400" />
                 <p className="text-gray-600 font-medium">Tap to choose a photo</p>
                 <p className="text-gray-400 text-sm">or drag and drop here</p>
                 <p className="text-gray-400 text-xs">JPG, PNG, WebP — max 10 MB</p>
@@ -108,7 +109,7 @@ export default function Receipt() {
                 disabled={uploading}
                 className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg py-3 font-medium transition-colors"
               >
-                {uploading ? 'Scanning…' : '🔍 Scan receipt'}
+                {uploading ? 'Scanning...' : <><IconSearch className="h-4 w-4 inline -mt-0.5" /> Scan receipt</>}
               </button>
             </div>
           )}
@@ -121,7 +122,7 @@ export default function Receipt() {
           {/* Checked off */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-5">
             <h2 className="font-semibold text-green-800 mb-3">
-              ✅ Checked off ({result.checkedOff?.length ?? 0})
+              <span className="flex items-center gap-1.5"><IconCheck className="h-4 w-4" /> Checked off ({result.checkedOff?.length ?? 0})</span>
             </h2>
             {result.checkedOff?.length === 0 ? (
               <p className="text-sm text-green-700">None matched your shopping list.</p>
@@ -140,7 +141,7 @@ export default function Receipt() {
           {result.unmatched?.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
               <h2 className="font-semibold text-amber-800 mb-3">
-                📋 On receipt, not in your list ({result.unmatched.length})
+                <span className="flex items-center gap-1.5"><IconClipboard className="h-4 w-4" /> On receipt, not in your list ({result.unmatched.length})</span>
               </h2>
               <ul className="space-y-1">
                 {result.unmatched.map((item, i) => (
@@ -153,7 +154,7 @@ export default function Receipt() {
           {/* All extracted items */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
             <h2 className="font-semibold text-gray-700 mb-3">
-              🧾 Extracted from receipt ({result.extracted?.items?.length ?? 0})
+              <span className="flex items-center gap-1.5"><IconReceipt className="h-4 w-4" /> Extracted from receipt ({result.extracted?.items?.length ?? 0})</span>
             </h2>
             <ul className="space-y-1">
               {(result.extracted?.items ?? []).map((item, i) => (

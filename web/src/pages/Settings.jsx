@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
+import { IconSettings, IconHome, IconMail, IconPhone, IconUsers, IconUser } from '../components/Icons';
 
 export default function Settings() {
   const { household, user, isAdmin, login, token } = useAuth();
@@ -113,13 +114,13 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">⚙️ Settings</h1>
+      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IconSettings className="h-6 w-6" /> Settings</h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* Household card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-4">🏠 Household</h2>
+        <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2"><IconHome className="h-4 w-4" /> Household</h2>
 
         {isAdmin ? (
           <form onSubmit={handleSave} className="space-y-4">
@@ -179,7 +180,7 @@ export default function Settings() {
       {/* Invite Members (admin only) */}
       {isAdmin && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-3">✉️ Invite Members</h2>
+          <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><IconMail className="h-4 w-4" /> Invite Members</h2>
           <p className="text-sm text-gray-500 mb-3">
             Send an email invite to add someone to your household.
           </p>
@@ -225,7 +226,7 @@ export default function Settings() {
 
       {/* Connect Telegram */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-3">📱 Connect Telegram</h2>
+        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><IconPhone className="h-4 w-4" /> Connect Telegram</h2>
         {members.find((m) => m.id === user?.id)?.telegram_chat_id ? (
           <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
             Telegram connected! You'll receive reminders and can add items via the bot.
@@ -265,7 +266,7 @@ export default function Settings() {
 
       {/* Members */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-3">👨‍👩‍👧 Members</h2>
+        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Members</h2>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-2">
             {members.map((m) => (
@@ -277,7 +278,7 @@ export default function Settings() {
                   <p className="text-sm font-medium text-gray-800">{m.name}</p>
                   <p className="text-xs text-gray-400">
                     {m.role}
-                    {m.telegram_chat_id && ' · 📱 Telegram connected'}
+                    {m.telegram_chat_id && ' · Telegram connected'}
                   </p>
                 </div>
                 {m.id === user?.id && (
@@ -299,7 +300,7 @@ export default function Settings() {
 
       {/* Signed in as */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-2">👤 You</h2>
+        <h2 className="font-semibold text-gray-800 mb-2 flex items-center gap-2"><IconUser className="h-4 w-4" /> You</h2>
         <p className="text-sm text-gray-600">
           Signed in as <span className="font-medium">{user?.name}</span>
           <span className="text-gray-400"> ({user?.role})</span>

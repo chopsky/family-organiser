@@ -4,14 +4,17 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
+import { IconCart, IconAlert, IconCalendar, IconUsers, IconPlus, IconMic } from '../components/Icons';
 
-function StatCard({ emoji, label, value, to }) {
+function StatCard({ icon, label, value, to }) {
   return (
     <Link
       to={to}
       className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:shadow-md transition-shadow"
     >
-      <span className="text-3xl">{emoji}</span>
+      <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
       <div>
         <p className="text-2xl font-bold text-gray-900">{value}</p>
         <p className="text-sm text-gray-500">{label}</p>
@@ -79,7 +82,7 @@ export default function Dashboard() {
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          👋 Hello, {user?.name}!
+          Hello, {user?.name}!
         </h1>
         <p className="text-gray-500 text-sm mt-1">
           {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -90,16 +93,18 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard emoji="🛒" label="Shopping items" value={shoppingCount}       to="/shopping" />
-        <StatCard emoji="⚠️" label="Overdue / due today" value={outstandingCount} to="/tasks"    />
-        <StatCard emoji="📅" label="Coming up"      value={upcomingCount}       to="/tasks"    />
-        <StatCard emoji="🏠" label={`${household?.name ?? ''} members`}
-                  value={digest?.members?.length ?? 0}                          to="/settings" />
+        <StatCard icon={<IconCart className="h-5 w-5" />}     label="Shopping items"     value={shoppingCount}       to="/shopping" />
+        <StatCard icon={<IconAlert className="h-5 w-5" />}    label="Overdue / due today" value={outstandingCount} to="/tasks"    />
+        <StatCard icon={<IconCalendar className="h-5 w-5" />} label="Coming up"          value={upcomingCount}       to="/tasks"    />
+        <StatCard icon={<IconUsers className="h-5 w-5" />}    label={`${household?.name ?? ''} members`}
+                  value={digest?.members?.length ?? 0}                                                              to="/settings" />
       </div>
 
       {/* Natural-language input */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-3">➕ Add items or tasks</h2>
+        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <IconPlus className="h-4 w-4" /> Add items or tasks
+        </h2>
         <form onSubmit={handleNlSubmit} className="flex gap-2">
           <input
             type="text"
@@ -112,9 +117,9 @@ export default function Dashboard() {
             type="button"
             onClick={startVoice}
             title="Voice input"
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg px-3 py-2 text-lg transition-colors"
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg px-3 py-2 transition-colors"
           >
-            🎤
+            <IconMic className="h-5 w-5" />
           </button>
           <button
             type="submit"
@@ -132,7 +137,9 @@ export default function Dashboard() {
       {/* Outstanding tasks */}
       {outstandingCount > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-3">⚠️ Needs attention</h2>
+          <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <IconAlert className="h-4 w-4" /> Needs attention
+          </h2>
           <ul className="space-y-2">
             {(digest.outstanding ?? []).slice(0, 5).map((t) => (
               <li key={t.id} className="flex items-start gap-2 text-sm">
@@ -157,7 +164,9 @@ export default function Dashboard() {
       {/* Members */}
       {digest?.members?.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-3">👨‍👩‍👧 Household</h2>
+          <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <IconUsers className="h-4 w-4" /> Household
+          </h2>
           <div className="flex flex-wrap gap-2">
             {digest.members.map((m) => (
               <span
