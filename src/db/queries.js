@@ -557,6 +557,245 @@ async function getTasksForUser(householdId, userId) {
   return data;
 }
 
+// ─── Calendar Events ─────────────────────────────────────────────────────────
+
+async function getCalendarEvents(householdId, startDate, endDate) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select()
+    .eq('household_id', householdId)
+    .lte('start_time', endDate)
+    .gte('end_time', startDate)
+    .order('start_time');
+  if (error) throw error;
+  return data;
+}
+
+async function getTasksByDateRange(householdId, startDate, endDate) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false)
+    .gte('due_date', startDate.split('T')[0])
+    .lte('due_date', endDate.split('T')[0])
+    .order('due_date');
+  if (error) throw error;
+  return data;
+}
+
+async function createCalendarEvent(householdId, eventData, createdByUserId) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .insert({
+      household_id: householdId,
+      title: eventData.title,
+      description: eventData.description || null,
+      start_time: eventData.start_time,
+      end_time: eventData.end_time,
+      all_day: eventData.all_day || false,
+      location: eventData.location || null,
+      color: eventData.color || 'orange',
+      recurrence: eventData.recurrence || null,
+      assigned_to: eventData.assigned_to || null,
+      assigned_to_name: eventData.assigned_to_name || null,
+      created_by: createdByUserId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateCalendarEvent(eventId, householdId, updates) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .update(updates)
+    .eq('id', eventId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteCalendarEvent(eventId, householdId) {
+  const { error } = await supabase
+    .from('calendar_events')
+    .delete()
+    .eq('id', eventId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function getOrCreateFeedToken(userId, householdId) {
+  // Check for existing token
+  const { data: existing } = await supabase
+    .from('calendar_feed_tokens')
+    .select()
+    .eq('user_id', userId)
+    .eq('household_id', householdId)
+    .single();
+
+  if (existing) return existing;
+
+  // Create new token
+  const token = crypto.randomBytes(32).toString('hex');
+  const { data, error } = await supabase
+    .from('calendar_feed_tokens')
+    .insert({ user_id: userId, household_id: householdId, token })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function regenerateFeedToken(userId, householdId) {
+  // Delete old token
+  await supabase
+    .from('calendar_feed_tokens')
+    .delete()
+    .eq('user_id', userId)
+    .eq('household_id', householdId);
+
+  // Create new token
+  const token = crypto.randomBytes(32).toString('hex');
+  const { data, error } = await supabase
+    .from('calendar_feed_tokens')
+    .insert({ user_id: userId, household_id: householdId, token })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getFeedTokenData(token) {
+  const { data, error } = await supabase
+    .from('calendar_feed_tokens')
+    .select()
+    .eq('token', token)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function getAllEventsForFeed(householdId) {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const oneYearAhead = new Date();
+  oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
+
+  const [{ data: events }, { data: tasks }] = await Promise.all([
+    supabase
+      .from('calendar_events')
+      .select()
+      .eq('household_id', householdId)
+      .gte('start_time', thirtyDaysAgo.toISOString())
+      .lte('start_time', oneYearAhead.toISOString())
+      .order('start_time'),
+    supabase
+      .from('tasks')
+      .select()
+      .eq('household_id', householdId)
+      .eq('completed', false)
+      .order('due_date'),
+  ]);
+
+  return { events: events || [], tasks: tasks || [] };
+}
+
+// ─── Calendar Connections (two-way sync) ─────────────────────────────────────
+
+async function getCalendarConnections(userId) {
+  const { data, error } = await supabase
+    .from('calendar_connections')
+    .select()
+    .eq('user_id', userId);
+  if (error) throw error;
+  return data;
+}
+
+async function upsertCalendarConnection(userId, householdId, provider, connectionData) {
+  const { data, error } = await supabase
+    .from('calendar_connections')
+    .upsert({
+      user_id: userId,
+      household_id: householdId,
+      provider,
+      ...connectionData,
+    }, { onConflict: 'user_id,provider' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteCalendarConnection(userId, provider) {
+  const { error } = await supabase
+    .from('calendar_connections')
+    .delete()
+    .eq('user_id', userId)
+    .eq('provider', provider);
+  if (error) throw error;
+}
+
+async function getConnectionsByHousehold(householdId) {
+  const { data, error } = await supabase
+    .from('calendar_connections')
+    .select()
+    .eq('household_id', householdId)
+    .eq('sync_enabled', true);
+  if (error) throw error;
+  return data;
+}
+
+async function createSyncMapping(eventId, connectionId, externalEventId, etag) {
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .upsert({
+      event_id: eventId,
+      connection_id: connectionId,
+      external_event_id: externalEventId,
+      external_etag: etag || null,
+      last_synced_at: new Date().toISOString(),
+    }, { onConflict: 'event_id,connection_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getSyncMapping(eventId, connectionId) {
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .select()
+    .eq('event_id', eventId)
+    .eq('connection_id', connectionId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function getSyncMappingByExternalId(connectionId, externalEventId) {
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .select()
+    .eq('connection_id', connectionId)
+    .eq('external_event_id', externalEventId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function deleteSyncMapping(eventId, connectionId) {
+  const { error } = await supabase
+    .from('calendar_sync_mappings')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('connection_id', connectionId);
+  if (error) throw error;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -604,4 +843,23 @@ module.exports = {
   uncompleteShoppingItem,
   deleteShoppingItem,
   deleteTask,
+  // Calendar
+  getCalendarEvents,
+  getTasksByDateRange,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  getOrCreateFeedToken,
+  regenerateFeedToken,
+  getFeedTokenData,
+  getAllEventsForFeed,
+  // Calendar connections (two-way sync)
+  getCalendarConnections,
+  upsertCalendarConnection,
+  deleteCalendarConnection,
+  getConnectionsByHousehold,
+  createSyncMapping,
+  getSyncMapping,
+  getSyncMappingByExternalId,
+  deleteSyncMapping,
 };

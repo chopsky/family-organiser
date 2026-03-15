@@ -1,11 +1,12 @@
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { IconHome, IconCart, IconCheck, IconCamera, IconSettings } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings } from './Icons';
 
 const nav = [
   { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
   { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
+  { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
   { to: '/settings',   label: 'Settings',  Icon: IconSettings  },
 ];

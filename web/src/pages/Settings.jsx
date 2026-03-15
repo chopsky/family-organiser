@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
-import { IconSettings, IconHome, IconMail, IconPhone, IconUsers, IconUser } from '../components/Icons';
+import { IconSettings, IconHome, IconMail, IconPhone, IconUsers, IconUser, IconCalendar } from '../components/Icons';
 
 export default function Settings() {
   const { household, user, isAdmin, login, token } = useAuth();
@@ -32,6 +33,19 @@ export default function Settings() {
   const [telegramLink, setTelegramLink] = useState('');
   const [linkingTelegram, setLinkingTelegram] = useState(false);
 
+  // Calendar feed state
+  const [feedUrl, setFeedUrl] = useState('');
+  const [loadingFeed, setLoadingFeed] = useState(false);
+  const [feedCopied, setFeedCopied] = useState(false);
+
+  // Calendar connections state
+  const [calConnections, setCalConnections] = useState([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [appleEmail, setAppleEmail] = useState('');
+  const [applePassword, setApplePassword] = useState('');
+  const [connectingApple, setConnectingApple] = useState(false);
+  const [showAppleForm, setShowAppleForm] = useState(false);
+
   function loadMembers() {
     return api.get('/household')
       .then(({ data }) => setMembers(data.members ?? []))
@@ -48,6 +62,35 @@ export default function Settings() {
         .catch(() => {});
     }
   }, [isAdmin]);
+
+  // Load calendar connections
+  function loadConnections() {
+    setLoadingConnections(true);
+    api.get('/calendar/connections')
+      .then(({ data }) => setCalConnections(data.connections ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingConnections(false));
+  }
+
+  useEffect(() => { loadConnections(); }, []);
+
+  // Handle OAuth callback redirects (e.g. ?connected=google)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const connected = searchParams.get('connected');
+    const connError = searchParams.get('error');
+    if (connected) {
+      setSuccess(`${connected.charAt(0).toUpperCase() + connected.slice(1)} Calendar connected!`);
+      loadConnections();
+      searchParams.delete('connected');
+      setSearchParams(searchParams, { replace: true });
+    }
+    if (connError) {
+      setError(`Failed to connect calendar. Please try again.`);
+      searchParams.delete('error');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
 
   async function handleRemoveMember(member) {
     if (!window.confirm(`Remove ${member.name} from the household?`)) return;
@@ -109,6 +152,94 @@ export default function Settings() {
       setError(err.response?.data?.error || 'Could not generate Telegram link.');
     } finally {
       setLinkingTelegram(false);
+    }
+  }
+
+  async function handleGetFeedUrl() {
+    setError('');
+    setLoadingFeed(true);
+    try {
+      const { data } = await api.get('/calendar/feed-token');
+      setFeedUrl(data.feedUrl);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not get calendar feed URL.');
+    } finally {
+      setLoadingFeed(false);
+    }
+  }
+
+  async function handleRegenerateFeed() {
+    if (!window.confirm('Regenerate your calendar feed URL? The old URL will stop working.')) return;
+    setError('');
+    setLoadingFeed(true);
+    setFeedCopied(false);
+    try {
+      const { data } = await api.post('/calendar/feed-token');
+      setFeedUrl(data.feedUrl);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not regenerate feed URL.');
+    } finally {
+      setLoadingFeed(false);
+    }
+  }
+
+  function handleCopyFeed() {
+    navigator.clipboard.writeText(feedUrl).then(() => {
+      setFeedCopied(true);
+      setTimeout(() => setFeedCopied(false), 2000);
+    });
+  }
+
+  async function handleConnectGoogle() {
+    try {
+      const { data } = await api.get('/calendar/connect/google');
+      window.location.href = data.url;
+    } catch (err) {
+      setError('Could not start Google Calendar connection.');
+    }
+  }
+
+  async function handleConnectMicrosoft() {
+    try {
+      const { data } = await api.get('/calendar/connect/microsoft');
+      window.location.href = data.url;
+    } catch (err) {
+      setError('Could not start Microsoft Calendar connection.');
+    }
+  }
+
+  async function handleConnectApple(e) {
+    e.preventDefault();
+    if (!appleEmail.trim() || !applePassword.trim()) {
+      setError('Email and app-specific password are required.');
+      return;
+    }
+    setConnectingApple(true);
+    setError('');
+    try {
+      await api.post('/calendar/connect/apple', {
+        email: appleEmail.trim(),
+        appPassword: applePassword.trim(),
+      });
+      setSuccess('Apple Calendar connected!');
+      setShowAppleForm(false);
+      setAppleEmail('');
+      setApplePassword('');
+      loadConnections();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not connect Apple Calendar.');
+    } finally {
+      setConnectingApple(false);
+    }
+  }
+
+  async function handleDisconnect(provider) {
+    if (!window.confirm(`Disconnect ${provider.charAt(0).toUpperCase() + provider.slice(1)} Calendar?`)) return;
+    try {
+      await api.delete(`/calendar/connections/${provider}`);
+      setCalConnections(prev => prev.filter(c => c.provider !== provider));
+    } catch (err) {
+      setError('Could not disconnect calendar.');
     }
   }
 
@@ -262,6 +393,139 @@ export default function Settings() {
             )}
           </>
         )}
+      </div>
+
+      {/* Calendar Sync */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><IconCalendar className="h-4 w-4" /> Calendar Sync</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
+        </p>
+
+        {feedUrl ? (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={feedUrl}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 select-all"
+                onClick={(e) => e.target.select()}
+              />
+              <button
+                onClick={handleCopyFeed}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap"
+              >
+                {feedCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <div className="text-xs text-gray-500 space-y-1">
+              <p className="font-medium text-gray-600">How to subscribe:</p>
+              <p><span className="font-medium">Apple Calendar:</span> File &rarr; New Calendar Subscription &rarr; paste URL</p>
+              <p><span className="font-medium">Google Calendar:</span> Settings &rarr; Add calendar &rarr; From URL &rarr; paste URL</p>
+              <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web &rarr; paste URL</p>
+            </div>
+            <button
+              onClick={handleRegenerateFeed}
+              disabled={loadingFeed}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+            >
+              {loadingFeed ? 'Regenerating…' : 'Regenerate URL'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleGetFeedUrl}
+            disabled={loadingFeed}
+            className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
+          >
+            {loadingFeed ? 'Generating…' : 'Generate Calendar Feed'}
+          </button>
+        )}
+
+        {/* Two-Way Sync Connections */}
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <p className="text-sm font-medium text-gray-700 mb-3">Two-way sync</p>
+          <p className="text-xs text-gray-400 mb-3">
+            Connect your external calendar for automatic two-way sync. Changes in either app will be reflected in the other.
+          </p>
+
+          <div className="space-y-2">
+            {/* Google */}
+            {calConnections.find(c => c.provider === 'google') ? (
+              <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                <span className="text-sm text-green-700 flex items-center gap-2">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  Google Calendar connected
+                </span>
+                <button onClick={() => handleDisconnect('google')} className="text-xs text-red-500 hover:text-red-700">Disconnect</button>
+              </div>
+            ) : (
+              <button onClick={handleConnectGoogle} className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Connect Google Calendar
+              </button>
+            )}
+
+            {/* Microsoft */}
+            {calConnections.find(c => c.provider === 'microsoft') ? (
+              <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                <span className="text-sm text-green-700 flex items-center gap-2">
+                  <svg className="w-4 h-4" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                  Microsoft Calendar connected
+                </span>
+                <button onClick={() => handleDisconnect('microsoft')} className="text-xs text-red-500 hover:text-red-700">Disconnect</button>
+              </div>
+            ) : (
+              <button onClick={handleConnectMicrosoft} className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                Connect Microsoft / Outlook
+              </button>
+            )}
+
+            {/* Apple */}
+            {calConnections.find(c => c.provider === 'apple') ? (
+              <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                <span className="text-sm text-green-700 flex items-center gap-2">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                  Apple Calendar connected
+                </span>
+                <button onClick={() => handleDisconnect('apple')} className="text-xs text-red-500 hover:text-red-700">Disconnect</button>
+              </div>
+            ) : showAppleForm ? (
+              <form onSubmit={handleConnectApple} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-gray-500">
+                  Use an app-specific password from <a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer" className="text-orange-500 underline">appleid.apple.com</a> &rarr; Sign-In and Security &rarr; App-Specific Passwords.
+                </p>
+                <input
+                  type="email"
+                  placeholder="Apple ID email"
+                  value={appleEmail}
+                  onChange={(e) => setAppleEmail(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <input
+                  type="password"
+                  placeholder="App-specific password"
+                  value={applePassword}
+                  onChange={(e) => setApplePassword(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={connectingApple} className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors">
+                    {connectingApple ? 'Connecting…' : 'Connect'}
+                  </button>
+                  <button type="button" onClick={() => setShowAppleForm(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <button onClick={() => setShowAppleForm(true)} className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                Connect Apple Calendar
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Members */}

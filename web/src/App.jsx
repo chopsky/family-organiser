@@ -10,6 +10,7 @@ import SetupHousehold from './pages/SetupHousehold';
 import Dashboard     from './pages/Dashboard';
 import Shopping      from './pages/Shopping';
 import Tasks         from './pages/Tasks';
+import Calendar      from './pages/Calendar';
 import Receipt       from './pages/Receipt';
 import Settings      from './pages/Settings';
 
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
       <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
       <Route path="/tasks" element={<RequireAuth><Layout><Tasks /></Layout></RequireAuth>} />
+      <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
       <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
       <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
