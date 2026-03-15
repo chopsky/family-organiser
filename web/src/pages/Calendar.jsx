@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
@@ -112,6 +112,7 @@ export default function Calendar() {
   const [saving, setSaving] = useState(false);
 
   const [toggling, setToggling] = useState(new Set());
+  const formRef = useRef(null);
 
   // ── Data loading ────────────────────────────────────────
 
@@ -139,6 +140,13 @@ export default function Calendar() {
   useEffect(() => {
     api.get('/household').then(({ data }) => setMembers(data.members ?? [])).catch(() => {});
   }, []);
+
+  // Scroll to form when it opens
+  useEffect(() => {
+    if (showForm && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [showForm]);
 
   // ── Month navigation ───────────────────────────────────
 
@@ -175,7 +183,7 @@ export default function Calendar() {
   function resetForm() {
     setEditingEvent(null);
     setFormTitle('');
-    setFormDate(toDateStr(selectedDate));
+    setFormDate(toDateStr(selectedDate || today));
     setFormAllDay(false);
     setFormStart('09:00');
     setFormEnd('10:00');
@@ -244,6 +252,7 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id) {
+    if (!window.confirm('Delete this event? This cannot be undone.')) return;
     try {
       await api.delete(`/calendar/events/${id}`);
       setShowForm(false);
@@ -275,10 +284,6 @@ export default function Calendar() {
   const selectedTasks = selectedDate ? tasksForDate(selectedDate) : [];
 
   // ── Render ─────────────────────────────────────────────
-
-  if (loading && events.length === 0) {
-    return <div className="flex justify-center py-20"><Spinner /></div>;
-  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -312,41 +317,53 @@ export default function Calendar() {
 
         {/* Day cells */}
         <div className="grid grid-cols-7">
-          {calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
-            const isToday = isSameDay(date, today);
-            const isSelected = selectedDate && isSameDay(date, selectedDate);
-            const dayEvents = eventsForDate(date);
-            const dayTasks = tasksForDate(date);
-            const totalItems = dayEvents.length + dayTasks.length;
-            const maxShow = 3;
-
-            return (
-              <button
+          {loading && events.length === 0 ? (
+            // Skeleton grid while loading
+            Array.from({ length: 35 }).map((_, idx) => (
+              <div
                 key={idx}
-                onClick={() => setSelectedDate(new Date(date))}
-                className={`
-                  relative min-h-[48px] sm:min-h-[64px] p-1 border border-gray-50 text-left transition-all rounded
-                  ${!isCurrent ? 'text-gray-300' : 'text-gray-700'}
-                  ${isToday ? 'bg-orange-50 font-bold text-orange-600' : ''}
-                  ${isSelected ? 'ring-2 ring-orange-400' : ''}
-                  hover:bg-gray-50
-                `}
+                className="min-h-[56px] sm:min-h-[68px] p-1 border border-gray-50 rounded animate-pulse"
               >
-                <span className="text-xs sm:text-sm">{date.getDate()}</span>
-                <div className="flex flex-wrap gap-0.5 mt-0.5">
-                  {dayEvents.slice(0, maxShow).map(ev => (
-                    <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-orange-400'}`} title={ev.title} />
-                  ))}
-                  {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => (
-                    <span key={tk.id} className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[tk.priority] || 'bg-amber-400'}`} title={tk.title} />
-                  ))}
-                </div>
-                {totalItems > maxShow && (
-                  <span className="text-[10px] text-gray-400 leading-none">+{totalItems - maxShow}</span>
-                )}
-              </button>
-            );
-          })}
+                <div className="w-5 h-3 bg-gray-100 rounded" />
+              </div>
+            ))
+          ) : (
+            calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
+              const isToday = isSameDay(date, today);
+              const isSelected = selectedDate && isSameDay(date, selectedDate);
+              const dayEvents = eventsForDate(date);
+              const dayTasks = tasksForDate(date);
+              const totalItems = dayEvents.length + dayTasks.length;
+              const maxShow = 3;
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedDate(new Date(date))}
+                  className={`
+                    relative min-h-[56px] sm:min-h-[68px] p-1 border border-gray-50 text-left transition-all rounded
+                    ${!isCurrent ? 'text-gray-300' : 'text-gray-700'}
+                    ${isToday ? 'bg-orange-50 font-bold text-orange-600' : ''}
+                    ${isSelected ? 'ring-2 ring-orange-400' : ''}
+                    hover:bg-gray-50
+                  `}
+                >
+                  <span className="text-xs sm:text-sm">{date.getDate()}</span>
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {dayEvents.slice(0, maxShow).map(ev => (
+                      <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-orange-400'}`} title={ev.title} />
+                    ))}
+                    {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => (
+                      <span key={tk.id} className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[tk.priority] || 'bg-amber-400'}`} title={tk.title} />
+                    ))}
+                  </div>
+                  {totalItems > maxShow && (
+                    <span className="text-[10px] text-gray-400 leading-none">+{totalItems - maxShow}</span>
+                  )}
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -390,9 +407,9 @@ export default function Calendar() {
                 );
               })}
             </div>
-          ) : (
-            <p className="text-sm text-gray-400">No events</p>
-          )}
+          ) : selectedTasks.length === 0 ? (
+            <p className="text-sm text-gray-400">No events or tasks for this day</p>
+          ) : null}
 
           {/* Tasks */}
           {selectedTasks.length > 0 && (
@@ -427,7 +444,7 @@ export default function Calendar() {
 
       {/* ── Event Form ───────────────────────────────────── */}
       {showForm && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div ref={formRef} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
             {editingEvent ? 'Edit Event' : 'New Event'}
           </h2>

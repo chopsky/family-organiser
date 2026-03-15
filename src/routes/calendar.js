@@ -33,8 +33,9 @@ function parseMonth(month) {
 const feedLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 60,
-  keyGenerator: (req) => `${req.params.token}-${req.ip}`,
+  keyGenerator: (req) => `${req.params.token}`,
   message: { error: 'Too many requests, please try again later' },
+  validate: { xForwardedForHeader: false, default: true },
 });
 
 /**
