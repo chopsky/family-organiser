@@ -1,6 +1,11 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
-const ical = require('ical-generator').default;
+// Lazy-load ical-generator to keep server startup fast
+let _ical = null;
+function getIcal() {
+  if (!_ical) _ical = require('ical-generator').default;
+  return _ical;
+}
 const db = require('../db/queries');
 const { requireAuth } = require('../middleware/auth');
 const calendarSync = require('../services/calendarSync');
@@ -52,7 +57,7 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
     const household = await db.getHouseholdById(tokenData.household_id);
     const { events, tasks } = await db.getAllEventsForFeed(tokenData.household_id);
 
-    const calendar = ical({ name: household.name + ' \u2014 Curata' });
+    const calendar = getIcal()({ name: household.name + ' \u2014 Curata' });
 
     // Add calendar events
     for (const event of events) {

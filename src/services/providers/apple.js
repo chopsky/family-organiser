@@ -1,4 +1,10 @@
-const { DAVClient } = require('tsdav');
+// Lazy-load tsdav to keep server startup fast
+let _DAVClient = null;
+function getDAVClient() {
+  if (!_DAVClient) _DAVClient = require('tsdav').DAVClient;
+  return _DAVClient;
+}
+
 const { v4: uuidv4 } = require('uuid');
 
 const CALDAV_SERVER_URL = 'https://caldav.icloud.com';
@@ -91,7 +97,7 @@ function parseVEvent(icalData) {
  * Create and return a DAVClient connected to Apple's CalDAV server.
  */
 async function connect(connection) {
-  const client = new DAVClient({
+  const client = new (getDAVClient())({
     serverUrl: CALDAV_SERVER_URL,
     credentials: {
       username: connection.caldav_username,
@@ -282,7 +288,7 @@ async function refreshToken(_connection) {
  */
 async function validateCredentials(email, appPassword) {
   try {
-    const client = new DAVClient({
+    const client = new (getDAVClient())({
       serverUrl: CALDAV_SERVER_URL,
       credentials: {
         username: email,

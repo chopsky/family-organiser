@@ -1,5 +1,11 @@
 const axios = require('axios');
-const { Client } = require('@microsoft/microsoft-graph-client');
+
+// Lazy-load microsoft-graph-client to keep server startup fast
+let _GraphClient = null;
+function getGraphClient() {
+  if (!_GraphClient) _GraphClient = require('@microsoft/microsoft-graph-client').Client;
+  return _GraphClient;
+}
 
 const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID;
 const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET;
@@ -13,7 +19,7 @@ const REDIRECT_URI = `${API_URL}/api/calendar/connect/microsoft/callback`;
 const SCOPES = 'Calendars.ReadWrite offline_access';
 
 function getClient(accessToken) {
-  return Client.init({
+  return getGraphClient().init({
     authProvider: (done) => done(null, accessToken),
   });
 }

@@ -1,4 +1,9 @@
-const { google } = require('googleapis');
+// Lazy-load googleapis (it's ~800ms to require) to keep server startup fast
+let _google = null;
+function getGoogle() {
+  if (!_google) _google = require('googleapis').google;
+  return _google;
+}
 
 const CLIENT_ID = process.env.GOOGLE_CALENDAR_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
@@ -7,13 +12,13 @@ const REDIRECT_URI = `${API_URL}/api/calendar/connect/google/callback`;
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 function createOAuth2Client() {
-  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+  return new (getGoogle()).auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 }
 
 function createCalendarClient(accessToken) {
   const auth = createOAuth2Client();
   auth.setCredentials({ access_token: accessToken });
-  return google.calendar({ version: 'v3', auth });
+  return getGoogle().calendar({ version: 'v3', auth });
 }
 
 function toGoogleEvent(event) {
