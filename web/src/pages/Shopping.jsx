@@ -113,10 +113,10 @@ export default function Shopping() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IconCart className="h-6 w-6" /> Shopping</h1>
+        <h1 className="text-2xl font-bold text-bark flex items-center gap-2"><IconCart className="h-6 w-6" /> Shopping</h1>
         <button
           onClick={() => setShowCompleted((v) => !v)}
-          className="text-sm text-orange-500 hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           {showCompleted ? 'Hide done' : 'Show done'}
         </button>
@@ -125,18 +125,18 @@ export default function Shopping() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* Add item */}
-      <form onSubmit={addItem} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex gap-2">
+      <form onSubmit={addItem} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 flex gap-2">
         <input
           type="text"
           value={addText}
           onChange={(e) => setAddText(e.target.value)}
           placeholder="Add item…"
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
         <select
           value={addCat}
           onChange={(e) => setAddCat(e.target.value)}
-          className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+          className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
@@ -145,7 +145,7 @@ export default function Shopping() {
         <button
           type="submit"
           disabled={adding || !addText.trim()}
-          className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors"
         >
           {adding ? '…' : '+ Add'}
         </button>
@@ -156,7 +156,7 @@ export default function Shopping() {
         <button
           onClick={() => setFilter('')}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            !filter ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            !filter ? 'bg-primary text-white' : 'bg-linen text-cocoa hover:bg-secondary/30'
           }`}
         >
           All
@@ -166,7 +166,7 @@ export default function Shopping() {
             key={c}
             onClick={() => setFilter(c === filter ? '' : c)}
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              filter === c ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              filter === c ? 'bg-primary text-white' : 'bg-linen text-cocoa hover:bg-secondary/30'
             }`}
           >
             {CATEGORY_EMOJI[c]} {c}
@@ -178,7 +178,7 @@ export default function Shopping() {
         <>
           {/* Incomplete items */}
           {incomplete.length === 0 && !showCompleted && (
-            <p className="text-center text-gray-400 py-8">All done! Nothing left to buy.</p>
+            <p className="text-center text-cocoa py-8">All done! Nothing left to buy.</p>
           )}
           <ul className="space-y-2">
             {incomplete.map((item) => (
@@ -189,7 +189,7 @@ export default function Shopping() {
           {/* Completed items */}
           {showCompleted && complete.length > 0 && (
             <>
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mt-4">Completed</h2>
+              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mt-4">Completed</h2>
               <ul className="space-y-2 opacity-60">
                 {complete.map((item) => (
                   <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} />
@@ -201,36 +201,36 @@ export default function Shopping() {
           {/* Previously Purchased (last 24h) */}
           {recentDone.length > 0 && (
             <div className="mt-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mb-2">
                 Previously purchased
               </h2>
               <ul className="space-y-2">
                 {recentDone.map((item) => (
-                  <li key={item.id} className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 text-xs font-bold">
+                  <li key={item.id} className="bg-oat rounded-2xl border border-cream-border px-4 py-3 flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-success/20 text-success flex items-center justify-center shrink-0 text-xs font-bold">
                       ✓
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-600">{item.item}</p>
+                      <p className="text-sm text-cocoa">{item.item}</p>
                       <div className="flex gap-x-3 mt-0.5">
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-cocoa">
                           {CATEGORY_EMOJI[item.category]} {item.category}
                         </span>
-                        <span className="text-xs text-gray-400">{timeAgo(item.completed_at)}</span>
+                        <span className="text-xs text-cocoa">{timeAgo(item.completed_at)}</span>
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => restore(item)}
                         disabled={restoring.has(item.id)}
-                        className="text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                        className="text-xs font-medium text-warn hover:text-warn bg-warn/10 hover:bg-warn/20 px-3 py-1.5 rounded-2xl transition-colors"
                       >
                         {restoring.has(item.id) ? '…' : 'Restore'}
                       </button>
                       <button
                         onClick={() => confirmDelete(item)}
                         disabled={deleting.has(item.id)}
-                        className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                        className="text-xs text-error hover:text-error hover:bg-error/10 p-1.5 rounded-2xl transition-colors"
                         title="Delete permanently"
                       >
                         {deleting.has(item.id) ? '…' : (
@@ -253,27 +253,27 @@ export default function Shopping() {
 
 function ItemRow({ item, toggle, loading }) {
   return (
-    <li className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3 flex items-center gap-3">
+    <li className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-center gap-3">
       <button
         onClick={() => toggle(item)}
         disabled={loading}
         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
           item.completed
-            ? 'bg-green-500 border-green-500 text-white'
-            : 'border-gray-300 hover:border-orange-400'
+            ? 'bg-success border-success text-white'
+            : 'border-cream-border hover:border-primary'
         }`}
       >
         {item.completed && '✓'}
       </button>
       <div className="flex-1 min-w-0">
-        <span className={`text-sm ${item.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+        <span className={`text-sm ${item.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
           {item.item}
         </span>
         {item.quantity && (
-          <span className="text-gray-400 text-xs ml-1">({item.quantity})</span>
+          <span className="text-cocoa text-xs ml-1">({item.quantity})</span>
         )}
       </div>
-      <span className="text-xs text-gray-400 shrink-0">
+      <span className="text-xs text-cocoa shrink-0">
         {CATEGORY_EMOJI[item.category]} {item.category}
       </span>
     </li>

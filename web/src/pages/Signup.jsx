@@ -57,72 +57,72 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/Curata-favicon.png" alt="Curata" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-3xl font-bold text-gray-900">Create your account</h1>
+          <h1 className="text-3xl font-bold text-bark">Create your account</h1>
           {inviteToken && (
-            <p className="text-orange-500 mt-2 font-medium">You've been invited to join a household!</p>
+            <p className="text-primary mt-2 font-medium">You've been invited to join a household!</p>
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
           <ErrorBanner message={error} onDismiss={() => setError('')} />
 
           <SocialButtons inviteToken={inviteToken} onSuccess={handleSocialSuccess} onError={setError} />
 
           <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-            <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-gray-400">or sign up with email</span></div>
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-cream-border" /></div>
+            <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-cocoa">or sign up with email</span></div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-sm font-medium text-bark mb-1">Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Sarah"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 autoComplete="given-name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-bark mb-1">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 autoComplete="email"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-bark mb-1">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 autoComplete="new-password"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-lg transition-colors"
+              className="w-full bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-3 rounded-2xl transition-colors"
             >
               {loading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Already have an account? <Link to="/login" className="text-orange-500 font-medium hover:underline">Log in</Link>
+        <p className="text-center text-sm text-cocoa mt-6">
+          Already have an account? <Link to="/login" className="text-primary font-medium hover:underline">Log in</Link>
         </p>
       </div>
     </div>

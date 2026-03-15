@@ -4,7 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconUser, IconCalendar } from '../components/Icons';
 
-const PRIORITY_COLORS = { high: 'bg-rose-400', medium: 'bg-amber-400', low: 'bg-emerald-400' };
+const PRIORITY_COLORS = { high: 'bg-error', medium: 'bg-warn', low: 'bg-success' };
 const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
 const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
@@ -148,19 +148,19 @@ export default function Tasks() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-bark flex items-center gap-2">
           <IconCheck className="h-6 w-6" /> Tasks
         </h1>
         <div className="flex gap-3">
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="text-sm text-orange-500 hover:underline"
+            className="text-sm text-primary hover:underline"
           >
             {showAll ? 'Due today' : 'All tasks'}
           </button>
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            className="bg-primary hover:bg-primary-pressed text-white text-sm font-medium px-3 py-1.5 rounded-2xl transition-colors"
           >
             + Add
           </button>
@@ -171,43 +171,43 @@ export default function Tasks() {
 
       {/* Add task form */}
       {showForm && (
-        <form onSubmit={addTask} className="bg-white rounded-xl shadow-sm border border-orange-100 p-4 space-y-3">
-          <h2 className="font-semibold text-gray-800">New task</h2>
+        <form onSubmit={addTask} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 space-y-3">
+          <h2 className="font-semibold text-bark">New task</h2>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Task title"
             required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Due date</label>
+              <label className="text-xs text-cocoa mb-1 block">Due date</label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Assign to</label>
+              <label className="text-xs text-cocoa mb-1 block">Assign to</label>
               <select
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">Everyone</option>
                 {members.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Priority</label>
+              <label className="text-xs text-cocoa mb-1 block">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -215,11 +215,11 @@ export default function Tasks() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Repeats</label>
+              <label className="text-xs text-cocoa mb-1 block">Repeats</label>
               <select
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 {RECURRENCES.map((r) => <option key={r} value={r}>{r || 'Never'}</option>)}
               </select>
@@ -229,14 +229,14 @@ export default function Tasks() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2"
+              className="text-sm text-cocoa hover:text-bark px-3 py-2"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={adding || !title.trim()}
-              className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
             >
               {adding ? 'Adding...' : 'Add task'}
             </button>
@@ -245,7 +245,7 @@ export default function Tasks() {
       )}
 
       {loading ? <Spinner /> : tasks.length === 0 ? (
-        <p className="text-center text-gray-400 py-10">
+        <p className="text-center text-cocoa py-10">
           {showAll ? 'All tasks complete!' : 'Nothing due today!'}
         </p>
       ) : (
@@ -254,20 +254,20 @@ export default function Tasks() {
             const overdue = daysOverdue(task.due_date);
             const dueToday = overdue === 0;
             return (
-              <li key={task.id} className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3 flex items-start gap-3">
+              <li key={task.id} className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-start gap-3">
                 <button
                   onClick={() => toggle(task)}
                   disabled={toggling.has(task.id)}
                   className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                     task.completed
-                      ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-gray-300 hover:border-orange-400'
+                      ? 'bg-success border-success text-white'
+                      : 'border-cream-border hover:border-primary'
                   }`}
                 >
                   {task.completed && '✓'}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium flex items-center gap-1.5 ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                  <p className={`text-sm font-medium flex items-center gap-1.5 ${task.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
                     <button
                       onClick={(e) => { e.stopPropagation(); cyclePriority(task); }}
                       disabled={updating.has(task.id) || task.completed}
@@ -275,7 +275,7 @@ export default function Tasks() {
                       title={`Priority: ${PRIORITY_LABELS[task.priority]} (tap to change)`}
                     >
                       {updating.has(task.id)
-                        ? <span className="w-3 h-3 rounded-full bg-gray-300 animate-pulse" />
+                        ? <span className="w-3 h-3 rounded-full bg-cocoa animate-pulse" />
                         : <PriorityDot priority={task.priority} />
                       }
                     </button>
@@ -283,22 +283,22 @@ export default function Tasks() {
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                     {task.assigned_to_name && (
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <span className="text-xs text-cocoa flex items-center gap-1">
                         <IconUser className="h-3 w-3" /> {task.assigned_to_name}
                       </span>
                     )}
                     <span className={`text-xs font-medium flex items-center gap-1 ${
-                      task.completed ? 'text-gray-400' :
-                      overdue > 0   ? 'text-red-500' :
-                      dueToday      ? 'text-amber-500' : 'text-gray-400'
+                      task.completed ? 'text-cocoa' :
+                      overdue > 0   ? 'text-error' :
+                      dueToday      ? 'text-warn' : 'text-cocoa'
                     }`}>
                       {task.completed ? 'Done' :
-                       overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> {overdue}d overdue</> :
-                       dueToday      ? <><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Due today</> :
+                       overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-error inline-block" /> {overdue}d overdue</> :
+                       dueToday      ? <><span className="w-2 h-2 rounded-full bg-warn inline-block" /> Due today</> :
                        <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
                     </span>
                     {task.recurrence && (
-                      <span className="text-xs text-gray-400">[{task.recurrence}]</span>
+                      <span className="text-xs text-cocoa">[{task.recurrence}]</span>
                     )}
                   </div>
                 </div>
@@ -311,38 +311,38 @@ export default function Tasks() {
       {/* Recently Completed (last 24h) */}
       {!loading && recentDone.length > 0 && (
         <div className="mt-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mb-2">
             Recently completed
           </h2>
           <ul className="space-y-2">
             {recentDone.map((task) => (
-              <li key={task.id} className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 text-xs font-bold">
+              <li key={task.id} className="bg-oat rounded-2xl border border-cream-border px-4 py-3 flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-success/20 text-success flex items-center justify-center shrink-0 text-xs font-bold">
                   ✓
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-500 line-through">{task.title}</p>
+                  <p className="text-sm text-cocoa line-through">{task.title}</p>
                   <div className="flex gap-x-3 mt-0.5">
                     {task.assigned_to_name && (
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <span className="text-xs text-cocoa flex items-center gap-1">
                         <IconUser className="h-3 w-3" /> {task.assigned_to_name}
                       </span>
                     )}
-                    <span className="text-xs text-gray-400">{timeAgo(task.completed_at)}</span>
+                    <span className="text-xs text-cocoa">{timeAgo(task.completed_at)}</span>
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => restore(task)}
                     disabled={restoring.has(task.id)}
-                    className="text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                    className="text-xs font-medium text-warn hover:text-warn bg-warn/10 hover:bg-warn/20 px-3 py-1.5 rounded-2xl transition-colors"
                   >
                     {restoring.has(task.id) ? '...' : 'Restore'}
                   </button>
                   <button
                     onClick={() => confirmDelete(task)}
                     disabled={deleting.has(task.id)}
-                    className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                    className="text-xs text-error hover:text-error hover:bg-error/10 p-1.5 rounded-2xl transition-colors"
                     title="Delete permanently"
                   >
                     {deleting.has(task.id) ? '...' : (

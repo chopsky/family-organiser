@@ -28,17 +28,17 @@ export default function SetupHousehold() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/Curata-favicon.png" alt="Curata" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to Curata!</h1>
-          <p className="text-gray-500 mt-2">Create your household to get started.</p>
+          <h1 className="text-2xl font-bold text-bark">Welcome to Curata!</h1>
+          <p className="text-cocoa mt-2">Create your household to get started.</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Create a household</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
+          <h2 className="text-lg font-semibold text-bark mb-4">Create a household</h2>
+          <p className="text-sm text-cocoa mb-4">
             Give your household a name — you can change it later.
           </p>
 
@@ -50,20 +50,20 @@ export default function SetupHousehold() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. The Shapiros"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
               autoFocus
             />
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-lg transition-colors"
+              className="w-full bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-3 rounded-2xl transition-colors"
             >
               {loading ? 'Creating...' : 'Create household'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs text-cocoa mt-6">
           Once created, you can invite family members from Settings.
         </p>
       </div>

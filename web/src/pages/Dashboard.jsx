@@ -10,14 +10,14 @@ function StatCard({ icon, label, value, to }) {
   return (
     <Link
       to={to}
-      className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:shadow-md transition-shadow"
+      className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5 flex items-center gap-4 hover:shadow-md transition-shadow"
     >
-      <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0">
+      <div className="w-10 h-10 rounded-full bg-secondary/30 text-primary flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <p className="text-sm text-gray-500">{label}</p>
+        <p className="text-2xl font-bold text-bark">{value}</p>
+        <p className="text-sm text-cocoa">{label}</p>
       </div>
     </Link>
   );
@@ -81,10 +81,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-bark">
           Hello, {user?.name}!
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-cocoa text-sm mt-1">
           {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
@@ -101,8 +101,8 @@ export default function Dashboard() {
       </div>
 
       {/* Natural-language input */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+      <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
           <IconPlus className="h-4 w-4" /> Add items or tasks
         </h2>
         <form onSubmit={handleNlSubmit} className="flex gap-2">
@@ -111,50 +111,50 @@ export default function Dashboard() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. Buy milk and remind Jake to do homework"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="button"
             onClick={startVoice}
             title="Voice input"
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg px-3 py-2 transition-colors"
+            className="bg-linen hover:bg-linen text-bark rounded-2xl px-3 py-2 transition-colors"
           >
             <IconMic className="h-5 w-5" />
           </button>
           <button
             type="submit"
             disabled={sending || !text.trim()}
-            className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors"
           >
             {sending ? '…' : 'Add'}
           </button>
         </form>
         {nlResult && (
-          <p className="mt-3 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">{nlResult}</p>
+          <p className="mt-3 text-sm text-success bg-success/10 rounded-lg px-3 py-2">{nlResult}</p>
         )}
       </div>
 
       {/* Outstanding tasks */}
       {outstandingCount > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+          <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
             <IconAlert className="h-4 w-4" /> Needs attention
           </h2>
           <ul className="space-y-2">
             {(digest.outstanding ?? []).slice(0, 5).map((t) => (
               <li key={t.id} className="flex items-start gap-2 text-sm">
-                <span className="text-red-500 mt-0.5">●</span>
-                <span className="text-gray-700">
+                <span className="text-error mt-0.5">●</span>
+                <span className="text-bark">
                   {t.title}
                   {t.assigned_to_name && (
-                    <span className="text-gray-400"> · {t.assigned_to_name}</span>
+                    <span className="text-cocoa"> · {t.assigned_to_name}</span>
                   )}
                 </span>
               </li>
             ))}
           </ul>
           {outstandingCount > 5 && (
-            <Link to="/tasks" className="text-orange-500 text-sm mt-2 block hover:underline">
+            <Link to="/tasks" className="text-primary text-sm mt-2 block hover:underline">
               + {outstandingCount - 5} more →
             </Link>
           )}
@@ -163,18 +163,18 @@ export default function Dashboard() {
 
       {/* Members */}
       {digest?.members?.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+          <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
             <IconUsers className="h-4 w-4" /> Household
           </h2>
           <div className="flex flex-wrap gap-2">
             {digest.members.map((m) => (
               <span
                 key={m.id}
-                className="bg-orange-50 text-orange-600 rounded-full px-3 py-1 text-sm font-medium"
+                className="bg-secondary/30 text-primary rounded-full px-3 py-1 text-sm font-medium"
               >
                 {m.name}
-                {m.role === 'admin' && <span className="ml-1 text-orange-400 text-xs">admin</span>}
+                {m.role === 'admin' && <span className="ml-1 text-primary text-xs">admin</span>}
               </span>
             ))}
           </div>

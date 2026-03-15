@@ -55,8 +55,8 @@ export default function Receipt() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IconCamera className="h-6 w-6" /> Receipt Scanner</h1>
-      <p className="text-sm text-gray-500">
+      <h1 className="text-2xl font-bold text-bark flex items-center gap-2"><IconCamera className="h-6 w-6" /> Receipt Scanner</h1>
+      <p className="text-sm text-cocoa">
         Upload a receipt photo to automatically check off matching items from your shopping list.
       </p>
 
@@ -69,7 +69,7 @@ export default function Receipt() {
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => inputRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 hover:border-orange-400 rounded-xl p-8 text-center cursor-pointer transition-colors bg-white"
+            className="border-2 border-dashed border-cream-border hover:border-primary rounded-2xl p-8 text-center cursor-pointer transition-colors bg-linen"
           >
             {preview ? (
               <img
@@ -79,10 +79,10 @@ export default function Receipt() {
               />
             ) : (
               <div className="space-y-2">
-                <IconReceipt className="h-10 w-10 mx-auto text-gray-400" />
-                <p className="text-gray-600 font-medium">Tap to choose a photo</p>
-                <p className="text-gray-400 text-sm">or drag and drop here</p>
-                <p className="text-gray-400 text-xs">JPG, PNG, WebP — max 10 MB</p>
+                <IconReceipt className="h-10 w-10 mx-auto text-cocoa" />
+                <p className="text-bark font-medium">Tap to choose a photo</p>
+                <p className="text-cocoa text-sm">or drag and drop here</p>
+                <p className="text-cocoa text-xs">JPG, PNG, WebP — max 10 MB</p>
               </div>
             )}
             <input
@@ -100,14 +100,14 @@ export default function Receipt() {
             <div className="flex gap-3">
               <button
                 onClick={reset}
-                className="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg py-3 font-medium transition-colors"
+                className="flex-1 border border-cream-border text-cocoa hover:bg-oat rounded-2xl py-3 font-medium transition-colors"
               >
                 Choose different
               </button>
               <button
                 onClick={handleUpload}
                 disabled={uploading}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg py-3 font-medium transition-colors"
+                className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl py-3 font-medium transition-colors"
               >
                 {uploading ? 'Scanning...' : <><IconSearch className="h-4 w-4 inline -mt-0.5" /> Scan receipt</>}
               </button>
@@ -120,16 +120,16 @@ export default function Receipt() {
         /* Results */
         <div className="space-y-4">
           {/* Checked off */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-            <h2 className="font-semibold text-green-800 mb-3">
+          <div className="bg-success/10 border border-success/30 rounded-2xl p-5">
+            <h2 className="font-semibold text-success mb-3">
               <span className="flex items-center gap-1.5"><IconCheck className="h-4 w-4" /> Checked off ({result.checkedOff?.length ?? 0})</span>
             </h2>
             {result.checkedOff?.length === 0 ? (
-              <p className="text-sm text-green-700">None matched your shopping list.</p>
+              <p className="text-sm text-success">None matched your shopping list.</p>
             ) : (
               <ul className="space-y-1">
                 {result.checkedOff.map((item, i) => (
-                  <li key={i} className="text-sm text-green-700 flex items-center gap-2">
+                  <li key={i} className="text-sm text-success flex items-center gap-2">
                     <span>✓</span> {item.name ?? item}
                   </li>
                 ))}
@@ -139,33 +139,33 @@ export default function Receipt() {
 
           {/* Unmatched items from receipt */}
           {result.unmatched?.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-              <h2 className="font-semibold text-amber-800 mb-3">
+            <div className="bg-warn/10 border border-warn/30 rounded-2xl p-5">
+              <h2 className="font-semibold text-warn mb-3">
                 <span className="flex items-center gap-1.5"><IconClipboard className="h-4 w-4" /> On receipt, not in your list ({result.unmatched.length})</span>
               </h2>
               <ul className="space-y-1">
                 {result.unmatched.map((item, i) => (
-                  <li key={i} className="text-sm text-amber-700">• {item}</li>
+                  <li key={i} className="text-sm text-warn">• {item}</li>
                 ))}
               </ul>
             </div>
           )}
 
           {/* All extracted items */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-700 mb-3">
+          <div className="bg-oat border border-cream-border rounded-2xl p-5">
+            <h2 className="font-semibold text-bark mb-3">
               <span className="flex items-center gap-1.5"><IconReceipt className="h-4 w-4" /> Extracted from receipt ({result.extracted?.items?.length ?? 0})</span>
             </h2>
             <ul className="space-y-1">
               {(result.extracted?.items ?? []).map((item, i) => (
-                <li key={i} className="text-sm text-gray-600">• {item.normalised_name ?? item.name ?? String(item)}{item.price ? ` — ${item.price}` : ''}</li>
+                <li key={i} className="text-sm text-cocoa">• {item.normalised_name ?? item.name ?? String(item)}{item.price ? ` — ${item.price}` : ''}</li>
               ))}
             </ul>
           </div>
 
           <button
             onClick={reset}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-3 font-medium transition-colors"
+            className="w-full bg-primary hover:bg-primary-pressed text-white rounded-2xl py-3 font-medium transition-colors"
           >
             Scan another receipt
           </button>
@@ -193,12 +193,12 @@ function ScanProgress() {
   }, []);
 
   return (
-    <div className="bg-orange-50 rounded-xl p-5 text-center space-y-3">
+    <div className="bg-oat rounded-2xl p-5 text-center space-y-3">
       <Spinner />
-      <p className="text-orange-600 text-sm font-medium">{SCAN_STEPS[step].label}</p>
-      <div className="w-full bg-orange-100 rounded-full h-1.5">
+      <p className="text-primary text-sm font-medium">{SCAN_STEPS[step].label}</p>
+      <div className="w-full bg-secondary/30 rounded-full h-1.5">
         <div
-          className="bg-orange-400 h-1.5 rounded-full transition-all duration-1000"
+          className="bg-primary h-1.5 rounded-full transition-all duration-1000"
           style={{ width: `${((step + 1) / SCAN_STEPS.length) * 100}%` }}
         />
       </div>
