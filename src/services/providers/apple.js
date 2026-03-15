@@ -8,7 +8,7 @@ async function getDAVClient() {
   return _DAVClient;
 }
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 const CALDAV_SERVER_URL = 'https://caldav.icloud.com';
 
@@ -142,7 +142,7 @@ async function pushEvent(connection, event, action) {
   }
 
   if (action === 'create') {
-    const uid = uuidv4();
+    const uid = randomUUID();
     const icalData = buildVEvent(event, uid);
     const filename = `${uid}.ics`;
 
