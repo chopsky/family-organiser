@@ -1,7 +1,10 @@
-// Lazy-load tsdav to keep server startup fast
+// Lazy-load tsdav via dynamic import — it's ESM-only and can't use require()
 let _DAVClient = null;
-function getDAVClient() {
-  if (!_DAVClient) _DAVClient = require('tsdav').DAVClient;
+async function getDAVClient() {
+  if (!_DAVClient) {
+    const tsdav = await import('tsdav');
+    _DAVClient = tsdav.DAVClient;
+  }
   return _DAVClient;
 }
 
@@ -97,7 +100,8 @@ function parseVEvent(icalData) {
  * Create and return a DAVClient connected to Apple's CalDAV server.
  */
 async function connect(connection) {
-  const client = new (getDAVClient())({
+  const DAVClient = await getDAVClient();
+  const client = new DAVClient({
     serverUrl: CALDAV_SERVER_URL,
     credentials: {
       username: connection.caldav_username,
@@ -288,7 +292,8 @@ async function refreshToken(_connection) {
  */
 async function validateCredentials(email, appPassword) {
   try {
-    const client = new (getDAVClient())({
+    const DAVClient = await getDAVClient();
+    const client = new DAVClient({
       serverUrl: CALDAV_SERVER_URL,
       credentials: {
         username: email,
