@@ -13,7 +13,6 @@ const CATEGORY_EMOJI = {
 
 export default function Shopping() {
   const [items, setItems]           = useState([]);
-  const [recentDone, setRecentDone] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
   const [filter, setFilter]         = useState('');          // category filter
@@ -32,12 +31,8 @@ export default function Shopping() {
       const params = {};
       if (filter) params.category = filter;
       if (showCompleted) params.completed = 'true';
-      const [itemsRes, recentRes] = await Promise.all([
-        api.get('/shopping', { params }),
-        api.get('/shopping/recent'),
-      ]);
-      setItems(itemsRes.data.items ?? []);
-      setRecentDone(recentRes.data.items ?? []);
+      const res = await api.get('/shopping', { params });
+      setItems(res.data.items ?? []);
     } catch {
       setError('Could not load shopping list.');
     } finally {
@@ -72,14 +67,6 @@ export default function Shopping() {
     } finally {
       setRestoring((s) => { const n = new Set(s); n.delete(item.id); return n; });
     }
-  }
-
-  function timeAgo(dateStr) {
-    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    return `${hrs}h ago`;
   }
 
   async function confirmDelete(item) {
@@ -190,34 +177,17 @@ export default function Shopping() {
           {showCompleted && complete.length > 0 && (
             <>
               <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mt-4">Completed</h2>
-              <ul className="space-y-2 opacity-60">
-                {complete.map((item) => (
-                  <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} />
-                ))}
-              </ul>
-            </>
-          )}
-
-          {/* Previously Purchased (last 24h) */}
-          {recentDone.length > 0 && (
-            <div className="mt-6">
-              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mb-2">
-                Previously purchased
-              </h2>
               <ul className="space-y-2">
-                {recentDone.map((item) => (
+                {complete.map((item) => (
                   <li key={item.id} className="bg-oat rounded-2xl border border-cream-border px-4 py-3 flex items-center gap-3">
                     <div className="w-6 h-6 rounded-full bg-success/20 text-success flex items-center justify-center shrink-0 text-xs font-bold">
                       ✓
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-cocoa">{item.item}</p>
-                      <div className="flex gap-x-3 mt-0.5">
-                        <span className="text-xs text-cocoa">
-                          {CATEGORY_EMOJI[item.category]} {item.category}
-                        </span>
-                        <span className="text-xs text-cocoa">{timeAgo(item.completed_at)}</span>
-                      </div>
+                      <span className="text-xs text-cocoa">
+                        {CATEGORY_EMOJI[item.category]} {item.category}
+                      </span>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button
@@ -243,7 +213,7 @@ export default function Shopping() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
         </>
       )}
