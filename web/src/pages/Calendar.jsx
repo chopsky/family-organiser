@@ -13,8 +13,19 @@ const EVENT_COLORS = {
   gray:   { bg: 'bg-sand',   border: 'border-cream-border',   dot: 'bg-cocoa',   text: 'text-cocoa',   darkBg: 'bg-sand' },
 };
 
-const PRIORITY_COLORS = { high: 'bg-error', medium: 'bg-warn', low: 'bg-success' };
+const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg-[#9db36c]' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
+const NOTIFICATION_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'at_time', label: 'At time of task' },
+  { value: '5_min', label: '5 minutes before' },
+  { value: '15_min', label: '15 minutes before' },
+  { value: '30_min', label: '30 minutes before' },
+  { value: '1_hour', label: '1 hour before' },
+  { value: '2_hours', label: '2 hours before' },
+  { value: '1_day', label: '1 day before' },
+  { value: '2_days', label: '2 days before' },
+];
 const RECURRENCE_LABELS = { '': 'Never', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', yearly: 'Yearly' };
 const COLOR_OPTIONS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -157,6 +168,21 @@ export default function Calendar() {
 
   const [toggling, setToggling] = useState(new Set());
   const [deletingTask, setDeletingTask] = useState(new Set());
+
+  // Task edit form state
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskDueTime, setTaskDueTime] = useState('');
+  const [taskAssignee, setTaskAssignee] = useState('');
+  const [taskPriority, setTaskPriority] = useState('medium');
+  const [taskRecurrence, setTaskRecurrence] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [taskNotification, setTaskNotification] = useState('');
+  const [savingTask, setSavingTask] = useState(false);
+  const taskFormRef = useRef(null);
+
   const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays']));
   const toggleFilter = (key) => setActiveFilters(prev => {
     const next = new Set(prev);
@@ -443,6 +469,50 @@ export default function Calendar() {
       setError('Could not delete task.');
     } finally {
       setDeletingTask(prev => { const s = new Set(prev); s.delete(task.id); return s; });
+    }
+  }
+
+  function openTaskEditForm(task) {
+    setEditingTask(task);
+    setTaskTitle(task.title);
+    setTaskDueDate(task.due_date);
+    setTaskDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
+    setTaskAssignee(task.assigned_to_name || '');
+    setTaskPriority(task.priority || 'medium');
+    setTaskRecurrence(task.recurrence || '');
+    setTaskDescription(task.description || '');
+    setTaskNotification(task.notification || '');
+    setShowTaskForm(true);
+    setShowForm(false); // close event form if open
+    setTimeout(() => taskFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  }
+
+  function closeTaskForm() {
+    setShowTaskForm(false);
+    setEditingTask(null);
+  }
+
+  async function handleTaskSubmit(e) {
+    e.preventDefault();
+    if (!taskTitle.trim()) return;
+    setSavingTask(true);
+    try {
+      await api.patch(`/tasks/${editingTask.id}`, {
+        title: taskTitle.trim(),
+        due_date: taskDueDate,
+        due_time: taskDueTime || null,
+        assigned_to_name: taskAssignee || null,
+        priority: taskPriority,
+        recurrence: taskRecurrence || null,
+        description: taskDescription || null,
+        notification: taskNotification || null,
+      });
+      closeTaskForm();
+      await load();
+    } catch {
+      setError('Could not update task.');
+    } finally {
+      setSavingTask(false);
     }
   }
 
@@ -820,15 +890,15 @@ export default function Calendar() {
                       </div>
                       {!tk.completed && (
                         <div className="flex gap-1 shrink-0">
-                          <a
-                            href="/tasks"
+                          <button
+                            onClick={() => openTaskEditForm(tk)}
                             className="text-cocoa hover:text-primary p-1 rounded transition-colors hover:bg-primary/10"
-                            title="Edit on Tasks page"
+                            title="Edit task"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                               <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                             </svg>
-                          </a>
+                          </button>
                           <button
                             onClick={() => deleteTask(tk)}
                             disabled={deletingTask.has(tk.id)}
@@ -1009,6 +1079,117 @@ export default function Calendar() {
                   Delete
                 </button>
               )}
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ── Task Edit Form ────────────────────────────────── */}
+      {showTaskForm && editingTask && (
+        <div ref={taskFormRef} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+          <h2 className="text-lg font-semibold text-bark mb-4">Edit Task</h2>
+          <form onSubmit={handleTaskSubmit} className="space-y-3">
+            <div>
+              <label className="text-xs text-cocoa mb-1 block">Title *</label>
+              <input
+                type="text"
+                value={taskTitle}
+                onChange={e => setTaskTitle(e.target.value)}
+                required
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                placeholder="Task title"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-cocoa mb-1 block">Description (optional)</label>
+              <textarea
+                value={taskDescription}
+                onChange={e => setTaskDescription(e.target.value)}
+                placeholder="Add a description..."
+                rows={2}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Due date</label>
+                <input
+                  type="date"
+                  value={taskDueDate}
+                  onChange={e => setTaskDueDate(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Time (optional)</label>
+                <input
+                  type="time"
+                  value={taskDueTime}
+                  onChange={e => setTaskDueTime(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Assign to</label>
+                <select
+                  value={taskAssignee}
+                  onChange={e => setTaskAssignee(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Everyone</option>
+                  {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Priority</label>
+                <select
+                  value={taskPriority}
+                  onChange={e => setTaskPriority(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Repeats</label>
+                <select
+                  value={taskRecurrence}
+                  onChange={e => setTaskRecurrence(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {RECURRENCES.map(r => <option key={r} value={r}>{r || 'Never'}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Notification</label>
+                <select
+                  value={taskNotification}
+                  onChange={e => setTaskNotification(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {NOTIFICATION_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={savingTask || !taskTitle.trim()}
+                className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-5 py-2.5 rounded-2xl transition-colors"
+              >
+                {savingTask ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                type="button"
+                onClick={closeTaskForm}
+                className="text-sm text-cocoa hover:text-bark"
+              >
+                Cancel
+              </button>
             </div>
           </form>
         </div>
