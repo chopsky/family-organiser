@@ -552,13 +552,14 @@ router.get('/connections/:provider/subscriptions', async (req, res) => {
 
 /**
  * POST /api/calendar/connections/:provider/subscriptions
- * Create/update calendar subscriptions and trigger initial import.
+ * Save calendar subscriptions: add new, update existing, remove unselected.
+ * Only triggers import for newly added calendars.
  * Body: { calendars: [{ external_calendar_id, display_name, category, visibility }] }
  */
 router.post('/connections/:provider/subscriptions', async (req, res) => {
   const { provider } = req.params;
   const { calendars } = req.body;
-  if (!Array.isArray(calendars) || calendars.length === 0) {
+  if (!Array.isArray(calendars)) {
     return res.status(400).json({ error: 'calendars array is required.' });
   }
 
@@ -566,9 +567,29 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
     const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
     if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
 
+    // Get existing subscriptions for this connection
+    const existingSubs = await db.getSubscriptionsByConnection(connection.id);
+    const existingByCalId = {};
+    for (const sub of existingSubs) {
+      existingByCalId[sub.external_calendar_id] = sub;
+    }
+
+    // Track which external calendar IDs the user selected
+    const selectedCalIds = new Set(calendars.map((c) => c.external_calendar_id));
+
+    // Remove subscriptions that were unselected (deletes their events too)
+    for (const sub of existingSubs) {
+      if (!selectedCalIds.has(sub.external_calendar_id)) {
+        await db.deleteSubscription(sub.id);
+      }
+    }
+
+    // Add or update selected calendars
     const results = [];
     for (const cal of calendars) {
       if (!cal.external_calendar_id || !cal.display_name) continue;
+      const isNew = !existingByCalId[cal.external_calendar_id];
+
       const sub = await db.upsertSubscription(connection.id, {
         external_calendar_id: cal.external_calendar_id,
         display_name: cal.display_name,
@@ -577,10 +598,12 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
       });
       results.push(sub);
 
-      // Trigger import asynchronously
-      calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
-        console.error(`Initial import failed for subscription ${sub.id}:`, err);
-      });
+      // Only import for brand-new subscriptions
+      if (isNew) {
+        calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
+          console.error(`Initial import failed for subscription ${sub.id}:`, err);
+        });
+      }
     }
 
     return res.json({ subscriptions: results });

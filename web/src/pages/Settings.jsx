@@ -291,7 +291,7 @@ export default function Settings() {
           visibility: calendarSelections[cal.id].visibility,
         }));
       await api.post(`/calendar/connections/${selectingProvider}/subscriptions`, { calendars });
-      setSuccess('Calendars saved! Importing events...');
+      setSuccess('Calendar selections saved.');
       setSelectingProvider(null);
     } catch {
       setError('Could not save calendar selections.');
@@ -681,7 +681,7 @@ export default function Settings() {
                     disabled={savingSubscriptions}
                     className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
                   >
-                    {savingSubscriptions ? 'Saving…' : 'Save & Import'}
+                    {savingSubscriptions ? 'Saving…' : 'Save'}
                   </button>
                 </div>
               )}
