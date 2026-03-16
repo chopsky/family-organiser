@@ -4,6 +4,7 @@ const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
 const calendarSync = require('../services/calendarSync');
+const publicHolidays = require('../services/publicHolidays');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -132,6 +133,10 @@ function startScheduler(bot) {
   // ── Apple CalDAV polling: every 15 minutes ─────────────────────────────────
   cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());
   console.log('✓ Apple Calendar polling started (every 15 minutes)');
+
+  // ── Yearly public holiday refresh: Dec 1 at midnight ───────────────────────
+  cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
+  console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
 
   // ── Weekly digest: Sunday evenings ──────────────────────────────────────────
   const digestDay  = process.env.WEEKLY_DIGEST_DAY  ?? '0';   // 0 = Sunday

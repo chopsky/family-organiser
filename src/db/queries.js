@@ -1048,4 +1048,5 @@ module.exports = {
   getSyncMappingsBySubscription,
   createSyncMappingWithSubscription,
   createCalendarEventFromSync,
+  getSupabase: () => supabase,
 };

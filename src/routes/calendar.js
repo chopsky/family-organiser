@@ -15,6 +15,7 @@ const calendarSync = require('../services/calendarSync');
 const googleProvider = require('../services/providers/google');
 const microsoftProvider = require('../services/providers/microsoft');
 const appleProvider = require('../services/providers/apple');
+const publicHolidays = require('../services/publicHolidays');
 
 const router = Router();
 
@@ -643,6 +644,28 @@ router.delete('/subscriptions/:id', async (req, res) => {
   } catch (err) {
     console.error('DELETE /subscriptions error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/calendar/seed-holidays ─────────────────────────────────────────
+// Seed public holidays for the current household (idempotent — skips duplicates)
+router.post('/seed-holidays', requireAuth, async (req, res) => {
+  if (!req.householdId) {
+    return res.status(400).json({ error: 'No household' });
+  }
+  try {
+    const household = await db.getHouseholdById(req.householdId);
+    const countryCode = publicHolidays.countryFromTimezone(household.timezone);
+    if (!countryCode) {
+      return res.status(400).json({ error: `Cannot determine country from timezone "${household.timezone}". Please update your household timezone in settings.` });
+    }
+    const currentYear = new Date().getFullYear();
+    const count1 = await publicHolidays.insertHolidaysForHousehold(req.householdId, countryCode, currentYear, req.user.id);
+    const count2 = await publicHolidays.insertHolidaysForHousehold(req.householdId, countryCode, currentYear + 1, req.user.id);
+    return res.json({ inserted: count1 + count2, country: countryCode });
+  } catch (err) {
+    console.error('POST /seed-holidays error:', err);
+    return res.status(500).json({ error: 'Failed to seed holidays' });
   }
 });
 

@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const db = require('../db/queries');
 const { signToken, requireAuth } = require('../middleware/auth');
 const email = require('../services/email');
+const publicHolidays = require('../services/publicHolidays');
 
 const router = Router();
 
@@ -170,6 +171,11 @@ router.post('/create-household', requireAuth, async (req, res) => {
   try {
     const household = await db.createHousehold(name.trim());
     const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin' });
+
+    // Seed public holidays in the background (don't block response)
+    publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id)
+      .catch((err) => console.error('Failed to seed public holidays:', err));
+
     const response = await authResponse(user);
     return res.status(201).json(response);
   } catch (err) {

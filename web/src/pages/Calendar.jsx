@@ -632,6 +632,37 @@ export default function Calendar() {
         <button onClick={goToday} className="border border-cream-border text-cocoa hover:bg-oat rounded-2xl px-3 py-1.5 text-sm transition-colors">Today</button>
       </div>
 
+      {/* ── Filter pills ─────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        {[
+          { key: 'events', label: 'Events', color: 'bg-blue-500' },
+          { key: 'tasks', label: 'Tasks', color: 'bg-orange-400' },
+          { key: 'birthdays', label: 'Birthdays', color: 'bg-purple-500' },
+          { key: 'holidays', label: 'Holidays', color: 'bg-red-500' },
+        ].map(({ key, label, color }) => {
+          const active = activeFilters.has(key);
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveFilters((prev) => {
+                const next = new Set(prev);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                return next;
+              })}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                active
+                  ? 'border-bark/30 bg-linen text-bark'
+                  : 'border-cream-border bg-oat text-cocoa/50 line-through'
+              }`}
+            >
+              <span className={`inline-block w-2 h-2 rounded-full ${active ? color : 'bg-gray-300'}`} />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── Filters ──────────────────────────────────────────── */}
       <div className="flex items-center justify-center gap-2 flex-wrap">
         {[
