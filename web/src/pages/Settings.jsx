@@ -261,11 +261,14 @@ export default function Settings() {
       setExistingSubscriptions(subs);
 
       // Build selections map: merge existing subscriptions with available calendars
+      // If user has existing subscriptions, unsubscribed calendars default to unchecked.
+      // If no subscriptions yet (first time), all calendars default to checked.
+      const hasExistingSubs = subs.length > 0;
       const selections = {};
       for (const cal of cals) {
         const existing = subs.find((s) => s.external_calendar_id === cal.id);
         selections[cal.id] = {
-          enabled: existing ? existing.sync_enabled : true,
+          enabled: existing ? existing.sync_enabled : !hasExistingSubs,
           category: existing ? existing.category : cal.suggestedCategory || 'general',
           visibility: existing ? existing.visibility : 'family',
         };
