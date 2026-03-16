@@ -113,10 +113,7 @@ router.get('/connect/google/callback', async (req, res) => {
     const { userId, householdId } = JSON.parse(state);
     const tokens = await googleProvider.handleCallback(code);
 
-    await db.upsertCalendarConnection({
-      user_id: userId,
-      household_id: householdId,
-      provider: 'google',
+    await db.upsertCalendarConnection(userId, householdId, 'google', {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: new Date(tokens.expiry_date).toISOString(),
@@ -146,10 +143,7 @@ router.get('/connect/microsoft/callback', async (req, res) => {
     const { userId, householdId } = JSON.parse(state);
     const tokens = await microsoftProvider.handleCallback(code);
 
-    await db.upsertCalendarConnection({
-      user_id: userId,
-      household_id: householdId,
-      provider: 'microsoft',
+    await db.upsertCalendarConnection(userId, householdId, 'microsoft', {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
@@ -478,10 +472,7 @@ router.post('/connect/apple', async (req, res) => {
       return res.status(400).json({ error: result.error || 'Invalid credentials.' });
     }
 
-    await db.upsertCalendarConnection({
-      user_id: req.user.id,
-      household_id: req.householdId,
-      provider: 'apple',
+    await db.upsertCalendarConnection(req.user.id, req.householdId, 'apple', {
       access_token: appPassword,
       caldav_username: email,
       sync_enabled: true,
@@ -490,7 +481,7 @@ router.post('/connect/apple', async (req, res) => {
     return res.json({ success: true, message: 'Apple Calendar connected.' });
   } catch (err) {
     console.error('POST /api/calendar/connect/apple error:', err);
-    return res.status(500).json({ error: 'Could not connect Apple Calendar.' });
+    return res.status(500).json({ error: err.message || 'Could not connect Apple Calendar.' });
   }
 });
 
