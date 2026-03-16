@@ -308,16 +308,25 @@ async function listCalendars(connection) {
   await Promise.race([client.login(), timeout]);
   const calendars = await Promise.race([client.fetchCalendars(), timeout]);
 
-  return calendars.map((cal) => {
-    const displayName = cal.displayName || cal.url;
-    let suggestedCategory = 'general';
-    if (/birthday/i.test(displayName)) {
-      suggestedCategory = 'birthday';
-    } else if (/holiday/i.test(displayName)) {
-      suggestedCategory = 'public_holiday';
-    }
-    return { id: cal.url, displayName, suggestedCategory };
-  });
+  // Filter out Reminders (VTODO) calendars — only include event (VEVENT) calendars
+  return calendars
+    .filter((cal) => {
+      const comps = cal.components || [];
+      // If components are declared, only include calendars that support VEVENT
+      if (comps.length > 0) return comps.includes('VEVENT');
+      // Exclude by name as a fallback
+      return !/reminder/i.test(cal.displayName || '');
+    })
+    .map((cal) => {
+      const displayName = cal.displayName || cal.url;
+      let suggestedCategory = 'general';
+      if (/birthday/i.test(displayName)) {
+        suggestedCategory = 'birthday';
+      } else if (/holiday/i.test(displayName)) {
+        suggestedCategory = 'public_holiday';
+      }
+      return { id: cal.url, displayName, suggestedCategory };
+    });
 }
 
 /**
