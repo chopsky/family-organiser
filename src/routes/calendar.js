@@ -577,12 +577,10 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
       });
       results.push(sub);
 
-      // Trigger initial import asynchronously
-      if (!sub.last_synced_at) {
-        calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
-          console.error(`Initial import failed for subscription ${sub.id}:`, err);
-        });
-      }
+      // Trigger import asynchronously
+      calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
+        console.error(`Initial import failed for subscription ${sub.id}:`, err);
+      });
     }
 
     return res.json({ subscriptions: results });

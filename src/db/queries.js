@@ -943,14 +943,20 @@ async function createSyncMappingWithSubscription(eventId, connectionId, subscrip
 }
 
 async function createCalendarEventFromSync(householdId, eventData, sourceUserId, subscriptionId, category, visibility) {
+  // Ensure timestamps are valid for timestamptz columns (bare dates need time appended)
+  let startTime = eventData.start_time;
+  let endTime = eventData.end_time;
+  if (startTime && !startTime.includes('T')) startTime = `${startTime}T00:00:00Z`;
+  if (endTime && !endTime.includes('T')) endTime = `${endTime}T00:00:00Z`;
+
   const { data, error } = await supabase
     .from('calendar_events')
     .insert({
       household_id: householdId,
-      title: eventData.title,
+      title: eventData.title || 'Untitled event',
       description: eventData.description || null,
-      start_time: eventData.start_time,
-      end_time: eventData.end_time,
+      start_time: startTime,
+      end_time: endTime || startTime,
       all_day: eventData.all_day || false,
       location: eventData.location || null,
       color: category === 'birthday' ? 'purple' : category === 'public_holiday' ? 'red' : 'blue',
