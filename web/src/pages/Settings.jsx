@@ -287,7 +287,7 @@ export default function Settings() {
         .map((cal) => ({
           external_calendar_id: cal.id,
           display_name: cal.displayName,
-          category: calendarSelections[cal.id].category,
+          category: cal.suggestedCategory || 'general',
           visibility: calendarSelections[cal.id].visibility,
         }));
       await api.post(`/calendar/connections/${selectingProvider}/subscriptions`, { calendars });
@@ -644,19 +644,16 @@ export default function Settings() {
                           <span className="text-sm font-medium text-bark flex-1">{cal.displayName}</span>
                         </div>
                         {sel.enabled && (
-                          <div className="flex gap-3 mt-2 ml-7">
-                            <select
-                              value={sel.category || 'general'}
-                              onChange={(e) => setCalendarSelections((prev) => ({
-                                ...prev,
-                                [cal.id]: { ...prev[cal.id], category: e.target.value },
-                              }))}
-                              className="text-xs border border-cream-border rounded-xl px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                            >
-                              <option value="general">General</option>
-                              <option value="birthday">Birthdays</option>
-                              <option value="public_holiday">Public Holidays</option>
-                            </select>
+                          <div className="flex items-center gap-3 mt-2 ml-7">
+                            {cal.suggestedCategory && cal.suggestedCategory !== 'general' && (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                cal.suggestedCategory === 'birthday'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : 'bg-red-100 text-red-700'
+                              }`}>
+                                {cal.suggestedCategory === 'birthday' ? 'Birthdays' : 'Public Holidays'}
+                              </span>
+                            )}
                             <select
                               value={sel.visibility || 'family'}
                               onChange={(e) => setCalendarSelections((prev) => ({
