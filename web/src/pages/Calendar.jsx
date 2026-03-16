@@ -677,28 +677,6 @@ export default function Calendar() {
         })}
       </div>
 
-      {/* ── Filters ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        {[
-          { key: 'events', label: 'Events' },
-          { key: 'tasks', label: 'Tasks' },
-          { key: 'birthdays', label: 'Birthdays' },
-          { key: 'holidays', label: 'Holidays' },
-        ].map(f => (
-          <button
-            key={f.key}
-            onClick={() => toggleFilter(f.key)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-              activeFilters.has(f.key)
-                ? 'bg-primary text-white'
-                : 'bg-oat text-cocoa border border-cream-border'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
       {/* ── Day View ────────────────────────────────────────── */}
       {viewMode === 'day' && renderTimeGrid([selectedDate], true)}
 
