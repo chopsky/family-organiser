@@ -567,6 +567,8 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
     .lte('start_time', endDate)
     .gte('end_time', startDate);
 
+  // category/visibility columns may not exist until migration is run — try filtered
+  // query first, fall back to unfiltered if it fails
   if (category) {
     query = query.eq('category', category);
   }
@@ -577,6 +579,20 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
   }
 
   const { data, error } = await query.order('start_time');
+
+  if (error && (category || userId)) {
+    // Retry without category/visibility filters (columns may not exist yet)
+    const fallback = await supabase
+      .from('calendar_events')
+      .select()
+      .eq('household_id', householdId)
+      .lte('start_time', endDate)
+      .gte('end_time', startDate)
+      .order('start_time');
+    if (fallback.error) throw fallback.error;
+    return fallback.data;
+  }
+
   if (error) throw error;
   return data;
 }
