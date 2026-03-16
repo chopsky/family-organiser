@@ -105,7 +105,7 @@ export default function Shopping() {
           onClick={() => setShowCompleted((v) => !v)}
           className="text-sm text-primary hover:underline"
         >
-          {showCompleted ? 'Hide done' : 'Show done'}
+          {showCompleted ? 'Hide purchased' : 'Show purchased'}
         </button>
       </div>
 
