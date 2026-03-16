@@ -578,14 +578,17 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
     const selectedCalIds = new Set(calendars.map((c) => c.external_calendar_id));
 
     // Remove subscriptions that were unselected (deletes their events too)
+    let removed = 0;
     for (const sub of existingSubs) {
       if (!selectedCalIds.has(sub.external_calendar_id)) {
         await db.deleteSubscription(sub.id);
+        removed++;
       }
     }
 
     // Add or update selected calendars
     const results = [];
+    let newImports = 0;
     for (const cal of calendars) {
       if (!cal.external_calendar_id || !cal.display_name) continue;
       const isNew = !existingByCalId[cal.external_calendar_id];
@@ -600,13 +603,14 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
 
       // Only import for brand-new subscriptions
       if (isNew) {
+        newImports++;
         calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
           console.error(`Initial import failed for subscription ${sub.id}:`, err);
         });
       }
     }
 
-    return res.json({ subscriptions: results });
+    return res.json({ subscriptions: results, newImports, removed });
   } catch (err) {
     console.error(`POST /connections/${provider}/subscriptions error:`, err);
     return res.status(500).json({ error: err.message || 'Could not save subscriptions.' });

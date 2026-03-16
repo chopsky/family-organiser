@@ -293,8 +293,13 @@ export default function Settings() {
           category: cal.suggestedCategory || 'general',
           visibility: calendarSelections[cal.id].visibility,
         }));
-      await api.post(`/calendar/connections/${selectingProvider}/subscriptions`, { calendars });
-      setSuccess('Calendar selections saved.');
+      const { data } = await api.post(`/calendar/connections/${selectingProvider}/subscriptions`, { calendars });
+      const newCount = (data.newImports || 0);
+      const removedCount = (data.removed || 0);
+      let msg = 'Calendar selections saved.';
+      if (newCount > 0) msg += ` Importing ${newCount} calendar${newCount > 1 ? 's' : ''} — this may take a few minutes.`;
+      if (removedCount > 0) msg += ` Removed ${removedCount} calendar${removedCount > 1 ? 's' : ''}.`;
+      setSuccess(msg);
       setSelectingProvider(null);
     } catch {
       setError('Could not save calendar selections.');
