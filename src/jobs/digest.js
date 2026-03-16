@@ -1,5 +1,6 @@
 const db = require('../db/queries');
 const email = require('../services/email');
+const whatsapp = require('../services/whatsapp');
 
 // ─── Message builder ──────────────────────────────────────────────────────────
 
@@ -102,11 +103,26 @@ async function sendWeeklyDigest(bot, householdId) {
   );
 
   for (const member of members) {
-    if (!member.telegram_chat_id) continue;
-    try {
-      await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
-    } catch (err) {
-      console.error(`Failed to send digest to ${member.name} (${member.telegram_chat_id}):`, err.message);
+    const hasTelegram = !!member.telegram_chat_id;
+    const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
+    if (!hasTelegram && !hasWhatsApp) continue;
+
+    // Send via Telegram
+    if (hasTelegram) {
+      try {
+        await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
+      } catch (err) {
+        console.error(`Failed to send digest to ${member.name} via Telegram:`, err.message);
+      }
+    }
+
+    // Send via WhatsApp
+    if (hasWhatsApp && whatsapp.isConfigured()) {
+      try {
+        await whatsapp.sendTemplate(member.whatsapp_phone, message);
+      } catch (err) {
+        console.error(`Failed to send digest to ${member.name} via WhatsApp:`, err.message);
+      }
     }
   }
 }

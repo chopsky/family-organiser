@@ -2,6 +2,7 @@ const { Telegraf } = require('telegraf');
 const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
+const sharedHandlers = require('./handlers');
 
 // ─── File download helper ─────────────────────────────────────────────────────
 
@@ -12,61 +13,9 @@ async function downloadFile(url) {
   return Buffer.from(arrayBuffer);
 }
 
-// ─── Format helpers ───────────────────────────────────────────────────────────
+// ─── Format helpers (delegate to shared handlers) ─────────────────────────────
 
-const CATEGORY_EMOJI = {
-  groceries: '🛒',
-  clothing:  '👕',
-  household: '🏠',
-  school:    '🎒',
-  pets:      '🐾',
-  other:     '📦',
-};
-
-function formatShoppingList(items) {
-  if (!items.length) return '✅ Shopping list is empty!';
-
-  const grouped = {};
-  for (const item of items) {
-    if (!grouped[item.category]) grouped[item.category] = [];
-    grouped[item.category].push(item);
-  }
-
-  const lines = [];
-  for (const [cat, catItems] of Object.entries(grouped)) {
-    const emoji = CATEGORY_EMOJI[cat] || '📦';
-    lines.push(`\n${emoji} *${capitalise(cat)}*`);
-    for (const i of catItems) {
-      const qty = i.quantity ? ` (${i.quantity})` : '';
-      lines.push(`  • ${i.item}${qty}`);
-    }
-  }
-  return lines.join('\n').trim();
-}
-
-function formatTaskList(tasks, heading = 'Tasks') {
-  if (!tasks.length) return `✅ No ${heading.toLowerCase()}!`;
-
-  const today = new Date().toISOString().split('T')[0];
-  const lines = [`*${heading}*`];
-
-  for (const t of tasks) {
-    const overdue = t.due_date < today;
-    const dueToday = t.due_date === today;
-    const statusIcon = overdue ? '🔴' : dueToday ? '🟡' : '⚪';
-    const who = t.assigned_to_name ? ` — ${t.assigned_to_name}` : ' — Everyone';
-    const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
-    const dateLabel = overdue
-      ? ` _(overdue: ${t.due_date})_`
-      : dueToday ? ' _(today)_' : ` _(${t.due_date})_`;
-    lines.push(`${statusIcon} ${t.title}${who}${rec}${dateLabel}`);
-  }
-  return lines.join('\n');
-}
-
-function capitalise(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+const { CATEGORY_EMOJI, formatShoppingList, formatTaskList, capitalise } = sharedHandlers;
 
 // ─── Context middleware: load user + household for every update ───────────────
 
@@ -541,44 +490,15 @@ function createBot(token) {
       const fileLink = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
       const audioBuffer = await downloadFile(fileLink.href);
 
-      // Transcribe with Whisper
-      const transcribedText = await transcribeVoice(audioBuffer, 'voice.ogg');
+      const result = await sharedHandlers.handleVoiceNote(audioBuffer, 'voice.ogg', ctx.familyUser, ctx.household);
 
-      if (!transcribedText) {
-        await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null, "🎙️ Couldn't hear anything in that voice note. Please try again.");
+      if (!result.transcription) {
+        await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null, result.response);
         return;
       }
 
-      // Echo the transcription so the user knows what was understood
-      await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null, `🎙️ _"${transcribedText}"_\n\nProcessing…`, { parse_mode: 'Markdown' });
-
-      // Feed into the same classify pipeline as text messages
-      const memberNames = ctx.household.members.map((m) => m.name);
-      const result = await classify(transcribedText, memberNames);
-
-      // Handle shopping items
-      if (result.shopping_items?.length) {
-        const toAdd = result.shopping_items.filter((i) => i.action === 'add');
-        const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
-        if (toAdd.length) await db.addShoppingItems(ctx.household.id, toAdd, ctx.familyUser.id);
-        if (toRemove.length) await db.completeShoppingItemsByName(ctx.household.id, toRemove.map((i) => i.item));
-      }
-
-      // Handle tasks
-      if (result.tasks?.length) {
-        const toAdd = result.tasks.filter((t) => t.action === 'add');
-        const toComplete = result.tasks.filter((t) => t.action === 'complete');
-        if (toAdd.length) await db.addTasks(ctx.household.id, toAdd, ctx.familyUser.id, ctx.household.members);
-        for (const t of toComplete) {
-          const done = await db.completeTasksByName(ctx.household.id, [t.title], t.assigned_to_name);
-          for (const completedTask of done) {
-            if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
-          }
-        }
-      }
-
       await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
-        `🎙️ _"${transcribedText}"_\n\n${result.response_message || 'Done! ✅'}`,
+        result.response,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
@@ -610,45 +530,10 @@ function createBot(token) {
       const fileLink = await ctx.telegram.getFileLink(bestPhoto.file_id);
       const imageBuffer = await downloadFile(fileLink.href);
 
-      // Extract items from receipt using Claude Vision
-      const extracted = await scanReceipt(imageBuffer, 'image/jpeg');
-
-      if (!extracted.items?.length) {
-        await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
-          "🧾 I couldn't find any items on that receipt. Is this a grocery receipt? Try sending a clearer photo."
-        );
-        return;
-      }
-
-      // Fuzzy-match against the household shopping list
-      const shoppingList = await db.getShoppingList(ctx.household.id);
-      const matchResult = await matchReceiptToList(extracted.items, shoppingList);
-
-      // Complete matched items
-      const checkedOff = [];
-      for (const match of matchResult.matches || []) {
-        if (match.confidence >= 0.7) {
-          await db.completeShoppingItemById(match.list_item_id);
-          checkedOff.push(match.list_item_name);
-        }
-      }
-
-      // Build confirmation message
-      const store = extracted.store_name ? ` from *${extracted.store_name}*` : '';
-      const lines = [`🧾 Receipt scanned${store}`];
-
-      if (checkedOff.length) {
-        lines.push(`\n✅ *Checked off:* ${checkedOff.join(', ')}`);
-      } else {
-        lines.push('\n✅ No shopping list items matched this receipt.');
-      }
-
-      if (matchResult.unmatched_receipt_items?.length) {
-        lines.push(`\n❓ *Not on your list:* ${matchResult.unmatched_receipt_items.join(', ')}`);
-      }
+      const response = await sharedHandlers.handlePhoto(imageBuffer, 'image/jpeg', ctx.familyUser, ctx.household);
 
       await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
-        lines.join('\n'), { parse_mode: 'Markdown' }
+        response, { parse_mode: 'Markdown' }
       );
     } catch (err) {
       console.error('Photo handler error:', err);
@@ -750,50 +635,8 @@ function createBot(token) {
     if (!text) return;
 
     try {
-      const memberNames = ctx.household.members.map((m) => m.name);
-      const result = await classify(text, memberNames);
-
-      const added = { shopping: [], tasks: [] };
-      const completed = { shopping: [], tasks: [] };
-
-      // Handle shopping items
-      if (result.shopping_items?.length) {
-        const toAdd = result.shopping_items.filter((i) => i.action === 'add');
-        const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
-
-        if (toAdd.length) {
-          const saved = await db.addShoppingItems(ctx.household.id, toAdd, ctx.familyUser.id);
-          added.shopping.push(...saved.map((i) => i.item));
-        }
-        if (toRemove.length) {
-          const names = toRemove.map((i) => i.item);
-          const done = await db.completeShoppingItemsByName(ctx.household.id, names);
-          completed.shopping.push(...done.map((i) => i.item));
-        }
-      }
-
-      // Handle tasks
-      if (result.tasks?.length) {
-        const toAdd = result.tasks.filter((t) => t.action === 'add');
-        const toComplete = result.tasks.filter((t) => t.action === 'complete');
-
-        if (toAdd.length) {
-          const saved = await db.addTasks(ctx.household.id, toAdd, ctx.familyUser.id, ctx.household.members);
-          added.tasks.push(...saved.map((t) => t.title));
-        }
-        if (toComplete.length) {
-          for (const t of toComplete) {
-            const done = await db.completeTasksByName(ctx.household.id, [t.title], t.assigned_to_name);
-            completed.tasks.push(...done.map((d) => d.title));
-            // Generate next recurrence for completed recurring tasks
-            for (const completedTask of done) {
-              if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
-            }
-          }
-        }
-      }
-
-      return ctx.reply(result.response_message || 'Done! ✅');
+      const response = await sharedHandlers.handleTextMessage(text, ctx.familyUser, ctx.household);
+      return ctx.reply(response);
     } catch (err) {
       console.error('Natural language handler error:', err);
       return ctx.reply('Sorry, I had trouble understanding that. Please try again, or use /help to see commands.');

@@ -18,6 +18,7 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Body parsing — 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false })); // Twilio sends webhooks as URL-encoded form data
 
 // Global rate limiter: 100 requests per 15 minutes per IP
 if (process.env.NODE_ENV !== 'test') {

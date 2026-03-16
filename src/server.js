@@ -12,6 +12,16 @@ async function start() {
     await testConnection();
     console.log('✓ Database connected');
 
+    // Mount WhatsApp webhook route (before 404 handler)
+    const whatsappRouter = require('./routes/whatsapp');
+    app.use('/whatsapp', whatsappRouter);
+    const whatsappService = require('./services/whatsapp');
+    if (whatsappService.isConfigured()) {
+      console.log('✓ WhatsApp (Twilio) configured');
+    } else {
+      console.log('ℹ WhatsApp not configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER to enable');
+    }
+
     // Start Express API
     app.listen(PORT, () => {
       console.log(`✓ Server running on port ${PORT}`);

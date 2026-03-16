@@ -30,6 +30,14 @@ export default function Settings() {
   const [telegramLink, setTelegramLink] = useState('');
   const [linkingTelegram, setLinkingTelegram] = useState(false);
 
+  // WhatsApp link state
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappCode, setWhatsappCode] = useState('');
+  const [sendingWhatsappCode, setSendingWhatsappCode] = useState(false);
+  const [verifyingWhatsapp, setVerifyingWhatsapp] = useState(false);
+  const [whatsappCodeSent, setWhatsappCodeSent] = useState(false);
+  const [disconnectingWhatsapp, setDisconnectingWhatsapp] = useState(false);
+
   // Calendar feed state
   const [feedUrl, setFeedUrl] = useState('');
   const [loadingFeed, setLoadingFeed] = useState(false);
@@ -157,6 +165,54 @@ export default function Settings() {
       setError(err.response?.data?.error || 'Could not generate Telegram link.');
     } finally {
       setLinkingTelegram(false);
+    }
+  }
+
+  async function handleSendWhatsappCode(e) {
+    e.preventDefault();
+    setError('');
+    if (!whatsappPhone.trim()) { setError('Please enter your phone number.'); return; }
+    setSendingWhatsappCode(true);
+    try {
+      await api.post('/auth/whatsapp-send-code', { phone: whatsappPhone.trim() });
+      setWhatsappCodeSent(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not send verification code.');
+    } finally {
+      setSendingWhatsappCode(false);
+    }
+  }
+
+  async function handleVerifyWhatsapp(e) {
+    e.preventDefault();
+    setError('');
+    if (!whatsappCode.trim()) { setError('Please enter the verification code.'); return; }
+    setVerifyingWhatsapp(true);
+    try {
+      await api.post('/auth/whatsapp-verify-code', { code: whatsappCode.trim() });
+      setSuccess('WhatsApp connected!');
+      setWhatsappCodeSent(false);
+      setWhatsappPhone('');
+      setWhatsappCode('');
+      loadMembers(); // Refresh to show updated status
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code. Please try again.');
+    } finally {
+      setVerifyingWhatsapp(false);
+    }
+  }
+
+  async function handleDisconnectWhatsapp() {
+    setError('');
+    setDisconnectingWhatsapp(true);
+    try {
+      await api.post('/auth/whatsapp-disconnect');
+      setSuccess('WhatsApp disconnected.');
+      loadMembers();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not disconnect WhatsApp.');
+    } finally {
+      setDisconnectingWhatsapp(false);
     }
   }
 
@@ -452,6 +508,81 @@ export default function Settings() {
         )}
       </div>
 
+      {/* Connect WhatsApp */}
+      <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Connect WhatsApp
+        </h2>
+        {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
+          <div className="space-y-3">
+            <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
+              WhatsApp connected! You'll receive reminders and can message the bot.
+            </p>
+            <button
+              onClick={handleDisconnectWhatsapp}
+              disabled={disconnectingWhatsapp}
+              className="text-sm text-cocoa hover:text-error transition-colors"
+            >
+              {disconnectingWhatsapp ? 'Disconnecting…' : 'Disconnect WhatsApp'}
+            </button>
+          </div>
+        ) : whatsappCodeSent ? (
+          <form onSubmit={handleVerifyWhatsapp} className="space-y-3">
+            <p className="text-sm text-cocoa">
+              A verification code has been sent to your WhatsApp. Enter it below:
+            </p>
+            <input
+              type="text"
+              value={whatsappCode}
+              onChange={(e) => setWhatsappCode(e.target.value)}
+              placeholder="Enter 6-digit code"
+              maxLength={6}
+              className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center text-lg tracking-widest"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={verifyingWhatsapp}
+                className="flex-1 bg-[#25D366] hover:bg-[#1DA851] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors"
+              >
+                {verifyingWhatsapp ? 'Verifying…' : 'Verify'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setWhatsappCodeSent(false); setWhatsappCode(''); }}
+                className="px-4 py-2.5 rounded-2xl text-sm text-cocoa hover:bg-oat transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <p className="text-sm text-cocoa mb-3">
+              Link your WhatsApp to receive daily reminders and manage your household via chat.
+            </p>
+            <form onSubmit={handleSendWhatsappCode} className="flex gap-2">
+              <input
+                type="tel"
+                value={whatsappPhone}
+                onChange={(e) => setWhatsappPhone(e.target.value)}
+                placeholder="+44 7700 900000"
+                className="flex-1 border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
+              />
+              <button
+                type="submit"
+                disabled={sendingWhatsappCode}
+                className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#1DA851] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors whitespace-nowrap"
+              >
+                {sendingWhatsappCode ? 'Sending…' : 'Send code'}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+
       {/* Calendar Sync */}
       <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconCalendar className="h-4 w-4" /> Calendar Sync</h2>
@@ -695,6 +826,7 @@ export default function Settings() {
                   <p className="text-xs text-cocoa">
                     {m.role}
                     {m.telegram_chat_id && ' · Telegram connected'}
+                    {m.whatsapp_linked && ' · WhatsApp connected'}
                   </p>
                 </div>
                 {m.id === user?.id && (

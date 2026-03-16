@@ -375,6 +375,82 @@ router.post('/telegram-link-token', requireAuth, async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/whatsapp-send-code ────────────────────────────────────────
+
+router.post('/whatsapp-send-code', requireAuth, async (req, res) => {
+  const { phone } = req.body;
+  if (!phone?.trim()) {
+    return res.status(400).json({ error: 'Phone number is required' });
+  }
+
+  // Normalise phone: ensure + prefix
+  let normalised = phone.trim();
+  if (!normalised.startsWith('+')) normalised = `+${normalised}`;
+
+  try {
+    const whatsapp = require('../services/whatsapp');
+    if (!whatsapp.isConfigured()) {
+      return res.status(503).json({ error: 'WhatsApp is not configured on this server' });
+    }
+
+    // Generate 6-digit code
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
+    await db.createWhatsAppVerificationCode(req.user.id, normalised, code, expiresAt);
+    await whatsapp.sendVerificationCode(normalised, code);
+
+    return res.json({ success: true, message: 'Verification code sent via WhatsApp' });
+  } catch (err) {
+    console.error('POST /api/auth/whatsapp-send-code error:', err);
+    return res.status(500).json({ error: 'Failed to send verification code. Check your phone number and try again.' });
+  }
+});
+
+// ─── POST /api/auth/whatsapp-verify-code ──────────────────────────────────────
+
+router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
+  const { code } = req.body;
+  if (!code?.trim()) {
+    return res.status(400).json({ error: 'Verification code is required' });
+  }
+
+  try {
+    const record = await db.getWhatsAppVerificationCode(req.user.id, code.trim());
+    if (!record) {
+      return res.status(400).json({ error: 'Invalid or expired code. Please request a new one.' });
+    }
+
+    // Link the phone number
+    await db.updateUser(req.user.id, {
+      whatsapp_phone: record.phone,
+      whatsapp_linked: true,
+    });
+
+    await db.markWhatsAppVerificationCodeUsed(record.id);
+
+    return res.json({ success: true, phone: record.phone });
+  } catch (err) {
+    console.error('POST /api/auth/whatsapp-verify-code error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/auth/whatsapp-disconnect ───────────────────────────────────────
+
+router.post('/whatsapp-disconnect', requireAuth, async (req, res) => {
+  try {
+    await db.updateUser(req.user.id, {
+      whatsapp_phone: null,
+      whatsapp_linked: false,
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/auth/whatsapp-disconnect error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── POST /api/auth/join (legacy — kept for backwards compatibility) ────────
 
 router.post('/join', async (req, res) => {

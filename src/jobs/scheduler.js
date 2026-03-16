@@ -5,6 +5,7 @@ const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
 const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
+const whatsapp = require('../services/whatsapp');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -172,17 +173,29 @@ async function runTaskNotificationCheck(bot) {
       // Send notification
       const members = await db.getHouseholdMembers(task.household_id);
       const recipients = task.assigned_to
-        ? members.filter((m) => m.id === task.assigned_to && m.telegram_chat_id)
-        : members.filter((m) => m.telegram_chat_id);
+        ? members.filter((m) => m.id === task.assigned_to && (m.telegram_chat_id || (m.whatsapp_linked && m.whatsapp_phone)))
+        : members.filter((m) => m.telegram_chat_id || (m.whatsapp_linked && m.whatsapp_phone));
 
       const timeStr = task.due_time.substring(0, 5);
       const message = `🔔 *Task Reminder*\n\n*${task.title}*\nDue: ${task.due_date} at ${timeStr}${task.description ? `\n${task.description}` : ''}`;
 
       for (const member of recipients) {
-        try {
-          await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
-        } catch (err) {
-          console.error(`[scheduler] Failed to send task notification to ${member.name}:`, err.message);
+        // Send via Telegram
+        if (member.telegram_chat_id) {
+          try {
+            await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
+          } catch (err) {
+            console.error(`[scheduler] Failed to send task notification to ${member.name} via Telegram:`, err.message);
+          }
+        }
+
+        // Send via WhatsApp
+        if (member.whatsapp_linked && member.whatsapp_phone && whatsapp.isConfigured()) {
+          try {
+            await whatsapp.sendTemplate(member.whatsapp_phone, message);
+          } catch (err) {
+            console.error(`[scheduler] Failed to send task notification to ${member.name} via WhatsApp:`, err.message);
+          }
         }
       }
 

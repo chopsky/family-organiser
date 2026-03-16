@@ -183,6 +183,56 @@ const createTelegramLinkToken = (userId, token, expiresAt) => createToken('teleg
 const getTelegramLinkToken = (token) => getValidToken('telegram_link_tokens', token);
 const markTelegramLinkTokenUsed = (id) => markTokenUsed('telegram_link_tokens', id);
 
+// ─── WhatsApp helpers ────────────────────────────────────────────────────────
+
+async function getUserByWhatsAppPhone(phone) {
+  // Normalise: strip whatsapp: prefix and ensure + prefix
+  const clean = phone.replace(/^whatsapp:/, '').trim();
+  const normalised = clean.startsWith('+') ? clean : `+${clean}`;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select()
+    .eq('whatsapp_phone', normalised)
+    .eq('whatsapp_linked', true)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function createWhatsAppVerificationCode(userId, phone, code, expiresAt) {
+  const { data, error } = await supabase
+    .from('whatsapp_verification_codes')
+    .insert({ user_id: userId, phone, code, expires_at: expiresAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getWhatsAppVerificationCode(userId, code) {
+  const { data, error } = await supabase
+    .from('whatsapp_verification_codes')
+    .select()
+    .eq('user_id', userId)
+    .eq('code', code)
+    .eq('used', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function markWhatsAppVerificationCodeUsed(id) {
+  const { error } = await supabase
+    .from('whatsapp_verification_codes')
+    .update({ used: true })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ─── Invites ────────────────────────────────────────────────────────────────
 
 async function createInvite({ householdId, email, token, invitedBy, expiresAt }) {
@@ -1000,6 +1050,11 @@ module.exports = {
   createTelegramLinkToken,
   getTelegramLinkToken,
   markTelegramLinkTokenUsed,
+  // WhatsApp
+  getUserByWhatsAppPhone,
+  createWhatsAppVerificationCode,
+  getWhatsAppVerificationCode,
+  markWhatsAppVerificationCodeUsed,
   createInvite,
   getInviteByToken,
   markInviteAccepted,
