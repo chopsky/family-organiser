@@ -176,7 +176,7 @@ export default function Shopping() {
           {/* Completed items */}
           {showCompleted && complete.length > 0 && (
             <>
-              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mt-4">Completed</h2>
+              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mt-4">Previously purchased</h2>
               <ul className="space-y-2">
                 {complete.map((item) => (
                   <li key={item.id} className="bg-oat rounded-2xl border border-cream-border px-4 py-3 flex items-center gap-3">
