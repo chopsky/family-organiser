@@ -45,6 +45,7 @@ export default function Settings() {
   const [applePassword, setApplePassword] = useState('');
   const [connectingApple, setConnectingApple] = useState(false);
   const [showAppleForm, setShowAppleForm] = useState(false);
+  const [appleError, setAppleError] = useState('');
 
   function loadMembers() {
     return api.get('/household')
@@ -211,23 +212,27 @@ export default function Settings() {
   async function handleConnectApple(e) {
     e.preventDefault();
     if (!appleEmail.trim() || !applePassword.trim()) {
-      setError('Email and app-specific password are required.');
+      setAppleError('Email and app-specific password are required.');
       return;
     }
     setConnectingApple(true);
-    setError('');
+    setAppleError('');
     try {
       await api.post('/calendar/connect/apple', {
         email: appleEmail.trim(),
         appPassword: applePassword.trim(),
-      });
+      }, { timeout: 30000 });
       setSuccess('Apple Calendar connected!');
       setShowAppleForm(false);
       setAppleEmail('');
       setApplePassword('');
+      setAppleError('');
       loadConnections();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not connect Apple Calendar.');
+      const msg = err.code === 'ECONNABORTED'
+        ? 'Connection timed out. Please try again.'
+        : err.response?.data?.error || 'Could not connect Apple Calendar.';
+      setAppleError(msg);
     } finally {
       setConnectingApple(false);
     }
@@ -497,6 +502,9 @@ export default function Settings() {
                 <p className="text-xs text-cocoa">
                   Use an app-specific password from <a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">appleid.apple.com</a> &rarr; Sign-In and Security &rarr; App-Specific Passwords.
                 </p>
+                {appleError && (
+                  <p className="text-xs text-error bg-error/10 rounded-xl px-3 py-2">{appleError}</p>
+                )}
                 <input
                   type="email"
                   placeholder="Apple ID email"

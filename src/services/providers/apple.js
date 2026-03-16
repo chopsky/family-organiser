@@ -303,8 +303,12 @@ async function validateCredentials(email, appPassword) {
       defaultAccountType: 'caldav',
     });
 
-    await client.login();
-    const calendars = await client.fetchCalendars();
+    // Timeout after 20s to avoid hanging indefinitely
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Connection to Apple CalDAV timed out. Please try again.')), 20000)
+    );
+    await Promise.race([client.login(), timeout]);
+    const calendars = await Promise.race([client.fetchCalendars(), timeout]);
 
     return {
       valid: true,
@@ -314,6 +318,7 @@ async function validateCredentials(email, appPassword) {
       })),
     };
   } catch (error) {
+    console.error('Apple CalDAV validateCredentials error:', error.message);
     return {
       valid: false,
       error: error.message || 'Failed to connect to Apple CalDAV',
