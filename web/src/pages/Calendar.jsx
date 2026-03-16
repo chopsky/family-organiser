@@ -156,6 +156,7 @@ export default function Calendar() {
   const [saving, setSaving] = useState(false);
 
   const [toggling, setToggling] = useState(new Set());
+  const [deletingTask, setDeletingTask] = useState(new Set());
   const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays']));
   const toggleFilter = (key) => setActiveFilters(prev => {
     const next = new Set(prev);
@@ -429,6 +430,19 @@ export default function Calendar() {
       setError('Could not update task.');
     } finally {
       setToggling(prev => { const s = new Set(prev); s.delete(task.id); return s; });
+    }
+  }
+
+  async function deleteTask(task) {
+    if (!window.confirm(`Delete "${task.title}"? This can't be undone.`)) return;
+    setDeletingTask(prev => new Set(prev).add(task.id));
+    try {
+      await api.delete(`/tasks/${task.id}`);
+      await load();
+    } catch {
+      setError('Could not delete task.');
+    } finally {
+      setDeletingTask(prev => { const s = new Set(prev); s.delete(task.id); return s; });
     }
   }
 
@@ -815,11 +829,41 @@ export default function Calendar() {
                         {tk.completed && <IconCheck className="h-3 w-3" />}
                       </button>
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_COLORS[tk.priority] || 'bg-warn'}`} />
-                      <span className={`text-sm flex-1 ${tk.completed ? 'line-through text-cocoa' : 'text-bark'}`}>{tk.title}</span>
-                      {tk.assigned_to_name && (
-                        <span className="text-xs text-cocoa flex items-center gap-1">
-                          <IconUser className="h-3 w-3" /> {tk.assigned_to_name}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm ${tk.completed ? 'line-through text-cocoa' : 'text-bark'}`}>{tk.title}</span>
+                        {tk.due_time && !tk.completed && (
+                          <span className="text-xs text-cocoa ml-1">at {tk.due_time.substring(0, 5)}</span>
+                        )}
+                        {tk.assigned_to_name && (
+                          <span className="text-xs text-cocoa flex items-center gap-1 mt-0.5">
+                            <IconUser className="h-3 w-3" /> {tk.assigned_to_name}
+                          </span>
+                        )}
+                      </div>
+                      {!tk.completed && (
+                        <div className="flex gap-1 shrink-0">
+                          <a
+                            href="/tasks"
+                            className="text-cocoa hover:text-primary p-1 rounded transition-colors hover:bg-primary/10"
+                            title="Edit on Tasks page"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </a>
+                          <button
+                            onClick={() => deleteTask(tk)}
+                            disabled={deletingTask.has(tk.id)}
+                            className="text-cocoa hover:text-error p-1 rounded transition-colors hover:bg-error/10"
+                            title="Delete task"
+                          >
+                            {deletingTask.has(tk.id) ? '…' : (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
