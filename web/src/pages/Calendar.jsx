@@ -13,7 +13,6 @@ const EVENT_COLORS = {
   gray:   { bg: 'bg-sand',   border: 'border-cream-border',   dot: 'bg-cocoa',   text: 'text-cocoa',   darkBg: 'bg-sand' },
 };
 
-const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg-[#9db36c]' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const NOTIFICATION_OPTIONS = [
   { value: '', label: 'None' },
@@ -176,7 +175,6 @@ export default function Calendar() {
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskDueTime, setTaskDueTime] = useState('');
   const [taskAssignee, setTaskAssignee] = useState('');
-  const [taskPriority, setTaskPriority] = useState('medium');
   const [taskRecurrence, setTaskRecurrence] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskNotification, setTaskNotification] = useState('');
@@ -478,7 +476,6 @@ export default function Calendar() {
     setTaskDueDate(task.due_date);
     setTaskDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
     setTaskAssignee(task.assigned_to_name || '');
-    setTaskPriority(task.priority || 'medium');
     setTaskRecurrence(task.recurrence || '');
     setTaskDescription(task.description || '');
     setTaskNotification(task.notification || '');
@@ -502,7 +499,6 @@ export default function Calendar() {
         due_date: taskDueDate,
         due_time: taskDueTime || null,
         assigned_to_name: taskAssignee || null,
-        priority: taskPriority,
         recurrence: taskRecurrence || null,
         description: taskDescription || null,
         notification: taskNotification || null,
@@ -802,7 +798,7 @@ export default function Calendar() {
                           <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-primary'}`} title={ev.title} />
                         ))}
                         {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => (
-                          <span key={tk.id} className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[tk.priority] || 'bg-warn'}`} title={tk.title} />
+                          <span key={tk.id} className="w-2 h-2 rounded-full bg-warn" title={tk.title} />
                         ))}
                       </div>
                       {totalItems > maxShow && (
@@ -876,7 +872,6 @@ export default function Calendar() {
                       >
                         {tk.completed && <IconCheck className="h-3 w-3" />}
                       </button>
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_COLORS[tk.priority] || 'bg-warn'}`} />
                       <div className="flex-1 min-w-0">
                         <span className={`text-sm ${tk.completed ? 'line-through text-cocoa' : 'text-bark'}`}>{tk.title}</span>
                         {tk.due_time && !tk.completed && (
@@ -1138,18 +1133,6 @@ export default function Calendar() {
                 >
                   <option value="">Everyone</option>
                   {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-cocoa mb-1 block">Priority</label>
-                <select
-                  value={taskPriority}
-                  onChange={e => setTaskPriority(e.target.value)}
-                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
                 </select>
               </div>
               <div>

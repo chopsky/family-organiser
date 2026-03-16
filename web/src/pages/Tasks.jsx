@@ -4,9 +4,6 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconUser, IconCalendar } from '../components/Icons';
 
-const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg-[#9db36c]' };
-const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
-const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const NOTIFICATION_OPTIONS = [
   { value: '', label: 'None' },
@@ -19,10 +16,6 @@ const NOTIFICATION_OPTIONS = [
   { value: '1_day', label: '1 day before' },
   { value: '2_days', label: '2 days before' },
 ];
-
-function PriorityDot({ priority, className = 'w-3 h-3' }) {
-  return <span className={`${className} rounded-full inline-block ${PRIORITY_COLORS[priority] || PRIORITY_COLORS.medium}`} />;
-}
 
 function daysOverdue(dueDate) {
   const due  = new Date(dueDate + 'T00:00:00');
@@ -67,7 +60,6 @@ export default function Tasks() {
   const [toggling, setToggling] = useState(new Set());
   const [restoring, setRestoring] = useState(new Set());
   const [deleting, setDeleting] = useState(new Set());
-  const [updating, setUpdating] = useState(new Set());
 
   // Form state (shared between add & edit)
   const [title, setTitle]               = useState('');
@@ -75,7 +67,6 @@ export default function Tasks() {
   const [dueTime, setDueTime]           = useState('');
   const [assignee, setAssignee]         = useState('');
   const [recurrence, setRecurrence]     = useState('');
-  const [priority, setPriority]         = useState('medium');
   const [description, setDescription]   = useState('');
   const [notification, setNotification] = useState('');
   const [adding, setAdding]             = useState(false);
@@ -89,7 +80,7 @@ export default function Tasks() {
 
   function resetForm() {
     setTitle(''); setDueDate(today()); setDueTime(''); setAssignee('');
-    setRecurrence(''); setPriority('medium'); setDescription('');
+    setRecurrence(''); setDescription('');
     setNotification(''); setEditingTask(null);
   }
 
@@ -104,7 +95,6 @@ export default function Tasks() {
     setDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
     setAssignee(task.assigned_to_name || '');
     setRecurrence(task.recurrence || '');
-    setPriority(task.priority || 'medium');
     setDescription(task.description || '');
     setNotification(task.notification || '');
     setEditingTask(task);
@@ -166,14 +156,13 @@ export default function Tasks() {
           due_time: dueTime || null,
           assigned_to_name: assignee || null,
           recurrence: recurrence || null,
-          priority,
           description: description || null,
           notification: notification || null,
         };
         await api.patch(`/tasks/${editingTask.id}`, payload);
       } else {
         // Add mode — POST
-        const payload = { title: title.trim(), due_date: dueDate, priority };
+        const payload = { title: title.trim(), due_date: dueDate };
         if (dueTime) payload.due_time = dueTime;
         if (assignee) payload.assigned_to_name = assignee;
         if (recurrence) payload.recurrence = recurrence;
@@ -224,19 +213,6 @@ export default function Tasks() {
       setError('Could not delete task.');
     } finally {
       setDeleting((s) => { const n = new Set(s); n.delete(task.id); return n; });
-    }
-  }
-
-  async function cyclePriority(task) {
-    const next = PRIORITY_CYCLE[task.priority] || 'medium';
-    setUpdating((s) => new Set([...s, task.id]));
-    try {
-      await api.patch(`/tasks/${task.id}`, { priority: next });
-      await load();
-    } catch {
-      setError('Could not update priority.');
-    } finally {
-      setUpdating((s) => { const n = new Set(s); n.delete(task.id); return n; });
     }
   }
 
@@ -326,18 +302,6 @@ export default function Tasks() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-cocoa mb-1 block">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-            <div>
               <label className="text-xs text-cocoa mb-1 block">Repeats</label>
               <select
                 value={recurrence}
@@ -408,18 +372,7 @@ export default function Tasks() {
                         {task.completed && '✓'}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium flex items-center gap-1.5 ${task.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); cyclePriority(task); }}
-                            disabled={updating.has(task.id) || task.completed}
-                            className="inline-flex items-center hover:scale-125 transition-transform disabled:hover:scale-100"
-                            title={`Priority: ${PRIORITY_LABELS[task.priority]} (tap to change)`}
-                          >
-                            {updating.has(task.id)
-                              ? <span className="w-3 h-3 rounded-full bg-cocoa animate-pulse" />
-                              : <PriorityDot priority={task.priority} />
-                            }
-                          </button>
+                        <p className={`text-sm font-medium ${task.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
                           {task.title}
                         </p>
                         {task.description && (
