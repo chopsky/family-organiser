@@ -95,7 +95,14 @@ export default function Shopping() {
   }
 
   const incomplete = items.filter((i) => !i.completed);
-  const complete   = items.filter((i) => i.completed);
+  const complete   = items.filter((i) => i.completed)
+    .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
 
   return (
     <div className="space-y-5">
@@ -185,9 +192,14 @@ export default function Shopping() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-cocoa">{item.item}</p>
-                      <span className="text-xs text-cocoa">
-                        {CATEGORY_EMOJI[item.category]} {item.category}
-                      </span>
+                      <div className="flex gap-x-3 mt-0.5">
+                        <span className="text-xs text-cocoa">
+                          {CATEGORY_EMOJI[item.category]} {item.category}
+                        </span>
+                        {item.completed_at && (
+                          <span className="text-xs text-cocoa">Last purchased: {formatDate(item.completed_at)}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button
