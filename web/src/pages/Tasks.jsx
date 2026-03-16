@@ -4,7 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconUser, IconCalendar } from '../components/Icons';
 
-const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg-success' };
+const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg-[#9db36c]' };
 const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
 const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
