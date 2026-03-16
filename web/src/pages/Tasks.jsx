@@ -68,6 +68,22 @@ export default function Tasks() {
     api.get('/household').then(({ data }) => setMembers(data.members ?? [])).catch(() => {});
   }, [load]);
 
+  // Group tasks by assignee
+  const groupedTasks = (() => {
+    const groups = {};
+    const memberNames = members.map((m) => m.name);
+    for (const name of memberNames) groups[name] = [];
+    for (const task of tasks) {
+      const key = task.assigned_to_name || 'Unassigned';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(task);
+    }
+    // Return entries: member groups first (in order), then Unassigned last
+    const entries = memberNames.filter((n) => groups[n]?.length > 0).map((n) => [n, groups[n]]);
+    if (groups['Unassigned']?.length > 0) entries.push(['Unassigned', groups['Unassigned']]);
+    return entries;
+  })();
+
   async function addTask(e) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -249,63 +265,67 @@ export default function Tasks() {
           {showAll ? 'All tasks complete!' : 'Nothing due today!'}
         </p>
       ) : (
-        <ul className="space-y-2">
-          {tasks.map((task) => {
-            const overdue = daysOverdue(task.due_date);
-            const dueToday = overdue === 0;
-            return (
-              <li key={task.id} className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-start gap-3">
-                <button
-                  onClick={() => toggle(task)}
-                  disabled={toggling.has(task.id)}
-                  className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                    task.completed
-                      ? 'bg-success border-success text-white'
-                      : 'border-cream-border hover:border-primary'
-                  }`}
-                >
-                  {task.completed && '✓'}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium flex items-center gap-1.5 ${task.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); cyclePriority(task); }}
-                      disabled={updating.has(task.id) || task.completed}
-                      className="inline-flex items-center hover:scale-125 transition-transform disabled:hover:scale-100"
-                      title={`Priority: ${PRIORITY_LABELS[task.priority]} (tap to change)`}
-                    >
-                      {updating.has(task.id)
-                        ? <span className="w-3 h-3 rounded-full bg-cocoa animate-pulse" />
-                        : <PriorityDot priority={task.priority} />
-                      }
-                    </button>
-                    {task.title}
-                  </p>
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                    {task.assigned_to_name && (
-                      <span className="text-xs text-cocoa flex items-center gap-1">
-                        <IconUser className="h-3 w-3" /> {task.assigned_to_name}
-                      </span>
-                    )}
-                    <span className={`text-xs font-medium flex items-center gap-1 ${
-                      task.completed ? 'text-cocoa' :
-                      overdue > 0   ? 'text-error' :
-                      dueToday      ? 'text-warn' : 'text-cocoa'
-                    }`}>
-                      {task.completed ? 'Done' :
-                       overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-[#d76353] inline-block" /> {overdue}d overdue</> :
-                       dueToday      ? <><span className="w-2 h-2 rounded-full bg-[#e5ad57] inline-block" /> Due today</> :
-                       <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
-                    </span>
-                    {task.recurrence && (
-                      <span className="text-xs text-cocoa">[{task.recurrence}]</span>
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-5">
+          {groupedTasks.map(([groupName, groupTasks]) => (
+            <div key={groupName}>
+              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <IconUser className="h-3.5 w-3.5" /> {groupName}
+              </h2>
+              <ul className="space-y-2">
+                {groupTasks.map((task) => {
+                  const overdue = daysOverdue(task.due_date);
+                  const dueToday = overdue === 0;
+                  return (
+                    <li key={task.id} className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-start gap-3">
+                      <button
+                        onClick={() => toggle(task)}
+                        disabled={toggling.has(task.id)}
+                        className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                          task.completed
+                            ? 'bg-success border-success text-white'
+                            : 'border-cream-border hover:border-primary'
+                        }`}
+                      >
+                        {task.completed && '✓'}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium flex items-center gap-1.5 ${task.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); cyclePriority(task); }}
+                            disabled={updating.has(task.id) || task.completed}
+                            className="inline-flex items-center hover:scale-125 transition-transform disabled:hover:scale-100"
+                            title={`Priority: ${PRIORITY_LABELS[task.priority]} (tap to change)`}
+                          >
+                            {updating.has(task.id)
+                              ? <span className="w-3 h-3 rounded-full bg-cocoa animate-pulse" />
+                              : <PriorityDot priority={task.priority} />
+                            }
+                          </button>
+                          {task.title}
+                        </p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                          <span className={`text-xs font-medium flex items-center gap-1 ${
+                            task.completed ? 'text-cocoa' :
+                            overdue > 0   ? 'text-error' :
+                            dueToday      ? 'text-warn' : 'text-cocoa'
+                          }`}>
+                            {task.completed ? 'Done' :
+                             overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-[#d76353] inline-block" /> {overdue}d overdue</> :
+                             dueToday      ? <><span className="w-2 h-2 rounded-full bg-[#e5ad57] inline-block" /> Due today</> :
+                             <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
+                          </span>
+                          {task.recurrence && (
+                            <span className="text-xs text-cocoa">[{task.recurrence}]</span>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Recently Completed (last 24h) */}
