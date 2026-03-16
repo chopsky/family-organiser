@@ -7,11 +7,13 @@ function generateJoinCode() {
   return crypto.randomBytes(3).toString('hex').toUpperCase(); // e.g. "A3F9B2"
 }
 
-async function createHousehold(name) {
+async function createHousehold(name, timezone) {
   const join_code = generateJoinCode();
+  const row = { name, join_code };
+  if (timezone) row.timezone = timezone;
   const { data, error } = await supabase
     .from('households')
-    .insert({ name, join_code })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;

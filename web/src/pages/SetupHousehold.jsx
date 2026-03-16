@@ -17,7 +17,8 @@ export default function SetupHousehold() {
     if (!name.trim()) { setError('Please enter a household name.'); return; }
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/create-household', { name: name.trim() });
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+      const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone });
       login(data);
       navigate('/dashboard');
     } catch (err) {

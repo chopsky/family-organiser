@@ -13,9 +13,6 @@ export default function Settings() {
   const [reminderTime, setReminderTime] = useState(
     household?.reminder_time?.slice(0, 5) ?? '08:00'
   );
-  const [timezone, setTimezone]       = useState(
-    household?.timezone ?? 'Africa/Johannesburg'
-  );
   const [saving, setSaving]           = useState(false);
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
@@ -120,7 +117,6 @@ export default function Settings() {
       const { data } = await api.patch('/settings/settings', {
         name: name.trim(),
         reminder_time: reminderTime + ':00',
-        timezone,
       });
       setSuccess('Settings saved!');
       // Update stored household
@@ -352,19 +348,6 @@ export default function Settings() {
               />
               <p className="text-xs text-cocoa mt-1">Telegram reminders are sent at this time each day.</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-bark block mb-1">Timezone</label>
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-linen"
-              >
-                {Intl.supportedValuesOf('timeZone').map((tz) => (
-                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
-                ))}
-              </select>
-              <p className="text-xs text-cocoa mt-1">Reminders use this timezone.</p>
-            </div>
             <button
               type="submit"
               disabled={saving}
@@ -377,7 +360,6 @@ export default function Settings() {
           <div className="space-y-2 text-sm text-cocoa">
             <p><span className="font-medium text-bark">Name:</span> {household?.name}</p>
             <p><span className="font-medium text-bark">Reminder time:</span> {household?.reminder_time?.slice(0, 5)}</p>
-            <p><span className="font-medium text-bark">Timezone:</span> {(household?.timezone ?? 'Africa/Johannesburg').replace(/_/g, ' ')}</p>
             <p className="text-xs text-cocoa mt-2">Only admins can change household settings.</p>
           </div>
         )}

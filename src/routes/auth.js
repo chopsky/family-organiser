@@ -158,7 +158,7 @@ router.get('/verify-email', async (req, res) => {
 // ─── POST /api/auth/create-household ────────────────────────────────────────
 
 router.post('/create-household', requireAuth, async (req, res) => {
-  const { name } = req.body;
+  const { name, timezone } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Household name is required' });
@@ -169,7 +169,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
   }
 
   try {
-    const household = await db.createHousehold(name.trim());
+    const household = await db.createHousehold(name.trim(), timezone);
     const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin' });
 
     // Seed public holidays in the background (don't block response)
