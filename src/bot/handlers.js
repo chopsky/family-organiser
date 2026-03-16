@@ -75,34 +75,81 @@ function formatTaskList(tasks, heading = 'Tasks') {
  * @param {string} text       - The message text
  * @param {object} user       - User row from DB
  * @param {object} household  - { id, members }
- * @returns {Promise<string>} Response message
+ * @returns {Promise<{response: string, actions: object}>} Response message and action details
  */
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
   const result = await classify(text, memberNames);
 
+  const actions = {
+    shoppingAdded: [],
+    shoppingCompleted: [],
+    tasksAdded: [],
+    tasksCompleted: [],
+  };
+
   // Handle shopping items
   if (result.shopping_items?.length) {
     const toAdd = result.shopping_items.filter((i) => i.action === 'add');
     const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
-    if (toAdd.length) await db.addShoppingItems(household.id, toAdd, user.id);
-    if (toRemove.length) await db.completeShoppingItemsByName(household.id, toRemove.map((i) => i.item));
+    if (toAdd.length) {
+      await db.addShoppingItems(household.id, toAdd, user.id);
+      actions.shoppingAdded = toAdd.map((i) => i.item);
+    }
+    if (toRemove.length) {
+      await db.completeShoppingItemsByName(household.id, toRemove.map((i) => i.item));
+      actions.shoppingCompleted = toRemove.map((i) => i.item);
+    }
   }
 
   // Handle tasks
   if (result.tasks?.length) {
     const toAdd = result.tasks.filter((t) => t.action === 'add');
     const toComplete = result.tasks.filter((t) => t.action === 'complete');
-    if (toAdd.length) await db.addTasks(household.id, toAdd, user.id, household.members);
+    if (toAdd.length) {
+      await db.addTasks(household.id, toAdd, user.id, household.members);
+      actions.tasksAdded = toAdd.map((t) => t.title);
+    }
     for (const t of toComplete) {
       const done = await db.completeTasksByName(household.id, [t.title], t.assigned_to_name);
+      actions.tasksCompleted.push(t.title);
       for (const completedTask of done) {
         if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
       }
     }
   }
 
-  return result.response_message || 'Done! ✅';
+  return {
+    response: result.response_message || 'Done! ✅',
+    actions,
+  };
+}
+
+/**
+ * Build a short broadcast notification message for other household members.
+ * Returns null if no meaningful actions were taken.
+ *
+ * @param {string} userName - Name of the person who made the change
+ * @param {object} actions  - { shoppingAdded, shoppingCompleted, tasksAdded, tasksCompleted }
+ * @returns {string|null}
+ */
+function buildBroadcastMessage(userName, actions) {
+  const lines = [];
+
+  if (actions.shoppingAdded.length) {
+    lines.push(`🛒 ${userName} added: ${actions.shoppingAdded.join(', ')}`);
+  }
+  if (actions.shoppingCompleted.length) {
+    lines.push(`✅ ${userName} checked off: ${actions.shoppingCompleted.join(', ')}`);
+  }
+  if (actions.tasksAdded.length) {
+    lines.push(`📋 ${userName} added task: ${actions.tasksAdded.join(', ')}`);
+  }
+  if (actions.tasksCompleted.length) {
+    lines.push(`✅ ${userName} completed: ${actions.tasksCompleted.join(', ')}`);
+  }
+
+  return lines.length ? lines.join('\n') : null;
 }
 
 /**
@@ -122,10 +169,11 @@ async function handleVoiceNote(audioBuffer, filename, user, household) {
     return { transcription: null, response: "🎙️ Couldn't hear anything in that voice note. Please try again." };
   }
 
-  const response = await handleTextMessage(transcribedText, user, household);
+  const result = await handleTextMessage(transcribedText, user, household);
   return {
     transcription: transcribedText,
-    response: `🎙️ _"${transcribedText}"_\n\n${response}`,
+    response: `🎙️ _"${transcribedText}"_\n\n${result.response}`,
+    actions: result.actions,
   };
 }
 
@@ -137,13 +185,17 @@ async function handleVoiceNote(audioBuffer, filename, user, household) {
  * @param {string} mimeType - e.g. "image/jpeg"
  * @param {object} user
  * @param {object} household
- * @returns {Promise<string>} Response message
+ * @returns {Promise<{response: string, actions: object}>}
  */
 async function handlePhoto(imageBuffer, mimeType, user, household) {
+  const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
   const extracted = await scanReceipt(imageBuffer, mimeType);
 
   if (!extracted.items?.length) {
-    return "🧾 I couldn't find any items on that receipt. Is this a grocery receipt? Try sending a clearer photo.";
+    return {
+      response: "🧾 I couldn't find any items on that receipt. Is this a grocery receipt? Try sending a clearer photo.",
+      actions: noActions,
+    };
   }
 
   // Fuzzy-match against the household shopping list
@@ -173,7 +225,10 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
     lines.push(`\n❓ *Not on your list:* ${matchResult.unmatched_receipt_items.join(', ')}`);
   }
 
-  return lines.join('\n');
+  return {
+    response: lines.join('\n'),
+    actions: { ...noActions, shoppingCompleted: checkedOff },
+  };
 }
 
 /**
@@ -212,6 +267,7 @@ module.exports = {
   handleList,
   handleTasks,
   handleMyTasks,
+  buildBroadcastMessage,
   formatShoppingList,
   formatTaskList,
   CATEGORY_EMOJI,

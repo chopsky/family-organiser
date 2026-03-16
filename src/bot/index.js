@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
 const sharedHandlers = require('./handlers');
+const broadcast = require('../services/broadcast');
 
 // ─── File download helper ─────────────────────────────────────────────────────
 
@@ -501,6 +502,10 @@ function createBot(token) {
         result.response,
         { parse_mode: 'Markdown' }
       );
+
+      // Broadcast to other members
+      const notification = sharedHandlers.buildBroadcastMessage(ctx.familyUser.name, result.actions);
+      if (notification) broadcast.toHousehold(ctx.familyUser.id, ctx.household.members, notification, ctx.telegram);
     } catch (err) {
       console.error('Voice handler error:', err.message, err.stack);
       let msg;
@@ -530,11 +535,15 @@ function createBot(token) {
       const fileLink = await ctx.telegram.getFileLink(bestPhoto.file_id);
       const imageBuffer = await downloadFile(fileLink.href);
 
-      const response = await sharedHandlers.handlePhoto(imageBuffer, 'image/jpeg', ctx.familyUser, ctx.household);
+      const result = await sharedHandlers.handlePhoto(imageBuffer, 'image/jpeg', ctx.familyUser, ctx.household);
 
       await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
-        response, { parse_mode: 'Markdown' }
+        result.response, { parse_mode: 'Markdown' }
       );
+
+      // Broadcast to other members
+      const notification = sharedHandlers.buildBroadcastMessage(ctx.familyUser.name, result.actions);
+      if (notification) broadcast.toHousehold(ctx.familyUser.id, ctx.household.members, notification, ctx.telegram);
     } catch (err) {
       console.error('Photo handler error:', err);
       await ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
@@ -635,8 +644,12 @@ function createBot(token) {
     if (!text) return;
 
     try {
-      const response = await sharedHandlers.handleTextMessage(text, ctx.familyUser, ctx.household);
-      return ctx.reply(response);
+      const result = await sharedHandlers.handleTextMessage(text, ctx.familyUser, ctx.household);
+      await ctx.reply(result.response);
+
+      // Broadcast to other members
+      const notification = sharedHandlers.buildBroadcastMessage(ctx.familyUser.name, result.actions);
+      if (notification) broadcast.toHousehold(ctx.familyUser.id, ctx.household.members, notification, ctx.telegram);
     } catch (err) {
       console.error('Natural language handler error:', err);
       return ctx.reply('Sorry, I had trouble understanding that. Please try again, or use /help to see commands.');

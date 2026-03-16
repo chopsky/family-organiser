@@ -9,6 +9,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
+const broadcast = require('../services/broadcast');
 const handlers = require('../bot/handlers');
 
 const router = Router();
@@ -69,6 +70,10 @@ router.post('/webhook', async (req, res) => {
           const audioBuffer = await whatsapp.downloadMedia(mediaUrl);
           const result = await handlers.handleVoiceNote(audioBuffer, 'voice.ogg', user, household);
           await whatsapp.sendMessage(phone, result.response);
+
+          // Broadcast to other members
+          const notification = handlers.buildBroadcastMessage(user.name, result.actions);
+          if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Voice note error:', err.message);
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble processing that voice note. Please try again.');
@@ -80,8 +85,12 @@ router.post('/webhook', async (req, res) => {
         // Photo (receipt scanning)
         try {
           const imageBuffer = await whatsapp.downloadMedia(mediaUrl);
-          const response = await handlers.handlePhoto(imageBuffer, mediaType, user, household);
-          await whatsapp.sendMessage(phone, response);
+          const result = await handlers.handlePhoto(imageBuffer, mediaType, user, household);
+          await whatsapp.sendMessage(phone, result.response);
+
+          // Broadcast to other members
+          const notification = handlers.buildBroadcastMessage(user.name, result.actions);
+          if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Photo error:', err.message);
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble scanning that receipt. Please try again with a clearer photo.');
@@ -95,8 +104,12 @@ router.post('/webhook', async (req, res) => {
       const text = Body.trim();
 
       try {
-        const response = await handlers.handleTextMessage(text, user, household);
-        await whatsapp.sendMessage(phone, response);
+        const result = await handlers.handleTextMessage(text, user, household);
+        await whatsapp.sendMessage(phone, result.response);
+
+        // Broadcast to other members
+        const notification = handlers.buildBroadcastMessage(user.name, result.actions);
+        if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
         console.error('[whatsapp] Text handler error:', err.message);
         await whatsapp.sendMessage(phone, 'Sorry, I had trouble understanding that. Please try again.');
