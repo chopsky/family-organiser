@@ -4,7 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconUser, IconCalendar } from '../components/Icons';
 
-const PRIORITY_COLORS = { high: 'bg-error', medium: 'bg-warn', low: 'bg-success' };
+const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg-success' };
 const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
 const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
@@ -293,8 +293,8 @@ export default function Tasks() {
                       dueToday      ? 'text-warn' : 'text-cocoa'
                     }`}>
                       {task.completed ? 'Done' :
-                       overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-error inline-block" /> {overdue}d overdue</> :
-                       dueToday      ? <><span className="w-2 h-2 rounded-full bg-warn inline-block" /> Due today</> :
+                       overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-[#d76353] inline-block" /> {overdue}d overdue</> :
+                       dueToday      ? <><span className="w-2 h-2 rounded-full bg-[#e5ad57] inline-block" /> Due today</> :
                        <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
                     </span>
                     {task.recurrence && (
