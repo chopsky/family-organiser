@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
+const calendarSync = require('../services/calendarSync');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -92,6 +93,29 @@ async function runWeeklyDigest(bot) {
 }
 
 /**
+ * Poll Apple CalDAV connections for changes.
+ * Apple doesn't support webhooks, so we poll every 15 minutes.
+ */
+async function runAppleCalendarPoll() {
+  try {
+    const households = await db.getAllHouseholds();
+    for (const household of households) {
+      const connections = await db.getConnectionsByHousehold(household.id);
+      const appleConnections = connections.filter((c) => c.provider === 'apple' && c.sync_enabled);
+      for (const connection of appleConnections) {
+        try {
+          await calendarSync.pullChangesFromProvider(connection);
+        } catch (err) {
+          console.error(`[scheduler] Apple poll failed for connection ${connection.id}:`, err.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] Apple calendar poll failed:', err.message);
+  }
+}
+
+/**
  * Start all scheduled jobs.
  *
  * @param {object} bot - Telegraf bot instance (needs bot.telegram.sendMessage)
@@ -104,6 +128,10 @@ function startScheduler(bot) {
   // ── Overdue nudges: check every minute (fires at 14:00 per household TZ) ───
   cron.schedule('* * * * *', () => runOverdueNudgeCheck(bot));
   console.log('✓ Overdue nudge scheduler started (14:00 per household timezone)');
+
+  // ── Apple CalDAV polling: every 15 minutes ─────────────────────────────────
+  cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());
+  console.log('✓ Apple Calendar polling started (every 15 minutes)');
 
   // ── Weekly digest: Sunday evenings ──────────────────────────────────────────
   const digestDay  = process.env.WEEKLY_DIGEST_DAY  ?? '0';   // 0 = Sunday

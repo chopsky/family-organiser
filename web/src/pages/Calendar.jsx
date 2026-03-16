@@ -156,6 +156,12 @@ export default function Calendar() {
   const [saving, setSaving] = useState(false);
 
   const [toggling, setToggling] = useState(new Set());
+  const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays']));
+  const toggleFilter = (key) => setActiveFilters(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
   const formRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
@@ -297,11 +303,18 @@ export default function Calendar() {
     return events.filter(e => {
       const start = e.start_time?.split('T')[0];
       const end = e.end_time?.split('T')[0];
-      return start === ds || (start <= ds && end >= ds);
+      if (!(start === ds || (start <= ds && end >= ds))) return false;
+      // Apply category filters
+      const cat = e.category || 'general';
+      if (cat === 'general' && !activeFilters.has('events')) return false;
+      if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
+      if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
+      return true;
     });
   }
 
   function tasksForDate(date) {
+    if (!activeFilters.has('tasks')) return [];
     const ds = toDateStr(date);
     return tasks.filter(t => t.due_date === ds);
   }
@@ -617,6 +630,28 @@ export default function Calendar() {
         <span className="text-lg font-semibold text-bark min-w-[180px] text-center">{navigationLabel}</span>
         <button onClick={navigateNext} className="border border-cream-border text-cocoa hover:bg-oat rounded-2xl px-3 py-1.5 text-sm transition-colors">&rarr;</button>
         <button onClick={goToday} className="border border-cream-border text-cocoa hover:bg-oat rounded-2xl px-3 py-1.5 text-sm transition-colors">Today</button>
+      </div>
+
+      {/* ── Filters ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        {[
+          { key: 'events', label: 'Events' },
+          { key: 'tasks', label: 'Tasks' },
+          { key: 'birthdays', label: 'Birthdays' },
+          { key: 'holidays', label: 'Holidays' },
+        ].map(f => (
+          <button
+            key={f.key}
+            onClick={() => toggleFilter(f.key)}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+              activeFilters.has(f.key)
+                ? 'bg-primary text-white'
+                : 'bg-oat text-cocoa border border-cream-border'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Day View ────────────────────────────────────────── */}

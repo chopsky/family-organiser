@@ -559,14 +559,24 @@ async function getTasksForUser(householdId, userId) {
 
 // ─── Calendar Events ─────────────────────────────────────────────────────────
 
-async function getCalendarEvents(householdId, startDate, endDate) {
-  const { data, error } = await supabase
+async function getCalendarEvents(householdId, startDate, endDate, { userId, category } = {}) {
+  let query = supabase
     .from('calendar_events')
     .select()
     .eq('household_id', householdId)
     .lte('start_time', endDate)
-    .gte('end_time', startDate)
-    .order('start_time');
+    .gte('end_time', startDate);
+
+  if (category) {
+    query = query.eq('category', category);
+  }
+
+  // Visibility: show family events + personal events belonging to the requesting user
+  if (userId) {
+    query = query.or(`visibility.eq.family,source_user_id.eq.${userId},source_user_id.is.null`);
+  }
+
+  const { data, error } = await query.order('start_time');
   if (error) throw error;
   return data;
 }
@@ -796,6 +806,147 @@ async function deleteSyncMapping(eventId, connectionId) {
   if (error) throw error;
 }
 
+// ─── Calendar Subscriptions ──────────────────────────────────────────────────
+
+async function getSubscriptionsByConnection(connectionId) {
+  const { data, error } = await supabase
+    .from('calendar_subscriptions')
+    .select()
+    .eq('connection_id', connectionId)
+    .order('display_name');
+  if (error) throw error;
+  return data;
+}
+
+async function getEnabledSubscriptionsByConnection(connectionId) {
+  const { data, error } = await supabase
+    .from('calendar_subscriptions')
+    .select()
+    .eq('connection_id', connectionId)
+    .eq('sync_enabled', true)
+    .order('display_name');
+  if (error) throw error;
+  return data;
+}
+
+async function upsertSubscription(connectionId, subData) {
+  const { data, error } = await supabase
+    .from('calendar_subscriptions')
+    .upsert({
+      connection_id: connectionId,
+      external_calendar_id: subData.external_calendar_id,
+      display_name: subData.display_name,
+      category: subData.category || 'general',
+      visibility: subData.visibility || 'family',
+      sync_enabled: subData.sync_enabled !== false,
+    }, { onConflict: 'connection_id,external_calendar_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getSubscriptionById(subscriptionId) {
+  const { data, error } = await supabase
+    .from('calendar_subscriptions')
+    .select()
+    .eq('id', subscriptionId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function updateSubscription(subscriptionId, updates) {
+  const allowed = {};
+  if (updates.category !== undefined) allowed.category = updates.category;
+  if (updates.visibility !== undefined) allowed.visibility = updates.visibility;
+  if (updates.sync_enabled !== undefined) allowed.sync_enabled = updates.sync_enabled;
+  if (updates.last_synced_at !== undefined) allowed.last_synced_at = updates.last_synced_at;
+  if (updates.sync_token !== undefined) allowed.sync_token = updates.sync_token;
+  const { data, error } = await supabase
+    .from('calendar_subscriptions')
+    .update(allowed)
+    .eq('id', subscriptionId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteSubscription(subscriptionId) {
+  // Delete synced events first
+  await supabase
+    .from('calendar_events')
+    .delete()
+    .eq('subscription_id', subscriptionId);
+  // Then delete the subscription (cascade deletes sync mappings)
+  const { error } = await supabase
+    .from('calendar_subscriptions')
+    .delete()
+    .eq('id', subscriptionId);
+  if (error) throw error;
+}
+
+async function getConnectionByUserAndProvider(userId, provider) {
+  const { data, error } = await supabase
+    .from('calendar_connections')
+    .select()
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function getSyncMappingsBySubscription(subscriptionId) {
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .select()
+    .eq('subscription_id', subscriptionId);
+  if (error) throw error;
+  return data;
+}
+
+async function createSyncMappingWithSubscription(eventId, connectionId, subscriptionId, externalEventId, etag) {
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .upsert({
+      event_id: eventId,
+      connection_id: connectionId,
+      subscription_id: subscriptionId,
+      external_event_id: externalEventId,
+      external_etag: etag || null,
+      last_synced_at: new Date().toISOString(),
+    }, { onConflict: 'event_id,connection_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function createCalendarEventFromSync(householdId, eventData, sourceUserId, subscriptionId, category, visibility) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .insert({
+      household_id: householdId,
+      title: eventData.title,
+      description: eventData.description || null,
+      start_time: eventData.start_time,
+      end_time: eventData.end_time,
+      all_day: eventData.all_day || false,
+      location: eventData.location || null,
+      color: category === 'birthday' ? 'purple' : category === 'public_holiday' ? 'red' : 'blue',
+      source_user_id: sourceUserId,
+      subscription_id: subscriptionId,
+      category,
+      visibility,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -862,4 +1013,15 @@ module.exports = {
   getSyncMapping,
   getSyncMappingByExternalId,
   deleteSyncMapping,
+  // Calendar subscriptions
+  getSubscriptionsByConnection,
+  getEnabledSubscriptionsByConnection,
+  upsertSubscription,
+  getSubscriptionById,
+  updateSubscription,
+  deleteSubscription,
+  getConnectionByUserAndProvider,
+  getSyncMappingsBySubscription,
+  createSyncMappingWithSubscription,
+  createCalendarEventFromSync,
 };

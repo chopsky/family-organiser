@@ -244,7 +244,11 @@ router.get('/events', async (req, res) => {
       return res.status(400).json({ error: 'Invalid month format. Use "YYYY-MM".' });
     }
 
-    const events = await db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate);
+    const { category } = req.query;
+    const events = await db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
+      userId: req.user.id,
+      category: category || undefined,
+    });
     return res.json({ events });
   } catch (err) {
     console.error('GET /api/calendar/events error:', err);
@@ -499,6 +503,120 @@ router.delete('/connections/:provider', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/calendar/connections error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Calendar Subscriptions ──────────────────────────────────────────────────
+
+const PROVIDERS = { google: googleProvider, microsoft: microsoftProvider, apple: appleProvider };
+
+/**
+ * GET /api/calendar/connections/:provider/calendars
+ * List available calendars for a connected provider.
+ */
+router.get('/connections/:provider/calendars', async (req, res) => {
+  const { provider } = req.params;
+  const providerModule = PROVIDERS[provider];
+  if (!providerModule) return res.status(400).json({ error: 'Invalid provider.' });
+
+  try {
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
+    if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
+
+    const calendars = await providerModule.listCalendars(connection);
+    return res.json({ calendars });
+  } catch (err) {
+    console.error(`GET /connections/${provider}/calendars error:`, err);
+    return res.status(500).json({ error: err.message || 'Could not list calendars.' });
+  }
+});
+
+/**
+ * GET /api/calendar/connections/:provider/subscriptions
+ * Get current calendar subscriptions for a provider.
+ */
+router.get('/connections/:provider/subscriptions', async (req, res) => {
+  const { provider } = req.params;
+  try {
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
+    if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
+
+    const subscriptions = await db.getSubscriptionsByConnection(connection.id);
+    return res.json({ subscriptions });
+  } catch (err) {
+    console.error(`GET /connections/${provider}/subscriptions error:`, err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/calendar/connections/:provider/subscriptions
+ * Create/update calendar subscriptions and trigger initial import.
+ * Body: { calendars: [{ external_calendar_id, display_name, category, visibility }] }
+ */
+router.post('/connections/:provider/subscriptions', async (req, res) => {
+  const { provider } = req.params;
+  const { calendars } = req.body;
+  if (!Array.isArray(calendars) || calendars.length === 0) {
+    return res.status(400).json({ error: 'calendars array is required.' });
+  }
+
+  try {
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
+    if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
+
+    const results = [];
+    for (const cal of calendars) {
+      if (!cal.external_calendar_id || !cal.display_name) continue;
+      const sub = await db.upsertSubscription(connection.id, {
+        external_calendar_id: cal.external_calendar_id,
+        display_name: cal.display_name,
+        category: cal.category || 'general',
+        visibility: cal.visibility || 'family',
+      });
+      results.push(sub);
+
+      // Trigger initial import asynchronously
+      if (!sub.last_synced_at) {
+        calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
+          console.error(`Initial import failed for subscription ${sub.id}:`, err);
+        });
+      }
+    }
+
+    return res.json({ subscriptions: results });
+  } catch (err) {
+    console.error(`POST /connections/${provider}/subscriptions error:`, err);
+    return res.status(500).json({ error: err.message || 'Could not save subscriptions.' });
+  }
+});
+
+/**
+ * PATCH /api/calendar/subscriptions/:id
+ * Update a subscription's category, visibility, or sync_enabled.
+ */
+router.patch('/subscriptions/:id', async (req, res) => {
+  try {
+    const { category, visibility, sync_enabled } = req.body;
+    const sub = await db.updateSubscription(req.params.id, { category, visibility, sync_enabled });
+    return res.json({ subscription: sub });
+  } catch (err) {
+    console.error('PATCH /subscriptions error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/calendar/subscriptions/:id
+ * Remove a subscription and all its synced events.
+ */
+router.delete('/subscriptions/:id', async (req, res) => {
+  try {
+    await db.deleteSubscription(req.params.id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /subscriptions error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

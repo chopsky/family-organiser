@@ -114,8 +114,12 @@ async function pushEvent(connection, event, action) {
  * @param {object} connection - Calendar connection with access_token and optional deltaLink
  * @returns {Array<{ externalEventId: string, action: string, eventData: object|null, etag: string|null }>}
  */
-async function pullChanges(connection) {
+async function pullChanges(connection, calendarId) {
   const client = getClient(connection.access_token);
+
+  const basePath = calendarId
+    ? `/me/calendars/${calendarId}/calendarView/delta`
+    : '/me/calendarView/delta';
 
   let url;
   if (connection.deltaLink) {
@@ -127,7 +131,7 @@ async function pullChanges(connection) {
     endDate.setDate(endDate.getDate() + 30);
     const endDateTime = endDate.toISOString();
 
-    url = `/me/calendarView/delta?startDateTime=${encodeURIComponent(
+    url = `${basePath}?startDateTime=${encodeURIComponent(
       startDateTime
     )}&endDateTime=${encodeURIComponent(endDateTime)}`;
   }
@@ -169,6 +173,101 @@ async function pullChanges(connection) {
   }
 
   return changes;
+}
+
+/**
+ * List all calendars for the connected Microsoft account.
+ *
+ * @param {object} connection - Calendar connection with access_token
+ * @returns {Array<{ id: string, displayName: string, suggestedCategory: string }>}
+ */
+async function listCalendars(connection) {
+  const { data } = await axios.get(
+    'https://graph.microsoft.com/v1.0/me/calendars',
+    {
+      headers: { Authorization: `Bearer ${connection.access_token}` },
+    }
+  );
+
+  return (data.value || []).map((cal) => {
+    const name = cal.name || '';
+    let suggestedCategory = 'general';
+
+    if (
+      name === 'Birthday calendar' ||
+      /birthday/i.test(name)
+    ) {
+      suggestedCategory = 'birthday';
+    } else if (
+      name === 'Holidays' ||
+      /holiday/i.test(name)
+    ) {
+      suggestedCategory = 'public_holiday';
+    }
+
+    return {
+      id: cal.id,
+      displayName: name,
+      suggestedCategory,
+    };
+  });
+}
+
+/**
+ * Pull all events from a specific calendar using calendarView (non-delta).
+ * Fetches events from 6 months ago to 12 months from now.
+ *
+ * @param {object} connection - Calendar connection with access_token
+ * @param {string} [calendarId] - Calendar ID; omit for default calendar
+ * @returns {Array<{ externalEventId: string, action: string, eventData: object }>}
+ */
+async function pullAllEvents(connection, calendarId) {
+  const client = getClient(connection.access_token);
+
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setMonth(startDate.getMonth() - 6);
+  const endDate = new Date(now);
+  endDate.setMonth(endDate.getMonth() + 12);
+
+  const startDateTime = startDate.toISOString();
+  const endDateTime = endDate.toISOString();
+
+  const basePath = calendarId
+    ? `/me/calendars/${calendarId}/calendarView`
+    : '/me/calendarView';
+
+  let url = `${basePath}?startDateTime=${encodeURIComponent(
+    startDateTime
+  )}&endDateTime=${encodeURIComponent(endDateTime)}`;
+
+  const events = [];
+  let response = await client.api(url).get();
+
+  while (response) {
+    for (const item of response.value || []) {
+      events.push({
+        externalEventId: item.id,
+        action: 'upsert',
+        eventData: {
+          title: item.subject,
+          description: item.body?.content || '',
+          start_time: item.start?.dateTime,
+          end_time: item.end?.dateTime,
+          location: item.location?.displayName || '',
+          all_day: item.isAllDay || false,
+        },
+      });
+    }
+
+    if (response['@odata.nextLink']) {
+      response = await client.api(response['@odata.nextLink']).get();
+    } else {
+      break;
+    }
+  }
+
+  return events;
 }
 
 /**
@@ -224,6 +323,8 @@ module.exports = {
   handleCallback,
   pushEvent,
   pullChanges,
+  listCalendars,
+  pullAllEvents,
   refreshToken,
   registerWebhook,
 };

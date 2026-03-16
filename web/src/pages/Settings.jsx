@@ -47,6 +47,14 @@ export default function Settings() {
   const [showAppleForm, setShowAppleForm] = useState(false);
   const [appleError, setAppleError] = useState('');
 
+  // Calendar subscription selection state
+  const [selectingProvider, setSelectingProvider] = useState(null); // 'google' | 'microsoft' | 'apple' | null
+  const [availableCalendars, setAvailableCalendars] = useState([]);
+  const [calendarSelections, setCalendarSelections] = useState({}); // { calId: { enabled, category, visibility } }
+  const [loadingCalendars, setLoadingCalendars] = useState(false);
+  const [savingSubscriptions, setSavingSubscriptions] = useState(false);
+  const [existingSubscriptions, setExistingSubscriptions] = useState([]);
+
   function loadMembers() {
     return api.get('/household')
       .then(({ data }) => setMembers(data.members ?? []))
@@ -235,6 +243,59 @@ export default function Settings() {
       setAppleError(msg);
     } finally {
       setConnectingApple(false);
+    }
+  }
+
+  async function openCalendarSelection(provider) {
+    setSelectingProvider(provider);
+    setLoadingCalendars(true);
+    try {
+      const [calsRes, subsRes] = await Promise.all([
+        api.get(`/calendar/connections/${provider}/calendars`),
+        api.get(`/calendar/connections/${provider}/subscriptions`),
+      ]);
+      const cals = calsRes.data.calendars ?? [];
+      const subs = subsRes.data.subscriptions ?? [];
+      setAvailableCalendars(cals);
+      setExistingSubscriptions(subs);
+
+      // Build selections map: merge existing subscriptions with available calendars
+      const selections = {};
+      for (const cal of cals) {
+        const existing = subs.find((s) => s.external_calendar_id === cal.id);
+        selections[cal.id] = {
+          enabled: existing ? existing.sync_enabled : true,
+          category: existing ? existing.category : cal.suggestedCategory || 'general',
+          visibility: existing ? existing.visibility : 'family',
+        };
+      }
+      setCalendarSelections(selections);
+    } catch {
+      setError('Could not load calendars.');
+      setSelectingProvider(null);
+    } finally {
+      setLoadingCalendars(false);
+    }
+  }
+
+  async function saveCalendarSubscriptions() {
+    setSavingSubscriptions(true);
+    try {
+      const calendars = availableCalendars
+        .filter((cal) => calendarSelections[cal.id]?.enabled)
+        .map((cal) => ({
+          external_calendar_id: cal.id,
+          display_name: cal.displayName,
+          category: calendarSelections[cal.id].category,
+          visibility: calendarSelections[cal.id].visibility,
+        }));
+      await api.post(`/calendar/connections/${selectingProvider}/subscriptions`, { calendars });
+      setSuccess('Calendars saved! Importing events...');
+      setSelectingProvider(null);
+    } catch {
+      setError('Could not save calendar selections.');
+    } finally {
+      setSavingSubscriptions(false);
     }
   }
 
@@ -458,12 +519,17 @@ export default function Settings() {
           <div className="space-y-2">
             {/* Google */}
             {calConnections.find(c => c.provider === 'google') ? (
-              <div className="flex items-center justify-between bg-success/10 rounded-2xl px-3 py-2">
-                <span className="text-sm text-success flex items-center gap-2">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                  Google Calendar connected
-                </span>
-                <button onClick={() => handleDisconnect('google')} className="text-xs text-error hover:text-error">Disconnect</button>
+              <div className="bg-success/10 rounded-2xl px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-success flex items-center gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                    Google Calendar connected
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => openCalendarSelection('google')} className="text-xs text-primary hover:text-primary-pressed">Manage calendars</button>
+                    <button onClick={() => handleDisconnect('google')} className="text-xs text-error hover:text-error">Disconnect</button>
+                  </div>
+                </div>
               </div>
             ) : (
               <button onClick={handleConnectGoogle} className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-2xl px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors">
@@ -474,12 +540,17 @@ export default function Settings() {
 
             {/* Microsoft */}
             {calConnections.find(c => c.provider === 'microsoft') ? (
-              <div className="flex items-center justify-between bg-success/10 rounded-2xl px-3 py-2">
-                <span className="text-sm text-success flex items-center gap-2">
-                  <svg className="w-4 h-4" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-                  Microsoft Calendar connected
-                </span>
-                <button onClick={() => handleDisconnect('microsoft')} className="text-xs text-error hover:text-error">Disconnect</button>
+              <div className="bg-success/10 rounded-2xl px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-success flex items-center gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                    Microsoft Calendar connected
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => openCalendarSelection('microsoft')} className="text-xs text-primary hover:text-primary-pressed">Manage calendars</button>
+                    <button onClick={() => handleDisconnect('microsoft')} className="text-xs text-error hover:text-error">Disconnect</button>
+                  </div>
+                </div>
               </div>
             ) : (
               <button onClick={handleConnectMicrosoft} className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-2xl px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors">
@@ -490,12 +561,17 @@ export default function Settings() {
 
             {/* Apple */}
             {calConnections.find(c => c.provider === 'apple') ? (
-              <div className="flex items-center justify-between bg-success/10 rounded-2xl px-3 py-2">
-                <span className="text-sm text-success flex items-center gap-2">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                  Apple Calendar connected
-                </span>
-                <button onClick={() => handleDisconnect('apple')} className="text-xs text-error hover:text-error">Disconnect</button>
+              <div className="bg-success/10 rounded-2xl px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-success flex items-center gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                    Apple Calendar connected
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => openCalendarSelection('apple')} className="text-xs text-primary hover:text-primary-pressed">Manage calendars</button>
+                    <button onClick={() => handleDisconnect('apple')} className="text-xs text-error hover:text-error">Disconnect</button>
+                  </div>
+                </div>
               </div>
             ) : showAppleForm ? (
               <form onSubmit={handleConnectApple} className="border border-cream-border rounded-2xl p-3 space-y-2">
@@ -533,6 +609,86 @@ export default function Settings() {
               </button>
             )}
           </div>
+
+          {/* Calendar Selection Panel */}
+          {selectingProvider && (
+            <div className="mt-4 border border-cream-border rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-bark">
+                  Select calendars to sync ({selectingProvider.charAt(0).toUpperCase() + selectingProvider.slice(1)})
+                </h3>
+                <button onClick={() => setSelectingProvider(null)} className="text-xs text-cocoa hover:text-bark">Close</button>
+              </div>
+
+              {loadingCalendars ? (
+                <Spinner />
+              ) : availableCalendars.length === 0 ? (
+                <p className="text-xs text-cocoa">No calendars found.</p>
+              ) : (
+                <div className="space-y-2">
+                  {availableCalendars.map((cal) => {
+                    const sel = calendarSelections[cal.id] || {};
+                    return (
+                      <div key={cal.id} className={`rounded-xl border border-cream-border p-3 ${sel.enabled ? 'bg-linen' : 'bg-oat opacity-60'}`}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={sel.enabled ?? true}
+                            onChange={(e) => setCalendarSelections((prev) => ({
+                              ...prev,
+                              [cal.id]: { ...prev[cal.id], enabled: e.target.checked },
+                            }))}
+                            className="w-4 h-4 rounded accent-primary"
+                          />
+                          <span className="text-sm font-medium text-bark flex-1">{cal.displayName}</span>
+                        </div>
+                        {sel.enabled && (
+                          <div className="flex gap-3 mt-2 ml-7">
+                            <select
+                              value={sel.category || 'general'}
+                              onChange={(e) => setCalendarSelections((prev) => ({
+                                ...prev,
+                                [cal.id]: { ...prev[cal.id], category: e.target.value },
+                              }))}
+                              className="text-xs border border-cream-border rounded-xl px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                            >
+                              <option value="general">General</option>
+                              <option value="birthday">Birthdays</option>
+                              <option value="public_holiday">Public Holidays</option>
+                            </select>
+                            <select
+                              value={sel.visibility || 'family'}
+                              onChange={(e) => setCalendarSelections((prev) => ({
+                                ...prev,
+                                [cal.id]: { ...prev[cal.id], visibility: e.target.value },
+                              }))}
+                              className="text-xs border border-cream-border rounded-xl px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                            >
+                              <option value="family">Visible to family</option>
+                              <option value="personal">Only me</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {!loadingCalendars && availableCalendars.length > 0 && (
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setSelectingProvider(null)} className="text-sm text-cocoa hover:text-bark px-3 py-1.5">Cancel</button>
+                  <button
+                    onClick={saveCalendarSubscriptions}
+                    disabled={savingSubscriptions}
+                    className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
+                  >
+                    {savingSubscriptions ? 'Saving…' : 'Save & Import'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

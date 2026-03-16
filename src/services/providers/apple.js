@@ -213,10 +213,16 @@ async function pushEvent(connection, event, action) {
  * Compares etags with stored sync mappings to detect changes.
  * Used for polling (every 15 mins) since CalDAV has no webhooks.
  */
-async function pullChanges(connection) {
+async function pullChanges(connection, calendarUrl) {
   const client = await connect(connection);
-  const calendars = await client.fetchCalendars();
-  const calendar = findCalendar(calendars, connection);
+
+  let calendar;
+  if (calendarUrl) {
+    calendar = { url: calendarUrl };
+  } else {
+    const calendars = await client.fetchCalendars();
+    calendar = findCalendar(calendars, connection);
+  }
 
   if (!calendar) {
     throw new Error('No calendar found on Apple account');
@@ -281,6 +287,40 @@ async function pullChanges(connection) {
 }
 
 /**
+ * List all calendars on the Apple CalDAV account.
+ * Returns an array of { id, displayName, suggestedCategory }.
+ */
+async function listCalendars(connection) {
+  const DAVClient = await getDAVClient();
+  const client = new DAVClient({
+    serverUrl: CALDAV_SERVER_URL,
+    credentials: {
+      username: connection.caldav_username,
+      password: connection.access_token,
+    },
+    authMethod: 'Basic',
+    defaultAccountType: 'caldav',
+  });
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Connection to Apple CalDAV timed out. Please try again.')), 20000)
+  );
+  await Promise.race([client.login(), timeout]);
+  const calendars = await Promise.race([client.fetchCalendars(), timeout]);
+
+  return calendars.map((cal) => {
+    const displayName = cal.displayName || cal.url;
+    let suggestedCategory = 'general';
+    if (/birthday/i.test(displayName)) {
+      suggestedCategory = 'birthday';
+    } else if (/holiday/i.test(displayName)) {
+      suggestedCategory = 'public_holiday';
+    }
+    return { id: cal.url, displayName, suggestedCategory };
+  });
+}
+
+/**
  * No-op for CalDAV — app-specific passwords don't expire.
  */
 async function refreshToken(_connection) {
@@ -326,6 +366,49 @@ async function validateCredentials(email, appPassword) {
   }
 }
 
+/**
+ * Fetch ALL events from a specific Apple calendar and return them as upserts.
+ * Unlike pullChanges, this does not compare against existing mappings —
+ * every event is returned as an 'upsert' for the caller to reconcile.
+ */
+async function pullAllEvents(connection, calendarUrl) {
+  const client = await connect(connection);
+
+  let calendar;
+  if (calendarUrl) {
+    calendar = { url: calendarUrl };
+  } else {
+    const calendars = await client.fetchCalendars();
+    calendar = findCalendar(calendars, connection);
+  }
+
+  if (!calendar) {
+    throw new Error('No calendar found on Apple account');
+  }
+
+  const calendarObjects = await client.fetchCalendarObjects({ calendar });
+
+  const events = [];
+
+  for (const obj of calendarObjects) {
+    const icalData = obj.data;
+    if (!icalData) continue;
+
+    const uidMatch = icalData.match(/^UID[^:]*:(.*)$/m);
+    const externalEventId = uidMatch ? uidMatch[1].trim() : null;
+    if (!externalEventId) continue;
+
+    events.push({
+      externalEventId,
+      action: 'upsert',
+      eventData: parseVEvent(icalData),
+      etag: obj.etag,
+    });
+  }
+
+  return events;
+}
+
 module.exports = {
   connect,
   pushEvent,
@@ -333,4 +416,6 @@ module.exports = {
   refreshToken,
   validateCredentials,
   buildVEvent,
+  listCalendars,
+  pullAllEvents,
 };

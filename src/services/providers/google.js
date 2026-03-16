@@ -123,7 +123,29 @@ async function pushEvent(connection, event, action) {
 /**
  * Fetch changed events from Google Calendar since the last sync.
  */
-async function pullChanges(connection) {
+/**
+ * List all calendars visible to the authenticated user.
+ */
+async function listCalendars(connection) {
+  const calendar = createCalendarClient(connection.access_token);
+  const result = await calendar.calendarList.list();
+  const items = result.data.items || [];
+
+  return items.map((cal) => {
+    let suggestedCategory = 'general';
+    if (cal.id.includes('#contacts@group.v.calendar.google.com')) {
+      suggestedCategory = 'birthday';
+    } else if (
+      cal.id.includes('#holiday@group.v.calendar.google.com') ||
+      /^en\.[a-z]{2,3}(\.)?#/.test(cal.id)
+    ) {
+      suggestedCategory = 'public_holiday';
+    }
+    return { id: cal.id, displayName: cal.summary || '', suggestedCategory };
+  });
+}
+
+async function pullChanges(connection, calendarId) {
   const calendar = createCalendarClient(connection.access_token);
 
   const updatedMin = connection.last_synced_at
@@ -131,7 +153,7 @@ async function pullChanges(connection) {
     : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const result = await calendar.events.list({
-    calendarId: 'primary',
+    calendarId: calendarId || 'primary',
     updatedMin,
     singleEvents: true,
     orderBy: 'updated',
@@ -148,6 +170,48 @@ async function pullChanges(connection) {
       etag: googleEvent.etag,
     };
   });
+}
+
+/**
+ * Fetch all events from a Google Calendar (paginated).
+ * Limits to the last 6 months and next 12 months.
+ */
+async function pullAllEvents(connection, calendarId) {
+  const calendar = createCalendarClient(connection.access_token);
+
+  const now = new Date();
+  const timeMin = new Date(now);
+  timeMin.setMonth(timeMin.getMonth() - 6);
+  const timeMax = new Date(now);
+  timeMax.setMonth(timeMax.getMonth() + 12);
+
+  const allEvents = [];
+  let pageToken = undefined;
+
+  do {
+    const result = await calendar.events.list({
+      calendarId: calendarId || 'primary',
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      pageToken,
+    });
+
+    const events = result.data.items || [];
+    for (const googleEvent of events) {
+      if (googleEvent.status === 'cancelled') continue;
+      allEvents.push({
+        externalEventId: googleEvent.id,
+        action: 'upsert',
+        eventData: toCurataEvent(googleEvent),
+      });
+    }
+
+    pageToken = result.data.nextPageToken;
+  } while (pageToken);
+
+  return allEvents;
 }
 
 /**
@@ -191,6 +255,8 @@ module.exports = {
   handleCallback,
   pushEvent,
   pullChanges,
+  pullAllEvents,
+  listCalendars,
   refreshToken,
   registerWebhook,
 };
