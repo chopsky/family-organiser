@@ -8,6 +8,17 @@ const PRIORITY_COLORS = { high: 'bg-[#d76353]', medium: 'bg-[#e5ad57]', low: 'bg
 const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
 const PRIORITY_CYCLE = { low: 'medium', medium: 'high', high: 'low' };
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
+const NOTIFICATION_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'at_time', label: 'At time of task' },
+  { value: '5_min', label: '5 minutes before' },
+  { value: '15_min', label: '15 minutes before' },
+  { value: '30_min', label: '30 minutes before' },
+  { value: '1_hour', label: '1 hour before' },
+  { value: '2_hours', label: '2 hours before' },
+  { value: '1_day', label: '1 day before' },
+  { value: '2_days', label: '2 days before' },
+];
 
 function PriorityDot({ priority, className = 'w-3 h-3' }) {
   return <span className={`${className} rounded-full inline-block ${PRIORITY_COLORS[priority] || PRIORITY_COLORS.medium}`} />;
@@ -18,6 +29,33 @@ function daysOverdue(dueDate) {
   const now  = new Date();
   now.setHours(0, 0, 0, 0);
   return Math.floor((now - due) / 86400000);
+}
+
+/* Reusable bin icon SVG */
+function BinIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+/* Pencil/edit icon SVG */
+function EditIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+    </svg>
+  );
+}
+
+/* Bell icon for notification indicator */
+function BellIcon({ className = 'h-3 w-3' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+    </svg>
+  );
 }
 
 export default function Tasks() {
@@ -31,18 +69,51 @@ export default function Tasks() {
   const [deleting, setDeleting] = useState(new Set());
   const [updating, setUpdating] = useState(new Set());
 
-  // Add form
-  const [title, setTitle]         = useState('');
-  const [dueDate, setDueDate]     = useState(today());
-  const [assignee, setAssignee]   = useState('');
-  const [recurrence, setRecurrence] = useState('');
-  const [priority, setPriority]   = useState('medium');
-  const [adding, setAdding]       = useState(false);
-  const [members, setMembers]     = useState([]);
-  const [showForm, setShowForm]   = useState(false);
+  // Form state (shared between add & edit)
+  const [title, setTitle]               = useState('');
+  const [dueDate, setDueDate]           = useState(today());
+  const [dueTime, setDueTime]           = useState('');
+  const [assignee, setAssignee]         = useState('');
+  const [recurrence, setRecurrence]     = useState('');
+  const [priority, setPriority]         = useState('medium');
+  const [description, setDescription]   = useState('');
+  const [notification, setNotification] = useState('');
+  const [adding, setAdding]             = useState(false);
+  const [members, setMembers]           = useState([]);
+  const [showForm, setShowForm]         = useState(false);
+  const [editingTask, setEditingTask]   = useState(null); // null = add mode, object = edit mode
 
   function today() {
     return new Date().toISOString().split('T')[0];
+  }
+
+  function resetForm() {
+    setTitle(''); setDueDate(today()); setDueTime(''); setAssignee('');
+    setRecurrence(''); setPriority('medium'); setDescription('');
+    setNotification(''); setEditingTask(null);
+  }
+
+  function openAddForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditForm(task) {
+    setTitle(task.title);
+    setDueDate(task.due_date);
+    setDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
+    setAssignee(task.assigned_to_name || '');
+    setRecurrence(task.recurrence || '');
+    setPriority(task.priority || 'medium');
+    setDescription(task.description || '');
+    setNotification(task.notification || '');
+    setEditingTask(task);
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    resetForm();
   }
 
   const load = useCallback(async () => {
@@ -64,7 +135,6 @@ export default function Tasks() {
   useEffect(() => {
     setLoading(true);
     load();
-    // Load members for assignee dropdown
     api.get('/household').then(({ data }) => setMembers(data.members ?? [])).catch(() => {});
   }, [load]);
 
@@ -78,26 +148,43 @@ export default function Tasks() {
       if (!groups[key]) groups[key] = [];
       groups[key].push(task);
     }
-    // Return entries: member groups first (in order), then Unassigned last
     const entries = memberNames.filter((n) => groups[n]?.length > 0).map((n) => [n, groups[n]]);
     if (groups['Unassigned']?.length > 0) entries.push(['Unassigned', groups['Unassigned']]);
     return entries;
   })();
 
-  async function addTask(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim()) return;
     setAdding(true);
     try {
-      const payload = { title: title.trim(), due_date: dueDate, priority };
-      if (assignee) payload.assigned_to_name = assignee;
-      if (recurrence) payload.recurrence = recurrence;
-      await api.post('/tasks', payload);
-      setTitle(''); setAssignee(''); setRecurrence(''); setPriority('medium'); setDueDate(today());
-      setShowForm(false);
+      if (editingTask) {
+        // Edit mode — PATCH
+        const payload = {
+          title: title.trim(),
+          due_date: dueDate,
+          due_time: dueTime || null,
+          assigned_to_name: assignee || null,
+          recurrence: recurrence || null,
+          priority,
+          description: description || null,
+          notification: notification || null,
+        };
+        await api.patch(`/tasks/${editingTask.id}`, payload);
+      } else {
+        // Add mode — POST
+        const payload = { title: title.trim(), due_date: dueDate, priority };
+        if (dueTime) payload.due_time = dueTime;
+        if (assignee) payload.assigned_to_name = assignee;
+        if (recurrence) payload.recurrence = recurrence;
+        if (description) payload.description = description;
+        if (notification) payload.notification = notification;
+        await api.post('/tasks', payload);
+      }
+      closeForm();
       await load();
     } catch {
-      setError('Could not add task.');
+      setError(editingTask ? 'Could not update task.' : 'Could not add task.');
     } finally {
       setAdding(false);
     }
@@ -161,6 +248,10 @@ export default function Tasks() {
     return `${hrs}h ago`;
   }
 
+  function notificationLabel(value) {
+    return NOTIFICATION_OPTIONS.find((o) => o.value === value)?.label || '';
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -175,7 +266,7 @@ export default function Tasks() {
             {showAll ? 'Due today' : 'All tasks'}
           </button>
           <button
-            onClick={() => setShowForm((v) => !v)}
+            onClick={openAddForm}
             className="bg-primary hover:bg-primary-pressed text-white text-sm font-medium px-3 py-1.5 rounded-2xl transition-colors"
           >
             + Add
@@ -185,10 +276,10 @@ export default function Tasks() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* Add task form */}
+      {/* Add / Edit task form */}
       {showForm && (
-        <form onSubmit={addTask} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 space-y-3">
-          <h2 className="font-semibold text-bark">New task</h2>
+        <form onSubmit={handleSubmit} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 space-y-3">
+          <h2 className="font-semibold text-bark">{editingTask ? 'Edit task' : 'New task'}</h2>
           <input
             type="text"
             value={title}
@@ -197,6 +288,13 @@ export default function Tasks() {
             required
             className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add a description... (optional)"
+            rows={2}
+            className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+          />
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs text-cocoa mb-1 block">Due date</label>
@@ -204,6 +302,15 @@ export default function Tasks() {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-cocoa mb-1 block">Time (optional)</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
@@ -240,11 +347,23 @@ export default function Tasks() {
                 {RECURRENCES.map((r) => <option key={r} value={r}>{r || 'Never'}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-xs text-cocoa mb-1 block">Notification</label>
+              <select
+                value={notification}
+                onChange={(e) => setNotification(e.target.value)}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {NOTIFICATION_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2 justify-end">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={closeForm}
               className="text-sm text-cocoa hover:text-bark px-3 py-2"
             >
               Cancel
@@ -254,7 +373,7 @@ export default function Tasks() {
               disabled={adding || !title.trim()}
               className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
             >
-              {adding ? 'Adding...' : 'Add task'}
+              {adding ? (editingTask ? 'Saving...' : 'Adding...') : (editingTask ? 'Save changes' : 'Add task')}
             </button>
           </div>
         </form>
@@ -303,6 +422,9 @@ export default function Tasks() {
                           </button>
                           {task.title}
                         </p>
+                        {task.description && (
+                          <p className="text-xs text-cocoa mt-0.5 line-clamp-2">{task.description}</p>
+                        )}
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                           <span className={`text-xs font-medium flex items-center gap-1 ${
                             task.completed ? 'text-cocoa' :
@@ -313,12 +435,40 @@ export default function Tasks() {
                              overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-[#d76353] inline-block" /> {overdue}d overdue</> :
                              dueToday      ? <><span className="w-2 h-2 rounded-full bg-[#e5ad57] inline-block" /> Due today</> :
                              <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
+                            {task.due_time && !task.completed && (
+                              <span className="ml-1">at {task.due_time.substring(0, 5)}</span>
+                            )}
                           </span>
                           {task.recurrence && (
                             <span className="text-xs text-cocoa">[{task.recurrence}]</span>
                           )}
+                          {task.notification && (
+                            <span className="text-xs text-cocoa flex items-center gap-0.5" title={notificationLabel(task.notification)}>
+                              <BellIcon />
+                            </span>
+                          )}
                         </div>
                       </div>
+                      {/* Edit & Remove buttons */}
+                      {!task.completed && (
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            onClick={() => openEditForm(task)}
+                            className="text-cocoa hover:text-primary p-1.5 rounded-2xl transition-colors hover:bg-primary/10"
+                            title="Edit task"
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            onClick={() => confirmDelete(task)}
+                            disabled={deleting.has(task.id)}
+                            className="text-cocoa hover:text-error p-1.5 rounded-2xl transition-colors hover:bg-error/10"
+                            title="Delete task"
+                          >
+                            {deleting.has(task.id) ? '...' : <BinIcon />}
+                          </button>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -365,11 +515,7 @@ export default function Tasks() {
                     className="text-xs text-error hover:text-error hover:bg-error/10 p-1.5 rounded-2xl transition-colors"
                     title="Delete permanently"
                   >
-                    {deleting.has(task.id) ? '...' : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    )}
+                    {deleting.has(task.id) ? '...' : <BinIcon />}
                   </button>
                 </div>
               </li>

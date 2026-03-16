@@ -117,6 +117,89 @@ async function runAppleCalendarPoll() {
 }
 
 /**
+ * Map notification preference to minutes before due time.
+ */
+const NOTIFICATION_OFFSETS = {
+  at_time: 0,
+  '5_min': 5,
+  '15_min': 15,
+  '30_min': 30,
+  '1_hour': 60,
+  '2_hours': 120,
+  '1_day': 1440,
+  '2_days': 2880,
+};
+
+/**
+ * Check for task notifications that need to be sent.
+ * Runs every minute. Finds tasks with a notification preference and due_time set,
+ * calculates the fire time (due_date + due_time - offset), and sends if now.
+ */
+async function runTaskNotificationCheck(bot) {
+  try {
+    const { supabase } = require('../db/client');
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select('*, households!inner(timezone)')
+      .eq('completed', false)
+      .not('notification', 'is', null)
+      .not('due_time', 'is', null)
+      .is('notification_sent_at', null);
+
+    if (error) throw error;
+    if (!tasks || tasks.length === 0) return;
+
+    const now = new Date();
+
+    for (const task of tasks) {
+      const tz = task.households?.timezone || 'Europe/London';
+      const offsetMinutes = NOTIFICATION_OFFSETS[task.notification] ?? 0;
+
+      // Build the due datetime in UTC by parsing due_date + due_time in the household TZ
+      const dueStr = `${task.due_date}T${task.due_time}`;
+      // Convert to a Date using the household timezone
+      const dueInTZ = new Date(new Date(dueStr).toLocaleString('en-US', { timeZone: tz }));
+      // Actually, we need the fire time in UTC for comparison
+      // Use a simpler approach: get current time in household TZ and compare
+      const nowInTZ = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+      const dueLocal = new Date(`${task.due_date}T${task.due_time}`);
+      const fireLocal = new Date(dueLocal.getTime() - offsetMinutes * 60000);
+
+      // Check if fire time is within the current minute
+      const diffMs = Math.abs(nowInTZ.getTime() - fireLocal.getTime());
+      if (diffMs > 60000) continue; // Not yet or already past
+
+      // Send notification
+      const members = await db.getHouseholdMembers(task.household_id);
+      const recipients = task.assigned_to
+        ? members.filter((m) => m.id === task.assigned_to && m.telegram_chat_id)
+        : members.filter((m) => m.telegram_chat_id);
+
+      const timeStr = task.due_time.substring(0, 5);
+      const message = `🔔 *Task Reminder*\n\n*${task.title}*\nDue: ${task.due_date} at ${timeStr}${task.description ? `\n${task.description}` : ''}`;
+
+      for (const member of recipients) {
+        try {
+          await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
+        } catch (err) {
+          console.error(`[scheduler] Failed to send task notification to ${member.name}:`, err.message);
+        }
+      }
+
+      // Mark as sent
+      await supabase
+        .from('tasks')
+        .update({ notification_sent_at: now.toISOString() })
+        .eq('id', task.id);
+
+      console.log(`[scheduler] Sent task notification for "${task.title}" (${task.id})`);
+    }
+  } catch (err) {
+    console.error('[scheduler] Task notification check failed:', err.message);
+  }
+}
+
+/**
  * Start all scheduled jobs.
  *
  * @param {object} bot - Telegraf bot instance (needs bot.telegram.sendMessage)
@@ -129,6 +212,10 @@ function startScheduler(bot) {
   // ── Overdue nudges: check every minute (fires at 14:00 per household TZ) ───
   cron.schedule('* * * * *', () => runOverdueNudgeCheck(bot));
   console.log('✓ Overdue nudge scheduler started (14:00 per household timezone)');
+
+  // ── Task notifications: check every minute ──────────────────────────────────
+  cron.schedule('* * * * *', () => runTaskNotificationCheck(bot));
+  console.log('✓ Task notification scheduler started (checks every minute)');
 
   // ── Apple CalDAV polling: every 15 minutes ─────────────────────────────────
   cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());

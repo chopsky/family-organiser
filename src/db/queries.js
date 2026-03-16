@@ -315,8 +315,11 @@ async function addTasks(householdId, tasks, addedByUserId, members = []) {
       assigned_to: assignedToId,
       assigned_to_name: t.assigned_to_name || null,
       due_date: t.due_date || new Date().toISOString().split('T')[0],
+      due_time: t.due_time || null,
       recurrence: t.recurrence || null,
       priority: t.priority || 'medium',
+      description: t.description || null,
+      notification: t.notification || null,
       added_by: addedByUserId,
     };
   }));

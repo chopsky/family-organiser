@@ -7,6 +7,7 @@ const router = Router();
 
 const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const VALID_PRIORITIES   = ['low', 'medium', 'high'];
+const VALID_NOTIFICATIONS = ['at_time', '5_min', '15_min', '30_min', '1_hour', '2_hours', '1_day', '2_days'];
 
 /**
  * GET /api/tasks/recent
@@ -86,6 +87,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     if (t.priority && !VALID_PRIORITIES.includes(t.priority)) {
       return res.status(400).json({ error: `Invalid priority "${t.priority}"` });
     }
+    if (t.notification && !VALID_NOTIFICATIONS.includes(t.notification)) {
+      return res.status(400).json({ error: `Invalid notification "${t.notification}"` });
+    }
   }
 
   try {
@@ -100,19 +104,25 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * PATCH /api/tasks/:id
- * Update task fields: completion status and/or priority.
+ * Update task fields: any editable field.
  *
- * Body: { completed?: boolean, priority?: 'low'|'medium'|'high' }
+ * Body: { title?, completed?, priority?, due_date?, due_time?, assigned_to_name?,
+ *         recurrence?, description?, notification? }
  */
 router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
-  const { completed, priority } = req.body;
-
-  if (typeof completed !== 'boolean' && !priority) {
-    return res.status(400).json({ error: '"completed" (boolean) or "priority" is required' });
-  }
+  const {
+    completed, priority, title, due_date, due_time,
+    assigned_to_name, recurrence, description, notification,
+  } = req.body;
 
   if (priority && !VALID_PRIORITIES.includes(priority)) {
     return res.status(400).json({ error: `Invalid priority "${priority}"` });
+  }
+  if (recurrence && !VALID_RECURRENCES.includes(recurrence)) {
+    return res.status(400).json({ error: `Invalid recurrence "${recurrence}"` });
+  }
+  if (notification && !VALID_NOTIFICATIONS.includes(notification)) {
+    return res.status(400).json({ error: `Invalid notification "${notification}"` });
   }
 
   try {
@@ -132,9 +142,36 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       updateData.completed = completed;
       updateData.completed_at = completed ? new Date().toISOString() : null;
     }
+    if (title !== undefined) updateData.title = title.trim();
+    if (priority) updateData.priority = priority;
+    if (due_date !== undefined) updateData.due_date = due_date;
+    if (due_time !== undefined) updateData.due_time = due_time || null;
+    if (recurrence !== undefined) updateData.recurrence = recurrence || null;
+    if (description !== undefined) updateData.description = description || null;
+    if (notification !== undefined) {
+      updateData.notification = notification || null;
+      updateData.notification_sent_at = null; // Reset so notification fires again
+    }
 
-    if (priority) {
-      updateData.priority = priority;
+    // Resolve assigned_to_name to user ID
+    if (assigned_to_name !== undefined) {
+      updateData.assigned_to_name = assigned_to_name || null;
+      if (assigned_to_name) {
+        const members = await db.getHouseholdMembers(req.householdId);
+        const member = members.find((m) => m.name.toLowerCase() === assigned_to_name.toLowerCase());
+        updateData.assigned_to = member ? member.id : null;
+      } else {
+        updateData.assigned_to = null;
+      }
+    }
+
+    // Reset notification_sent_at if due_date or due_time changed
+    if (due_date !== undefined || due_time !== undefined) {
+      updateData.notification_sent_at = null;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
     }
 
     const { data: updated, error: updateErr } = await supabase
