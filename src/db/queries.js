@@ -830,6 +830,8 @@ async function getSubscriptionsByConnection(connectionId) {
     .select()
     .eq('connection_id', connectionId)
     .order('display_name');
+  // Table may not exist until migration is run
+  if (error && error.code === '42P01') return [];
   if (error) throw error;
   return data;
 }

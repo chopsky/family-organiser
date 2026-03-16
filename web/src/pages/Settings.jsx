@@ -250,12 +250,13 @@ export default function Settings() {
     setSelectingProvider(provider);
     setLoadingCalendars(true);
     try {
-      const [calsRes, subsRes] = await Promise.all([
+      const [calsRes, subsRes] = await Promise.allSettled([
         api.get(`/calendar/connections/${provider}/calendars`),
         api.get(`/calendar/connections/${provider}/subscriptions`),
       ]);
-      const cals = calsRes.data.calendars ?? [];
-      const subs = subsRes.data.subscriptions ?? [];
+      if (calsRes.status === 'rejected') throw calsRes.reason;
+      const cals = calsRes.value.data.calendars ?? [];
+      const subs = subsRes.status === 'fulfilled' ? (subsRes.value.data.subscriptions ?? []) : [];
       setAvailableCalendars(cals);
       setExistingSubscriptions(subs);
 
