@@ -39,11 +39,22 @@ export default function Layout({ children }) {
 
           {/* Profile circle + sign out — right */}
           <div className="flex items-center gap-2 shrink-0">
-            {user && (
-              <Link to="/settings" className="w-8 h-8 rounded-full bg-secondary/30 flex items-center justify-center text-primary font-bold text-sm" title={user.name}>
-                {user.name?.[0]?.toUpperCase()}
-              </Link>
-            )}
+            {user && (() => {
+              const avatarColors = {
+                orange: 'bg-secondary/30 text-primary',
+                blue: 'bg-blue-100 text-blue-600',
+                green: 'bg-success/20 text-success',
+                purple: 'bg-purple-100 text-purple-600',
+                red: 'bg-error/20 text-error',
+                gray: 'bg-sand text-cocoa',
+              };
+              const avatarClass = avatarColors[user.color_theme] || avatarColors.orange;
+              return (
+                <Link to="/settings" className={`w-8 h-8 rounded-full ${avatarClass} flex items-center justify-center font-bold text-sm`} title={user.name}>
+                  {user.name?.[0]?.toUpperCase()}
+                </Link>
+              );
+            })()}
             <button
               onClick={handleLogout}
               className="text-cocoa hover:text-bark text-sm transition-colors"

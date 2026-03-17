@@ -133,6 +133,9 @@ export default function Settings() {
         color_theme: profileColor,
       });
       await loadMembers();
+      // Update auth context so header avatar reflects changes immediately
+      const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
+      login({ token, user: updatedUser, household });
       setEditingMember(null);
       setSuccess('Profile updated!');
       setTimeout(() => setSuccess(''), 2000);
