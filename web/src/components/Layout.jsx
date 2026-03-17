@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../lib/api';
 import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings } from './Icons';
 
 const nav = [
@@ -12,8 +14,21 @@ const nav = [
 ];
 
 export default function Layout({ children }) {
-  const { household, user, logout } = useAuth();
+  const { household, user, token, login, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Sync user profile (e.g. color_theme) from backend on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    api.get('/household')
+      .then(({ data }) => {
+        const me = data.members?.find(m => m.id === user.id);
+        if (me && me.color_theme && me.color_theme !== user.color_theme) {
+          login({ token, user: { ...user, color_theme: me.color_theme }, household });
+        }
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleLogout() {
     logout();

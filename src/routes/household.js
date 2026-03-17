@@ -77,10 +77,12 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
+    // Fetch full user from DB (req.user from JWT only has id/name/role)
+    const fullUser = (await db.getHouseholdMembers(req.householdId)).find(m => m.id === req.user.id);
     const updated = await db.updateUser(req.user.id, updates);
 
     // Handle birthday calendar event — only if the date actually changed
-    const currentBirthday = req.user.birthday || null;
+    const currentBirthday = fullUser?.birthday || null;
     const newBirthday = birthday !== undefined ? (birthday || null) : currentBirthday;
     const birthdayChanged = birthday !== undefined && String(newBirthday || '') !== String(currentBirthday || '');
 
