@@ -1,27 +1,55 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&display=swap');
 
 @theme {
-  --font-sans: 'Figtree', system-ui, sans-serif;
+  /* Font stacks */
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Lora', Georgia, serif;
 
-  /* Core brand */
-  --color-primary: #C98F6F;
-  --color-primary-pressed: #B8745C;
-  --color-secondary: #D8B98A;
-  --color-accent: #A89F84;
-
-  /* Neutrals */
-  --color-oat: #faf4ed;
-  --color-linen: #fffcfa;
-  --color-sand: #EADFCC;
-  --color-cream-border: #DCCFBE;
-
-  /* Text */
-  --color-bark: #4E4037;
-  --color-cocoa: #6B574A;
-
-  /* Feedback */
-  --color-success: #8F9B74;
-  --color-warn: #D9A35F;
+  /* ── Remapped legacy tokens (pages reference these) ── */
+  --color-primary: #6B3FA0;
+  --color-primary-pressed: #5A3488;
+  --color-secondary: #F3EDFC;
+  --color-accent: #E8724A;
+  --color-oat: #FBF8F3;
+  --color-linen: #FFFFFF;
+  --color-sand: #E8E5EC;
+  --color-cream-border: #E8E5EC;
+  --color-bark: #2D2A33;
+  --color-cocoa: #6B6774;
+  --color-success: #7DAE82;
+  --color-warn: #E8724A;
   --color-error: #d76353;
+
+  /* ── Nestd palette (layout and new components) ── */
+  --color-plum: #6B3FA0;
+  --color-plum-dark: #5A3488;
+  --color-plum-light: #F3EDFC;
+  --color-plum-mid: #8B6DB5;
+  --color-coral: #E8724A;
+  --color-coral-light: #FDF0EB;
+  --color-sage: #7DAE82;
+  --color-sage-light: #EDF5EE;
+  --color-charcoal: #2D2A33;
+  --color-warm-grey: #6B6774;
+  --color-light-grey: #E8E5EC;
+  --color-cream: #FBF8F3;
+}
+
+@layer base {
+  :root {
+    --shadow-sm: 0 2px 8px rgba(107, 63, 160, 0.06);
+    --shadow-md: 0 4px 16px rgba(107, 63, 160, 0.08);
+    --shadow-lg: 0 8px 24px rgba(107, 63, 160, 0.10);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Lora', Georgia, serif;
+    letter-spacing: -0.02em;
+  }
 }
