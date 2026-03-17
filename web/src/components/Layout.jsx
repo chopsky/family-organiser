@@ -27,7 +27,7 @@ export default function Layout({ children }) {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <img src="/anora-logomark.png" alt="Anora" className="h-7" />
+              <img src="/anora-logomark-colour.png" alt="Anora" className="h-7" />
               <span className="font-bold text-lg text-bark">{household?.name ?? 'Anora'}</span>
             </Link>
             {user && <span className="ml-2 text-cocoa text-sm">· {user.name}</span>}

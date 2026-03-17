@@ -28,7 +28,7 @@ export default function ForgotPassword() {
     <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/anora-logomark.png" alt="Anora" className="h-16 mx-auto mb-4 rounded-2xl" />
+          <img src="/anora-logomark-colour.png" alt="Anora" className="h-16 mx-auto mb-4 rounded-2xl" />
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
           <h2 className="text-xl font-semibold text-bark mb-2">Reset your password</h2>
