@@ -71,14 +71,14 @@ function createBot(token) {
       try {
         const tokenRecord = await db.getTelegramLinkToken(linkToken);
         if (!tokenRecord) {
-          return ctx.reply('This link has expired or is invalid. Please generate a new one from the Curata app Settings page.');
+          return ctx.reply('This link has expired or is invalid. Please generate a new one from the Anora app Settings page.');
         }
         await db.updateUser(tokenRecord.user_id, {
           telegram_chat_id: String(ctx.from.id),
           telegram_username: ctx.from.username || null,
         });
         await db.markTelegramLinkTokenUsed(tokenRecord.id);
-        return ctx.reply('✅ Your Telegram account has been linked to Curata! You can now use the bot to manage your household.');
+        return ctx.reply('✅ Your Telegram account has been linked to Anora! You can now use the bot to manage your household.');
       } catch (err) {
         console.error('/start link error:', err);
         return ctx.reply('Something went wrong linking your account. Please try again from the app.');
@@ -92,10 +92,10 @@ function createBot(token) {
       );
     }
     return ctx.reply(
-      `👋 *Welcome to Curata!*\n\n` +
+      `👋 *Welcome to Anora!*\n\n` +
       `I help your whole household manage shopping lists and tasks through chat.\n\n` +
       `To get started:\n` +
-      `• *Sign up at the Curata app* and link your Telegram from Settings\n` +
+      `• *Sign up at the Anora app* and link your Telegram from Settings\n` +
       `• *Or create a household here:* /create YourFamilyName\n` +
       `• *Or join one:* /join XXXXXX\n\n` +
       `Once set up, just message me naturally — _"We need milk and remind Jake to do homework by Friday"_ — and I'll sort it out.`,

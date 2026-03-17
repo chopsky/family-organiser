@@ -52,7 +52,7 @@ create table if not exists calendar_connections (
   unique(user_id, provider)
 );
 
--- calendar_sync_mappings — maps Curata events to external calendar event IDs
+-- calendar_sync_mappings — maps Anora events to external calendar event IDs
 create table if not exists calendar_sync_mappings (
   id                uuid primary key default gen_random_uuid(),
   event_id          uuid not null references calendar_events(id) on delete cascade,

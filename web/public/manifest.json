@@ -1,6 +1,6 @@
 {
-  "name": "Curata",
-  "short_name": "Curata",
+  "name": "Anora",
+  "short_name": "Anora",
   "description": "Shopping lists, tasks and reminders — together.",
   "start_url": "/",
   "display": "standalone",
@@ -9,7 +9,7 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/Curata-favicon.png",
+      "src": "/Anora-favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

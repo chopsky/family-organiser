@@ -17,7 +17,7 @@ function getProvider(providerName) {
 }
 
 /**
- * After a Curata calendar event is created/updated/deleted, push the change
+ * After a Anora calendar event is created/updated/deleted, push the change
  * to all connected external calendars for the household.
  * Only pushes to 'general' category subscriptions (birthday/public_holiday calendars are read-only).
  */
@@ -58,7 +58,7 @@ async function pushEventToConnections(householdId, event, action) {
 
 /**
  * Called by webhooks (Google/Microsoft) or polling (Apple). Fetches changed
- * events from the provider and syncs them back to Curata.
+ * events from the provider and syncs them back to Anora.
  * Now iterates over all enabled subscriptions for the connection.
  */
 async function pullChangesFromProvider(connection) {

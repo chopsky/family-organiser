@@ -35,7 +35,7 @@ function toGoogleEvent(event) {
   };
 }
 
-function toCurataEvent(googleEvent) {
+function toAnoraEvent(googleEvent) {
   const isAllDay = !!googleEvent.start.date;
   return {
     title: googleEvent.summary || '',
@@ -74,7 +74,7 @@ async function handleCallback(code) {
 }
 
 /**
- * Push a Curata event to Google Calendar.
+ * Push a Anora event to Google Calendar.
  */
 async function pushEvent(connection, event, action) {
   const calendar = createCalendarClient(connection.access_token);
@@ -166,7 +166,7 @@ async function pullChanges(connection, calendarId) {
     return {
       externalEventId: googleEvent.id,
       action: isCancelled ? 'delete' : 'upsert',
-      eventData: isCancelled ? null : toCurataEvent(googleEvent),
+      eventData: isCancelled ? null : toAnoraEvent(googleEvent),
       etag: googleEvent.etag,
     };
   });
@@ -204,7 +204,7 @@ async function pullAllEvents(connection, calendarId) {
       allEvents.push({
         externalEventId: googleEvent.id,
         action: 'upsert',
-        eventData: toCurataEvent(googleEvent),
+        eventData: toAnoraEvent(googleEvent),
       });
     }
 
@@ -232,7 +232,7 @@ async function refreshToken(connection) {
  */
 async function registerWebhook(connection, callbackUrl) {
   const calendar = createCalendarClient(connection.access_token);
-  const channelId = `curata-${connection.id}-${Date.now()}`;
+  const channelId = `anora-${connection.id}-${Date.now()}`;
 
   const result = await calendar.events.watch({
     calendarId: 'primary',

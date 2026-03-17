@@ -29,7 +29,7 @@ function formatDate(dateString, allDay) {
 }
 
 /**
- * Build a VCALENDAR/VEVENT string from a Curata event.
+ * Build a VCALENDAR/VEVENT string from a Anora event.
  */
 function buildVEvent(event, uid) {
   const dtstart = formatDate(event.start_time, event.all_day);
@@ -39,7 +39,7 @@ function buildVEvent(event, uid) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Curata//Calendar//EN',
+    'PRODID:-//Anora//Calendar//EN',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTART${valueParam}:${dtstart}`,
@@ -55,7 +55,7 @@ function buildVEvent(event, uid) {
 }
 
 /**
- * Parse a VEVENT from iCal data into a Curata event object.
+ * Parse a VEVENT from iCal data into a Anora event object.
  */
 function parseVEvent(icalData) {
   const getValue = (key) => {
@@ -130,7 +130,7 @@ function findCalendar(calendars, connection) {
 }
 
 /**
- * Push a Curata event to Apple Calendar via CalDAV.
+ * Push a Anora event to Apple Calendar via CalDAV.
  */
 async function pushEvent(connection, event, action) {
   const client = await connect(connection);

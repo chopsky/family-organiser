@@ -478,7 +478,7 @@ export default function Settings() {
         ) : (
           <>
             <p className="text-sm text-cocoa mb-3">
-              Link your Telegram account to receive daily reminders and add items via the Curata bot.
+              Link your Telegram account to receive daily reminders and add items via the Anora bot.
             </p>
             {telegramLink ? (
               <a

@@ -64,7 +64,7 @@ async function handleCallback(code) {
 }
 
 /**
- * Convert a Curata event into the Microsoft Graph event format.
+ * Convert a Anora event into the Microsoft Graph event format.
  */
 function toMicrosoftEvent(event) {
   return {
@@ -78,10 +78,10 @@ function toMicrosoftEvent(event) {
 }
 
 /**
- * Push a Curata event to Outlook Calendar.
+ * Push a Anora event to Outlook Calendar.
  *
  * @param {object} connection  - Calendar connection with access_token
- * @param {object} event       - Curata event object
+ * @param {object} event       - Anora event object
  * @param {'create'|'update'|'delete'} action
  * @returns {object|undefined} For 'create', returns { externalEventId }
  */

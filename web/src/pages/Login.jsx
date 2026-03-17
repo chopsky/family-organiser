@@ -48,8 +48,8 @@ export default function Login() {
     <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/Curata-favicon.png" alt="Curata" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-3xl font-bold text-bark">Curata</h1>
+          <img src="/Anora-favicon.png" alt="Anora" className="h-16 mx-auto mb-4 rounded-2xl" />
+          <h1 className="text-3xl font-bold text-bark">Anora</h1>
           <p className="text-cocoa mt-2">Shopping lists, tasks & reminders — together.</p>
         </div>
 

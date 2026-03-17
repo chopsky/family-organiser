@@ -43,9 +43,9 @@ router.post('/webhook', async (req, res) => {
     if (!user) {
       // Unknown user — send a helpful response
       await whatsapp.sendMessage(phone,
-        `👋 Hi${ProfileName ? ` ${ProfileName}` : ''}! Welcome to Curata.\n\n` +
+        `👋 Hi${ProfileName ? ` ${ProfileName}` : ''}! Welcome to Anora.\n\n` +
         `I don't have your number linked yet. To get started:\n` +
-        `1. Sign up at the Curata web app\n` +
+        `1. Sign up at the Anora web app\n` +
         `2. Go to Settings → Connect WhatsApp\n` +
         `3. Enter your phone number and verify it\n\n` +
         `Once linked, just message me naturally to manage your shopping list and tasks!`

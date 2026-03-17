@@ -142,7 +142,7 @@ async function downloadMedia(mediaUrl) {
  * @param {string} code  - 6-digit verification code
  */
 async function sendVerificationCode(phone, code) {
-  return sendMessage(phone, `Your Curata verification code is: ${code}\n\nThis code expires in 10 minutes.`);
+  return sendMessage(phone, `Your Anora verification code is: ${code}\n\nThis code expires in 10 minutes.`);
 }
 
 module.exports = {

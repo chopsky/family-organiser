@@ -4,7 +4,7 @@ const client = process.env.POSTMARK_SERVER_TOKEN
   ? new postmark.ServerClient(process.env.POSTMARK_SERVER_TOKEN)
   : null;
 
-const FROM = process.env.POSTMARK_FROM_EMAIL || 'noreply@curata.app';
+const FROM = process.env.POSTMARK_FROM_EMAIL || 'noreply@anora.app';
 const BASE_URL = process.env.WEB_URL || 'http://localhost:5173';
 const API_URL = process.env.API_URL || process.env.WEB_URL || 'http://localhost:3000';
 
@@ -16,14 +16,14 @@ function emailTemplate(title, body) {
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
     <div style="background:#059669;padding:24px;text-align:center;">
-      <h1 style="color:#fff;margin:0;font-size:24px;">Curata</h1>
+      <h1 style="color:#fff;margin:0;font-size:24px;">Anora</h1>
     </div>
     <div style="padding:32px 24px;">
       <h2 style="color:#111827;margin:0 0 16px;font-size:20px;">${title}</h2>
       ${body}
     </div>
     <div style="padding:16px 24px;background:#f9fafb;text-align:center;">
-      <p style="color:#9ca3af;font-size:12px;margin:0;">Curata — shopping lists, tasks & reminders, together.</p>
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Anora — shopping lists, tasks & reminders, together.</p>
     </div>
   </div>
 </body>
@@ -46,22 +46,22 @@ async function sendVerificationEmail(to, name, token) {
   const url = `${API_URL}/api/auth/verify-email?token=${token}`;
   const html = emailTemplate('Verify your email', `
     <p style="color:#374151;line-height:1.6;">Hi ${name},</p>
-    <p style="color:#374151;line-height:1.6;">Click the button below to verify your email address and get started with Curata.</p>
+    <p style="color:#374151;line-height:1.6;">Click the button below to verify your email address and get started with Anora.</p>
     <div style="text-align:center;">${button('Verify email', url)}</div>
     <p style="color:#9ca3af;font-size:13px;">This link expires in 24 hours.</p>
   `);
-  await sendEmail(to, 'Verify your email for Curata', html);
+  await sendEmail(to, 'Verify your email for Anora', html);
 }
 
 async function sendInviteEmail(to, inviterName, householdName, token) {
   const url = `${BASE_URL}/signup?invite=${token}`;
   const html = emailTemplate(`You're invited!`, `
-    <p style="color:#374151;line-height:1.6;">${inviterName} has invited you to join <strong>${householdName}</strong> on Curata.</p>
+    <p style="color:#374151;line-height:1.6;">${inviterName} has invited you to join <strong>${householdName}</strong> on Anora.</p>
     <p style="color:#374151;line-height:1.6;">Click below to create your account and join the household.</p>
     <div style="text-align:center;">${button('Join household', url)}</div>
     <p style="color:#9ca3af;font-size:13px;">This invite expires in 7 days.</p>
   `);
-  await sendEmail(to, `Join ${householdName} on Curata`, html);
+  await sendEmail(to, `Join ${householdName} on Anora`, html);
 }
 
 async function sendPasswordResetEmail(to, name, token) {
@@ -72,7 +72,7 @@ async function sendPasswordResetEmail(to, name, token) {
     <div style="text-align:center;">${button('Reset password', url)}</div>
     <p style="color:#9ca3af;font-size:13px;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
   `);
-  await sendEmail(to, 'Reset your password for Curata', html);
+  await sendEmail(to, 'Reset your password for Anora', html);
 }
 
 /**
@@ -132,7 +132,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 
     <!-- Header -->
     <div style="background:#059669;padding:32px 24px;text-align:center;">
-      <h1 style="color:#fff;margin:0 0 4px;font-size:24px;">Curata</h1>
+      <h1 style="color:#fff;margin:0 0 4px;font-size:24px;">Anora</h1>
       <p style="color:#D1FAE5;margin:0;font-size:14px;">Weekly Digest for ${householdName}</p>
     </div>
 
@@ -178,13 +178,13 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 
       <!-- CTA -->
       <div style="text-align:center;margin-top:24px;">
-        ${button('Open Curata', BASE_URL)}
+        ${button('Open Anora', BASE_URL)}
       </div>
     </div>
 
     <!-- Footer -->
     <div style="padding:16px 24px;background:#f9fafb;text-align:center;">
-      <p style="color:#9ca3af;font-size:12px;margin:0;">Curata — shopping lists, tasks & reminders, together.</p>
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Anora — shopping lists, tasks & reminders, together.</p>
     </div>
   </div>
 </body>

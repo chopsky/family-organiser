@@ -62,7 +62,7 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
     const { events, tasks } = await db.getAllEventsForFeed(tokenData.household_id);
 
     const ical = await getIcal();
-    const calendar = ical({ name: household.name + ' \u2014 Curata' });
+    const calendar = ical({ name: household.name + ' \u2014 Anora' });
 
     // Add calendar events
     for (const event of events) {

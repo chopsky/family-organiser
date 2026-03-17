@@ -365,7 +365,7 @@ router.post('/telegram-link-token', requireAuth, async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
     await db.createTelegramLinkToken(req.user.id, token, expiresAt);
 
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'CurataBot';
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'AnoraBot';
     const deepLink = `https://t.me/${botUsername}?start=link_${token}`;
 
     return res.json({ token, deepLink });
