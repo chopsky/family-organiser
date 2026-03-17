@@ -79,22 +79,25 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   try {
     const updated = await db.updateUser(req.user.id, updates);
 
-    // Handle birthday calendar event
-    if (birthday !== undefined) {
-      // Remove any existing birthday event for this user
+    // Handle birthday calendar event — only if the date actually changed
+    const currentBirthday = req.user.birthday || null;
+    const newBirthday = birthday !== undefined ? (birthday || null) : currentBirthday;
+    const birthdayChanged = birthday !== undefined && String(newBirthday || '') !== String(currentBirthday || '');
+
+    if (birthdayChanged) {
+      // Remove any existing birthday events for this user
       const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
-      const existingBirthday = allEvents.find(
+      const existingBirthdays = allEvents.filter(
         (e) => e.category === 'birthday' && e.source_user_id === req.user.id
       );
-      if (existingBirthday) {
-        await db.deleteCalendarEvent(existingBirthday.id, req.householdId);
+      for (const ev of existingBirthdays) {
+        await db.deleteCalendarEvent(ev.id, req.householdId);
       }
 
       // Create new birthday event if a birthday was provided
-      if (birthday) {
+      if (newBirthday) {
         const displayName = updates.name || req.user.name;
-        const birthdayDate = new Date(birthday);
-        // Set to current year for the event
+        const birthdayDate = new Date(newBirthday);
         const thisYear = new Date().getFullYear();
         const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
         const startTime = `${eventDate.toISOString().split('T')[0]}T00:00:00Z`;
