@@ -1,10 +1,25 @@
 const { Router } = require('express');
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
 const db = require('../db/queries');
+const { supabase } = require('../db/client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const email = require('../services/email');
 
 const router = Router();
+
+// Multer config for avatar uploads (5 MB, images only)
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are accepted'));
+    }
+    cb(null, true);
+  },
+});
 
 /**
  * GET /api/household
@@ -124,6 +139,73 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     return res.json({ user: updated });
   } catch (err) {
     console.error('PATCH /api/household/profile error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/household/profile/avatar
+ * Upload a profile image. Stored in Supabase Storage (avatars bucket).
+ */
+router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.single('avatar'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image uploaded. Use field name "avatar".' });
+  }
+
+  try {
+    const ext = path.extname(req.file.originalname || '.jpg').toLowerCase() || '.jpg';
+    const storagePath = `${req.householdId}/${req.user.id}${ext}`;
+
+    // Upload to Supabase Storage (upsert overwrites previous avatar)
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(storagePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Avatar upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload image.' });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(storagePath);
+
+    // Append cache-buster so browsers pick up new image
+    const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+    // Save to DB
+    const updated = await db.updateUser(req.user.id, { avatar_url: avatarUrl });
+    return res.json({ avatar_url: updated.avatar_url });
+  } catch (err) {
+    console.error('POST /api/household/profile/avatar error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/household/profile/avatar
+ * Remove the current user's profile image.
+ */
+router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    // Try to remove files from storage (best effort — may not exist or may have different ext)
+    const prefix = `${req.householdId}/${req.user.id}`;
+    const { data: files } = await supabase.storage.from('avatars').list(req.householdId, {
+      prefix: req.user.id,
+    });
+    if (files?.length) {
+      await supabase.storage.from('avatars').remove(files.map(f => `${req.householdId}/${f.name}`));
+    }
+
+    // Clear in DB
+    const updated = await db.updateUser(req.user.id, { avatar_url: null });
+    return res.json({ avatar_url: null });
+  } catch (err) {
+    console.error('DELETE /api/household/profile/avatar error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

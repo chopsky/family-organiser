@@ -18,6 +18,8 @@ const CATEGORY_EMOJI = {
   household: '🏠',
   school:    '🎒',
   pets:      '🐾',
+  party:     '🎉',
+  gifts:     '🎁',
   other:     '📦',
 };
 
@@ -87,6 +89,12 @@ async function handleTextMessage(text, user, household) {
     tasksAdded: [],
     tasksCompleted: [],
   };
+
+  // Handle query intent — show the shopping list
+  if (result.intent === 'query') {
+    const listResponse = await handleList(user, household);
+    return { response: listResponse, actions };
+  }
 
   // Handle shopping items
   if (result.shopping_items?.length) {

@@ -23,8 +23,11 @@ export default function Layout({ children }) {
     api.get('/household')
       .then(({ data }) => {
         const me = data.members?.find(m => m.id === user.id);
-        if (me && me.color_theme && me.color_theme !== user.color_theme) {
-          login({ token, user: { ...user, color_theme: me.color_theme }, household });
+        if (me && (
+          (me.color_theme && me.color_theme !== user.color_theme) ||
+          (me.avatar_url !== undefined && me.avatar_url !== user.avatar_url)
+        )) {
+          login({ token, user: { ...user, color_theme: me.color_theme || user.color_theme, avatar_url: me.avatar_url || null }, household });
         }
       })
       .catch(() => {});
@@ -55,6 +58,13 @@ export default function Layout({ children }) {
           {/* Profile circle + sign out — right */}
           <div className="flex items-center gap-2 shrink-0">
             {user && (() => {
+              if (user.avatar_url) {
+                return (
+                  <Link to="/settings" title={user.name}>
+                    <img src={user.avatar_url} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
+                  </Link>
+                );
+              }
               const avatarColors = {
                 orange: 'bg-secondary/30 text-primary',
                 blue: 'bg-blue-100 text-blue-600',

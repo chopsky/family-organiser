@@ -25,6 +25,7 @@ create table if not exists users (
   telegram_chat_id   text,
   telegram_username  text,
   role               text not null default 'member' check (role in ('admin', 'member')),
+  avatar_url         text,
   created_at         timestamp with time zone default now()
 );
 
@@ -33,7 +34,7 @@ create table if not exists shopping_items (
   id            uuid primary key default gen_random_uuid(),
   household_id  uuid references households(id) on delete cascade,
   item          text not null,
-  category      text not null default 'other' check (category in ('groceries', 'clothing', 'household', 'school', 'pets', 'other')),
+  category      text not null default 'other' check (category in ('groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other')),
   quantity      text,
   added_by      uuid references users(id) on delete set null,
   completed     boolean not null default false,

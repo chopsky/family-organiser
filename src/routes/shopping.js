@@ -4,7 +4,7 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
-const VALID_CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'other'];
+const VALID_CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other'];
 
 /**
  * GET /api/shopping/recent

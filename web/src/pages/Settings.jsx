@@ -58,6 +58,8 @@ export default function Settings() {
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('orange');
+  const [profileAvatar, setProfileAvatar] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Calendar subscription selection state
@@ -120,6 +122,42 @@ export default function Settings() {
     setProfileRole(member.family_role || '');
     setProfileBirthday(member.birthday || '');
     setProfileColor(member.color_theme || 'orange');
+    setProfileAvatar(member.avatar_url || null);
+  }
+
+  async function handleAvatarUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const { data } = await api.post('/household/profile/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setProfileAvatar(data.avatar_url);
+      await loadMembers();
+      // Update auth context immediately
+      login({ token, user: { ...user, avatar_url: data.avatar_url }, household });
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to upload image.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setUploadingAvatar(true);
+    try {
+      await api.delete('/household/profile/avatar');
+      setProfileAvatar(null);
+      await loadMembers();
+      login({ token, user: { ...user, avatar_url: null }, household });
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to remove image.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   async function handleSaveProfile() {
@@ -868,9 +906,13 @@ export default function Settings() {
               const avatarClass = avatarColors[m.color_theme] || avatarColors.orange;
               return (
               <li key={m.id} className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-full ${avatarClass} flex items-center justify-center font-bold text-sm shrink-0`}>
-                  {m.name[0].toUpperCase()}
-                </div>
+                {m.avatar_url ? (
+                  <img src={m.avatar_url} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className={`w-9 h-9 rounded-full ${avatarClass} flex items-center justify-center font-bold text-sm shrink-0`}>
+                    {m.name[0].toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1">
                   <p className="text-sm font-medium text-bark">{m.name}</p>
                   <p className="text-xs text-cocoa">
@@ -931,6 +973,41 @@ export default function Settings() {
             </div>
 
             <div className="space-y-4">
+              {/* Avatar upload */}
+              <div className="flex flex-col items-center gap-2">
+                {profileAvatar ? (
+                  <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
+                ) : (
+                  <div className={`w-20 h-20 rounded-full ${
+                    { orange: 'bg-secondary/30 text-primary', blue: 'bg-blue-100 text-blue-600', green: 'bg-success/20 text-success', purple: 'bg-purple-100 text-purple-600', red: 'bg-error/20 text-error', gray: 'bg-sand text-cocoa' }[profileColor] || 'bg-secondary/30 text-primary'
+                  } flex items-center justify-center font-bold text-2xl`}>
+                    {profileName?.[0]?.toUpperCase() || '?'}
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <label className={`text-sm font-medium cursor-pointer ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}>
+                    {uploadingAvatar ? 'Uploading…' : 'Upload photo'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      disabled={uploadingAvatar}
+                      className="hidden"
+                    />
+                  </label>
+                  {profileAvatar && (
+                    <button
+                      type="button"
+                      onClick={handleAvatarRemove}
+                      disabled={uploadingAvatar}
+                      className="text-sm text-error hover:text-error/80 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
                 <input

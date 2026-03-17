@@ -4,11 +4,11 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCart } from '../components/Icons';
 
-const CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'other'];
+const CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other'];
 
 const CATEGORY_EMOJI = {
   groceries: '🥦', clothing: '👕', household: '🏠',
-  school: '🎒', pets: '🐾', other: '📦',
+  school: '🎒', pets: '🐾', party: '🎉', gifts: '🎁', other: '📦',
 };
 
 export default function Shopping() {

@@ -26,7 +26,7 @@ async function authResponse(user) {
   });
   return {
     token,
-    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'orange' },
+    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'orange', avatar_url: user.avatar_url || null },
     household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time } : null,
   };
 }
@@ -488,7 +488,7 @@ router.post('/join', async (req, res) => {
 
     return res.json({
       token,
-      user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'orange' },
+      user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'orange', avatar_url: user.avatar_url || null },
       household: { id: household.id, name: household.name, join_code: household.join_code },
     });
   } catch (err) {
