@@ -24,20 +24,33 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-oat flex flex-col">
       {/* Top bar */}
       <header className="bg-oat border-b border-cream-border shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link to="/dashboard" className="flex items-center gap-2">
-              <img src="/anora-logomark-colour.png" alt="Anora" className="h-7" />
-              <span className="font-bold text-lg text-bark">{household?.name ?? 'Anora'}</span>
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center">
+          {/* Logo — left */}
+          <Link to="/dashboard" className="shrink-0">
+            <img src="/anora-logomark-colour.png" alt="Anora" className="h-7" />
+          </Link>
+
+          {/* Family name — centered */}
+          <div className="flex-1 text-center">
+            <Link to="/dashboard" className="font-bold text-lg text-bark">
+              {household?.name ?? 'Anora'}
             </Link>
-            {user && <span className="ml-2 text-cocoa text-sm">· {user.name}</span>}
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-cocoa hover:text-bark text-sm transition-colors"
-          >
-            Sign out
-          </button>
+
+          {/* Profile circle + sign out — right */}
+          <div className="flex items-center gap-2 shrink-0">
+            {user && (
+              <Link to="/settings" className="w-8 h-8 rounded-full bg-secondary/30 flex items-center justify-center text-primary font-bold text-sm" title={user.name}>
+                {user.name?.[0]?.toUpperCase()}
+              </Link>
+            )}
+            <button
+              onClick={handleLogout}
+              className="text-cocoa hover:text-bark text-sm transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
 
