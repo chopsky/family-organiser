@@ -136,7 +136,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-gray-900 flex items-center justify-center">
-              <img src="/Anora-Symbol-white.png" alt="" className="h-4 w-4" />
+              <img src="/anora-logomark-white.png" alt="" className="h-4 w-4" />
             </div>
             <span className="text-lg font-bold text-gray-900 tracking-tight">Anora</span>
           </a>
@@ -283,7 +283,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-md bg-gray-300 flex items-center justify-center">
-              <img src="/Anora-Symbol-white.png" alt="" className="h-3.5 w-3.5" />
+              <img src="/anora-logomark-white.png" alt="" className="h-3.5 w-3.5" />
             </div>
             <span className="text-sm font-bold text-gray-400 tracking-tight">Anora</span>
           </div>
