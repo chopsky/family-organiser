@@ -577,11 +577,12 @@ export default function Calendar() {
                   <div key={i} className="flex-1 border-l border-cream-border p-0.5 min-h-[28px]">
                     {dayAllDay.map(ev => {
                       const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                      const isReadOnly = ev.category === 'public_holiday' || ev.category === 'birthday';
                       return (
                         <button
                           key={ev.id}
-                          onClick={() => openEditForm(ev)}
-                          className={`block w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate ${colors.bg} ${colors.text} hover:opacity-80`}
+                          onClick={() => !isReadOnly && openEditForm(ev)}
+                          className={`block w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate ${colors.bg} ${colors.text} ${isReadOnly ? 'cursor-default' : 'hover:opacity-80'}`}
                         >
                           {ev.title}
                         </button>
@@ -637,7 +638,7 @@ export default function Calendar() {
                       return (
                         <button
                           key={ev.id}
-                          onClick={(e) => { e.stopPropagation(); openEditForm(ev); }}
+                          onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                           className={`absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded ${colors.bg} border-l-2 ${colors.border} px-1 py-0.5 overflow-hidden hover:opacity-80 z-10 cursor-pointer text-left`}
                           style={{ top: `${pos.top}px`, height: `${pos.height}px` }}
                           title={`${ev.title}\n${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
@@ -842,7 +843,7 @@ export default function Calendar() {
                               </p>
                             )}
                           </div>
-                          {ev.category !== 'public_holiday' && (
+                          {ev.category !== 'public_holiday' && ev.category !== 'birthday' && (
                           <div className="flex gap-1 shrink-0">
                             <button
                               onClick={() => openEditForm(ev)}
