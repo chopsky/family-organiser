@@ -107,7 +107,7 @@ export default function Shopping() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-bark flex items-center gap-2"><IconCart className="h-6 w-6" /> Shopping</h1>
+        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2"><IconCart className="h-6 w-6" /> Shopping</h1>
         <button
           onClick={() => setShowCompleted((v) => !v)}
           className="text-sm text-primary hover:underline"

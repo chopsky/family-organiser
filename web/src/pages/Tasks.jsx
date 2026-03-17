@@ -231,7 +231,7 @@ export default function Tasks() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-bark flex items-center gap-2">
+        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2">
           <IconCheck className="h-6 w-6" /> Tasks
         </h1>
         <div className="flex gap-3">

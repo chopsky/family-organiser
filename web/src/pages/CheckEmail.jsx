@@ -9,7 +9,7 @@ export default function CheckEmail() {
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
           <div className="text-5xl mb-4">📧</div>
-          <h1 className="text-2xl font-bold text-bark mb-3">Check your email</h1>
+          <h1 className="text-2xl font-semibold text-bark mb-3">Check your email</h1>
           <p className="text-cocoa mb-6">
             We've sent you a verification link. Click it to activate your account, then come back and log in.
           </p>

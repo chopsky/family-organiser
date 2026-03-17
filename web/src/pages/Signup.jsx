@@ -61,7 +61,7 @@ export default function Signup() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/anora-logomark-colour.png" alt="Anora" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-3xl font-bold text-bark">Create your account</h1>
+          <h1 className="text-3xl font-semibold text-bark">Create your account</h1>
           {inviteToken && (
             <p className="text-primary mt-2 font-medium">You've been invited to join a household!</p>
           )}

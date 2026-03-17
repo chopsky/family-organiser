@@ -686,7 +686,7 @@ export default function Calendar() {
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-bark flex items-center gap-2">
+        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2">
           <IconCalendar className="h-6 w-6" /> Calendar
         </h1>
         <div className="flex items-center gap-2">

@@ -47,7 +47,7 @@ export default function Layout({ children }) {
 
           {/* Family name — centered */}
           <div className="flex-1 text-center">
-            <Link to="/dashboard" className="font-bold text-lg text-bark">
+            <Link to="/dashboard" className="font-semibold text-lg text-bark">
               {household?.name ?? 'Anora'}
             </Link>
           </div>
