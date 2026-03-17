@@ -1043,7 +1043,14 @@ export default function Calendar() {
               <label className="text-xs text-cocoa mb-1 block">Assign to</label>
               <select
                 value={formAssignee}
-                onChange={e => setFormAssignee(e.target.value)}
+                onChange={e => {
+                  setFormAssignee(e.target.value);
+                  // Default color to assigned user's theme
+                  if (!editingEvent) {
+                    const assignedMember = members.find(m => m.name === e.target.value);
+                    if (assignedMember?.color_theme) setFormColor(assignedMember.color_theme);
+                  }
+                }}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">Unassigned</option>

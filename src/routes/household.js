@@ -51,6 +51,79 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
 });
 
 /**
+ * PATCH /api/household/profile
+ * Update the current user's profile (name, family_role, birthday, color_theme).
+ */
+router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
+  const VALID_COLORS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
+  const { name, family_role, birthday, color_theme } = req.body;
+  const updates = {};
+
+  if (name !== undefined) {
+    if (!name.trim()) return res.status(400).json({ error: 'Name cannot be empty.' });
+    updates.name = name.trim();
+  }
+  if (family_role !== undefined) updates.family_role = family_role.trim() || null;
+  if (birthday !== undefined) updates.birthday = birthday || null;
+  if (color_theme !== undefined) {
+    if (!VALID_COLORS.includes(color_theme)) {
+      return res.status(400).json({ error: 'Invalid color theme.' });
+    }
+    updates.color_theme = color_theme;
+  }
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ error: 'No valid fields to update.' });
+  }
+
+  try {
+    const updated = await db.updateUser(req.user.id, updates);
+
+    // Handle birthday calendar event
+    if (birthday !== undefined) {
+      // Remove any existing birthday event for this user
+      const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
+      const existingBirthday = allEvents.find(
+        (e) => e.category === 'birthday' && e.source_user_id === req.user.id
+      );
+      if (existingBirthday) {
+        await db.deleteCalendarEvent(existingBirthday.id, req.householdId);
+      }
+
+      // Create new birthday event if a birthday was provided
+      if (birthday) {
+        const displayName = updates.name || req.user.name;
+        const birthdayDate = new Date(birthday);
+        // Set to current year for the event
+        const thisYear = new Date().getFullYear();
+        const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
+        const startTime = `${eventDate.toISOString().split('T')[0]}T00:00:00Z`;
+
+        await db.createCalendarEventFromSync(
+          req.householdId,
+          {
+            title: `${displayName}'s Birthday 🎂`,
+            description: null,
+            start_time: startTime,
+            end_time: startTime,
+            all_day: true,
+          },
+          req.user.id,
+          null,
+          'birthday',
+          'family'
+        );
+      }
+    }
+
+    return res.json({ user: updated });
+  } catch (err) {
+    console.error('PATCH /api/household/profile error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * DELETE /api/household/members/:userId
  * Remove a member from the household. Admin only.
  */

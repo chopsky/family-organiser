@@ -52,6 +52,14 @@ export default function Settings() {
   const [showAppleForm, setShowAppleForm] = useState(false);
   const [appleError, setAppleError] = useState('');
 
+  // Edit profile state
+  const [editingMember, setEditingMember] = useState(null);
+  const [profileName, setProfileName] = useState('');
+  const [profileRole, setProfileRole] = useState('');
+  const [profileBirthday, setProfileBirthday] = useState('');
+  const [profileColor, setProfileColor] = useState('orange');
+  const [savingProfile, setSavingProfile] = useState(false);
+
   // Calendar subscription selection state
   const [selectingProvider, setSelectingProvider] = useState(null); // 'google' | 'microsoft' | 'apple' | null
   const [availableCalendars, setAvailableCalendars] = useState([]);
@@ -105,6 +113,35 @@ export default function Settings() {
       setSearchParams(searchParams, { replace: true });
     }
   }, []);
+
+  function openEditProfile(member) {
+    setEditingMember(member);
+    setProfileName(member.name || '');
+    setProfileRole(member.family_role || '');
+    setProfileBirthday(member.birthday || '');
+    setProfileColor(member.color_theme || 'orange');
+  }
+
+  async function handleSaveProfile() {
+    if (!profileName.trim()) { setError('Name is required.'); return; }
+    setSavingProfile(true);
+    try {
+      await api.patch('/household/profile', {
+        name: profileName.trim(),
+        family_role: profileRole.trim(),
+        birthday: profileBirthday || null,
+        color_theme: profileColor,
+      });
+      await loadMembers();
+      setEditingMember(null);
+      setSuccess('Profile updated!');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update profile.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   async function handleRemoveMember(member) {
     if (!window.confirm(`Remove ${member.name} from the household?`)) return;
@@ -816,21 +853,39 @@ export default function Settings() {
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Members</h2>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-2">
-            {members.map((m) => (
+            {members.map((m) => {
+              const avatarColors = {
+                orange: 'bg-secondary/30 text-primary',
+                blue: 'bg-blue-100 text-blue-600',
+                green: 'bg-success/20 text-success',
+                purple: 'bg-purple-100 text-purple-600',
+                red: 'bg-error/20 text-error',
+                gray: 'bg-sand text-cocoa',
+              };
+              const avatarClass = avatarColors[m.color_theme] || avatarColors.orange;
+              return (
               <li key={m.id} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-secondary/30 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                <div className={`w-9 h-9 rounded-full ${avatarClass} flex items-center justify-center font-bold text-sm shrink-0`}>
                   {m.name[0].toUpperCase()}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-bark">{m.name}</p>
                   <p className="text-xs text-cocoa">
-                    {m.role}
+                    {m.family_role ? `${m.family_role} · ` : ''}{m.role}
                     {m.telegram_chat_id && ' · Telegram connected'}
                     {m.whatsapp_linked && ' · WhatsApp connected'}
                   </p>
                 </div>
                 {m.id === user?.id && (
-                  <span className="text-xs bg-secondary/30 text-primary px-2 py-0.5 rounded-full">You</span>
+                  <button
+                    onClick={() => openEditProfile(m)}
+                    className="text-cocoa hover:text-primary p-1.5 rounded-lg transition-colors hover:bg-primary/10"
+                    title="Edit profile"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                  </button>
                 )}
                 {isAdmin && m.id !== user?.id && m.role !== 'admin' && (
                   <button
@@ -841,7 +896,8 @@ export default function Settings() {
                   </button>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
@@ -854,6 +910,105 @@ export default function Settings() {
           <span className="text-cocoa"> ({user?.role})</span>
         </p>
       </div>
+      {/* Edit Profile Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingMember(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-bark">Edit profile</h2>
+              <button onClick={() => setEditingMember(null)} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  placeholder="Your name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Family role</label>
+                <input
+                  type="text"
+                  value={profileRole}
+                  onChange={(e) => setProfileRole(e.target.value)}
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  placeholder="e.g. Father, Mother, Daughter"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
+                <input
+                  type="date"
+                  value={profileBirthday}
+                  onChange={(e) => setProfileBirthday(e.target.value)}
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1.5">Color theme</label>
+                <div className="flex gap-3">
+                  {[
+                    { key: 'orange', bg: 'bg-secondary',     ring: 'ring-primary' },
+                    { key: 'blue',   bg: 'bg-blue-300',      ring: 'ring-blue-400' },
+                    { key: 'green',  bg: 'bg-success/60',    ring: 'ring-success' },
+                    { key: 'purple', bg: 'bg-purple-300',    ring: 'ring-purple-400' },
+                    { key: 'red',    bg: 'bg-error/60',      ring: 'ring-error' },
+                    { key: 'gray',   bg: 'bg-sand',          ring: 'ring-cream-border' },
+                  ].map(({ key, bg, ring }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setProfileColor(key)}
+                      className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${
+                        profileColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'
+                      }`}
+                      title={key.charAt(0).toUpperCase() + key.slice(1)}
+                    >
+                      {profileColor === key && (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white drop-shadow" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setEditingMember(null)}
+                className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProfile}
+                disabled={savingProfile}
+                className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors"
+              >
+                {savingProfile ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
