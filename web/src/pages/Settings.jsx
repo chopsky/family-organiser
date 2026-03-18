@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
@@ -7,7 +7,8 @@ import Spinner from '../components/Spinner';
 import { IconSettings, IconHome, IconMail, IconPhone, IconUsers, IconUser, IconCalendar } from '../components/Icons';
 
 export default function Settings() {
-  const { household, user, isAdmin, login, token } = useAuth();
+  const { household, user, isAdmin, login, logout, token } = useAuth();
+  const navigate = useNavigate();
 
   const [name, setName]               = useState(household?.name ?? '');
   const [reminderTime, setReminderTime] = useState(
@@ -955,6 +956,14 @@ export default function Settings() {
           <span className="text-cocoa"> ({user?.role})</span>
         </p>
       </div>
+      {/* Log out */}
+      <button
+        onClick={() => { logout(); navigate('/'); }}
+        className="w-full py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
+      >
+        Log out
+      </button>
+
       {/* Edit Profile Modal */}
       {editingMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingMember(null)}>

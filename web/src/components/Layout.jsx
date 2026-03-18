@@ -113,7 +113,7 @@ export default function Layout({ children }) {
       </aside>
 
       {/* ── Mobile Top Bar ── */}
-      <header className="md:hidden bg-cream border-b border-light-grey sticky top-0 z-30">
+      <header className="md:hidden bg-cream border-b border-light-grey z-30">
         <div className="px-4 py-3 flex items-center gap-3">
           {/* Logo — left */}
           <Link to="/dashboard" className="shrink-0">
@@ -127,18 +127,10 @@ export default function Layout({ children }) {
             </Link>
           </div>
 
-          {/* Profile circle + sign out — right */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Link to="/settings" className="shrink-0">
-              {renderAvatar('w-8 h-8', 'text-xs')}
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="text-warm-grey hover:text-charcoal text-sm whitespace-nowrap transition-colors"
-            >
-              Sign out
-            </button>
-          </div>
+          {/* Profile circle — right */}
+          <Link to="/settings" className="shrink-0">
+            {renderAvatar('w-8 h-8', 'text-xs')}
+          </Link>
         </div>
       </header>
 
