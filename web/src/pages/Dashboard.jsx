@@ -78,7 +78,7 @@ export default function Dashboard() {
   const shoppingCount    = digest?.shoppingCount       ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-semibold text-bark">
