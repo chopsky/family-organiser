@@ -10,11 +10,7 @@ const mainNav = [
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
-];
-
-const bottomNav = [
-  { to: '/family',    label: 'Family',    Icon: IconUsers    },
-  { to: '/settings',  label: 'Settings',  Icon: IconSettings  },
+  { to: '/family',     label: 'Family',    Icon: IconUsers     },
 ];
 
 const mobileNav = [
@@ -27,7 +23,7 @@ const mobileNav = [
 const moreNav = [
   { to: '/family',    label: 'Family Setup',     Icon: IconUsers    },
   { to: '/receipt',   label: 'Receipt Scanner',   Icon: IconCamera   },
-  { to: '/settings',  label: 'Settings',          Icon: IconSettings },
+  { to: '/settings',  label: 'Settings',          Icon: IconSettings  },
 ];
 
 const avatarColors = {
@@ -156,18 +152,18 @@ export default function Layout({ children }) {
         {/* Main nav */}
         <nav className="flex-1 px-3 flex flex-col gap-0.5">
           {mainNav.map(renderNavLink)}
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Bottom nav items */}
-          {bottomNav.map(renderNavLink)}
         </nav>
 
         {/* User footer */}
         <div className="px-4 py-4 border-t border-light-grey flex items-center gap-2.5">
           {renderAvatar('w-8 h-8', 'text-xs')}
-          <p className="flex-1 min-w-0 text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
+            <p className="text-[11px] text-warm-grey capitalize">{user?.role || 'Member'}</p>
+          </div>
+          <Link to="/settings" className="text-warm-grey hover:text-charcoal transition-colors" title="Settings">
+            <IconSettings className="h-5 w-5" />
+          </Link>
         </div>
       </aside>
 
