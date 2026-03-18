@@ -101,16 +101,24 @@ export default function FamilySetup() {
     if (!profileName.trim()) { setError('Name is required.'); return; }
     setSavingProfile(true);
     try {
-      await api.patch('/household/profile', {
+      const payload = {
         name: profileName.trim(),
         family_role: profileRole.trim(),
         birthday: profileBirthday || null,
         color_theme: profileColor,
         reminder_time: profileReminderTime || null,
-      });
+      };
+      // When admin edits another member, include target user_id
+      if (editingMember && editingMember.id !== user?.id) {
+        payload.user_id = editingMember.id;
+      }
+      await api.patch('/household/profile', payload);
       await loadMembers();
-      const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
-      login({ token, user: updatedUser, household });
+      // Only update auth context if editing own profile
+      if (!editingMember || editingMember.id === user?.id) {
+        const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
+        login({ token, user: updatedUser, household });
+      }
       setEditingMember(null);
       setSuccess('Profile updated!');
       setTimeout(() => setSuccess(''), 2000);
@@ -317,7 +325,7 @@ export default function FamilySetup() {
                     {m.whatsapp_linked && ' · WhatsApp connected'}
                   </p>
                 </div>
-                {m.id === user?.id && (
+                {(m.id === user?.id || isAdmin) && (
                   <button
                     onClick={() => openEditProfile(m)}
                     className="text-cocoa hover:text-primary p-1.5 rounded-lg transition-colors hover:bg-primary/10"
@@ -331,9 +339,12 @@ export default function FamilySetup() {
                 {isAdmin && m.id !== user?.id && m.role !== 'admin' && (
                   <button
                     onClick={() => handleRemoveMember(m)}
-                    className="text-xs text-error hover:text-error transition-colors"
+                    className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10"
+                    title="Remove member"
                   >
-                    Remove
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
                   </button>
                 )}
               </li>

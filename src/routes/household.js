@@ -67,11 +67,27 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
 
 /**
  * PATCH /api/household/profile
- * Update the current user's profile (name, family_role, birthday, color_theme, reminder_time).
+ * Update a user's profile. Admins can update any member via optional `user_id` field.
+ * Regular members can only update their own profile.
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate'];
-  const { name, family_role, birthday, color_theme, reminder_time } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, user_id } = req.body;
+
+  // Determine target user — admins can edit others, members only themselves
+  let targetUserId = req.user.id;
+  if (user_id && user_id !== req.user.id) {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can edit other members.' });
+    }
+    // Verify target belongs to same household
+    const members = await db.getHouseholdMembers(req.householdId);
+    if (!members.find(m => m.id === user_id)) {
+      return res.status(404).json({ error: 'Member not found in this household.' });
+    }
+    targetUserId = user_id;
+  }
+
   const updates = {};
 
   if (name !== undefined) {
@@ -99,10 +115,10 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     // Only fetch full user if birthday is being updated (expensive query)
     let fullUser = null;
     if (birthday !== undefined) {
-      fullUser = (await db.getHouseholdMembers(req.householdId)).find(m => m.id === req.user.id);
+      fullUser = (await db.getHouseholdMembers(req.householdId)).find(m => m.id === targetUserId);
     }
 
-    const updated = await db.updateUser(req.user.id, updates);
+    const updated = await db.updateUser(targetUserId, updates);
 
     // Handle birthday calendar event — only when birthday field is explicitly sent and changed
     if (birthday !== undefined && fullUser) {
@@ -116,7 +132,7 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
           // Remove any existing birthday events for this user
           const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
           const existingBirthdays = allEvents.filter(
-            (e) => e.category === 'birthday' && e.source_user_id === req.user.id
+            (e) => e.category === 'birthday' && e.source_user_id === targetUserId
           );
           for (const ev of existingBirthdays) {
             await db.deleteCalendarEvent(ev.id, req.householdId);
@@ -124,7 +140,7 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
 
           // Create new birthday event if a birthday was provided
           if (newBirthday) {
-            const displayName = updates.name || req.user.name;
+            const displayName = updates.name || fullUser.name || req.user.name;
             const birthdayDate = new Date(newBirthday);
             const thisYear = new Date().getFullYear();
             const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
@@ -139,7 +155,7 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
                 end_time: startTime,
                 all_day: true,
               },
-              req.user.id,
+              targetUserId,
               null,
               'birthday',
               'family'
