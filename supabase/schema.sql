@@ -23,6 +23,7 @@ create table if not exists users (
   password_hash      text,
   email_verified     boolean not null default false,
   role               text not null default 'member' check (role in ('admin', 'member')),
+  member_type        text not null default 'account' check (member_type in ('account', 'dependent')),
   avatar_url         text,
   reminder_time      time,
   created_at         timestamp with time zone default now()

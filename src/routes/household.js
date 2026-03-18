@@ -269,6 +269,45 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
 });
 
 /**
+ * POST /api/household/dependents
+ * Add a dependent (infant, pet, etc.) to the household. Admin only.
+ */
+router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { name, family_role, birthday, color_theme } = req.body;
+
+  if (!name?.trim()) {
+    return res.status(400).json({ error: 'Name is required.' });
+  }
+
+  try {
+    const dependent = await db.createDependent(req.householdId, {
+      name: name.trim(),
+      family_role: family_role?.trim() || null,
+      birthday: birthday || null,
+      color_theme: color_theme || 'sage',
+    });
+    return res.status(201).json({ member: dependent });
+  } catch (err) {
+    console.error('POST /api/household/dependents error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/household/dependents/:id
+ * Remove a dependent from the household. Admin only.
+ */
+router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    await db.deleteDependent(req.params.id, req.householdId);
+    return res.json({ message: 'Dependent removed.' });
+  } catch (err) {
+    console.error('DELETE /api/household/dependents error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/household/invite
  * Send an email invite to join the household. Admin only.
  */

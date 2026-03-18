@@ -201,6 +201,37 @@ async function deleteHouseholdNote(householdId, key) {
   if (error) throw error;
 }
 
+// ─── Dependent helpers ───────────────────────────────────────────────────────
+
+async function createDependent(householdId, { name, family_role, birthday, color_theme }) {
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      household_id: householdId,
+      name,
+      family_role: family_role || null,
+      birthday: birthday || null,
+      color_theme: color_theme || 'sage',
+      member_type: 'dependent',
+      role: 'member',
+      email_verified: false,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteDependent(id, householdId) {
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', id)
+    .eq('household_id', householdId)
+    .eq('member_type', 'dependent');
+  if (error) throw error;
+}
+
 // ─── Chat message helpers ────────────────────────────────────────────────────
 
 async function getChatHistory(userId, limit = 50) {
@@ -1172,6 +1203,9 @@ module.exports = {
   getSyncMappingsBySubscription,
   createSyncMappingWithSubscription,
   createCalendarEventFromSync,
+  // Dependents
+  createDependent,
+  deleteDependent,
   // Chat
   getChatHistory,
   saveChatMessage,
