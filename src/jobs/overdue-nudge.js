@@ -32,33 +32,22 @@ function buildOverdueNudgeMessage(user, overdueTasks) {
  * Only messages members who have tasks personally assigned to them that are overdue.
  * Does NOT send to the group or about unassigned tasks.
  *
- * @param {object} bot
  * @param {string} householdId
  */
-async function sendOverdueNudges(bot, householdId) {
+async function sendOverdueNudges(householdId) {
   const members = await db.getHouseholdMembers(householdId);
 
   for (const member of members) {
-    const hasTelegram = !!member.telegram_chat_id;
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasTelegram && !hasWhatsApp) continue;
+    if (!hasWhatsApp) continue;
 
     const overdueTasks = await db.getOverdueTasksForUser(householdId, member.id);
     if (!overdueTasks.length) continue;
 
     const message = buildOverdueNudgeMessage(member, overdueTasks);
 
-    // Send via Telegram
-    if (hasTelegram) {
-      try {
-        await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
-      } catch (err) {
-        console.error(`Failed to send overdue nudge to ${member.name} via Telegram:`, err.message);
-      }
-    }
-
     // Send via WhatsApp
-    if (hasWhatsApp && whatsapp.isConfigured()) {
+    if (whatsapp.isConfigured()) {
       try {
         await whatsapp.sendTemplate(member.whatsapp_phone, message);
       } catch (err) {

@@ -4,7 +4,7 @@ const { toFile } = require('openai');
 /**
  * Transcribe an audio buffer using OpenAI Whisper.
  *
- * @param {Buffer} audioBuffer - Raw audio data (OGG Opus from Telegram voice notes)
+ * @param {Buffer} audioBuffer - Raw audio data (OGG Opus from voice notes)
  * @param {string} [filename='voice.ogg'] - Filename hint for the MIME type detection
  * @returns {Promise<string>} Transcribed text
  */
@@ -22,7 +22,7 @@ async function transcribeVoice(audioBuffer, filename = 'voice.ogg') {
     : filename.endsWith('.m4a') ? 'audio/mp4'
     : filename.endsWith('.wav') ? 'audio/wav'
     : filename.endsWith('.webm') ? 'audio/webm'
-    : 'audio/ogg'; // default: Telegram voice notes are OGG Opus
+    : 'audio/ogg'; // default: voice notes are OGG Opus
 
   const file = await toFile(audioBuffer, filename, { type: mimeType });
 

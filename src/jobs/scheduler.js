@@ -38,7 +38,7 @@ function currentHHMMInTZ(timezone) {
  * Run daily reminders for every household whose reminder_time matches now.
  * Called every minute by cron.
  */
-async function runDailyReminderCheck(bot) {
+async function runDailyReminderCheck() {
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
@@ -47,7 +47,7 @@ async function runDailyReminderCheck(bot) {
       const nowInTZ = currentHHMMInTZ(household.timezone || 'Africa/Johannesburg');
       if (reminderHHMM === nowInTZ) {
         console.log(`[scheduler] Sending daily reminders for "${household.name}" (${household.id})`);
-        await sendDailyReminders(bot, household.id);
+        await sendDailyReminders(household.id);
       }
     }
   } catch (err) {
@@ -60,7 +60,7 @@ async function runDailyReminderCheck(bot) {
  * Sends at 14:00 in the household's timezone (6 hours after default reminder).
  * Called every minute by cron.
  */
-async function runOverdueNudgeCheck(bot) {
+async function runOverdueNudgeCheck() {
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
@@ -68,7 +68,7 @@ async function runOverdueNudgeCheck(bot) {
       const nowInTZ = currentHHMMInTZ(household.timezone || 'Africa/Johannesburg');
       if (nowInTZ === '14:00') {
         console.log(`[scheduler] Sending overdue nudges for "${household.name}" (${household.id})`);
-        await sendOverdueNudges(bot, household.id);
+        await sendOverdueNudges(household.id);
       }
     }
   } catch (err) {
@@ -79,14 +79,14 @@ async function runOverdueNudgeCheck(bot) {
 /**
  * Run weekly digest for all households.
  * Called once on Sunday at the configured time (default 20:00).
- * Sends via both Telegram and email.
+ * Sends via WhatsApp and email.
  */
-async function runWeeklyDigest(bot) {
+async function runWeeklyDigest() {
   console.log('[scheduler] Sending weekly digests to all households');
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
-      await sendWeeklyDigest(bot, household.id);
+      await sendWeeklyDigest(household.id);
       await sendWeeklyDigestEmail(household.id);
     }
   } catch (err) {
@@ -136,7 +136,7 @@ const NOTIFICATION_OFFSETS = {
  * Runs every minute. Finds tasks with a notification preference and due_time set,
  * calculates the fire time (due_date + due_time - offset), and sends if now.
  */
-async function runTaskNotificationCheck(bot) {
+async function runTaskNotificationCheck() {
   try {
     const { supabase } = require('../db/client');
     const { data: tasks, error } = await supabase
@@ -173,22 +173,13 @@ async function runTaskNotificationCheck(bot) {
       // Send notification
       const members = await db.getHouseholdMembers(task.household_id);
       const recipients = task.assigned_to
-        ? members.filter((m) => m.id === task.assigned_to && (m.telegram_chat_id || (m.whatsapp_linked && m.whatsapp_phone)))
-        : members.filter((m) => m.telegram_chat_id || (m.whatsapp_linked && m.whatsapp_phone));
+        ? members.filter((m) => m.id === task.assigned_to && m.whatsapp_linked && m.whatsapp_phone)
+        : members.filter((m) => m.whatsapp_linked && m.whatsapp_phone);
 
       const timeStr = task.due_time.substring(0, 5);
       const message = `🔔 *Task Reminder*\n\n*${task.title}*\nDue: ${task.due_date} at ${timeStr}${task.description ? `\n${task.description}` : ''}`;
 
       for (const member of recipients) {
-        // Send via Telegram
-        if (member.telegram_chat_id) {
-          try {
-            await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
-          } catch (err) {
-            console.error(`[scheduler] Failed to send task notification to ${member.name} via Telegram:`, err.message);
-          }
-        }
-
         // Send via WhatsApp
         if (member.whatsapp_linked && member.whatsapp_phone && whatsapp.isConfigured()) {
           try {
@@ -214,20 +205,18 @@ async function runTaskNotificationCheck(bot) {
 
 /**
  * Start all scheduled jobs.
- *
- * @param {object} bot - Telegraf bot instance (needs bot.telegram.sendMessage)
  */
-function startScheduler(bot) {
+function startScheduler() {
   // ── Daily reminders: check every minute ─────────────────────────────────────
-  cron.schedule('* * * * *', () => runDailyReminderCheck(bot));
+  cron.schedule('* * * * *', () => runDailyReminderCheck());
   console.log('✓ Daily reminder scheduler started (checks every minute)');
 
   // ── Overdue nudges: check every minute (fires at 14:00 per household TZ) ───
-  cron.schedule('* * * * *', () => runOverdueNudgeCheck(bot));
+  cron.schedule('* * * * *', () => runOverdueNudgeCheck());
   console.log('✓ Overdue nudge scheduler started (14:00 per household timezone)');
 
   // ── Task notifications: check every minute ──────────────────────────────────
-  cron.schedule('* * * * *', () => runTaskNotificationCheck(bot));
+  cron.schedule('* * * * *', () => runTaskNotificationCheck());
   console.log('✓ Task notification scheduler started (checks every minute)');
 
   // ── Apple CalDAV polling: every 15 minutes ─────────────────────────────────
@@ -245,14 +234,14 @@ function startScheduler(bot) {
 
   // node-cron: minute hour dayOfMonth month dayOfWeek
   const digestCron = `${digestMin} ${digestHour} * * ${digestDay}`;
-  cron.schedule(digestCron, () => runWeeklyDigest(bot));
+  cron.schedule(digestCron, () => runWeeklyDigest());
   console.log(`✓ Weekly digest scheduler started (${digestCron})`);
 
   return {
     // Expose manual triggers for testing / admin use
-    triggerDailyReminders: (householdId) => sendDailyReminders(bot, householdId),
-    triggerOverdueNudges:  (householdId) => sendOverdueNudges(bot, householdId),
-    triggerWeeklyDigest:   (householdId) => sendWeeklyDigest(bot, householdId),
+    triggerDailyReminders: (householdId) => sendDailyReminders(householdId),
+    triggerOverdueNudges:  (householdId) => sendOverdueNudges(householdId),
+    triggerWeeklyDigest:   (householdId) => sendWeeklyDigest(householdId),
   };
 }
 

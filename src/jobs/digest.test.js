@@ -25,8 +25,8 @@ function makeShoppingItem(overrides = {}) {
 }
 
 const MEMBERS = [
-  { id: 'u1', name: 'Sarah', telegram_chat_id: '111' },
-  { id: 'u2', name: 'Jake', telegram_chat_id: '222' },
+  { id: 'u1', name: 'Sarah' },
+  { id: 'u2', name: 'Jake' },
 ];
 
 describe('buildWeeklyDigestMessage()', () => {

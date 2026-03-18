@@ -357,24 +357,6 @@ router.post('/apple', async (req, res) => {
   }
 });
 
-// ─── POST /api/auth/telegram-link-token ─────────────────────────────────────
-
-router.post('/telegram-link-token', requireAuth, async (req, res) => {
-  try {
-    const token = generateToken().slice(0, 16); // shorter for Telegram deep link
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
-    await db.createTelegramLinkToken(req.user.id, token, expiresAt);
-
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'AnoraBot';
-    const deepLink = `https://t.me/${botUsername}?start=link_${token}`;
-
-    return res.json({ token, deepLink });
-  } catch (err) {
-    console.error('POST /api/auth/telegram-link-token error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // ─── POST /api/auth/whatsapp-send-code ────────────────────────────────────────
 
 router.post('/whatsapp-send-code', requireAuth, async (req, res) => {
@@ -473,8 +455,6 @@ router.post('/join', async (req, res) => {
       user = await db.createUser({
         householdId: household.id,
         name: name.trim(),
-        telegramChatId: null,
-        telegramUsername: null,
         role: members.length === 0 ? 'admin' : 'member',
       });
     }

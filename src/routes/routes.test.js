@@ -33,7 +33,7 @@ const { signToken } = require('../middleware/auth');
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const HOUSEHOLD = { id: 'hh-1', name: 'The Smiths', join_code: 'ABC123', reminder_time: '08:00:00' };
-const USER      = { id: 'u-1', name: 'Sarah', role: 'admin', household_id: 'hh-1', telegram_chat_id: null };
+const USER      = { id: 'u-1', name: 'Sarah', role: 'admin', household_id: 'hh-1' };
 const MEMBERS   = [USER, { id: 'u-2', name: 'Jake', role: 'member', household_id: 'hh-1' }];
 const TOKEN     = signToken({ userId: USER.id, householdId: HOUSEHOLD.id, name: USER.name, role: USER.role });
 const AUTH      = { Authorization: `Bearer ${TOKEN}` };
@@ -612,27 +612,6 @@ describe('POST /api/auth/reset-password', () => {
   test('returns 400 when fields are missing', async () => {
     const res = await request(app).post('/api/auth/reset-password').send({});
     expect(res.status).toBe(400);
-  });
-});
-
-// ─── POST /api/auth/telegram-link-token ──────────────────────────────────
-
-describe('POST /api/auth/telegram-link-token', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('returns deep link for authenticated user', async () => {
-    db.createTelegramLinkToken.mockResolvedValue();
-
-    const res = await request(app).post('/api/auth/telegram-link-token').set(AUTH);
-
-    expect(res.status).toBe(200);
-    expect(res.body.deepLink).toContain('https://t.me/');
-    expect(res.body.token).toBeTruthy();
-  });
-
-  test('returns 401 without auth', async () => {
-    const res = await request(app).post('/api/auth/telegram-link-token');
-    expect(res.status).toBe(401);
   });
 });
 

@@ -27,10 +27,6 @@ export default function Settings() {
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [pendingInvites, setPendingInvites] = useState([]);
 
-  // Telegram link state
-  const [telegramLink, setTelegramLink] = useState('');
-  const [linkingTelegram, setLinkingTelegram] = useState(false);
-
   // WhatsApp link state
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [whatsappCode, setWhatsappCode] = useState('');
@@ -231,19 +227,6 @@ export default function Settings() {
       setError(err.response?.data?.error || 'Could not send invite.');
     } finally {
       setInviting(false);
-    }
-  }
-
-  async function handleConnectTelegram() {
-    setError('');
-    setLinkingTelegram(true);
-    try {
-      const { data } = await api.post('/auth/telegram-link-token');
-      setTelegramLink(data.deepLink);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not generate Telegram link.');
-    } finally {
-      setLinkingTelegram(false);
     }
   }
 
@@ -481,7 +464,7 @@ export default function Settings() {
                 onChange={(e) => setReminderTime(e.target.value)}
                 className="border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="text-xs text-cocoa mt-1">Telegram reminders are sent at this time each day.</p>
+              <p className="text-xs text-cocoa mt-1">Reminders are sent at this time each day.</p>
             </div>
             <button
               type="submit"
@@ -546,46 +529,6 @@ export default function Settings() {
           )}
         </div>
       )}
-
-      {/* Connect Telegram */}
-      <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
-        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconPhone className="h-4 w-4" /> Connect Telegram</h2>
-        {members.find((m) => m.id === user?.id)?.telegram_chat_id ? (
-          <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
-            Telegram connected! You'll receive reminders and can add items via the bot.
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-cocoa mb-3">
-              Link your Telegram account to receive daily reminders and add items via the Anora bot.
-            </p>
-            {telegramLink ? (
-              <a
-                href={telegramLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-[#2AABEE] hover:bg-[#229ED9] text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.96 6.504-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                </svg>
-                Open in Telegram
-              </a>
-            ) : (
-              <button
-                onClick={handleConnectTelegram}
-                disabled={linkingTelegram}
-                className="inline-flex items-center gap-2 bg-[#2AABEE] hover:bg-[#229ED9] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.96 6.504-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                </svg>
-                {linkingTelegram ? 'Generating link…' : 'Connect Telegram'}
-              </button>
-            )}
-          </>
-        )}
-      </div>
 
       {/* Connect WhatsApp */}
       <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
@@ -918,7 +861,6 @@ export default function Settings() {
                   <p className="text-sm font-medium text-bark">{m.name}</p>
                   <p className="text-xs text-cocoa">
                     {m.family_role ? `${m.family_role} · ` : ''}{m.role}
-                    {m.telegram_chat_id && ' · Telegram connected'}
                     {m.whatsapp_linked && ' · WhatsApp connected'}
                   </p>
                 </div>

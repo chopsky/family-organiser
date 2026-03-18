@@ -8,7 +8,7 @@ const TODAY = new Date().toISOString().split('T')[0];
 const YESTERDAY = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 const TWO_DAYS_AGO = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
 
-const SARAH = { id: 'u1', name: 'Sarah', telegram_chat_id: '111' };
+const SARAH = { id: 'u1', name: 'Sarah' };
 
 function makeTask(overrides = {}) {
   return {

@@ -64,13 +64,11 @@ function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount) {
 }
 
 /**
- * Send daily reminders to all members of one household.
- * Skips members with no telegram_chat_id.
+ * Send daily reminders to all connected members of one household.
  *
- * @param {object} bot       - Telegraf bot instance
  * @param {string} householdId
  */
-async function sendDailyReminders(bot, householdId) {
+async function sendDailyReminders(householdId) {
   const today = new Date().toISOString().split('T')[0];
   const members = await db.getHouseholdMembers(householdId);
   const shoppingItems = await db.getShoppingList(householdId);
@@ -86,9 +84,8 @@ async function sendDailyReminders(bot, householdId) {
     .lte('due_date', today);
 
   for (const member of members) {
-    const hasTelegram = !!member.telegram_chat_id;
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasTelegram && !hasWhatsApp) continue;
+    if (!hasWhatsApp) continue;
 
     // Tasks assigned specifically to this member, due today or overdue
     const { data: myTasks } = await require('../db/client').supabase
@@ -106,17 +103,8 @@ async function sendDailyReminders(bot, householdId) {
       shoppingCount
     );
 
-    // Send via Telegram
-    if (hasTelegram) {
-      try {
-        await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
-      } catch (err) {
-        console.error(`Failed to send reminder to ${member.name} via Telegram:`, err.message);
-      }
-    }
-
     // Send via WhatsApp
-    if (hasWhatsApp && whatsapp.isConfigured()) {
+    if (whatsapp.isConfigured()) {
       try {
         await whatsapp.sendTemplate(member.whatsapp_phone, message);
       } catch (err) {

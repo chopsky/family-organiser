@@ -53,30 +53,18 @@ async function updateHouseholdSettings(id, settings) {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-async function createUser({ householdId, name, telegramChatId, telegramUsername, role = 'member' }) {
+async function createUser({ householdId, name, role = 'member' }) {
   const { data, error } = await supabase
     .from('users')
     .insert({
       household_id: householdId,
       name,
-      telegram_chat_id: String(telegramChatId),
-      telegram_username: telegramUsername || null,
       role,
     })
     .select()
     .single();
   if (error) throw error;
   return data;
-}
-
-async function getUserByTelegramId(telegramChatId) {
-  const { data, error } = await supabase
-    .from('users')
-    .select()
-    .eq('telegram_chat_id', String(telegramChatId))
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
 }
 
 async function getHouseholdMembers(householdId) {
@@ -138,7 +126,7 @@ async function updateUser(userId, fields) {
   return data;
 }
 
-// ─── Token helpers (verification, reset, telegram link) ─────────────────────
+// ─── Token helpers (verification, reset) ─────────────────────────────────────
 
 async function createToken(table, { userId, token, expiresAt }) {
   const { data, error } = await supabase
@@ -178,10 +166,6 @@ const markEmailVerificationTokenUsed = (id) => markTokenUsed('email_verification
 const createPasswordResetToken = (userId, token, expiresAt) => createToken('password_reset_tokens', { userId, token, expiresAt });
 const getPasswordResetToken = (token) => getValidToken('password_reset_tokens', token);
 const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens', id);
-
-const createTelegramLinkToken = (userId, token, expiresAt) => createToken('telegram_link_tokens', { userId, token, expiresAt });
-const getTelegramLinkToken = (token) => getValidToken('telegram_link_tokens', token);
-const markTelegramLinkTokenUsed = (id) => markTokenUsed('telegram_link_tokens', id);
 
 // ─── WhatsApp helpers ────────────────────────────────────────────────────────
 
@@ -1034,7 +1018,6 @@ module.exports = {
   getHouseholdById,
   updateHouseholdSettings,
   createUser,
-  getUserByTelegramId,
   getHouseholdMembers,
   findUserByName,
   getUserByEmail,
@@ -1047,9 +1030,6 @@ module.exports = {
   createPasswordResetToken,
   getPasswordResetToken,
   markPasswordResetTokenUsed,
-  createTelegramLinkToken,
-  getTelegramLinkToken,
-  markTelegramLinkTokenUsed,
   // WhatsApp
   getUserByWhatsAppPhone,
   createWhatsAppVerificationCode,

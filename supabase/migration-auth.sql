@@ -38,16 +38,6 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at  timestamp with time zone DEFAULT now()
 );
 
--- Telegram link tokens
-CREATE TABLE IF NOT EXISTS telegram_link_tokens (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token       text UNIQUE NOT NULL,
-  used        boolean NOT NULL DEFAULT false,
-  expires_at  timestamp with time zone NOT NULL,
-  created_at  timestamp with time zone DEFAULT now()
-);
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(token);

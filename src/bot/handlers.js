@@ -2,8 +2,8 @@
  * Channel-agnostic message handlers.
  *
  * These functions process incoming messages (text, voice, photos) and return
- * response strings. They don't depend on Telegraf or any specific messaging
- * platform — both the Telegram bot and WhatsApp webhook call them.
+ * response strings. They don't depend on any specific messaging
+ * platform — the WhatsApp webhook calls them.
  */
 
 const db = require('../db/queries');

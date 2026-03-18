@@ -22,8 +22,6 @@ create table if not exists users (
   email              text unique,
   password_hash      text,
   email_verified     boolean not null default false,
-  telegram_chat_id   text,
-  telegram_username  text,
   role               text not null default 'member' check (role in ('admin', 'member')),
   avatar_url         text,
   created_at         timestamp with time zone default now()
@@ -82,16 +80,6 @@ create table if not exists email_verification_tokens (
 
 -- password_reset_tokens
 create table if not exists password_reset_tokens (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references users(id) on delete cascade,
-  token       text unique not null,
-  used        boolean not null default false,
-  expires_at  timestamp with time zone not null,
-  created_at  timestamp with time zone default now()
-);
-
--- telegram_link_tokens
-create table if not exists telegram_link_tokens (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references users(id) on delete cascade,
   token       text unique not null,
@@ -162,13 +150,11 @@ create index if not exists idx_shopping_items_completed on shopping_items(househ
 create index if not exists idx_tasks_household on tasks(household_id);
 create index if not exists idx_tasks_due_date on tasks(household_id, due_date, completed);
 create index if not exists idx_users_household on users(household_id);
-create index if not exists idx_users_telegram on users(telegram_chat_id);
 create index if not exists idx_users_email on users(email);
 create index if not exists idx_invites_token on invites(token);
 create index if not exists idx_invites_email on invites(email);
 create index if not exists idx_email_verification_tokens_token on email_verification_tokens(token);
 create index if not exists idx_password_reset_tokens_token on password_reset_tokens(token);
-create index if not exists idx_telegram_link_tokens_token on telegram_link_tokens(token);
 create index if not exists idx_cal_events_household on calendar_events(household_id);
 create index if not exists idx_cal_events_range on calendar_events(household_id, start_time, end_time);
 create unique index if not exists idx_feed_tokens_user on calendar_feed_tokens(user_id, household_id);

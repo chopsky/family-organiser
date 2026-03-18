@@ -71,10 +71,9 @@ function buildWeeklyDigestMessage(user, householdName, completedTasks, completed
 /**
  * Send the weekly digest to all members of one household.
  *
- * @param {object} bot
  * @param {string} householdId
  */
-async function sendWeeklyDigest(bot, householdId) {
+async function sendWeeklyDigest(householdId) {
   const today = new Date().toISOString().split('T')[0];
   const household = await db.getHouseholdById(householdId);
   const members = await db.getHouseholdMembers(householdId);
@@ -103,21 +102,11 @@ async function sendWeeklyDigest(bot, householdId) {
   );
 
   for (const member of members) {
-    const hasTelegram = !!member.telegram_chat_id;
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasTelegram && !hasWhatsApp) continue;
-
-    // Send via Telegram
-    if (hasTelegram) {
-      try {
-        await bot.telegram.sendMessage(member.telegram_chat_id, message, { parse_mode: 'Markdown' });
-      } catch (err) {
-        console.error(`Failed to send digest to ${member.name} via Telegram:`, err.message);
-      }
-    }
+    if (!hasWhatsApp) continue;
 
     // Send via WhatsApp
-    if (hasWhatsApp && whatsapp.isConfigured()) {
+    if (whatsapp.isConfigured()) {
       try {
         await whatsapp.sendTemplate(member.whatsapp_phone, message);
       } catch (err) {

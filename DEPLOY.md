@@ -7,7 +7,7 @@
 | Backend (Node/Express) | Railway | Free tier available |
 | Frontend (React/Vite) | Vercel | Free tier, global CDN |
 | Database | Supabase | Already set up |
-| Telegram bot | Webhook | Registered automatically on start |
+| WhatsApp bot | Twilio webhook | Receives messages via Twilio |
 
 ---
 
@@ -19,12 +19,10 @@
 4. Railway auto-detects the `railway.json` and runs `node src/server.js`.
 5. In **Variables**, add every key from `.env.example`:
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-   - `TELEGRAM_TOKEN`
    - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`
    - `JWT_SECRET` (generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
 6. After the first deploy succeeds, note your Railway URL (e.g. `https://family-organiser.railway.app`).
-7. Add `WEBHOOK_URL=https://family-organiser.railway.app` to Railway variables.
-8. **Redeploy** — the server will call `bot.telegram.setWebhook(...)` automatically on startup.
+7. **Redeploy**.
 
 ---
 
@@ -76,31 +74,12 @@ so no CORS issues and no need to set `VITE_API_URL` locally.
 | `SUPABASE_URL` | ✅ | Supabase project URL |
 | `SUPABASE_ANON_KEY` | ✅ | Supabase publishable (anon) key |
 | `SUPABASE_SERVICE_KEY` | ✅ | Supabase secret (service role) key |
-| `TELEGRAM_TOKEN` | ✅ | Bot token from @BotFather |
 | `ANTHROPIC_API_KEY` | ✅ | Claude API key |
 | `OPENAI_API_KEY` | ✅ | OpenAI key for Whisper transcription |
 | `JWT_SECRET` | ✅ | Random 32-byte hex string |
-| `WEBHOOK_URL` | Production only | Railway backend URL (enables webhook mode) |
+| `WEBHOOK_URL` | Production only | Railway backend URL |
 | `WEB_URL` | Production only | Vercel frontend URL (enables CORS restriction) |
 | `PORT` | ❌ | Defaults to 3000 (Railway sets this automatically) |
 | `DAILY_REMINDER_HOUR` | ❌ | e.g. `08:00` (default) |
 | `WEEKLY_DIGEST_DAY` | ❌ | 0=Sunday (default) |
 
----
-
-## Telegram bot commands (add via @BotFather)
-
-Use BotFather's `/setcommands` to give users a command menu:
-
-```
-start - Welcome and setup
-create - Create a new household
-join - Join an existing household
-list - Show shopping list
-shopping - Show shopping list
-tasks - Show today's tasks
-mytasks - Show tasks assigned to me
-done - Mark a task complete
-settings - Household settings
-help - Show help
-```
