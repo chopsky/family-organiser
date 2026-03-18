@@ -289,6 +289,45 @@ export default function Settings() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
+      {/* My profile */}
+      {(() => {
+        const me = members.find((m) => m.id === user?.id);
+        const avatarColors = {
+          sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white',
+          amber: 'bg-amber text-white', sky: 'bg-sky text-white', rose: 'bg-rose text-white',
+          teal: 'bg-teal text-white', lavender: 'bg-lavender text-white',
+          terracotta: 'bg-terracotta text-white', slate: 'bg-slate text-white',
+        };
+        const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.sage;
+        return (
+          <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+            <h2 className="font-semibold text-bark mb-3">My profile</h2>
+            <div className="flex items-center gap-4">
+              {(me?.avatar_url || user?.avatar_url) ? (
+                <img src={me?.avatar_url || user?.avatar_url} alt={user?.name} className="w-12 h-12 rounded-full object-cover" />
+              ) : (
+                <div className={`w-12 h-12 rounded-full ${ac} flex items-center justify-center font-bold text-lg`}>
+                  {user?.name?.[0]?.toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="font-medium text-bark">{user?.name}</p>
+                {me?.family_role && <p className="text-xs text-cocoa">{me.family_role}</p>}
+              </div>
+              <button
+                onClick={() => navigate('/family')}
+                className="flex items-center gap-1.5 border border-cream-border text-cocoa font-medium px-4 py-2 rounded-xl text-sm hover:bg-oat transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                Edit
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Connect WhatsApp */}
       <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
