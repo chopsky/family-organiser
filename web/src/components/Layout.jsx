@@ -44,6 +44,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [members, setMembers] = useState([]);
   const moreRef = useRef(null);
 
   // Close "More" popover on navigation
@@ -66,6 +67,7 @@ export default function Layout({ children }) {
     if (!user?.id) return;
     api.get('/household')
       .then(({ data }) => {
+        if (data.members) setMembers(data.members);
         const me = data.members?.find(m => m.id === user.id);
         if (me && (
           (me.color_theme && me.color_theme !== user.color_theme) ||
@@ -130,7 +132,21 @@ export default function Layout({ children }) {
 
         {/* Household pill */}
         <div className="mx-4 mb-4 px-3 py-2 bg-plum-light rounded-lg flex items-center gap-2 text-[13px] font-medium text-plum">
-          {household?.name ?? 'My Family'}
+          {members.length > 0 && (
+            <div className="flex -space-x-1.5">
+              {members.map((m) => {
+                const ac = avatarColors[m.color_theme] || avatarColors.orange;
+                return m.avatar_url ? (
+                  <img key={m.id} src={m.avatar_url} alt={m.name} className="w-6 h-6 rounded-full object-cover ring-2 ring-plum-light" />
+                ) : (
+                  <div key={m.id} className={`w-6 h-6 rounded-full ${ac} flex items-center justify-center text-[10px] font-bold ring-2 ring-plum-light`}>
+                    {m.name[0].toUpperCase()}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <span className="truncate">{household?.name ?? 'My Family'}</span>
         </div>
 
         {/* Main nav */}
