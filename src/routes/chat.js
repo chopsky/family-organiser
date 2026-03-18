@@ -51,20 +51,32 @@ async function buildSystemPrompt(householdId, householdName) {
 }
 
 /**
- * Extract note action JSON from assistant response (if present).
- * Returns { cleanContent, noteAction } where noteAction may be null.
+ * Extract all action JSON blocks from assistant response.
+ * Returns { cleanContent, actions[] } where actions may be empty.
  */
-function extractNoteAction(content) {
-  const match = content.match(/```json\s*\n?\s*(\{[\s\S]*?"note_action"[\s\S]*?\})\s*\n?\s*```/);
-  if (!match) return { cleanContent: content.trim(), noteAction: null };
+function extractActions(content) {
+  const actionRegex = /```json\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```/g;
+  const actions = [];
+  let cleanContent = content;
+  let m;
 
-  try {
-    const noteAction = JSON.parse(match[1]);
-    const cleanContent = content.replace(match[0], '').trim();
-    return { cleanContent, noteAction };
-  } catch {
-    return { cleanContent: content.trim(), noteAction: null };
+  while ((m = actionRegex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (parsed.action) {
+        actions.push(parsed);
+      } else if (parsed.note_action) {
+        // Backwards compat with old format
+        if (parsed.note_action === 'save') actions.push({ action: 'save_note', key: parsed.key, value: parsed.value });
+        else if (parsed.note_action === 'delete') actions.push({ action: 'delete_note', key: parsed.key });
+      }
+      cleanContent = cleanContent.replace(m[0], '');
+    } catch {
+      // Skip malformed JSON
+    }
   }
+
+  return { cleanContent: cleanContent.trim(), actions };
 }
 
 /**
@@ -132,18 +144,55 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     const textBlock = response.content.find(b => b.type === 'text');
     if (!textBlock) throw new Error('No text in AI response');
 
-    // Extract and process any note actions
-    const { cleanContent, noteAction } = extractNoteAction(textBlock.text);
+    // Extract and process all actions
+    const { cleanContent, actions } = extractActions(textBlock.text);
+    const members = await db.getHouseholdMembers(req.householdId);
+    const executedActions = [];
 
-    if (noteAction) {
+    for (const act of actions) {
       try {
-        if (noteAction.note_action === 'save' && noteAction.key && noteAction.value) {
-          await db.upsertHouseholdNote(req.householdId, noteAction.key, noteAction.value, req.user.id);
-        } else if (noteAction.note_action === 'delete' && noteAction.key) {
-          await db.deleteHouseholdNote(req.householdId, noteAction.key);
+        if (act.action === 'save_note' && act.key && act.value) {
+          await db.upsertHouseholdNote(req.householdId, act.key, act.value, req.user.id);
+          executedActions.push({ type: 'save_note', key: act.key });
+
+        } else if (act.action === 'delete_note' && act.key) {
+          await db.deleteHouseholdNote(req.householdId, act.key);
+          executedActions.push({ type: 'delete_note', key: act.key });
+
+        } else if (act.action === 'create_event') {
+          const assignee = act.assigned_to ? members.find(m => m.name.toLowerCase() === act.assigned_to.toLowerCase()) : null;
+          const startTime = act.all_day
+            ? `${act.date}T00:00:00Z`
+            : `${act.date}T${act.start_time || '09:00'}:00Z`;
+          const endTime = act.all_day
+            ? `${act.date}T23:59:59Z`
+            : `${act.date}T${act.end_time || act.start_time || '10:00'}:00Z`;
+
+          await db.createCalendarEvent(req.householdId, {
+            title: act.title,
+            start_time: startTime,
+            end_time: endTime,
+            all_day: !!act.all_day,
+            assigned_to: assignee?.id || null,
+            assigned_to_name: assignee?.name || null,
+            color: assignee?.color_theme || 'lavender',
+          }, req.user.id);
+          executedActions.push({ type: 'create_event', title: act.title });
+
+        } else if (act.action === 'add_shopping' && act.items?.length) {
+          await db.addShoppingItems(req.householdId, act.items, req.user.id);
+          executedActions.push({ type: 'add_shopping', count: act.items.length });
+
+        } else if (act.action === 'create_task') {
+          await db.addTasks(req.householdId, [{
+            title: act.title,
+            assigned_to_name: act.assigned_to || null,
+            due_date: act.due_date || null,
+          }], req.user.id, members);
+          executedActions.push({ type: 'create_task', title: act.title });
         }
-      } catch (noteErr) {
-        console.error('Note action failed (non-fatal):', noteErr.message);
+      } catch (actionErr) {
+        console.error(`Action ${act.action} failed (non-fatal):`, actionErr.message);
       }
     }
 
@@ -153,7 +202,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     return res.json({
       message: cleanContent,
-      note_action: noteAction || undefined,
+      actions: executedActions.length > 0 ? executedActions : undefined,
     });
   } catch (err) {
     console.error('POST /api/chat error:', err);
