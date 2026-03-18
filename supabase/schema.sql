@@ -157,6 +157,16 @@ create table if not exists household_notes (
   unique(household_id, key)
 );
 
+-- chat_messages (AI assistant conversation history)
+create table if not exists chat_messages (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null references households(id) on delete cascade,
+  user_id       uuid not null references users(id) on delete cascade,
+  role          text not null check (role in ('user', 'assistant')),
+  content       text not null,
+  created_at    timestamp with time zone default now()
+);
+
 -- Indexes for common query patterns
 create index if not exists idx_shopping_items_household on shopping_items(household_id);
 create index if not exists idx_shopping_items_completed on shopping_items(household_id, completed);
@@ -169,6 +179,7 @@ create index if not exists idx_invites_email on invites(email);
 create index if not exists idx_email_verification_tokens_token on email_verification_tokens(token);
 create index if not exists idx_password_reset_tokens_token on password_reset_tokens(token);
 create index if not exists idx_notes_household on household_notes(household_id);
+create index if not exists idx_chat_messages_user on chat_messages(user_id, created_at desc);
 create index if not exists idx_cal_events_household on calendar_events(household_id);
 create index if not exists idx_cal_events_range on calendar_events(household_id, start_time, end_time);
 create unique index if not exists idx_feed_tokens_user on calendar_feed_tokens(user_id, household_id);

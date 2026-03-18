@@ -201,6 +201,37 @@ async function deleteHouseholdNote(householdId, key) {
   if (error) throw error;
 }
 
+// ─── Chat message helpers ────────────────────────────────────────────────────
+
+async function getChatHistory(userId, limit = 50) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select()
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+async function saveChatMessage(householdId, userId, role, content) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({ household_id: householdId, user_id: userId, role, content })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function clearChatHistory(userId) {
+  const { error } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 // ─── WhatsApp helpers ────────────────────────────────────────────────────────
 
 async function getUserByWhatsAppPhone(phone) {
@@ -1136,5 +1167,9 @@ module.exports = {
   getSyncMappingsBySubscription,
   createSyncMappingWithSubscription,
   createCalendarEventFromSync,
+  // Chat
+  getChatHistory,
+  saveChatMessage,
+  clearChatHistory,
   getSupabase: () => supabase,
 };

@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore } from './Icons';
+import ChatWidget from './ChatWidget';
 
 const mainNav = [
   { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
@@ -238,6 +239,8 @@ export default function Layout({ children }) {
           )}
         </div>
       </nav>
+
+      <ChatWidget />
     </div>
   );
 }
