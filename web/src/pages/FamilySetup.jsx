@@ -107,6 +107,9 @@ export default function FamilySetup() {
     if (!profileName.trim()) { setProfileError('Name is required.'); return; }
     setProfileError('');
     setSavingProfile(true);
+    // Capture target member ID immediately (before any async/state changes)
+    const targetId = editingMember?.id;
+    const isEditingSelf = !targetId || targetId === user?.id;
     try {
       const payload = {
         name: profileName.trim(),
@@ -116,13 +119,13 @@ export default function FamilySetup() {
         reminder_time: profileReminderTime || null,
       };
       // When admin edits another member, include target user_id
-      if (editingMember && editingMember.id !== user?.id) {
-        payload.user_id = editingMember.id;
+      if (!isEditingSelf) {
+        payload.user_id = targetId;
       }
       await api.patch('/household/profile', payload);
       await loadMembers();
       // Only update auth context if editing own profile
-      if (!editingMember || editingMember.id === user?.id) {
+      if (isEditingSelf) {
         const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
         login({ token, user: updatedUser, household });
       }
