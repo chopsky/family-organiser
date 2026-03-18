@@ -82,7 +82,7 @@ export default function Dashboard() {
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-semibold text-bark">
-          Hello, {user?.name}!
+          Hey, {user?.name}! 👋
         </h1>
         <p className="text-cocoa text-sm mt-1">
           {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}

@@ -163,12 +163,7 @@ export default function Layout({ children }) {
         {/* User footer */}
         <div className="px-4 py-4 border-t border-light-grey flex items-center gap-2.5">
           {renderAvatar('w-8 h-8', 'text-xs')}
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
-            <button onClick={handleLogout} className="text-[11px] text-warm-grey hover:text-plum transition-colors">
-              Sign out
-            </button>
-          </div>
+          <p className="flex-1 min-w-0 text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
         </div>
       </aside>
 
