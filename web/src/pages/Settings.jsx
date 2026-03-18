@@ -374,7 +374,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <h1 className="text-2xl font-semibold text-bark flex items-center gap-2"><IconSettings className="h-6 w-6" /> Settings</h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />

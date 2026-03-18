@@ -184,7 +184,7 @@ export default function Layout({ children }) {
 
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60">
-        <div className="max-w-3xl mx-auto px-5 md:px-8 py-6 md:py-7 pb-24 md:pb-7">
+        <div className="px-5 md:px-8 py-6 md:py-7 pb-24 md:pb-7">
           {children}
         </div>
       </main>
