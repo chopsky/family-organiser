@@ -9,6 +9,7 @@ async function getDAVClient() {
 }
 
 const { randomUUID } = require('crypto');
+const { RRule, rrulestr } = require('rrule');
 
 const CALDAV_SERVER_URL = 'https://caldav.icloud.com';
 
@@ -93,7 +94,71 @@ function parseVEvent(icalData) {
     start_time: parseICalDate(dtstart),
     end_time: dtend ? parseICalDate(dtend) : parseICalDate(dtstart),
     all_day: allDay,
+    rrule: getValue('RRULE') || null,
+    _rawDtstart: dtstart,
   };
+}
+
+/**
+ * Expand a recurring event into individual instances.
+ * Returns an array of eventData objects (one per occurrence).
+ * Window: 6 months in past → 12 months in future (matches Google/Microsoft).
+ */
+function expandRecurrence(eventData, externalEventId) {
+  if (!eventData.rrule) return null;
+
+  try {
+    const windowStart = new Date();
+    windowStart.setMonth(windowStart.getMonth() - 6);
+    const windowEnd = new Date();
+    windowEnd.setMonth(windowEnd.getMonth() + 12);
+
+    // Parse the original start date to get the base time
+    const rawDt = eventData._rawDtstart;
+    let dtDate;
+    if (rawDt.length === 8) {
+      dtDate = new Date(`${rawDt.substring(0,4)}-${rawDt.substring(4,6)}-${rawDt.substring(6,8)}T00:00:00Z`);
+    } else {
+      const y = rawDt.substring(0,4), mo = rawDt.substring(4,6), d = rawDt.substring(6,8);
+      const h = rawDt.substring(9,11), mi = rawDt.substring(11,13), s = rawDt.substring(13,15);
+      dtDate = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`);
+    }
+
+    // Calculate duration between start and end
+    const startMs = new Date(eventData.start_time + (eventData.all_day ? 'T00:00:00Z' : '')).getTime();
+    const endMs = new Date(eventData.end_time + (eventData.all_day ? 'T00:00:00Z' : '')).getTime();
+    const durationMs = endMs - startMs;
+
+    // Build RRule from the RRULE string
+    const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`);
+    const occurrences = rule.between(windowStart, windowEnd, true);
+
+    return occurrences.map((occDate, idx) => {
+      const occEnd = new Date(occDate.getTime() + durationMs);
+
+      const formatDate = (d) => {
+        if (eventData.all_day) {
+          return d.toISOString().split('T')[0];
+        }
+        return d.toISOString().replace('.000Z', 'Z');
+      };
+
+      return {
+        externalEventId: `${externalEventId}_${occDate.toISOString().split('T')[0]}`,
+        eventData: {
+          title: eventData.title,
+          description: eventData.description,
+          location: eventData.location,
+          start_time: formatDate(occDate),
+          end_time: formatDate(occEnd),
+          all_day: eventData.all_day,
+        },
+      };
+    });
+  } catch (err) {
+    console.error('Failed to expand RRULE for event:', externalEventId, err.message);
+    return null;
+  }
 }
 
 /**
@@ -249,25 +314,56 @@ async function pullChanges(connection, calendarUrl) {
     if (!externalEventId) continue;
 
     seenExternalIds.add(externalEventId);
-    const existing = existingByExternalId.get(externalEventId);
     const currentEtag = obj.etag;
+    const eventData = parseVEvent(icalData);
 
-    if (!existing) {
-      // New event not in our mappings
-      changes.push({
-        externalEventId,
-        action: 'upsert',
-        eventData: parseVEvent(icalData),
-        etag: currentEtag,
-      });
-    } else if (existing.etag !== currentEtag) {
-      // Etag changed — event was modified
-      changes.push({
-        externalEventId,
-        action: 'upsert',
-        eventData: parseVEvent(icalData),
-        etag: currentEtag,
-      });
+    // Expand recurring events
+    const expanded = expandRecurrence(eventData, externalEventId);
+    if (expanded && expanded.length > 0) {
+      for (const instance of expanded) {
+        seenExternalIds.add(instance.externalEventId);
+        const existingInstance = existingByExternalId.get(instance.externalEventId);
+        if (!existingInstance || existingInstance.etag !== currentEtag) {
+          changes.push({
+            externalEventId: instance.externalEventId,
+            action: 'upsert',
+            eventData: instance.eventData,
+            etag: currentEtag,
+          });
+        }
+      }
+    } else {
+      // Non-recurring event
+      const existing = existingByExternalId.get(externalEventId);
+      if (!existing) {
+        changes.push({
+          externalEventId,
+          action: 'upsert',
+          eventData: {
+            title: eventData.title,
+            description: eventData.description,
+            location: eventData.location,
+            start_time: eventData.start_time,
+            end_time: eventData.end_time,
+            all_day: eventData.all_day,
+          },
+          etag: currentEtag,
+        });
+      } else if (existing.etag !== currentEtag) {
+        changes.push({
+          externalEventId,
+          action: 'upsert',
+          eventData: {
+            title: eventData.title,
+            description: eventData.description,
+            location: eventData.location,
+            start_time: eventData.start_time,
+            end_time: eventData.end_time,
+            all_day: eventData.all_day,
+          },
+          etag: currentEtag,
+        });
+      }
     }
   }
 
@@ -407,12 +503,35 @@ async function pullAllEvents(connection, calendarUrl) {
     const externalEventId = uidMatch ? uidMatch[1].trim() : null;
     if (!externalEventId) continue;
 
-    events.push({
-      externalEventId,
-      action: 'upsert',
-      eventData: parseVEvent(icalData),
-      etag: obj.etag,
-    });
+    const eventData = parseVEvent(icalData);
+
+    // Expand recurring events into individual instances
+    const expanded = expandRecurrence(eventData, externalEventId);
+    if (expanded && expanded.length > 0) {
+      for (const instance of expanded) {
+        events.push({
+          externalEventId: instance.externalEventId,
+          action: 'upsert',
+          eventData: instance.eventData,
+          etag: obj.etag,
+        });
+      }
+    } else {
+      // Non-recurring event or expansion failed — import as single event
+      events.push({
+        externalEventId,
+        action: 'upsert',
+        eventData: {
+          title: eventData.title,
+          description: eventData.description,
+          location: eventData.location,
+          start_time: eventData.start_time,
+          end_time: eventData.end_time,
+          all_day: eventData.all_day,
+        },
+        etag: obj.etag,
+      });
+    }
   }
 
   return events;
