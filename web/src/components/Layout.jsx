@@ -1,16 +1,33 @@
-import { useEffect } from 'react';
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore } from './Icons';
 
-const nav = [
+const mainNav = [
   { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
   { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
-  { to: '/settings',   label: 'Settings',  Icon: IconSettings  },
+];
+
+const bottomNav = [
+  { to: '/family',    label: 'Family',    Icon: IconUsers    },
+  { to: '/settings',  label: 'Settings',  Icon: IconSettings  },
+];
+
+const mobileNav = [
+  { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
+  { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
+  { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
+  { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
+];
+
+const moreNav = [
+  { to: '/family',    label: 'Family Setup',     Icon: IconUsers    },
+  { to: '/receipt',   label: 'Receipt Scanner',   Icon: IconCamera   },
+  { to: '/settings',  label: 'Settings',          Icon: IconSettings },
 ];
 
 const avatarColors = {
@@ -25,6 +42,24 @@ const avatarColors = {
 export default function Layout({ children }) {
   const { household, user, token, login, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef(null);
+
+  // Close "More" popover on navigation
+  useEffect(() => { setMoreOpen(false); }, [location.pathname]);
+
+  // Close "More" popover on outside click
+  useEffect(() => {
+    if (!moreOpen) return;
+    function handleClick(e) {
+      if (moreRef.current && !moreRef.current.contains(e.target)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [moreOpen]);
 
   // Sync user profile (e.g. color_theme, avatar_url) from backend on mount
   useEffect(() => {
@@ -60,6 +95,27 @@ export default function Layout({ children }) {
     );
   }
 
+  const isMoreActive = moreNav.some(n => location.pathname === n.to);
+
+  function renderNavLink({ to, label, Icon }) {
+    return (
+      <NavLink
+        key={to}
+        to={to}
+        className={({ isActive }) =>
+          `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+            isActive
+              ? 'bg-plum-light text-plum'
+              : 'text-warm-grey hover:bg-cream hover:text-charcoal'
+          }`
+        }
+      >
+        <Icon className="h-5 w-5" />
+        {label}
+      </NavLink>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-cream flex flex-col md:flex-row">
       {/* ── Desktop Sidebar ── */}
@@ -77,24 +133,15 @@ export default function Layout({ children }) {
           {household?.name ?? 'My Family'}
         </div>
 
-        {/* Nav */}
+        {/* Main nav */}
         <nav className="flex-1 px-3 flex flex-col gap-0.5">
-          {nav.map(({ to, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                  isActive
-                    ? 'bg-plum-light text-plum'
-                    : 'text-warm-grey hover:bg-cream hover:text-charcoal'
-                }`
-              }
-            >
-              <Icon className="h-5 w-5" />
-              {label}
-            </NavLink>
-          ))}
+          {mainNav.map(renderNavLink)}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Bottom nav items */}
+          {bottomNav.map(renderNavLink)}
         </nav>
 
         {/* User footer */}
@@ -106,28 +153,20 @@ export default function Layout({ children }) {
               Sign out
             </button>
           </div>
-          <NavLink to="/settings" className="w-7 h-7 rounded-lg hover:bg-cream flex items-center justify-center text-warm-grey hover:text-charcoal transition-colors">
-            <IconSettings className="h-4 w-4" />
-          </NavLink>
         </div>
       </aside>
 
       {/* ── Mobile Top Bar ── */}
       <header className="md:hidden bg-cream border-b border-light-grey z-30">
         <div className="px-4 py-3 flex items-center gap-3">
-          {/* Logo — left */}
           <Link to="/dashboard" className="shrink-0">
             <img src="/anora-logomark-colour.png" alt="Anora" className="h-7" />
           </Link>
-
-          {/* Household name — centered */}
           <div className="flex-1 min-w-0 text-center">
             <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">
               {household?.name ?? 'Nestd'}
             </Link>
           </div>
-
-          {/* Profile circle — right */}
           <Link to="/settings" className="shrink-0">
             {renderAvatar('w-8 h-8', 'text-xs')}
           </Link>
@@ -143,7 +182,7 @@ export default function Layout({ children }) {
 
       {/* ── Mobile Bottom Tab Bar ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 h-[82px] border-t border-light-grey flex items-start justify-around pt-2.5" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
-        {nav.map(({ to, label, Icon }) => (
+        {mobileNav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -157,6 +196,36 @@ export default function Layout({ children }) {
             <span className="text-[10px] font-semibold">{label}</span>
           </NavLink>
         ))}
+
+        {/* More button + popover */}
+        <div ref={moreRef} className="relative flex flex-col items-center gap-1">
+          <button
+            onClick={() => setMoreOpen(v => !v)}
+            className={`flex flex-col items-center gap-1 ${isMoreActive || moreOpen ? 'text-plum' : 'text-warm-grey'}`}
+          >
+            <IconMore className="h-[22px] w-[22px]" />
+            <span className="text-[10px] font-semibold">More</span>
+          </button>
+
+          {moreOpen && (
+            <div className="absolute bottom-full mb-2 right-0 bg-white rounded-2xl shadow-lg border border-light-grey py-2 min-w-[180px] z-50">
+              {moreNav.map(({ to, label, Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
+                      isActive ? 'text-plum bg-plum-light' : 'text-charcoal hover:bg-cream'
+                    }`
+                  }
+                >
+                  <Icon className="h-5 w-5" />
+                  {label}
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
     </div>
   );
