@@ -252,95 +252,105 @@ export default function Tasks() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* Add / Edit task form */}
+      {/* Add / Edit task modal */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 space-y-3">
-          <h2 className="font-semibold text-bark">{editingTask ? 'Edit task' : 'New task'}</h2>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Task title"
-            required
-            className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add a description... (optional)"
-            rows={2}
-            className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-cocoa mb-1 block">Due date</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeForm}>
+          <div className="absolute inset-0 bg-black/40" />
+          <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()} className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-semibold text-bark text-lg">{editingTask ? 'Edit task' : 'New task'}</h2>
+              <button type="button" onClick={closeForm} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
-            <div>
-              <label className="text-xs text-cocoa mb-1 block">Time (optional)</label>
-              <input
-                type="time"
-                value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Task title"
+              required
+              className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add a description... (optional)"
+              rows={2}
+              className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Due date</label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Time (optional)</label>
+                <input
+                  type="time"
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Assign to</label>
+                <select
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Everyone</option>
+                  {members.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Repeats</label>
+                <select
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {RECURRENCES.map((r) => <option key={r} value={r}>{r || 'Never'}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-cocoa mb-1 block">Notification</label>
+                <select
+                  value={notification}
+                  onChange={(e) => setNotification(e.target.value)}
+                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {NOTIFICATION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-cocoa mb-1 block">Assign to</label>
-              <select
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={closeForm}
+                className="text-sm text-cocoa hover:text-bark px-3 py-2"
               >
-                <option value="">Everyone</option>
-                {members.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-cocoa mb-1 block">Repeats</label>
-              <select
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={adding || !title.trim()}
+                className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
               >
-                {RECURRENCES.map((r) => <option key={r} value={r}>{r || 'Never'}</option>)}
-              </select>
+                {adding ? (editingTask ? 'Saving...' : 'Adding...') : (editingTask ? 'Save changes' : 'Add task')}
+              </button>
             </div>
-            <div>
-              <label className="text-xs text-cocoa mb-1 block">Notification</label>
-              <select
-                value={notification}
-                onChange={(e) => setNotification(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                {NOTIFICATION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={closeForm}
-              className="text-sm text-cocoa hover:text-bark px-3 py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={adding || !title.trim()}
-              className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
-            >
-              {adding ? (editingTask ? 'Saving...' : 'Adding...') : (editingTask ? 'Save changes' : 'Add task')}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
       {loading ? <Spinner /> : tasks.length === 0 ? (

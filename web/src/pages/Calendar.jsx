@@ -936,13 +936,22 @@ export default function Calendar() {
         </>
       )}
 
-      {/* ── Event Form ───────────────────────────────────── */}
+      {/* ── Event Form Modal ───────────────────────────────────── */}
       {showForm && (
-        <div ref={formRef} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
-          <h2 className="text-lg font-semibold text-bark mb-4">
-            {editingEvent ? 'Edit Event' : 'New Event'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setShowForm(false); resetForm(); }}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div ref={formRef} onClick={(e) => e.stopPropagation()} className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-bark">
+                {editingEvent ? 'Edit Event' : 'New Event'}
+              </h2>
+              <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
             {/* Title */}
             <div>
               <label className="text-xs text-cocoa mb-1 block">Title *</label>
@@ -1102,14 +1111,24 @@ export default function Calendar() {
               )}
             </div>
           </form>
+          </div>
         </div>
       )}
 
-      {/* ── Task Edit Form ────────────────────────────────── */}
+      {/* ── Task Edit Form Modal ────────────────────────────────── */}
       {showTaskForm && editingTask && (
-        <div ref={taskFormRef} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
-          <h2 className="text-lg font-semibold text-bark mb-4">Edit Task</h2>
-          <form onSubmit={handleTaskSubmit} className="space-y-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeTaskForm}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div ref={taskFormRef} onClick={(e) => e.stopPropagation()} className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-bark">Edit Task</h2>
+              <button type="button" onClick={closeTaskForm} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleTaskSubmit} className="space-y-3">
             <div>
               <label className="text-xs text-cocoa mb-1 block">Title *</label>
               <input
@@ -1201,6 +1220,7 @@ export default function Calendar() {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
     </div>
