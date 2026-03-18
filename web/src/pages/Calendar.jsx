@@ -698,7 +698,7 @@ export default function Calendar() {
   // ── Render ─────────────────────────────────────────────
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="max-w-3xl mx-auto space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
 
       {/* ── Header ──────────────────────────────────────────── */}
