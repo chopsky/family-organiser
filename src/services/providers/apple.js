@@ -87,12 +87,25 @@ function parseVEvent(icalData) {
     return `${year}-${month}-${day}T${hour}:${min}:${sec}Z`;
   };
 
+  let endTime = dtend ? parseICalDate(dtend) : parseICalDate(dtstart);
+
+  // iCalendar all-day events use an exclusive end date (DTEND is the day AFTER the event).
+  // Subtract one day so the app doesn't show the event bleeding into the next day.
+  if (allDay && dtend && dtend.length === 8) {
+    const d = new Date(endTime + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() - 1);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    endTime = `${y}-${m}-${dd}`;
+  }
+
   return {
     title: getValue('SUMMARY'),
     description: getValue('DESCRIPTION'),
     location: getValue('LOCATION'),
     start_time: parseICalDate(dtstart),
-    end_time: dtend ? parseICalDate(dtend) : parseICalDate(dtstart),
+    end_time: endTime,
     all_day: allDay,
     rrule: getValue('RRULE') || null,
     _rawDtstart: dtstart,
