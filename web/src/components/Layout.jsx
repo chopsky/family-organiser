@@ -66,7 +66,7 @@ export default function Layout({ children }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [moreOpen]);
 
-  // Sync user profile (e.g. color_theme, avatar_url) from backend on mount
+  // Sync user profile and members on mount and route changes
   useEffect(() => {
     if (!user?.id) return;
     api.get('/household')
@@ -81,7 +81,7 @@ export default function Layout({ children }) {
         }
       })
       .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleLogout() {
     logout();
