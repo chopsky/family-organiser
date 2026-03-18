@@ -798,9 +798,11 @@ export default function Calendar() {
                         {dayEvents.slice(0, maxShow).map(ev => (
                           <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-primary'}`} title={ev.title} />
                         ))}
-                        {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => (
-                          <span key={tk.id} className="w-2 h-2 rounded-full bg-warn" title={tk.title} />
-                        ))}
+                        {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => {
+                          const taskMember = members.find(m => m.name === tk.assigned_to_name);
+                          const dotColor = taskMember?.color_theme ? `bg-${taskMember.color_theme}` : 'bg-warn';
+                          return <span key={tk.id} className={`w-2 h-2 rounded-full ${dotColor}`} title={tk.title} />;
+                        })}
                       </div>
                       {totalItems > maxShow && (
                         <span className="text-[10px] text-cocoa leading-none">+{totalItems - maxShow}</span>

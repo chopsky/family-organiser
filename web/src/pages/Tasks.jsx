@@ -395,8 +395,8 @@ export default function Tasks() {
                             dueToday      ? 'text-warn' : 'text-cocoa'
                           }`}>
                             {task.completed ? 'Done' :
-                             overdue > 0   ? <><span className="w-2 h-2 rounded-full bg-[#d76353] inline-block" /> {overdue}d overdue</> :
-                             dueToday      ? <><span className="w-2 h-2 rounded-full bg-[#e5ad57] inline-block" /> Due today</> :
+                             overdue > 0   ? <>{overdue}d overdue</> :
+                             dueToday      ? <>Due today</> :
                              <><IconCalendar className="h-3 w-3" /> {task.due_date}</>}
                             {task.due_time && !task.completed && (
                               <span className="ml-1">at {task.due_time.substring(0, 5)}</span>
