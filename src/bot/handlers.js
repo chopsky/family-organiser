@@ -118,6 +118,39 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || "I couldn't find that in my notes.", actions };
   }
 
+  // Handle calendar event creation
+  if (result.intent === 'create_event' && result.calendar_event) {
+    try {
+      const ev = result.calendar_event;
+      const assignee = ev.assigned_to_name
+        ? household.members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+        : null;
+
+      const startTime = ev.all_day
+        ? `${ev.date}T00:00:00Z`
+        : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+      const endTime = ev.all_day
+        ? `${ev.date}T23:59:59Z`
+        : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+
+      await db.createCalendarEvent(household.id, {
+        title: ev.title,
+        start_time: startTime,
+        end_time: endTime,
+        all_day: !!ev.all_day,
+        assigned_to: assignee?.id || null,
+        assigned_to_name: assignee?.name || ev.assigned_to_name || null,
+        color: assignee?.color_theme || 'lavender',
+      }, user.id);
+
+      actions.eventsAdded = [ev.title];
+    } catch (eventErr) {
+      console.error('Calendar event creation failed:', eventErr.message);
+      return { response: `⚠️ I understood the event but couldn't save it: ${eventErr.message}`, actions };
+    }
+    return { response: result.response_message || '📅 Event added! ✅', actions };
+  }
+
   // Handle general chat — just return the AI's conversational response
   if (result.intent === 'chat') {
     return { response: result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!", actions };
@@ -182,6 +215,9 @@ function buildBroadcastMessage(userName, actions) {
   }
   if (actions.tasksCompleted.length) {
     lines.push(`✅ ${userName} completed: ${actions.tasksCompleted.join(', ')}`);
+  }
+  if (actions.eventsAdded?.length) {
+    lines.push(`📅 ${userName} added event: ${actions.eventsAdded.join(', ')}`);
   }
 
   return lines.length ? lines.join('\n') : null;

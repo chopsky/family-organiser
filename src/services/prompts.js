@@ -21,9 +21,17 @@ INTENT DETECTION:
 - "mixed": A combination of add/remove operations
 - "note_save": User wants you to remember/save something (e.g. "remember our wifi password is ABC123", "save the alarm code as 4567", "our vet's number is 012 345 6789"). Extract the key (what it is) and value (the info to save).
 - "note_recall": User is asking about something that IS in the saved household notes above. Look up the answer from the notes and include it in response_message.
+- "create_event": User wants to add a calendar event (e.g. "add dentist on Monday at 10am", "schedule Logan's tennis for Saturday 5pm", "put anniversary on 20 March"). Extract event details into the "calendar_event" field.
 - "chat": Any general question, conversation, or request that doesn't match the above. This includes: recipes, advice, general knowledge, greetings, or questions about things NOT in the saved notes. Answer helpfully and conversationally.
 
 IMPORTANT: If a user asks about something and the answer IS in the saved household notes, use "note_recall" NOT "chat". If the answer is NOT in the notes, use "chat".
+
+CALENDAR EVENT RULES:
+- Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), and assigned_to_name
+- Resolve relative dates: "Monday", "next Saturday", "tomorrow" → actual YYYY-MM-DD
+- assigned_to_name: exact name from member list, or null
+- For events with no specific time, set all_day to true
+- Default end_time to 1 hour after start_time if not specified
 
 SHOPPING ITEM RULES:
 - Infer category from context: groceries | clothing | household | school | pets | party | gifts | other
@@ -50,7 +58,7 @@ RESPONSE MESSAGE:
 
 Respond only with valid JSON matching this schema:
 {
-  "intent": "add" | "remove" | "query_list" | "query_tasks" | "mixed" | "note_save" | "note_recall" | "chat",
+  "intent": "add" | "remove" | "query_list" | "query_tasks" | "mixed" | "note_save" | "note_recall" | "create_event" | "chat",
   "shopping_items": [
     {
       "item": string,
@@ -69,6 +77,14 @@ Respond only with valid JSON matching this schema:
       "action": "add" | "complete"
     }
   ],
+  "calendar_event": {
+    "title": string,
+    "date": "YYYY-MM-DD",
+    "start_time": "HH:MM" | null,
+    "end_time": "HH:MM" | null,
+    "all_day": boolean,
+    "assigned_to_name": string | null
+  } | null,
   "note": {
     "key": string,
     "value": string | null,
