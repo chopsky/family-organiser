@@ -768,18 +768,20 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
-                <input
-                  type="time"
-                  value={profileReminderTime}
-                  onChange={(e) => setProfileReminderTime(e.target.value)}
-                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
-                />
-                <p className="text-xs text-cocoa mt-1">
-                  {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
-                </p>
-              </div>
+              {editingMember?.member_type !== 'dependent' && (
+                <div>
+                  <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
+                  <input
+                    type="time"
+                    value={profileReminderTime}
+                    onChange={(e) => setProfileReminderTime(e.target.value)}
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  />
+                  <p className="text-xs text-cocoa mt-1">
+                    {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">
