@@ -739,7 +739,7 @@ export default function Calendar() {
       <div className="flex items-center justify-center gap-2 flex-wrap">
         {[
           { key: 'events', label: 'Events', color: 'bg-blue-500' },
-          { key: 'tasks', label: 'Tasks', color: 'bg-orange-400' },
+          { key: 'tasks', label: 'Tasks', color: 'bg-plum' },
           { key: 'birthdays', label: 'Birthdays', color: 'bg-purple-500' },
           { key: 'holidays', label: 'Holidays', color: 'bg-red-500' },
         ].map(({ key, label, color }) => {
@@ -822,8 +822,8 @@ export default function Calendar() {
                         ))}
                         {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => {
                           const taskMember = members.find(m => m.name === tk.assigned_to_name);
-                          const dotColor = taskMember?.color_theme ? `bg-${taskMember.color_theme}` : 'bg-warn';
-                          return <span key={tk.id} className={`w-2 h-2 rounded-full ${dotColor}`} title={tk.title} />;
+                          const taskColor = EVENT_COLORS[taskMember?.color_theme]?.dot || EVENT_COLORS.lavender.dot;
+                          return <span key={tk.id} className={`w-2 h-2 rounded-full ${taskColor}`} title={tk.title} />;
                         })}
                       </div>
                       {totalItems > maxShow && (
