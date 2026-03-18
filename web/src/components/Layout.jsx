@@ -171,7 +171,7 @@ export default function Layout({ children }) {
       <header className="md:hidden bg-cream border-b border-light-grey z-30">
         <div className="px-4 py-3 flex items-center gap-3">
           <Link to="/dashboard" className="shrink-0">
-            <img src="/anora-logomark-colour.png" alt="Anora" className="h-7" />
+            <img src="/anora-logomark-colour.png" alt="Nestd" className="h-7" />
           </Link>
           <div className="flex-1 min-w-0 text-center">
             <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">

@@ -32,7 +32,7 @@ export default function SetupHousehold() {
     <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/anora-logomark-colour.png" alt="Anora" className="h-16 mx-auto mb-4 rounded-2xl" />
+          <img src="/anora-logomark-colour.png" alt="Nestd" className="h-16 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-2xl font-semibold text-bark">Welcome to Anora!</h1>
           <p className="text-cocoa mt-2">Create your household to get started.</p>
         </div>

@@ -1,15 +1,15 @@
 {
-  "name": "Anora",
-  "short_name": "Anora",
-  "description": "Shopping lists, tasks and reminders — together.",
+  "name": "Nestd",
+  "short_name": "Nestd",
+  "description": "Family organiser for modern households.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFBF5",
-  "theme_color": "#F97316",
+  "background_color": "#FBF8F3",
+  "theme_color": "#6B3FA0",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/anora-favicon.png",
+      "src": "/Anora-favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
