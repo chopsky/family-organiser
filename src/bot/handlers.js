@@ -90,10 +90,19 @@ async function handleTextMessage(text, user, household) {
     tasksCompleted: [],
   };
 
-  // Handle query intent — show the shopping list
-  if (result.intent === 'query') {
+  // Handle specific query intents
+  if (result.intent === 'query_list') {
     const listResponse = await handleList(user, household);
     return { response: listResponse, actions };
+  }
+  if (result.intent === 'query_tasks') {
+    const taskResponse = await handleTasks(user, household);
+    return { response: taskResponse, actions };
+  }
+
+  // Handle general chat — just return the AI's conversational response
+  if (result.intent === 'chat') {
+    return { response: result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!", actions };
   }
 
   // Handle shopping items
