@@ -55,6 +55,7 @@ export default function Settings() {
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('orange');
+  const [profileReminderTime, setProfileReminderTime] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -119,6 +120,7 @@ export default function Settings() {
     setProfileRole(member.family_role || '');
     setProfileBirthday(member.birthday || '');
     setProfileColor(member.color_theme || 'orange');
+    setProfileReminderTime(member.reminder_time ? member.reminder_time.substring(0, 5) : '');
     setProfileAvatar(member.avatar_url || null);
   }
 
@@ -166,6 +168,7 @@ export default function Settings() {
         family_role: profileRole.trim(),
         birthday: profileBirthday || null,
         color_theme: profileColor,
+        reminder_time: profileReminderTime || null,
       });
       await loadMembers();
       // Update auth context so header avatar reflects changes immediately
@@ -1019,6 +1022,19 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
+                <input
+                  type="time"
+                  value={profileReminderTime}
+                  onChange={(e) => setProfileReminderTime(e.target.value)}
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                />
+                <p className="text-xs text-cocoa mt-1">
+                  {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
+                </p>
               </div>
             </div>
 

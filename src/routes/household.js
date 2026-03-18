@@ -67,11 +67,11 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
 
 /**
  * PATCH /api/household/profile
- * Update the current user's profile (name, family_role, birthday, color_theme).
+ * Update the current user's profile (name, family_role, birthday, color_theme, reminder_time).
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
-  const { name, family_role, birthday, color_theme } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time } = req.body;
   const updates = {};
 
   if (name !== undefined) {
@@ -85,6 +85,10 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
       return res.status(400).json({ error: 'Invalid color theme.' });
     }
     updates.color_theme = color_theme;
+  }
+  if (reminder_time !== undefined) {
+    // Accept HH:MM or null (null = use household default)
+    updates.reminder_time = reminder_time || null;
   }
 
   if (!Object.keys(updates).length) {

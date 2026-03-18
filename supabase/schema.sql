@@ -24,6 +24,7 @@ create table if not exists users (
   email_verified     boolean not null default false,
   role               text not null default 'member' check (role in ('admin', 'member')),
   avatar_url         text,
+  reminder_time      time,
   created_at         timestamp with time zone default now()
 );
 

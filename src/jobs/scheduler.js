@@ -35,19 +35,25 @@ function currentHHMMInTZ(timezone) {
 }
 
 /**
- * Run daily reminders for every household whose reminder_time matches now.
- * Called every minute by cron.
+ * Run daily reminders — checks each member's personal reminder_time,
+ * falling back to the household default. Called every minute by cron.
  */
 async function runDailyReminderCheck() {
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
-      // reminder_time comes back as "HH:MM:SS" from Postgres — compare first 5 chars
-      const reminderHHMM = (household.reminder_time || '08:00:00').substring(0, 5);
-      const nowInTZ = currentHHMMInTZ(household.timezone || 'Africa/Johannesburg');
-      if (reminderHHMM === nowInTZ) {
-        console.log(`[scheduler] Sending daily reminders for "${household.name}" (${household.id})`);
-        await sendDailyReminders(household.id);
+      const tz = household.timezone || 'Africa/Johannesburg';
+      const nowInTZ = currentHHMMInTZ(tz);
+      const householdDefault = (household.reminder_time || '08:00:00').substring(0, 5);
+      const members = await db.getHouseholdMembers(household.id);
+
+      for (const member of members) {
+        const memberTime = member.reminder_time
+          ? (member.reminder_time).substring(0, 5)
+          : householdDefault;
+        if (memberTime === nowInTZ) {
+          await sendDailyReminders(household.id, member);
+        }
       }
     }
   } catch (err) {

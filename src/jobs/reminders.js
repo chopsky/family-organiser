@@ -64,13 +64,13 @@ function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount) {
 }
 
 /**
- * Send daily reminders to all connected members of one household.
+ * Send daily reminder to a specific member, or all connected members of a household.
  *
  * @param {string} householdId
+ * @param {object} [singleMember] - If provided, only send to this member
  */
-async function sendDailyReminders(householdId) {
+async function sendDailyReminders(householdId, singleMember) {
   const today = new Date().toISOString().split('T')[0];
-  const members = await db.getHouseholdMembers(householdId);
   const shoppingItems = await db.getShoppingList(householdId);
   const shoppingCount = shoppingItems.length;
 
@@ -83,7 +83,9 @@ async function sendDailyReminders(householdId) {
     .is('assigned_to', null)
     .lte('due_date', today);
 
-  for (const member of members) {
+  const targets = singleMember ? [singleMember] : await db.getHouseholdMembers(householdId);
+
+  for (const member of targets) {
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
     if (!hasWhatsApp) continue;
 
