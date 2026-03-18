@@ -66,14 +66,24 @@ export default function Settings() {
 
   useEffect(() => { loadMembers(); }, []);
 
-  function openEditProfile() {
-    const me = members.find((m) => m.id === user?.id) || {};
-    setProfileName(me.name || user?.name || '');
-    setProfileRole(me.family_role || '');
-    setProfileBirthday(me.birthday || '');
-    setProfileColor(me.color_theme || user?.color_theme || 'sage');
-    setProfileReminderTime(me.reminder_time ? me.reminder_time.substring(0, 5) : '');
-    setProfileAvatar(me.avatar_url || user?.avatar_url || null);
+  async function openEditProfile() {
+    let me = members.find((m) => m.id === user?.id);
+    // If members haven't loaded yet, fetch directly
+    if (!me) {
+      try {
+        const { data } = await api.get('/household');
+        if (data.members) setMembers(data.members);
+        me = data.members?.find((m) => m.id === user?.id);
+      } catch {
+        // Fall back to auth context
+      }
+    }
+    setProfileName(me?.name || user?.name || '');
+    setProfileRole(me?.family_role || '');
+    setProfileBirthday(me?.birthday || '');
+    setProfileColor(me?.color_theme || user?.color_theme || 'sage');
+    setProfileReminderTime(me?.reminder_time ? me.reminder_time.substring(0, 5) : '');
+    setProfileAvatar(me?.avatar_url || user?.avatar_url || null);
     setEditingProfile(true);
   }
 
