@@ -5,12 +5,23 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck } from '../components/Icons';
 
 const EVENT_COLORS = {
-  orange: { bg: 'bg-secondary/30', border: 'border-primary', dot: 'bg-primary', text: 'text-primary-pressed', darkBg: 'bg-secondary/50' },
-  blue:   { bg: 'bg-blue-100',   border: 'border-blue-400',   dot: 'bg-blue-400',   text: 'text-blue-700',   darkBg: 'bg-blue-200' },
-  green:  { bg: 'bg-success/20',  border: 'border-success',  dot: 'bg-success',  text: 'text-success',  darkBg: 'bg-success/30' },
-  purple: { bg: 'bg-purple-100', border: 'border-purple-400', dot: 'bg-purple-400', text: 'text-purple-700', darkBg: 'bg-purple-200' },
-  red:    { bg: 'bg-error/20',    border: 'border-error',    dot: 'bg-error',    text: 'text-error',    darkBg: 'bg-error/30' },
-  gray:   { bg: 'bg-sand',   border: 'border-cream-border',   dot: 'bg-cocoa',   text: 'text-cocoa',   darkBg: 'bg-sand' },
+  sage:       { bg: 'bg-sage/20',       border: 'border-sage',       dot: 'bg-sage',       text: 'text-sage',       darkBg: 'bg-sage/30' },
+  plum:       { bg: 'bg-plum/20',       border: 'border-plum',       dot: 'bg-plum',       text: 'text-plum',       darkBg: 'bg-plum/30' },
+  coral:      { bg: 'bg-coral/20',      border: 'border-coral',      dot: 'bg-coral',      text: 'text-coral',      darkBg: 'bg-coral/30' },
+  amber:      { bg: 'bg-amber/20',      border: 'border-amber',      dot: 'bg-amber',      text: 'text-amber',      darkBg: 'bg-amber/30' },
+  sky:        { bg: 'bg-sky/20',        border: 'border-sky',        dot: 'bg-sky',        text: 'text-sky',        darkBg: 'bg-sky/30' },
+  rose:       { bg: 'bg-rose/20',       border: 'border-rose',       dot: 'bg-rose',       text: 'text-rose',       darkBg: 'bg-rose/30' },
+  teal:       { bg: 'bg-teal/20',       border: 'border-teal',       dot: 'bg-teal',       text: 'text-teal',       darkBg: 'bg-teal/30' },
+  lavender:   { bg: 'bg-lavender/20',   border: 'border-lavender',   dot: 'bg-lavender',   text: 'text-lavender',   darkBg: 'bg-lavender/30' },
+  terracotta: { bg: 'bg-terracotta/20', border: 'border-terracotta', dot: 'bg-terracotta', text: 'text-terracotta', darkBg: 'bg-terracotta/30' },
+  slate:      { bg: 'bg-slate/20',      border: 'border-slate',      dot: 'bg-slate',      text: 'text-slate',      darkBg: 'bg-slate/30' },
+  // Legacy mappings for existing events with old colour values
+  orange: { bg: 'bg-amber/20', border: 'border-amber', dot: 'bg-amber', text: 'text-amber', darkBg: 'bg-amber/30' },
+  blue:   { bg: 'bg-sky/20',   border: 'border-sky',   dot: 'bg-sky',   text: 'text-sky',   darkBg: 'bg-sky/30' },
+  green:  { bg: 'bg-sage/20',  border: 'border-sage',  dot: 'bg-sage',  text: 'text-sage',  darkBg: 'bg-sage/30' },
+  purple: { bg: 'bg-plum/20',  border: 'border-plum',  dot: 'bg-plum',  text: 'text-plum',  darkBg: 'bg-plum/30' },
+  red:    { bg: 'bg-coral/20', border: 'border-coral',  dot: 'bg-coral', text: 'text-coral', darkBg: 'bg-coral/30' },
+  gray:   { bg: 'bg-slate/20', border: 'border-slate',  dot: 'bg-slate', text: 'text-slate', darkBg: 'bg-slate/30' },
 };
 
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
@@ -26,7 +37,7 @@ const NOTIFICATION_OPTIONS = [
   { value: '2_days', label: '2 days before' },
 ];
 const RECURRENCE_LABELS = { '': 'Never', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', yearly: 'Yearly' };
-const COLOR_OPTIONS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
+// Event colour is derived from the assigned member's color_theme. Unassigned = lavender.
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
@@ -160,7 +171,7 @@ export default function Calendar() {
   const [formEnd, setFormEnd] = useState('10:00');
   const [formDesc, setFormDesc] = useState('');
   const [formLocation, setFormLocation] = useState('');
-  const [formColor, setFormColor] = useState('orange');
+  const [formColor, setFormColor] = useState('lavender');
   const [formAssignee, setFormAssignee] = useState('');
   const [formRecurrence, setFormRecurrence] = useState('');
   const [saving, setSaving] = useState(false);
@@ -365,7 +376,7 @@ export default function Calendar() {
     setFormEnd('10:00');
     setFormDesc('');
     setFormLocation('');
-    setFormColor('orange');
+    setFormColor('lavender');
     setFormAssignee('');
     setFormRecurrence('');
   }
@@ -389,7 +400,9 @@ export default function Calendar() {
     setFormEnd(ev.end_time ? formatTime(ev.end_time) : '10:00');
     setFormDesc(ev.description || '');
     setFormLocation(ev.location || '');
-    setFormColor(ev.color || 'orange');
+    // Derive colour from assigned member's theme, fallback to stored color or lavender
+    const assignedMember = members.find(m => m.name === ev.assigned_to_name);
+    setFormColor(assignedMember?.color_theme || ev.color || 'lavender');
     setFormAssignee(ev.assigned_to_name || '');
     setFormRecurrence(ev.recurrence || '');
     setShowForm(true);
@@ -430,6 +443,15 @@ export default function Calendar() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Resolve event colour: prefer assigned member's theme, fallback to stored color, then lavender
+  function getEventColor(ev) {
+    if (ev.assigned_to_name) {
+      const m = members.find(member => member.name === ev.assigned_to_name);
+      if (m?.color_theme) return m.color_theme;
+    }
+    return ev.color || 'lavender';
   }
 
   async function deleteEvent(id) {
@@ -576,7 +598,7 @@ export default function Calendar() {
                 return (
                   <div key={i} className="flex-1 border-l border-cream-border p-0.5 min-h-[28px]">
                     {dayAllDay.map(ev => {
-                      const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                      const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
                       const isReadOnly = ev.category === 'public_holiday' || ev.category === 'birthday';
                       return (
                         <button
@@ -634,7 +656,7 @@ export default function Calendar() {
                     {/* Events */}
                     {dayTimedEvents.map(ev => {
                       const pos = getEventPosition(ev, HOUR_HEIGHT);
-                      const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                      const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
                       return (
                         <button
                           key={ev.id}
@@ -796,7 +818,7 @@ export default function Calendar() {
                       <span className="text-xs sm:text-sm">{date.getDate()}</span>
                       <div className="flex flex-wrap gap-0.5 mt-0.5">
                         {dayEvents.slice(0, maxShow).map(ev => (
-                          <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[ev.color]?.dot || 'bg-primary'}`} title={ev.title} />
+                          <span key={ev.id} className={`w-2 h-2 rounded-full ${EVENT_COLORS[getEventColor(ev)]?.dot || 'bg-lavender'}`} title={ev.title} />
                         ))}
                         {dayTasks.slice(0, Math.max(0, maxShow - dayEvents.length)).map(tk => {
                           const taskMember = members.find(m => m.name === tk.assigned_to_name);
@@ -829,7 +851,7 @@ export default function Calendar() {
                 <div className="space-y-2">
                   <h3 className="text-xs text-cocoa uppercase tracking-wide font-medium">Events</h3>
                   {selectedEvents.map(ev => {
-                    const colors = EVENT_COLORS[ev.color] || EVENT_COLORS.orange;
+                    const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
                     return (
                       <div key={ev.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-lg px-3 py-2`}>
                         <div className="flex items-start justify-between gap-2">
@@ -1032,24 +1054,6 @@ export default function Calendar() {
               />
             </div>
 
-            {/* Color picker */}
-            <div>
-              <label className="text-xs text-cocoa mb-1 block">Color</label>
-              <div className="flex gap-2">
-                {COLOR_OPTIONS.map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setFormColor(c)}
-                    className={`w-7 h-7 rounded-full ${EVENT_COLORS[c].dot} transition-all ${
-                      formColor === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105'
-                    }`}
-                    title={c}
-                  />
-                ))}
-              </div>
-            </div>
-
             {/* Assign to */}
             <div>
               <label className="text-xs text-cocoa mb-1 block">Assign to</label>
@@ -1057,11 +1061,9 @@ export default function Calendar() {
                 value={formAssignee}
                 onChange={e => {
                   setFormAssignee(e.target.value);
-                  // Default color to assigned user's theme
-                  if (!editingEvent) {
-                    const assignedMember = members.find(m => m.name === e.target.value);
-                    if (assignedMember?.color_theme) setFormColor(assignedMember.color_theme);
-                  }
+                  // Colour always follows the assigned member's theme
+                  const assignedMember = members.find(m => m.name === e.target.value);
+                  setFormColor(assignedMember?.color_theme || 'lavender');
                 }}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >

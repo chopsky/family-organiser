@@ -806,7 +806,6 @@ export default function Settings() {
                     { key: 'sky',        bg: 'bg-sky',        ring: 'ring-sky' },
                     { key: 'rose',       bg: 'bg-rose',       ring: 'ring-rose' },
                     { key: 'teal',       bg: 'bg-teal',       ring: 'ring-teal' },
-                    { key: 'lavender',   bg: 'bg-lavender',   ring: 'ring-lavender' },
                     { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' },
                     { key: 'slate',      bg: 'bg-slate',      ring: 'ring-slate' },
                   ].map(({ key, bg, ring }) => (

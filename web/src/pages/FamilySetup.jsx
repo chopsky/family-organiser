@@ -529,7 +529,7 @@ export default function FamilySetup() {
                     { key: 'sage', bg: 'bg-sage', ring: 'ring-sage' }, { key: 'plum', bg: 'bg-plum', ring: 'ring-plum' },
                     { key: 'coral', bg: 'bg-coral', ring: 'ring-coral' }, { key: 'amber', bg: 'bg-amber', ring: 'ring-amber' },
                     { key: 'sky', bg: 'bg-sky', ring: 'ring-sky' }, { key: 'rose', bg: 'bg-rose', ring: 'ring-rose' },
-                    { key: 'teal', bg: 'bg-teal', ring: 'ring-teal' }, { key: 'lavender', bg: 'bg-lavender', ring: 'ring-lavender' },
+                    { key: 'teal', bg: 'bg-teal', ring: 'ring-teal' },
                     { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' }, { key: 'slate', bg: 'bg-slate', ring: 'ring-slate' },
                   ].map(({ key, bg, ring }) => (
                     <button key={key} type="button" onClick={() => setDepColor(key)}
@@ -610,7 +610,6 @@ export default function FamilySetup() {
                     { key: 'sky',        bg: 'bg-sky',        ring: 'ring-sky' },
                     { key: 'rose',       bg: 'bg-rose',       ring: 'ring-rose' },
                     { key: 'teal',       bg: 'bg-teal',       ring: 'ring-teal' },
-                    { key: 'lavender',   bg: 'bg-lavender',   ring: 'ring-lavender' },
                     { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' },
                     { key: 'slate',      bg: 'bg-slate',      ring: 'ring-slate' },
                   ].map(({ key, bg, ring }) => (
@@ -747,7 +746,6 @@ export default function FamilySetup() {
                     { key: 'sky',        bg: 'bg-sky',        ring: 'ring-sky' },
                     { key: 'rose',       bg: 'bg-rose',       ring: 'ring-rose' },
                     { key: 'teal',       bg: 'bg-teal',       ring: 'ring-teal' },
-                    { key: 'lavender',   bg: 'bg-lavender',   ring: 'ring-lavender' },
                     { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' },
                     { key: 'slate',      bg: 'bg-slate',      ring: 'ring-slate' },
                   ].map(({ key, bg, ring }) => (
