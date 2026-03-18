@@ -99,8 +99,8 @@ create table if not exists calendar_events (
   end_time         timestamp with time zone not null,
   all_day          boolean not null default false,
   location         text,
-  color            text not null default 'orange'
-                     check (color in ('orange', 'blue', 'green', 'purple', 'red', 'gray')),
+  color            text not null default 'sage'
+                     check (color in ('sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate')),
   recurrence       text check (recurrence in ('daily', 'weekly', 'biweekly', 'monthly', 'yearly')),
   assigned_to      uuid references users(id) on delete set null,
   assigned_to_name text,

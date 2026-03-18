@@ -101,43 +101,51 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     const updated = await db.updateUser(req.user.id, updates);
 
     // Handle birthday calendar event — only if the date actually changed
-    const currentBirthday = fullUser?.birthday || null;
-    const newBirthday = birthday !== undefined ? (birthday || null) : currentBirthday;
-    const birthdayChanged = birthday !== undefined && String(newBirthday || '') !== String(currentBirthday || '');
+    // Non-fatal: profile update succeeds even if birthday event fails
+    try {
+      const currentBirthday = fullUser?.birthday || null;
+      const newBirthday = birthday !== undefined ? (birthday || null) : currentBirthday;
+      // Compare as YYYY-MM-DD strings (DB may return Date object)
+      const currentStr = currentBirthday ? new Date(currentBirthday).toISOString().split('T')[0] : '';
+      const newStr = newBirthday ? new Date(newBirthday).toISOString().split('T')[0] : '';
+      const birthdayChanged = birthday !== undefined && newStr !== currentStr;
 
-    if (birthdayChanged) {
-      // Remove any existing birthday events for this user
-      const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
-      const existingBirthdays = allEvents.filter(
-        (e) => e.category === 'birthday' && e.source_user_id === req.user.id
-      );
-      for (const ev of existingBirthdays) {
-        await db.deleteCalendarEvent(ev.id, req.householdId);
-      }
-
-      // Create new birthday event if a birthday was provided
-      if (newBirthday) {
-        const displayName = updates.name || req.user.name;
-        const birthdayDate = new Date(newBirthday);
-        const thisYear = new Date().getFullYear();
-        const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
-        const startTime = `${eventDate.toISOString().split('T')[0]}T00:00:00Z`;
-
-        await db.createCalendarEventFromSync(
-          req.householdId,
-          {
-            title: `${displayName}'s Birthday 🎂`,
-            description: null,
-            start_time: startTime,
-            end_time: startTime,
-            all_day: true,
-          },
-          req.user.id,
-          null,
-          'birthday',
-          'family'
+      if (birthdayChanged) {
+        // Remove any existing birthday events for this user
+        const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
+        const existingBirthdays = allEvents.filter(
+          (e) => e.category === 'birthday' && e.source_user_id === req.user.id
         );
+        for (const ev of existingBirthdays) {
+          await db.deleteCalendarEvent(ev.id, req.householdId);
+        }
+
+        // Create new birthday event if a birthday was provided
+        if (newBirthday) {
+          const displayName = updates.name || req.user.name;
+          const birthdayDate = new Date(newBirthday);
+          const thisYear = new Date().getFullYear();
+          const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
+          const startTime = `${eventDate.toISOString().split('T')[0]}T00:00:00Z`;
+
+          await db.createCalendarEventFromSync(
+            req.householdId,
+            {
+              title: `${displayName}'s Birthday 🎂`,
+              description: null,
+              start_time: startTime,
+              end_time: startTime,
+              all_day: true,
+            },
+            req.user.id,
+            null,
+            'birthday',
+            'family'
+          );
+        }
       }
+    } catch (birthdayErr) {
+      console.error('Birthday event update failed (non-fatal):', birthdayErr.message);
     }
 
     return res.json({ user: updated });
