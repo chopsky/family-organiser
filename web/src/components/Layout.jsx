@@ -112,6 +112,36 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
+      {/* ── Mobile Top Bar ── */}
+      <header className="md:hidden bg-cream border-b border-light-grey sticky top-0 z-30">
+        <div className="px-4 py-3 flex items-center">
+          {/* Logo — left */}
+          <Link to="/dashboard" className="shrink-0">
+            <img src="/anora-logomark-colour.png" alt="Anora" className="h-7" />
+          </Link>
+
+          {/* Household name — centered */}
+          <div className="flex-1 text-center">
+            <Link to="/dashboard" className="font-semibold text-lg text-charcoal">
+              {household?.name ?? 'Nestd'}
+            </Link>
+          </div>
+
+          {/* Profile circle + sign out — right */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Link to="/settings">
+              {renderAvatar('w-8 h-8', 'text-xs')}
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-warm-grey hover:text-charcoal text-sm transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60">
         <div className="max-w-3xl mx-auto px-5 md:px-8 py-6 md:py-7 pb-24 md:pb-7">
