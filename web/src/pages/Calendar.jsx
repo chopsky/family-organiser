@@ -591,12 +591,12 @@ export default function Calendar() {
 
           {/* All-day events row */}
           {hasAllDay && (
-            <div className="flex border-t border-cream-border">
+            <div className="flex border-t border-cream-border" style={{ height: `${HOUR_HEIGHT}px` }}>
               <div className="w-16 sm:w-20 shrink-0 text-[10px] text-cocoa py-1 pr-2 text-right">all-day</div>
               {dates.map((date, i) => {
                 const dayAllDay = allDayEventsByDate[i];
                 return (
-                  <div key={i} className="flex-1 border-l border-cream-border p-0.5 min-h-[28px]">
+                  <div key={i} className="flex-1 border-l border-cream-border p-0.5 overflow-hidden flex flex-col gap-0.5">
                     {dayAllDay.map(ev => {
                       const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
                       const isReadOnly = ev.category === 'public_holiday' || ev.category === 'birthday';
@@ -604,7 +604,7 @@ export default function Calendar() {
                         <button
                           key={ev.id}
                           onClick={() => !isReadOnly && openEditForm(ev)}
-                          className={`block w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate ${colors.bg} ${colors.text} ${isReadOnly ? 'cursor-default' : 'hover:opacity-80'}`}
+                          className={`block w-full text-left text-[10px] sm:text-xs px-1 py-0.5 rounded truncate shrink-0 ${colors.bg} ${colors.text} ${isReadOnly ? 'cursor-default' : 'hover:opacity-80'}`}
                         >
                           {ev.title}
                         </button>
