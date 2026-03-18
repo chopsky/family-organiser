@@ -589,13 +589,9 @@ export default function Calendar() {
             })}
           </div>
 
-        </div>
-
-        {/* Scrollable time grid */}
-        <div ref={scrollContainerRef} className="overflow-y-auto" style={{ maxHeight: '600px' }}>
-          {/* All-day events row — inside scrollable area so columns align with time grid */}
+          {/* All-day events row */}
           {hasAllDay && (
-            <div className="flex border-b border-cream-border" style={{ height: `${HOUR_HEIGHT}px` }}>
+            <div className="flex border-t border-cream-border" style={{ height: `${HOUR_HEIGHT}px` }}>
               <div className="w-16 sm:w-20 shrink-0 text-[10px] text-cocoa py-1 pr-2 text-right">all-day</div>
               {dates.map((date, i) => {
                 const dayAllDay = allDayEventsByDate[i];
@@ -619,6 +615,10 @@ export default function Calendar() {
               })}
             </div>
           )}
+        </div>
+
+        {/* Scrollable time grid */}
+        <div ref={scrollContainerRef} className="overflow-y-auto" style={{ maxHeight: '600px' }}>
           <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
             {/* Hour lines and labels */}
             {HOURS.map(hour => (
