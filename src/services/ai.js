@@ -24,13 +24,17 @@ function getClient() {
  *   response_message: string
  * }>}
  */
-async function classify(message, memberNames = []) {
+async function classify(message, memberNames = [], notes = []) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
+  const notesStr = notes.length > 0
+    ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
+    : '(none saved yet)';
 
   const systemPrompt = CLASSIFICATION_SYSTEM
     .replace(/{{DATE}}/g, today)
-    .replace(/{{MEMBERS}}/g, membersStr);
+    .replace(/{{MEMBERS}}/g, membersStr)
+    .replace(/{{NOTES}}/g, notesStr);
 
   return withRetry(async () => {
     const client = getClient();

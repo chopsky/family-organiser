@@ -167,6 +167,40 @@ const createPasswordResetToken = (userId, token, expiresAt) => createToken('pass
 const getPasswordResetToken = (token) => getValidToken('password_reset_tokens', token);
 const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens', id);
 
+// ─── Household notes ─────────────────────────────────────────────────────────
+
+async function getHouseholdNotes(householdId) {
+  const { data, error } = await supabase
+    .from('household_notes')
+    .select()
+    .eq('household_id', householdId)
+    .order('key');
+  if (error) throw error;
+  return data || [];
+}
+
+async function upsertHouseholdNote(householdId, key, value, userId) {
+  const { data, error } = await supabase
+    .from('household_notes')
+    .upsert(
+      { household_id: householdId, key: key.toLowerCase().trim(), value, created_by: userId, updated_at: new Date().toISOString() },
+      { onConflict: 'household_id,key' }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteHouseholdNote(householdId, key) {
+  const { error } = await supabase
+    .from('household_notes')
+    .delete()
+    .eq('household_id', householdId)
+    .eq('key', key.toLowerCase().trim());
+  if (error) throw error;
+}
+
 // ─── WhatsApp helpers ────────────────────────────────────────────────────────
 
 async function getUserByWhatsAppPhone(phone) {
@@ -1030,6 +1064,10 @@ module.exports = {
   createPasswordResetToken,
   getPasswordResetToken,
   markPasswordResetTokenUsed,
+  // Notes
+  getHouseholdNotes,
+  upsertHouseholdNote,
+  deleteHouseholdNote,
   // WhatsApp
   getUserByWhatsAppPhone,
   createWhatsAppVerificationCode,

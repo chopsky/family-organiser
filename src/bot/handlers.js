@@ -81,7 +81,10 @@ function formatTaskList(tasks, heading = 'Tasks') {
  */
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
-  const result = await classify(text, memberNames);
+
+  // Fetch saved notes for context
+  const notes = await db.getHouseholdNotes(household.id);
+  const result = await classify(text, memberNames, notes);
 
   const actions = {
     shoppingAdded: [],
@@ -98,6 +101,21 @@ async function handleTextMessage(text, user, household) {
   if (result.intent === 'query_tasks') {
     const taskResponse = await handleTasks(user, household);
     return { response: taskResponse, actions };
+  }
+
+  // Handle note save/delete
+  if (result.intent === 'note_save' && result.note) {
+    if (result.note.action === 'delete') {
+      await db.deleteHouseholdNote(household.id, result.note.key);
+    } else if (result.note.value) {
+      await db.upsertHouseholdNote(household.id, result.note.key, result.note.value, user.id);
+    }
+    return { response: result.response_message || 'Noted! ✅', actions };
+  }
+
+  // Handle note recall — AI already included the answer in response_message
+  if (result.intent === 'note_recall') {
+    return { response: result.response_message || "I couldn't find that in my notes.", actions };
   }
 
   // Handle general chat — just return the AI's conversational response

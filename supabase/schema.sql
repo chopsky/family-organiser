@@ -144,6 +144,18 @@ create table if not exists calendar_sync_mappings (
   unique(event_id, connection_id)
 );
 
+-- household_notes (key-value memory for the bot)
+create table if not exists household_notes (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null references households(id) on delete cascade,
+  key           text not null,
+  value         text not null,
+  created_by    uuid references users(id) on delete set null,
+  updated_at    timestamp with time zone default now(),
+  created_at    timestamp with time zone default now(),
+  unique(household_id, key)
+);
+
 -- Indexes for common query patterns
 create index if not exists idx_shopping_items_household on shopping_items(household_id);
 create index if not exists idx_shopping_items_completed on shopping_items(household_id, completed);
@@ -155,6 +167,7 @@ create index if not exists idx_invites_token on invites(token);
 create index if not exists idx_invites_email on invites(email);
 create index if not exists idx_email_verification_tokens_token on email_verification_tokens(token);
 create index if not exists idx_password_reset_tokens_token on password_reset_tokens(token);
+create index if not exists idx_notes_household on household_notes(household_id);
 create index if not exists idx_cal_events_household on calendar_events(household_id);
 create index if not exists idx_cal_events_range on calendar_events(household_id, start_time, end_time);
 create unique index if not exists idx_feed_tokens_user on calendar_feed_tokens(user_id, household_id);
