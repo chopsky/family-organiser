@@ -119,30 +119,32 @@ export default function Shopping() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* Add item */}
-      <form onSubmit={addItem} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 flex gap-2">
+      <form onSubmit={addItem} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 flex flex-wrap gap-2">
         <input
           type="text"
           value={addText}
           onChange={(e) => setAddText(e.target.value)}
           placeholder="Add item…"
-          className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="flex-1 min-w-0 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
-        <select
-          value={addCat}
-          onChange={(e) => setAddCat(e.target.value)}
-          className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          disabled={adding || !addText.trim()}
-          className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors"
-        >
-          {adding ? '…' : '+ Add'}
-        </button>
+        <div className="flex gap-2">
+          <select
+            value={addCat}
+            onChange={(e) => setAddCat(e.target.value)}
+            className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            disabled={adding || !addText.trim()}
+            className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+          >
+            {adding ? '…' : '+ Add'}
+          </button>
+        </div>
       </form>
 
       {/* Category filter */}
