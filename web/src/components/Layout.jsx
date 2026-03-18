@@ -125,9 +125,7 @@ export default function Layout({ children }) {
       <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
         <div className="px-5 pt-6 pb-3 flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-plum rounded-[10px] flex items-center justify-center">
-            <IconHome className="h-5 w-5 text-white" />
-          </div>
+          <img src="/anora-logomark-colour.png" alt="Anora" className="h-9" />
           <span className="font-display text-[22px] font-bold text-plum tracking-tight">Nestd</span>
         </div>
 
