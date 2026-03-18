@@ -666,11 +666,6 @@ export default function Calendar() {
                           title={`${ev.title}\n${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
                         >
                           <p className={`text-[10px] sm:text-xs font-medium ${colors.text} truncate leading-tight`}>{ev.title}</p>
-                          {pos.height > 30 && (
-                            <p className="text-[9px] sm:text-[10px] text-cocoa truncate leading-tight">
-                              {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
-                            </p>
-                          )}
                           {pos.height > 50 && ev.location && (
                             <p className="text-[9px] text-cocoa truncate leading-tight">{ev.location}</p>
                           )}
