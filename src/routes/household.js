@@ -273,7 +273,7 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
  * Send an email invite to join the household. Admin only.
  */
 router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { email: inviteEmail } = req.body;
+  const { email: inviteEmail, name: inviteName, family_role, birthday, color_theme } = req.body;
 
   if (!inviteEmail?.trim()) {
     return res.status(400).json({ error: 'Email is required' });
@@ -290,6 +290,10 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
       token,
       invitedBy: req.user.id,
       expiresAt,
+      name: inviteName?.trim() || null,
+      family_role: family_role?.trim() || null,
+      birthday: birthday || null,
+      color_theme: color_theme || null,
     });
 
     try {

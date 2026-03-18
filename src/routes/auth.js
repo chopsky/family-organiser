@@ -63,14 +63,26 @@ router.post('/register', async (req, res) => {
       const user = await db.createUserWithEmail({
         email: emailLower,
         passwordHash,
-        name: name.trim(),
+        name: invite.name || name.trim(),
         householdId: invite.household_id,
         emailVerified: true,
         role: 'member',
       });
 
+      // Apply pre-filled profile fields from invite
+      const profileUpdates = {};
+      if (invite.family_role) profileUpdates.family_role = invite.family_role;
+      if (invite.birthday) profileUpdates.birthday = invite.birthday;
+      if (invite.color_theme) profileUpdates.color_theme = invite.color_theme;
+      if (Object.keys(profileUpdates).length > 0) {
+        await db.updateUser(user.id, profileUpdates);
+      }
+
       await db.markInviteAccepted(invite.id);
-      const response = await authResponse(user);
+      const updatedUser = Object.keys(profileUpdates).length > 0
+        ? await db.updateUser(user.id, {}) // re-fetch isn't needed, merge locally
+        : user;
+      const response = await authResponse({ ...user, ...profileUpdates });
       return res.status(201).json(response);
     }
 

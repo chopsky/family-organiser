@@ -19,11 +19,15 @@ export default function FamilySetup() {
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
-  // Invite state
-  const [inviteEmail, setInviteEmail]   = useState('');
-  const [inviting, setInviting]         = useState(false);
-  const [inviteSuccess, setInviteSuccess] = useState('');
+  // Invite / add member state
   const [pendingInvites, setPendingInvites] = useState([]);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newRole, setNewRole] = useState('');
+  const [newBirthday, setNewBirthday] = useState('');
+  const [newColor, setNewColor] = useState('sage');
+  const [newEmail, setNewEmail] = useState('');
+  const [addingMember, setAddingMember] = useState(false);
 
   // Edit profile state
   const [editingMember, setEditingMember] = useState(null);
@@ -161,21 +165,37 @@ export default function FamilySetup() {
     }
   }
 
-  async function handleInvite(e) {
-    e.preventDefault();
-    setError(''); setInviteSuccess('');
-    if (!inviteEmail.trim()) { setError('Email is required.'); return; }
-    setInviting(true);
+  function openAddMember() {
+    setNewName('');
+    setNewRole('');
+    setNewBirthday('');
+    setNewColor('sage');
+    setNewEmail('');
+    setShowAddMember(true);
+  }
+
+  async function handleAddMember() {
+    if (!newName.trim()) { setError('Name is required.'); return; }
+    if (!newEmail.trim()) { setError('Email is required to send the invite.'); return; }
+    setAddingMember(true);
+    setError('');
     try {
-      await api.post('/household/invite', { email: inviteEmail.trim() });
-      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}`);
-      setInviteEmail('');
+      await api.post('/household/invite', {
+        email: newEmail.trim(),
+        name: newName.trim(),
+        family_role: newRole.trim() || null,
+        birthday: newBirthday || null,
+        color_theme: newColor,
+      });
+      setShowAddMember(false);
+      setSuccess(`Invite sent to ${newEmail.trim()}`);
+      setTimeout(() => setSuccess(''), 3000);
       const { data } = await api.get('/household/invites');
       setPendingInvites(data.invites ?? []);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not send invite.');
     } finally {
-      setInviting(false);
+      setAddingMember(false);
     }
   }
 
@@ -229,69 +249,6 @@ export default function FamilySetup() {
           </div>
         )}
       </div>
-
-      {/* Invite Members (admin only) */}
-      {isAdmin && (
-        <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
-          <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconMail className="h-4 w-4" /> Invite Members</h2>
-          <p className="text-sm text-cocoa mb-3">
-            Send an email invite to add someone to your household.
-          </p>
-
-          <form onSubmit={handleInvite} className="flex gap-2 mb-4">
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="email@example.com"
-              className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-            <button
-              type="submit"
-              disabled={inviting}
-              className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-medium px-4 py-2 rounded-2xl text-sm transition-colors whitespace-nowrap"
-            >
-              {inviting ? 'Sending…' : 'Send invite'}
-            </button>
-          </form>
-
-          {inviteSuccess && (
-            <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2 mb-3">{inviteSuccess}</p>
-          )}
-
-          {pendingInvites.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-cocoa uppercase tracking-wider mb-2">Pending invites</p>
-              <ul className="space-y-1">
-                {pendingInvites.map((inv) => (
-                  <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-2xl px-3 py-2">
-                    <span>{inv.email}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-cocoa">
-                        expires {new Date(inv.expires_at).toLocaleDateString()}
-                      </span>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await api.delete(`/household/invites/${inv.id}`);
-                            setPendingInvites(prev => prev.filter(i => i.id !== inv.id));
-                          } catch {
-                            setError('Failed to cancel invite.');
-                          }
-                        }}
-                        className="text-xs text-error hover:text-error/80 transition-colors"
-                        title="Cancel invite"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Members */}
       <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
@@ -355,7 +312,143 @@ export default function FamilySetup() {
             })}
           </ul>
         )}
+
+        {/* Pending invites */}
+        {pendingInvites.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-cream-border">
+            <p className="text-xs font-medium text-cocoa uppercase tracking-wider mb-2">Pending invites</p>
+            <ul className="space-y-1">
+              {pendingInvites.map((inv) => (
+                <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-xl px-3 py-2">
+                  <span>{inv.name || inv.email}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-cocoa">
+                      {inv.name ? inv.email : ''} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.delete(`/household/invites/${inv.id}`);
+                          setPendingInvites(prev => prev.filter(i => i.id !== inv.id));
+                        } catch {
+                          setError('Failed to cancel invite.');
+                        }
+                      }}
+                      className="text-xs text-error hover:text-error/80 transition-colors"
+                      title="Cancel invite"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Add new member button */}
+        {isAdmin && (
+          <button
+            onClick={openAddMember}
+            className="mt-4 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-3 rounded-2xl text-sm transition-colors flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Add new member
+          </button>
+        )}
       </div>
+
+      {/* Add Member Modal */}
+      {showAddMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAddMember(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-bark">Add new member</h2>
+              <button onClick={() => setShowAddMember(false)} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Preview avatar */}
+              <div className="flex justify-center">
+                <div className={`w-16 h-16 rounded-full ${
+                  { sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', amber: 'bg-amber text-white', sky: 'bg-sky text-white', rose: 'bg-rose text-white', teal: 'bg-teal text-white', lavender: 'bg-lavender text-white', terracotta: 'bg-terracotta text-white', slate: 'bg-slate text-white' }[newColor] || 'bg-sage text-white'
+                } flex items-center justify-center font-bold text-xl`}>
+                  {newName?.[0]?.toUpperCase() || '?'}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
+                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="Their name" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Family role</label>
+                <input type="text" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Mother, Son, Grandmother" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
+                <input type="date" value={newBirthday} onChange={(e) => setNewBirthday(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { key: 'sage',       bg: 'bg-sage',       ring: 'ring-sage' },
+                    { key: 'plum',       bg: 'bg-plum',       ring: 'ring-plum' },
+                    { key: 'coral',      bg: 'bg-coral',      ring: 'ring-coral' },
+                    { key: 'amber',      bg: 'bg-amber',      ring: 'ring-amber' },
+                    { key: 'sky',        bg: 'bg-sky',        ring: 'ring-sky' },
+                    { key: 'rose',       bg: 'bg-rose',       ring: 'ring-rose' },
+                    { key: 'teal',       bg: 'bg-teal',       ring: 'ring-teal' },
+                    { key: 'lavender',   bg: 'bg-lavender',   ring: 'ring-lavender' },
+                    { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' },
+                    { key: 'slate',      bg: 'bg-slate',      ring: 'ring-slate' },
+                  ].map(({ key, bg, ring }) => (
+                    <button key={key} type="button" onClick={() => setNewColor(key)}
+                      className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${newColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}
+                      title={key.charAt(0).toUpperCase() + key.slice(1)}
+                    >
+                      {newColor === key && (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white drop-shadow" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-cream-border">
+                <label className="block text-sm font-medium text-bark mb-1">Email address <span className="text-error">*</span></label>
+                <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="Their email address" />
+                <p className="text-xs text-cocoa mt-1">An invite will be sent to this email address.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowAddMember(false)} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleAddMember} disabled={addingMember} className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors">
+                {addingMember ? 'Sending invite…' : 'Send invite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Profile Modal */}
       {editingMember && (

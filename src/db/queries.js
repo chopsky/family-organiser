@@ -284,10 +284,15 @@ async function markWhatsAppVerificationCodeUsed(id) {
 
 // ─── Invites ────────────────────────────────────────────────────────────────
 
-async function createInvite({ householdId, email, token, invitedBy, expiresAt }) {
+async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme }) {
+  const row = { household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt };
+  if (name) row.name = name;
+  if (family_role) row.family_role = family_role;
+  if (birthday) row.birthday = birthday;
+  if (color_theme) row.color_theme = color_theme;
   const { data, error } = await supabase
     .from('invites')
-    .insert({ household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;
