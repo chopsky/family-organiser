@@ -97,8 +97,11 @@ export default function FamilySetup() {
     }
   }
 
+  const [profileError, setProfileError] = useState('');
+
   async function handleSaveProfile() {
-    if (!profileName.trim()) { setError('Name is required.'); return; }
+    if (!profileName.trim()) { setProfileError('Name is required.'); return; }
+    setProfileError('');
     setSavingProfile(true);
     try {
       const payload = {
@@ -123,7 +126,7 @@ export default function FamilySetup() {
       setSuccess('Profile updated!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to update profile.');
+      setProfileError(err.response?.data?.error || 'Failed to update profile.');
     } finally {
       setSavingProfile(false);
     }
@@ -363,13 +366,17 @@ export default function FamilySetup() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-bark">Edit profile</h2>
-              <button onClick={() => setEditingMember(null)} className="text-cocoa hover:text-bark p-1">
+              <h2 className="text-lg font-semibold text-bark">{editingMember?.id === user?.id ? 'Edit profile' : `Edit ${editingMember?.name}`}</h2>
+              <button onClick={() => { setEditingMember(null); setProfileError(''); }} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
             </div>
+
+            {profileError && (
+              <p className="text-sm text-error bg-error/10 rounded-xl px-3 py-2 mb-2">{profileError}</p>
+            )}
 
             <div className="space-y-4">
               {/* Avatar upload */}
