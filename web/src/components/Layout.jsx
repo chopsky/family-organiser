@@ -125,8 +125,7 @@ export default function Layout({ children }) {
       <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
         <div className="px-5 pt-6 pb-3 flex items-center gap-2.5">
-          <img src="/Anora-favicon.png" alt="Anora" className="h-9 w-9 rounded-[10px]" />
-          <span className="font-display text-[22px] font-bold text-plum tracking-tight">Nestd</span>
+          <img src="/anora-logo-desktop.png" alt="Anora" className="h-8" />
         </div>
 
         {/* Household pill */}
