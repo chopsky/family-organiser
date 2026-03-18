@@ -591,7 +591,7 @@ export default function Calendar() {
 
           {/* All-day events row */}
           {hasAllDay && (
-            <div className="flex border-t border-cream-border" style={{ height: `${HOUR_HEIGHT}px` }}>
+            <div className="flex border-t border-cream-border">
               <div className="w-16 sm:w-20 shrink-0 text-[10px] text-cocoa py-1 pr-2 text-right">all-day</div>
               {dates.map((date, i) => {
                 const dayAllDay = allDayEventsByDate[i];
