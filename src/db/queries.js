@@ -283,6 +283,15 @@ async function markInviteAccepted(inviteId) {
   if (error) throw error;
 }
 
+async function deleteInvite(inviteId, householdId) {
+  const { error } = await supabase
+    .from('invites')
+    .delete()
+    .eq('id', inviteId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
 async function getPendingInvites(householdId) {
   const { data, error } = await supabase
     .from('invites')
@@ -1076,6 +1085,7 @@ module.exports = {
   createInvite,
   getInviteByToken,
   markInviteAccepted,
+  deleteInvite,
   getPendingInvites,
   addShoppingItems,
   getShoppingList,

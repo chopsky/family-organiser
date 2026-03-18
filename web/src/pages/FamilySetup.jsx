@@ -255,9 +255,25 @@ export default function FamilySetup() {
                 {pendingInvites.map((inv) => (
                   <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-2xl px-3 py-2">
                     <span>{inv.email}</span>
-                    <span className="text-xs text-cocoa">
-                      expires {new Date(inv.expires_at).toLocaleDateString()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-cocoa">
+                        expires {new Date(inv.expires_at).toLocaleDateString()}
+                      </span>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.delete(`/household/invites/${inv.id}`);
+                            setPendingInvites(prev => prev.filter(i => i.id !== inv.id));
+                          } catch {
+                            setError('Failed to cancel invite.');
+                          }
+                        }}
+                        className="text-xs text-error hover:text-error/80 transition-colors"
+                        title="Cancel invite"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -268,7 +284,7 @@ export default function FamilySetup() {
 
       {/* Members */}
       <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
-        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Members</h2>
+        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Family Members</h2>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-2">
             {members.map((m) => {

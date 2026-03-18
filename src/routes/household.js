@@ -303,4 +303,18 @@ router.get('/invites', requireAuth, requireHousehold, requireAdmin, async (req, 
   }
 });
 
+/**
+ * DELETE /api/household/invites/:inviteId
+ * Cancel a pending invite. Admin only.
+ */
+router.delete('/invites/:inviteId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    await db.deleteInvite(req.params.inviteId, req.householdId);
+    return res.json({ message: 'Invite cancelled.' });
+  } catch (err) {
+    console.error('DELETE /api/household/invites error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
