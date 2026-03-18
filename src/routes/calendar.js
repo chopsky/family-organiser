@@ -19,7 +19,7 @@ const publicHolidays = require('../services/publicHolidays');
 
 const router = Router();
 
-const VALID_COLORS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
+const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate'];
 const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
 /**

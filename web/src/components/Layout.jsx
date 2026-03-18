@@ -31,12 +31,16 @@ const moreNav = [
 ];
 
 const avatarColors = {
-  orange: 'bg-coral-light text-coral',
-  blue: 'bg-blue-100 text-blue-600',
-  green: 'bg-sage-light text-sage',
-  purple: 'bg-plum-light text-plum',
-  red: 'bg-error/20 text-error',
-  gray: 'bg-light-grey text-warm-grey',
+  sage: 'bg-sage-light text-sage',
+  plum: 'bg-plum-light text-plum',
+  coral: 'bg-coral-light text-coral',
+  amber: 'bg-amber-light text-amber',
+  sky: 'bg-sky-light text-sky',
+  rose: 'bg-rose-light text-rose',
+  teal: 'bg-teal-light text-teal',
+  lavender: 'bg-lavender-light text-lavender',
+  terracotta: 'bg-terracotta-light text-terracotta',
+  slate: 'bg-slate-light text-slate',
 };
 
 export default function Layout({ children }) {
@@ -84,7 +88,7 @@ export default function Layout({ children }) {
     navigate('/');
   }
 
-  const avatarClass = avatarColors[user?.color_theme] || avatarColors.orange;
+  const avatarClass = avatarColors[user?.color_theme] || avatarColors.sage;
 
   function renderAvatar(size = 'w-8 h-8', textSize = 'text-sm') {
     if (user?.avatar_url) {
@@ -135,7 +139,7 @@ export default function Layout({ children }) {
           {members.length > 0 && (
             <div className="flex -space-x-1.5">
               {members.map((m) => {
-                const ac = avatarColors[m.color_theme] || avatarColors.orange;
+                const ac = avatarColors[m.color_theme] || avatarColors.sage;
                 return m.avatar_url ? (
                   <img key={m.id} src={m.avatar_url} alt={m.name} className="w-6 h-6 rounded-full object-cover ring-2 ring-plum-light" />
                 ) : (

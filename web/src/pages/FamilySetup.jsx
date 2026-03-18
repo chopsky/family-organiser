@@ -30,7 +30,7 @@ export default function FamilySetup() {
   const [profileName, setProfileName] = useState('');
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
-  const [profileColor, setProfileColor] = useState('orange');
+  const [profileColor, setProfileColor] = useState('sage');
   const [profileReminderTime, setProfileReminderTime] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -58,7 +58,7 @@ export default function FamilySetup() {
     setProfileName(member.name || '');
     setProfileRole(member.family_role || '');
     setProfileBirthday(member.birthday || '');
-    setProfileColor(member.color_theme || 'orange');
+    setProfileColor(member.color_theme || 'sage');
     setProfileReminderTime(member.reminder_time ? member.reminder_time.substring(0, 5) : '');
     setProfileAvatar(member.avatar_url || null);
   }
@@ -273,14 +273,18 @@ export default function FamilySetup() {
           <ul className="space-y-2">
             {members.map((m) => {
               const avatarColors = {
-                orange: 'bg-secondary/30 text-primary',
-                blue: 'bg-blue-100 text-blue-600',
-                green: 'bg-success/20 text-success',
-                purple: 'bg-purple-100 text-purple-600',
-                red: 'bg-error/20 text-error',
-                gray: 'bg-sand text-cocoa',
+                sage: 'bg-sage-light text-sage',
+                plum: 'bg-plum-light text-plum',
+                coral: 'bg-coral-light text-coral',
+                amber: 'bg-amber-light text-amber',
+                sky: 'bg-sky-light text-sky',
+                rose: 'bg-rose-light text-rose',
+                teal: 'bg-teal-light text-teal',
+                lavender: 'bg-lavender-light text-lavender',
+                terracotta: 'bg-terracotta-light text-terracotta',
+                slate: 'bg-slate-light text-slate',
               };
-              const avatarClass = avatarColors[m.color_theme] || avatarColors.orange;
+              const avatarClass = avatarColors[m.color_theme] || avatarColors.sage;
               return (
               <li key={m.id} className="flex items-center gap-3">
                 {m.avatar_url ? (
@@ -347,7 +351,7 @@ export default function FamilySetup() {
                   <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
                 ) : (
                   <div className={`w-20 h-20 rounded-full ${
-                    { orange: 'bg-secondary/30 text-primary', blue: 'bg-blue-100 text-blue-600', green: 'bg-success/20 text-success', purple: 'bg-purple-100 text-purple-600', red: 'bg-error/20 text-error', gray: 'bg-sand text-cocoa' }[profileColor] || 'bg-secondary/30 text-primary'
+                    { sage: 'bg-sage-light text-sage', plum: 'bg-plum-light text-plum', coral: 'bg-coral-light text-coral', amber: 'bg-amber-light text-amber', sky: 'bg-sky-light text-sky', rose: 'bg-rose-light text-rose', teal: 'bg-teal-light text-teal', lavender: 'bg-lavender-light text-lavender', terracotta: 'bg-terracotta-light text-terracotta', slate: 'bg-slate-light text-slate' }[profileColor] || 'bg-sage-light text-sage'
                   } flex items-center justify-center font-bold text-2xl`}>
                     {profileName?.[0]?.toUpperCase() || '?'}
                   </div>
@@ -412,12 +416,16 @@ export default function FamilySetup() {
                 <label className="block text-sm font-medium text-bark mb-1.5">Color theme</label>
                 <div className="flex gap-3">
                   {[
-                    { key: 'orange', bg: 'bg-secondary',     ring: 'ring-primary' },
-                    { key: 'blue',   bg: 'bg-blue-300',      ring: 'ring-blue-400' },
-                    { key: 'green',  bg: 'bg-success/60',    ring: 'ring-success' },
-                    { key: 'purple', bg: 'bg-purple-300',    ring: 'ring-purple-400' },
-                    { key: 'red',    bg: 'bg-error/60',      ring: 'ring-error' },
-                    { key: 'gray',   bg: 'bg-sand',          ring: 'ring-cream-border' },
+                    { key: 'sage',       bg: 'bg-sage',       ring: 'ring-sage' },
+                    { key: 'plum',       bg: 'bg-plum',       ring: 'ring-plum' },
+                    { key: 'coral',      bg: 'bg-coral',      ring: 'ring-coral' },
+                    { key: 'amber',      bg: 'bg-amber',      ring: 'ring-amber' },
+                    { key: 'sky',        bg: 'bg-sky',        ring: 'ring-sky' },
+                    { key: 'rose',       bg: 'bg-rose',       ring: 'ring-rose' },
+                    { key: 'teal',       bg: 'bg-teal',       ring: 'ring-teal' },
+                    { key: 'lavender',   bg: 'bg-lavender',   ring: 'ring-lavender' },
+                    { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' },
+                    { key: 'slate',      bg: 'bg-slate',      ring: 'ring-slate' },
                   ].map(({ key, bg, ring }) => (
                     <button
                       key={key}

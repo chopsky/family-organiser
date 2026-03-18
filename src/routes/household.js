@@ -70,7 +70,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  * Update the current user's profile (name, family_role, birthday, color_theme, reminder_time).
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
-  const VALID_COLORS = ['orange', 'blue', 'green', 'purple', 'red', 'gray'];
+  const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate'];
   const { name, family_role, birthday, color_theme, reminder_time } = req.body;
   const updates = {};
 
