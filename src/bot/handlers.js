@@ -7,7 +7,7 @@
  */
 
 const db = require('../db/queries');
-const { classify, scanReceipt, matchReceiptToList } = require('../services/ai');
+const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
 
 // ─── Format helpers ───────────────────────────────────────────────────────────
@@ -141,6 +141,8 @@ async function handleTextMessage(text, user, household) {
         assigned_to: assignee?.id || null,
         assigned_to_name: assignee?.name || ev.assigned_to_name || null,
         color: assignee?.color_theme || 'lavender',
+        location: ev.location || null,
+        description: ev.description || null,
       }, user.id);
 
       actions.eventsAdded = [ev.title];
@@ -249,8 +251,9 @@ async function handleVoiceNote(audioBuffer, filename, user, household) {
 }
 
 /**
- * Handle a photo (receipt scanning).
- * Extracts items with Claude Vision, matches against shopping list.
+ * Handle a photo — smart image scanning.
+ * First classifies the image (receipt vs event/invitation vs unknown),
+ * then routes to the appropriate handler.
  *
  * @param {Buffer} imageBuffer
  * @param {string} mimeType - e.g. "image/jpeg"
@@ -260,45 +263,104 @@ async function handleVoiceNote(audioBuffer, filename, user, household) {
  */
 async function handlePhoto(imageBuffer, mimeType, user, household) {
   const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
-  const extracted = await scanReceipt(imageBuffer, mimeType);
+  const members = await db.getHouseholdMembers(household.id);
+  const memberNames = members.map(m => m.name);
 
-  if (!extracted.items?.length) {
+  // Smart classify: receipt, event, or unknown
+  const scan = await scanImage(imageBuffer, mimeType, memberNames);
+
+  // ── Receipt handling ──
+  if (scan.type === 'receipt') {
+    const extracted = await scanReceipt(imageBuffer, mimeType);
+
+    if (!extracted.items?.length) {
+      return {
+        response: "🧾 I couldn't find any items on that receipt. Is this a grocery receipt? Try sending a clearer photo.",
+        actions: noActions,
+      };
+    }
+
+    const shoppingList = await db.getShoppingList(household.id);
+    const matchResult = await matchReceiptToList(extracted.items, shoppingList);
+
+    const checkedOff = [];
+    for (const match of matchResult.matches || []) {
+      if (match.confidence >= 0.7) {
+        await db.completeShoppingItemById(match.list_item_id);
+        checkedOff.push(match.list_item_name);
+      }
+    }
+
+    const store = extracted.store_name ? ` from *${extracted.store_name}*` : '';
+    const lines = [`🧾 Receipt scanned${store}`];
+
+    if (checkedOff.length) {
+      lines.push(`\n✅ *Checked off:* ${checkedOff.join(', ')}`);
+    } else {
+      lines.push('\n✅ No shopping list items matched this receipt.');
+    }
+
+    if (matchResult.unmatched_receipt_items?.length) {
+      lines.push(`\n❓ *Not on your list:* ${matchResult.unmatched_receipt_items.join(', ')}`);
+    }
+
     return {
-      response: "🧾 I couldn't find any items on that receipt. Is this a grocery receipt? Try sending a clearer photo.",
+      response: lines.join('\n'),
+      actions: { ...noActions, shoppingCompleted: checkedOff },
+    };
+  }
+
+  // ── Event/invitation handling ──
+  if (scan.type === 'event' && scan.events?.length) {
+    const created = [];
+    for (const ev of scan.events) {
+      try {
+        const assignee = ev.assigned_to_name
+          ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+          : null;
+
+        const startTime = ev.all_day
+          ? `${ev.date}T00:00:00Z`
+          : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+        const endTime = ev.all_day
+          ? `${ev.date}T23:59:59Z`
+          : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+
+        await db.createCalendarEvent(household.id, {
+          title: ev.title,
+          start_time: startTime,
+          end_time: endTime,
+          all_day: !!ev.all_day,
+          assigned_to: assignee?.id || null,
+          assigned_to_name: assignee?.name || null,
+          color: assignee?.color_theme || 'lavender',
+          location: ev.location || null,
+          description: ev.description || null,
+        }, user.id);
+
+        created.push(ev.title);
+      } catch (err) {
+        console.error(`Failed to create event "${ev.title}" from image:`, err.message);
+      }
+    }
+
+    if (created.length) {
+      const lines = [`📅 *${created.length} event${created.length > 1 ? 's' : ''} added to calendar:*`];
+      created.forEach(t => lines.push(`• ${t}`));
+      if (scan.summary) lines.push(`\n${scan.summary}`);
+      return { response: lines.join('\n'), actions: noActions };
+    }
+
+    return {
+      response: `📅 I found event information but couldn't create the events. ${scan.summary || ''}`,
       actions: noActions,
     };
   }
 
-  // Fuzzy-match against the household shopping list
-  const shoppingList = await db.getShoppingList(household.id);
-  const matchResult = await matchReceiptToList(extracted.items, shoppingList);
-
-  // Complete matched items
-  const checkedOff = [];
-  for (const match of matchResult.matches || []) {
-    if (match.confidence >= 0.7) {
-      await db.completeShoppingItemById(match.list_item_id);
-      checkedOff.push(match.list_item_name);
-    }
-  }
-
-  // Build confirmation message
-  const store = extracted.store_name ? ` from *${extracted.store_name}*` : '';
-  const lines = [`🧾 Receipt scanned${store}`];
-
-  if (checkedOff.length) {
-    lines.push(`\n✅ *Checked off:* ${checkedOff.join(', ')}`);
-  } else {
-    lines.push('\n✅ No shopping list items matched this receipt.');
-  }
-
-  if (matchResult.unmatched_receipt_items?.length) {
-    lines.push(`\n❓ *Not on your list:* ${matchResult.unmatched_receipt_items.join(', ')}`);
-  }
-
+  // ── Unknown / fallback ──
   return {
-    response: lines.join('\n'),
-    actions: { ...noActions, shoppingCompleted: checkedOff },
+    response: `🤔 I wasn't sure what to do with that image. ${scan.summary || 'Try sending a receipt to check off shopping items, or an invitation/confirmation to add events to your calendar.'}`,
+    actions: noActions,
   };
 }
 

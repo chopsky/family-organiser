@@ -1,8 +1,22 @@
 const { Router } = require('express');
+const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
+const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
+
+// Multer config for chat image uploads (10 MB, images only)
+const chatImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are accepted'));
+    }
+    cb(null, true);
+  },
+});
 
 const router = Router();
 const MODEL = 'claude-sonnet-4-6';
@@ -176,6 +190,8 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             assigned_to: assignee?.id || null,
             assigned_to_name: assignee?.name || null,
             color: assignee?.color_theme || 'lavender',
+            location: act.location || null,
+            description: act.description || null,
           }, req.user.id);
           executedActions.push({ type: 'create_event', title: act.title });
 
@@ -207,6 +223,122 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   } catch (err) {
     console.error('POST /api/chat error:', err);
     return res.status(500).json({ error: 'Failed to get AI response. Please try again.' });
+  }
+});
+
+/**
+ * POST /api/chat/image
+ * Upload an image for the AI to scan (receipts, invitations, flight confirmations, etc.)
+ */
+router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image uploaded.' });
+  }
+
+  try {
+    const members = await db.getHouseholdMembers(req.householdId);
+    const memberNames = members.map(m => m.name);
+    const scan = await scanImage(req.file.buffer, req.file.mimetype, memberNames);
+
+    const executedActions = [];
+
+    // ── Receipt handling ──
+    if (scan.type === 'receipt') {
+      const extracted = await scanReceipt(req.file.buffer, req.file.mimetype);
+
+      if (extracted.items?.length) {
+        const shoppingList = await db.getShoppingList(req.householdId);
+        const matchResult = await matchReceiptToList(extracted.items, shoppingList);
+
+        const checkedOff = [];
+        for (const match of matchResult.matches || []) {
+          if (match.confidence >= 0.7) {
+            await db.completeShoppingItemById(match.list_item_id);
+            checkedOff.push(match.list_item_name);
+          }
+        }
+
+        const store = extracted.store_name ? ` from **${extracted.store_name}**` : '';
+        let msg = `🧾 Receipt scanned${store}.\n\n`;
+        if (checkedOff.length) {
+          msg += `✅ **Checked off:** ${checkedOff.join(', ')}`;
+        } else {
+          msg += '✅ No shopping list items matched this receipt.';
+        }
+        if (matchResult.unmatched_receipt_items?.length) {
+          msg += `\n\n❓ **Not on your list:** ${matchResult.unmatched_receipt_items.join(', ')}`;
+        }
+
+        executedActions.push({ type: 'receipt_scan', checked_off: checkedOff.length });
+
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent a receipt image]');
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg);
+
+        return res.json({ message: msg, actions: executedActions });
+      }
+
+      const noItemsMsg = "🧾 I couldn't find any items on that receipt. Try sending a clearer photo.";
+      await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]');
+      await db.saveChatMessage(req.householdId, req.user.id, 'assistant', noItemsMsg);
+      return res.json({ message: noItemsMsg });
+    }
+
+    // ── Event/invitation handling ──
+    if (scan.type === 'event' && scan.events?.length) {
+      const created = [];
+      for (const ev of scan.events) {
+        try {
+          const assignee = ev.assigned_to_name
+            ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+            : null;
+
+          const startTime = ev.all_day
+            ? `${ev.date}T00:00:00Z`
+            : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+          const endTime = ev.all_day
+            ? `${ev.date}T23:59:59Z`
+            : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+
+          await db.createCalendarEvent(req.householdId, {
+            title: ev.title,
+            start_time: startTime,
+            end_time: endTime,
+            all_day: !!ev.all_day,
+            assigned_to: assignee?.id || null,
+            assigned_to_name: assignee?.name || null,
+            color: assignee?.color_theme || 'lavender',
+            location: ev.location || null,
+            description: ev.description || null,
+          }, req.user.id);
+
+          created.push(ev.title);
+        } catch (err) {
+          console.error(`Failed to create event "${ev.title}" from image:`, err.message);
+        }
+      }
+
+      if (created.length) {
+        let msg = `📅 **${created.length} event${created.length > 1 ? 's' : ''} added to calendar:**\n`;
+        created.forEach(t => { msg += `• ${t}\n`; });
+        if (scan.summary) msg += `\n${scan.summary}`;
+        executedActions.push({ type: 'create_events', count: created.length });
+
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]');
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg);
+
+        return res.json({ message: msg, actions: executedActions });
+      }
+    }
+
+    // ── Unknown ──
+    const unknownMsg = `🤔 ${scan.summary || "I wasn't sure what to do with that image. Try sending a receipt or an event invitation."}`;
+    await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]');
+    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', unknownMsg);
+    return res.json({ message: unknownMsg });
+
+  } catch (err) {
+    console.error('POST /api/chat/image error:', err);
+    return res.status(500).json({ error: 'Failed to process image. Please try again.' });
   }
 });
 

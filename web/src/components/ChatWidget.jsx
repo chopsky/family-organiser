@@ -69,6 +69,31 @@ export default function ChatWidget() {
     }
   }
 
+  async function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || loading) return;
+    e.target.value = ''; // reset input
+
+    const userMsg = { role: 'user', content: `📷 Scanning image...`, created_at: new Date().toISOString() };
+    setMessages(prev => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const { data } = await api.post('/chat/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (err) {
+      const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble processing that image. Please try again.', created_at: new Date().toISOString() };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleClearChat() {
     if (!window.confirm('Clear all chat history?')) return;
     try {
@@ -178,6 +203,13 @@ export default function ChatWidget() {
             {/* Input */}
             <form onSubmit={handleSend} className="px-4 py-3 border-t border-light-grey shrink-0">
               <div className="flex items-center gap-2">
+                {/* Image upload button */}
+                <label className={`w-10 h-10 rounded-full border border-light-grey flex items-center justify-center transition-colors shrink-0 ${loading ? 'opacity-50' : 'hover:bg-cream cursor-pointer text-warm-grey hover:text-plum'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                  </svg>
+                  <input type="file" accept="image/*" onChange={handleImageUpload} disabled={loading} className="hidden" />
+                </label>
                 <input
                   ref={inputRef}
                   type="text"

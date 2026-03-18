@@ -4,6 +4,7 @@ const {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
   RECEIPT_MATCHING_SYSTEM,
+  IMAGE_SCAN_SYSTEM,
 } = require('./prompts');
 
 const MODEL = 'claude-sonnet-4-6';
@@ -186,4 +187,54 @@ function parseJSON(text, context) {
   }
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList };
+/**
+ * Scan an image to determine if it's a receipt or contains calendar events.
+ * For events (invitations, flight confirmations, school newsletters, etc.),
+ * extracts structured event data including title, date, time, location, description.
+ *
+ * @param {Buffer|string} imageData - Image as a Buffer or base64 string
+ * @param {string} [mediaType='image/jpeg'] - MIME type of the image
+ * @param {string[]} [memberNames=[]] - Household member names for assignment
+ * @returns {Promise<{ type: string, events: Array, summary: string }>}
+ */
+async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = []) {
+  const base64 = Buffer.isBuffer(imageData)
+    ? imageData.toString('base64')
+    : imageData;
+
+  const today = new Date().toISOString().split('T')[0];
+  const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
+  const systemPrompt = IMAGE_SCAN_SYSTEM
+    .replace(/{{DATE}}/g, today)
+    .replace(/{{MEMBERS}}/g, membersStr);
+
+  return withRetry(async () => {
+    const client = getClient();
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: 2048,
+      thinking: { type: 'adaptive' },
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64 },
+            },
+            { type: 'text', text: 'Analyse this image. Is it a receipt or does it contain event/date information? Extract all relevant details.' },
+          ],
+        },
+      ],
+    });
+
+    const response = await stream.finalMessage();
+    const textBlock = response.content.find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('No text in image scan response');
+
+    return parseJSON(textBlock.text, 'image scan');
+  });
+}
+
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage };

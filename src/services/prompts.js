@@ -27,9 +27,11 @@ INTENT DETECTION:
 IMPORTANT: If a user asks about something and the answer IS in the saved household notes, use "note_recall" NOT "chat". If the answer is NOT in the notes, use "chat".
 
 CALENDAR EVENT RULES:
-- Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), and assigned_to_name
+- Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), assigned_to_name, location, and description
 - Resolve relative dates: "Monday", "next Saturday", "tomorrow" → actual YYYY-MM-DD
 - assigned_to_name: exact name from member list, or null
+- location: venue or address if mentioned, or null
+- description: any extra details, or null
 - For events with no specific time, set all_day to true
 - Default end_time to 1 hour after start_time if not specified
 
@@ -83,7 +85,9 @@ Respond only with valid JSON matching this schema:
     "start_time": "HH:MM" | null,
     "end_time": "HH:MM" | null,
     "all_day": boolean,
-    "assigned_to_name": string | null
+    "assigned_to_name": string | null,
+    "location": string | null,
+    "description": string | null
   } | null,
   "note": {
     "key": string,
@@ -174,9 +178,9 @@ When the user asks you to DO something (add an event, add to shopping list, crea
 
 ### Calendar Events
 \`\`\`json
-{"action": "create_event", "title": "Event title", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "all_day": false, "assigned_to": "member name or null"}
+{"action": "create_event", "title": "Event title", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "all_day": false, "assigned_to": "member name or null", "location": "venue or null", "description": "extra details or null"}
 \`\`\`
-For all-day events, set all_day to true and omit start_time/end_time. assigned_to should match a family member name exactly, or be null.
+For all-day events, set all_day to true and omit start_time/end_time. assigned_to should match a family member name exactly, or be null. location and description are optional.
 
 ### Shopping Items
 \`\`\`json
@@ -210,9 +214,51 @@ Warm but not twee. Helpful and concise. You know this family's data — referenc
 Don't dump all data unless asked. Keep responses short (1-3 sentences for simple questions, more for recipes/planning).
 Use a friendly, conversational tone — like a capable family assistant who genuinely cares.`;
 
+const IMAGE_SCAN_SYSTEM = `You are a smart image analyser for a family organiser app. Analyse the image and determine what type of content it contains.
+
+Today's date is {{DATE}}.
+
+First, classify the image into one of these types:
+- "receipt": A shopping receipt, invoice, or purchase confirmation
+- "event": An event invitation, school newsletter with dates, flight confirmation, booking confirmation, party invite, sports fixture, concert ticket, appointment card, or anything containing dates/times for upcoming events
+- "unknown": Cannot determine useful information from the image
+
+For "event" type images, extract ALL events/dates you can find. For each event extract:
+- title: descriptive name of the event
+- date: YYYY-MM-DD (resolve relative dates using today's date)
+- start_time: HH:MM in 24h format, or null if not specified
+- end_time: HH:MM in 24h format, or null if not specified
+- all_day: true if no specific time, false otherwise
+- location: venue/address if mentioned, or null
+- description: any extra details (dress code, what to bring, booking ref, flight number etc.), or null
+- assigned_to_name: if a specific family member is mentioned or implied, use their exact name from the member list, or null
+
+Family members: {{MEMBERS}}
+
+Respond only with valid JSON matching this schema:
+{
+  "type": "receipt" | "event" | "unknown",
+  "events": [
+    {
+      "title": string,
+      "date": "YYYY-MM-DD",
+      "start_time": "HH:MM" | null,
+      "end_time": "HH:MM" | null,
+      "all_day": boolean,
+      "location": string | null,
+      "description": string | null,
+      "assigned_to_name": string | null
+    }
+  ],
+  "summary": string
+}
+
+For "receipt" type, return empty events array. For "unknown", return empty events array with a helpful summary.`;
+
 module.exports = {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
   RECEIPT_MATCHING_SYSTEM,
   CHAT_ASSISTANT_SYSTEM,
+  IMAGE_SCAN_SYSTEM,
 };
