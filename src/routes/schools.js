@@ -1,5 +1,7 @@
 const { Router } = require('express');
+const ical = require('node-ical');
 const db = require('../db/queries');
+const { callWithFailover } = require('../services/ai-client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
@@ -138,6 +140,20 @@ router.get('/:schoolId/term-dates', requireAuth, requireHousehold, async (req, r
 });
 
 /**
+ * DELETE /api/schools/term-dates/:dateId
+ * Remove a single term date entry.
+ */
+router.delete('/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    await db.deleteSchoolTermDate(req.params.dateId);
+    return res.json({ message: 'Term date removed.' });
+  } catch (err) {
+    console.error('DELETE /api/schools/term-dates error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/schools/activities
  * Add a weekly activity for a child.
  */
@@ -192,6 +208,124 @@ router.delete('/activities/:activityId', requireAuth, requireHousehold, requireA
     return res.json({ message: 'Activity removed.' });
   } catch (err) {
     console.error('DELETE /api/schools/activities error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/schools/:schoolId/import-ical
+ * Import events from a school's iCal feed URL.
+ * Uses AI to categorise events into term dates, INSET days, etc.
+ */
+router.post('/:schoolId/import-ical', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { ical_url } = req.body;
+  if (!ical_url?.trim()) {
+    return res.status(400).json({ error: 'iCal URL is required.' });
+  }
+
+  try {
+    // Fetch and parse the iCal feed
+    const events = await ical.async.fromURL(ical_url.trim());
+    const eventList = Object.values(events)
+      .filter(e => e.type === 'VEVENT')
+      .map(e => ({
+        title: e.summary || 'Untitled',
+        date: e.start ? new Date(e.start).toISOString().split('T')[0] : null,
+        end_date: e.end ? new Date(e.end).toISOString().split('T')[0] : null,
+        description: e.description || '',
+      }))
+      .filter(e => e.date);
+
+    if (eventList.length === 0) {
+      return res.json({ imported: 0, message: 'No events found in the iCal feed.' });
+    }
+
+    // Use AI to categorise the events
+    const categorisePrompt = `You are categorising school calendar events. For each event, determine the category.
+
+Events to categorise:
+${eventList.map((e, i) => `${i + 1}. "${e.title}" on ${e.date}${e.end_date && e.end_date !== e.date ? ` to ${e.end_date}` : ''}`).join('\n')}
+
+Return a JSON array where each element has:
+- index: the event number (1-based)
+- category: one of: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday, parents_evening, sports_day, performance, trip, exam, other
+- label: a clean display label
+
+Only return valid JSON array, nothing else.`;
+
+    const { text } = await callWithFailover({
+      system: 'You categorise school calendar events. Return only valid JSON.',
+      messages: [{ role: 'user', content: categorisePrompt }],
+    });
+
+    let categorised;
+    try {
+      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      categorised = JSON.parse(cleaned);
+    } catch {
+      categorised = eventList.map((e, i) => ({ index: i + 1, category: 'other', label: e.title }));
+    }
+
+    // Import categorised events as term dates
+    const termDateTypes = ['term_start', 'term_end', 'half_term_start', 'half_term_end', 'inset_day', 'bank_holiday'];
+    const termDates = [];
+    const now = new Date();
+    const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+
+    for (const cat of categorised) {
+      const event = eventList[cat.index - 1];
+      if (!event) continue;
+
+      if (termDateTypes.includes(cat.category)) {
+        termDates.push({
+          academic_year: academicYear,
+          event_type: cat.category,
+          date: event.date,
+          end_date: event.end_date !== event.date ? event.end_date : null,
+          label: cat.label || event.title,
+          source: 'ical_import',
+        });
+      }
+    }
+
+    if (termDates.length > 0) {
+      await db.addSchoolTermDates(req.params.schoolId, termDates);
+    }
+
+    // Save iCal URL on the school
+    await db.updateHouseholdSchool(req.params.schoolId, { ical_url: ical_url.trim() });
+
+    return res.json({
+      imported: termDates.length,
+      total_events: eventList.length,
+      message: `Imported ${termDates.length} term dates from ${eventList.length} events.`,
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/import-ical error:', err);
+    return res.status(500).json({ error: `Failed to import calendar: ${err.message}` });
+  }
+});
+
+/**
+ * PATCH /api/schools/:id
+ * Update school details (colour, ical_url, etc).
+ */
+router.patch('/:id', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { colour, ical_url, school_name } = req.body;
+  const updates = {};
+  if (colour !== undefined) updates.colour = colour;
+  if (ical_url !== undefined) updates.ical_url = ical_url;
+  if (school_name !== undefined) updates.school_name = school_name;
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ error: 'No valid fields to update.' });
+  }
+
+  try {
+    const updated = await db.updateHouseholdSchool(req.params.id, updates);
+    return res.json({ school: updated });
+  } catch (err) {
+    console.error('PATCH /api/schools/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

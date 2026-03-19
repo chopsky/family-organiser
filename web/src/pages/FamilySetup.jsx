@@ -71,6 +71,15 @@ export default function FamilySetup() {
   const [addActivityEnd, setAddActivityEnd] = useState('');
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [savingActivity, setSavingActivity] = useState(false);
+  const [editTermDates, setEditTermDates] = useState([]);
+  const [showAddTermDate, setShowAddTermDate] = useState(false);
+  const [termDateType, setTermDateType] = useState('inset_day');
+  const [termDateDate, setTermDateDate] = useState('');
+  const [termDateEndDate, setTermDateEndDate] = useState('');
+  const [termDateLabel, setTermDateLabel] = useState('');
+  const [savingTermDate, setSavingTermDate] = useState(false);
+  const [icalUrl, setIcalUrl] = useState('');
+  const [importingIcal, setImportingIcal] = useState(false);
 
   function loadMembers() {
     return api.get('/household')
@@ -204,13 +213,23 @@ export default function FamilySetup() {
     setEditSchoolSearch(school?.school_name || '');
     setEditSchoolResults([]);
     setShowAddActivity(false);
-    // Load activities for this member
+    setShowAddTermDate(false);
+    setEditTermDates([]);
+    // Load activities and term dates for this member
     if (member.member_type === 'dependent') {
       setLoadingActivities(true);
       api.get(`/schools/activities/${member.id}`)
         .then(({ data }) => setEditActivities(data.activities || []))
         .catch(() => setEditActivities([]))
         .finally(() => setLoadingActivities(false));
+      // Load term dates if they have a school
+      if (member.school_id) {
+        api.get(`/schools/${member.school_id}/term-dates`)
+          .then(({ data }) => setEditTermDates(data.term_dates || []))
+          .catch(() => setEditTermDates([]));
+        const school = householdSchools.find(s => s.id === member.school_id);
+        setIcalUrl(school?.ical_url || '');
+      }
     } else {
       setEditActivities([]);
     }
@@ -235,6 +254,63 @@ export default function FamilySetup() {
       setError(err.response?.data?.error || 'Could not add activity.');
     } finally {
       setSavingActivity(false);
+    }
+  }
+
+  async function handleAddTermDate() {
+    if (!termDateDate || !editingMember?.school_id) return;
+    setSavingTermDate(true);
+    try {
+      const now = new Date();
+      const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+      const { data } = await api.post(`/schools/${editingMember.school_id}/term-dates`, {
+        dates: [{
+          academic_year: academicYear,
+          event_type: termDateType,
+          date: termDateDate,
+          end_date: termDateEndDate || null,
+          label: termDateLabel.trim() || null,
+          source: 'manual',
+        }],
+      });
+      setEditTermDates(prev => [...prev, ...(data.term_dates || [])]);
+      setShowAddTermDate(false);
+      setTermDateDate('');
+      setTermDateEndDate('');
+      setTermDateLabel('');
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not add term date.');
+    } finally {
+      setSavingTermDate(false);
+    }
+  }
+
+  async function handleDeleteTermDate(dateId) {
+    try {
+      await api.delete(`/schools/term-dates/${dateId}`);
+      setEditTermDates(prev => prev.filter(d => d.id !== dateId));
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove term date.');
+    }
+  }
+
+  async function handleImportIcal() {
+    if (!icalUrl.trim() || !editingMember?.school_id) return;
+    setImportingIcal(true);
+    try {
+      const { data } = await api.post(`/schools/${editingMember.school_id}/import-ical`, { ical_url: icalUrl.trim() });
+      setSuccess(data.message || 'Calendar imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      // Refresh term dates
+      const { data: tdData } = await api.get(`/schools/${editingMember.school_id}/term-dates`);
+      setEditTermDates(tdData.term_dates || []);
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not import calendar.');
+    } finally {
+      setImportingIcal(false);
     }
   }
 
@@ -1129,6 +1205,68 @@ export default function FamilySetup() {
                           + Add activity
                         </button>
                       )}
+                    </>
+                  )}
+
+                  {/* Term dates */}
+                  {editingMember?.school_id && (
+                    <>
+                      <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">📆 Term dates & INSET days</h3>
+                      {editTermDates.length > 0 ? (
+                        <div className="space-y-1 mt-2">
+                          {editTermDates.map(td => (
+                            <div key={td.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-cream-border text-xs group">
+                              <div>
+                                <span className="font-medium text-bark">{td.label || td.event_type.replace(/_/g, ' ')}</span>
+                                <span className="text-cocoa ml-2">{td.date}{td.end_date && td.end_date !== td.date ? ` → ${td.end_date}` : ''}</span>
+                              </div>
+                              <button onClick={() => handleDeleteTermDate(td.id)} className="text-error/60 hover:text-error hidden group-hover:block" title="Remove">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-cocoa mt-1">No term dates added yet.</p>
+                      )}
+
+                      {showAddTermDate ? (
+                        <div className="bg-white rounded-lg border border-cream-border p-3 mt-2 space-y-2">
+                          <div className="flex gap-2">
+                            <select value={termDateType} onChange={(e) => setTermDateType(e.target.value)} className="border border-cream-border rounded-lg px-2 py-2 text-xs bg-white">
+                              <option value="term_start">Term start</option>
+                              <option value="term_end">Term end</option>
+                              <option value="half_term_start">Half term start</option>
+                              <option value="half_term_end">Half term end</option>
+                              <option value="inset_day">INSET day</option>
+                              <option value="bank_holiday">Bank holiday</option>
+                            </select>
+                            <input type="text" value={termDateLabel} onChange={(e) => setTermDateLabel(e.target.value)} placeholder="Label (optional)" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <input type="date" value={termDateDate} onChange={(e) => setTermDateDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
+                            <span className="text-xs text-cocoa">to</span>
+                            <input type="date" value={termDateEndDate} onChange={(e) => setTermDateEndDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" placeholder="End (optional)" />
+                            <div className="flex-1" />
+                            <button onClick={() => setShowAddTermDate(false)} className="text-xs text-cocoa">Cancel</button>
+                            <button onClick={handleAddTermDate} disabled={savingTermDate || !termDateDate} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
+                              {savingTermDate ? 'Adding...' : 'Add'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setShowAddTermDate(true)} className="mt-2 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors">
+                          + Add term date
+                        </button>
+                      )}
+
+                      {/* iCal import */}
+                      <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">🔗 School calendar feed</h3>
+                      <p className="text-xs text-cocoa">Paste the iCal URL from your school's website to auto-import term dates.</p>
+                      <div className="flex gap-2 mt-1">
+                        <input type="url" value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://school.com/calendar.ics" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
+                        <button onClick={handleImportIcal} disabled={importingIcal || !icalUrl.trim()} className="text-xs bg-primary text-white px-3 py-2 rounded-lg font-medium disabled:opacity-50 whitespace-nowrap">
+                          {importingIcal ? 'Importing...' : 'Import'}
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>

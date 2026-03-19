@@ -730,6 +730,9 @@ export default function Settings() {
         </p>
       </div>
 
+      {/* Schools (admin only) */}
+      {isAdmin && <SchoolsSection />}
+
       {/* Log out */}
       <button
         onClick={() => { logout(); navigate('/'); }}
@@ -843,6 +846,63 @@ export default function Settings() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Schools management section for Settings (admin only).
+ * Shows all linked schools with children, term date source, and calendar colour.
+ */
+function SchoolsSection() {
+  const [schools, setSchools] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/schools')
+      .then(({ data }) => setSchools(data.schools || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <Spinner />;
+  if (schools.length === 0) return null;
+
+  return (
+    <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+      <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">🏫 Schools</h2>
+      <p className="text-xs text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
+      <div className="space-y-3">
+        {schools.map(school => (
+          <div key={school.id} className="bg-white rounded-xl border border-cream-border p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-bark">{school.school_name}</p>
+                <p className="text-xs text-cocoa">
+                  {school.school_type && `${school.school_type} · `}
+                  {school.local_authority && `${school.local_authority} · `}
+                  {school.postcode}
+                </p>
+              </div>
+              <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: school.colour || '#4A90D9' }} />
+            </div>
+            {/* Children at this school */}
+            {school.children?.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {school.children.map(c => (
+                  <span key={c.id} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
+                    {c.name}{c.year_group ? ` · ${c.year_group}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Term dates count */}
+            <p className="text-[11px] text-cocoa mt-2">
+              {school.term_dates?.length || 0} term dates · {school.ical_url ? 'iCal connected' : 'Manual dates'}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

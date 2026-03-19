@@ -333,6 +333,17 @@ async function deleteHouseholdSchool(schoolId, householdId) {
   if (error) throw error;
 }
 
+async function updateHouseholdSchool(schoolId, updates) {
+  const { data, error } = await supabase
+    .from('household_schools')
+    .update(updates)
+    .eq('id', schoolId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function addSchoolTermDates(schoolId, dates) {
   const rows = dates.map(d => ({
     school_id: schoolId,
@@ -360,6 +371,14 @@ async function getSchoolTermDates(schoolId) {
     .order('date');
   if (error) throw error;
   return data || [];
+}
+
+async function deleteSchoolTermDate(dateId) {
+  const { error } = await supabase
+    .from('school_term_dates')
+    .delete()
+    .eq('id', dateId);
+  if (error) throw error;
 }
 
 async function addChildActivity(data) {
@@ -1379,8 +1398,10 @@ module.exports = {
   getHouseholdSchools,
   getHouseholdSchoolByUrn,
   deleteHouseholdSchool,
+  updateHouseholdSchool,
   addSchoolTermDates,
   getSchoolTermDates,
+  deleteSchoolTermDate,
   addChildActivity,
   getChildActivities,
   deleteChildActivity,
