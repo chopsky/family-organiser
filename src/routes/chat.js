@@ -5,7 +5,7 @@ const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
-const { getWeatherReport } = require('../services/weather');
+const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
 
 // Multer config for chat image uploads (10 MB, images only)
 const chatImageUpload = multer({
@@ -65,17 +65,21 @@ function getClient() {
 /**
  * Build the system prompt with family context injected.
  */
-async function buildSystemPrompt(householdId, householdName) {
+async function buildSystemPrompt(householdId, householdName, userId) {
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-  const [members, notes, shopping, tasks, events] = await Promise.all([
+  const [members, notes, shopping, tasks, events, household] = await Promise.all([
     db.getHouseholdMembers(householdId),
     db.getHouseholdNotes(householdId),
     db.getShoppingList(householdId),
     db.getAllIncompleteTasks(householdId),
     db.getCalendarEvents(householdId, today, twoWeeks),
+    db.getHouseholdById(householdId),
   ]);
+
+  const currentUser = members.find(m => m.id === userId);
+  const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
 
   const membersStr = members.map(m => `${m.name}${m.family_role ? ` (${m.family_role})` : ''}`).join(', ') || 'none';
   const notesStr = notes.length > 0
@@ -94,6 +98,7 @@ async function buildSystemPrompt(householdId, householdName) {
   return CHAT_ASSISTANT_SYSTEM
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
+    .replace(/{{TIMEZONE}}/g, userTz)
     .replace(/{{MEMBERS}}/g, membersStr)
     .replace(/{{SHOPPING_LIST}}/g, shoppingStr)
     .replace(/{{TASKS}}/g, tasksStr)
@@ -172,7 +177,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     // Build context-rich system prompt
     const household = await db.getHouseholdById(req.householdId);
-    const systemPrompt = await buildSystemPrompt(req.householdId, household?.name);
+    const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id);
 
     // Get recent conversation history for context
     const history = await db.getChatHistory(req.user.id, 30);
@@ -239,15 +244,21 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
-          const lat = currentUser?.latitude;
-          const lon = currentUser?.longitude;
+          let lat = currentUser?.latitude;
+          let lon = currentUser?.longitude;
+          // Fallback: derive coordinates from timezone if no GPS
+          if (!lat || !lon) {
+            const tzCoords = getCoordsFromTimezone(userTz);
+            if (tzCoords) {
+              [lat, lon] = tzCoords;
+            }
+          }
           if (lat && lon) {
             const report = await getWeatherReport(lat, lon, userTz);
-            // Append weather to the clean content so user sees it
             cleanContent += '\n\n' + report;
             executedActions.push({ type: 'fetch_weather' });
           } else {
-            cleanContent += "\n\n📍 I don't have your location yet. Please make sure location access is enabled in your browser when using the Anora app, then ask me again!";
+            cleanContent += "\n\n📍 I couldn't determine your location. Try opening the app in your browser to sync your timezone, then ask me again!";
           }
 
         } else if (act.action === 'create_task') {

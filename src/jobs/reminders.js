@@ -1,6 +1,6 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
-const { getWeatherReport } = require('../services/weather');
+const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
 
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 
@@ -105,12 +105,18 @@ async function sendDailyReminders(householdId, singleMember) {
       .eq('assigned_to', member.id)
       .lte('due_date', today);
 
-    // Fetch brief weather if user has geolocation
+    // Fetch brief weather — use GPS coords or fall back to timezone-based coords
     let weatherBrief = null;
-    if (member.latitude && member.longitude) {
+    const tz = member.timezone || 'Europe/London';
+    let wLat = member.latitude;
+    let wLon = member.longitude;
+    if (!wLat || !wLon) {
+      const tzCoords = getCoordsFromTimezone(tz);
+      if (tzCoords) [wLat, wLon] = tzCoords;
+    }
+    if (wLat && wLon) {
       try {
-        const tz = member.timezone || 'Europe/London';
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${member.latitude}&longitude=${member.longitude}&current=temperature_2m,apparent_temperature,weather_code&timezone=${encodeURIComponent(tz)}`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${wLat}&longitude=${wLon}&current=temperature_2m,apparent_temperature,weather_code&timezone=${encodeURIComponent(tz)}`;
         const weatherRes = await fetch(url);
         if (weatherRes.ok) {
           const wd = await weatherRes.json();
