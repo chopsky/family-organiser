@@ -109,6 +109,10 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   if (timezone !== undefined) {
     updates.timezone = timezone || null;
   }
+  if (req.body.latitude !== undefined && req.body.longitude !== undefined) {
+    updates.latitude = req.body.latitude;
+    updates.longitude = req.body.longitude;
+  }
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update.' });

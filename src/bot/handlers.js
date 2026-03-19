@@ -9,6 +9,7 @@
 const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
+const { getWeatherReport } = require('../services/weather');
 
 // ─── Timezone helper ──────────────────────────────────────────────────────────
 
@@ -131,6 +132,25 @@ async function handleTextMessage(text, user, household) {
   if (result.intent === 'query_tasks') {
     const taskResponse = await handleTasks(user, household);
     return { response: taskResponse, actions };
+  }
+
+  // Handle weather request
+  if (result.intent === 'weather') {
+    try {
+      // Get user's geolocation from profile
+      const fullUser = household.members.find(m => m.id === user.id);
+      const lat = fullUser?.latitude;
+      const lon = fullUser?.longitude;
+      if (!lat || !lon) {
+        return { response: "I don't have your location yet. Please open the Anora app in your browser first so I can detect your location, then ask me again! 📍", actions };
+      }
+      const tz = fullUser?.timezone || household.timezone || 'Europe/London';
+      const report = await getWeatherReport(lat, lon, tz);
+      return { response: report, actions };
+    } catch (err) {
+      console.error('Weather fetch failed:', err.message);
+      return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
+    }
   }
 
   // Handle note save/delete

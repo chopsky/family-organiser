@@ -5,6 +5,7 @@ const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
+const { getWeatherReport } = require('../services/weather');
 
 // Multer config for chat image uploads (10 MB, images only)
 const chatImageUpload = multer({
@@ -236,6 +237,18 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         } else if (act.action === 'add_shopping' && act.items?.length) {
           await db.addShoppingItems(req.householdId, act.items, req.user.id);
           executedActions.push({ type: 'add_shopping', count: act.items.length });
+
+        } else if (act.action === 'fetch_weather') {
+          const lat = currentUser?.latitude;
+          const lon = currentUser?.longitude;
+          if (lat && lon) {
+            const report = await getWeatherReport(lat, lon, userTz);
+            // Append weather to the clean content so user sees it
+            cleanContent += '\n\n' + report;
+            executedActions.push({ type: 'fetch_weather' });
+          } else {
+            cleanContent += "\n\n📍 I don't have your location yet. Please make sure location access is enabled in your browser when using the Anora app, then ask me again!";
+          }
 
         } else if (act.action === 'create_task') {
           await db.addTasks(req.householdId, [{

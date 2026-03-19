@@ -27,6 +27,8 @@ create table if not exists users (
   avatar_url         text,
   reminder_time      time,
   timezone           text,
+  latitude           double precision,
+  longitude          double precision,
   created_at         timestamp with time zone default now()
 );
 

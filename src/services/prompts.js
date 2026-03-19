@@ -22,6 +22,7 @@ INTENT DETECTION:
 - "note_save": User wants you to remember/save something (e.g. "remember our wifi password is ABC123", "save the alarm code as 4567", "our vet's number is 012 345 6789"). Extract the key (what it is) and value (the info to save).
 - "note_recall": User is asking about something that IS in the saved household notes above. Look up the answer from the notes and include it in response_message.
 - "create_event": User wants to add a calendar event (e.g. "add dentist on Monday at 10am", "schedule Logan's tennis for Saturday 5pm", "put anniversary on 20 March"). Extract event details into the "calendar_event" field.
+- "weather": User is asking about the weather (e.g. "what's the weather?", "will it rain today?", "do I need an umbrella?", "how's the weather this week?").
 - "chat": Any general question, conversation, or request that doesn't match the above. This includes: recipes, advice, general knowledge, greetings, or questions about things NOT in the saved notes. Answer helpfully and conversationally.
 
 IMPORTANT: If a user asks about something and the answer IS in the saved household notes, use "note_recall" NOT "chat". If the answer is NOT in the notes, use "chat".
@@ -172,6 +173,7 @@ Today is {{DATE}}.
 - Remember things long-term when asked ("remember this", "save a note", "take note")
 - Recall saved notes when asked ("what's the wifi password?", "what do you remember about...")
 - Forget notes when asked ("forget the gate code", "delete the note about...")
+- **Fetch the weather** when asked ("what's the weather?", "will it rain today?", "do I need a jacket?")
 
 ## Action Instructions
 When the user asks you to DO something (add an event, add to shopping list, create a task, or save a note), respond naturally AND include a JSON action block at the very end of your response.
@@ -206,6 +208,12 @@ To delete a note:
 \`\`\`json
 {"action": "delete_note", "key": "the key to delete"}
 \`\`\`
+
+### Weather
+\`\`\`json
+{"action": "fetch_weather"}
+\`\`\`
+Include this when the user asks about the weather, temperature, or if they need an umbrella/jacket.
 
 Only include JSON action blocks when performing an action. Never include them in normal conversational responses. You may include multiple action blocks in a single response if the user asks for multiple things.
 
