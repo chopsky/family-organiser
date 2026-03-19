@@ -127,7 +127,29 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
       fullUser = (await db.getHouseholdMembers(req.householdId)).find(m => m.id === targetUserId);
     }
 
+    // Capture the old school_id before updating (for orphan cleanup)
+    let oldSchoolId = null;
+    if (school_id !== undefined) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      const targetMember = members.find(m => m.id === targetUserId);
+      oldSchoolId = targetMember?.school_id || null;
+    }
+
     const updated = await db.updateUser(targetUserId, updates);
+
+    // Clean up orphaned schools — if this was the last child at the old school, delete it
+    if (oldSchoolId && oldSchoolId !== (school_id || null)) {
+      try {
+        const members = await db.getHouseholdMembers(req.householdId);
+        const stillLinked = members.some(m => m.school_id === oldSchoolId);
+        if (!stillLinked) {
+          await db.deleteHouseholdSchool(oldSchoolId, req.householdId);
+          console.log(`[orphan-cleanup] Deleted orphaned school ${oldSchoolId} — no children remaining`);
+        }
+      } catch (cleanupErr) {
+        console.error('School orphan cleanup failed (non-fatal):', cleanupErr.message);
+      }
+    }
 
     // Handle birthday calendar event — only when birthday field is explicitly sent and changed
     if (birthday !== undefined && fullUser) {
@@ -269,7 +291,23 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
       return res.status(404).json({ error: 'Member not found in this household.' });
     }
 
+    const removedSchoolId = target.school_id;
     await db.deleteUser(userId, req.householdId);
+
+    // Clean up orphaned school if this was the last child linked to it
+    if (removedSchoolId) {
+      try {
+        const remaining = await db.getHouseholdMembers(req.householdId);
+        const stillLinked = remaining.some(m => m.school_id === removedSchoolId);
+        if (!stillLinked) {
+          await db.deleteHouseholdSchool(removedSchoolId, req.householdId);
+          console.log(`[orphan-cleanup] Deleted orphaned school ${removedSchoolId} after member removal`);
+        }
+      } catch (e) {
+        console.error('School orphan cleanup failed (non-fatal):', e.message);
+      }
+    }
+
     return res.json({ message: 'Member removed.' });
   } catch (err) {
     console.error('DELETE /api/household/members error:', err);

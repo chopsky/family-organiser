@@ -35,18 +35,28 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const members = await db.getHouseholdMembers(req.householdId);
 
     // Enrich each school with its children and term dates
-    const enriched = await Promise.all(schools.map(async (school) => {
+    const enriched = [];
+    for (const school of schools) {
       const children = members.filter(m => m.school_id === school.id);
-      const termDates = await db.getSchoolTermDates(school.id);
 
-      // Get activities for each child at this school
+      // Auto-cleanup: if no children are linked to this school, delete it
+      if (children.length === 0) {
+        try {
+          await db.deleteHouseholdSchool(school.id, req.householdId);
+          console.log(`[orphan-cleanup] Auto-deleted orphaned school "${school.school_name}" (${school.id})`);
+        } catch (e) {
+          console.error('Auto-cleanup failed:', e.message);
+        }
+        continue; // Don't include in response
+      }
+
+      const termDates = await db.getSchoolTermDates(school.id);
       const childrenWithActivities = await Promise.all(children.map(async (child) => {
         const activities = await db.getChildActivities(child.id);
         return { ...child, activities };
       }));
-
-      return { ...school, children: childrenWithActivities, term_dates: termDates };
-    }));
+      enriched.push({ ...school, children: childrenWithActivities, term_dates: termDates });
+    }
 
     return res.json({ schools: enriched });
   } catch (err) {
