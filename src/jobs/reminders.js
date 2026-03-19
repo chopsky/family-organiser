@@ -1,5 +1,6 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
+const { getWeatherReport } = require('../services/weather');
 
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 
@@ -12,12 +13,18 @@ const whatsapp = require('../services/whatsapp');
  * @param {number} shoppingCount - Number of incomplete shopping items
  * @returns {string}
  */
-function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount) {
+function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, weatherBrief) {
   const today = new Date().toISOString().split('T')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   const lines = [`${greeting}, ${user.name}! Here's what's on for today:\n`];
+
+  // Weather brief (if available)
+  if (weatherBrief) {
+    lines.push(weatherBrief);
+    lines.push('');
+  }
 
   // Personal tasks
   if (myTasks.length) {
@@ -98,11 +105,29 @@ async function sendDailyReminders(householdId, singleMember) {
       .eq('assigned_to', member.id)
       .lte('due_date', today);
 
+    // Fetch brief weather if user has geolocation
+    let weatherBrief = null;
+    if (member.latitude && member.longitude) {
+      try {
+        const tz = member.timezone || 'Europe/London';
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${member.latitude}&longitude=${member.longitude}&current=temperature_2m,apparent_temperature,weather_code&timezone=${encodeURIComponent(tz)}`;
+        const weatherRes = await fetch(url);
+        if (weatherRes.ok) {
+          const wd = await weatherRes.json();
+          const c = wd.current;
+          const codes = { 0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌦️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'❄️',95:'⛈️',96:'⛈️',99:'⛈️' };
+          const icon = codes[c.weather_code] || '🌡️';
+          weatherBrief = `${icon} *Weather:* ${Math.round(c.temperature_2m)}°C (feels like ${Math.round(c.apparent_temperature)}°C)`;
+        }
+      } catch { /* silently skip weather on error */ }
+    }
+
     const message = buildDailyReminderMessage(
       member,
       myTasks || [],
       everyoneTasks || [],
-      shoppingCount
+      shoppingCount,
+      weatherBrief
     );
 
     // Send via WhatsApp
