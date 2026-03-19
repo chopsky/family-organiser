@@ -307,6 +307,154 @@ Only return valid JSON array, nothing else.`;
 });
 
 /**
+ * POST /api/schools/:schoolId/import-la-dates
+ * Scrape term dates from the school's local authority website using AI.
+ */
+router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    // Get the school's LA
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find(s => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+    if (!school.local_authority) return res.status(400).json({ error: 'No local authority associated with this school.' });
+
+    const now = new Date();
+    const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+
+    // Use AI to find and extract LA term dates
+    const { text } = await callWithFailover({
+      system: `You are a UK school term date researcher. When given a local authority name, provide the term dates for the ${academicYear} academic year.
+
+You should know the standard UK school term structure:
+- Autumn term: September to December (with October half term)
+- Spring term: January to March/April (with February half term)
+- Summer term: April to July (with May/June half term)
+
+Provide your best knowledge of the dates for this specific local authority. If you're not certain of exact dates, use typical dates for that region.
+
+Return ONLY a valid JSON array with objects like:
+[
+  {"event_type": "term_start", "date": "2025-09-03", "label": "Autumn term starts"},
+  {"event_type": "half_term_start", "date": "2025-10-27", "end_date": "2025-10-31", "label": "Autumn half term"},
+  {"event_type": "term_end", "date": "2025-12-19", "label": "Autumn term ends"},
+  ...
+]
+
+Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
+For half terms, use half_term_start with an end_date spanning the week.
+Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
+      messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
+    });
+
+    let dates;
+    try {
+      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      dates = JSON.parse(cleaned);
+    } catch {
+      return res.status(500).json({ error: 'Could not parse term dates from AI response.' });
+    }
+
+    if (!Array.isArray(dates) || dates.length === 0) {
+      return res.status(500).json({ error: 'No term dates found.' });
+    }
+
+    // Add academic year and source to each date
+    const termDates = dates.map(d => ({
+      ...d,
+      academic_year: academicYear,
+      source: 'local_authority',
+    }));
+
+    await db.addSchoolTermDates(req.params.schoolId, termDates);
+
+    return res.json({
+      imported: termDates.length,
+      local_authority: school.local_authority,
+      message: `Imported ${termDates.length} term dates for ${school.local_authority}.`,
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/import-la-dates error:', err);
+    return res.status(500).json({ error: `Failed to import LA dates: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/schools/:schoolId/import-website
+ * Scrape term dates from a school's website using AI.
+ */
+router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { website_url } = req.body;
+  if (!website_url?.trim()) {
+    return res.status(400).json({ error: 'School website URL is required.' });
+  }
+
+  try {
+    const now = new Date();
+    const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+
+    // Fetch the webpage content
+    let pageText;
+    try {
+      const response = await fetch(website_url.trim());
+      const html = await response.text();
+      // Strip HTML tags to get plain text
+      pageText = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 8000); // Limit to avoid token overflow
+    } catch (fetchErr) {
+      return res.status(400).json({ error: `Could not fetch the website: ${fetchErr.message}` });
+    }
+
+    // Use AI to extract term dates from the page content
+    const { text } = await callWithFailover({
+      system: `You extract school term dates from website content. Look for term start/end dates, half term dates, INSET days, and holidays for the ${academicYear} academic year.
+
+Return ONLY a valid JSON array:
+[
+  {"event_type": "term_start", "date": "YYYY-MM-DD", "label": "Description"},
+  {"event_type": "half_term_start", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "label": "Description"},
+  ...
+]
+
+Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
+If you cannot find term dates in the content, return an empty array [].`,
+      messages: [{ role: 'user', content: `Extract all school term dates from this school website page:\n\n${pageText}` }],
+    });
+
+    let dates;
+    try {
+      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      dates = JSON.parse(cleaned);
+    } catch {
+      return res.status(500).json({ error: 'Could not parse term dates from the website content.' });
+    }
+
+    if (!Array.isArray(dates) || dates.length === 0) {
+      return res.json({ imported: 0, message: 'No term dates found on that page. Try a different URL or add dates manually.' });
+    }
+
+    const termDates = dates.map(d => ({
+      ...d,
+      academic_year: academicYear,
+      source: 'website_scrape',
+    }));
+
+    await db.addSchoolTermDates(req.params.schoolId, termDates);
+
+    return res.json({
+      imported: termDates.length,
+      message: `Found and imported ${termDates.length} term dates from the school website.`,
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/import-website error:', err);
+    return res.status(500).json({ error: `Failed to import from website: ${err.message}` });
+  }
+});
+
+/**
  * PATCH /api/schools/:id
  * Update school details (colour, ical_url, etc).
  */

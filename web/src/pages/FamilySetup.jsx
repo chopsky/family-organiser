@@ -80,6 +80,15 @@ export default function FamilySetup() {
   const [savingTermDate, setSavingTermDate] = useState(false);
   const [icalUrl, setIcalUrl] = useState('');
   const [importingIcal, setImportingIcal] = useState(false);
+  const [showTermDateOptions, setShowTermDateOptions] = useState(false);
+  const [termDateSchoolId, setTermDateSchoolId] = useState(null);
+  const [termDateSchoolName, setTermDateSchoolName] = useState('');
+  const [termDateSchoolLA, setTermDateSchoolLA] = useState('');
+  const [importingLA, setImportingLA] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [importingWebsite, setImportingWebsite] = useState(false);
+  const [termImportIcalUrl, setTermImportIcalUrl] = useState('');
+  const [importingTermIcal, setImportingTermIcal] = useState(false);
 
   function loadMembers() {
     return api.get('/household')
@@ -179,7 +188,20 @@ export default function FamilySetup() {
       });
       setShowAddDependent(false);
       await loadMembers();
-      await loadSchools();
+      const updatedSchools = await api.get('/schools').then(r => r.data.schools || []);
+      setHouseholdSchools(updatedSchools);
+
+      // If a NEW school was just created (not existing), show term date import options
+      if (schoolId && !householdSchools.find(s => s.id === schoolId)) {
+        const newSchool = updatedSchools.find(s => s.id === schoolId);
+        if (newSchool) {
+          setTermDateSchoolId(schoolId);
+          setTermDateSchoolName(newSchool.school_name);
+          setTermDateSchoolLA(newSchool.local_authority || '');
+          setShowTermDateOptions(true);
+          return; // Don't show generic success — the term date flow will handle it
+        }
+      }
       setSuccess('Member added!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (err) {
@@ -311,6 +333,54 @@ export default function FamilySetup() {
       setError(err.response?.data?.error || 'Could not import calendar.');
     } finally {
       setImportingIcal(false);
+    }
+  }
+
+  async function handleImportLADates() {
+    if (!termDateSchoolId) return;
+    setImportingLA(true);
+    try {
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-la-dates`);
+      setSuccess(data.message || 'Term dates imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      setShowTermDateOptions(false);
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not import LA dates.');
+    } finally {
+      setImportingLA(false);
+    }
+  }
+
+  async function handleImportWebsite() {
+    if (!termDateSchoolId || !websiteUrl.trim()) return;
+    setImportingWebsite(true);
+    try {
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-website`, { website_url: websiteUrl.trim() });
+      setSuccess(data.message || 'Term dates imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      setShowTermDateOptions(false);
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not import from website.');
+    } finally {
+      setImportingWebsite(false);
+    }
+  }
+
+  async function handleImportTermIcal() {
+    if (!termDateSchoolId || !termImportIcalUrl.trim()) return;
+    setImportingTermIcal(true);
+    try {
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-ical`, { ical_url: termImportIcalUrl.trim() });
+      setSuccess(data.message || 'Calendar imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      setShowTermDateOptions(false);
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not import calendar.');
+    } finally {
+      setImportingTermIcal(false);
     }
   }
 
@@ -976,6 +1046,107 @@ export default function FamilySetup() {
               <button onClick={handleAddMember} disabled={addingMember} className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors">
                 {addingMember ? 'Sending invite…' : 'Send invite'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Term Date Import Options Modal */}
+      {showTermDateOptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowTermDateOptions(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-bark">Import term dates</h2>
+              <button onClick={() => setShowTermDateOptions(false)} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm text-cocoa mb-4">
+              How would you like to set up term dates for <span className="font-medium text-bark">{termDateSchoolName}</span>?
+            </p>
+
+            <div className="space-y-3">
+              {/* Option 1: Import from LA */}
+              {termDateSchoolLA && (
+                <div className="bg-white rounded-xl border border-cream-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
+                      <p className="text-xs text-cocoa mt-1">Automatically import term dates from {termDateSchoolLA} council.</p>
+                    </div>
+                    <button
+                      onClick={handleImportLADates}
+                      disabled={importingLA}
+                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                    >
+                      {importingLA ? 'Importing...' : 'Import'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Option 2: Import from school website */}
+              <div className="bg-white rounded-xl border border-cream-border p-4">
+                <h3 className="text-sm font-semibold text-bark">🌐 Import from school website</h3>
+                <p className="text-xs text-cocoa mt-1">Paste the URL of your school's term dates page.</p>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="url"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    placeholder="https://school.com/term-dates"
+                    className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <button
+                    onClick={handleImportWebsite}
+                    disabled={importingWebsite || !websiteUrl.trim()}
+                    className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                  >
+                    {importingWebsite ? 'Importing...' : 'Import'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 3: iCal import */}
+              <div className="bg-white rounded-xl border border-cream-border p-4">
+                <h3 className="text-sm font-semibold text-bark">📅 Import from iCal feed</h3>
+                <p className="text-xs text-cocoa mt-1">Paste the iCal calendar URL from your school's website or parent portal.</p>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="url"
+                    value={termImportIcalUrl}
+                    onChange={(e) => setTermImportIcalUrl(e.target.value)}
+                    placeholder="https://school.com/calendar.ics"
+                    className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <button
+                    onClick={handleImportTermIcal}
+                    disabled={importingTermIcal || !termImportIcalUrl.trim()}
+                    className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                  >
+                    {importingTermIcal ? 'Importing...' : 'Import'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 4: Manual */}
+              <div className="bg-white rounded-xl border border-cream-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-bark">✏️ Add manually</h3>
+                    <p className="text-xs text-cocoa mt-1">Enter term dates yourself. You can do this now or later from the child's profile.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowTermDateOptions(false)}
+                    className="shrink-0 border border-cream-border text-cocoa text-xs font-medium px-4 py-2 rounded-lg hover:bg-sand transition-colors"
+                  >
+                    Skip for now
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
