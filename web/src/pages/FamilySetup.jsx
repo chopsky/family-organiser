@@ -487,15 +487,35 @@ export default function FamilySetup() {
       if (!isEditingSelf) {
         payload.user_id = targetId;
       }
+      // Check if we're linking a new school (before saving, so we know if it's new)
+      const hadSchoolBefore = editingMember?.school_id;
+      const newSchoolId = payload.school_id;
+      const isNewSchoolLink = newSchoolId && !hadSchoolBefore;
+
       await api.patch('/household/profile', payload);
       await loadMembers();
-      await loadSchools();
+      const updatedSchools = await api.get('/schools').then(r => r.data.schools || []);
+      setHouseholdSchools(updatedSchools);
+
       // Only update auth context if editing own profile
       if (isEditingSelf) {
         const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
         login({ token, user: updatedUser, household });
       }
       setEditingMember(null);
+
+      // If a new school was just linked, show term date import options
+      if (isNewSchoolLink) {
+        const school = updatedSchools.find(s => s.id === newSchoolId);
+        if (school && (!school.term_dates || school.term_dates.length === 0)) {
+          setTermDateSchoolId(newSchoolId);
+          setTermDateSchoolName(school.school_name);
+          setTermDateSchoolLA(school.local_authority || '');
+          setShowTermDateOptions(true);
+          return;
+        }
+      }
+
       setSuccess('Profile updated!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (err) {
