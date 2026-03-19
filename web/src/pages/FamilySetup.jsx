@@ -6,7 +6,6 @@ import Spinner from '../components/Spinner';
 import { IconUsers, IconHome, IconMail } from '../components/Icons';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const YEAR_GROUPS = ['Nursery', 'Reception', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12', 'Year 13'];
 
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
@@ -763,7 +762,7 @@ export default function FamilySetup() {
                           return school ? (
                             <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
                               <span className="w-1.5 h-1.5 rounded-full bg-sky" />
-                              {m.year_group ? `${m.year_group}, ` : ''}{school.school_name}
+                              {school.school_name}
                             </span>
                           ) : null;
                         })()}
@@ -939,13 +938,6 @@ export default function FamilySetup() {
                           <p className="text-xs text-plum/70">Term dates already set up — just add {depName || 'their'} activities below.</p>
                         </div>
                       )}
-                    </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                      <select value={depYearGroup} onChange={(e) => setDepYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                        <option value="">Select...</option>
-                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
                     </div>
                   </div>
                 </div>
@@ -1305,13 +1297,6 @@ export default function FamilySetup() {
                       {profileSchoolId && editSchoolSearch && (
                         <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
                       )}
-                    </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                      <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                        <option value="">Select...</option>
-                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
                     </div>
                   </div>
 
