@@ -139,14 +139,35 @@ async function sendDailyReminders(householdId, singleMember) {
     }
 
     // Get today's school activities for children in this household
+    // Only include if today is during term time (not half term, INSET, or holiday)
     let schoolActivities = [];
     try {
       const dayOfWeek = (new Date().getDay() + 6) % 7; // Convert JS day (0=Sun) to our format (0=Mon)
       if (dayOfWeek <= 4) { // Only Mon-Fri
+        const todayStr = new Date().toISOString().split('T')[0];
+        const schools = await db.getHouseholdSchools(householdId);
         const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
+
         for (const child of dependents) {
+          // Check if today is during term time for this child's school
+          const school = schools.find(s => s.id === child.school_id);
+          if (school) {
+            const termDates = await db.getSchoolTermDates(school.id);
+            // Check if today is an INSET day or bank holiday
+            const isInsetOrHoliday = termDates.some(td =>
+              (td.event_type === 'inset_day' || td.event_type === 'bank_holiday') &&
+              td.date === todayStr
+            );
+            // Check if today is during half term
+            const isHalfTerm = termDates.some(td =>
+              (td.event_type === 'half_term_start' || td.event_type === 'half_term_end') &&
+              td.end_date && td.date <= todayStr && td.end_date >= todayStr
+            );
+            if (isInsetOrHoliday || isHalfTerm) continue; // Skip this child's activities
+          }
+
           const activities = await db.getChildActivities(child.id);
-          const todayActivities = activities.filter(a => a.day_of_week === dayOfWeek);
+          const todayActivities = activities.filter(a => a.day_of_week === dayOfWeek && a.term_only !== false);
           for (const act of todayActivities) {
             schoolActivities.push({ ...act, child_name: child.name });
           }

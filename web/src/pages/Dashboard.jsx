@@ -33,12 +33,18 @@ export default function Dashboard() {
   const [text, setText]         = useState('');
   const [sending, setSending]   = useState(false);
   const [nlResult, setNlResult] = useState('');
+  const [schoolData, setSchoolData] = useState([]);
 
   useEffect(() => {
     api.get('/digest')
       .then(({ data }) => setDigest(data))
       .catch(() => setError('Could not load dashboard data.'))
       .finally(() => setLoading(false));
+
+    // Load school activities for this week
+    api.get('/schools')
+      .then(({ data }) => setSchoolData(data.schools || []))
+      .catch(() => {});
   }, []);
 
   async function handleNlSubmit(e) {
@@ -160,6 +166,55 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      {/* School this week */}
+      {schoolData.some(s => s.children?.length > 0) && (() => {
+        const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const today = new Date();
+        const todayDow = (today.getDay() + 6) % 7; // 0=Mon
+        const allActivities = [];
+        schoolData.forEach(s => {
+          (s.children || []).forEach(c => {
+            (c.activities || []).forEach(a => {
+              allActivities.push({ ...a, child_name: c.name, child_color: c.color_theme });
+            });
+          });
+        });
+        // Group by day for the week
+        const weekDays = [0, 1, 2, 3, 4].map(d => ({
+          day: DAY_LABELS[d],
+          isToday: d === todayDow,
+          activities: allActivities.filter(a => a.day_of_week === d),
+        }));
+        const hasAnyActivities = allActivities.length > 0;
+        if (!hasAnyActivities) return null;
+        return (
+          <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
+            <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
+              🏫 School this week
+            </h2>
+            <div className="grid grid-cols-5 gap-2">
+              {weekDays.map(({ day, isToday, activities }) => (
+                <div key={day} className={`text-center rounded-xl p-2 ${isToday ? 'bg-plum-light border border-plum/20' : ''}`}>
+                  <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-plum' : 'text-cocoa'}`}>{day}</div>
+                  {activities.length > 0 ? (
+                    <div className="space-y-1">
+                      {activities.map((a, i) => (
+                        <div key={i} className="text-[11px] text-bark">
+                          <span className="font-medium">{a.child_name}</span>
+                          <div className="text-cocoa">{a.activity}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-cocoa">—</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Members */}
       {digest?.members?.length > 0 && (

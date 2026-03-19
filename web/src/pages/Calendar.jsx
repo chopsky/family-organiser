@@ -192,7 +192,7 @@ export default function Calendar() {
   const [savingTask, setSavingTask] = useState(false);
   const taskFormRef = useRef(null);
 
-  const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays']));
+  const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays', 'school']));
   const toggleFilter = (key) => setActiveFilters(prev => {
     const next = new Set(prev);
     next.has(key) ? next.delete(key) : next.add(key);
@@ -237,7 +237,57 @@ export default function Calendar() {
       const uniqueEvents = [...new Map(allEvents.map(e => [e.id, e])).values()];
       const uniqueTasks = [...new Map(allTasks.map(t => [t.id, t])).values()];
 
-      setEvents(uniqueEvents);
+      // Fetch school data (term dates + weekly activities)
+      try {
+        const { data: schoolData } = await api.get('/schools');
+        const schoolEvents = [];
+        for (const school of (schoolData.schools || [])) {
+          // Term dates → calendar events
+          for (const td of (school.term_dates || [])) {
+            schoolEvents.push({
+              id: `td-${td.id}`,
+              title: `${school.school_name} — ${td.label || td.event_type.replace(/_/g, ' ')}`,
+              start_time: `${td.date}T00:00:00Z`,
+              end_time: td.end_date ? `${td.end_date}T23:59:59Z` : `${td.date}T23:59:59Z`,
+              all_day: true,
+              category: 'school',
+              color: school.colour || 'lavender',
+              _school: true,
+            });
+          }
+          // Weekly activities → recurring events for the visible month range
+          for (const child of (school.children || [])) {
+            for (const act of (child.activities || [])) {
+              // Generate occurrences for the visible date range
+              const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+              const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 2, 0);
+              for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const jsDay = d.getDay(); // 0=Sun
+                const ourDay = (jsDay + 6) % 7; // 0=Mon
+                if (ourDay === act.day_of_week) {
+                  const dateStr = d.toISOString().split('T')[0];
+                  schoolEvents.push({
+                    id: `act-${act.id}-${dateStr}`,
+                    title: `${child.name} — ${act.activity}`,
+                    start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
+                    end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
+                    all_day: !act.time_start,
+                    category: 'school',
+                    assigned_to_name: child.name,
+                    color: child.color_theme || 'sky',
+                    _school: true,
+                    _activity: true,
+                  });
+                }
+              }
+            }
+          }
+        }
+        setEvents([...uniqueEvents, ...schoolEvents]);
+      } catch {
+        setEvents(uniqueEvents);
+      }
+
       setTasks(uniqueTasks);
     } catch {
       setError('Could not load calendar data.');
@@ -345,6 +395,7 @@ export default function Calendar() {
       if (cat === 'general' && !activeFilters.has('events')) return false;
       if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
       if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
+      if (cat === 'school' && !activeFilters.has('school')) return false;
       return true;
     });
   }
@@ -737,6 +788,7 @@ export default function Calendar() {
           { key: 'tasks', label: 'Tasks' },
           { key: 'birthdays', label: 'Birthdays' },
           { key: 'holidays', label: 'Holidays' },
+          { key: 'school', label: 'School' },
         ].map(({ key, label }) => {
           const active = activeFilters.has(key);
           return (

@@ -101,6 +101,66 @@ async function runWeeklyDigest() {
 }
 
 /**
+ * Evening school prep reminder (19:00 local time).
+ * Sends a heads-up for tomorrow's school activities.
+ */
+async function runEveningSchoolPrepCheck() {
+  try {
+    const households = await db.getAllHouseholds();
+    for (const household of households) {
+      const tz = household.timezone || 'Europe/London';
+      const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      // Only fire at 19:00
+      if (hour !== 19 || minute !== 0) continue;
+
+      const members = await db.getHouseholdMembers(household.id);
+      const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
+      if (dependents.length === 0) continue;
+
+      // Get tomorrow's day of week (0=Mon...4=Fri)
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowDow = (tomorrow.getDay() + 6) % 7;
+      if (tomorrowDow > 4) continue; // Skip if tomorrow is weekend
+
+      const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+      const lines = [`📚 *Heads up for tomorrow (${DAY_NAMES[tomorrowDow]}):*\n`];
+      let hasActivities = false;
+
+      for (const child of dependents) {
+        const activities = await db.getChildActivities(child.id);
+        const tomorrowActivities = activities.filter(a => a.day_of_week === tomorrowDow);
+        for (const act of tomorrowActivities) {
+          hasActivities = true;
+          const timeStr = act.time_end ? ` until ${act.time_end.substring(0, 5)}` : '';
+          lines.push(`• ${child.name} — ${act.activity}${timeStr}`);
+          if (act.reminder_text) lines.push(`  _${act.reminder_text}_`);
+        }
+      }
+
+      if (!hasActivities) continue;
+
+      const message = lines.join('\n');
+
+      // Send to all WhatsApp-connected account members
+      const accountMembers = members.filter(m => m.member_type !== 'dependent' && m.whatsapp_phone);
+      for (const member of accountMembers) {
+        try {
+          await whatsapp.sendTemplate(member.whatsapp_phone, message);
+        } catch (err) {
+          console.error(`[scheduler] Evening school prep failed for ${member.name}:`, err.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] Evening school prep check failed:', err.message);
+  }
+}
+
+/**
  * Poll Apple CalDAV connections for changes.
  * Apple doesn't support webhooks, so we poll every 15 minutes.
  */
@@ -224,6 +284,10 @@ function startScheduler() {
   // ── Task notifications: check every minute ──────────────────────────────────
   cron.schedule('* * * * *', () => runTaskNotificationCheck());
   console.log('✓ Task notification scheduler started (checks every minute)');
+
+  // ── Evening school prep reminders: check every minute (fires at 19:00) ─────
+  cron.schedule('* * * * *', () => runEveningSchoolPrepCheck());
+  console.log('✓ Evening school prep reminder started (19:00 per household timezone)');
 
   // ── Apple CalDAV polling: every 15 minutes ─────────────────────────────────
   cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());

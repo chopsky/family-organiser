@@ -211,6 +211,72 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || '📅 Event added! ✅', actions };
   }
 
+  // Handle school activity add/remove
+  if (result.intent === 'school_activity' && result.school_activity) {
+    try {
+      const sa = result.school_activity;
+      const child = household.members.find(m =>
+        m.name.toLowerCase() === sa.child_name?.toLowerCase() && m.member_type === 'dependent'
+      );
+      if (!child) {
+        return { response: `I couldn't find a child called "${sa.child_name}" in your family. Check the name and try again!`, actions };
+      }
+      if (sa.action === 'remove') {
+        // Find and remove the activity
+        const activities = await db.getChildActivities(child.id);
+        const match = activities.find(a =>
+          a.activity.toLowerCase() === sa.activity.toLowerCase() &&
+          (sa.day_of_week === undefined || a.day_of_week === sa.day_of_week)
+        );
+        if (match) {
+          await db.deleteChildActivity(match.id);
+        }
+      } else {
+        await db.addChildActivity({
+          child_id: child.id,
+          day_of_week: sa.day_of_week,
+          activity: sa.activity,
+          time_end: sa.time_end || null,
+        });
+      }
+    } catch (err) {
+      console.error('School activity update failed:', err.message);
+      return { response: `⚠️ I understood the activity but couldn't save it: ${err.message}`, actions };
+    }
+    return { response: result.response_message || '🏫 Activity updated! ✅', actions };
+  }
+
+  // Handle school event (one-off trip, INSET day, etc.) — create as calendar event
+  if (result.intent === 'school_event' && result.calendar_event) {
+    try {
+      const ev = result.calendar_event;
+      const assignee = ev.assigned_to_name
+        ? household.members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+        : null;
+
+      const userTz = user.timezone || household.timezone || 'Europe/London';
+      const startTime = ev.all_day ? `${ev.date}T00:00:00Z` : localToUTC(ev.date, ev.start_time || '09:00', userTz);
+      const endTime = ev.all_day ? `${ev.date}T23:59:59Z` : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
+
+      await db.createCalendarEvent(household.id, {
+        title: ev.title,
+        start_time: startTime,
+        end_time: endTime,
+        all_day: !!ev.all_day,
+        assigned_to: assignee?.id || null,
+        assigned_to_name: assignee?.name || ev.assigned_to_name || null,
+        color: assignee?.color_theme || 'sky',
+        location: ev.location || null,
+        description: ev.description || null,
+        category: 'school',
+      }, user.id);
+    } catch (err) {
+      console.error('School event creation failed:', err.message);
+      return { response: `⚠️ I understood the event but couldn't save it: ${err.message}`, actions };
+    }
+    return { response: result.response_message || '🏫 School event added! ✅', actions };
+  }
+
   // Handle general chat — just return the AI's conversational response
   if (result.intent === 'chat') {
     return { response: result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!", actions };

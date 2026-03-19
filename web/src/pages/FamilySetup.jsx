@@ -64,6 +64,13 @@ export default function FamilySetup() {
   const [profileYearGroup, setProfileYearGroup] = useState('');
   const [editSchoolSearch, setEditSchoolSearch] = useState('');
   const [editSchoolResults, setEditSchoolResults] = useState([]);
+  const [editActivities, setEditActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [addActivityDay, setAddActivityDay] = useState(0);
+  const [addActivityName, setAddActivityName] = useState('');
+  const [addActivityEnd, setAddActivityEnd] = useState('');
+  const [showAddActivity, setShowAddActivity] = useState(false);
+  const [savingActivity, setSavingActivity] = useState(false);
 
   function loadMembers() {
     return api.get('/household')
@@ -196,6 +203,49 @@ export default function FamilySetup() {
     const school = householdSchools.find(s => s.id === member.school_id);
     setEditSchoolSearch(school?.school_name || '');
     setEditSchoolResults([]);
+    setShowAddActivity(false);
+    // Load activities for this member
+    if (member.member_type === 'dependent') {
+      setLoadingActivities(true);
+      api.get(`/schools/activities/${member.id}`)
+        .then(({ data }) => setEditActivities(data.activities || []))
+        .catch(() => setEditActivities([]))
+        .finally(() => setLoadingActivities(false));
+    } else {
+      setEditActivities([]);
+    }
+  }
+
+  async function handleAddActivity() {
+    if (!addActivityName.trim() || !editingMember) return;
+    setSavingActivity(true);
+    try {
+      const { data } = await api.post('/schools/activities', {
+        child_id: editingMember.id,
+        day_of_week: addActivityDay,
+        activity: addActivityName.trim(),
+        time_end: addActivityEnd || null,
+      });
+      setEditActivities(prev => [...prev, data.activity]);
+      setAddActivityName('');
+      setAddActivityEnd('');
+      setShowAddActivity(false);
+      await loadSchools(); // refresh activity pills
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not add activity.');
+    } finally {
+      setSavingActivity(false);
+    }
+  }
+
+  async function handleDeleteActivity(activityId) {
+    try {
+      await api.delete(`/schools/activities/${activityId}`);
+      setEditActivities(prev => prev.filter(a => a.id !== activityId));
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove activity.');
+    }
   }
 
   async function handleEditSchoolSearch(query) {
@@ -1017,6 +1067,70 @@ export default function FamilySetup() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Weekly activities grid */}
+                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-3">📅 Weekly activities</h3>
+                  <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time</p>
+
+                  {loadingActivities ? <Spinner /> : (
+                    <>
+                      <div className="grid grid-cols-5 gap-1.5 mt-2">
+                        {DAY_LABELS.map((day, idx) => {
+                          const dayActivities = editActivities.filter(a => a.day_of_week === idx);
+                          return (
+                            <div key={day} className="text-center">
+                              <div className="text-[11px] font-semibold text-cocoa mb-1">{day}</div>
+                              {dayActivities.length > 0 ? (
+                                <div className="space-y-1">
+                                  {dayActivities.map(a => (
+                                    <div key={a.id} className="bg-white rounded-lg px-1.5 py-1.5 text-[11px] text-bark border border-cream-border relative group">
+                                      <div className="font-medium">{a.activity}</div>
+                                      {a.time_end && <div className="text-cocoa text-[10px]">til {a.time_end.substring(0, 5)}</div>}
+                                      <button
+                                        onClick={() => handleDeleteActivity(a.id)}
+                                        className="absolute -top-1 -right-1 w-4 h-4 bg-error text-white rounded-full text-[9px] hidden group-hover:flex items-center justify-center"
+                                        title="Remove"
+                                      >×</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-cocoa text-sm py-2">—</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Add activity form */}
+                      {showAddActivity ? (
+                        <div className="bg-white rounded-lg border border-cream-border p-3 mt-2 space-y-2">
+                          <div className="flex gap-2">
+                            <select value={addActivityDay} onChange={(e) => setAddActivityDay(Number(e.target.value))} className="border border-cream-border rounded-lg px-2 py-2 text-sm bg-white">
+                              {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                            </select>
+                            <input type="text" value={addActivityName} onChange={(e) => setAddActivityName(e.target.value)} placeholder="e.g. PE, Swimming" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <label className="text-xs text-cocoa">Ends at:</label>
+                            <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                            <div className="flex-1" />
+                            <button onClick={() => setShowAddActivity(false)} className="text-xs text-cocoa">Cancel</button>
+                            <button onClick={handleAddActivity} disabled={savingActivity || !addActivityName.trim()} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
+                              {savingActivity ? 'Adding...' : 'Add'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setShowAddActivity(true); setAddActivityName(''); setAddActivityEnd(''); }}
+                          className="mt-2 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors"
+                        >
+                          + Add activity
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
