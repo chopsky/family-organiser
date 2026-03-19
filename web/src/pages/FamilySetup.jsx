@@ -1469,15 +1469,19 @@ export default function FamilySetup() {
                         </button>
                       )}
 
-                      {/* iCal import */}
-                      <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">🔗 School calendar feed</h3>
-                      <p className="text-xs text-cocoa">Paste the iCal URL from your school's website to auto-import term dates.</p>
-                      <div className="flex gap-2 mt-1">
-                        <input type="url" value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://school.com/calendar.ics" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
-                        <button onClick={handleImportIcal} disabled={importingIcal || !icalUrl.trim()} className="text-xs bg-primary text-white px-3 py-2 rounded-lg font-medium disabled:opacity-50 whitespace-nowrap">
-                          {importingIcal ? 'Importing...' : 'Import'}
-                        </button>
-                      </div>
+                      {/* iCal import — only show if no term dates exist yet */}
+                      {editTermDates.length === 0 && (
+                        <>
+                          <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">🔗 School calendar feed</h3>
+                          <p className="text-xs text-cocoa">Paste the iCal URL from your school's website to auto-import term dates.</p>
+                          <div className="flex gap-2 mt-1">
+                            <input type="url" value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://school.com/calendar.ics" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
+                            <button onClick={handleImportIcal} disabled={importingIcal || !icalUrl.trim()} className="text-xs bg-primary text-white px-3 py-2 rounded-lg font-medium disabled:opacity-50 whitespace-nowrap">
+                              {importingIcal ? 'Importing...' : 'Import'}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
