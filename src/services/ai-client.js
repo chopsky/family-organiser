@@ -10,7 +10,8 @@ const OpenAI = require('openai');
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const GPT_MODEL = 'gpt-4o';
-const FAILOVER_TIMEOUT_MS = 8000; // abort Claude after 8s
+const DEFAULT_TIMEOUT_MS = 8000; // abort Claude after 8s for chat
+const LONG_TIMEOUT_MS = 30000;   // 30s for complex tasks (imports, scraping)
 
 function getAnthropicClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -42,10 +43,10 @@ function isTransient(err) {
 /**
  * Call Claude with a timeout. Returns { text, provider }.
  */
-async function callClaude({ system, messages, maxTokens = 2048 }) {
+async function callClaude({ system, messages, maxTokens = 2048, timeoutMs }) {
   const client = getAnthropicClient();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FAILOVER_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
 
   try {
     const stream = client.messages.stream(
@@ -148,4 +149,5 @@ module.exports = {
   isTransient,
   CLAUDE_MODEL,
   GPT_MODEL,
+  LONG_TIMEOUT_MS,
 };

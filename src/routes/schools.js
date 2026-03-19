@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const ical = require('node-ical');
 const db = require('../db/queries');
-const { callWithFailover } = require('../services/ai-client');
+const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
@@ -256,6 +256,7 @@ Only return valid JSON array, nothing else.`;
     const { text } = await callWithFailover({
       system: 'You categorise school calendar events. Return only valid JSON.',
       messages: [{ role: 'user', content: categorisePrompt }],
+      timeoutMs: LONG_TIMEOUT_MS,
     });
 
     let categorised;
@@ -354,6 +355,7 @@ Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_d
 For half terms, use half_term_start with an end_date spanning the week.
 Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
       messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
+      timeoutMs: LONG_TIMEOUT_MS,
     });
 
     let dates;
@@ -470,6 +472,7 @@ For half terms, use half_term_start with an end_date spanning the break.
 If you genuinely cannot find any term dates in the content, return an empty array [].
 Do NOT wrap in markdown code fences.`,
       messages: [{ role: 'user', content: `Extract all school term dates from this UK school website page content:\n\n${pageText}` }],
+      timeoutMs: LONG_TIMEOUT_MS,
     });
 
     let dates;
