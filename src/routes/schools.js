@@ -334,9 +334,21 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     const now = new Date();
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
 
-    // Use AI to find and extract LA term dates
-    const { text } = await callWithFailover({
-      system: `You are a UK school term date researcher. When given a local authority name, provide the term dates for the ${academicYear} academic year.
+    // Check shared cache first — another family may have already imported this LA's dates
+    const cached = await db.getCachedLATermDates(school.local_authority, academicYear);
+    let dates;
+    let fromCache = false;
+
+    if (cached) {
+      dates = cached;
+      fromCache = true;
+      console.log(`[import-la] Cache hit for ${school.local_authority} ${academicYear}`);
+    } else {
+      console.log(`[import-la] Cache miss for ${school.local_authority} ${academicYear} — calling AI`);
+
+      // Use AI to find and extract LA term dates
+      const { text } = await callWithFailover({
+        system: `You are a UK school term date researcher. When given a local authority name, provide the term dates for the ${academicYear} academic year.
 
 You should know the standard UK school term structure:
 - Autumn term: September to December (with October half term)
@@ -356,22 +368,25 @@ Return ONLY a valid JSON array with objects like:
 Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
 For half terms, use half_term_start with an end_date spanning the week.
 Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
-      messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
-      timeoutMs: LONG_TIMEOUT_MS,
-      maxTokens: 4096,
-      useThinking: false,
-    });
+        messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
+        timeoutMs: LONG_TIMEOUT_MS,
+        maxTokens: 4096,
+        useThinking: false,
+      });
 
-    let dates;
-    try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-      dates = JSON.parse(cleaned);
-    } catch {
-      return res.status(500).json({ error: 'Could not parse term dates from AI response.' });
-    }
+      try {
+        const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+        dates = JSON.parse(cleaned);
+      } catch {
+        return res.status(500).json({ error: 'Could not parse term dates from AI response.' });
+      }
 
-    if (!Array.isArray(dates) || dates.length === 0) {
-      return res.status(500).json({ error: 'No term dates found.' });
+      if (!Array.isArray(dates) || dates.length === 0) {
+        return res.status(500).json({ error: 'No term dates found.' });
+      }
+
+      // Cache the results for other families in the same LA
+      await db.cacheLATermDates(school.local_authority, academicYear, dates);
     }
 
     // Add academic year and source to each date
@@ -386,7 +401,7 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
     return res.json({
       imported: termDates.length,
       local_authority: school.local_authority,
-      message: `Imported ${termDates.length} term dates for ${school.local_authority}.`,
+      message: `Imported ${termDates.length} term dates for ${school.local_authority}.${fromCache ? '' : ' These dates are now cached for other families.'}`,
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-la-dates error:', err);

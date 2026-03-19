@@ -72,12 +72,23 @@ CREATE TABLE IF NOT EXISTS child_school_events (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- 7. Shared LA term dates cache (avoids repeat AI calls for the same council)
+CREATE TABLE IF NOT EXISTS la_term_dates_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  local_authority TEXT NOT NULL,
+  academic_year TEXT NOT NULL,
+  dates JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE (local_authority, academic_year)
+);
+
 -- Enable RLS on all new tables
 ALTER TABLE schools_directory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE household_schools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE school_term_dates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE child_weekly_schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE child_school_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE la_term_dates_cache ENABLE ROW LEVEL SECURITY;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_schools_directory_name ON schools_directory USING gin (to_tsvector('english', name));

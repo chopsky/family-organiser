@@ -354,6 +354,28 @@ async function updateHouseholdSchool(schoolId, updates) {
   return data;
 }
 
+async function getCachedLATermDates(localAuthority, academicYear) {
+  const { data, error } = await supabase
+    .from('la_term_dates_cache')
+    .select('dates')
+    .eq('local_authority', localAuthority.toLowerCase().trim())
+    .eq('academic_year', academicYear)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.dates || null;
+}
+
+async function cacheLATermDates(localAuthority, academicYear, dates) {
+  const { error } = await supabase
+    .from('la_term_dates_cache')
+    .upsert({
+      local_authority: localAuthority.toLowerCase().trim(),
+      academic_year: academicYear,
+      dates,
+    }, { onConflict: 'local_authority,academic_year' });
+  if (error) console.error('Failed to cache LA term dates:', error.message);
+}
+
 async function addSchoolTermDates(schoolId, dates) {
   const rows = dates.map(d => ({
     school_id: schoolId,
@@ -1410,6 +1432,8 @@ module.exports = {
   getHouseholdSchoolByUrn,
   deleteHouseholdSchool,
   updateHouseholdSchool,
+  getCachedLATermDates,
+  cacheLATermDates,
   addSchoolTermDates,
   getSchoolTermDates,
   deleteSchoolTermDate,
