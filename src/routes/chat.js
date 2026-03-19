@@ -196,7 +196,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     if (!textBlock) throw new Error('No text in AI response');
 
     // Extract and process all actions
-    const { cleanContent, actions } = extractActions(textBlock.text);
+    let { cleanContent, actions } = extractActions(textBlock.text);
     const members = await db.getHouseholdMembers(req.householdId);
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
