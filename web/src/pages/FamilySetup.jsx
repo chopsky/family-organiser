@@ -64,6 +64,7 @@ export default function FamilySetup() {
   const [profileYearGroup, setProfileYearGroup] = useState('');
   const [editSchoolSearch, setEditSchoolSearch] = useState('');
   const [editSchoolResults, setEditSchoolResults] = useState([]);
+  const [editSelectedSchoolData, setEditSelectedSchoolData] = useState(null); // full GIAS school data for new school creation
   const [editActivities, setEditActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [addActivityDay, setAddActivityDay] = useState(0);
@@ -407,6 +408,7 @@ export default function FamilySetup() {
     // Check if school exists in household, if so use that ID
     const existing = householdSchools.find(s => s.school_urn === school.urn);
     setProfileSchoolId(existing ? existing.id : `new:${school.urn}`);
+    setEditSelectedSchoolData(school); // store full GIAS data for new school creation
     setEditSchoolSearch(school.name);
     setEditSchoolResults([]);
   }
@@ -465,32 +467,32 @@ export default function FamilySetup() {
       };
 
       // Handle school assignment for dependents
+      let createdNewSchool = false;
       if (editingMember?.member_type === 'dependent') {
         if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
           // Need to create the school in household first
-          const urn = profileSchoolId.replace('new:', '');
-          const schoolResult = editSchoolResults.find(s => s.urn === urn) || { name: editSchoolSearch, urn };
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: schoolResult.name || editSchoolSearch,
-            school_urn: urn,
-            school_type: schoolResult.type,
-            local_authority: schoolResult.local_authority,
-            postcode: schoolResult.postcode,
+          const schoolData = editSelectedSchoolData || {};
+          const { data: created } = await api.post('/schools', {
+            school_name: schoolData.name || editSchoolSearch,
+            school_urn: schoolData.urn || profileSchoolId.replace('new:', ''),
+            school_type: schoolData.type,
+            local_authority: schoolData.local_authority,
+            postcode: schoolData.postcode,
           });
-          payload.school_id = schoolData.school.id;
+          payload.school_id = created.school.id;
+          createdNewSchool = !created.existing;
         } else {
           payload.school_id = profileSchoolId || null;
         }
       }
 
+      // Check if school changed (new school linked that may need term dates)
+      const schoolChanged = payload.school_id && payload.school_id !== editingMember?.school_id;
+
       // When admin edits another member, include target user_id
       if (!isEditingSelf) {
         payload.user_id = targetId;
       }
-      // Check if we're linking a new school (before saving, so we know if it's new)
-      const hadSchoolBefore = editingMember?.school_id;
-      const newSchoolId = payload.school_id;
-      const isNewSchoolLink = newSchoolId && !hadSchoolBefore;
 
       await api.patch('/household/profile', payload);
       await loadMembers();
@@ -504,11 +506,11 @@ export default function FamilySetup() {
       }
       setEditingMember(null);
 
-      // If a new school was just linked, show term date import options
-      if (isNewSchoolLink) {
-        const school = updatedSchools.find(s => s.id === newSchoolId);
+      // If school changed, show term date import options (if the school has no dates yet)
+      if (schoolChanged) {
+        const school = updatedSchools.find(s => s.id === payload.school_id);
         if (school && (!school.term_dates || school.term_dates.length === 0)) {
-          setTermDateSchoolId(newSchoolId);
+          setTermDateSchoolId(payload.school_id);
           setTermDateSchoolName(school.school_name);
           setTermDateSchoolLA(school.local_authority || '');
           setShowTermDateOptions(true);
