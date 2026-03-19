@@ -85,19 +85,6 @@ export default function Layout({ children }) {
       api.patch('/household/profile', { timezone: browserTz }).catch(() => {});
     }
 
-    // Sync browser geolocation to backend for weather (fire-and-forget, silent)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          api.patch('/household/profile', {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          }).catch(() => {});
-        },
-        () => {}, // silently ignore denied/unavailable
-        { timeout: 10000, maximumAge: 600000 } // cache for 10 min
-      );
-    }
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleLogout() {
