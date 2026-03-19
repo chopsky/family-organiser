@@ -257,6 +257,8 @@ Only return valid JSON array, nothing else.`;
       system: 'You categorise school calendar events. Return only valid JSON.',
       messages: [{ role: 'user', content: categorisePrompt }],
       timeoutMs: LONG_TIMEOUT_MS,
+      maxTokens: 4096,
+      useThinking: false,
     });
 
     let categorised;
@@ -356,6 +358,8 @@ For half terms, use half_term_start with an end_date spanning the week.
 Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
       messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
       timeoutMs: LONG_TIMEOUT_MS,
+      maxTokens: 4096,
+      useThinking: false,
     });
 
     let dates;
@@ -473,6 +477,8 @@ If you genuinely cannot find any term dates in the content, return an empty arra
 Do NOT wrap in markdown code fences.`,
       messages: [{ role: 'user', content: `Extract all school term dates from this UK school website page content:\n\n${pageText}` }],
       timeoutMs: LONG_TIMEOUT_MS,
+      maxTokens: 4096,
+      useThinking: false,
     });
 
     let dates;

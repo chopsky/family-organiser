@@ -43,22 +43,25 @@ function isTransient(err) {
 /**
  * Call Claude with a timeout. Returns { text, provider }.
  */
-async function callClaude({ system, messages, maxTokens = 2048, timeoutMs }) {
+async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = true }) {
   const client = getAnthropicClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
 
   try {
-    const stream = client.messages.stream(
-      {
-        model: CLAUDE_MODEL,
-        max_tokens: maxTokens,
-        thinking: { type: 'adaptive' },
-        system,
-        messages,
-      },
-      { signal: controller.signal }
-    );
+    const params = {
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages,
+    };
+
+    // Only enable thinking for conversational tasks — skip it for structured data extraction
+    if (useThinking) {
+      params.thinking = { type: 'adaptive' };
+    }
+
+    const stream = client.messages.stream(params, { signal: controller.signal });
 
     const response = await stream.finalMessage();
     clearTimeout(timer);
