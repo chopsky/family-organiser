@@ -316,7 +316,17 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     const schools = await db.getHouseholdSchools(req.householdId);
     const school = schools.find(s => s.id === req.params.schoolId);
     if (!school) return res.status(404).json({ error: 'School not found.' });
-    if (!school.local_authority) return res.status(400).json({ error: 'No local authority associated with this school.' });
+
+    // If local_authority is missing, try to look it up from GIAS directory
+    if (!school.local_authority && school.school_urn) {
+      const giasResults = await db.searchSchoolByUrn(school.school_urn);
+      if (giasResults?.local_authority) {
+        school.local_authority = giasResults.local_authority;
+        // Also update the household school record for next time
+        await db.updateHouseholdSchool(school.id, { local_authority: giasResults.local_authority });
+      }
+    }
+    if (!school.local_authority) return res.status(400).json({ error: 'No local authority associated with this school. Please check the school details.' });
 
     const now = new Date();
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
@@ -394,25 +404,61 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
 
     // Fetch the webpage content
     let pageText;
+    let rawHtml;
     try {
-      const response = await fetch(website_url.trim());
-      const html = await response.text();
-      // Strip HTML tags to get plain text
-      pageText = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      const response = await fetch(website_url.trim(), {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+      });
+      if (!response.ok) {
+        return res.status(400).json({ error: `Website returned HTTP ${response.status}. Check the URL and try again.` });
+      }
+      rawHtml = await response.text();
+
+      // Strip HTML but try to preserve table/list structure for better AI parsing
+      pageText = rawHtml
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+        .replace(/<\/tr>/gi, '\n')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/h[1-6]>/gi, '\n')
         .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
         .trim()
-        .substring(0, 8000); // Limit to avoid token overflow
+        .substring(0, 12000); // Allow more content for better context
     } catch (fetchErr) {
       return res.status(400).json({ error: `Could not fetch the website: ${fetchErr.message}` });
     }
 
+    if (pageText.length < 50) {
+      return res.status(400).json({ error: 'The page appears to have very little text content. Term dates may be in a PDF or image. Try a different URL or add dates manually.' });
+    }
+
+    console.log(`[import-website] Extracted ${pageText.length} chars from ${website_url}`);
+
     // Use AI to extract term dates from the page content
     const { text } = await callWithFailover({
-      system: `You extract school term dates from website content. Look for term start/end dates, half term dates, INSET days, and holidays for the ${academicYear} academic year.
+      system: `You are an expert at extracting UK school term dates from website content. Look for term start/end dates, half term dates, INSET days, and holidays for the ${academicYear} academic year (September ${academicYear.split('-')[0]} to July ${academicYear.split('-')[1]}).
 
-Return ONLY a valid JSON array:
+Look carefully for:
+- Dates in any UK format (e.g. "3rd September 2025", "3 Sep 2025", "03/09/2025")
+- Term names (Autumn, Spring, Summer)
+- Half term breaks
+- INSET/training days
+- Bank holidays
+
+Return ONLY a valid JSON array with no other text:
 [
   {"event_type": "term_start", "date": "YYYY-MM-DD", "label": "Description"},
   {"event_type": "half_term_start", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "label": "Description"},
@@ -420,16 +466,19 @@ Return ONLY a valid JSON array:
 ]
 
 Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
-If you cannot find term dates in the content, return an empty array [].`,
-      messages: [{ role: 'user', content: `Extract all school term dates from this school website page:\n\n${pageText}` }],
+For half terms, use half_term_start with an end_date spanning the break.
+If you genuinely cannot find any term dates in the content, return an empty array [].
+Do NOT wrap in markdown code fences.`,
+      messages: [{ role: 'user', content: `Extract all school term dates from this UK school website page content:\n\n${pageText}` }],
     });
 
     let dates;
     try {
       const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
       dates = JSON.parse(cleaned);
-    } catch {
-      return res.status(500).json({ error: 'Could not parse term dates from the website content.' });
+    } catch (parseErr) {
+      console.error('[import-website] AI response could not be parsed:', text.substring(0, 500));
+      return res.status(500).json({ error: 'Could not extract structured term dates from the website. The page may not contain parseable date information. Try adding dates manually.' });
     }
 
     if (!Array.isArray(dates) || dates.length === 0) {

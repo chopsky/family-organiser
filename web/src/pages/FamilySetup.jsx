@@ -1092,23 +1092,25 @@ export default function FamilySetup() {
 
             <div className="space-y-3">
               {/* Option 1: Import from LA */}
-              {termDateSchoolLA && (
-                <div className="bg-white rounded-xl border border-cream-border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
-                      <p className="text-xs text-cocoa mt-1">Automatically import term dates from {termDateSchoolLA} council.</p>
-                    </div>
-                    <button
-                      onClick={handleImportLADates}
-                      disabled={importingLA}
-                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
-                    >
-                      {importingLA ? 'Importing...' : 'Import'}
-                    </button>
+              <div className="bg-white rounded-xl border border-cream-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
+                    <p className="text-xs text-cocoa mt-1">
+                      {termDateSchoolLA
+                        ? `Automatically import term dates from ${termDateSchoolLA} council.`
+                        : 'Automatically look up and import term dates from the local authority.'}
+                    </p>
                   </div>
+                  <button
+                    onClick={handleImportLADates}
+                    disabled={importingLA}
+                    className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                  >
+                    {importingLA ? 'Importing...' : 'Import'}
+                  </button>
                 </div>
-              )}
+              </div>
 
               {/* Option 2: Import from school website */}
               <div className="bg-white rounded-xl border border-cream-border p-4">

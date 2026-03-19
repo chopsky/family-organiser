@@ -146,7 +146,8 @@ async function sendDailyReminders(householdId, singleMember) {
       if (dayOfWeek <= 4) { // Only Mon-Fri
         const todayStr = new Date().toISOString().split('T')[0];
         const schools = await db.getHouseholdSchools(householdId);
-        const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
+        const allMembers = await db.getHouseholdMembers(householdId);
+        const dependents = allMembers.filter(m => m.member_type === 'dependent' && m.school_id);
 
         for (const child of dependents) {
           // Check if today is during term time for this child's school

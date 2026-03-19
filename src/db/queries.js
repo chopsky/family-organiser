@@ -284,6 +284,16 @@ async function searchSchools(query, postcode) {
   return data || [];
 }
 
+async function searchSchoolByUrn(urn) {
+  const { data, error } = await supabase
+    .from('schools_directory')
+    .select('urn, name, type, phase, local_authority, address, postcode')
+    .eq('urn', urn)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 async function createHouseholdSchool(householdId, data) {
   const { data: school, error } = await supabase
     .from('household_schools')
@@ -1394,6 +1404,7 @@ module.exports = {
   clearChatHistory,
   // Schools
   searchSchools,
+  searchSchoolByUrn,
   createHouseholdSchool,
   getHouseholdSchools,
   getHouseholdSchoolByUrn,
