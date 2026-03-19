@@ -1,10 +1,10 @@
 const { Router } = require('express');
 const multer = require('multer');
-const Anthropic = require('@anthropic-ai/sdk');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
+const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
 
 // Multer config for chat image uploads (10 MB, images only)
@@ -20,7 +20,6 @@ const chatImageUpload = multer({
 });
 
 const router = Router();
-const MODEL = 'claude-sonnet-4-6';
 
 /**
  * Convert a local date+time string to a UTC ISO timestamp using the user's timezone.
@@ -56,10 +55,6 @@ function localToUTC(date, time, timezone) {
   } catch {
     return `${date}T${time || '00:00'}:00Z`;
   }
-}
-
-function getClient() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
 /**
@@ -188,20 +183,17 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       { role: 'user', content: message.trim() },
     ];
 
-    // Call Claude
-    const client = getClient();
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
+    // Call AI (Claude primary, GPT-4o fallback)
+    const { text: aiText, provider } = await callWithFailover({
       system: systemPrompt,
       messages,
     });
-
-    const textBlock = response.content.find(b => b.type === 'text');
-    if (!textBlock) throw new Error('No text in AI response');
+    if (provider !== 'claude') {
+      console.log(`[chat] Response served by ${provider}`);
+    }
 
     // Extract and process all actions
-    let { cleanContent, actions } = extractActions(textBlock.text);
+    let { cleanContent, actions } = extractActions(aiText);
     const members = await db.getHouseholdMembers(req.householdId);
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
