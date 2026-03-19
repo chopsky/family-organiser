@@ -494,10 +494,26 @@ export default function FamilySetup() {
         payload.user_id = targetId;
       }
 
+      const oldSchoolId = editingMember?.school_id;
+
       await api.patch('/household/profile', payload);
       await loadMembers();
       const updatedSchools = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(updatedSchools);
+
+      // If the school was removed or changed, check if old school is now orphaned (no children left)
+      if (oldSchoolId && oldSchoolId !== payload.school_id) {
+        const oldSchool = updatedSchools.find(s => s.id === oldSchoolId);
+        if (oldSchool && (!oldSchool.children || oldSchool.children.length === 0)) {
+          try {
+            await api.delete(`/schools/${oldSchoolId}`);
+            const refreshed = await api.get('/schools').then(r => r.data.schools || []);
+            setHouseholdSchools(refreshed);
+          } catch (e) {
+            console.warn('Could not auto-remove orphaned school:', e);
+          }
+        }
+      }
 
       // Only update auth context if editing own profile
       if (isEditingSelf) {
