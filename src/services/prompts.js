@@ -23,6 +23,8 @@ INTENT DETECTION:
 - "note_recall": User is asking about something that IS in the saved household notes above. Look up the answer from the notes and include it in response_message.
 - "create_event": User wants to add a calendar event (e.g. "add dentist on Monday at 10am", "schedule Logan's tennis for Saturday 5pm", "put anniversary on 20 March"). Extract event details into the "calendar_event" field.
 - "weather": User is asking about the weather (e.g. "what's the weather?", "will it rain today?", "do I need an umbrella?", "how's the weather this week?").
+- "school_activity": User is adding/updating a child's weekly school activity (e.g. "Mason has PE on Tuesdays", "Emma starts art club Wednesday until 4", "Jake's stopped coding club"). Extract into "school_activity" field.
+- "school_event": User is adding a one-off school event (e.g. "Jake has a school trip next Thursday", "non-uniform day Friday £1", "INSET day on the 14th"). Extract into "calendar_event" field with school context.
 - "chat": Any general question, conversation, or request that doesn't match the above. This includes: recipes, advice, general knowledge, greetings, or questions about things NOT in the saved notes. Answer helpfully and conversationally.
 
 IMPORTANT: If a user asks about something and the answer IS in the saved household notes, use "note_recall" NOT "chat". If the answer is NOT in the notes, use "chat".
@@ -95,6 +97,13 @@ Respond only with valid JSON matching this schema:
     "value": string | null,
     "action": "save" | "delete"
   } | null,
+  "school_activity": {
+    "child_name": string,
+    "activity": string,
+    "day_of_week": integer (0=Monday...4=Friday),
+    "time_end": "HH:MM" | null,
+    "action": "add" | "remove"
+  } | null,
   "response_message": string
 }`;
 
@@ -161,6 +170,9 @@ The user's timezone is {{TIMEZONE}}.
 
 ## Upcoming Calendar Events (next 14 days)
 {{EVENTS}}
+
+## Schools & Activities
+{{SCHOOLS}}
 
 ## Household Notes (Long-term Memory)
 {{NOTES}}

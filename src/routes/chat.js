@@ -64,13 +64,14 @@ async function buildSystemPrompt(householdId, householdName, userId) {
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-  const [members, notes, shopping, tasks, events, household] = await Promise.all([
+  const [members, notes, shopping, tasks, events, household, schools] = await Promise.all([
     db.getHouseholdMembers(householdId),
     db.getHouseholdNotes(householdId),
     db.getShoppingList(householdId),
     db.getAllIncompleteTasks(householdId),
     db.getCalendarEvents(householdId, today, twoWeeks),
     db.getHouseholdById(householdId),
+    db.getHouseholdSchools(householdId),
   ]);
 
   const currentUser = members.find(m => m.id === userId);
@@ -90,6 +91,20 @@ async function buildSystemPrompt(householdId, householdName, userId) {
     ? events.map(e => `- ${e.title} on ${e.start_time?.split('T')[0] || 'TBD'}${e.assigned_to_name ? ` (${e.assigned_to_name})` : ''}`).join('\n')
     : '(none)';
 
+  // Build school context
+  let schoolsStr = '(none)';
+  if (schools.length > 0) {
+    const schoolLines = [];
+    for (const school of schools) {
+      const children = members.filter(m => m.school_id === school.id);
+      if (children.length > 0) {
+        const childNames = children.map(c => `${c.name} (${c.year_group || 'no year group'})`).join(', ');
+        schoolLines.push(`${school.school_name}: ${childNames}`);
+      }
+    }
+    if (schoolLines.length > 0) schoolsStr = schoolLines.join('\n');
+  }
+
   return CHAT_ASSISTANT_SYSTEM
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
@@ -98,6 +113,7 @@ async function buildSystemPrompt(householdId, householdName, userId) {
     .replace(/{{SHOPPING_LIST}}/g, shoppingStr)
     .replace(/{{TASKS}}/g, tasksStr)
     .replace(/{{EVENTS}}/g, eventsStr)
+    .replace(/{{SCHOOLS}}/g, schoolsStr)
     .replace(/{{NOTES}}/g, notesStr);
 }
 

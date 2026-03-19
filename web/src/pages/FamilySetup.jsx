@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconUsers, IconHome, IconMail } from '../components/Icons';
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const YEAR_GROUPS = ['Nursery', 'Reception', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12', 'Year 13'];
 
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
@@ -37,6 +40,16 @@ export default function FamilySetup() {
   const [depColor, setDepColor] = useState('sage');
   const [addingDependent, setAddingDependent] = useState(false);
 
+  // School state
+  const [depAttendsSchool, setDepAttendsSchool] = useState(false);
+  const [depSchoolSearch, setDepSchoolSearch] = useState('');
+  const [depSchoolResults, setDepSchoolResults] = useState([]);
+  const [depSelectedSchool, setDepSelectedSchool] = useState(null);
+  const [depYearGroup, setDepYearGroup] = useState('');
+  const [searchingSchools, setSearchingSchools] = useState(false);
+  const [householdSchools, setHouseholdSchools] = useState([]);
+  const [childActivities, setChildActivities] = useState({}); // { childId: [activities] }
+
   // Edit profile state
   const [editingMember, setEditingMember] = useState(null);
   const [profileName, setProfileName] = useState('');
@@ -47,6 +60,10 @@ export default function FamilySetup() {
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSchoolId, setProfileSchoolId] = useState(null);
+  const [profileYearGroup, setProfileYearGroup] = useState('');
+  const [editSchoolSearch, setEditSchoolSearch] = useState('');
+  const [editSchoolResults, setEditSchoolResults] = useState([]);
 
   function loadMembers() {
     return api.get('/household')
@@ -55,7 +72,40 @@ export default function FamilySetup() {
       .finally(() => setLoadingMembers(false));
   }
 
-  useEffect(() => { loadMembers(); }, []);
+  useEffect(() => { loadMembers(); loadSchools(); }, []);
+
+  function loadSchools() {
+    api.get('/schools')
+      .then(({ data }) => {
+        setHouseholdSchools(data.schools || []);
+        // Build activities map from school data
+        const actMap = {};
+        (data.schools || []).forEach(s => {
+          (s.children || []).forEach(c => {
+            if (c.activities?.length) actMap[c.id] = c.activities;
+          });
+        });
+        setChildActivities(actMap);
+      })
+      .catch(() => {});
+  }
+
+  async function handleSchoolSearch(query) {
+    setDepSchoolSearch(query);
+    if (query.trim().length < 2) { setDepSchoolResults([]); return; }
+    setSearchingSchools(true);
+    try {
+      const { data } = await api.get(`/schools/search?q=${encodeURIComponent(query.trim())}`);
+      setDepSchoolResults(data.schools || []);
+    } catch { setDepSchoolResults([]); }
+    finally { setSearchingSchools(false); }
+  }
+
+  function selectSchool(school) {
+    setDepSelectedSchool(school);
+    setDepSchoolSearch(school.name);
+    setDepSchoolResults([]);
+  }
 
   useEffect(() => {
     if (isAdmin) {
@@ -70,6 +120,11 @@ export default function FamilySetup() {
     setDepRole('');
     setDepBirthday('');
     setDepColor('sage');
+    setDepAttendsSchool(false);
+    setDepSchoolSearch('');
+    setDepSelectedSchool(null);
+    setDepYearGroup('');
+    setDepSchoolResults([]);
     setShowAddDependent(true);
   }
 
@@ -78,14 +133,37 @@ export default function FamilySetup() {
     setAddingDependent(true);
     setError('');
     try {
+      // If school is selected, ensure it exists in household first
+      let schoolId = null;
+      if (depAttendsSchool && depSelectedSchool) {
+        // Check if this school already exists in the household
+        const existingSchool = householdSchools.find(s => s.school_urn === depSelectedSchool.urn);
+        if (existingSchool) {
+          schoolId = existingSchool.id;
+        } else {
+          // Create new household school
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: depSelectedSchool.name,
+            school_urn: depSelectedSchool.urn,
+            school_type: depSelectedSchool.type,
+            local_authority: depSelectedSchool.local_authority,
+            postcode: depSelectedSchool.postcode,
+          });
+          schoolId = schoolData.school.id;
+        }
+      }
+
       await api.post('/household/dependents', {
         name: depName.trim(),
         family_role: depRole.trim() || null,
         birthday: depBirthday || null,
         color_theme: depColor,
+        school_id: schoolId,
+        year_group: depAttendsSchool ? depYearGroup || null : null,
       });
       setShowAddDependent(false);
       await loadMembers();
+      await loadSchools();
       setSuccess('Member added!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (err) {
@@ -113,6 +191,28 @@ export default function FamilySetup() {
     setProfileColor(member.color_theme || 'sage');
     setProfileReminderTime(member.reminder_time ? member.reminder_time.substring(0, 5) : '');
     setProfileAvatar(member.avatar_url || null);
+    setProfileSchoolId(member.school_id || null);
+    setProfileYearGroup(member.year_group || '');
+    const school = householdSchools.find(s => s.id === member.school_id);
+    setEditSchoolSearch(school?.school_name || '');
+    setEditSchoolResults([]);
+  }
+
+  async function handleEditSchoolSearch(query) {
+    setEditSchoolSearch(query);
+    if (query.trim().length < 2) { setEditSchoolResults([]); return; }
+    try {
+      const { data } = await api.get(`/schools/search?q=${encodeURIComponent(query.trim())}`);
+      setEditSchoolResults(data.schools || []);
+    } catch { setEditSchoolResults([]); }
+  }
+
+  function selectEditSchool(school) {
+    // Check if school exists in household, if so use that ID
+    const existing = householdSchools.find(s => s.school_urn === school.urn);
+    setProfileSchoolId(existing ? existing.id : `new:${school.urn}`);
+    setEditSchoolSearch(school.name);
+    setEditSchoolResults([]);
   }
 
   async function handleAvatarUpload(e) {
@@ -165,13 +265,35 @@ export default function FamilySetup() {
         birthday: profileBirthday || null,
         color_theme: profileColor,
         reminder_time: profileReminderTime || null,
+        year_group: profileYearGroup || null,
       };
+
+      // Handle school assignment for dependents
+      if (editingMember?.member_type === 'dependent') {
+        if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
+          // Need to create the school in household first
+          const urn = profileSchoolId.replace('new:', '');
+          const schoolResult = editSchoolResults.find(s => s.urn === urn) || { name: editSchoolSearch, urn };
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: schoolResult.name || editSchoolSearch,
+            school_urn: urn,
+            school_type: schoolResult.type,
+            local_authority: schoolResult.local_authority,
+            postcode: schoolResult.postcode,
+          });
+          payload.school_id = schoolData.school.id;
+        } else {
+          payload.school_id = profileSchoolId || null;
+        }
+      }
+
       // When admin edits another member, include target user_id
       if (!isEditingSelf) {
         payload.user_id = targetId;
       }
       await api.patch('/household/profile', payload);
       await loadMembers();
+      await loadSchools();
       // Only update auth context if editing own profile
       if (isEditingSelf) {
         const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
@@ -436,9 +558,37 @@ export default function FamilySetup() {
                           {m.name[0].toUpperCase()}
                         </div>
                       )}
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-bark">{m.name}</p>
                         {m.family_role && <p className="text-xs text-cocoa">{m.family_role}</p>}
+                        {/* School badge */}
+                        {m.school_id && (() => {
+                          const school = householdSchools.find(s => s.id === m.school_id);
+                          return school ? (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky" />
+                              {m.year_group ? `${m.year_group}, ` : ''}{school.school_name}
+                            </span>
+                          ) : null;
+                        })()}
+                        {/* Activity pills */}
+                        {childActivities[m.id]?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(() => {
+                              // Group activities: "PE Tue & Thu", "Swimming Fri"
+                              const grouped = {};
+                              childActivities[m.id].forEach(a => {
+                                if (!grouped[a.activity]) grouped[a.activity] = [];
+                                grouped[a.activity].push(DAY_LABELS[a.day_of_week]);
+                              });
+                              return Object.entries(grouped).map(([activity, days]) => (
+                                <span key={activity} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-cream-border/50 text-cocoa">
+                                  {activity} {days.join(' & ')}
+                                </span>
+                              ));
+                            })()}
+                          </div>
+                        )}
                       </div>
                       {isAdmin && (
                         <>
@@ -545,6 +695,65 @@ export default function FamilySetup() {
                   ))}
                 </div>
               </div>
+
+              {/* School toggle */}
+              <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-bark">Do they attend school?</span>
+                <button
+                  type="button"
+                  onClick={() => setDepAttendsSchool(!depAttendsSchool)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${depAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
+                >
+                  <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${depAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* School fields (shown when toggle is on) */}
+              {depAttendsSchool && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-bark mb-1">School</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={depSchoolSearch}
+                          onChange={(e) => handleSchoolSearch(e.target.value)}
+                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                          placeholder="Search by name or postcode..."
+                        />
+                        {searchingSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
+                        {depSchoolResults.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {depSchoolResults.map(s => (
+                              <li key={s.urn}>
+                                <button type="button" onClick={() => selectSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                  <span className="font-medium text-bark">{s.name}</span>
+                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      {/* Same-school detection */}
+                      {depSelectedSchool && householdSchools.find(s => s.school_urn === depSelectedSchool.urn) && (
+                        <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
+                          <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === depSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
+                          <p className="text-xs text-plum/70">Term dates already set up — just add {depName || 'their'} activities below.</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-28">
+                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
+                      <select value={depYearGroup} onChange={(e) => setDepYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
+                        <option value="">Select...</option>
+                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -767,6 +976,49 @@ export default function FamilySetup() {
                   ))}
                 </div>
               </div>
+
+              {/* School details (dependents only) */}
+              {editingMember?.member_type === 'dependent' && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📋 School details</h3>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-bark mb-1">School</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={editSchoolSearch}
+                          onChange={(e) => handleEditSchoolSearch(e.target.value)}
+                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                          placeholder="Search by name or postcode..."
+                        />
+                        {editSchoolResults.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {editSchoolResults.map(s => (
+                              <li key={s.urn}>
+                                <button type="button" onClick={() => selectEditSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                  <span className="font-medium text-bark">{s.name}</span>
+                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      {profileSchoolId && editSchoolSearch && (
+                        <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
+                      )}
+                    </div>
+                    <div className="w-28">
+                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
+                      <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
+                        <option value="">Select...</option>
+                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {editingMember?.member_type !== 'dependent' && (
                 <div>

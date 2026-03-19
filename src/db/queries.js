@@ -203,7 +203,7 @@ async function deleteHouseholdNote(householdId, key) {
 
 // ─── Dependent helpers ───────────────────────────────────────────────────────
 
-async function createDependent(householdId, { name, family_role, birthday, color_theme }) {
+async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, year_group }) {
   const { data, error } = await supabase
     .from('users')
     .insert({
@@ -212,6 +212,8 @@ async function createDependent(householdId, { name, family_role, birthday, color
       family_role: family_role || null,
       birthday: birthday || null,
       color_theme: color_theme || 'sage',
+      school_id: school_id || null,
+      year_group: year_group || null,
       member_type: 'dependent',
       role: 'member',
       email_verified: false,
@@ -261,6 +263,167 @@ async function clearChatHistory(userId) {
     .delete()
     .eq('user_id', userId);
   if (error) throw error;
+}
+
+// ─── School helpers ──────────────────────────────────────────────────────────
+
+async function searchSchools(query, postcode) {
+  let q = supabase
+    .from('schools_directory')
+    .select('urn, name, type, phase, local_authority, address, postcode')
+    .ilike('name', `%${query}%`)
+    .eq('status', 'open')
+    .limit(10);
+
+  if (postcode) {
+    q = q.ilike('postcode', `${postcode}%`);
+  }
+
+  const { data, error } = await q.order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+async function createHouseholdSchool(householdId, data) {
+  const { data: school, error } = await supabase
+    .from('household_schools')
+    .insert({
+      household_id: householdId,
+      school_name: data.school_name,
+      school_urn: data.school_urn || null,
+      school_type: data.school_type || null,
+      local_authority: data.local_authority || null,
+      postcode: data.postcode || null,
+      uses_la_dates: data.uses_la_dates !== false,
+      colour: data.colour || '#4A90D9',
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return school;
+}
+
+async function getHouseholdSchools(householdId) {
+  const { data, error } = await supabase
+    .from('household_schools')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('school_name');
+  if (error) throw error;
+  return data || [];
+}
+
+async function getHouseholdSchoolByUrn(householdId, urn) {
+  const { data, error } = await supabase
+    .from('household_schools')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('school_urn', urn)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteHouseholdSchool(schoolId, householdId) {
+  const { error } = await supabase
+    .from('household_schools')
+    .delete()
+    .eq('id', schoolId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function addSchoolTermDates(schoolId, dates) {
+  const rows = dates.map(d => ({
+    school_id: schoolId,
+    academic_year: d.academic_year,
+    event_type: d.event_type,
+    date: d.date,
+    end_date: d.end_date || null,
+    label: d.label || null,
+    applies_to_year_groups: d.applies_to_year_groups || null,
+    source: d.source || 'manual',
+  }));
+  const { data, error } = await supabase
+    .from('school_term_dates')
+    .insert(rows)
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+async function getSchoolTermDates(schoolId) {
+  const { data, error } = await supabase
+    .from('school_term_dates')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('date');
+  if (error) throw error;
+  return data || [];
+}
+
+async function addChildActivity(data) {
+  const { data: activity, error } = await supabase
+    .from('child_weekly_schedule')
+    .insert({
+      child_id: data.child_id,
+      day_of_week: data.day_of_week,
+      activity: data.activity,
+      time_start: data.time_start || null,
+      time_end: data.time_end || null,
+      reminder_text: data.reminder_text || null,
+      reminder_offset: data.reminder_offset || 'morning_of',
+      term_only: data.term_only !== false,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return activity;
+}
+
+async function getChildActivities(childId) {
+  const { data, error } = await supabase
+    .from('child_weekly_schedule')
+    .select('*')
+    .eq('child_id', childId)
+    .order('day_of_week');
+  if (error) throw error;
+  return data || [];
+}
+
+async function deleteChildActivity(activityId) {
+  const { error } = await supabase
+    .from('child_weekly_schedule')
+    .delete()
+    .eq('id', activityId);
+  if (error) throw error;
+}
+
+async function addChildSchoolEvent(data) {
+  const { data: event, error } = await supabase
+    .from('child_school_events')
+    .insert({
+      child_id: data.child_id,
+      school_id: data.school_id,
+      title: data.title,
+      date: data.date,
+      event_type: data.event_type || 'other',
+      notes: data.notes || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return event;
+}
+
+async function getChildSchoolEvents(childId) {
+  const { data, error } = await supabase
+    .from('child_school_events')
+    .select('*')
+    .eq('child_id', childId)
+    .order('date');
+  if (error) throw error;
+  return data || [];
 }
 
 // ─── WhatsApp helpers ────────────────────────────────────────────────────────
@@ -1210,5 +1373,18 @@ module.exports = {
   getChatHistory,
   saveChatMessage,
   clearChatHistory,
+  // Schools
+  searchSchools,
+  createHouseholdSchool,
+  getHouseholdSchools,
+  getHouseholdSchoolByUrn,
+  deleteHouseholdSchool,
+  addSchoolTermDates,
+  getSchoolTermDates,
+  addChildActivity,
+  getChildActivities,
+  deleteChildActivity,
+  addChildSchoolEvent,
+  getChildSchoolEvents,
   getSupabase: () => supabase,
 };

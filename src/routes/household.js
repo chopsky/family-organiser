@@ -72,7 +72,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'terracotta', 'slate'];
-  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group } = req.body;
 
   // Determine target user — admins can edit others, members only themselves
   let targetUserId = req.user.id;
@@ -113,6 +113,8 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     updates.latitude = req.body.latitude;
     updates.longitude = req.body.longitude;
   }
+  if (school_id !== undefined) updates.school_id = school_id || null;
+  if (year_group !== undefined) updates.year_group = year_group || null;
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update.' });
@@ -280,7 +282,7 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
  * Add a dependent (infant, pet, etc.) to the household. Admin only.
  */
 router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, family_role, birthday, color_theme } = req.body;
+  const { name, family_role, birthday, color_theme, school_id, year_group } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Name is required.' });
@@ -292,6 +294,8 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
       family_role: family_role?.trim() || null,
       birthday: birthday || null,
       color_theme: color_theme || 'sage',
+      school_id: school_id || null,
+      year_group: year_group || null,
     });
     return res.status(201).json({ member: dependent });
   } catch (err) {

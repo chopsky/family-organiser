@@ -13,7 +13,7 @@ const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather
  * @param {number} shoppingCount - Number of incomplete shopping items
  * @returns {string}
  */
-function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, weatherBrief) {
+function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, weatherBrief, schoolActivities) {
   const today = new Date().toISOString().split('T')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -23,6 +23,16 @@ function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, weath
   // Weather brief (if available)
   if (weatherBrief) {
     lines.push(weatherBrief);
+    lines.push('');
+  }
+
+  // School activities for today
+  if (schoolActivities && schoolActivities.length > 0) {
+    lines.push('🏫 *SCHOOL:*');
+    for (const act of schoolActivities) {
+      const timeStr = act.time_end ? ` until ${act.time_end.substring(0, 5)}` : '';
+      lines.push(`• ${act.child_name} — ${act.activity}${timeStr}${act.reminder_text ? ` (${act.reminder_text})` : ''}`);
+    }
     lines.push('');
   }
 
@@ -128,12 +138,29 @@ async function sendDailyReminders(householdId, singleMember) {
       } catch { /* silently skip weather on error */ }
     }
 
+    // Get today's school activities for children in this household
+    let schoolActivities = [];
+    try {
+      const dayOfWeek = (new Date().getDay() + 6) % 7; // Convert JS day (0=Sun) to our format (0=Mon)
+      if (dayOfWeek <= 4) { // Only Mon-Fri
+        const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
+        for (const child of dependents) {
+          const activities = await db.getChildActivities(child.id);
+          const todayActivities = activities.filter(a => a.day_of_week === dayOfWeek);
+          for (const act of todayActivities) {
+            schoolActivities.push({ ...act, child_name: child.name });
+          }
+        }
+      }
+    } catch { /* silently skip school activities on error */ }
+
     const message = buildDailyReminderMessage(
       member,
       myTasks || [],
       everyoneTasks || [],
       shoppingCount,
-      weatherBrief
+      weatherBrief,
+      schoolActivities
     );
 
     // Send via WhatsApp

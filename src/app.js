@@ -55,6 +55,7 @@ app.use('/api/classify', require('./routes/classify'));
 app.use('/api/receipt',  require('./routes/receipt'));
 app.use('/api/digest',   require('./routes/digest'));
 app.use('/api/chat',     require('./routes/chat'));
+app.use('/api/schools',  require('./routes/schools'));
 // /api/settings is mounted on the household router (PATCH /api/household/settings)
 // but also available as PATCH /api/settings for convenience:
 app.use('/api/settings', require('./routes/household'));

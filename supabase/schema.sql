@@ -29,7 +29,76 @@ create table if not exists users (
   timezone           text,
   latitude           double precision,
   longitude          double precision,
+  school_id          uuid,
+  year_group         text,
   created_at         timestamp with time zone default now()
+);
+
+-- schools_directory (imported from GOV.UK GIAS)
+create table if not exists schools_directory (
+  urn        text primary key,
+  name       text not null,
+  type       text,
+  phase      text,
+  local_authority text,
+  address    text,
+  postcode   text,
+  status     text
+);
+
+-- household_schools
+create table if not exists household_schools (
+  id             uuid primary key default gen_random_uuid(),
+  household_id   uuid references households(id) on delete cascade,
+  school_name    text not null,
+  school_urn     text,
+  school_type    text,
+  local_authority text,
+  postcode       text,
+  uses_la_dates  boolean default true,
+  ical_url       text,
+  colour         text default '#4A90D9',
+  created_at     timestamp with time zone default now()
+);
+
+-- school_term_dates
+create table if not exists school_term_dates (
+  id                      uuid primary key default gen_random_uuid(),
+  school_id               uuid references household_schools(id) on delete cascade,
+  academic_year           text not null,
+  event_type              text not null check (event_type in ('term_start','term_end','half_term_start','half_term_end','inset_day','bank_holiday')),
+  date                    date not null,
+  end_date                date,
+  label                   text,
+  applies_to_year_groups  text[],
+  source                  text default 'manual',
+  created_at              timestamp with time zone default now()
+);
+
+-- child_weekly_schedule
+create table if not exists child_weekly_schedule (
+  id              uuid primary key default gen_random_uuid(),
+  child_id        uuid references users(id) on delete cascade,
+  day_of_week     integer not null check (day_of_week between 0 and 4),
+  activity        text not null,
+  time_start      time,
+  time_end        time,
+  reminder_text   text,
+  reminder_offset text default 'morning_of',
+  term_only       boolean default true,
+  created_at      timestamp with time zone default now()
+);
+
+-- child_school_events
+create table if not exists child_school_events (
+  id          uuid primary key default gen_random_uuid(),
+  child_id    uuid references users(id) on delete cascade,
+  school_id   uuid references household_schools(id) on delete cascade,
+  title       text not null,
+  date        date not null,
+  event_type  text default 'other',
+  notes       text,
+  created_at  timestamp with time zone default now()
 );
 
 -- shopping_items
