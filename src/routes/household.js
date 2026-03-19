@@ -72,7 +72,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'terracotta', 'slate'];
-  const { name, family_role, birthday, color_theme, reminder_time, user_id } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id } = req.body;
 
   // Determine target user — admins can edit others, members only themselves
   let targetUserId = req.user.id;
@@ -105,6 +105,9 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   if (reminder_time !== undefined) {
     // Accept HH:MM or null (null = use household default)
     updates.reminder_time = reminder_time || null;
+  }
+  if (timezone !== undefined) {
+    updates.timezone = timezone || null;
   }
 
   if (!Object.keys(updates).length) {

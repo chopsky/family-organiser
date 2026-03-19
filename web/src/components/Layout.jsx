@@ -78,6 +78,12 @@ export default function Layout({ children }) {
         }
       })
       .catch(() => {});
+
+    // Sync browser timezone to backend (fire-and-forget)
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (browserTz) {
+      api.patch('/household/profile', { timezone: browserTz }).catch(() => {});
+    }
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleLogout() {

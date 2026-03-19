@@ -21,6 +21,42 @@ const chatImageUpload = multer({
 const router = Router();
 const MODEL = 'claude-sonnet-4-6';
 
+/**
+ * Convert a local date+time string to a UTC ISO timestamp using the user's timezone.
+ * e.g. localToUTC('2026-03-19', '10:00', 'Africa/Johannesburg') → '2026-03-19T08:00:00Z'
+ */
+function localToUTC(date, time, timezone) {
+  if (!timezone) return `${date}T${time || '00:00'}:00Z`;
+  try {
+    // Create a date in the target timezone
+    const localStr = `${date}T${time || '00:00'}:00`;
+    // Use Intl to get the UTC offset for this timezone at this date/time
+    const dt = new Date(localStr + 'Z'); // treat as UTC first
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    // Get what the UTC time looks like in the target timezone
+    const parts = formatter.formatToParts(dt);
+    const get = (type) => parts.find(p => p.type === type)?.value || '00';
+    const tzDate = `${get('year')}-${get('month')}-${get('day')}`;
+    const tzTime = `${get('hour')}:${get('minute')}:${get('second')}`;
+
+    // The difference between localStr and tzDate/tzTime is the offset
+    const localMs = new Date(localStr + 'Z').getTime();
+    const inTzMs = new Date(`${tzDate}T${tzTime}Z`).getTime();
+    const offsetMs = inTzMs - localMs; // how much the timezone is ahead of UTC
+
+    // To get UTC from local time: subtract the offset
+    const utcMs = localMs - offsetMs;
+    return new Date(utcMs).toISOString().replace('.000Z', 'Z');
+  } catch {
+    return `${date}T${time || '00:00'}:00Z`;
+  }
+}
+
 function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
@@ -161,6 +197,8 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // Extract and process all actions
     const { cleanContent, actions } = extractActions(textBlock.text);
     const members = await db.getHouseholdMembers(req.householdId);
+    const currentUser = members.find(m => m.id === req.user.id);
+    const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
     const executedActions = [];
 
     for (const act of actions) {
@@ -177,10 +215,10 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           const assignee = act.assigned_to ? members.find(m => m.name.toLowerCase() === act.assigned_to.toLowerCase()) : null;
           const startTime = act.all_day
             ? `${act.date}T00:00:00Z`
-            : `${act.date}T${act.start_time || '09:00'}:00Z`;
+            : localToUTC(act.date, act.start_time || '09:00', userTz);
           const endTime = act.all_day
             ? `${act.date}T23:59:59Z`
-            : `${act.date}T${act.end_time || act.start_time || '10:00'}:00Z`;
+            : localToUTC(act.date, act.end_time || act.start_time || '10:00', userTz);
 
           await db.createCalendarEvent(req.householdId, {
             title: act.title,
@@ -240,6 +278,9 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
     const memberNames = members.map(m => m.name);
     const scan = await scanImage(req.file.buffer, req.file.mimetype, memberNames);
 
+    const currentUser = members.find(m => m.id === req.user.id);
+    const household = await db.getHouseholdById(req.householdId);
+    const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
     const executedActions = [];
 
     // ── Receipt handling ──
@@ -294,10 +335,10 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
 
           const startTime = ev.all_day
             ? `${ev.date}T00:00:00Z`
-            : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+            : localToUTC(ev.date, ev.start_time || '09:00', userTz);
           const endTime = ev.all_day
             ? `${ev.date}T23:59:59Z`
-            : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+            : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
           await db.createCalendarEvent(req.householdId, {
             title: ev.title,

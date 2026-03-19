@@ -10,6 +10,36 @@ const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
 
+// ─── Timezone helper ──────────────────────────────────────────────────────────
+
+/**
+ * Convert a local date+time string to a UTC ISO timestamp using the user's timezone.
+ */
+function localToUTC(date, time, timezone) {
+  if (!timezone) return `${date}T${time || '00:00'}:00Z`;
+  try {
+    const localStr = `${date}T${time || '00:00'}:00`;
+    const dt = new Date(localStr + 'Z');
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(dt);
+    const get = (type) => parts.find(p => p.type === type)?.value || '00';
+    const tzDate = `${get('year')}-${get('month')}-${get('day')}`;
+    const tzTime = `${get('hour')}:${get('minute')}:${get('second')}`;
+    const localMs = new Date(localStr + 'Z').getTime();
+    const inTzMs = new Date(`${tzDate}T${tzTime}Z`).getTime();
+    const offsetMs = inTzMs - localMs;
+    const utcMs = localMs - offsetMs;
+    return new Date(utcMs).toISOString().replace('.000Z', 'Z');
+  } catch {
+    return `${date}T${time || '00:00'}:00Z`;
+  }
+}
+
 // ─── Format helpers ───────────────────────────────────────────────────────────
 
 const CATEGORY_EMOJI = {
@@ -126,12 +156,13 @@ async function handleTextMessage(text, user, household) {
         ? household.members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
         : null;
 
+      const userTz = user.timezone || household.timezone || 'Europe/London';
       const startTime = ev.all_day
         ? `${ev.date}T00:00:00Z`
-        : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+        : localToUTC(ev.date, ev.start_time || '09:00', userTz);
       const endTime = ev.all_day
         ? `${ev.date}T23:59:59Z`
-        : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+        : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
       await db.createCalendarEvent(household.id, {
         title: ev.title,
@@ -312,6 +343,7 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
 
   // ── Event/invitation handling ──
   if (scan.type === 'event' && scan.events?.length) {
+    const userTz = user.timezone || household.timezone || 'Europe/London';
     const created = [];
     for (const ev of scan.events) {
       try {
@@ -321,10 +353,10 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
 
         const startTime = ev.all_day
           ? `${ev.date}T00:00:00Z`
-          : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+          : localToUTC(ev.date, ev.start_time || '09:00', userTz);
         const endTime = ev.all_day
           ? `${ev.date}T23:59:59Z`
-          : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+          : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
         await db.createCalendarEvent(household.id, {
           title: ev.title,

@@ -26,6 +26,7 @@ create table if not exists users (
   member_type        text not null default 'account' check (member_type in ('account', 'dependent')),
   avatar_url         text,
   reminder_time      time,
+  timezone           text,
   created_at         timestamp with time zone default now()
 );
 
