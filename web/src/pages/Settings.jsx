@@ -891,7 +891,7 @@ function SchoolsSection() {
               <div className="flex flex-wrap gap-1 mt-2">
                 {school.children.map(c => (
                   <span key={c.id} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
-                    {c.name}
+                    {c.name}{c.year_group ? ` · ${c.year_group}` : ''}
                   </span>
                 ))}
               </div>
