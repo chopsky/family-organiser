@@ -985,6 +985,7 @@ async function createCalendarEvent(householdId, eventData, createdByUserId) {
       all_day: eventData.all_day || false,
       location: eventData.location || null,
       color: eventData.color || 'sage',
+      category: eventData.category || 'general',
       recurrence: eventData.recurrence || null,
       assigned_to: eventData.assigned_to || null,
       assigned_to_name: eventData.assigned_to_name || null,
