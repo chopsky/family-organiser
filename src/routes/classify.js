@@ -76,9 +76,10 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         recurrence: ev.recurrence || null,
       };
 
-      // Resolve assigned_to member
-      if (ev.assigned_to) {
-        const match = members.find(m => m.name.toLowerCase() === ev.assigned_to.toLowerCase());
+      // Resolve assigned_to member (AI returns assigned_to_name)
+      const assigneeName = ev.assigned_to_name || ev.assigned_to;
+      if (assigneeName) {
+        const match = members.find(m => m.name.toLowerCase() === assigneeName.toLowerCase());
         if (match) {
           eventData.assigned_to = match.id;
           eventData.assigned_to_name = match.name;
