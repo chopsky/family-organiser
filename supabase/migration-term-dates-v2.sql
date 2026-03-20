@@ -25,8 +25,15 @@ ALTER TABLE household_schools
 --    (allows household members to update their own school's term dates)
 -- =============================================================================
 
--- Policy: household members can update term dates belonging to their schools
-CREATE POLICY IF NOT EXISTS "Household members can update own term dates"
+-- Drop policies first if they exist, then recreate
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Household members can update own term dates" ON school_term_dates;
+  DROP POLICY IF EXISTS "Household members can read own term dates" ON school_term_dates;
+  DROP POLICY IF EXISTS "Household members can insert own term dates" ON school_term_dates;
+  DROP POLICY IF EXISTS "Household members can delete own term dates" ON school_term_dates;
+END $$;
+
+CREATE POLICY "Household members can update own term dates"
   ON school_term_dates
   FOR UPDATE
   USING (
@@ -46,8 +53,7 @@ CREATE POLICY IF NOT EXISTS "Household members can update own term dates"
     )
   );
 
--- Policy: household members can read their own term dates
-CREATE POLICY IF NOT EXISTS "Household members can read own term dates"
+CREATE POLICY "Household members can read own term dates"
   ON school_term_dates
   FOR SELECT
   USING (
@@ -59,8 +65,7 @@ CREATE POLICY IF NOT EXISTS "Household members can read own term dates"
     )
   );
 
--- Policy: household members can insert term dates for their schools
-CREATE POLICY IF NOT EXISTS "Household members can insert own term dates"
+CREATE POLICY "Household members can insert own term dates"
   ON school_term_dates
   FOR INSERT
   WITH CHECK (
@@ -72,8 +77,7 @@ CREATE POLICY IF NOT EXISTS "Household members can insert own term dates"
     )
   );
 
--- Policy: household members can delete term dates for their schools
-CREATE POLICY IF NOT EXISTS "Household members can delete own term dates"
+CREATE POLICY "Household members can delete own term dates"
   ON school_term_dates
   FOR DELETE
   USING (
