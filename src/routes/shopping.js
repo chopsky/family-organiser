@@ -76,28 +76,40 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * PATCH /api/shopping/:id
- * Toggle completion status of an item.
+ * Update a shopping item — completion status, quantity, unit, description, category.
  *
- * Body: { completed: boolean }
+ * Body: { completed?, quantity?, unit?, description?, category?, item? }
  */
 router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
-  const { completed } = req.body;
+  const { completed, quantity, unit, description, category, item } = req.body;
 
-  if (typeof completed !== 'boolean') {
-    return res.status(400).json({ error: '"completed" (boolean) is required' });
+  if (category && !VALID_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: `Invalid category "${category}"` });
   }
 
   try {
     const { supabase } = require('../db/client');
-    const updateData = completed
-      ? { completed: true,  completed_at: new Date().toISOString() }
-      : { completed: false, completed_at: null };
+    const updateData = {};
+
+    if (typeof completed === 'boolean') {
+      updateData.completed = completed;
+      updateData.completed_at = completed ? new Date().toISOString() : null;
+    }
+    if (item !== undefined) updateData.item = item.trim();
+    if (quantity !== undefined) updateData.quantity = quantity || null;
+    if (unit !== undefined) updateData.unit = unit || null;
+    if (description !== undefined) updateData.description = description || null;
+    if (category) updateData.category = category;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
 
     const { data, error } = await supabase
       .from('shopping_items')
       .update(updateData)
       .eq('id', req.params.id)
-      .eq('household_id', req.householdId) // scoped to household
+      .eq('household_id', req.householdId)
       .select()
       .single();
 

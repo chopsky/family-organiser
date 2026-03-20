@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
@@ -26,6 +26,16 @@ export default function Shopping() {
   const [restoring, setRestoring]   = useState(new Set());
   const [deleting, setDeleting]     = useState(new Set());
 
+  // Edit popup state
+  const [editItem, setEditItem]     = useState(null);
+  const [editName, setEditName]     = useState('');
+  const [editQty, setEditQty]       = useState('');
+  const [editUnit, setEditUnit]     = useState('');
+  const [editDesc, setEditDesc]     = useState('');
+  const [editCat, setEditCat]       = useState('');
+  const [saving, setSaving]         = useState(false);
+  const popupRef = useRef(null);
+
   const load = useCallback(async () => {
     try {
       const params = {};
@@ -41,6 +51,59 @@ export default function Shopping() {
   }, [filter, showCompleted]);
 
   useEffect(() => { setLoading(true); load(); }, [load]);
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (!editItem) return;
+    function handleClick(e) {
+      if (popupRef.current && !popupRef.current.contains(e.target)) {
+        setEditItem(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [editItem]);
+
+  function openEdit(item) {
+    setEditItem(item);
+    setEditName(item.item || '');
+    setEditQty(item.quantity || '');
+    setEditUnit(item.unit || '');
+    setEditDesc(item.description || '');
+    setEditCat(item.category || 'other');
+  }
+
+  async function saveEdit() {
+    if (!editItem || !editName.trim()) return;
+    setSaving(true);
+    try {
+      await api.patch(`/shopping/${editItem.id}`, {
+        item: editName.trim(),
+        quantity: editQty.trim() || null,
+        unit: editUnit.trim() || null,
+        description: editDesc.trim() || null,
+        category: editCat,
+      });
+      setEditItem(null);
+      await load();
+    } catch {
+      setError('Could not update item.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteFromEdit() {
+    if (!editItem) return;
+    if (!window.confirm(`Delete "${editItem.item}"? This can't be undone.`)) return;
+    try {
+      await api.delete(`/shopping/${editItem.id}`);
+      setEditItem(null);
+      await load();
+    } catch {
+      setError('Could not delete item.');
+    }
+  }
 
   async function addItem(e) {
     e.preventDefault();
@@ -178,7 +241,7 @@ export default function Shopping() {
           )}
           <ul className="space-y-2">
             {incomplete.map((item) => (
-              <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} />
+              <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} onEdit={openEdit} />
             ))}
           </ul>
 
@@ -192,7 +255,7 @@ export default function Shopping() {
                     <div className="w-6 h-6 rounded-full bg-success/20 text-success flex items-center justify-center shrink-0 text-xs font-bold">
                       ✓
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <button onClick={() => openEdit(item)} className="flex-1 min-w-0 text-left">
                       <p className="text-sm text-cocoa">{item.item}</p>
                       <div className="flex gap-x-3 mt-0.5">
                         <span className="text-xs text-cocoa">
@@ -202,7 +265,7 @@ export default function Shopping() {
                           <span className="text-xs text-cocoa">Last purchased: {formatDate(item.completed_at)}</span>
                         )}
                       </div>
-                    </div>
+                    </button>
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => restore(item)}
@@ -231,11 +294,116 @@ export default function Shopping() {
           )}
         </>
       )}
+
+      {/* Edit item popup */}
+      {editItem && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div
+            ref={popupRef}
+            className="bg-linen w-full sm:w-[420px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border p-5 space-y-4 max-h-[80vh] overflow-y-auto"
+          >
+            {/* Item name */}
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full text-lg font-semibold text-bark bg-transparent border-b border-cream-border pb-2 focus:outline-none focus:border-primary"
+              placeholder="Item name"
+            />
+
+            {/* Qty + Unit row */}
+            <div className="flex items-center gap-3">
+              <span className="text-cocoa shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" x2="21" y1="6" y2="6" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={editQty}
+                onChange={(e) => setEditQty(e.target.value)}
+                placeholder="Qty"
+                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <input
+                type="text"
+                value={editUnit}
+                onChange={(e) => setEditUnit(e.target.value)}
+                placeholder="Unit (kg, litres, packs…)"
+                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+
+            {/* Category */}
+            <div className="flex items-center gap-3">
+              <span className="text-cocoa shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 9h16" /><path d="M4 15h16" /><path d="M10 3 8 21" /><path d="M16 3l-2 18" />
+                </svg>
+              </span>
+              <select
+                value={editCat}
+                onChange={(e) => setEditCat(e.target.value)}
+                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Description */}
+            <div className="flex items-start gap-3">
+              <span className="text-cocoa shrink-0 mt-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" />
+                </svg>
+              </span>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                placeholder="Add description"
+                rows={2}
+                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <button
+                onClick={deleteFromEdit}
+                className="flex items-center gap-1.5 text-sm text-error hover:text-error/80 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Delete
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditItem(null)}
+                  className="px-4 py-2 text-sm font-medium text-cocoa bg-oat hover:bg-cream-border rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  disabled={saving || !editName.trim()}
+                  className="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-pressed disabled:bg-primary/50 rounded-xl transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ItemRow({ item, toggle, loading }) {
+function ItemRow({ item, toggle, loading, onEdit }) {
   return (
     <li className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-center gap-3">
       <button
@@ -249,14 +417,21 @@ function ItemRow({ item, toggle, loading }) {
       >
         {item.completed && '✓'}
       </button>
-      <div className="flex-1 min-w-0">
-        <span className={`text-sm ${item.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
-          {item.item}
-        </span>
-        {item.quantity && (
-          <span className="text-cocoa text-xs ml-1">({item.quantity})</span>
+      <button onClick={() => onEdit(item)} className="flex-1 min-w-0 text-left">
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-sm ${item.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
+            {item.item}
+          </span>
+          {(item.quantity || item.unit) && (
+            <span className="text-cocoa text-xs">
+              ({[item.quantity, item.unit].filter(Boolean).join(' ')})
+            </span>
+          )}
+        </div>
+        {item.description && (
+          <p className="text-xs text-cocoa mt-0.5 truncate">{item.description}</p>
         )}
-      </div>
+      </button>
       <span className="text-xs text-cocoa shrink-0">
         {CATEGORY_EMOJI[item.category]} {item.category}
       </span>
