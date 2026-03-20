@@ -135,6 +135,76 @@ function getEventPosition(event, hourHeight) {
   return { top, height: Math.max(height, 20) }; // minimum 20px height
 }
 
+/**
+ * Calculate column layout for overlapping events (like Google Calendar).
+ * Returns a Map of eventId → { col, totalCols } so each event knows its
+ * horizontal position and width fraction.
+ */
+function layoutOverlappingEvents(events, hourHeight) {
+  if (!events.length) return new Map();
+
+  // Get start/end minutes for each event
+  const items = events.map(ev => {
+    const s = new Date(ev.start_time);
+    const e = new Date(ev.end_time);
+    const startMin = s.getHours() * 60 + s.getMinutes();
+    const endMin = Math.max(e.getHours() * 60 + e.getMinutes(), startMin + 15);
+    return { id: ev.id, startMin, endMin };
+  });
+
+  // Sort by start time, then by duration (longer first)
+  items.sort((a, b) => a.startMin - b.startMin || (b.endMin - b.startMin) - (a.endMin - a.startMin));
+
+  // Group overlapping events into clusters
+  const clusters = [];
+  let current = [items[0]];
+  let clusterEnd = items[0].endMin;
+
+  for (let i = 1; i < items.length; i++) {
+    if (items[i].startMin < clusterEnd) {
+      // Overlaps with current cluster
+      current.push(items[i]);
+      clusterEnd = Math.max(clusterEnd, items[i].endMin);
+    } else {
+      clusters.push(current);
+      current = [items[i]];
+      clusterEnd = items[i].endMin;
+    }
+  }
+  clusters.push(current);
+
+  // For each cluster, assign columns
+  const layout = new Map();
+  for (const cluster of clusters) {
+    const columns = []; // each column is an array of events
+
+    for (const item of cluster) {
+      // Find the first column where this event doesn't overlap
+      let placed = false;
+      for (let c = 0; c < columns.length; c++) {
+        const lastInCol = columns[c][columns[c].length - 1];
+        if (item.startMin >= lastInCol.endMin) {
+          columns[c].push(item);
+          item._col = c;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        item._col = columns.length;
+        columns.push([item]);
+      }
+    }
+
+    const totalCols = columns.length;
+    for (const item of cluster) {
+      layout.set(item.id, { col: item._col, totalCols });
+    }
+  }
+
+  return layout;
+}
+
 /** Get months to fetch for a given date range */
 function getMonthsForRange(startDate, endDate) {
   const months = new Set();
@@ -707,25 +777,43 @@ export default function Calendar() {
                       />
                     ))}
 
-                    {/* Events */}
-                    {dayTimedEvents.map(ev => {
-                      const pos = getEventPosition(ev, HOUR_HEIGHT);
-                      const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
-                      return (
-                        <button
-                          key={ev.id}
-                          onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
-                          className={`absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded ${colors.bg} border-l-2 ${colors.border} px-1 py-0.5 overflow-hidden hover:opacity-80 z-10 cursor-pointer text-left`}
-                          style={{ top: `${pos.top}px`, height: `${pos.height}px` }}
-                          title={`${ev.title}\n${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
-                        >
-                          <p className={`text-[10px] sm:text-xs font-medium ${colors.text} truncate leading-tight`}>{ev.title}</p>
-                          {pos.height > 50 && ev.location && (
-                            <p className="text-[9px] text-cocoa truncate leading-tight">{ev.location}</p>
-                          )}
-                        </button>
-                      );
-                    })}
+                    {/* Events — laid out side-by-side when overlapping */}
+                    {(() => {
+                      const overlapLayout = layoutOverlappingEvents(dayTimedEvents, HOUR_HEIGHT);
+                      return dayTimedEvents.map(ev => {
+                        const pos = getEventPosition(ev, HOUR_HEIGHT);
+                        const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
+                        const layout = overlapLayout.get(ev.id) || { col: 0, totalCols: 1 };
+                        const widthPct = 100 / layout.totalCols;
+                        const leftPct = layout.col * widthPct;
+                        const gap = 2; // px gap between columns
+
+                        return (
+                          <button
+                            key={ev.id}
+                            onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+                            className={`absolute rounded ${colors.bg} border-l-2 ${colors.border} px-1 py-0.5 overflow-hidden hover:opacity-90 hover:shadow-md z-10 cursor-pointer text-left transition-shadow`}
+                            style={{
+                              top: `${pos.top}px`,
+                              height: `${pos.height}px`,
+                              left: `calc(${leftPct}% + ${gap}px)`,
+                              width: `calc(${widthPct}% - ${gap * 2}px)`,
+                            }}
+                            title={`${ev.title}\n${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
+                          >
+                            <p className={`text-[10px] sm:text-xs font-medium ${colors.text} truncate leading-tight`}>{ev.title}</p>
+                            {pos.height > 40 && (
+                              <p className="text-[9px] text-cocoa truncate leading-tight">
+                                {formatTime(ev.start_time)}{ev.end_time ? ` – ${formatTime(ev.end_time)}` : ''}
+                              </p>
+                            )}
+                            {pos.height > 60 && ev.location && (
+                              <p className="text-[9px] text-cocoa truncate leading-tight">{ev.location}</p>
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
 
                     {/* Current time indicator */}
                     {isToday_ && (
