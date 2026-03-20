@@ -7,20 +7,36 @@ import { IconCart } from '../components/Icons';
 const CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other'];
 
 const CATEGORY_EMOJI = {
-  groceries: '🥦', clothing: '👕', household: '🏠',
+  groceries: '🛒', clothing: '👕', household: '🏠',
   school: '🎒', pets: '🐾', party: '🎉', gifts: '🎁', other: '📦',
 };
+
+const GROCERY_SUBCATEGORIES = [
+  { key: 'dairy_eggs',         label: 'Dairy & Eggs',         emoji: '🥛' },
+  { key: 'produce',            label: 'Produce',              emoji: '🥦' },
+  { key: 'meat_seafood',       label: 'Meat & Seafood',       emoji: '🥩' },
+  { key: 'pantry_grains',      label: 'Pantry / Grains',      emoji: '🍝' },
+  { key: 'bakery',             label: 'Bakery',               emoji: '🍞' },
+  { key: 'frozen',             label: 'Frozen Foods',         emoji: '🧊' },
+  { key: 'beverages',          label: 'Beverages',            emoji: '☕' },
+  { key: 'household_cleaning', label: 'Household / Cleaning', emoji: '🧹' },
+  { key: 'personal_care',      label: 'Personal Care',        emoji: '🧴' },
+  { key: 'other',              label: 'Other Groceries',      emoji: '🛒' },
+];
+
+const SUBCATEGORY_MAP = Object.fromEntries(GROCERY_SUBCATEGORIES.map(s => [s.key, s]));
 
 export default function Shopping() {
   const [items, setItems]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
-  const [filter, setFilter]         = useState('');          // category filter
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [filter, setFilter]         = useState('');
+  const [showCompleted, setShowCompleted] = useState(true);
 
   // Add form state
   const [addText, setAddText]       = useState('');
   const [addCat, setAddCat]         = useState('groceries');
+  const [addSubcat, setAddSubcat]   = useState('');
   const [adding, setAdding]         = useState(false);
   const [toggling, setToggling]     = useState(new Set());
   const [restoring, setRestoring]   = useState(new Set());
@@ -29,8 +45,10 @@ export default function Shopping() {
   const load = useCallback(async () => {
     try {
       const params = {};
-      if (filter) params.category = filter;
+      if (filter && filter !== 'groceries') params.category = filter;
       if (showCompleted) params.completed = 'true';
+      // For groceries filter, we still fetch all and filter client-side to group by subcategory
+      if (filter === 'groceries') params.category = 'groceries';
       const res = await api.get('/shopping', { params });
       setItems(res.data.items ?? []);
     } catch {
@@ -47,7 +65,9 @@ export default function Shopping() {
     if (!addText.trim()) return;
     setAdding(true);
     try {
-      await api.post('/shopping', { item: addText.trim(), category: addCat });
+      const payload = { item: addText.trim(), category: addCat };
+      if (addCat === 'groceries' && addSubcat) payload.subcategory = addSubcat;
+      await api.post('/shopping', payload);
       setAddText('');
       await load();
     } catch {
@@ -98,11 +118,36 @@ export default function Shopping() {
   const complete   = items.filter((i) => i.completed)
     .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
 
+  // Group grocery items by subcategory
+  const groceryItems = incomplete.filter(i => i.category === 'groceries');
+  const nonGroceryItems = incomplete.filter(i => i.category !== 'groceries');
+
+  // Build subcategory groups (only groups that have items)
+  const groceryGroups = [];
+  for (const sub of GROCERY_SUBCATEGORIES) {
+    const groupItems = groceryItems.filter(i => (i.subcategory || 'other') === sub.key);
+    if (groupItems.length > 0) {
+      groceryGroups.push({ ...sub, items: groupItems });
+    }
+  }
+
+  // Group non-grocery items by category
+  const nonGroceryGroups = [];
+  for (const cat of CATEGORIES.filter(c => c !== 'groceries')) {
+    const groupItems = nonGroceryItems.filter(i => i.category === cat);
+    if (groupItems.length > 0) {
+      nonGroceryGroups.push({ key: cat, label: cat.charAt(0).toUpperCase() + cat.slice(1), emoji: CATEGORY_EMOJI[cat], items: groupItems });
+    }
+  }
+
   function formatDate(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   }
+
+  const showGroceries = !filter || filter === 'groceries';
+  const showNonGroceries = !filter || (filter && filter !== 'groceries');
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -119,32 +164,46 @@ export default function Shopping() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* Add item */}
-      <form onSubmit={addItem} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 flex flex-wrap gap-2">
-        <input
-          type="text"
-          value={addText}
-          onChange={(e) => setAddText(e.target.value)}
-          placeholder="Add item…"
-          className="flex-1 min-w-0 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-        <div className="flex gap-2">
+      <form onSubmit={addItem} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 space-y-2">
+        <div className="flex flex-wrap gap-2">
+          <input
+            type="text"
+            value={addText}
+            onChange={(e) => setAddText(e.target.value)}
+            placeholder="Add item…"
+            className="flex-1 min-w-0 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <div className="flex gap-2">
+            <select
+              value={addCat}
+              onChange={(e) => { setAddCat(e.target.value); setAddSubcat(''); }}
+              className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              disabled={adding || !addText.trim()}
+              className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              {adding ? '…' : '+ Add'}
+            </button>
+          </div>
+        </div>
+        {addCat === 'groceries' && (
           <select
-            value={addCat}
-            onChange={(e) => setAddCat(e.target.value)}
-            className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
+            value={addSubcat}
+            onChange={(e) => setAddSubcat(e.target.value)}
+            className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white w-full"
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
+            <option value="">Auto-detect aisle</option>
+            {GROCERY_SUBCATEGORIES.filter(s => s.key !== 'other').map((s) => (
+              <option key={s.key} value={s.key}>{s.emoji} {s.label}</option>
             ))}
           </select>
-          <button
-            type="submit"
-            disabled={adding || !addText.trim()}
-            className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
-          >
-            {adding ? '…' : '+ Add'}
-          </button>
-        </div>
+        )}
       </form>
 
       {/* Category filter */}
@@ -172,15 +231,40 @@ export default function Shopping() {
 
       {loading ? <Spinner /> : (
         <>
-          {/* Incomplete items */}
           {incomplete.length === 0 && !showCompleted && (
             <p className="text-center text-cocoa py-8">All done! Nothing left to buy.</p>
           )}
-          <ul className="space-y-2">
-            {incomplete.map((item) => (
-              <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} />
-            ))}
-          </ul>
+
+          {/* Groceries grouped by aisle/subcategory */}
+          {showGroceries && groceryGroups.length > 0 && (
+            <div className="space-y-3">
+              {!filter && <h2 className="text-sm font-semibold text-bark uppercase tracking-wide flex items-center gap-1.5">🛒 Groceries</h2>}
+              {groceryGroups.map((group) => (
+                <div key={group.key} className="bg-linen rounded-2xl shadow-sm border border-cream-border overflow-hidden">
+                  <div className="px-4 py-2 bg-oat/50 border-b border-cream-border">
+                    <h3 className="text-xs font-semibold text-bark uppercase tracking-wide">{group.emoji} {group.label}</h3>
+                  </div>
+                  <ul className="divide-y divide-cream-border">
+                    {group.items.map((item) => (
+                      <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} showCategory={false} />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Non-grocery items grouped by category */}
+          {showNonGroceries && nonGroceryGroups.map((group) => (
+            <div key={group.key} className="space-y-2">
+              {!filter && <h2 className="text-sm font-semibold text-bark uppercase tracking-wide flex items-center gap-1.5">{group.emoji} {group.label}</h2>}
+              <ul className="space-y-2">
+                {group.items.map((item) => (
+                  <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} showCategory={filter ? false : false} />
+                ))}
+              </ul>
+            </div>
+          ))}
 
           {/* Completed items */}
           {showCompleted && complete.length > 0 && (
@@ -196,10 +280,13 @@ export default function Shopping() {
                       <p className="text-sm text-cocoa">{item.item}</p>
                       <div className="flex gap-x-3 mt-0.5">
                         <span className="text-xs text-cocoa">
-                          {CATEGORY_EMOJI[item.category]} {item.category}
+                          {CATEGORY_EMOJI[item.category] || '📦'} {item.category}
+                          {item.subcategory && SUBCATEGORY_MAP[item.subcategory] && (
+                            <> · {SUBCATEGORY_MAP[item.subcategory].label}</>
+                          )}
                         </span>
                         {item.completed_at && (
-                          <span className="text-xs text-cocoa">Last purchased: {formatDate(item.completed_at)}</span>
+                          <span className="text-xs text-cocoa">Purchased: {formatDate(item.completed_at)}</span>
                         )}
                       </div>
                     </div>
@@ -235,9 +322,9 @@ export default function Shopping() {
   );
 }
 
-function ItemRow({ item, toggle, loading }) {
+function ItemRow({ item, toggle, loading, showCategory = true }) {
   return (
-    <li className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-center gap-3">
+    <li className="bg-linen px-4 py-3 flex items-center gap-3">
       <button
         onClick={() => toggle(item)}
         disabled={loading}
@@ -257,9 +344,11 @@ function ItemRow({ item, toggle, loading }) {
           <span className="text-cocoa text-xs ml-1">({item.quantity})</span>
         )}
       </div>
-      <span className="text-xs text-cocoa shrink-0">
-        {CATEGORY_EMOJI[item.category]} {item.category}
-      </span>
+      {showCategory && (
+        <span className="text-xs text-cocoa shrink-0">
+          {CATEGORY_EMOJI[item.category]} {item.category}
+        </span>
+      )}
     </li>
   );
 }
