@@ -309,7 +309,15 @@ export default function Calendar() {
       const allEvents = results.flatMap(([evRes]) => evRes.data.events ?? []);
       const allTasks = results.flatMap(([, tkRes]) => tkRes.data.tasks ?? []);
 
-      const uniqueEvents = [...new Map(allEvents.map(e => [e.id, e])).values()];
+      // Dedup by ID first, then by title+date to catch sync duplicates
+      const byId = [...new Map(allEvents.map(e => [e.id, e])).values()];
+      const seen = new Set();
+      const uniqueEvents = byId.filter(e => {
+        const key = `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}|${(e.end_time || '').split('T')[0]}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       const uniqueTasks = [...new Map(allTasks.map(t => [t.id, t])).values()];
 
       // Use cached or freshly fetched school data
