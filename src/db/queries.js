@@ -476,6 +476,14 @@ async function deleteTermDatesBySchoolAndAcademicYear(schoolId, academicYear) {
   if (error) throw error;
 }
 
+async function deleteAllTermDatesBySchool(schoolId) {
+  const { error } = await supabase
+    .from('school_term_dates')
+    .delete()
+    .eq('school_id', schoolId);
+  if (error) throw error;
+}
+
 async function getSchoolsWithIcalUrls() {
   const { data, error } = await supabase
     .from('household_schools')
@@ -1515,6 +1523,7 @@ module.exports = {
   updateSchoolTermDate,
   updateHouseholdSchoolMeta,
   deleteTermDatesBySchoolAndAcademicYear,
+  deleteAllTermDatesBySchool,
   getSchoolsWithIcalUrls,
   addChildActivity,
   getChildActivities,

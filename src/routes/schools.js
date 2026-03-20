@@ -321,6 +321,9 @@ Only return valid JSON array, nothing else.`;
       }
     }
 
+    // Clear all existing dates when switching to iCal (full replacement)
+    await db.deleteAllTermDatesBySchool(req.params.schoolId);
+
     if (termDates.length > 0) {
       await db.addSchoolTermDates(req.params.schoolId, termDates);
     }
@@ -432,8 +435,13 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
       source: 'local_authority',
     }));
 
-    // Merge strategy: delete existing dates for the same academic year before inserting
-    await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, academicYear);
+    // If source changed (e.g. website_scrape → local_authority), clear ALL existing dates first
+    // Otherwise just clear the matching academic year for a clean merge
+    if (school.term_dates_source && school.term_dates_source !== 'local_authority') {
+      await db.deleteAllTermDatesBySchool(req.params.schoolId);
+    } else {
+      await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, academicYear);
+    }
     await db.addSchoolTermDates(req.params.schoolId, termDates);
 
     // Update household_schools metadata
@@ -619,16 +627,18 @@ Do NOT wrap in markdown code fences.`,
       source: 'website_scrape',
     }));
 
-    // Merge strategy: group by academic year, delete existing dates per year, then insert
-    const datesByYear = {};
-    for (const td of termDates) {
-      (datesByYear[td.academic_year] ??= []).push(td);
-    }
-
-    const yearCounts = [];
-    for (const [ay, ayDates] of Object.entries(datesByYear)) {
-      await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, ay);
-      yearCounts.push({ year: ay, count: ayDates.length });
+    // If source changed, clear ALL existing dates first to avoid conflicts
+    if (school.term_dates_source && school.term_dates_source !== 'website_scrape') {
+      await db.deleteAllTermDatesBySchool(req.params.schoolId);
+    } else {
+      // Same source — merge by academic year
+      const datesByYear = {};
+      for (const td of termDates) {
+        (datesByYear[td.academic_year] ??= []).push(td);
+      }
+      for (const ay of Object.keys(datesByYear)) {
+        await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, ay);
+      }
     }
 
     await db.addSchoolTermDates(req.params.schoolId, termDates);
