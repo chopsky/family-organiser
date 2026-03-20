@@ -314,7 +314,10 @@ router.post('/events', async (req, res) => {
 
     if (assigned_to_name) {
       const user = await db.findUserByName(req.householdId, assigned_to_name);
-      if (user) eventData.assigned_to = user.id;
+      if (user) {
+        eventData.assigned_to = user.id;
+        eventData.assigned_to_name = user.name;
+      }
     }
 
     const event = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
@@ -350,7 +353,14 @@ router.patch('/events/:id', async (req, res) => {
 
     if (assigned_to_name) {
       const user = await db.findUserByName(req.householdId, assigned_to_name);
-      if (user) updates.assigned_to = user.id;
+      if (user) {
+        updates.assigned_to = user.id;
+        updates.assigned_to_name = user.name;
+      }
+    } else if (assigned_to_name === null) {
+      // Explicitly unassign
+      updates.assigned_to = null;
+      updates.assigned_to_name = null;
     }
 
     const event = await db.updateCalendarEvent(req.params.id, req.householdId, updates);
