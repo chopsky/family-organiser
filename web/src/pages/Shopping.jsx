@@ -405,9 +405,9 @@ export default function Shopping() {
 
 function ItemRow({ item, toggle, loading, onEdit }) {
   return (
-    <li className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-center gap-3">
+    <li className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onEdit(item)}>
       <button
-        onClick={() => toggle(item)}
+        onClick={(e) => { e.stopPropagation(); toggle(item); }}
         disabled={loading}
         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
           item.completed
