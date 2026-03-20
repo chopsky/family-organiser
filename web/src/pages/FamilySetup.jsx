@@ -1248,7 +1248,7 @@ export default function FamilySetup() {
 
       {/* Term Date Import Options Modal */}
       {showTermDateOptions && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowTermDateOptions(false)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => setShowTermDateOptions(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
