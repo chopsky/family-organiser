@@ -522,9 +522,12 @@ export default function FamilySetup() {
       }
       setEditingMember(null);
 
-      // If school changed, show term date import options (if the school has no dates yet)
+      // If school changed, show term date import options — but ONLY if the school has no term dates yet
+      // Re-fetch schools fresh to ensure we have the latest term dates count
+      const freshSchools = await api.get('/schools').then(r => r.data.schools || []);
+      setHouseholdSchools(freshSchools);
       if (schoolChanged) {
-        const school = updatedSchools.find(s => s.id === payload.school_id);
+        const school = freshSchools.find(s => s.id === payload.school_id);
         if (school && (!school.term_dates || school.term_dates.length === 0)) {
           setTermDateSchoolId(payload.school_id);
           setTermDateSchoolName(school.school_name);
