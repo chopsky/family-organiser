@@ -498,22 +498,23 @@ export default function FamilySetup() {
 
       await api.patch('/household/profile', payload);
       await loadMembers();
-      const updatedSchools = await api.get('/schools').then(r => r.data.schools || []);
-      setHouseholdSchools(updatedSchools);
 
       // If the school was removed or changed, check if old school is now orphaned (no children left)
       if (oldSchoolId && oldSchoolId !== payload.school_id) {
-        const oldSchool = updatedSchools.find(s => s.id === oldSchoolId);
+        const schoolsAfterSave = await api.get('/schools').then(r => r.data.schools || []);
+        const oldSchool = schoolsAfterSave.find(s => s.id === oldSchoolId);
         if (oldSchool && (!oldSchool.children || oldSchool.children.length === 0)) {
           try {
             await api.delete(`/schools/${oldSchoolId}`);
-            const refreshed = await api.get('/schools').then(r => r.data.schools || []);
-            setHouseholdSchools(refreshed);
           } catch (e) {
             console.warn('Could not auto-remove orphaned school:', e);
           }
         }
       }
+
+      // Fetch the definitive school list (after any orphan cleanup)
+      const freshSchools = await api.get('/schools').then(r => r.data.schools || []);
+      setHouseholdSchools(freshSchools);
 
       // Only update auth context if editing own profile
       if (isEditingSelf) {
@@ -523,9 +524,6 @@ export default function FamilySetup() {
       setEditingMember(null);
 
       // If school changed, show term date import options — but ONLY if the school has no term dates yet
-      // Re-fetch schools fresh to ensure we have the latest term dates count
-      const freshSchools = await api.get('/schools').then(r => r.data.schools || []);
-      setHouseholdSchools(freshSchools);
       if (schoolChanged) {
         const school = freshSchools.find(s => s.id === payload.school_id);
         if (school && (!school.term_dates || school.term_dates.length === 0)) {

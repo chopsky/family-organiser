@@ -106,7 +106,7 @@ router.post('/', requireAuth, requireHousehold, requireAdmin, async (req, res) =
  * DELETE /api/schools/:id
  * Remove a school from the household.
  */
-router.delete('/:id', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     await db.deleteHouseholdSchool(req.params.id, req.householdId);
     return res.json({ message: 'School removed.' });
