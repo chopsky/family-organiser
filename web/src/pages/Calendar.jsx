@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
@@ -150,7 +149,6 @@ function getMonthsForRange(startDate, endDate) {
 // ── Component ───────────────────────────────────────────────
 
 export default function Calendar() {
-  const location = useLocation();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -303,18 +301,11 @@ export default function Calendar() {
     } finally {
       setLoading(false);
     }
-  }, [currentMonth, selectedDate, viewMode, location.key]);
+  }, [currentMonth, selectedDate, viewMode]);
 
   useEffect(() => {
     setLoading(true);
     load();
-  }, [load]);
-
-  // Re-fetch when user navigates back to this page (e.g. after editing schools)
-  useEffect(() => {
-    const handleVisibility = () => { if (!document.hidden) load(); };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [load]);
 
   useEffect(() => {

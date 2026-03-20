@@ -13,15 +13,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-logout on 401
+// Auto-logout on 401, retry on 429 (rate limit)
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('household');
       window.location.href = '/login';
+    }
+    // Retry once on rate limit after a brief pause
+    if (err.response?.status === 429 && !err.config._retried) {
+      err.config._retried = true;
+      await new Promise(r => setTimeout(r, 1000));
+      return api(err.config);
     }
     return Promise.reject(err);
   }
