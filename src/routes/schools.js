@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const ical = require('node-ical');
+const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
@@ -472,11 +473,59 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
       return res.status(400).json({ error: `Could not fetch the website: ${fetchErr.message}` });
     }
 
-    if (pageText.length < 50) {
-      return res.status(400).json({ error: 'The page appears to have very little text content. Term dates may be in a PDF or image. Try a different URL or add dates manually.' });
+    // If the page has little text content, look for PDF links containing term dates
+    if (pageText.length < 200 || /term.dates/i.test(rawHtml)) {
+      const pdfLinks = [];
+      const pdfRegex = /href=["']([^"']*\.pdf[^"']*)["']/gi;
+      let pdfMatch;
+      while ((pdfMatch = pdfRegex.exec(rawHtml)) !== null) {
+        let pdfUrl = pdfMatch[1];
+        if (pdfUrl.startsWith('/')) {
+          const urlObj = new URL(website_url.trim());
+          pdfUrl = `${urlObj.origin}${pdfUrl}`;
+        } else if (!pdfUrl.startsWith('http')) {
+          const base = website_url.trim().replace(/\/[^/]*$/, '/');
+          pdfUrl = `${base}${pdfUrl}`;
+        }
+        pdfLinks.push(pdfUrl);
+      }
+
+      const yearStart = parseInt(academicYear.split('-')[0]);
+      const yearEnd = parseInt(academicYear.split('-')[1]);
+      const relevantPdfs = pdfLinks.filter(url => {
+        const lower = url.toLowerCase();
+        return (lower.includes('term') || lower.includes('date') || lower.includes('calendar')) &&
+          (lower.includes(String(yearStart)) || lower.includes(String(yearEnd)));
+      });
+      const pdfsToTry = relevantPdfs.length > 0 ? relevantPdfs : pdfLinks.filter(url =>
+        url.toLowerCase().includes('term') || url.toLowerCase().includes('date')
+      );
+
+      for (const pdfUrl of pdfsToTry.slice(0, 3)) {
+        try {
+          console.log('[import-website] Fetching PDF:', pdfUrl);
+          const pdfResponse = await fetch(pdfUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)' },
+          });
+          if (!pdfResponse.ok) continue;
+          const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+          const pdfData = await pdfParse(pdfBuffer);
+          if (pdfData.text && pdfData.text.trim().length > 20) {
+            console.log('[import-website] Extracted', pdfData.text.length, 'chars from PDF');
+            pageText = pdfData.text.trim().substring(0, 12000);
+            break;
+          }
+        } catch (pdfErr) {
+          console.warn('[import-website] Could not parse PDF:', pdfErr.message);
+        }
+      }
     }
 
-    console.log(`[import-website] Extracted ${pageText.length} chars from ${website_url}`);
+    if (pageText.length < 50) {
+      return res.status(400).json({ error: 'The page appears to have very little text content. Term dates may be in a PDF or image that could not be read. Try adding dates manually.' });
+    }
+
+    console.log('[import-website] Extracted', pageText.length, 'chars from', website_url);
 
     // Use AI to extract term dates from the page content
     const { text } = await callWithFailover({
