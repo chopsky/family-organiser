@@ -90,6 +90,7 @@ export default function FamilySetup() {
   const [importingWebsite, setImportingWebsite] = useState(false);
   const [termImportIcalUrl, setTermImportIcalUrl] = useState('');
   const [importingTermIcal, setImportingTermIcal] = useState(false);
+  const [importError, setImportError] = useState('');
 
   function loadMembers() {
     return api.get('/household')
@@ -199,6 +200,7 @@ export default function FamilySetup() {
           setTermDateSchoolId(schoolId);
           setTermDateSchoolName(newSchool.school_name);
           setTermDateSchoolLA(newSchool.local_authority || '');
+          setImportError('');
           setShowTermDateOptions(true);
           return; // Don't show generic success — the term date flow will handle it
         }
@@ -340,14 +342,20 @@ export default function FamilySetup() {
   async function handleImportLADates() {
     if (!termDateSchoolId) return;
     setImportingLA(true);
+    setImportError('');
     try {
       const { data } = await api.post(`/schools/${termDateSchoolId}/import-la-dates`);
+      if (data.imported === 0) {
+        setImportError(data.message || 'No term dates found. Try another import method.');
+        return;
+      }
       setSuccess(data.message || 'Term dates imported!');
       setTimeout(() => setSuccess(''), 3000);
       setShowTermDateOptions(false);
+      setImportError('');
       await loadSchools();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not import LA dates.');
+      setImportError(err.response?.data?.error || 'Could not import LA dates. Try another option below.');
     } finally {
       setImportingLA(false);
     }
@@ -356,14 +364,20 @@ export default function FamilySetup() {
   async function handleImportWebsite() {
     if (!termDateSchoolId || !websiteUrl.trim()) return;
     setImportingWebsite(true);
+    setImportError('');
     try {
       const { data } = await api.post(`/schools/${termDateSchoolId}/import-website`, { website_url: websiteUrl.trim() });
+      if (data.imported === 0) {
+        setImportError(data.message || 'No term dates found on that page. Try a different URL or another import method.');
+        return;
+      }
       setSuccess(data.message || 'Term dates imported!');
       setTimeout(() => setSuccess(''), 3000);
       setShowTermDateOptions(false);
+      setImportError('');
       await loadSchools();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not import from website.');
+      setImportError(err.response?.data?.error || 'Could not import from website. Try another option below.');
     } finally {
       setImportingWebsite(false);
     }
@@ -372,14 +386,20 @@ export default function FamilySetup() {
   async function handleImportTermIcal() {
     if (!termDateSchoolId || !termImportIcalUrl.trim()) return;
     setImportingTermIcal(true);
+    setImportError('');
     try {
       const { data } = await api.post(`/schools/${termDateSchoolId}/import-ical`, { ical_url: termImportIcalUrl.trim() });
+      if (data.imported === 0) {
+        setImportError(data.message || 'No events found in that calendar feed. Try another option.');
+        return;
+      }
       setSuccess(data.message || 'Calendar imported!');
       setTimeout(() => setSuccess(''), 3000);
       setShowTermDateOptions(false);
+      setImportError('');
       await loadSchools();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not import calendar.');
+      setImportError(err.response?.data?.error || 'Could not import calendar. Try another option below.');
     } finally {
       setImportingTermIcal(false);
     }
@@ -530,6 +550,7 @@ export default function FamilySetup() {
           setTermDateSchoolId(payload.school_id);
           setTermDateSchoolName(school.school_name);
           setTermDateSchoolLA(school.local_authority || '');
+          setImportError('');
           setShowTermDateOptions(true);
           return;
         }
@@ -1106,6 +1127,16 @@ export default function FamilySetup() {
             <p className="text-sm text-cocoa mb-4">
               How would you like to set up term dates for <span className="font-medium text-bark">{termDateSchoolName}</span>?
             </p>
+
+            {importError && (
+              <div className="bg-coral/10 border border-coral/30 rounded-xl px-4 py-3 mb-4 flex items-start gap-2">
+                <span className="text-coral text-sm mt-0.5">⚠️</span>
+                <div>
+                  <p className="text-sm text-bark font-medium">{importError}</p>
+                  <p className="text-xs text-cocoa mt-1">Please try another option below.</p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               {/* Option 1: Import from LA */}
