@@ -250,9 +250,10 @@ export default function Calendar() {
         for (const school of (schoolData.schools || [])) {
           // Term dates → calendar events
           for (const td of (school.term_dates || [])) {
+            if (!td.date) continue; // skip invalid entries
             schoolEvents.push({
               id: `td-${td.id}`,
-              title: `${school.school_name} — ${td.label || td.event_type.replace(/_/g, ' ')}`,
+              title: `${school.school_name} — ${td.label || (td.event_type || 'school event').replace(/_/g, ' ')}`,
               start_time: `${td.date}T00:00:00Z`,
               end_time: td.end_date ? `${td.end_date}T23:59:59Z` : `${td.date}T23:59:59Z`,
               all_day: true,
@@ -290,12 +291,14 @@ export default function Calendar() {
           }
         }
         setEvents([...uniqueEvents, ...schoolEvents]);
-      } catch {
+      } catch (schoolErr) {
+        console.error('School data load error:', schoolErr);
         setEvents(uniqueEvents);
       }
 
       setTasks(uniqueTasks);
-    } catch {
+    } catch (err) {
+      console.error('Calendar load error:', err);
       setError('Could not load calendar data.');
     } finally {
       setLoading(false);
