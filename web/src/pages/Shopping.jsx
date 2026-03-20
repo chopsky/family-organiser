@@ -16,7 +16,7 @@ export default function Shopping() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
   const [filter, setFilter]         = useState('');          // category filter
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(true);
 
   // Add form state
   const [addText, setAddText]       = useState('');
