@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconCalendar, IconPlus, IconUser, IconCheck } from '../components/Icons';
+import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch } from '../components/Icons';
 
 const EVENT_COLORS = {
   sage:       { bg: 'bg-sage/20',       border: 'border-sage',       dot: 'bg-sage',       text: 'text-sage',       darkBg: 'bg-sage/30' },
@@ -193,6 +193,10 @@ export default function Calendar() {
   const [taskNotification, setTaskNotification] = useState('');
   const [savingTask, setSavingTask] = useState(false);
   const taskFormRef = useRef(null);
+
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef(null);
 
   const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays', 'school']));
   const toggleFilter = (key) => setActiveFilters(prev => {
@@ -755,6 +759,55 @@ export default function Calendar() {
     );
   }
 
+  // ── Search results ─────────────────────────────────────
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    const matches = [];
+
+    for (const ev of events) {
+      if (ev.title?.toLowerCase().includes(q) || ev.description?.toLowerCase().includes(q) || ev.location?.toLowerCase().includes(q)) {
+        matches.push({ type: 'event', item: ev, date: ev.start_time?.split('T')[0], title: ev.title });
+      }
+    }
+    for (const t of tasks) {
+      if (t.title?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)) {
+        matches.push({ type: 'task', item: t, date: t.due_date, title: t.title });
+      }
+    }
+
+    // Sort by date ascending
+    matches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    return matches.slice(0, 20);
+  }, [searchQuery, events, tasks]);
+
+  function jumpToSearchResult(result) {
+    const dateStr = result.date;
+    if (dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      setSelectedDate(date);
+      setCurrentMonth(new Date(y, m - 1, 1));
+      setViewMode('day');
+    }
+    setShowSearch(false);
+    setSearchQuery('');
+  }
+
+  // Close search on click outside
+  useEffect(() => {
+    if (!showSearch) return;
+    function handleClick(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSearch(false);
+        setSearchQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showSearch]);
+
   // ── Render ─────────────────────────────────────────────
 
   return (
@@ -767,6 +820,61 @@ export default function Calendar() {
           <IconCalendar className="h-6 w-6" /> Calendar
         </h1>
         <div className="flex items-center gap-2">
+          {/* Search */}
+          <div ref={searchRef} className="relative">
+            <button
+              onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.querySelector('input')?.focus(), 50); }}
+              className={`border border-cream-border rounded-2xl p-2 text-sm transition-colors ${showSearch ? 'bg-primary text-white' : 'text-cocoa hover:bg-oat'}`}
+              title="Search events & tasks"
+            >
+              <IconSearch className="h-4 w-4" />
+            </button>
+            {showSearch && (
+              <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-lg border border-cream-border z-50 overflow-hidden">
+                <div className="p-3 border-b border-cream-border">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search events, tasks…"
+                    className="w-full border border-cream-border rounded-xl px-3 py-2 text-sm bg-oat focus:outline-none focus:ring-2 focus:ring-accent"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Escape') { setShowSearch(false); setSearchQuery(''); } }}
+                  />
+                </div>
+                {searchQuery.trim() && (
+                  <div className="max-h-64 overflow-y-auto">
+                    {searchResults.length === 0 ? (
+                      <p className="text-sm text-cocoa p-4 text-center">No results found</p>
+                    ) : (
+                      searchResults.map((result, i) => {
+                        const colors = result.type === 'event'
+                          ? (EVENT_COLORS[getEventColor(result.item)] || EVENT_COLORS.lavender)
+                          : EVENT_COLORS.slate;
+                        const dateLabel = result.date
+                          ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+                          : 'No date';
+                        return (
+                          <button
+                            key={`${result.type}-${result.item.id}-${i}`}
+                            onClick={() => jumpToSearchResult(result)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-oat transition-colors flex items-start gap-3 border-b border-cream-border last:border-0"
+                          >
+                            <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${colors.dot}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-bark truncate">{result.title}</p>
+                              <p className="text-xs text-cocoa">{dateLabel} · {result.type === 'event' ? 'Event' : 'Task'}</p>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <select
             value={viewMode}
             onChange={e => setViewMode(e.target.value)}
