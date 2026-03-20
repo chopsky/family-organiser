@@ -40,8 +40,6 @@ CALENDAR EVENT RULES:
 
 SHOPPING ITEM RULES:
 - Infer category from context: groceries | clothing | household | school | pets | party | gifts | other
-- For groceries, also infer subcategory: dairy_eggs | produce | meat_seafood | pantry_grains | bakery | frozen | beverages | household_cleaning | personal_care | other
-  Examples: milk/cheese/butter/eggs → dairy_eggs, fruits/vegetables → produce, chicken/beef/salmon → meat_seafood, pasta/rice/flour/spices → pantry_grains, bread/bagels → bakery, ice cream/frozen peas → frozen, juice/coffee → beverages, paper towels/detergent → household_cleaning, shampoo/toothpaste → personal_care
 - Extract quantity if mentioned (e.g. "2 litres", "a dozen")
 - action must be "add" or "remove"
 - Normalise item names to plain English (e.g. "some milk" → "milk")
@@ -70,7 +68,6 @@ Respond only with valid JSON matching this schema:
     {
       "item": string,
       "category": "groceries" | "clothing" | "household" | "school" | "pets" | "party" | "gifts" | "other",
-      "subcategory": "dairy_eggs" | "produce" | "meat_seafood" | "pantry_grains" | "bakery" | "frozen" | "beverages" | "household_cleaning" | "personal_care" | "other" | null,
       "quantity": string | null,
       "action": "add" | "remove"
     }
@@ -202,10 +199,9 @@ For all-day events, set all_day to true and omit start_time/end_time. assigned_t
 
 ### Shopping Items
 \`\`\`json
-{"action": "add_shopping", "items": [{"item": "item name", "category": "groceries", "subcategory": "dairy_eggs"}]}
+{"action": "add_shopping", "items": [{"item": "item name", "category": "groceries"}]}
 \`\`\`
 Valid categories: groceries, clothing, household, school, pets, party, gifts, other.
-For groceries, also include subcategory: dairy_eggs, produce, meat_seafood, pantry_grains, bakery, frozen, beverages, household_cleaning, personal_care, other.
 
 ### Tasks
 \`\`\`json

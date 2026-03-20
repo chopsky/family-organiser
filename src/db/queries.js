@@ -683,7 +683,6 @@ async function addShoppingItems(householdId, items, addedByUserId) {
     household_id: householdId,
     item: i.item,
     category: i.category || 'other',
-    subcategory: i.subcategory || null,
     quantity: i.quantity || null,
     added_by: addedByUserId,
   }));
