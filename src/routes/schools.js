@@ -451,7 +451,8 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
 
   try {
     const now = new Date();
-    const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+    const currentAY = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+    const nextAY = `${parseInt(currentAY.split('-')[1])}-${parseInt(currentAY.split('-')[1]) + 1}`;
 
     // Fetch the webpage content
     let pageText;
@@ -509,18 +510,24 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
         pdfLinks.push(pdfUrl);
       }
 
-      const yearStart = parseInt(academicYear.split('-')[0]);
-      const yearEnd = parseInt(academicYear.split('-')[1]);
+      // Match PDFs for both current and next academic year
+      const yearsToMatch = [
+        parseInt(currentAY.split('-')[0]),
+        parseInt(currentAY.split('-')[1]),
+        parseInt(nextAY.split('-')[1]),
+      ];
       const relevantPdfs = pdfLinks.filter(url => {
         const lower = url.toLowerCase();
         return (lower.includes('term') || lower.includes('date') || lower.includes('calendar')) &&
-          (lower.includes(String(yearStart)) || lower.includes(String(yearEnd)));
+          yearsToMatch.some(y => lower.includes(String(y)));
       });
       const pdfsToTry = relevantPdfs.length > 0 ? relevantPdfs : pdfLinks.filter(url =>
         url.toLowerCase().includes('term') || url.toLowerCase().includes('date')
       );
 
-      for (const pdfUrl of pdfsToTry.slice(0, 3)) {
+      // Download and combine text from all relevant PDFs
+      const pdfTexts = [];
+      for (const pdfUrl of pdfsToTry.slice(0, 4)) {
         try {
           console.log('[import-website] Fetching PDF:', pdfUrl);
           const pdfResponse = await fetch(pdfUrl, {
@@ -531,12 +538,14 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
           const pdfData = await pdfParse(pdfBuffer);
           if (pdfData.text && pdfData.text.trim().length > 20) {
             console.log('[import-website] Extracted', pdfData.text.length, 'chars from PDF');
-            pageText = pdfData.text.trim().substring(0, 12000);
-            break;
+            pdfTexts.push(pdfData.text.trim());
           }
         } catch (pdfErr) {
           console.warn('[import-website] Could not parse PDF:', pdfErr.message);
         }
+      }
+      if (pdfTexts.length > 0) {
+        pageText = pdfTexts.join('\n\n---\n\n').substring(0, 16000);
       }
     }
 
@@ -548,7 +557,7 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
 
     // Use AI to extract term dates from the page content
     const { text } = await callWithFailover({
-      system: `You are an expert at extracting UK school term dates from website content. Look for term start/end dates, half term dates, INSET days, and holidays for the ${academicYear} academic year (September ${academicYear.split('-')[0]} to July ${academicYear.split('-')[1]}).
+      system: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find — for both the ${currentAY} academic year and the ${nextAY} academic year if available.
 
 Look carefully for:
 - Dates in any UK format (e.g. "3rd September 2025", "3 Sep 2025", "03/09/2025")
@@ -556,16 +565,19 @@ Look carefully for:
 - Half term breaks
 - INSET/training days
 - Bank holidays
+- School-specific closures (e.g. religious holidays)
 
 Return ONLY a valid JSON array with no other text:
 [
-  {"event_type": "term_start", "date": "YYYY-MM-DD", "label": "Description"},
-  {"event_type": "half_term_start", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "label": "Description"},
+  {"event_type": "term_start", "date": "YYYY-MM-DD", "label": "Description", "academic_year": "YYYY-YYYY"},
+  {"event_type": "half_term_start", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "label": "Description", "academic_year": "YYYY-YYYY"},
   ...
 ]
 
 Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
 For half terms, use half_term_start with an end_date spanning the break.
+For school-specific closures (religious holidays etc), use bank_holiday with a descriptive label.
+Include the academic_year field (e.g. "${currentAY}" or "${nextAY}") for each entry.
 If you genuinely cannot find any term dates in the content, return an empty array [].
 Do NOT wrap in markdown code fences.`,
       messages: [{ role: 'user', content: `Extract all school term dates from this UK school website page content:\n\n${pageText}` }],
@@ -589,7 +601,7 @@ Do NOT wrap in markdown code fences.`,
 
     const termDates = dates.map(d => ({
       ...d,
-      academic_year: academicYear,
+      academic_year: d.academic_year || currentAY,
       source: 'website_scrape',
     }));
 
