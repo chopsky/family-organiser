@@ -158,6 +158,7 @@ export default function Calendar() {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
+  const [schoolData, setSchoolData] = useState(null); // cached school data
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -224,76 +225,71 @@ export default function Calendar() {
         monthsToFetch = [monthParam(currentMonth)];
       }
 
-      // Fetch all needed months
-      const results = await Promise.all(
-        monthsToFetch.map(mp =>
-          Promise.all([
-            api.get('/calendar/events', { params: { month: mp } }),
-            api.get('/calendar/tasks', { params: { month: mp } }),
-          ])
-        )
+      // Fetch events, tasks, and school data in parallel
+      const monthFetches = monthsToFetch.map(mp =>
+        Promise.all([
+          api.get('/calendar/events', { params: { month: mp } }),
+          api.get('/calendar/tasks', { params: { month: mp } }),
+        ])
       );
+      // Only fetch school data if not cached yet
+      const schoolFetch = schoolData ? Promise.resolve(null) : api.get('/schools').catch(() => null);
+      const [results, freshSchoolData] = await Promise.all([Promise.all(monthFetches), schoolFetch]);
 
       const allEvents = results.flatMap(([evRes]) => evRes.data.events ?? []);
       const allTasks = results.flatMap(([, tkRes]) => tkRes.data.tasks ?? []);
 
-      // Deduplicate by id
       const uniqueEvents = [...new Map(allEvents.map(e => [e.id, e])).values()];
       const uniqueTasks = [...new Map(allTasks.map(t => [t.id, t])).values()];
 
-      // Fetch school data (term dates + weekly activities)
-      try {
-        const { data: schoolData } = await api.get('/schools');
-        const schoolEvents = [];
-        for (const school of (schoolData.schools || [])) {
-          // Term dates → calendar events
-          for (const td of (school.term_dates || [])) {
-            if (!td.date) continue; // skip invalid entries
-            schoolEvents.push({
-              id: `td-${td.id}`,
-              title: `${school.school_name} — ${td.label || (td.event_type || 'school event').replace(/_/g, ' ')}`,
-              start_time: `${td.date}T00:00:00Z`,
-              end_time: td.end_date ? `${td.end_date}T23:59:59Z` : `${td.date}T23:59:59Z`,
-              all_day: true,
-              category: 'school',
-              color: school.colour || 'lavender',
-              _school: true,
-            });
-          }
-          // Weekly activities → recurring events for the visible month range
-          for (const child of (school.children || [])) {
-            for (const act of (child.activities || [])) {
-              // Generate occurrences for the visible date range
-              const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-              const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 2, 0);
-              for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                const jsDay = d.getDay(); // 0=Sun
-                const ourDay = (jsDay + 6) % 7; // 0=Mon
-                if (ourDay === act.day_of_week) {
-                  const dateStr = d.toISOString().split('T')[0];
-                  schoolEvents.push({
-                    id: `act-${act.id}-${dateStr}`,
-                    title: `${child.name} — ${act.activity}`,
-                    start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
-                    end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
-                    all_day: !act.time_start,
-                    category: 'school',
-                    assigned_to_name: child.name,
-                    color: child.color_theme || 'sky',
-                    _school: true,
-                    _activity: true,
-                  });
-                }
+      // Use cached or freshly fetched school data
+      const schools = freshSchoolData ? freshSchoolData.data.schools || [] : schoolData || [];
+      if (freshSchoolData) setSchoolData(schools);
+
+      // Build school events from the cached/fetched data
+      const schoolEvents = [];
+      for (const school of schools) {
+        for (const td of (school.term_dates || [])) {
+          if (!td.date) continue;
+          schoolEvents.push({
+            id: `td-${td.id}`,
+            title: `${school.school_name} — ${td.label || (td.event_type || 'school event').replace(/_/g, ' ')}`,
+            start_time: `${td.date}T00:00:00Z`,
+            end_time: td.end_date ? `${td.end_date}T23:59:59Z` : `${td.date}T23:59:59Z`,
+            all_day: true,
+            category: 'school',
+            color: school.colour || 'lavender',
+            _school: true,
+          });
+        }
+        for (const child of (school.children || [])) {
+          for (const act of (child.activities || [])) {
+            const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+            const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 2, 0);
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              const jsDay = d.getDay();
+              const ourDay = (jsDay + 6) % 7;
+              if (ourDay === act.day_of_week) {
+                const dateStr = d.toISOString().split('T')[0];
+                schoolEvents.push({
+                  id: `act-${act.id}-${dateStr}`,
+                  title: `${child.name} — ${act.activity}`,
+                  start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
+                  end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
+                  all_day: !act.time_start,
+                  category: 'school',
+                  assigned_to_name: child.name,
+                  color: child.color_theme || 'sky',
+                  _school: true,
+                  _activity: true,
+                });
               }
             }
           }
         }
-        setEvents([...uniqueEvents, ...schoolEvents]);
-      } catch (schoolErr) {
-        console.error('School data load error:', schoolErr);
-        setEvents(uniqueEvents);
       }
 
+      setEvents([...uniqueEvents, ...schoolEvents]);
       setTasks(uniqueTasks);
     } catch (err) {
       console.error('Calendar load error:', err);

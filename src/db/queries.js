@@ -405,6 +405,28 @@ async function getSchoolTermDates(schoolId) {
   return data || [];
 }
 
+async function getTermDatesBySchoolIds(schoolIds) {
+  if (!schoolIds.length) return [];
+  const { data, error } = await supabase
+    .from('school_term_dates')
+    .select('*')
+    .in('school_id', schoolIds)
+    .order('date');
+  if (error) throw error;
+  return data || [];
+}
+
+async function getActivitiesByChildIds(childIds) {
+  if (!childIds.length) return [];
+  const { data, error } = await supabase
+    .from('child_weekly_schedule')
+    .select('*')
+    .in('child_id', childIds)
+    .order('day_of_week');
+  if (error) throw error;
+  return data || [];
+}
+
 async function deleteSchoolTermDate(dateId) {
   const { error } = await supabase
     .from('school_term_dates')
@@ -1437,9 +1459,11 @@ module.exports = {
   cacheLATermDates,
   addSchoolTermDates,
   getSchoolTermDates,
+  getTermDatesBySchoolIds,
   deleteSchoolTermDate,
   addChildActivity,
   getChildActivities,
+  getActivitiesByChildIds,
   deleteChildActivity,
   addChildSchoolEvent,
   getChildSchoolEvents,

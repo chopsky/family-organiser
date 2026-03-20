@@ -32,32 +32,51 @@ router.get('/search', async (req, res) => {
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const schools = await db.getHouseholdSchools(req.householdId);
-    const members = await db.getHouseholdMembers(req.householdId);
+    const [schools, members] = await Promise.all([
+      db.getHouseholdSchools(req.householdId),
+      db.getHouseholdMembers(req.householdId),
+    ]);
 
-    // Enrich each school with its children and term dates
-    const enriched = [];
+    // Auto-cleanup orphaned schools (no children linked)
+    const activeSchools = [];
     for (const school of schools) {
       const children = members.filter(m => m.school_id === school.id);
-
-      // Auto-cleanup: if no children are linked to this school, delete it
       if (children.length === 0) {
-        try {
-          await db.deleteHouseholdSchool(school.id, req.householdId);
-          console.log(`[orphan-cleanup] Auto-deleted orphaned school "${school.school_name}" (${school.id})`);
-        } catch (e) {
-          console.error('Auto-cleanup failed:', e.message);
-        }
-        continue; // Don't include in response
+        db.deleteHouseholdSchool(school.id, req.householdId).catch(e =>
+          console.error('Auto-cleanup failed:', e.message)
+        );
+        continue;
       }
-
-      const termDates = await db.getSchoolTermDates(school.id);
-      const childrenWithActivities = await Promise.all(children.map(async (child) => {
-        const activities = await db.getChildActivities(child.id);
-        return { ...child, activities };
-      }));
-      enriched.push({ ...school, children: childrenWithActivities, term_dates: termDates });
+      activeSchools.push({ ...school, _children: children });
     }
+
+    // Batch-fetch all term dates and activities in 2 queries (not N+1)
+    const schoolIds = activeSchools.map(s => s.id);
+    const childIds = activeSchools.flatMap(s => s._children.map(c => c.id));
+    const [allTermDates, allActivities] = await Promise.all([
+      db.getTermDatesBySchoolIds(schoolIds),
+      db.getActivitiesByChildIds(childIds),
+    ]);
+
+    // Group by school/child
+    const termDatesBySchool = {};
+    for (const td of allTermDates) {
+      (termDatesBySchool[td.school_id] ??= []).push(td);
+    }
+    const activitiesByChild = {};
+    for (const act of allActivities) {
+      (activitiesByChild[act.child_id] ??= []).push(act);
+    }
+
+    const enriched = activeSchools.map(school => ({
+      ...school,
+      children: school._children.map(child => ({
+        ...child,
+        activities: activitiesByChild[child.id] || [],
+      })),
+      term_dates: termDatesBySchool[school.id] || [],
+      _children: undefined,
+    }));
 
     return res.json({ schools: enriched });
   } catch (err) {
