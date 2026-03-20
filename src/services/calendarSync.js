@@ -77,6 +77,10 @@ async function pullChangesFromProvider(connection) {
 
   const provider = getProvider(connection.provider);
 
+  // Load existing sync mappings so pullChanges can detect already-synced events
+  const syncMappings = await db.getSyncMappingsByConnection(connection.id);
+  connection.sync_mappings = syncMappings;
+
   for (const sub of subscriptions) {
     try {
       const changes = await provider.pullChanges(connection, sub.external_calendar_id, sub.sync_token);

@@ -1258,6 +1258,15 @@ async function getSyncMappingByExternalId(connectionId, externalEventId) {
   return data || null;
 }
 
+async function getSyncMappingsByConnection(connectionId) {
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .select()
+    .eq('connection_id', connectionId);
+  if (error) throw error;
+  return data || [];
+}
+
 async function deleteSyncMapping(eventId, connectionId) {
   const { error } = await supabase
     .from('calendar_sync_mappings')
@@ -1487,6 +1496,7 @@ module.exports = {
   createSyncMapping,
   getSyncMapping,
   getSyncMappingByExternalId,
+  getSyncMappingsByConnection,
   deleteSyncMapping,
   // Calendar subscriptions
   getSubscriptionsByConnection,
