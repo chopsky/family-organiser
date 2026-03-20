@@ -91,6 +91,12 @@ export default function FamilySetup() {
   const [termImportIcalUrl, setTermImportIcalUrl] = useState('');
   const [importingTermIcal, setImportingTermIcal] = useState(false);
   const [importError, setImportError] = useState('');
+  const [showAllDates, setShowAllDates] = useState(false);
+  const [editingTermDate, setEditingTermDate] = useState(null);
+  const [editTermDateFields, setEditTermDateFields] = useState({});
+  const [savingTermDateEdit, setSavingTermDateEdit] = useState(false);
+  const [syncingIcal, setSyncingIcal] = useState(false);
+  const [newYearNudgeDismissed, setNewYearNudgeDismissed] = useState(false);
 
   function loadMembers() {
     return api.get('/household')
@@ -354,6 +360,11 @@ export default function FamilySetup() {
       setShowTermDateOptions(false);
       setImportError('');
       await loadSchools();
+      // Refresh term dates in edit modal if open
+      if (editingMember?.school_id === termDateSchoolId) {
+        const { data: tdData } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
+        setEditTermDates(tdData.term_dates || []);
+      }
     } catch (err) {
       setImportError(err.response?.data?.error || 'Could not import LA dates. Try another option below.');
     } finally {
@@ -376,6 +387,10 @@ export default function FamilySetup() {
       setShowTermDateOptions(false);
       setImportError('');
       await loadSchools();
+      if (editingMember?.school_id === termDateSchoolId) {
+        const { data: tdData } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
+        setEditTermDates(tdData.term_dates || []);
+      }
     } catch (err) {
       setImportError(err.response?.data?.error || 'Could not import from website. Try another option below.');
     } finally {
@@ -398,10 +413,130 @@ export default function FamilySetup() {
       setShowTermDateOptions(false);
       setImportError('');
       await loadSchools();
+      if (editingMember?.school_id === termDateSchoolId) {
+        const { data: tdData } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
+        setEditTermDates(tdData.term_dates || []);
+      }
     } catch (err) {
       setImportError(err.response?.data?.error || 'Could not import calendar. Try another option below.');
     } finally {
       setImportingTermIcal(false);
+    }
+  }
+
+  function getAcademicYear(dateStr) {
+    const d = new Date(dateStr);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+  }
+
+  function groupDatesByTerm(dates) {
+    const terms = {};
+    for (const td of dates) {
+      const ay = td.academic_year || getAcademicYear(td.date);
+      if (!terms[ay]) terms[ay] = { autumn: [], spring: [], summer: [], other: [] };
+      const month = new Date(td.date).getMonth();
+      if (month >= 8 && month <= 11) terms[ay].autumn.push(td);
+      else if (month >= 0 && month <= 3) terms[ay].spring.push(td);
+      else if (month >= 4 && month <= 7) terms[ay].summer.push(td);
+      else terms[ay].other.push(td);
+    }
+    // Sort dates within each term
+    for (const ay of Object.keys(terms)) {
+      for (const term of Object.values(terms[ay])) {
+        term.sort((a, b) => a.date.localeCompare(b.date));
+      }
+    }
+    return terms;
+  }
+
+  function getTermSummary(termDates) {
+    const starts = termDates.filter(d => d.event_type === 'term_start');
+    const ends = termDates.filter(d => d.event_type === 'term_end');
+    const halfTerms = termDates.filter(d => d.event_type === 'half_term_start' || d.event_type === 'half_term_end');
+    const insets = termDates.filter(d => d.event_type === 'inset_day');
+    const start = starts[0]?.date;
+    const end = ends[0]?.date;
+    const htStart = halfTerms.find(d => d.event_type === 'half_term_start');
+    const htEnd = halfTerms.find(d => d.event_type === 'half_term_end') || htStart;
+    return { start, end, htStart: htStart?.date, htEnd: htEnd?.end_date || htEnd?.date, insets };
+  }
+
+  function formatDateShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: undefined });
+  }
+
+  function formatDateFull(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function shouldShowNewYearNudge(school) {
+    if (newYearNudgeDismissed) return false;
+    const today = new Date();
+    const currentYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
+    const ayStart = new Date(currentYear, 8, 1);
+    const ayEnd = new Date(currentYear + 1, 7, 31);
+    const totalDays = (ayEnd - ayStart) / (1000 * 60 * 60 * 24);
+    const daysPassed = (today - ayStart) / (1000 * 60 * 60 * 24);
+    if (daysPassed / totalDays < 0.75) return false;
+    const nextAY = `${currentYear + 1}/${currentYear + 2}`;
+    const nextYearDates = (school?.term_dates || []).filter(d => {
+      const ay = d.academic_year || getAcademicYear(d.date);
+      return ay === nextAY || ay === `${currentYear + 1}-${currentYear + 2}`;
+    });
+    return nextYearDates.length === 0;
+  }
+
+  function openUpdateTermDates() {
+    const school = householdSchools.find(s => s.id === editingMember?.school_id);
+    if (!school) return;
+    setTermDateSchoolId(school.id);
+    setTermDateSchoolName(school.school_name);
+    setTermDateSchoolLA(school.local_authority || '');
+    setImportError('');
+    setWebsiteUrl('');
+    setTermImportIcalUrl('');
+    setShowTermDateOptions(true);
+  }
+
+  async function handleUpdateTermDate(dateId) {
+    if (!editTermDateFields.date) return;
+    setSavingTermDateEdit(true);
+    try {
+      await api.patch(`/schools/${editingMember.school_id}/term-dates/${dateId}`, editTermDateFields);
+      // Refresh term dates
+      const { data } = await api.get(`/schools/${editingMember.school_id}/term-dates`);
+      setEditTermDates(data.term_dates || []);
+      setEditingTermDate(null);
+      setEditTermDateFields({});
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not update term date.');
+    } finally {
+      setSavingTermDateEdit(false);
+    }
+  }
+
+  async function handleSyncIcal() {
+    const school = householdSchools.find(s => s.id === editingMember?.school_id);
+    if (!school?.ical_url) return;
+    setSyncingIcal(true);
+    try {
+      const { data } = await api.post(`/schools/${school.id}/sync-ical`);
+      setSuccess(data.message || 'Synced successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      const { data: tdData } = await api.get(`/schools/${school.id}/term-dates`);
+      setEditTermDates(tdData.term_dates || []);
+      await loadSchools();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Sync failed. Check the iCal URL.');
+    } finally {
+      setSyncingIcal(false);
     }
   }
 
@@ -1451,71 +1586,145 @@ export default function FamilySetup() {
                     </>
                   )}
 
-                  {/* Term dates */}
-                  {editingMember?.school_id && (
-                    <>
-                      <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">📆 Term dates & INSET days</h3>
-                      {editTermDates.length > 0 ? (
-                        <div className="space-y-1 mt-2">
-                          {editTermDates.map(td => (
-                            <div key={td.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-cream-border text-xs group">
-                              <div>
-                                <span className="font-medium text-bark">{td.label || td.event_type.replace(/_/g, ' ')}</span>
-                                <span className="text-cocoa ml-2">{td.date}{td.end_date && td.end_date !== td.date ? ` → ${td.end_date}` : ''}</span>
-                              </div>
-                              <button onClick={() => handleDeleteTermDate(td.id)} className="text-error/60 hover:text-error hidden group-hover:block" title="Remove">×</button>
+                  {/* Term dates section */}
+                  {editingMember?.school_id && (() => {
+                    const school = householdSchools.find(s => s.id === editingMember.school_id);
+                    const grouped = groupDatesByTerm(editTermDates);
+                    const academicYears = Object.keys(grouped).sort();
+                    const siblings = members.filter(m => m.school_id === editingMember.school_id && m.id !== editingMember.id);
+
+                    return (
+                      <>
+                        <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">📅 Term dates</h3>
+                        {school && <p className="text-xs text-cocoa">{school.school_name}</p>}
+
+                        {/* Sibling note */}
+                        {siblings.length > 0 && (
+                          <div className="bg-plum/5 border border-plum/15 rounded-lg px-3 py-2 mt-1">
+                            <p className="text-[11px] text-plum">These dates apply to all children at {school?.school_name}.</p>
+                          </div>
+                        )}
+
+                        {/* New year nudge */}
+                        {school && shouldShowNewYearNudge(school) && (
+                          <div className="bg-amber/10 border border-amber/30 rounded-lg px-3 py-2 mt-2 flex items-center justify-between">
+                            <p className="text-xs text-bark">💡 Next year's term dates may be available.</p>
+                            <div className="flex gap-2 shrink-0">
+                              <button onClick={openUpdateTermDates} className="text-xs font-medium text-primary hover:text-primary-pressed">Update</button>
+                              <button onClick={() => setNewYearNudgeDismissed(true)} className="text-xs text-cocoa hover:text-bark">Dismiss</button>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-cocoa mt-1">No term dates added yet.</p>
-                      )}
-
-                      {showAddTermDate ? (
-                        <div className="bg-white rounded-lg border border-cream-border p-3 mt-2 space-y-2">
-                          <div className="flex gap-2">
-                            <select value={termDateType} onChange={(e) => setTermDateType(e.target.value)} className="border border-cream-border rounded-lg px-2 py-2 text-xs bg-white">
-                              <option value="term_start">Term start</option>
-                              <option value="term_end">Term end</option>
-                              <option value="half_term_start">Half term start</option>
-                              <option value="half_term_end">Half term end</option>
-                              <option value="inset_day">INSET day</option>
-                              <option value="bank_holiday">Bank holiday</option>
-                            </select>
-                            <input type="text" value={termDateLabel} onChange={(e) => setTermDateLabel(e.target.value)} placeholder="Label (optional)" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white" />
                           </div>
-                          <div className="flex gap-2 items-center">
-                            <input type="date" value={termDateDate} onChange={(e) => setTermDateDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
-                            <span className="text-xs text-cocoa">to</span>
-                            <input type="date" value={termDateEndDate} onChange={(e) => setTermDateEndDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" placeholder="End (optional)" />
-                            <div className="flex-1" />
-                            <button onClick={() => setShowAddTermDate(false)} className="text-xs text-cocoa">Cancel</button>
-                            <button onClick={handleAddTermDate} disabled={savingTermDate || !termDateDate} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
-                              {savingTermDate ? 'Adding...' : 'Add'}
+                        )}
+
+                        {editTermDates.length > 0 ? (
+                          <div className="mt-2 space-y-3">
+                            {/* Compact term summary per academic year */}
+                            {academicYears.map(ay => {
+                              const terms = grouped[ay];
+                              return (
+                                <div key={ay} className="bg-white rounded-lg border border-cream-border p-3">
+                                  <div className="text-[11px] font-semibold text-cocoa uppercase tracking-wide mb-1.5">{ay}</div>
+                                  {[
+                                    { label: 'Autumn', dates: terms.autumn },
+                                    { label: 'Spring', dates: terms.spring },
+                                    { label: 'Summer', dates: terms.summer },
+                                  ].map(({ label, dates: termDates }) => {
+                                    if (termDates.length === 0) return null;
+                                    const summary = getTermSummary(termDates);
+                                    return (
+                                      <div key={label} className="mb-1.5 last:mb-0">
+                                        <div className="flex items-baseline gap-2">
+                                          <span className="text-xs font-semibold text-bark w-14">{label}</span>
+                                          <span className="text-[11px] text-cocoa">
+                                            {summary.start && summary.end
+                                              ? `${formatDateShort(summary.start)} – ${formatDateShort(summary.end)}`
+                                              : termDates.map(d => formatDateShort(d.date)).join(', ')
+                                            }
+                                          </span>
+                                        </div>
+                                        {summary.htStart && (
+                                          <div className="ml-16 text-[11px] text-cocoa">
+                                            Half term: {formatDateShort(summary.htStart)}{summary.htEnd && summary.htEnd !== summary.htStart ? ` – ${formatDateShort(summary.htEnd)}` : ''}
+                                          </div>
+                                        )}
+                                        {summary.insets.length > 0 && (
+                                          <div className="ml-16 text-[11px] text-cocoa">
+                                            INSET: {summary.insets.map(d => formatDateShort(d.date)).join(', ')}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+
+                            {/* Source & last updated */}
+                            <div className="text-[11px] text-cocoa space-y-0.5">
+                              {school?.term_dates_source && (
+                                <p>Source: {
+                                  { local_authority: `Local authority (${school.local_authority || ''})`, school_website: 'School website', ical: 'iCal feed', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source
+                                }</p>
+                              )}
+                              {school?.term_dates_last_updated && (
+                                <p>Last updated: {new Date(school.term_dates_last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                              )}
+                            </div>
+
+                            {/* iCal sync status */}
+                            {school?.ical_url && (
+                              <div className="text-[11px] text-cocoa">
+                                {school.ical_last_sync_status === 'failed' ? (
+                                  <div className="flex items-center gap-1 text-amber">
+                                    <span>⚠️ Sync failed</span>
+                                    {school.ical_last_sync && <span>· Last successful sync: {new Date(school.ical_last_sync).toLocaleDateString('en-GB')}</span>}
+                                  </div>
+                                ) : school.ical_last_sync ? (
+                                  <div className="flex items-center gap-1 text-sage">
+                                    <span>✅ Auto-syncing daily</span>
+                                    <span>· Last sync: {new Date(school.ical_last_sync).toLocaleDateString('en-GB')}</span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+
+                            {/* Action buttons */}
+                            <div className="flex gap-2 mt-1">
+                              {school?.ical_url ? (
+                                <>
+                                  <button onClick={handleSyncIcal} disabled={syncingIcal} className="text-xs font-medium text-primary hover:text-primary-pressed disabled:opacity-50">
+                                    🔄 {syncingIcal ? 'Syncing...' : 'Sync now'}
+                                  </button>
+                                  <span className="text-cream-border">|</span>
+                                  <button onClick={openUpdateTermDates} className="text-xs font-medium text-primary hover:text-primary-pressed">
+                                    Change source
+                                  </button>
+                                </>
+                              ) : (
+                                <button onClick={openUpdateTermDates} className="text-xs font-medium text-primary hover:text-primary-pressed">
+                                  🔄 Update term dates
+                                </button>
+                              )}
+                              <span className="text-cream-border">|</span>
+                              <button onClick={() => setShowAllDates(true)} className="text-xs font-medium text-primary hover:text-primary-pressed">
+                                View & edit all dates
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-2">
+                            <p className="text-xs text-cocoa mb-2">No term dates added yet.</p>
+                            <button
+                              onClick={openUpdateTermDates}
+                              className="w-full bg-primary text-white text-xs font-medium py-2.5 rounded-xl hover:bg-primary-pressed transition-colors"
+                            >
+                              Import term dates
                             </button>
                           </div>
-                        </div>
-                      ) : (
-                        <button onClick={() => setShowAddTermDate(true)} className="mt-2 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors">
-                          + Add term date
-                        </button>
-                      )}
-
-                      {/* iCal import — only show if no term dates exist yet */}
-                      {editTermDates.length === 0 && (
-                        <>
-                          <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">🔗 School calendar feed</h3>
-                          <p className="text-xs text-cocoa">Paste the iCal URL from your school's website to auto-import term dates.</p>
-                          <div className="flex gap-2 mt-1">
-                            <input type="url" value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://school.com/calendar.ics" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
-                            <button onClick={handleImportIcal} disabled={importingIcal || !icalUrl.trim()} className="text-xs bg-primary text-white px-3 py-2 rounded-lg font-medium disabled:opacity-50 whitespace-nowrap">
-                              {importingIcal ? 'Importing...' : 'Import'}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1550,6 +1759,148 @@ export default function FamilySetup() {
                 {savingProfile ? 'Saving…' : 'Save'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* View & Edit All Dates Panel */}
+      {showAllDates && editingMember?.school_id && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowAllDates(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold text-bark">All term dates</h2>
+              <button onClick={() => setShowAllDates(false)} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-cocoa mb-4">{householdSchools.find(s => s.id === editingMember.school_id)?.school_name}</p>
+
+            {(() => {
+              const grouped = groupDatesByTerm(editTermDates);
+              const academicYears = Object.keys(grouped).sort();
+              const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term starts', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday' };
+              const TYPE_COLORS = { term_start: 'text-sage', term_end: 'text-sage', half_term_start: 'text-amber', half_term_end: 'text-amber', inset_day: 'text-coral', bank_holiday: 'text-plum' };
+
+              return (
+                <div className="space-y-4">
+                  {academicYears.map(ay => {
+                    const terms = grouped[ay];
+                    return (
+                      <div key={ay}>
+                        {[
+                          { label: `AUTUMN TERM ${ay}`, dates: terms.autumn },
+                          { label: `SPRING TERM ${ay}`, dates: terms.spring },
+                          { label: `SUMMER TERM ${ay}`, dates: terms.summer },
+                        ].map(({ label, dates: termDates }) => {
+                          if (termDates.length === 0) return null;
+                          return (
+                            <div key={label} className="mb-3">
+                              <div className="text-[10px] font-bold text-cocoa uppercase tracking-wider mb-1.5 border-b border-cream-border pb-1">{label}</div>
+                              <div className="space-y-1">
+                                {termDates.map(td => (
+                                  <div key={td.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white group text-xs">
+                                    {editingTermDate === td.id ? (
+                                      <div className="flex-1 space-y-1.5">
+                                        <div className="flex gap-2">
+                                          <select
+                                            value={editTermDateFields.event_type || td.event_type}
+                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, event_type: e.target.value }))}
+                                            className="border border-cream-border rounded px-1.5 py-1 text-xs bg-white"
+                                          >
+                                            {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                          </select>
+                                          <input
+                                            type="text"
+                                            value={editTermDateFields.label ?? td.label ?? ''}
+                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, label: e.target.value }))}
+                                            placeholder="Label"
+                                            className="flex-1 border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div className="flex gap-2 items-center">
+                                          <input
+                                            type="date"
+                                            value={editTermDateFields.date || td.date}
+                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, date: e.target.value }))}
+                                            className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                                          />
+                                          <span className="text-cocoa">to</span>
+                                          <input
+                                            type="date"
+                                            value={editTermDateFields.end_date ?? td.end_date ?? ''}
+                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, end_date: e.target.value }))}
+                                            className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                                          />
+                                          <div className="flex-1" />
+                                          <button onClick={() => { setEditingTermDate(null); setEditTermDateFields({}); }} className="text-xs text-cocoa">Cancel</button>
+                                          <button onClick={() => handleUpdateTermDate(td.id)} disabled={savingTermDateEdit} className="text-xs bg-primary text-white px-2 py-1 rounded font-medium disabled:opacity-50">
+                                            {savingTermDateEdit ? 'Saving...' : 'Save'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="flex-1">
+                                          <span className={`font-medium ${TYPE_COLORS[td.event_type] || 'text-bark'}`}>
+                                            {td.label || TYPE_LABELS[td.event_type] || td.event_type.replace(/_/g, ' ')}
+                                          </span>
+                                          <span className="text-cocoa ml-2">{formatDateFull(td.date)}{td.end_date && td.end_date !== td.date ? ` – ${formatDateFull(td.end_date)}` : ''}</span>
+                                        </div>
+                                        <div className="hidden group-hover:flex items-center gap-1">
+                                          <button
+                                            onClick={() => { setEditingTermDate(td.id); setEditTermDateFields({ date: td.date, end_date: td.end_date || '', label: td.label || '', event_type: td.event_type }); }}
+                                            className="text-primary hover:text-primary-pressed p-0.5" title="Edit"
+                                          >✎</button>
+                                          <button onClick={() => handleDeleteTermDate(td.id)} className="text-error/60 hover:text-error p-0.5" title="Delete">🗑</button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Add date button */}
+                  {showAddTermDate ? (
+                    <div className="bg-white rounded-lg border border-cream-border p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <select value={termDateType} onChange={(e) => setTermDateType(e.target.value)} className="border border-cream-border rounded-lg px-2 py-2 text-xs bg-white">
+                          <option value="term_start">Term start</option>
+                          <option value="term_end">Term end</option>
+                          <option value="half_term_start">Half term start</option>
+                          <option value="half_term_end">Half term end</option>
+                          <option value="inset_day">INSET day</option>
+                          <option value="bank_holiday">Bank holiday</option>
+                        </select>
+                        <input type="text" value={termDateLabel} onChange={(e) => setTermDateLabel(e.target.value)} placeholder="Label (optional)" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white" />
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <input type="date" value={termDateDate} onChange={(e) => setTermDateDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
+                        <span className="text-xs text-cocoa">to</span>
+                        <input type="date" value={termDateEndDate} onChange={(e) => setTermDateEndDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
+                        <div className="flex-1" />
+                        <button onClick={() => setShowAddTermDate(false)} className="text-xs text-cocoa">Cancel</button>
+                        <button onClick={handleAddTermDate} disabled={savingTermDate || !termDateDate} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
+                          {savingTermDate ? 'Adding...' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowAddTermDate(true)} className="w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors">
+                      + Add date
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

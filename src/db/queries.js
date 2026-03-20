@@ -435,6 +435,57 @@ async function deleteSchoolTermDate(dateId) {
   if (error) throw error;
 }
 
+async function updateSchoolTermDate(dateId, updates) {
+  const allowed = {};
+  if (updates.date !== undefined) allowed.date = updates.date;
+  if (updates.end_date !== undefined) allowed.end_date = updates.end_date;
+  if (updates.label !== undefined) allowed.label = updates.label;
+  if (updates.event_type !== undefined) allowed.event_type = updates.event_type;
+  const { data, error } = await supabase
+    .from('school_term_dates')
+    .update(allowed)
+    .eq('id', dateId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateHouseholdSchoolMeta(schoolId, meta) {
+  const allowed = {};
+  if (meta.term_dates_source !== undefined) allowed.term_dates_source = meta.term_dates_source;
+  if (meta.term_dates_last_updated !== undefined) allowed.term_dates_last_updated = meta.term_dates_last_updated;
+  if (meta.ical_last_sync !== undefined) allowed.ical_last_sync = meta.ical_last_sync;
+  if (meta.ical_last_sync_status !== undefined) allowed.ical_last_sync_status = meta.ical_last_sync_status;
+  const { data, error } = await supabase
+    .from('household_schools')
+    .update(allowed)
+    .eq('id', schoolId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteTermDatesBySchoolAndAcademicYear(schoolId, academicYear) {
+  const { error } = await supabase
+    .from('school_term_dates')
+    .delete()
+    .eq('school_id', schoolId)
+    .eq('academic_year', academicYear);
+  if (error) throw error;
+}
+
+async function getSchoolsWithIcalUrls() {
+  const { data, error } = await supabase
+    .from('household_schools')
+    .select('*')
+    .not('ical_url', 'is', null)
+    .neq('ical_url', '');
+  if (error) throw error;
+  return data || [];
+}
+
 async function addChildActivity(data) {
   const { data: activity, error } = await supabase
     .from('child_weekly_schedule')
@@ -1461,6 +1512,10 @@ module.exports = {
   getSchoolTermDates,
   getTermDatesBySchoolIds,
   deleteSchoolTermDate,
+  updateSchoolTermDate,
+  updateHouseholdSchoolMeta,
+  deleteTermDatesBySchoolAndAcademicYear,
+  getSchoolsWithIcalUrls,
   addChildActivity,
   getChildActivities,
   getActivitiesByChildIds,

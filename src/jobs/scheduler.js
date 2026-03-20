@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const ical = require('node-ical');
 const db = require('../db/queries');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
@@ -6,6 +7,7 @@ const { sendOverdueNudges } = require('./overdue-nudge');
 const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
+const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -270,6 +272,136 @@ async function runTaskNotificationCheck() {
 }
 
 /**
+ * Daily iCal sync — re-fetch and replace all ical_import dates for every
+ * school that has an ical_url configured.
+ */
+async function syncAllIcalFeeds() {
+  console.log('[scheduler] Starting daily iCal sync for all schools');
+  try {
+    const schools = await db.getSchoolsWithIcalUrls();
+    if (schools.length === 0) {
+      console.log('[scheduler] No schools with iCal URLs configured');
+      return;
+    }
+
+    for (const school of schools) {
+      try {
+        console.log(`[scheduler] Syncing iCal for school ${school.id} (${school.school_name})`);
+
+        // Fetch and parse the iCal feed
+        const events = await ical.async.fromURL(school.ical_url);
+        const eventList = Object.values(events)
+          .filter(e => e.type === 'VEVENT')
+          .map(e => ({
+            title: e.summary || 'Untitled',
+            date: e.start ? new Date(e.start).toISOString().split('T')[0] : null,
+            end_date: e.end ? new Date(e.end).toISOString().split('T')[0] : null,
+            description: e.description || '',
+          }))
+          .filter(e => e.date);
+
+        if (eventList.length === 0) {
+          await db.updateHouseholdSchoolMeta(school.id, {
+            ical_last_sync: new Date().toISOString(),
+            ical_last_sync_status: 'success_empty',
+          });
+          console.log(`[scheduler] No events found for school ${school.id}`);
+          continue;
+        }
+
+        // Use AI to categorise the events
+        const categorisePrompt = `You are categorising school calendar events. For each event, determine the category.
+
+Events to categorise:
+${eventList.map((e, i) => `${i + 1}. "${e.title}" on ${e.date}${e.end_date && e.end_date !== e.date ? ` to ${e.end_date}` : ''}`).join('\n')}
+
+Return a JSON array where each element has:
+- index: the event number (1-based)
+- category: one of: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday, parents_evening, sports_day, performance, trip, exam, other
+- label: a clean display label
+
+Only return valid JSON array, nothing else.`;
+
+        const { text } = await callWithFailover({
+          system: 'You categorise school calendar events. Return only valid JSON.',
+          messages: [{ role: 'user', content: categorisePrompt }],
+          timeoutMs: LONG_TIMEOUT_MS,
+          maxTokens: 4096,
+          useThinking: false,
+        });
+
+        let categorised;
+        try {
+          const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+          categorised = JSON.parse(cleaned);
+        } catch {
+          categorised = eventList.map((e, i) => ({ index: i + 1, category: 'other', label: e.title }));
+        }
+
+        const termDateTypes = ['term_start', 'term_end', 'half_term_start', 'half_term_end', 'inset_day', 'bank_holiday'];
+        const termDates = [];
+
+        for (const cat of categorised) {
+          const event = eventList[cat.index - 1];
+          if (!event) continue;
+
+          if (termDateTypes.includes(cat.category)) {
+            const eventDate = new Date(event.date);
+            const eventMonth = eventDate.getMonth();
+            const eventYear = eventDate.getFullYear();
+            const academicYear = eventMonth >= 7
+              ? `${eventYear}-${eventYear + 1}`
+              : `${eventYear - 1}-${eventYear}`;
+
+            termDates.push({
+              academic_year: academicYear,
+              event_type: cat.category,
+              date: event.date,
+              end_date: event.end_date !== event.date ? event.end_date : null,
+              label: cat.label || event.title,
+              source: 'ical_import',
+            });
+          }
+        }
+
+        // Delete all existing ical_import dates for this school, then insert fresh
+        const { supabase } = require('../db/client');
+        const { error: deleteErr } = await supabase
+          .from('school_term_dates')
+          .delete()
+          .eq('school_id', school.id)
+          .eq('source', 'ical_import');
+        if (deleteErr) throw deleteErr;
+
+        if (termDates.length > 0) {
+          await db.addSchoolTermDates(school.id, termDates);
+        }
+
+        await db.updateHouseholdSchoolMeta(school.id, {
+          ical_last_sync: new Date().toISOString(),
+          ical_last_sync_status: 'success',
+          term_dates_last_updated: new Date().toISOString(),
+        });
+
+        console.log(`[scheduler] Synced ${termDates.length} term dates for school ${school.id}`);
+      } catch (err) {
+        console.error(`[scheduler] iCal sync failed for school ${school.id}:`, err.message);
+        try {
+          await db.updateHouseholdSchoolMeta(school.id, {
+            ical_last_sync: new Date().toISOString(),
+            ical_last_sync_status: `error: ${err.message}`,
+          });
+        } catch { /* ignore meta update failure */ }
+      }
+    }
+
+    console.log('[scheduler] Daily iCal sync complete');
+  } catch (err) {
+    console.error('[scheduler] Daily iCal sync failed:', err.message);
+  }
+}
+
+/**
  * Start all scheduled jobs.
  */
 function startScheduler() {
@@ -293,6 +425,10 @@ function startScheduler() {
   cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());
   console.log('✓ Apple Calendar polling started (every 15 minutes)');
 
+  // ── Daily iCal feed sync: 06:00 UTC ─────────────────────────────────────────
+  cron.schedule('0 6 * * *', () => syncAllIcalFeeds());
+  console.log('✓ Daily iCal sync scheduled (06:00 UTC)');
+
   // ── Yearly public holiday refresh: Dec 1 at midnight ───────────────────────
   cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
@@ -315,4 +451,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, currentHHMMInTZ };
+module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, currentHHMMInTZ };

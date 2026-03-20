@@ -325,8 +325,14 @@ Only return valid JSON array, nothing else.`;
       await db.addSchoolTermDates(req.params.schoolId, termDates);
     }
 
-    // Save iCal URL on the school
+    // Save iCal URL on the school and update metadata
     await db.updateHouseholdSchool(req.params.schoolId, { ical_url: ical_url.trim() });
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+      term_dates_source: 'ical_import',
+      term_dates_last_updated: new Date().toISOString(),
+      ical_last_sync: new Date().toISOString(),
+      ical_last_sync_status: 'success',
+    });
 
     return res.json({
       imported: termDates.length,
@@ -426,12 +432,20 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
       source: 'local_authority',
     }));
 
+    // Merge strategy: delete existing dates for the same academic year before inserting
+    await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, academicYear);
     await db.addSchoolTermDates(req.params.schoolId, termDates);
+
+    // Update household_schools metadata
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+      term_dates_source: 'local_authority',
+      term_dates_last_updated: new Date().toISOString(),
+    });
 
     return res.json({
       imported: termDates.length,
       local_authority: school.local_authority,
-      message: `Imported ${termDates.length} term dates for ${school.local_authority}.${fromCache ? '' : ' These dates are now cached for other families.'}`,
+      message: `Updated ${termDates.length} dates for ${academicYear}.${fromCache ? '' : ' These dates are now cached for other families.'}`,
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-la-dates error:', err);
@@ -605,15 +619,186 @@ Do NOT wrap in markdown code fences.`,
       source: 'website_scrape',
     }));
 
+    // Merge strategy: group by academic year, delete existing dates per year, then insert
+    const datesByYear = {};
+    for (const td of termDates) {
+      (datesByYear[td.academic_year] ??= []).push(td);
+    }
+
+    const yearCounts = [];
+    for (const [ay, ayDates] of Object.entries(datesByYear)) {
+      await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, ay);
+      yearCounts.push({ year: ay, count: ayDates.length });
+    }
+
     await db.addSchoolTermDates(req.params.schoolId, termDates);
 
+    // Update household_schools metadata
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+      term_dates_source: 'website_scrape',
+      term_dates_last_updated: new Date().toISOString(),
+    });
+
+    const countMessages = yearCounts.map(yc => `${yc.count} dates for ${yc.year}`);
     return res.json({
       imported: termDates.length,
-      message: `Found and imported ${termDates.length} term dates from the school website.`,
+      message: `Updated ${countMessages.join('. Added ')}.`,
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-website error:', err);
     return res.status(500).json({ error: `Failed to import from website: ${err.message}` });
+  }
+});
+
+/**
+ * PATCH /api/schools/:schoolId/term-dates/:dateId
+ * Edit an individual term date (date, end_date, label, event_type).
+ */
+router.patch('/:schoolId/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { date, end_date, label, event_type } = req.body;
+  const updates = {};
+  if (date !== undefined) updates.date = date;
+  if (end_date !== undefined) updates.end_date = end_date;
+  if (label !== undefined) updates.label = label;
+  if (event_type !== undefined) updates.event_type = event_type;
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ error: 'No valid fields to update.' });
+  }
+
+  try {
+    const updated = await db.updateSchoolTermDate(req.params.dateId, updates);
+    return res.json({ term_date: updated });
+  } catch (err) {
+    console.error('PATCH /api/schools/:schoolId/term-dates/:dateId error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/schools/:schoolId/sync-ical
+ * Manual iCal sync — re-fetch and replace all ical_import dates for this school.
+ */
+router.post('/:schoolId/sync-ical', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    // Get the school record and check it has an ical_url
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find(s => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+    if (!school.ical_url) return res.status(400).json({ error: 'No iCal URL configured for this school.' });
+
+    // Fetch and parse the iCal feed
+    const events = await ical.async.fromURL(school.ical_url);
+    const eventList = Object.values(events)
+      .filter(e => e.type === 'VEVENT')
+      .map(e => ({
+        title: e.summary || 'Untitled',
+        date: e.start ? new Date(e.start).toISOString().split('T')[0] : null,
+        end_date: e.end ? new Date(e.end).toISOString().split('T')[0] : null,
+        description: e.description || '',
+      }))
+      .filter(e => e.date);
+
+    if (eventList.length === 0) {
+      await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+        ical_last_sync: new Date().toISOString(),
+        ical_last_sync_status: 'success_empty',
+      });
+      return res.json({ success: true, dates_synced: 0, message: 'No events found in the iCal feed.' });
+    }
+
+    // Use AI to categorise the events (same logic as import-ical)
+    const categorisePrompt = `You are categorising school calendar events. For each event, determine the category.
+
+Events to categorise:
+${eventList.map((e, i) => `${i + 1}. "${e.title}" on ${e.date}${e.end_date && e.end_date !== e.date ? ` to ${e.end_date}` : ''}`).join('\n')}
+
+Return a JSON array where each element has:
+- index: the event number (1-based)
+- category: one of: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday, parents_evening, sports_day, performance, trip, exam, other
+- label: a clean display label
+
+Only return valid JSON array, nothing else.`;
+
+    const { text } = await callWithFailover({
+      system: 'You categorise school calendar events. Return only valid JSON.',
+      messages: [{ role: 'user', content: categorisePrompt }],
+      timeoutMs: LONG_TIMEOUT_MS,
+      maxTokens: 4096,
+      useThinking: false,
+    });
+
+    let categorised;
+    try {
+      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      categorised = JSON.parse(cleaned);
+    } catch {
+      categorised = eventList.map((e, i) => ({ index: i + 1, category: 'other', label: e.title }));
+    }
+
+    const termDateTypes = ['term_start', 'term_end', 'half_term_start', 'half_term_end', 'inset_day', 'bank_holiday'];
+    const termDates = [];
+
+    for (const cat of categorised) {
+      const event = eventList[cat.index - 1];
+      if (!event) continue;
+
+      if (termDateTypes.includes(cat.category)) {
+        // Determine academic year from the event date
+        const eventDate = new Date(event.date);
+        const eventMonth = eventDate.getMonth(); // 0-indexed
+        const eventYear = eventDate.getFullYear();
+        const academicYear = eventMonth >= 7
+          ? `${eventYear}-${eventYear + 1}`
+          : `${eventYear - 1}-${eventYear}`;
+
+        termDates.push({
+          academic_year: academicYear,
+          event_type: cat.category,
+          date: event.date,
+          end_date: event.end_date !== event.date ? event.end_date : null,
+          label: cat.label || event.title,
+          source: 'ical_import',
+        });
+      }
+    }
+
+    // Delete ALL existing ical_import dates for this school, then insert fresh
+    const { supabase } = require('../db/client');
+    const { error: deleteErr } = await supabase
+      .from('school_term_dates')
+      .delete()
+      .eq('school_id', req.params.schoolId)
+      .eq('source', 'ical_import');
+    if (deleteErr) throw deleteErr;
+
+    if (termDates.length > 0) {
+      await db.addSchoolTermDates(req.params.schoolId, termDates);
+    }
+
+    // Update metadata
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+      ical_last_sync: new Date().toISOString(),
+      ical_last_sync_status: 'success',
+      term_dates_last_updated: new Date().toISOString(),
+    });
+
+    return res.json({
+      success: true,
+      dates_synced: termDates.length,
+      message: `Synced ${termDates.length} term dates from iCal feed.`,
+    });
+  } catch (err) {
+    // Update metadata with failure status
+    try {
+      await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+        ical_last_sync: new Date().toISOString(),
+        ical_last_sync_status: `error: ${err.message}`,
+      });
+    } catch { /* ignore meta update failure */ }
+
+    console.error('POST /api/schools/:id/sync-ical error:', err);
+    return res.status(500).json({ error: `Failed to sync iCal feed: ${err.message}` });
   }
 });
 
