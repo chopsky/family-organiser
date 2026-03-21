@@ -40,6 +40,11 @@ CALENDAR EVENT RULES:
 
 SHOPPING ITEM RULES:
 - Infer category from context: groceries | clothing | household | school | pets | party | gifts | other
+- clothing = any wearable items (t-shirts, shoes, jackets, socks, uniforms, etc.)
+- household = cleaning products, toiletries, DIY, furniture, homeware
+- groceries = food and drink items ONLY
+- school = stationery, school supplies, book bags
+- pets = pet food, pet accessories
 - Extract quantity if mentioned (e.g. "2 litres", "a dozen")
 - action must be "add" or "remove"
 - Normalise item names to plain English (e.g. "some milk" → "milk")

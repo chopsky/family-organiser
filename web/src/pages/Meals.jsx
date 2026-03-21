@@ -7,12 +7,15 @@ import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
 // ── Constants ─────────────────────────────────────────────────────
 
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-const CATEGORY_COLOURS = {
-  Breakfast: { bg: 'bg-[#F5CBA7]', text: 'text-[#8B5E2B]', light: 'bg-[#F5CBA7]/20', border: 'border-[#F5CBA7]' },
-  Lunch:     { bg: 'bg-[#A9DFBF]', text: 'text-[#2E7D46]', light: 'bg-[#A9DFBF]/20', border: 'border-[#A9DFBF]' },
-  Dinner:    { bg: 'bg-[#AED6F1]', text: 'text-[#1F5F8B]', light: 'bg-[#AED6F1]/20', border: 'border-[#AED6F1]' },
-  Snack:     { bg: 'bg-[#D7BDE2]', text: 'text-[#6C3483]', light: 'bg-[#D7BDE2]/20', border: 'border-[#D7BDE2]' },
+const CATEGORY_COLOURS_MAP = {
+  breakfast: { bg: 'bg-[#F5CBA7]', text: 'text-[#8B5E2B]', light: 'bg-[#F5CBA7]/20', border: 'border-[#F5CBA7]' },
+  lunch:     { bg: 'bg-[#A9DFBF]', text: 'text-[#2E7D46]', light: 'bg-[#A9DFBF]/20', border: 'border-[#A9DFBF]' },
+  dinner:    { bg: 'bg-[#AED6F1]', text: 'text-[#1F5F8B]', light: 'bg-[#AED6F1]/20', border: 'border-[#AED6F1]' },
+  snack:     { bg: 'bg-[#D7BDE2]', text: 'text-[#6C3483]', light: 'bg-[#D7BDE2]/20', border: 'border-[#D7BDE2]' },
 };
+function getCatColours(cat) {
+  return CATEGORY_COLOURS_MAP[(cat || 'dinner').toLowerCase()] || CATEGORY_COLOURS_MAP.dinner;
+}
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DIETARY_TAGS = ['Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Nut-free', 'Low-carb', 'High-protein'];
 const UNITS = ['', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pcs', 'bunch', 'clove', 'can', 'tin', 'pack'];
@@ -153,7 +156,8 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   // Get meal for a specific cell
   function getMeal(date, category) {
     const ds = toDateStr(date);
-    return meals.find(m => m.date === ds && m.category === category);
+    const catLower = category.toLowerCase();
+    return meals.find(m => m.date === ds && m.category?.toLowerCase() === catLower);
   }
 
   // Delete meal
@@ -205,17 +209,18 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   // Handle meal selected from picker
   async function handleMealPicked(data) {
     try {
+      const categoryLower = pickerCell.category.toLowerCase();
       if (editingMeal) {
         await api.patch(`/meals/${editingMeal.id}`, {
           ...data,
           date: pickerCell.date,
-          category: pickerCell.category,
+          category: categoryLower,
         });
       } else {
         await api.post('/meals', {
           ...data,
           date: pickerCell.date,
-          category: pickerCell.category,
+          category: categoryLower,
         });
       }
       setPickerCell(null);
@@ -276,7 +281,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                 </thead>
                 <tbody>
                   {MEAL_CATEGORIES.map((category) => {
-                    const colors = CATEGORY_COLOURS[category];
+                    const colors = getCatColours(category);
                     return (
                       <tr key={category}>
                         <td className="py-2 px-3 border-b border-cream-border">
@@ -380,7 +385,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
 import { forwardRef } from 'react';
 
 const MealDetailPopup = forwardRef(function MealDetailPopup({ meal, onClose, onEdit, onDelete, onAddToShoppingList }, ref) {
-  const colors = CATEGORY_COLOURS[meal.category] || CATEGORY_COLOURS.Dinner;
+  const colors = getCatColours(meal.category);
   const recipe = meal.recipe;
 
   return (
@@ -399,14 +404,14 @@ const MealDetailPopup = forwardRef(function MealDetailPopup({ meal, onClose, onE
           </div>
           {recipe && (
             <div className="flex items-center gap-3 mt-2 text-xs text-bark/70">
-              {recipe.prep_time && <span>Prep: {recipe.prep_time}min</span>}
-              {recipe.cook_time && <span>Cook: {recipe.cook_time}min</span>}
+              {recipe.prep_time_mins && <span>Prep: {recipe.prep_time_mins}min</span>}
+              {recipe.cook_time_mins && <span>Cook: {recipe.cook_time_mins}min</span>}
               {recipe.servings && <span>Serves: {recipe.servings}</span>}
             </div>
           )}
-          {recipe?.tags?.length > 0 && (
+          {(recipe?.dietary_tags || recipe?.tags)?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {recipe.tags.map(tag => (
+              {(recipe.dietary_tags || recipe.tags).map(tag => (
                 <span key={tag} className="text-[10px] font-medium bg-white/60 text-bark/70 px-2 py-0.5 rounded-full">{tag}</span>
               ))}
             </div>
@@ -496,7 +501,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
   const [aiLoading, setAiLoading] = useState(false);
   const modalRef = useRef(null);
 
-  const colors = CATEGORY_COLOURS[cell.category] || CATEGORY_COLOURS.Dinner;
+  const colors = getCatColours(cell.category);
 
   // Load recipes filtered by category
   useEffect(() => {
@@ -505,7 +510,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
       try {
         const params = {};
         if (search) params.search = search;
-        params.category = cell.category;
+        params.category = cell.category.toLowerCase();
         const res = await api.get('/recipes', { params });
         setRecipes(res.data.recipes ?? []);
       } catch {
@@ -548,7 +553,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
   }
 
   function acceptAiSuggestion(suggestion) {
-    onSelect({ meal_name: suggestion.name, recipe_id: suggestion.recipe_id || undefined });
+    onSelect({ meal_name: suggestion.meal_name || suggestion.name, recipe_id: suggestion.recipe_id || undefined });
   }
 
   return (
@@ -611,12 +616,12 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
                         >
                           <p className="text-sm font-semibold text-bark">{recipe.name}</p>
                           <div className="flex items-center gap-2 mt-1 text-xs text-cocoa">
-                            {recipe.prep_time && <span>Prep: {recipe.prep_time}m</span>}
-                            {recipe.cook_time && <span>Cook: {recipe.cook_time}m</span>}
+                            {recipe.prep_time_mins && <span>Prep: {recipe.prep_time_mins}m</span>}
+                            {recipe.cook_time_mins && <span>Cook: {recipe.cook_time_mins}m</span>}
                           </div>
-                          {recipe.tags?.length > 0 && (
+                          {(recipe.dietary_tags || recipe.tags)?.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1.5">
-                              {recipe.tags.map(tag => (
+                              {(recipe.dietary_tags || recipe.tags).map(tag => (
                                 <span key={tag} className="text-[10px] font-medium bg-oat text-cocoa px-2 py-0.5 rounded-full">{tag}</span>
                               ))}
                             </div>
@@ -682,8 +687,9 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
                       <li key={i} className="bg-white rounded-xl border border-cream-border p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-bark">{s.name}</p>
-                            {s.reason && <p className="text-xs text-cocoa mt-1">{s.reason}</p>}
+                            <p className="text-sm font-semibold text-bark">{s.meal_name || s.name}</p>
+                            {(s.description || s.reason) && <p className="text-xs text-cocoa mt-1">{s.description || s.reason}</p>}
+                            {s.prep_time_mins && <p className="text-xs text-cocoa/60 mt-0.5">⏱ {s.prep_time_mins} mins</p>}
                           </div>
                           <button
                             onClick={() => acceptAiSuggestion(s)}
@@ -737,7 +743,7 @@ function RecipeBoxView({ setError }) {
     try {
       const params = {};
       if (search) params.search = search;
-      if (catFilter) params.category = catFilter;
+      if (catFilter) params.category = catFilter.toLowerCase();
       if (tagFilter) params.tag = tagFilter;
       if (favOnly) params.favourites = 'true';
       const res = await api.get('/recipes', { params });
@@ -755,7 +761,7 @@ function RecipeBoxView({ setError }) {
   async function toggleFavourite(recipe, e) {
     e.stopPropagation();
     try {
-      await api.patch(`/recipes/${recipe.id}`, { favourite: !recipe.favourite });
+      await api.patch(`/recipes/${recipe.id}`, { is_favourite: !(recipe.is_favourite || recipe.favourite) });
       await loadRecipes();
     } catch {
       setError('Could not update favourite.');
@@ -912,7 +918,7 @@ function RecipeBoxView({ setError }) {
           {/* Recipe grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {recipes.map(recipe => {
-              const colors = CATEGORY_COLOURS[recipe.category] || CATEGORY_COLOURS.Dinner;
+              const colors = getCatColours(recipe.category);
               return (
                 <button
                   key={recipe.id}
@@ -923,22 +929,22 @@ function RecipeBoxView({ setError }) {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-sm font-semibold text-bark truncate">{recipe.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${colors.bg} ${colors.text}`}>{recipe.category}</span>
-                        {recipe.prep_time && <span className="text-xs text-cocoa">Prep: {recipe.prep_time}m</span>}
-                        {recipe.cook_time && <span className="text-xs text-cocoa">Cook: {recipe.cook_time}m</span>}
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${colors.bg} ${colors.text} capitalize`}>{recipe.category}</span>
+                        {recipe.prep_time_mins && <span className="text-xs text-cocoa">Prep: {recipe.prep_time_mins}m</span>}
+                        {recipe.cook_time_mins && <span className="text-xs text-cocoa">Cook: {recipe.cook_time_mins}m</span>}
                       </div>
                     </div>
                     <button
                       onClick={e => toggleFavourite(recipe, e)}
                       className="text-lg shrink-0 transition-transform hover:scale-110"
-                      title={recipe.favourite ? 'Remove favourite' : 'Add favourite'}
+                      title={(recipe.is_favourite || recipe.favourite) ? 'Remove favourite' : 'Add favourite'}
                     >
-                      {recipe.favourite ? '⭐' : '☆'}
+                      {(recipe.is_favourite || recipe.favourite) ? '⭐' : '☆'}
                     </button>
                   </div>
-                  {recipe.tags?.length > 0 && (
+                  {(recipe.dietary_tags || recipe.tags)?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {recipe.tags.map(tag => (
+                      {(recipe.dietary_tags || recipe.tags).map(tag => (
                         <span key={tag} className="text-[10px] font-medium bg-oat text-cocoa px-2 py-0.5 rounded-full">{tag}</span>
                       ))}
                     </div>
@@ -1111,15 +1117,17 @@ function AddRecipeModal({ onClose, onManual, importUrl, setImportUrl, onImportUr
 
 function RecipeFormModal({ recipe, onSave, onClose }) {
   const [name, setName] = useState(recipe.name || '');
-  const [category, setCategory] = useState(recipe.category || 'Dinner');
+  const [category, setCategory] = useState((recipe.category || 'dinner').charAt(0).toUpperCase() + (recipe.category || 'dinner').slice(1));
   const [servings, setServings] = useState(recipe.servings || 4);
   const [ingredients, setIngredients] = useState(
     recipe.ingredients?.length > 0 ? recipe.ingredients : [{ name: '', quantity: '', unit: '' }]
   );
-  const [method, setMethod] = useState(recipe.method || '');
-  const [prepTime, setPrepTime] = useState(recipe.prep_time || '');
-  const [cookTime, setCookTime] = useState(recipe.cook_time || '');
-  const [tags, setTags] = useState(recipe.tags || []);
+  const [method, setMethod] = useState(
+    Array.isArray(recipe.method) ? recipe.method.join('\n') : (recipe.method || '')
+  );
+  const [prepTime, setPrepTime] = useState(recipe.prep_time_mins || recipe.prep_time || '');
+  const [cookTime, setCookTime] = useState(recipe.cook_time_mins || recipe.cook_time || '');
+  const [tags, setTags] = useState(recipe.dietary_tags || recipe.tags || []);
   const [notes, setNotes] = useState(recipe.notes || '');
   const [saving, setSaving] = useState(false);
   const modalRef = useRef(null);
@@ -1158,13 +1166,13 @@ function RecipeFormModal({ recipe, onSave, onClose }) {
     const data = {
       ...(recipe.id ? { id: recipe.id } : {}),
       name: name.trim(),
-      category,
+      category: category.toLowerCase(),
       servings: Number(servings) || 4,
       ingredients: ingredients.filter(i => i.name.trim()),
       method: method.trim(),
-      prep_time: prepTime ? Number(prepTime) : null,
-      cook_time: cookTime ? Number(cookTime) : null,
-      tags,
+      prep_time_mins: prepTime ? Number(prepTime) : null,
+      cook_time_mins: cookTime ? Number(cookTime) : null,
+      dietary_tags: tags,
       notes: notes.trim() || null,
     };
     await onSave(data);
@@ -1431,7 +1439,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
     if (!planDay) return;
     setAddingToPlan(true);
     try {
-      await api.post('/meals', { date: planDay, category: planCategory, recipe_id: recipe.id, meal_name: recipe.name });
+      await api.post('/meals', { date: planDay, category: planCategory.toLowerCase(), recipe_id: recipe.id, meal_name: recipe.name });
       alert('Added to meal plan!');
       setAddingToPlan(false);
       setPlanDay('');
@@ -1441,7 +1449,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
     }
   }
 
-  const colors = CATEGORY_COLOURS[recipe.category] || CATEGORY_COLOURS.Dinner;
+  const colors = getCatColours(recipe.category);
 
   // Get this week's dates for "Add to plan" picker
   const thisMonday = getMonday(new Date());
@@ -1467,12 +1475,12 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
             </button>
           </div>
           <div className="flex items-center gap-3 mt-2 text-xs text-bark/70">
-            {recipe.prep_time && <span>Prep: {recipe.prep_time}min</span>}
-            {recipe.cook_time && <span>Cook: {recipe.cook_time}min</span>}
+            {recipe.prep_time_mins && <span>Prep: {recipe.prep_time_mins}min</span>}
+            {recipe.cook_time_mins && <span>Cook: {recipe.cook_time_mins}min</span>}
           </div>
-          {recipe.tags?.length > 0 && (
+          {(recipe.dietary_tags || recipe.tags)?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {recipe.tags.map(tag => (
+              {(recipe.dietary_tags || recipe.tags).map(tag => (
                 <span key={tag} className="text-[10px] font-medium bg-white/60 text-bark/70 px-2 py-0.5 rounded-full">{tag}</span>
               ))}
             </div>
@@ -1523,7 +1531,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
             <div>
               <h4 className="text-sm font-semibold text-bark mb-2">Method</h4>
               <ol className="space-y-3">
-                {recipe.method.split('\n').filter(s => s.trim()).map((step, i) => (
+                {(Array.isArray(recipe.method) ? recipe.method : recipe.method.split('\n')).filter(s => s.trim()).map((step, i) => (
                   <li key={i} className="flex gap-3 text-sm">
                     <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">{i + 1}</span>
                     <span className="text-cocoa leading-relaxed">{step.replace(/^\d+\.\s*/, '')}</span>
