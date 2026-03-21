@@ -187,14 +187,15 @@ Return ONLY valid JSON:
       messages: [{ role: 'user', content: prompt }],
       useThinking: false,
       maxTokens: 2048,
-      timeoutMs: 15000,
+      timeoutMs: 30000,
     });
 
     let parsed;
     try {
       const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
       parsed = JSON.parse(cleaned);
-    } catch {
+    } catch (parseErr) {
+      console.error('Could not parse AI suggestions:', text?.substring(0, 200));
       return res.status(500).json({ error: 'Could not parse AI suggestions' });
     }
 
@@ -420,7 +421,7 @@ router.post('/recipes', requireAuth, requireHousehold, async (req, res) => {
   try {
     const recipe = await db.createRecipe(req.householdId, {
       name: name.trim(),
-      category: category || null,
+      category: (category || 'dinner').toLowerCase(),
       ingredients: ingredients || [],
       method: method || [],
       prep_time_mins: prep_time_mins || null,

@@ -1534,7 +1534,7 @@ async function createRecipe(householdId, recipeData) {
     .insert({
       household_id: householdId,
       name: recipeData.name,
-      category: recipeData.category || null,
+      category: recipeData.category || 'dinner',
       ingredients: recipeData.ingredients || [],
       method: Array.isArray(recipeData.method) ? recipeData.method.join('\n') : (recipeData.method || null),
       prep_time_mins: recipeData.prep_time_mins || null,
@@ -1543,6 +1543,7 @@ async function createRecipe(householdId, recipeData) {
       dietary_tags: recipeData.dietary_tags || [],
       image_url: recipeData.image_url || null,
       source_url: recipeData.source_url || null,
+      source_type: recipeData.source_type || 'manual',
       notes: recipeData.notes || null,
       is_favourite: recipeData.is_favourite || false,
     })
