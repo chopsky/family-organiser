@@ -1102,7 +1102,7 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-8 gap-2.5">
                   {COLOUR_OPTIONS.map(({ key, bg, ring }) => (
                     <button key={key} type="button" onClick={() => setDepColor(key)}
                       className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${depColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}
@@ -1232,7 +1232,7 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-8 gap-2.5">
                   {COLOUR_OPTIONS.map(({ key, bg, ring }) => (
                     <button key={key} type="button" onClick={() => setNewColor(key)}
                       className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${newColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}
@@ -1471,7 +1471,7 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1.5">Color theme</label>
-                <div className="flex gap-3">
+                <div className="grid grid-cols-8 gap-2.5">
                   {COLOUR_OPTIONS.map(({ key, bg, ring }) => (
                     <button
                       key={key}

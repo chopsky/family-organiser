@@ -805,7 +805,7 @@ export default function Settings() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-8 gap-2.5">
                   {[
                     { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
                     { key: 'burnt-orange',  bg: 'bg-burnt-orange',  ring: 'ring-burnt-orange' },
