@@ -53,7 +53,7 @@ router.get('/meals', requireAuth, requireHousehold, async (req, res) => {
             meal_name: recurMeal.meal_name,
             notes: recurMeal.notes,
             is_recurring: false, // Generated instance, not the template
-          }, recurMeal.created_by);
+          }, recurMeal.added_by);
           generatedMeals.push(generated);
         } catch (genErr) {
           console.error('Failed to generate recurring meal entry:', genErr);

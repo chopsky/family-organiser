@@ -1462,7 +1462,7 @@ async function createMealPlanEntry(householdId, data, userId) {
       notes: data.notes || null,
       is_recurring: data.is_recurring || false,
       recurrence_day: data.recurrence_day !== undefined ? data.recurrence_day : null,
-      created_by: userId,
+      added_by: userId,
     })
     .select('*, recipes(*)')
     .single();
@@ -1545,7 +1545,6 @@ async function createRecipe(householdId, recipeData) {
       source_url: recipeData.source_url || null,
       notes: recipeData.notes || null,
       is_favourite: recipeData.is_favourite || false,
-      created_by: recipeData.created_by || null,
     })
     .select()
     .single();
