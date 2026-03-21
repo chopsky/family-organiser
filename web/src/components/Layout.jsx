@@ -30,16 +30,27 @@ const moreNav = [
 ];
 
 const avatarColors = {
+  red: 'bg-red text-white',
+  'burnt-orange': 'bg-burnt-orange text-white',
+  amber: 'bg-amber text-white',
+  gold: 'bg-gold text-white',
+  leaf: 'bg-leaf text-white',
+  emerald: 'bg-emerald text-white',
+  teal: 'bg-teal text-white',
+  sky: 'bg-sky text-white',
+  cobalt: 'bg-cobalt text-white',
+  indigo: 'bg-indigo text-white',
+  purple: 'bg-purple text-white',
+  magenta: 'bg-magenta text-white',
+  rose: 'bg-rose text-white',
+  terracotta: 'bg-terracotta text-white',
+  moss: 'bg-moss text-white',
+  slate: 'bg-slate text-white',
+  // Legacy fallbacks
   sage: 'bg-sage text-white',
   plum: 'bg-plum text-white',
   coral: 'bg-coral text-white',
-  amber: 'bg-amber text-white',
-  sky: 'bg-sky text-white',
-  rose: 'bg-rose text-white',
-  teal: 'bg-teal text-white',
-  lavender: 'bg-lavender text-white',
-  terracotta: 'bg-terracotta text-white',
-  slate: 'bg-slate text-white',
+  lavender: 'bg-indigo text-white',
 };
 
 export default function Layout({ children }) {

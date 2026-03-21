@@ -43,7 +43,7 @@ export default function Settings() {
   const [profileName, setProfileName] = useState('');
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
-  const [profileColor, setProfileColor] = useState('sage');
+  const [profileColor, setProfileColor] = useState('teal');
   const [profileReminderTime, setProfileReminderTime] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -383,12 +383,17 @@ export default function Settings() {
       {(() => {
         const me = members.find((m) => m.id === user?.id);
         const avatarColors = {
-          sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white',
-          amber: 'bg-amber text-white', sky: 'bg-sky text-white', rose: 'bg-rose text-white',
-          teal: 'bg-teal text-white', lavender: 'bg-lavender text-white',
-          terracotta: 'bg-terracotta text-white', slate: 'bg-slate text-white',
+          red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
+          amber: 'bg-amber text-white', gold: 'bg-gold text-white',
+          leaf: 'bg-leaf text-white', emerald: 'bg-emerald text-white',
+          teal: 'bg-teal text-white', sky: 'bg-sky text-white',
+          cobalt: 'bg-cobalt text-white', indigo: 'bg-indigo text-white',
+          purple: 'bg-purple text-white', magenta: 'bg-magenta text-white',
+          rose: 'bg-rose text-white', terracotta: 'bg-terracotta text-white',
+          moss: 'bg-moss text-white', slate: 'bg-slate text-white',
+          sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', lavender: 'bg-indigo text-white',
         };
-        const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.sage;
+        const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
         return (
           <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
             <h2 className="font-semibold text-bark mb-3">My profile</h2>
@@ -765,7 +770,7 @@ export default function Settings() {
                   <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
                 ) : (
                   <div className={`w-20 h-20 rounded-full ${
-                    { sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', amber: 'bg-amber text-white', sky: 'bg-sky text-white', rose: 'bg-rose text-white', teal: 'bg-teal text-white', lavender: 'bg-lavender text-white', terracotta: 'bg-terracotta text-white', slate: 'bg-slate text-white' }[profileColor] || 'bg-sage text-white'
+                    avatarColors[profileColor] || avatarColors.teal
                   } flex items-center justify-center font-bold text-2xl`}>
                     {profileName?.[0]?.toUpperCase() || '?'}
                   </div>
@@ -802,15 +807,22 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
                 <div className="flex flex-wrap gap-3">
                   {[
-                    { key: 'sage',       bg: 'bg-sage',       ring: 'ring-sage' },
-                    { key: 'plum',       bg: 'bg-plum',       ring: 'ring-plum' },
-                    { key: 'coral',      bg: 'bg-coral',      ring: 'ring-coral' },
-                    { key: 'amber',      bg: 'bg-amber',      ring: 'ring-amber' },
-                    { key: 'sky',        bg: 'bg-sky',        ring: 'ring-sky' },
-                    { key: 'rose',       bg: 'bg-rose',       ring: 'ring-rose' },
-                    { key: 'teal',       bg: 'bg-teal',       ring: 'ring-teal' },
-                    { key: 'terracotta', bg: 'bg-terracotta', ring: 'ring-terracotta' },
-                    { key: 'slate',      bg: 'bg-slate',      ring: 'ring-slate' },
+                    { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
+                    { key: 'burnt-orange',  bg: 'bg-burnt-orange',  ring: 'ring-burnt-orange' },
+                    { key: 'amber',         bg: 'bg-amber',         ring: 'ring-amber' },
+                    { key: 'gold',          bg: 'bg-gold',          ring: 'ring-gold' },
+                    { key: 'leaf',          bg: 'bg-leaf',          ring: 'ring-leaf' },
+                    { key: 'emerald',       bg: 'bg-emerald',       ring: 'ring-emerald' },
+                    { key: 'teal',          bg: 'bg-teal',          ring: 'ring-teal' },
+                    { key: 'sky',           bg: 'bg-sky',           ring: 'ring-sky' },
+                    { key: 'cobalt',        bg: 'bg-cobalt',        ring: 'ring-cobalt' },
+                    { key: 'indigo',        bg: 'bg-indigo',        ring: 'ring-indigo' },
+                    { key: 'purple',        bg: 'bg-purple',        ring: 'ring-purple' },
+                    { key: 'magenta',       bg: 'bg-magenta',       ring: 'ring-magenta' },
+                    { key: 'rose',          bg: 'bg-rose',          ring: 'ring-rose' },
+                    { key: 'terracotta',    bg: 'bg-terracotta',    ring: 'ring-terracotta' },
+                    { key: 'moss',          bg: 'bg-moss',          ring: 'ring-moss' },
+                    { key: 'slate',         bg: 'bg-slate',         ring: 'ring-slate' },
                   ].map(({ key, bg, ring }) => (
                     <button key={key} type="button" onClick={() => setProfileColor(key)}
                       className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${profileColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}

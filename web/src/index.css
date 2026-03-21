@@ -35,21 +35,23 @@
   --color-light-grey: #E8E5EC;
   --color-cream: #FBF8F3;
 
-  /* ── Avatar / theme colours ── */
-  --color-amber: #D4A843;
-  --color-amber-light: #FBF3E0;
-  --color-sky: #5B9BD5;
-  --color-sky-light: #E8F1FA;
-  --color-rose: #D4728C;
-  --color-rose-light: #FAE8EE;
-  --color-teal: #4A9B8E;
-  --color-teal-light: #E3F3F0;
-  --color-lavender: #9B8EC4;
-  --color-lavender-light: #F0ECF8;
-  --color-terracotta: #C67B5C;
-  --color-terracotta-light: #F8EDE8;
-  --color-slate: #6B7B8D;
-  --color-slate-light: #EBEEF1;
+  /* ── Avatar / theme colours (16 profile colours) ── */
+  --color-red: #E25555;
+  --color-burnt-orange: #E07A3A;
+  --color-amber: #E8A040;
+  --color-gold: #C5A833;
+  --color-leaf: #7BAE4E;
+  --color-emerald: #3A9E6E;
+  --color-teal: #3AADA0;
+  --color-sky: #4A9FCC;
+  --color-cobalt: #3A6FD4;
+  --color-indigo: #6558C7;
+  --color-purple: #9050B5;
+  --color-magenta: #C74E95;
+  --color-rose: #E06888;
+  --color-terracotta: #C47A5E;
+  --color-moss: #7C8A6E;
+  --color-slate: #7A8694;
 }
 
 @layer base {
