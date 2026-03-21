@@ -14,6 +14,7 @@ import Calendar      from './pages/Calendar';
 import Receipt       from './pages/Receipt';
 import Settings      from './pages/Settings';
 import FamilySetup   from './pages/FamilySetup';
+import Meals         from './pages/Meals';
 
 function RequireAuth({ children }) {
   const { token, needsHousehold } = useAuth();
@@ -42,6 +43,7 @@ function AppRoutes() {
       <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
       <Route path="/tasks" element={<RequireAuth><Layout><Tasks /></Layout></RequireAuth>} />
       <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
+      <Route path="/meals" element={<RequireAuth><Layout><Meals /></Layout></RequireAuth>} />
       <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
       <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
       <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />

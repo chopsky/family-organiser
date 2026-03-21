@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils } from './Icons';
 import ChatWidget from './ChatWidget';
 
 const mainNav = [
@@ -10,6 +10,7 @@ const mainNav = [
   { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
+  { to: '/meals',      label: 'Meals',     Icon: IconUtensils  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
   { to: '/family',     label: 'Family',    Icon: IconUsers     },
 ];
@@ -19,6 +20,7 @@ const mobileNav = [
   { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
+  { to: '/meals',      label: 'Meals',     Icon: IconUtensils  },
 ];
 
 const moreNav = [

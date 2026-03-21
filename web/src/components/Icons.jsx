@@ -75,6 +75,10 @@ export function IconMore(p) {
   return <Icon {...p}><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="5" r="1" fill="currentColor" /><circle cx="12" cy="19" r="1" fill="currentColor" /></Icon>;
 }
 
+export function IconUtensils(p) {
+  return <Icon {...p}><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" /></Icon>;
+}
+
 export function IconWave(p) {
   return <Icon {...p}><path d="M18.36 18.36A9 9 0 005.64 5.64" /><path d="M15.54 15.54A5 5 0 008.46 8.46" /><circle cx="12" cy="12" r="1" /></Icon>;
 }

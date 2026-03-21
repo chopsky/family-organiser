@@ -1425,6 +1425,222 @@ async function createCalendarEventFromSync(householdId, eventData, sourceUserId,
   return data;
 }
 
+// ─── Meal Plan ──────────────────────────────────────────────────────────────
+
+async function getMealPlanForWeek(householdId, startDate, endDate) {
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .select('*, recipes(*)')
+    .eq('household_id', householdId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date')
+    .order('category');
+  if (error) throw error;
+  return data;
+}
+
+async function getRecurringMeals(householdId) {
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('is_recurring', true);
+  if (error) throw error;
+  return data;
+}
+
+async function createMealPlanEntry(householdId, data, userId) {
+  const { data: meal, error } = await supabase
+    .from('meal_plan')
+    .insert({
+      household_id: householdId,
+      date: data.date,
+      category: data.category || 'dinner',
+      recipe_id: data.recipe_id || null,
+      meal_name: data.meal_name,
+      notes: data.notes || null,
+      is_recurring: data.is_recurring || false,
+      recurrence_day: data.recurrence_day !== undefined ? data.recurrence_day : null,
+      created_by: userId,
+    })
+    .select('*, recipes(*)')
+    .single();
+  if (error) throw error;
+  return meal;
+}
+
+async function updateMealPlanEntry(mealId, householdId, updates) {
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .update(updates)
+    .eq('id', mealId)
+    .eq('household_id', householdId)
+    .select('*, recipes(*)')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteMealPlanEntry(mealId, householdId) {
+  const { error } = await supabase
+    .from('meal_plan')
+    .delete()
+    .eq('id', mealId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+// ─── Recipes ────────────────────────────────────────────────────────────────
+
+async function getRecipes(householdId, filters = {}) {
+  let query = supabase
+    .from('recipes')
+    .select()
+    .eq('household_id', householdId);
+
+  if (filters.search) {
+    query = query.ilike('name', `%${filters.search}%`);
+  }
+  if (filters.category) {
+    query = query.eq('category', filters.category);
+  }
+  if (filters.tag) {
+    query = query.contains('dietary_tags', [filters.tag]);
+  }
+  if (filters.favourites) {
+    query = query.eq('is_favourite', true);
+  }
+
+  const { data, error } = await query.order('name');
+  if (error) throw error;
+  return data;
+}
+
+async function getRecipeById(recipeId, householdId) {
+  const { data, error } = await supabase
+    .from('recipes')
+    .select()
+    .eq('id', recipeId)
+    .eq('household_id', householdId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function createRecipe(householdId, recipeData) {
+  const { data, error } = await supabase
+    .from('recipes')
+    .insert({
+      household_id: householdId,
+      name: recipeData.name,
+      category: recipeData.category || null,
+      ingredients: recipeData.ingredients || [],
+      method: recipeData.method || [],
+      prep_time_mins: recipeData.prep_time_mins || null,
+      cook_time_mins: recipeData.cook_time_mins || null,
+      servings: recipeData.servings || null,
+      dietary_tags: recipeData.dietary_tags || [],
+      image_url: recipeData.image_url || null,
+      source_url: recipeData.source_url || null,
+      notes: recipeData.notes || null,
+      is_favourite: recipeData.is_favourite || false,
+      created_by: recipeData.created_by || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateRecipe(recipeId, householdId, updates) {
+  updates.updated_at = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('recipes')
+    .update(updates)
+    .eq('id', recipeId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteRecipe(recipeId, householdId) {
+  const { error } = await supabase
+    .from('recipes')
+    .delete()
+    .eq('id', recipeId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+// ─── Meal Categories ────────────────────────────────────────────────────────
+
+async function getMealCategories(householdId) {
+  const { data, error } = await supabase
+    .from('meal_categories')
+    .select()
+    .eq('household_id', householdId)
+    .order('sort_order');
+  if (error) throw error;
+  return data;
+}
+
+async function createDefaultMealCategories(householdId) {
+  const defaults = [
+    { household_id: householdId, name: 'Breakfast', colour: '#F5CBA7', sort_order: 0, active: true },
+    { household_id: householdId, name: 'Lunch', colour: '#A9DFBF', sort_order: 1, active: true },
+    { household_id: householdId, name: 'Dinner', colour: '#AED6F1', sort_order: 2, active: true },
+    { household_id: householdId, name: 'Snack', colour: '#D7BDE2', sort_order: 3, active: true },
+  ];
+  const { data, error } = await supabase
+    .from('meal_categories')
+    .insert(defaults)
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+async function updateMealCategory(categoryId, householdId, updates) {
+  const { data, error } = await supabase
+    .from('meal_categories')
+    .update(updates)
+    .eq('id', categoryId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getRecentMeals(householdId, days = 14) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .select()
+    .eq('household_id', householdId)
+    .gte('date', since.toISOString().split('T')[0])
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function getRecentPurchases(householdId, days = 14) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const { data, error } = await supabase
+    .from('shopping_items')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', true)
+    .gte('completed_at', since.toISOString())
+    .order('completed_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -1541,5 +1757,21 @@ module.exports = {
   deleteChildActivity,
   addChildSchoolEvent,
   getChildSchoolEvents,
+  // Meals
+  getMealPlanForWeek,
+  getRecurringMeals,
+  createMealPlanEntry,
+  updateMealPlanEntry,
+  deleteMealPlanEntry,
+  getRecipes,
+  getRecipeById,
+  createRecipe,
+  updateRecipe,
+  deleteRecipe,
+  getMealCategories,
+  createDefaultMealCategories,
+  updateMealCategory,
+  getRecentMeals,
+  getRecentPurchases,
   getSupabase: () => supabase,
 };
