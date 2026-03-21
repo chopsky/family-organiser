@@ -404,55 +404,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Card 5 — School this week (full width) */}
-      {schoolData.some(s => s.children?.length > 0) && (() => {
-        const DAY_LABELS_FULL = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        const todayDow = (now.getDay() + 6) % 7; // 0=Mon
-        const allActivities = [];
-        schoolData.forEach(s => {
-          (s.children || []).forEach(c => {
-            (c.activities || []).forEach(a => {
-              allActivities.push({ ...a, child_name: c.name, child_color: c.color_theme });
-            });
-          });
-        });
-        const weekDays = [0, 1, 2, 3, 4].map(d => ({
-          day: DAY_LABELS_FULL[d],
-          isToday: d === todayDow,
-          activities: allActivities.filter(a => a.day_of_week === d),
-        }));
-        if (allActivities.length === 0) return null;
-        return (
-          <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-semibold text-bark flex items-center gap-2">
-                🏫 School this week
-              </h2>
-              <Link to="/settings" className="text-xs font-medium text-primary hover:underline">View details →</Link>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {weekDays.map(({ day, isToday, activities }) => (
-                <div key={day} className={`text-center rounded-xl p-2.5 transition-colors ${isToday ? 'bg-plum-light border border-plum/20' : 'bg-white/50'}`}>
-                  <div className={`text-xs font-semibold mb-2 ${isToday ? 'text-plum' : 'text-cocoa'}`}>{day}</div>
-                  {activities.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {activities.map((a, i) => (
-                        <div key={i} className="text-[11px] text-bark">
-                          <span className="font-semibold">{a.child_name}</span>
-                          <div className="text-cocoa">{a.activity}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-cocoa/50">—</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
       {/* NL input modal */}
       {nlModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
