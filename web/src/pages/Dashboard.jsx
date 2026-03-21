@@ -203,8 +203,8 @@ export default function Dashboard() {
   function getEventDotColor(ev) {
     const member = getMemberForEvent(ev);
     if (member?.color_theme) return dotColors[member.color_theme] || 'bg-sage';
-    if (ev.source === 'sync' || ev.synced) return 'bg-sage';
-    return dotColors[ev.color] || 'bg-sage';
+    // Unassigned / synced events default to sage
+    return 'bg-sage';
   }
 
   // Shopping list last updated info
