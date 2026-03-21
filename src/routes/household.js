@@ -71,7 +71,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  * Regular members can only update their own profile.
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
-  const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'terracotta', 'slate'];
+  const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
   const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group } = req.body;
 
   // Determine target user — admins can edit others, members only themselves
