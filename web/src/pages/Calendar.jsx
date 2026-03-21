@@ -5,23 +5,32 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch } from '../components/Icons';
 
 const EVENT_COLORS = {
+  // New 16 profile colours
+  red:            { bg: 'bg-red/20',            border: 'border-red',            dot: 'bg-red',            text: 'text-red',            darkBg: 'bg-red/30' },
+  'burnt-orange': { bg: 'bg-burnt-orange/20',   border: 'border-burnt-orange',   dot: 'bg-burnt-orange',   text: 'text-burnt-orange',   darkBg: 'bg-burnt-orange/30' },
+  amber:          { bg: 'bg-amber/20',          border: 'border-amber',          dot: 'bg-amber',          text: 'text-amber',          darkBg: 'bg-amber/30' },
+  gold:           { bg: 'bg-gold/20',           border: 'border-gold',           dot: 'bg-gold',           text: 'text-gold',           darkBg: 'bg-gold/30' },
+  leaf:           { bg: 'bg-leaf/20',           border: 'border-leaf',           dot: 'bg-leaf',           text: 'text-leaf',           darkBg: 'bg-leaf/30' },
+  emerald:        { bg: 'bg-emerald/20',        border: 'border-emerald',        dot: 'bg-emerald',        text: 'text-emerald',        darkBg: 'bg-emerald/30' },
+  teal:           { bg: 'bg-teal/20',           border: 'border-teal',           dot: 'bg-teal',           text: 'text-teal',           darkBg: 'bg-teal/30' },
+  sky:            { bg: 'bg-sky/20',            border: 'border-sky',            dot: 'bg-sky',            text: 'text-sky',            darkBg: 'bg-sky/30' },
+  cobalt:         { bg: 'bg-cobalt/20',         border: 'border-cobalt',         dot: 'bg-cobalt',         text: 'text-cobalt',         darkBg: 'bg-cobalt/30' },
+  indigo:         { bg: 'bg-indigo/20',         border: 'border-indigo',         dot: 'bg-indigo',         text: 'text-indigo',         darkBg: 'bg-indigo/30' },
+  purple:         { bg: 'bg-purple/20',         border: 'border-purple',         dot: 'bg-purple',         text: 'text-purple',         darkBg: 'bg-purple/30' },
+  magenta:        { bg: 'bg-magenta/20',        border: 'border-magenta',        dot: 'bg-magenta',        text: 'text-magenta',        darkBg: 'bg-magenta/30' },
+  rose:           { bg: 'bg-rose/20',           border: 'border-rose',           dot: 'bg-rose',           text: 'text-rose',           darkBg: 'bg-rose/30' },
+  terracotta:     { bg: 'bg-terracotta/20',     border: 'border-terracotta',     dot: 'bg-terracotta',     text: 'text-terracotta',     darkBg: 'bg-terracotta/30' },
+  moss:           { bg: 'bg-moss/20',           border: 'border-moss',           dot: 'bg-moss',           text: 'text-moss',           darkBg: 'bg-moss/30' },
+  slate:          { bg: 'bg-slate/20',          border: 'border-slate',          dot: 'bg-slate',          text: 'text-slate',          darkBg: 'bg-slate/30' },
+  // Legacy fallbacks
   sage:       { bg: 'bg-sage/20',       border: 'border-sage',       dot: 'bg-sage',       text: 'text-sage',       darkBg: 'bg-sage/30' },
   plum:       { bg: 'bg-plum/20',       border: 'border-plum',       dot: 'bg-plum',       text: 'text-plum',       darkBg: 'bg-plum/30' },
   coral:      { bg: 'bg-coral/20',      border: 'border-coral',      dot: 'bg-coral',      text: 'text-coral',      darkBg: 'bg-coral/30' },
-  amber:      { bg: 'bg-amber/20',      border: 'border-amber',      dot: 'bg-amber',      text: 'text-amber',      darkBg: 'bg-amber/30' },
-  sky:        { bg: 'bg-sky/20',        border: 'border-sky',        dot: 'bg-sky',        text: 'text-sky',        darkBg: 'bg-sky/30' },
-  rose:       { bg: 'bg-rose/20',       border: 'border-rose',       dot: 'bg-rose',       text: 'text-rose',       darkBg: 'bg-rose/30' },
-  teal:       { bg: 'bg-teal/20',       border: 'border-teal',       dot: 'bg-teal',       text: 'text-teal',       darkBg: 'bg-teal/30' },
-  lavender:   { bg: 'bg-lavender/20',   border: 'border-lavender',   dot: 'bg-lavender',   text: 'text-lavender',   darkBg: 'bg-lavender/30' },
-  terracotta: { bg: 'bg-terracotta/20', border: 'border-terracotta', dot: 'bg-terracotta', text: 'text-terracotta', darkBg: 'bg-terracotta/30' },
-  slate:      { bg: 'bg-slate/20',      border: 'border-slate',      dot: 'bg-slate',      text: 'text-slate',      darkBg: 'bg-slate/30' },
-  // Legacy mappings for existing events with old colour values
-  orange: { bg: 'bg-amber/20', border: 'border-amber', dot: 'bg-amber', text: 'text-amber', darkBg: 'bg-amber/30' },
-  blue:   { bg: 'bg-sky/20',   border: 'border-sky',   dot: 'bg-sky',   text: 'text-sky',   darkBg: 'bg-sky/30' },
-  green:  { bg: 'bg-sage/20',  border: 'border-sage',  dot: 'bg-sage',  text: 'text-sage',  darkBg: 'bg-sage/30' },
-  purple: { bg: 'bg-plum/20',  border: 'border-plum',  dot: 'bg-plum',  text: 'text-plum',  darkBg: 'bg-plum/30' },
-  red:    { bg: 'bg-coral/20', border: 'border-coral',  dot: 'bg-coral', text: 'text-coral', darkBg: 'bg-coral/30' },
-  gray:   { bg: 'bg-slate/20', border: 'border-slate',  dot: 'bg-slate', text: 'text-slate', darkBg: 'bg-slate/30' },
+  lavender:   { bg: 'bg-indigo/20',     border: 'border-indigo',     dot: 'bg-indigo',     text: 'text-indigo',     darkBg: 'bg-indigo/30' },
+  orange:     { bg: 'bg-amber/20',      border: 'border-amber',      dot: 'bg-amber',      text: 'text-amber',      darkBg: 'bg-amber/30' },
+  blue:       { bg: 'bg-sky/20',        border: 'border-sky',        dot: 'bg-sky',        text: 'text-sky',        darkBg: 'bg-sky/30' },
+  green:      { bg: 'bg-sage/20',       border: 'border-sage',       dot: 'bg-sage',       text: 'text-sage',       darkBg: 'bg-sage/30' },
+  gray:       { bg: 'bg-slate/20',      border: 'border-slate',      dot: 'bg-slate',      text: 'text-slate',      darkBg: 'bg-slate/30' },
 };
 
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
