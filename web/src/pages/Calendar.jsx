@@ -586,13 +586,13 @@ export default function Calendar() {
     }
   }
 
-  // Resolve event colour: prefer assigned member's theme, fallback to stored color, then lavender
+  // Resolve event colour: prefer assigned member's theme, fallback to sage
   function getEventColor(ev) {
     if (ev.assigned_to_name) {
       const m = members.find(member => member.name === ev.assigned_to_name);
       if (m?.color_theme) return m.color_theme;
     }
-    return ev.color || 'lavender';
+    return 'sage';
   }
 
   async function deleteEvent(id) {
