@@ -280,14 +280,14 @@ export default function Dashboard() {
           {todayEvents.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">No events today</p>
           ) : (
-            <div className="space-y-2">
+            <div className="bg-white rounded-2xl border border-cream-border/60 divide-y divide-cream-border/50">
               {todayEvents
                 .sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date))
                 .slice(0, 6)
                 .map((ev, i) => {
                   const member = getMemberForEvent(ev);
                   return (
-                    <div key={ev.id || i} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-cream-border/60">
+                    <div key={ev.id || i} className="flex items-center gap-3 px-4 py-3.5">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${getEventDotColor(ev)}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-bark truncate">{ev.title}</p>
