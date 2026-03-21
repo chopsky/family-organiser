@@ -42,7 +42,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       db.getHouseholdById(req.householdId),
       db.getHouseholdMembers(req.householdId),
       db.getShoppingList(req.householdId),
-      db.getCalendarEvents(req.householdId, todayStr, todayStr),
+      db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59'),
       db.getMealPlanForWeek(req.householdId, weekStart, weekEnd),
     ]);
 
