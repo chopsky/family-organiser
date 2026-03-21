@@ -1536,7 +1536,7 @@ async function createRecipe(householdId, recipeData) {
       name: recipeData.name,
       category: recipeData.category || null,
       ingredients: recipeData.ingredients || [],
-      method: recipeData.method || [],
+      method: Array.isArray(recipeData.method) ? recipeData.method.join('\n') : (recipeData.method || null),
       prep_time_mins: recipeData.prep_time_mins || null,
       cook_time_mins: recipeData.cook_time_mins || null,
       servings: recipeData.servings || null,

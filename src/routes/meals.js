@@ -231,7 +231,7 @@ router.post('/meals/accept-suggestion', requireAuth, requireHousehold, async (re
       cook_time_mins: suggestion.cook_time_mins || null,
       servings: suggestion.servings || null,
       dietary_tags: suggestion.dietary_tags || [],
-      created_by: req.user.id,
+      source_type: 'ai_generated',
     });
 
     // 2. Create meal plan entry linked to the recipe
@@ -430,7 +430,7 @@ router.post('/recipes', requireAuth, requireHousehold, async (req, res) => {
       image_url: image_url || null,
       notes: notes || null,
       is_favourite: is_favourite || false,
-      created_by: req.user.id,
+      source_type: 'manual',
     });
 
     return res.status(201).json({ recipe });
@@ -545,7 +545,7 @@ ${pageText}` }],
       dietary_tags: parsed.dietary_tags || [],
       image_url: parsed.image_url || null,
       source_url: url.trim(),
-      created_by: req.user.id,
+      source_type: 'url',
     });
 
     return res.status(201).json({ recipe });
@@ -629,7 +629,7 @@ Rules:
       cook_time_mins: parsed.cook_time_mins || null,
       servings: parsed.servings || null,
       dietary_tags: parsed.dietary_tags || [],
-      created_by: req.user.id,
+      source_type: 'photo',
     });
 
     return res.status(201).json({ recipe });
@@ -695,7 +695,7 @@ Return ONLY valid JSON:
       cook_time_mins: parsed.cook_time_mins || null,
       servings: parsed.servings || null,
       dietary_tags: parsed.dietary_tags || [],
-      created_by: req.user.id,
+      source_type: 'ai_generated',
     });
 
     return res.status(201).json({ recipe });
