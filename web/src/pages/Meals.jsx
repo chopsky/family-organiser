@@ -153,11 +153,11 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
     setWeekStart(getMonday(new Date()));
   }
 
-  // Get meal for a specific cell
-  function getMeal(date, category) {
+  // Get all meals for a specific cell
+  function getMealsForCell(date, category) {
     const ds = toDateStr(date);
     const catLower = category.toLowerCase();
-    return meals.find(m => m.date === ds && m.category?.toLowerCase() === catLower);
+    return meals.filter(m => m.date === ds && m.category?.toLowerCase() === catLower);
   }
 
   // Delete meal
@@ -349,28 +349,30 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                           </span>
                         </td>
                         {weekDates.map((date, i) => {
-                          const meal = getMeal(date, category);
+                          const cellMeals = getMealsForCell(date, category);
                           const isToday = toDateStr(date) === toDateStr(today);
                           return (
                             <td
                               key={i}
                               className={`py-1.5 px-1.5 border-b border-l border-cream-border align-top min-w-[90px] ${isToday ? 'bg-oat/30' : ''}`}
                             >
-                              {meal ? (
-                                <button
-                                  onClick={() => setDetailMeal(meal)}
-                                  className={`w-full text-left p-1.5 rounded-lg text-xs font-medium transition-all hover:shadow-sm ${colors.light} ${colors.text} ${colors.border} border`}
-                                >
-                                  <span className="line-clamp-2">{meal.meal_name}</span>
-                                </button>
-                              ) : (
+                              <div className="flex flex-col gap-1">
+                                {cellMeals.map(meal => (
+                                  <button
+                                    key={meal.id}
+                                    onClick={() => setDetailMeal(meal)}
+                                    className={`w-full text-left p-1.5 rounded-lg text-xs font-medium transition-all hover:shadow-sm ${colors.light} ${colors.text} ${colors.border} border`}
+                                  >
+                                    <span className="line-clamp-2">{meal.meal_name}</span>
+                                  </button>
+                                ))}
                                 <button
                                   onClick={() => { setPickerCell({ date: toDateStr(date), category }); setEditingMeal(null); }}
-                                  className="w-full h-10 rounded-lg border border-dashed border-cream-border text-cocoa/40 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center group"
+                                  className={`w-full rounded-lg border border-dashed border-cream-border text-cocoa/40 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center ${cellMeals.length > 0 ? 'h-6' : 'h-10'}`}
                                 >
-                                  <span className="text-lg leading-none">+</span>
+                                  <span className={`leading-none ${cellMeals.length > 0 ? 'text-sm' : 'text-lg'}`}>+</span>
                                 </button>
-                              )}
+                              </div>
                             </td>
                           );
                         })}
