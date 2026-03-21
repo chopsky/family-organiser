@@ -378,34 +378,29 @@ export default function Dashboard() {
             <h2 className="font-display font-semibold text-bark">This week's meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
-          <div className="space-y-0">
-            {weekDinners.map((day) => {
-              const mealColors = day.meal ? {
-                bg: day.isToday ? 'bg-[#AED6F1]/20' : 'bg-white',
-              } : {};
-              return (
-                <div
-                  key={day.dateStr}
-                  className={`flex items-center gap-3 py-2.5 border-b border-cream-border/50 last:border-0 ${day.isToday ? 'rounded-lg bg-[#AED6F1]/10 -mx-2 px-2' : ''}`}
-                >
-                  <span className={`text-[11px] font-bold w-8 shrink-0 ${day.isToday ? 'text-[#1F5F8B]' : 'text-cocoa'}`}>
-                    {day.label}
-                  </span>
-                  {day.meal ? (
-                    <div className="flex-1 flex items-center justify-between min-w-0">
-                      <span className="text-sm font-medium text-bark truncate">{day.meal.meal_name}</span>
-                      {(day.meal.recipe?.prep_time_mins || day.meal.prep_time_mins) && (
-                        <span className="shrink-0 text-[10px] font-medium text-sage bg-sage-light px-2 py-0.5 rounded-full ml-2">
-                          {day.meal.recipe?.prep_time_mins || day.meal.prep_time_mins} min
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-sm italic text-cocoa/60">Not planned yet</span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="space-y-2">
+            {weekDinners.map((day) => (
+              <div
+                key={day.dateStr}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${day.isToday ? 'bg-plum-light' : 'bg-cream'}`}
+              >
+                <span className={`text-[11px] font-bold w-8 shrink-0 ${day.isToday ? 'text-primary' : 'text-cocoa'}`}>
+                  {day.label}
+                </span>
+                {day.meal ? (
+                  <div className="flex-1 flex items-center justify-between min-w-0">
+                    <span className="text-sm font-medium text-bark truncate">{day.meal.meal_name}</span>
+                    {(day.meal.recipe?.prep_time_mins || day.meal.prep_time_mins) && (
+                      <span className="shrink-0 text-[10px] font-medium text-sage bg-sage-light px-2 py-0.5 rounded-full ml-2">
+                        {day.meal.recipe?.prep_time_mins || day.meal.prep_time_mins} min
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-sm italic text-cocoa/60">Not planned yet</span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
