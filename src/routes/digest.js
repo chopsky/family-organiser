@@ -16,15 +16,12 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
 
-    // Monday–Sunday of the current week
-    const dayOfWeek = today.getDay(); // 0 = Sunday
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + mondayOffset);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const weekStart = monday.toISOString().slice(0, 10);
-    const weekEnd = sunday.toISOString().slice(0, 10);
+    // Meals: today + next 6 days (covers the dashboard's "today + 3 days" view
+    // even when it spans across a Mon-Sun week boundary)
+    const mealsEnd = new Date(today);
+    mealsEnd.setDate(today.getDate() + 6);
+    const weekStart = todayStr;
+    const weekEnd = mealsEnd.toISOString().slice(0, 10);
 
     const [
       { tasks: completedTasks, shoppingItems: completedShopping },
