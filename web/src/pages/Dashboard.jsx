@@ -256,14 +256,14 @@ export default function Dashboard() {
           onClick={() => navigate('/shopping')}
           className="flex items-center gap-1.5 px-4 py-2.5 bg-linen border border-cream-border rounded-full text-sm font-medium text-bark hover:shadow-sm hover:border-primary/30 transition-all"
         >
-          <svg className="h-4 w-4 text-cocoa" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
+          <svg className="h-4 w-4 text-sage" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
           Grocery list
         </button>
         <button
           onClick={() => navigate('/shopping?scan=1')}
           className="flex items-center gap-1.5 px-4 py-2.5 bg-linen border border-cream-border rounded-full text-sm font-medium text-bark hover:shadow-sm hover:border-primary/30 transition-all"
         >
-          <svg className="h-4 w-4 text-cocoa" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M7 15h0M2 9.5h20" /></svg>
+          <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
           Scan receipt
         </button>
       </div>
