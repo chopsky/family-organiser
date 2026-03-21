@@ -175,9 +175,9 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   // Add ingredients to shopping list
   async function addToShoppingList(mealIds) {
     try {
-      await api.post('/meals/to-shopping-list', { meal_ids: mealIds });
+      const res = await api.post('/meals/to-shopping-list', { meal_ids: mealIds });
       setError(''); // clear any previous
-      alert('Ingredients added to shopping list!');
+      setShoppingListSummary(res.data);
     } catch {
       setError('Could not add to shopping list.');
     }
@@ -186,12 +186,15 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   // Add entire week to shopping list
   async function addWeekToShoppingList() {
     try {
-      await api.post('/meals/to-shopping-list', { week: weekParam });
-      alert('All ingredients added to shopping list!');
+      const res = await api.post('/meals/to-shopping-list', { week: weekParam });
+      setShoppingListSummary(res.data);
     } catch {
       setError('Could not add to shopping list.');
     }
   }
+
+  // Shopping list summary modal
+  const [shoppingListSummary, setShoppingListSummary] = useState(null); // { added, skipped, summary }
 
   // Suggest meals (AI) — shows a modal with suggestions for empty dinner slots
   const [suggestResults, setSuggestResults] = useState(null); // { suggestions: [...], emptySlots: [...] }
@@ -238,10 +241,10 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
     if (toAdd.length === 0) { setSuggestResults(null); return; }
     try {
       for (const slot of toAdd) {
-        await api.post('/meals', {
+        await api.post('/meals/accept-suggestion', {
           date: slot.date,
           category: 'dinner',
-          meal_name: slot.suggestion.meal_name || slot.suggestion.name,
+          suggestion: slot.suggestion,
         });
       }
       setSuggestResults(null);
@@ -257,6 +260,13 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
 
   // Handle meal selected from picker
   async function handleMealPicked(data) {
+    // null signals that the meal was already saved (e.g. via accept-suggestion), just reload
+    if (data === null) {
+      setPickerCell(null);
+      setEditingMeal(null);
+      await loadMeals();
+      return;
+    }
     try {
       const categoryLower = pickerCell.category.toLowerCase();
       if (editingMeal) {
@@ -424,6 +434,70 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
         />
       )}
 
+      {/* Shopping List Summary Modal */}
+      {shoppingListSummary && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-bark">Shopping List Updated</h3>
+                <p className="text-xs text-cocoa mt-0.5">{shoppingListSummary.summary}</p>
+              </div>
+              <button onClick={() => setShoppingListSummary(null)} className="text-cocoa hover:text-bark p-1 transition-colors">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {shoppingListSummary.added?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-bark mb-2 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-success/20 text-success flex items-center justify-center text-xs">+</span>
+                    Items added ({shoppingListSummary.added.length})
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {shoppingListSummary.added.map((item, i) => (
+                      <li key={i} className="text-sm text-bark bg-white rounded-lg border border-cream-border px-3 py-2">
+                        {item.quantity && <span className="font-medium">{item.quantity}</span>}
+                        {item.unit && <span> {item.unit}</span>}
+                        {(item.quantity || item.unit) && <span> </span>}
+                        {item.item || item.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {shoppingListSummary.skipped?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-cocoa mb-2 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-oat text-cocoa flex items-center justify-center text-xs">-</span>
+                    Skipped ({shoppingListSummary.skipped.length})
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {shoppingListSummary.skipped.map((item, i) => (
+                      <li key={i} className="text-sm text-cocoa bg-oat/50 rounded-lg px-3 py-2">
+                        {item.item || item.name}
+                        {item.reason && <span className="text-xs text-cocoa/60 ml-1">({item.reason})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(!shoppingListSummary.added || shoppingListSummary.added.length === 0) && (!shoppingListSummary.skipped || shoppingListSummary.skipped.length === 0) && (
+                <p className="text-center text-cocoa text-sm py-4">{shoppingListSummary.summary || 'No ingredients to add.'}</p>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-cream-border shrink-0">
+              <button
+                onClick={() => setShoppingListSummary(null)}
+                className="w-full py-3 bg-primary hover:bg-primary-pressed text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Suggestions modal */}
       {suggestResults && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -461,7 +535,12 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                         <p className="text-xs text-cocoa mt-0.5">{slot.suggestion.description}</p>
                       )}
                       {slot.suggestion.prep_time_mins && (
-                        <p className="text-xs text-cocoa/60 mt-0.5">⏱ {slot.suggestion.prep_time_mins} mins</p>
+                        <p className="text-xs text-cocoa/60 mt-0.5">⏱ {slot.suggestion.prep_time_mins} mins{slot.suggestion.cook_time_mins ? ` · ${slot.suggestion.cook_time_mins} mins cook` : ''}</p>
+                      )}
+                      {slot.suggestion.ingredients?.length > 0 && (
+                        <p className="text-xs text-cocoa/60 mt-0.5 line-clamp-1">
+                          Ingredients: {slot.suggestion.ingredients.slice(0, 4).map(ing => ing.name).join(', ')}{slot.suggestion.ingredients.length > 4 ? ` +${slot.suggestion.ingredients.length - 4} more` : ''}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -664,8 +743,18 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
     }
   }
 
-  function acceptAiSuggestion(suggestion) {
-    onSelect({ meal_name: suggestion.meal_name || suggestion.name, recipe_id: suggestion.recipe_id || undefined });
+  async function acceptAiSuggestion(suggestion) {
+    try {
+      await api.post('/meals/accept-suggestion', {
+        date: cell.date,
+        category: cell.category.toLowerCase(),
+        suggestion,
+      });
+      // Signal parent to reload (null = already saved, just refresh)
+      onSelect(null);
+    } catch {
+      setError('Could not save suggested meal.');
+    }
   }
 
   return (
@@ -720,13 +809,20 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
                   <p className="text-center text-cocoa text-sm py-6">No recipes found for {cell.category}.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {recipes.map(recipe => (
+                    {[...recipes].sort((a, b) => {
+                      const aFav = a.is_favourite || a.favourite ? 1 : 0;
+                      const bFav = b.is_favourite || b.favourite ? 1 : 0;
+                      return bFav - aFav;
+                    }).map(recipe => (
                       <li key={recipe.id}>
                         <button
                           onClick={() => selectRecipe(recipe)}
                           className="w-full text-left bg-white rounded-xl border border-cream-border p-3 hover:shadow-sm hover:border-primary/30 transition-all"
                         >
-                          <p className="text-sm font-semibold text-bark">{recipe.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-bark">{recipe.name}</p>
+                            {(recipe.is_favourite || recipe.favourite) && <span className="text-xs" title="Favourite">⭐</span>}
+                          </div>
                           <div className="flex items-center gap-2 mt-1 text-xs text-cocoa">
                             {recipe.prep_time_mins && <span>Prep: {recipe.prep_time_mins}m</span>}
                             {recipe.cook_time_mins && <span>Cook: {recipe.cook_time_mins}m</span>}
@@ -801,7 +897,12 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-bark">{s.meal_name || s.name}</p>
                             {(s.description || s.reason) && <p className="text-xs text-cocoa mt-1">{s.description || s.reason}</p>}
-                            {s.prep_time_mins && <p className="text-xs text-cocoa/60 mt-0.5">⏱ {s.prep_time_mins} mins</p>}
+                            {s.prep_time_mins && <p className="text-xs text-cocoa/60 mt-0.5">⏱ {s.prep_time_mins} mins prep{s.cook_time_mins ? ` · ${s.cook_time_mins} mins cook` : ''}</p>}
+                            {s.ingredients?.length > 0 && (
+                              <p className="text-xs text-cocoa/60 mt-1 line-clamp-2">
+                                Ingredients: {s.ingredients.slice(0, 5).map(ing => ing.name).join(', ')}{s.ingredients.length > 5 ? ` +${s.ingredients.length - 5} more` : ''}
+                              </p>
+                            )}
                           </div>
                           <button
                             onClick={() => acceptAiSuggestion(s)}
@@ -1067,7 +1168,15 @@ function RecipeBoxView({ setError }) {
           </div>
 
           {recipes.length === 0 && (
-            <p className="text-center text-cocoa py-8 text-sm">No recipes found. Add your first recipe!</p>
+            <div className="text-center py-8">
+              <p className="text-cocoa text-sm mb-4">No recipes found. Add your first recipe!</p>
+              <button
+                onClick={() => setAddModalOpen(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-pressed text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                <IconPlus className="h-4 w-4" /> Add your first recipe
+              </button>
+            </div>
           )}
         </>
       )}
@@ -1485,6 +1594,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
   const [servingsMultiplier, setServingsMultiplier] = useState(1);
   const [checkedIngredients, setCheckedIngredients] = useState(new Set());
   const [addingToList, setAddingToList] = useState(false);
+  const [shoppingListResult, setShoppingListResult] = useState(null);
   const [addingToPlan, setAddingToPlan] = useState(false);
   const [planDay, setPlanDay] = useState('');
   const [planCategory, setPlanCategory] = useState(recipe.category || 'Dinner');
@@ -1538,8 +1648,8 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
     setAddingToList(true);
     try {
       // Post ingredients to shopping list via the recipe
-      await api.post('/meals/to-shopping-list', { recipe_id: recipe.id, servings_multiplier: servingsMultiplier });
-      alert('Ingredients added to shopping list!');
+      const res = await api.post('/meals/to-shopping-list', { recipe_id: recipe.id, servings_multiplier: servingsMultiplier });
+      setShoppingListResult(res.data);
     } catch {
       setError('Could not add ingredients to shopping list.');
     } finally {
@@ -1691,6 +1801,44 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
               {addingToPlan ? 'Adding...' : 'Add to Plan'}
             </button>
           </div>
+
+          {/* Shopping list result */}
+          {shoppingListResult && (
+            <div className="bg-white rounded-xl border border-cream-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-bark">Shopping List Updated</h4>
+                <button onClick={() => setShoppingListResult(null)} className="text-xs text-cocoa hover:text-bark">Dismiss</button>
+              </div>
+              <p className="text-xs text-cocoa">{shoppingListResult.summary}</p>
+              {shoppingListResult.added?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-bark mb-1">Added ({shoppingListResult.added.length}):</p>
+                  <ul className="space-y-1">
+                    {shoppingListResult.added.map((item, i) => (
+                      <li key={i} className="text-xs text-cocoa bg-success/10 rounded-lg px-2.5 py-1.5">
+                        {item.quantity && <span className="font-medium">{item.quantity}</span>}
+                        {item.unit && <span> {item.unit}</span>}
+                        {(item.quantity || item.unit) && <span> </span>}
+                        {item.item || item.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {shoppingListResult.skipped?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-cocoa mb-1">Skipped ({shoppingListResult.skipped.length}):</p>
+                  <ul className="space-y-1">
+                    {shoppingListResult.skipped.map((item, i) => (
+                      <li key={i} className="text-xs text-cocoa/70 bg-oat/50 rounded-lg px-2.5 py-1.5">
+                        {item.item || item.name}{item.reason && <span className="ml-1">({item.reason})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-cream-border">

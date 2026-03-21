@@ -173,7 +173,11 @@ Return ONLY valid JSON:
       "category": "breakfast|lunch|dinner|snack",
       "description": "Brief description",
       "prep_time_mins": 15,
-      "dietary_tags": ["vegetarian"]
+      "cook_time_mins": 30,
+      "servings": 4,
+      "dietary_tags": ["vegetarian"],
+      "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc"}],
+      "method": ["Step 1...", "Step 2..."]
     }
   ]
 }`;
@@ -197,6 +201,52 @@ Return ONLY valid JSON:
     return res.json(parsed);
   } catch (err) {
     console.error('POST /api/meals/suggest error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Accept AI Suggestion ───────────────────────────────────────────────────
+
+/**
+ * POST /api/meals/accept-suggestion
+ * Accept an AI suggestion: creates a recipe in the Recipe Box and
+ * a meal plan entry linked to that recipe.
+ * Body: { date, category, suggestion: { meal_name, category, description, prep_time_mins, cook_time_mins, servings, dietary_tags, ingredients, method } }
+ */
+router.post('/meals/accept-suggestion', requireAuth, requireHousehold, async (req, res) => {
+  const { date, category, suggestion } = req.body;
+
+  if (!date || !suggestion?.meal_name?.trim()) {
+    return res.status(400).json({ error: 'date and suggestion with meal_name are required' });
+  }
+
+  try {
+    // 1. Create recipe in the Recipe Box
+    const recipe = await db.createRecipe(req.householdId, {
+      name: suggestion.meal_name.trim(),
+      category: (suggestion.category || category || 'dinner').toLowerCase(),
+      ingredients: suggestion.ingredients || [],
+      method: suggestion.method || [],
+      prep_time_mins: suggestion.prep_time_mins || null,
+      cook_time_mins: suggestion.cook_time_mins || null,
+      servings: suggestion.servings || null,
+      dietary_tags: suggestion.dietary_tags || [],
+      created_by: req.user.id,
+    });
+
+    // 2. Create meal plan entry linked to the recipe
+    const meal = await db.createMealPlanEntry(req.householdId, {
+      date,
+      category: (category || suggestion.category || 'dinner').toLowerCase(),
+      recipe_id: recipe.id,
+      meal_name: suggestion.meal_name.trim(),
+      notes: suggestion.description || null,
+      is_recurring: false,
+    }, req.user.id);
+
+    return res.status(201).json({ meal, recipe });
+  } catch (err) {
+    console.error('POST /api/meals/accept-suggestion error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
