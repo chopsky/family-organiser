@@ -193,17 +193,66 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
     }
   }
 
-  // Suggest meals (AI)
+  // Suggest meals (AI) — shows a modal with suggestions for empty dinner slots
+  const [suggestResults, setSuggestResults] = useState(null); // { suggestions: [...], emptySlots: [...] }
+
   async function suggestMeals() {
     setSuggesting(true);
     try {
-      await api.post('/meals/suggest', { week: weekParam });
-      await loadMeals();
+      // Find empty dinner slots for the week
+      const emptySlots = [];
+      for (const date of weekDates) {
+        const ds = toDateStr(date);
+        if (!meals.find(m => m.date === ds && m.category?.toLowerCase() === 'dinner')) {
+          emptySlots.push({ date: ds, dayLabel: DAY_HEADERS[weekDates.indexOf(date)] + ' ' + date.getDate() });
+        }
+      }
+      if (emptySlots.length === 0) {
+        setError('All dinner slots are filled! Clear some slots first.');
+        setSuggesting(false);
+        return;
+      }
+      const res = await api.post('/meals/suggest', { category: 'dinner', count: emptySlots.length });
+      const suggestions = res.data.suggestions ?? [];
+      if (suggestions.length === 0) {
+        setError('No suggestions were returned. Try again.');
+      } else {
+        // Pair suggestions with empty slots
+        const paired = emptySlots.map((slot, i) => ({
+          ...slot,
+          suggestion: suggestions[i] || suggestions[suggestions.length - 1],
+          accepted: true,
+        }));
+        setSuggestResults(paired);
+      }
     } catch {
       setError('Could not generate suggestions.');
     } finally {
       setSuggesting(false);
     }
+  }
+
+  async function acceptSuggestions() {
+    if (!suggestResults) return;
+    const toAdd = suggestResults.filter(s => s.accepted);
+    if (toAdd.length === 0) { setSuggestResults(null); return; }
+    try {
+      for (const slot of toAdd) {
+        await api.post('/meals', {
+          date: slot.date,
+          category: 'dinner',
+          meal_name: slot.suggestion.meal_name || slot.suggestion.name,
+        });
+      }
+      setSuggestResults(null);
+      await loadMeals();
+    } catch {
+      setError('Could not save suggested meals.');
+    }
+  }
+
+  function toggleSuggestion(index) {
+    setSuggestResults(prev => prev.map((s, i) => i === index ? { ...s, accepted: !s.accepted } : s));
   }
 
   // Handle meal selected from picker
@@ -373,6 +422,69 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
           onClose={() => { setPickerCell(null); setEditingMeal(null); }}
           setError={setError}
         />
+      )}
+
+      {/* AI Suggestions modal */}
+      {suggestResults && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-bark">Dinner Suggestions</h3>
+                <p className="text-xs text-cocoa mt-0.5">AI-picked meals for your empty dinner slots</p>
+              </div>
+              <button onClick={() => setSuggestResults(null)} className="text-cocoa hover:text-bark p-1 transition-colors">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {suggestResults.map((slot, i) => (
+                <div
+                  key={i}
+                  className={`bg-white rounded-xl border p-3.5 transition-all cursor-pointer ${
+                    slot.accepted ? 'border-primary/40 shadow-sm' : 'border-cream-border opacity-50'
+                  }`}
+                  onClick={() => toggleSuggestion(i)}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                      slot.accepted ? 'bg-primary border-primary text-white' : 'border-cream-border'
+                    }`}>
+                      {slot.accepted && <span className="text-xs">✓</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-cocoa bg-oat px-2 py-0.5 rounded-lg">{slot.dayLabel}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-bark mt-1">{slot.suggestion.meal_name || slot.suggestion.name}</p>
+                      {slot.suggestion.description && (
+                        <p className="text-xs text-cocoa mt-0.5">{slot.suggestion.description}</p>
+                      )}
+                      {slot.suggestion.prep_time_mins && (
+                        <p className="text-xs text-cocoa/60 mt-0.5">⏱ {slot.suggestion.prep_time_mins} mins</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-4 border-t border-cream-border shrink-0 flex gap-3">
+              <button
+                onClick={() => setSuggestResults(null)}
+                className="flex-1 py-3 bg-oat hover:bg-cream-border text-bark rounded-xl text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={acceptSuggestions}
+                disabled={!suggestResults.some(s => s.accepted)}
+                className="flex-1 py-3 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                Add {suggestResults.filter(s => s.accepted).length} to plan
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
