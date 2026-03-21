@@ -166,23 +166,21 @@ export default function Dashboard() {
   });
   const shoppingGroups = Object.entries(shoppingByCategory).slice(0, 4);
 
-  // This week's dinners (Mon–Sun)
-  const monday = getMonday(now);
-  const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  const weekDinners = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+  // This week's dinners — today + next 3 days
+  const DAY_LABELS_FULL = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const weekDinners = Array.from({ length: 4 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const meal = weekMeals.find(m => m.date === dateStr && m.category?.toLowerCase() === 'dinner');
     return {
-      label: DAY_LABELS[i],
+      label: DAY_LABELS_FULL[d.getDay()],
       dateStr,
-      isPast: dateStr < todayDate,
       isToday: dateStr === todayDate,
       meal,
     };
-  }).filter(d => !d.isPast || d.isToday).slice(0, 4);
+  });
 
   // Find member info for events
   function getMemberForEvent(ev) {
