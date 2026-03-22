@@ -250,7 +250,7 @@ To delete a note:
 \`\`\`json
 {"action": "fetch_weather"}
 \`\`\`
-Include this when the user asks about the weather, temperature, or if they need an umbrella/jacket.
+Include this when the user asks about the weather, temperature, or if they need an umbrella/jacket. IMPORTANT: Do NOT include any weather details, temperatures, or forecasts in your response text — the system will fetch real-time data and append it automatically. Just say something brief like "Let me check the weather for you!" and include the action block.
 
 Only include JSON action blocks when performing an action. Never include them in normal conversational responses. You may include multiple action blocks in a single response if the user asks for multiple things.
 
