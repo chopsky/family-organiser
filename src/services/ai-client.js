@@ -1,7 +1,7 @@
 /**
  * Unified AI client with automatic failover.
  *
- * Primary: Gemini 3.1 Pro (Google) — fast, great reasoning
+ * Primary: Gemini 2.5 Flash (Google) — fast, smart, great value
  * Fallback 1: Claude (Anthropic) — excellent tone, structured output
  * Fallback 2: GPT-4o (OpenAI) — reliable backup
  */
@@ -10,7 +10,7 @@ const { GoogleGenAI } = require('@google/genai');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 
-const GEMINI_MODEL = 'gemini-3.1-pro-preview';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const GPT_MODEL = 'gpt-4o';
 const DEFAULT_TIMEOUT_MS = 12000; // abort after 12s for chat
