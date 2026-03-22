@@ -1,17 +1,24 @@
 /**
- * Unified AI client with automatic failover from Claude to GPT-4o.
+ * Unified AI client with automatic failover.
  *
- * Primary: Claude (Anthropic) — better tone, extended thinking
- * Fallback: GPT-4o (OpenAI) — used when Claude is down or slow
+ * Primary: Gemini 3.1 Pro (Google) — fast, great reasoning
+ * Fallback 1: Claude (Anthropic) — excellent tone, structured output
+ * Fallback 2: GPT-4o (OpenAI) — reliable backup
  */
 require('dotenv').config();
+const { GoogleGenAI } = require('@google/genai');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 
+const GEMINI_MODEL = 'gemini-3.1-pro-preview';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const GPT_MODEL = 'gpt-4o';
-const DEFAULT_TIMEOUT_MS = 12000; // abort Claude after 12s for chat
+const DEFAULT_TIMEOUT_MS = 12000; // abort after 12s for chat
 const LONG_TIMEOUT_MS = 30000;   // 30s for complex tasks (imports, scraping)
+
+function getGeminiClient() {
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+}
 
 function getAnthropicClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -41,9 +48,67 @@ function isTransient(err) {
 }
 
 /**
+ * Call Gemini 3.1 Pro. Returns { text, provider }.
+ * Converts Claude-style messages to Gemini format.
+ */
+async function callGemini({ system, messages, maxTokens = 2048, timeoutMs }) {
+  const client = getGeminiClient();
+  const timeout = timeoutMs || DEFAULT_TIMEOUT_MS;
+
+  // Build Gemini contents from Claude-style messages
+  const contents = [];
+  for (const msg of messages) {
+    const role = msg.role === 'assistant' ? 'model' : 'user';
+    if (typeof msg.content === 'string') {
+      contents.push({ role, parts: [{ text: msg.content }] });
+    } else if (Array.isArray(msg.content)) {
+      const parts = msg.content.map((block) => {
+        if (block.type === 'text') {
+          return { text: block.text };
+        } else if (block.type === 'image') {
+          return {
+            inlineData: {
+              mimeType: block.source.media_type,
+              data: block.source.data,
+            },
+          };
+        }
+        return { text: JSON.stringify(block) };
+      });
+      contents.push({ role, parts });
+    }
+  }
+
+  // Use AbortController for timeout
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await client.models.generateContent({
+      model: GEMINI_MODEL,
+      contents,
+      config: {
+        systemInstruction: system,
+        maxOutputTokens: maxTokens,
+      },
+    }, { signal: controller.signal });
+
+    clearTimeout(timer);
+
+    const text = response.text;
+    if (!text) throw new Error('No text in Gemini response');
+
+    return { text, provider: 'gemini' };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+/**
  * Call Claude with a timeout. Returns { text, provider }.
  */
-async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = true }) {
+async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false }) {
   const client = getAnthropicClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
@@ -56,7 +121,6 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
       messages,
     };
 
-    // Only enable thinking for conversational tasks — skip it for structured data extraction
     if (useThinking) {
       params.thinking = { type: 'adaptive' };
     }
@@ -83,20 +147,16 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
 async function callGPT({ system, messages, maxTokens = 2048 }) {
   const client = getOpenAIClient();
 
-  // Build OpenAI-style messages
   const gptMessages = [{ role: 'system', content: system }];
 
   for (const msg of messages) {
     if (typeof msg.content === 'string') {
       gptMessages.push({ role: msg.role, content: msg.content });
     } else if (Array.isArray(msg.content)) {
-      // Convert Claude content blocks to OpenAI format
       const parts = msg.content.map((block) => {
         if (block.type === 'text') {
           return { type: 'text', text: block.text };
         } else if (block.type === 'image') {
-          // Claude: { type: 'base64', media_type, data }
-          // OpenAI: { type: 'image_url', image_url: { url: 'data:mime;base64,...' } }
           const dataUrl = `data:${block.source.media_type};base64,${block.source.data}`;
           return { type: 'image_url', image_url: { url: dataUrl } };
         }
@@ -120,15 +180,25 @@ async function callGPT({ system, messages, maxTokens = 2048 }) {
 
 /**
  * Call AI with automatic failover.
- * Tries Claude first; if it fails with a transient error or times out, falls back to GPT-4o.
+ * Tries Gemini first; if it fails, falls back to Claude, then GPT-4o.
  *
  * @param {object} opts
  * @param {string} opts.system - System prompt
- * @param {Array} opts.messages - Claude-format messages (works for both providers)
+ * @param {Array} opts.messages - Claude-format messages (works for all providers)
  * @param {number} [opts.maxTokens=2048]
  * @returns {Promise<{ text: string, provider: string }>}
  */
 async function callWithFailover(opts) {
+  // Try Gemini first (if API key is set)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await callGemini(opts);
+    } catch (err) {
+      console.warn(`[ai-failover] Gemini failed (${err.message || err.code}), falling back to Claude`);
+    }
+  }
+
+  // Try Claude
   try {
     return await callClaude(opts);
   } catch (err) {
@@ -147,9 +217,11 @@ async function callWithFailover(opts) {
 
 module.exports = {
   callWithFailover,
+  callGemini,
   callClaude,
   callGPT,
   isTransient,
+  GEMINI_MODEL,
   CLAUDE_MODEL,
   GPT_MODEL,
   LONG_TIMEOUT_MS,
