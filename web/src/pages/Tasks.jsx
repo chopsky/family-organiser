@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconUser, IconCalendar } from '../components/Icons';
@@ -52,6 +53,7 @@ function BellIcon({ className = 'h-3 w-3' }) {
 }
 
 export default function Tasks() {
+  const { user } = useAuth();
   const [tasks, setTasks]       = useState([]);
   const [recentDone, setRecentDone] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -138,7 +140,14 @@ export default function Tasks() {
       if (!groups[key]) groups[key] = [];
       groups[key].push(task);
     }
-    const entries = memberNames.filter((n) => groups[n]?.length > 0).map((n) => [n, groups[n]]);
+    // Put logged-in user's tasks first
+    const currentUserName = user?.name;
+    const sorted = [...memberNames].sort((a, b) => {
+      if (a === currentUserName) return -1;
+      if (b === currentUserName) return 1;
+      return 0;
+    });
+    const entries = sorted.filter((n) => groups[n]?.length > 0).map((n) => [n, groups[n]]);
     if (groups['Unassigned']?.length > 0) entries.push(['Unassigned', groups['Unassigned']]);
     return entries;
   })();
