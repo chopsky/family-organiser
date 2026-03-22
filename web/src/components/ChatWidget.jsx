@@ -1,6 +1,52 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api';
 
+/**
+ * Format markdown-style text into React elements.
+ * Handles **bold**, *italic*, and preserves line breaks.
+ */
+function formatMessage(text) {
+  if (!text) return text;
+  // Split by line, process each line
+  return text.split('\n').map((line, lineIdx) => {
+    // Process inline formatting: **bold** and *italic*
+    const parts = [];
+    let remaining = line;
+    let key = 0;
+    while (remaining.length > 0) {
+      // Check for **bold**
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+      // Check for *italic* (but not **)
+      const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/);
+
+      // Find whichever comes first
+      const boldIdx = boldMatch ? remaining.indexOf(boldMatch[0]) : Infinity;
+      const italicIdx = italicMatch ? remaining.indexOf(italicMatch[0]) : Infinity;
+
+      if (boldIdx === Infinity && italicIdx === Infinity) {
+        parts.push(remaining);
+        break;
+      }
+
+      if (boldIdx <= italicIdx) {
+        if (boldIdx > 0) parts.push(remaining.slice(0, boldIdx));
+        parts.push(<strong key={`b${key++}`}>{boldMatch[1]}</strong>);
+        remaining = remaining.slice(boldIdx + boldMatch[0].length);
+      } else {
+        if (italicIdx > 0) parts.push(remaining.slice(0, italicIdx));
+        parts.push(<em key={`i${key++}`}>{italicMatch[1]}</em>);
+        remaining = remaining.slice(italicIdx + italicMatch[0].length);
+      }
+    }
+    return (
+      <span key={lineIdx}>
+        {lineIdx > 0 && '\n'}
+        {parts}
+      </span>
+    );
+  });
+}
+
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1 px-4 py-3">
@@ -184,7 +230,7 @@ export default function ChatWidget() {
                       ? 'bg-plum text-white rounded-br-md'
                       : 'bg-cream text-charcoal rounded-bl-md'
                   }`}>
-                    {msg.content}
+                    {msg.role === 'assistant' ? formatMessage(msg.content) : msg.content}
                   </div>
                 </div>
               ))}
