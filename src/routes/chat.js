@@ -122,22 +122,36 @@ async function buildSystemPrompt(householdId, householdName, userId) {
  * Returns { cleanContent, actions[] } where actions may be empty.
  */
 function extractActions(content) {
-  const actionRegex = /```json\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```/g;
   const actions = [];
   let cleanContent = content;
-  let m;
 
-  while ((m = actionRegex.exec(content)) !== null) {
+  // 1. Extract fenced ```json ... ``` blocks
+  const fencedRegex = /```json\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```/g;
+  let m;
+  while ((m = fencedRegex.exec(content)) !== null) {
     try {
       const parsed = JSON.parse(m[1]);
       if (parsed.action) {
         actions.push(parsed);
       } else if (parsed.note_action) {
-        // Backwards compat with old format
         if (parsed.note_action === 'save') actions.push({ action: 'save_note', key: parsed.key, value: parsed.value });
         else if (parsed.note_action === 'delete') actions.push({ action: 'delete_note', key: parsed.key });
       }
       cleanContent = cleanContent.replace(m[0], '');
+    } catch {
+      // Skip malformed JSON
+    }
+  }
+
+  // 2. Extract bare inline {"action": ...} objects (not in fences)
+  const bareRegex = /\s*(\{"action"\s*:\s*"[^"]*"[^}]*\})/g;
+  while ((m = bareRegex.exec(cleanContent)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (parsed.action) {
+        actions.push(parsed);
+        cleanContent = cleanContent.replace(m[0], '');
+      }
     } catch {
       // Skip malformed JSON
     }
