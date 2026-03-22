@@ -7,35 +7,26 @@ import api from '../lib/api';
  */
 function formatMessage(text) {
   if (!text) return text;
-  // Split by line, process each line
   return text.split('\n').map((line, lineIdx) => {
-    // Process inline formatting: **bold** and *italic*
+    // Split line by **bold** and *italic* markers
+    // Process **bold** first, then *italic* within remaining segments
     const parts = [];
-    let remaining = line;
     let key = 0;
-    while (remaining.length > 0) {
-      // Check for **bold**
-      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-      // Check for *italic* (but not **)
-      const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/);
-
-      // Find whichever comes first
-      const boldIdx = boldMatch ? remaining.indexOf(boldMatch[0]) : Infinity;
-      const italicIdx = italicMatch ? remaining.indexOf(italicMatch[0]) : Infinity;
-
-      if (boldIdx === Infinity && italicIdx === Infinity) {
-        parts.push(remaining);
-        break;
-      }
-
-      if (boldIdx <= italicIdx) {
-        if (boldIdx > 0) parts.push(remaining.slice(0, boldIdx));
-        parts.push(<strong key={`b${key++}`}>{boldMatch[1]}</strong>);
-        remaining = remaining.slice(boldIdx + boldMatch[0].length);
-      } else {
-        if (italicIdx > 0) parts.push(remaining.slice(0, italicIdx));
-        parts.push(<em key={`i${key++}`}>{italicMatch[1]}</em>);
-        remaining = remaining.slice(italicIdx + italicMatch[0].length);
+    const boldParts = line.split(/\*\*(.+?)\*\*/g);
+    for (let i = 0; i < boldParts.length; i++) {
+      if (i % 2 === 1) {
+        // Odd indices are bold content
+        parts.push(<strong key={`b${key++}`}>{boldParts[i]}</strong>);
+      } else if (boldParts[i]) {
+        // Even indices are plain text — check for *italic*
+        const italicParts = boldParts[i].split(/\*(.+?)\*/g);
+        for (let j = 0; j < italicParts.length; j++) {
+          if (j % 2 === 1) {
+            parts.push(<em key={`i${key++}`}>{italicParts[j]}</em>);
+          } else if (italicParts[j]) {
+            parts.push(italicParts[j]);
+          }
+        }
       }
     }
     return (
