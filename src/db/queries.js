@@ -1528,6 +1528,18 @@ async function getRecipeById(recipeId, householdId) {
   return data || null;
 }
 
+async function getLatestRecipe(householdId) {
+  const { data, error } = await supabase
+    .from('recipes')
+    .select()
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 async function createRecipe(householdId, recipeData) {
   const { data, error } = await supabase
     .from('recipes')
@@ -1765,6 +1777,7 @@ module.exports = {
   deleteMealPlanEntry,
   getRecipes,
   getRecipeById,
+  getLatestRecipe,
   createRecipe,
   updateRecipe,
   deleteRecipe,

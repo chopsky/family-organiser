@@ -276,6 +276,17 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             due_date: act.due_date || null,
           }], req.user.id, members);
           executedActions.push({ type: 'create_task', title: act.title });
+
+        } else if (act.action === 'create_recipe') {
+          // Generate and save recipe to Recipe Box
+          const { generateAndSaveRecipe } = require('../bot/handlers');
+          const recipe = await generateAndSaveRecipe(
+            req.householdId,
+            act.description,
+            act.dietary || null,
+            act.servings || 4
+          );
+          executedActions.push({ type: 'create_recipe', name: recipe.name, id: recipe.id });
         }
       } catch (actionErr) {
         console.error(`Action ${act.action} failed (non-fatal):`, actionErr.message);

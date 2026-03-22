@@ -10,6 +10,7 @@ const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
+const { callWithFailover } = require('../services/ai-client');
 
 // ─── Timezone helper ──────────────────────────────────────────────────────────
 
@@ -277,6 +278,57 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || '🏫 School event added! ✅', actions };
   }
 
+  // Handle recipe request — generate, save to Recipe Box, format nicely
+  if (result.intent === 'recipe' && result.recipe_request) {
+    try {
+      const req = result.recipe_request;
+      const recipe = await generateAndSaveRecipe(household.id, req.description, req.dietary, req.servings);
+      const response = formatRecipeResponse(recipe);
+      return { response, actions };
+    } catch (err) {
+      console.error('Recipe generation failed:', err.message);
+      // Fall back to chat response
+      return { response: result.response_message || "Sorry, I couldn't create that recipe right now. Try again in a moment!", actions };
+    }
+  }
+
+  // Handle recipe follow-up — add ingredients to shopping list
+  if (result.intent === 'recipe_followup') {
+    try {
+      // Get the most recently created recipe for this household
+      const recipe = await db.getLatestRecipe(household.id);
+      if (!recipe) {
+        return { response: "I'm not sure which recipe you're referring to. Ask me for a recipe first, then I can add the ingredients to your list!", actions };
+      }
+      if (!recipe?.ingredients?.length) {
+        return { response: "That recipe doesn't have any ingredients listed. Try asking me for a new recipe!", actions };
+      }
+      // Add ingredients to shopping list
+      const ingredientItems = recipe.ingredients
+        .filter(ing => ing.name && !ing.optional)
+        .map(ing => ({
+          item: ing.quantity && ing.unit
+            ? `${ing.quantity}${ing.unit} ${ing.name}`
+            : ing.quantity
+              ? `${ing.quantity} ${ing.name}`
+              : ing.name,
+          category: 'groceries',
+          quantity: null,
+        }));
+      if (ingredientItems.length) {
+        await db.addShoppingItems(household.id, ingredientItems, user.id);
+        actions.shoppingAdded = ingredientItems.map(i => i.item);
+      }
+      return {
+        response: `✅ Added ${ingredientItems.length} ingredients for *${recipe.name}* to your shopping list!`,
+        actions,
+      };
+    } catch (err) {
+      console.error('Recipe follow-up failed:', err.message);
+      return { response: "Sorry, I couldn't add those ingredients. Try again!", actions };
+    }
+  }
+
   // Handle general chat — just return the AI's conversational response
   if (result.intent === 'chat') {
     return { response: result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!", actions };
@@ -518,6 +570,119 @@ async function handleMyTasks(user, household) {
   return formatTaskList(tasks, heading);
 }
 
+// ─── Recipe helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Generate a recipe via AI and save it to the Recipe Box.
+ */
+async function generateAndSaveRecipe(householdId, description, dietary, servings) {
+  const prompt = `Create a simple, family-friendly recipe based on: ${description}
+${dietary ? `Dietary requirements: ${dietary}` : ''}
+${servings ? `Servings: ${servings}` : 'Servings: 4'}
+
+Keep it simple — families are busy. Use common British supermarket ingredients.
+
+Return ONLY valid JSON:
+{
+  "name": "recipe name",
+  "category": "breakfast|lunch|dinner|snack",
+  "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc", "optional": false}],
+  "method": ["Step 1...", "Step 2..."],
+  "prep_time_mins": 15,
+  "cook_time_mins": 30,
+  "servings": 4,
+  "dietary_tags": ["vegetarian"]
+}
+
+Rules:
+- Maximum 3-5 method steps, each one short sentence
+- Use metric measurements
+- Keep ingredient list practical (under 12 items)
+- Infer dietary tags from ingredients`;
+
+  const { text } = await callWithFailover({
+    system: 'You are a family recipe creator for busy UK households. Create simple, practical recipes. Return ONLY valid JSON.',
+    messages: [{ role: 'user', content: prompt }],
+    useThinking: false,
+    maxTokens: 2048,
+    timeoutMs: 30000,
+  });
+
+  const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+  const parsed = JSON.parse(cleaned);
+
+  const recipe = await db.createRecipe(householdId, {
+    name: parsed.name,
+    category: (parsed.category || 'dinner').toLowerCase(),
+    ingredients: parsed.ingredients || [],
+    method: parsed.method || [],
+    prep_time_mins: parsed.prep_time_mins || null,
+    cook_time_mins: parsed.cook_time_mins || null,
+    servings: parsed.servings || 4,
+    dietary_tags: parsed.dietary_tags || [],
+    source_type: 'ai_generated',
+  });
+
+  // Attach parsed data for formatting (DB may store method as string)
+  recipe._parsed = parsed;
+  return recipe;
+}
+
+/**
+ * Format a recipe for WhatsApp — concise, family-friendly, actionable.
+ */
+function formatRecipeResponse(recipe) {
+  const parsed = recipe._parsed || {};
+  const name = recipe.name || parsed.name;
+  const servings = recipe.servings || parsed.servings || 4;
+  const prepMins = recipe.prep_time_mins || parsed.prep_time_mins;
+  const cookMins = recipe.cook_time_mins || parsed.cook_time_mins;
+  const totalMins = (prepMins || 0) + (cookMins || 0);
+  const ingredients = recipe.ingredients || parsed.ingredients || [];
+  const method = parsed.method || (typeof recipe.method === 'string' ? recipe.method.split('\n') : recipe.method) || [];
+
+  const lines = [];
+
+  // Confirmation
+  lines.push(`✅ *${name}* saved to your recipes!`);
+  lines.push(`🍽 Serves ${servings}${totalMins ? ` · ⏱ ${totalMins} mins` : ''}`);
+  lines.push('');
+
+  // Key ingredients (top 5-6)
+  if (ingredients.length > 0) {
+    lines.push('*Key ingredients:*');
+    const mainIngredients = ingredients.filter(i => !i.optional).slice(0, 6);
+    for (const ing of mainIngredients) {
+      const qty = ing.quantity && ing.unit ? `${ing.quantity}${ing.unit} ` : ing.quantity ? `${ing.quantity} ` : '';
+      lines.push(`• ${qty}${ing.name}`);
+    }
+    if (ingredients.length > 6) {
+      lines.push(`_+${ingredients.length - 6} more in your recipe box_`);
+    }
+    lines.push('');
+  }
+
+  // Quick steps (max 4)
+  if (method.length > 0) {
+    lines.push('*Quick steps:*');
+    const steps = method.slice(0, 4);
+    steps.forEach((step, i) => {
+      // Clean up step text — remove "Step X:" prefix if present
+      const clean = step.replace(/^step\s*\d+[:.]\s*/i, '').trim();
+      lines.push(`${i + 1}. ${clean}`);
+    });
+    if (method.length > 4) {
+      lines.push(`_Full method in your recipe box_`);
+    }
+    lines.push('');
+  }
+
+  // Call to action
+  lines.push('Would you like me to add the ingredients to your shopping list?');
+
+  return lines.join('\n');
+}
+
 module.exports = {
   handleTextMessage,
   handleVoiceNote,
@@ -528,6 +693,8 @@ module.exports = {
   buildBroadcastMessage,
   formatShoppingList,
   formatTaskList,
+  generateAndSaveRecipe,
+  formatRecipeResponse,
   CATEGORY_EMOJI,
   capitalise,
 };
