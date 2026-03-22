@@ -14,8 +14,8 @@ function stripActionBlocks(text) {
   if (!text) return text;
   // Remove fenced JSON blocks
   let cleaned = text.replace(/```json\s*\{[^`]*?\}\s*```/gs, '').trim();
-  // Remove bare JSON action objects on their own line
-  cleaned = cleaned.replace(/^\s*\{"action"\s*:.*?\}\s*$/gm, '').trim();
+  // Remove any JSON action objects (on their own line or inline)
+  cleaned = cleaned.replace(/\s*\{"action"\s*:.*?\}/g, '').trim();
   // Collapse multiple blank lines
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
   return cleaned;
