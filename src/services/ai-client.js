@@ -10,7 +10,7 @@ const OpenAI = require('openai');
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const GPT_MODEL = 'gpt-4o';
-const DEFAULT_TIMEOUT_MS = 8000; // abort Claude after 8s for chat
+const DEFAULT_TIMEOUT_MS = 12000; // abort Claude after 12s for chat
 const LONG_TIMEOUT_MS = 30000;   // 30s for complex tasks (imports, scraping)
 
 function getAnthropicClient() {

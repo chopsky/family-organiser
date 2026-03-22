@@ -26,6 +26,8 @@ async function classify(message, memberNames = [], notes = []) {
     const { text } = await callWithFailover({
       system: systemPrompt,
       messages: [{ role: 'user', content: message }],
+      useThinking: false,
+      maxTokens: 2048,
     });
     return parseJSON(text, 'classification');
   });
@@ -54,6 +56,8 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg') {
           ],
         },
       ],
+      useThinking: false,
+      maxTokens: 2048,
     });
     return parseJSON(text, 'receipt extraction');
   });
@@ -81,6 +85,8 @@ async function matchReceiptToList(receiptItems, shoppingList) {
     const { text } = await callWithFailover({
       system: RECEIPT_MATCHING_SYSTEM,
       messages: [{ role: 'user', content: userMessage }],
+      useThinking: false,
+      maxTokens: 1024,
     });
     return parseJSON(text, 'receipt matching');
   });
@@ -115,6 +121,8 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = []) 
           ],
         },
       ],
+      useThinking: false,
+      maxTokens: 2048,
     });
     return parseJSON(text, 'image scan');
   });
