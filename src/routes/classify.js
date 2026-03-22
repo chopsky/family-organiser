@@ -1,9 +1,25 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { classify } = require('../services/ai');
+const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
+
+/**
+ * Strip JSON action blocks (```json...```) from AI response text
+ * so they don't leak into the user-visible message.
+ */
+function stripActionBlocks(text) {
+  if (!text) return text;
+  // Remove fenced JSON blocks
+  let cleaned = text.replace(/```json\s*\{[^`]*?\}\s*```/gs, '').trim();
+  // Remove bare JSON action objects on their own line
+  cleaned = cleaned.replace(/^\s*\{"action"\s*:.*?\}\s*$/gm, '').trim();
+  // Collapse multiple blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  return cleaned;
+}
 
 /**
  * POST /api/classify
@@ -22,6 +38,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map((m) => m.name);
     const result = await classify(text.trim(), memberNames);
+
+    // Strip any leaked JSON action blocks from the response message
+    if (result.response_message) {
+      result.response_message = stripActionBlocks(result.response_message);
+    }
 
     // Send the AI response immediately — don't wait for DB saves
     res.json({ result });
@@ -82,6 +103,52 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             }
           }
           ops.push(db.createCalendarEvent(req.householdId, eventData, req.user.id));
+        }
+
+        // Recipe generation (intent = 'recipe')
+        if (result.intent === 'recipe' && result.recipe_request) {
+          ops.push((async () => {
+            try {
+              const req2 = result.recipe_request;
+              const prompt = `Create a simple, family-friendly recipe based on: ${req2.description}
+${req2.dietary ? `Dietary requirements: ${req2.dietary}` : ''}
+${req2.servings ? `Servings: ${req2.servings}` : ''}
+
+Return ONLY valid JSON:
+{
+  "name": "recipe name",
+  "category": "breakfast|lunch|dinner|snack",
+  "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc", "optional": false}],
+  "method": ["Step 1...", "Step 2..."],
+  "prep_time_mins": 15,
+  "cook_time_mins": 30,
+  "servings": 4,
+  "dietary_tags": ["vegetarian"]
+}`;
+              const { text: aiText } = await callWithFailover({
+                system: 'You are a family recipe creator for busy UK households. Create simple, practical recipes. Return ONLY valid JSON.',
+                messages: [{ role: 'user', content: prompt }],
+                useThinking: false,
+                maxTokens: 2048,
+                timeoutMs: LONG_TIMEOUT_MS,
+              });
+              const cleaned = aiText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+              const parsed = JSON.parse(cleaned);
+              await db.createRecipe(req.householdId, {
+                name: parsed.name,
+                category: (parsed.category || 'dinner').toLowerCase(),
+                ingredients: parsed.ingredients || [],
+                method: parsed.method || [],
+                prep_time_mins: parsed.prep_time_mins || null,
+                cook_time_mins: parsed.cook_time_mins || null,
+                servings: parsed.servings || null,
+                dietary_tags: parsed.dietary_tags || [],
+                source_type: 'ai_generated',
+              });
+            } catch (recipeErr) {
+              console.error('Background recipe generation failed:', recipeErr);
+            }
+          })());
         }
 
         await Promise.all(ops);
