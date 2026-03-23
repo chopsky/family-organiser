@@ -42,9 +42,9 @@ const dotColors = {
 
 // ── Shopping aisle category badges (matches new aisle system) ───
 const AISLE_BADGE = {
-  'Produce':              { bg: 'bg-[#EDF5EE]', text: 'text-[#3A6B40]', label: 'VEG' },
+  'Produce':              { bg: 'bg-sage-light', text: 'text-[#4A7D50]', label: 'VEG' },
   'Meat & Seafood':       { bg: 'bg-coral-light', text: 'text-[#C4522A]', label: 'MEAT' },
-  'Dairy & Eggs':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'DAIRY' },
+  'Dairy & Eggs':         { bg: 'bg-plum-light', text: 'text-primary', label: 'DAIRY' },
   'Bakery':               { bg: 'bg-[#FFF4E6]', text: 'text-[#B8860B]', label: 'BAKERY' },
   'Pantry & Grains':      { bg: 'bg-[#FAEEDA]', text: 'text-[#854F0B]', label: 'PANTRY' },
   'Frozen Foods':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'FROZEN' },
@@ -340,24 +340,27 @@ export default function Dashboard() {
             <p className="text-sm text-cocoa py-4 text-center">Shopping list is empty</p>
           ) : (
             <>
-              <div className="space-y-2.5">
+              <div className="flex flex-col" style={{ gap: 6 }}>
                 {shoppingGroups.map(([cat, items]) => {
                   const badge = getCatBadge(cat);
                   return (
-                    <div key={cat} className="flex items-center gap-3 bg-[#FBF8F3] rounded-xl px-4 py-3">
-                      <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-md ${badge.bg} ${badge.text}`}>
+                    <div key={cat} className="flex items-center" style={{ gap: 10, padding: '6px 0' }}>
+                      <span
+                        className={`shrink-0 uppercase tracking-wide ${badge.bg} ${badge.text}`}
+                        style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}
+                      >
                         {badge.label}
                       </span>
-                      <span className="text-sm text-bark font-medium">
+                      <span style={{ fontSize: 13 }} className="text-bark">
                         {items.slice(0, 3).map(i => i.item).join(', ')}
-                        {items.length > 3 && <span className="text-cocoa font-normal"> +{items.length - 3}</span>}
+                        {items.length > 3 && <span className="text-cocoa"> +{items.length - 3}</span>}
                       </span>
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-3 pt-3 border-t border-cream-border/50">
-                <p className="text-xs text-cocoa">
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-cream-border, #E8E5EC)', fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
+                <p>
                   {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}
                   {lastUpdatedBy && lastUpdatedAgo && (
                     <span> · Updated by {lastUpdatedBy} {lastUpdatedAgo}</span>
