@@ -122,5 +122,14 @@ ALTER TABLE shopping_items ALTER COLUMN list_id SET NOT NULL;
 -- Add index on list_id for query performance
 CREATE INDEX IF NOT EXISTS idx_shopping_items_list ON shopping_items(list_id);
 
--- 7. Reload PostgREST schema cache
+-- 7. Create default store lists for all households
+INSERT INTO shopping_lists (household_id, name)
+SELECT h.id, store.name
+FROM households h
+CROSS JOIN (VALUES ('M&S'), ('Tesco'), ('Waitrose'), ('Sainsbury''s'), ('Aldi')) AS store(name)
+WHERE NOT EXISTS (
+  SELECT 1 FROM shopping_lists sl WHERE sl.household_id = h.id AND sl.name = store.name
+);
+
+-- 8. Reload PostgREST schema cache
 NOTIFY pgrst, 'reload schema';

@@ -1009,6 +1009,8 @@ async function deleteShoppingList(listId, householdId) {
   return data;
 }
 
+const DEFAULT_SHOPPING_LISTS = ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'];
+
 async function getDefaultShoppingList(householdId) {
   let { data } = await supabase
     .from('shopping_lists')
@@ -1017,11 +1019,14 @@ async function getDefaultShoppingList(householdId) {
     .eq('name', 'Default')
     .single();
   if (!data) {
-    // Create Default list if it doesn't exist
+    // Create all default lists for this household
+    const rows = DEFAULT_SHOPPING_LISTS.map(name => ({ household_id: householdId, name }));
+    await supabase.from('shopping_lists').insert(rows);
     const result = await supabase
       .from('shopping_lists')
-      .insert({ household_id: householdId, name: 'Default' })
-      .select()
+      .select('*')
+      .eq('household_id', householdId)
+      .eq('name', 'Default')
       .single();
     data = result.data;
   }
