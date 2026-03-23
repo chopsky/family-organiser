@@ -392,7 +392,7 @@ export default function Shopping() {
                     {aisleItems.map(item => (
                       <div
                         key={item.id}
-                        className="group flex items-center gap-3 px-4 py-3 bg-white rounded-xl transition-all hover:shadow-sm hover:border-light-grey border border-transparent cursor-pointer"
+                        className="group flex items-center gap-3 px-4 py-3 bg-white rounded-xl transition-all hover:shadow-sm border border-light-grey cursor-pointer"
                         onClick={() => openEditPopup(item)}
                       >
                         {/* Checkbox */}
@@ -461,7 +461,7 @@ export default function Shopping() {
                   {completedItems.map(item => {
                     const config = AISLE_CONFIG[item.aisle_category] || AISLE_CONFIG.Other;
                     return (
-                      <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl opacity-60">
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl border border-light-grey opacity-60">
                         {/* Checked circle */}
                         <div className="w-[22px] h-[22px] rounded-[7px] bg-sage flex items-center justify-center shrink-0">
                           <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
