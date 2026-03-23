@@ -223,7 +223,7 @@ export default function Dashboard() {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-display font-semibold text-bark">
+        <h1 className="font-display font-semibold text-bark" style={{ fontSize: 28 }}>
           {getGreeting()}, {user?.name}! 👋
         </h1>
         <p className="text-cocoa text-sm mt-1">
