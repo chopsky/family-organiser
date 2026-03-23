@@ -66,7 +66,7 @@ export default function Meals() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* Tab toggle */}
-      <div className="flex gap-1 bg-oat rounded-xl p-1">
+      <div className="flex gap-1 bg-oat rounded-xl p-1 border border-cream-border">
         <button
           onClick={() => setActiveTab('plan')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
