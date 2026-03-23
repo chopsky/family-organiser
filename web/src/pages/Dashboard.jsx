@@ -40,29 +40,26 @@ const dotColors = {
   orange: 'bg-amber', blue: 'bg-sky', green: 'bg-sage', gray: 'bg-slate',
 };
 
-// ── Shopping category colours ───────────────────────────────────
-const CATEGORY_BADGE = {
-  fruit:          { bg: 'bg-[#E8F5E9]', text: 'text-[#388E3C]', label: 'FRUIT' },
-  'fruit & veg':  { bg: 'bg-[#E8F5E9]', text: 'text-[#388E3C]', label: 'VEG' },
-  vegetables:     { bg: 'bg-[#E8F5E9]', text: 'text-[#388E3C]', label: 'VEG' },
-  veg:            { bg: 'bg-[#E8F5E9]', text: 'text-[#388E3C]', label: 'VEG' },
-  meat:           { bg: 'bg-[#FFEBEE]', text: 'text-[#C62828]', label: 'MEAT' },
-  'meat & fish':  { bg: 'bg-[#FFEBEE]', text: 'text-[#C62828]', label: 'MEAT' },
-  fish:           { bg: 'bg-[#FFEBEE]', text: 'text-[#C62828]', label: 'FISH' },
-  dairy:          { bg: 'bg-[#E3F2FD]', text: 'text-[#1565C0]', label: 'DAIRY' },
-  bakery:         { bg: 'bg-[#FFF8E1]', text: 'text-[#F57F17]', label: 'BAKERY' },
-  bread:          { bg: 'bg-[#FFF8E1]', text: 'text-[#F57F17]', label: 'BAKERY' },
-  frozen:         { bg: 'bg-[#E0F7FA]', text: 'text-[#00838F]', label: 'FROZEN' },
-  drinks:         { bg: 'bg-[#F3E5F5]', text: 'text-[#7B1FA2]', label: 'DRINKS' },
-  snacks:         { bg: 'bg-[#FFF3E0]', text: 'text-[#E65100]', label: 'SNACKS' },
-  household:      { bg: 'bg-[#ECEFF1]', text: 'text-[#455A64]', label: 'HOME' },
-  toiletries:     { bg: 'bg-[#FCE4EC]', text: 'text-[#AD1457]', label: 'BATH' },
-  other:          { bg: 'bg-oat',       text: 'text-cocoa',      label: 'OTHER' },
+// ── Shopping aisle category badges (matches new aisle system) ───
+const AISLE_BADGE = {
+  'Produce':              { bg: 'bg-[#EDF5EE]', text: 'text-[#3A6B40]', label: 'VEG' },
+  'Meat & Seafood':       { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'MEAT' },
+  'Dairy & Eggs':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'DAIRY' },
+  'Bakery':               { bg: 'bg-[#FAEEDA]', text: 'text-[#854F0B]', label: 'BAKERY' },
+  'Pantry & Grains':      { bg: 'bg-[#FAEEDA]', text: 'text-[#854F0B]', label: 'PANTRY' },
+  'Frozen Foods':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'FROZEN' },
+  'Beverages':            { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'DRINKS' },
+  'Household & Cleaning': { bg: 'bg-[#F3EDFC]', text: 'text-[#6B3FA0]', label: 'HOME' },
+  'Personal Care':        { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'CARE' },
+  'Other':                { bg: 'bg-oat',       text: 'text-cocoa',      label: 'OTHER' },
+  // Legacy fallbacks
+  'groceries':            { bg: 'bg-[#EDF5EE]', text: 'text-[#3A6B40]', label: 'GROCERY' },
+  'household':            { bg: 'bg-[#F3EDFC]', text: 'text-[#6B3FA0]', label: 'HOME' },
 };
 
 function getCatBadge(cat) {
-  if (!cat) return CATEGORY_BADGE.other;
-  return CATEGORY_BADGE[cat.toLowerCase()] || { bg: 'bg-oat', text: 'text-cocoa', label: cat.toUpperCase().slice(0, 6) };
+  if (!cat) return AISLE_BADGE.Other;
+  return AISLE_BADGE[cat] || AISLE_BADGE[cat.toLowerCase()] || { bg: 'bg-oat', text: 'text-cocoa', label: cat.toUpperCase().slice(0, 6) };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -157,14 +154,14 @@ export default function Dashboard() {
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
   const weekMeals = digest?.weekMeals ?? [];
 
-  // Group shopping by category (max 4 groups for the dashboard)
-  const shoppingByCategory = {};
+  // Group shopping by aisle category (max 4 groups for the dashboard)
+  const shoppingByAisle = {};
   shoppingItems.forEach(item => {
-    const cat = item.category || 'other';
-    if (!shoppingByCategory[cat]) shoppingByCategory[cat] = [];
-    shoppingByCategory[cat].push(item);
+    const cat = item.aisle_category || item.category || 'Other';
+    if (!shoppingByAisle[cat]) shoppingByAisle[cat] = [];
+    shoppingByAisle[cat].push(item);
   });
-  const shoppingGroups = Object.entries(shoppingByCategory).slice(0, 4);
+  const shoppingGroups = Object.entries(shoppingByAisle).slice(0, 4);
 
   // This week's dinners — today + next 3 days
   const DAY_LABELS_FULL = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -343,12 +340,12 @@ export default function Dashboard() {
             <p className="text-sm text-cocoa py-4 text-center">Shopping list is empty</p>
           ) : (
             <>
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {shoppingGroups.map(([cat, items]) => {
                   const badge = getCatBadge(cat);
                   return (
-                    <div key={cat} className="flex items-start gap-2.5">
-                      <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${badge.bg} ${badge.text} mt-0.5`}>
+                    <div key={cat} className="flex items-center gap-3 bg-cream rounded-xl px-3.5 py-2.5">
+                      <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${badge.bg} ${badge.text}`}>
                         {badge.label}
                       </span>
                       <span className="text-sm text-bark">
