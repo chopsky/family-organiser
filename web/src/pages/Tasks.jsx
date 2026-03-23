@@ -241,7 +241,7 @@ export default function Tasks() {
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-bark flex items-center gap-2">
-          <IconCheck className="h-6 w-6" /> Tasks
+          <IconCheck className="h-6 w-6 text-plum" /> Tasks
         </h1>
         <div className="flex gap-3">
           <button
