@@ -277,7 +277,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               {todayEvents
                 .sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date))
-                .slice(0, 6)
+                .slice(0, 4)
                 .map((ev, i) => {
                   const member = getMemberForEvent(ev);
                   return (
