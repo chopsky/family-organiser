@@ -741,7 +741,7 @@ export default function Tasks() {
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-md max-h-[90vh] overflow-y-auto space-y-3"
             style={{
-              background: 'var(--cream, #FBF8F3)',
+              background: '#FFFFFF',
               borderRadius: 16,
               boxShadow: 'var(--shadow-lg, 0 8px 24px rgba(107,63,160,0.10))',
               padding: 24,
@@ -780,7 +780,7 @@ export default function Tasks() {
                   height: 48,
                   padding: '0 14px',
                   fontSize: 14,
-                  background: 'var(--cream, #FBF8F3)',
+                  background: '#FFFFFF',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--plum, #6B3FA0)';
@@ -806,7 +806,7 @@ export default function Tasks() {
                   borderRadius: 10,
                   padding: '10px 14px',
                   fontSize: 14,
-                  background: 'var(--cream, #FBF8F3)',
+                  background: '#FFFFFF',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--plum, #6B3FA0)';
@@ -833,7 +833,7 @@ export default function Tasks() {
                     height: 48,
                     padding: '0 14px',
                     fontSize: 14,
-                    background: 'var(--cream, #FBF8F3)',
+                    background: '#FFFFFF',
                   }}
                 />
               </div>
@@ -850,7 +850,7 @@ export default function Tasks() {
                     height: 48,
                     padding: '0 14px',
                     fontSize: 14,
-                    background: 'var(--cream, #FBF8F3)',
+                    background: '#FFFFFF',
                   }}
                 />
               </div>
