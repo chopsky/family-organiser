@@ -70,7 +70,7 @@ export default function Meals() {
         <button
           onClick={() => setActiveTab('plan')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-            activeTab === 'plan' ? 'bg-white text-bark shadow-sm' : 'text-cocoa hover:text-bark'
+            activeTab === 'plan' ? 'bg-white text-bark ' : 'text-cocoa hover:text-bark'
           }`}
         >
           Meal Plan
@@ -78,7 +78,7 @@ export default function Meals() {
         <button
           onClick={() => setActiveTab('recipes')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-            activeTab === 'recipes' ? 'bg-white text-bark shadow-sm' : 'text-cocoa hover:text-bark'
+            activeTab === 'recipes' ? 'bg-white text-bark ' : 'text-cocoa hover:text-bark'
           }`}
         >
           Recipe Box
@@ -297,7 +297,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   return (
     <>
       {/* Week navigation */}
-      <div className="flex items-center justify-between bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3">
+      <div className="flex items-center justify-between bg-linen rounded-2xl  border border-cream-border px-4 py-3">
         <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-oat text-cocoa transition-colors">
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
@@ -319,7 +319,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       {loading ? <Spinner /> : (
         <>
           {/* Weekly grid */}
-          <div className="bg-linen rounded-2xl shadow-sm border border-cream-border overflow-hidden">
+          <div className="bg-linen rounded-2xl  border border-cream-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] border-collapse">
                 <thead>
@@ -361,7 +361,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                                   <button
                                     key={meal.id}
                                     onClick={() => setDetailMeal(meal)}
-                                    className={`w-full text-left p-1.5 rounded-lg text-xs font-medium transition-all hover:shadow-sm ${colors.light} ${colors.text} ${colors.border} border`}
+                                    className={`w-full text-left p-1.5 rounded-lg text-xs font-medium transition-all hover: ${colors.light} ${colors.text} ${colors.border} border`}
                                   >
                                     <span className="line-clamp-2">{meal.meal_name}</span>
                                   </button>
@@ -388,20 +388,20 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={onSwitchToRecipes}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover:shadow-sm transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
             >
               <span>📚</span> Recipe Box
             </button>
             <button
               onClick={suggestMeals}
               disabled={suggesting}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover:shadow-sm transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all disabled:opacity-50"
             >
               <span>✨</span> {suggesting ? 'Suggesting...' : 'Suggest Meals'}
             </button>
             <button
               onClick={addWeekToShoppingList}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover:shadow-sm transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
             >
               <span>🛒</span> Add to Shopping List
             </button>
@@ -439,7 +439,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       {/* Shopping List Summary Modal */}
       {shoppingListSummary && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] flex flex-col">
+          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] flex flex-col">
             <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-bark">Shopping List Updated</h3>
@@ -503,7 +503,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       {/* AI Suggestions modal */}
       {suggestResults && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] flex flex-col">
+          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] flex flex-col">
             <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-bark">Dinner Suggestions</h3>
@@ -518,7 +518,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                 <div
                   key={i}
                   className={`bg-white rounded-xl border p-3.5 transition-all cursor-pointer ${
-                    slot.accepted ? 'border-primary/40 shadow-sm' : 'border-cream-border opacity-50'
+                    slot.accepted ? 'border-primary/40 ' : 'border-cream-border opacity-50'
                   }`}
                   onClick={() => toggleSuggestion(i)}
                 >
@@ -583,7 +583,7 @@ const MealDetailPopup = forwardRef(function MealDetailPopup({ meal, onClose, onE
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div ref={ref} className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] overflow-y-auto">
+      <div ref={ref} className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className={`px-5 py-4 ${colors.bg} sm:rounded-t-2xl`}>
           <div className="flex items-start justify-between">
@@ -761,7 +761,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div ref={modalRef} className="bg-linen w-full sm:w-[500px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] flex flex-col">
+      <div ref={modalRef} className="bg-linen w-full sm:w-[500px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
           <div>
@@ -819,7 +819,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
                       <li key={recipe.id}>
                         <button
                           onClick={() => selectRecipe(recipe)}
-                          className="w-full text-left bg-white rounded-xl border border-cream-border p-3 hover:shadow-sm hover:border-primary/30 transition-all"
+                          className="w-full text-left bg-white rounded-xl border border-cream-border p-3 hover: hover:border-primary/30 transition-all"
                         >
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-semibold text-bark">{recipe.name}</p>
@@ -1138,7 +1138,7 @@ function RecipeBoxView({ setError }) {
                 <button
                   key={recipe.id}
                   onClick={() => setDetailRecipe(recipe)}
-                  className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 text-left hover:shadow-md transition-shadow"
+                  className="bg-linen rounded-2xl  border border-cream-border p-4 text-left hover: transition-shadow"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -1186,7 +1186,7 @@ function RecipeBoxView({ setError }) {
       {/* Add recipe FAB */}
       <button
         onClick={() => setAddModalOpen(true)}
-        className="fixed bottom-24 md:bottom-8 right-5 md:right-8 bg-primary hover:bg-primary-pressed text-white w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center transition-colors z-20"
+        className="fixed bottom-24 md:bottom-8 right-5 md:right-8 bg-primary hover:bg-primary-pressed text-white w-14 h-14 rounded-2xl  flex items-center justify-center transition-colors z-20"
         title="Add recipe"
       >
         <IconPlus className="h-6 w-6" />
@@ -1251,7 +1251,7 @@ function AddRecipeModal({ onClose, onManual, importUrl, setImportUrl, onImportUr
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div ref={modalRef} className="bg-linen w-full sm:w-[460px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[85vh] overflow-y-auto p-5">
+      <div ref={modalRef} className="bg-linen w-full sm:w-[460px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] overflow-y-auto p-5">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-lg font-bold text-bark">Add Recipe</h3>
           <button onClick={onClose} className="text-cocoa hover:text-bark p-1 transition-colors">
@@ -1323,7 +1323,7 @@ function AddRecipeModal({ onClose, onManual, importUrl, setImportUrl, onImportUr
           {/* Manual */}
           <button
             onClick={onManual}
-            className="w-full bg-white rounded-xl border border-cream-border p-4 text-left hover:shadow-sm transition-shadow"
+            className="w-full bg-white rounded-xl border border-cream-border p-4 text-left hover: transition-shadow"
           >
             <h4 className="text-sm font-semibold text-bark">✎ Add manually</h4>
             <p className="text-xs text-cocoa mt-0.5">Enter recipe details yourself</p>
@@ -1404,7 +1404,7 @@ function RecipeFormModal({ recipe, onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div ref={modalRef} className="bg-linen w-full sm:w-[540px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[90vh] flex flex-col">
+      <div ref={modalRef} className="bg-linen w-full sm:w-[540px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[90vh] flex flex-col">
         <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
           <h3 className="text-lg font-bold text-bark">{recipe.id ? 'Edit Recipe' : 'New Recipe'}</h3>
           <button onClick={onClose} className="text-cocoa hover:text-bark p-1 transition-colors">
@@ -1681,7 +1681,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div ref={modalRef} className="bg-linen w-full sm:w-[540px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border max-h-[90vh] flex flex-col">
+      <div ref={modalRef} className="bg-linen w-full sm:w-[540px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className={`px-5 py-4 ${colors.bg} sm:rounded-t-2xl shrink-0`}>
           <div className="flex items-start justify-between">
