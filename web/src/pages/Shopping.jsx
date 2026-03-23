@@ -209,6 +209,16 @@ export default function Shopping() {
     setActiveListId(id);
   }
 
+  async function deleteList(listId, listName) {
+    if (!window.confirm(`Delete "${listName}" list and all its items?`)) return;
+    try {
+      await api.delete(`/shopping-lists/${listId}`);
+      await loadLists();
+    } catch {
+      setError('Could not delete list.');
+    }
+  }
+
   function toggleAisle(aisle) {
     setCollapsedAisles(prev => {
       const next = new Set(prev);
@@ -265,17 +275,31 @@ export default function Shopping() {
       {/* List selector - horizontal pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {lists.map(list => (
-          <button
-            key={list.id}
-            onClick={() => selectList(list.id)}
-            className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border-[1.5px] transition-all ${
-              activeListId === list.id
-                ? 'bg-plum text-white border-plum'
-                : 'bg-white text-warm-grey border-light-grey hover:border-plum hover:text-plum'
-            }`}
-          >
-            {list.name}
-          </button>
+          <div key={list.id} className="shrink-0 relative group/pill">
+            <button
+              onClick={() => selectList(list.id)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold border-[1.5px] transition-all ${
+                activeListId === list.id
+                  ? 'bg-plum text-white border-plum'
+                  : 'bg-white text-warm-grey border-light-grey hover:border-plum hover:text-plum'
+              } ${list.name !== 'Default' ? 'pr-8' : ''}`}
+            >
+              {list.name}
+            </button>
+            {list.name !== 'Default' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteList(list.id, list.name); }}
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center transition-all opacity-0 group-hover/pill:opacity-100 ${
+                  activeListId === list.id
+                    ? 'text-white/70 hover:text-white hover:bg-white/20'
+                    : 'text-warm-grey hover:text-coral hover:bg-coral-light'
+                }`}
+                title={`Delete ${list.name}`}
+              >
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            )}
+          </div>
         ))}
         {showNewListInput ? (
           <input
