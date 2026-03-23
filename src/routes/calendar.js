@@ -392,6 +392,34 @@ router.delete('/events/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/calendar/deleted
+ * List soft-deleted calendar events for the household.
+ */
+router.get('/deleted', async (req, res) => {
+  try {
+    const events = await db.getDeletedCalendarEvents(req.householdId);
+    return res.json({ events });
+  } catch (err) {
+    console.error('GET /api/calendar/deleted error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/calendar/:id/restore
+ * Restore a soft-deleted calendar event.
+ */
+router.post('/:id/restore', async (req, res) => {
+  try {
+    const event = await db.restoreCalendarEvent(req.params.id, req.householdId);
+    return res.json({ event });
+  } catch (err) {
+    console.error('POST /api/calendar/:id/restore error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/calendar/feed-token
  * Get or create a feed token for the current user.
  */

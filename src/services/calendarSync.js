@@ -184,7 +184,7 @@ async function processChange(connection, subscription, change) {
       }
     } else if (action === 'delete') {
       if (existingMapping) {
-        await db.deleteCalendarEvent(existingMapping.event_id, connection.household_id);
+        await db.softDeleteCalendarEvent(existingMapping.event_id, connection.household_id);
         await db.deleteSyncMapping(existingMapping.event_id, connection.id);
       }
     }

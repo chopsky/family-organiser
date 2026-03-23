@@ -1067,6 +1067,7 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
     .from('calendar_events')
     .select()
     .eq('household_id', householdId)
+    .is('deleted_at', null)
     .lte('start_time', endDate)
     .gte('end_time', startDate);
 
@@ -1089,6 +1090,7 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
       .from('calendar_events')
       .select()
       .eq('household_id', householdId)
+      .is('deleted_at', null)
       .lte('start_time', endDate)
       .gte('end_time', startDate)
       .order('start_time');
@@ -1149,7 +1151,48 @@ async function updateCalendarEvent(eventId, householdId, updates) {
   return data;
 }
 
+async function softDeleteCalendarEvent(eventId, householdId) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', eventId)
+    .eq('household_id', householdId)
+    .is('deleted_at', null)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function deleteCalendarEvent(eventId, householdId) {
+  return softDeleteCalendarEvent(eventId, householdId);
+}
+
+async function getDeletedCalendarEvents(householdId) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select()
+    .eq('household_id', householdId)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function restoreCalendarEvent(eventId, householdId) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .update({ deleted_at: null })
+    .eq('id', eventId)
+    .eq('household_id', householdId)
+    .not('deleted_at', 'is', null)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function permanentlyDeleteCalendarEvent(eventId, householdId) {
   const { error } = await supabase
     .from('calendar_events')
     .delete()
@@ -1220,6 +1263,7 @@ async function getAllEventsForFeed(householdId) {
       .from('calendar_events')
       .select()
       .eq('household_id', householdId)
+      .is('deleted_at', null)
       .gte('start_time', thirtyDaysAgo.toISOString())
       .lte('start_time', oneYearAhead.toISOString())
       .order('start_time'),
@@ -1775,6 +1819,10 @@ module.exports = {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
+  softDeleteCalendarEvent,
+  getDeletedCalendarEvents,
+  restoreCalendarEvent,
+  permanentlyDeleteCalendarEvent,
   getOrCreateFeedToken,
   regenerateFeedToken,
   getFeedTokenData,
