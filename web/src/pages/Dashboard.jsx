@@ -43,9 +43,9 @@ const dotColors = {
 // ── Shopping aisle category badges (matches new aisle system) ───
 const AISLE_BADGE = {
   'Produce':              { bg: 'bg-[#EDF5EE]', text: 'text-[#3A6B40]', label: 'VEG' },
-  'Meat & Seafood':       { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'MEAT' },
+  'Meat & Seafood':       { bg: 'bg-coral-light', text: 'text-[#C4522A]', label: 'MEAT' },
   'Dairy & Eggs':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'DAIRY' },
-  'Bakery':               { bg: 'bg-[#FAEEDA]', text: 'text-[#854F0B]', label: 'BAKERY' },
+  'Bakery':               { bg: 'bg-[#FFF4E6]', text: 'text-[#B8860B]', label: 'BAKERY' },
   'Pantry & Grains':      { bg: 'bg-[#FAEEDA]', text: 'text-[#854F0B]', label: 'PANTRY' },
   'Frozen Foods':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'FROZEN' },
   'Beverages':            { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'DRINKS' },
@@ -340,17 +340,17 @@ export default function Dashboard() {
             <p className="text-sm text-cocoa py-4 text-center">Shopping list is empty</p>
           ) : (
             <>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {shoppingGroups.map(([cat, items]) => {
                   const badge = getCatBadge(cat);
                   return (
-                    <div key={cat} className="flex items-center gap-3 bg-cream rounded-xl px-3.5 py-2.5">
-                      <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${badge.bg} ${badge.text}`}>
+                    <div key={cat} className="flex items-center gap-3 bg-[#FBF8F3] rounded-xl px-4 py-3">
+                      <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-md ${badge.bg} ${badge.text}`}>
                         {badge.label}
                       </span>
-                      <span className="text-sm text-bark">
+                      <span className="text-sm text-bark font-medium">
                         {items.slice(0, 3).map(i => i.item).join(', ')}
-                        {items.length > 3 && <span className="text-cocoa"> +{items.length - 3}</span>}
+                        {items.length > 3 && <span className="text-cocoa font-normal"> +{items.length - 3}</span>}
                       </span>
                     </div>
                   );
