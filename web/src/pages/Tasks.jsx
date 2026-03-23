@@ -691,7 +691,7 @@ export default function Tasks() {
   /* ─ Render ─ */
 
   return (
-    <div className="space-y-5 overflow-hidden">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1
@@ -1044,7 +1044,7 @@ export default function Tasks() {
 
           {/* ─── DESKTOP: Column view ─── */}
           {!isMobile && (
-            <div className="relative">
+            <div className="relative overflow-hidden">
               {/* Scroll left arrow */}
               {canScrollLeft && (
                 <button
