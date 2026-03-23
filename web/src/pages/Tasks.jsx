@@ -1044,7 +1044,7 @@ export default function Tasks() {
 
           {/* ─── DESKTOP: Column view ─── */}
           {!isMobile && (
-            <div className="relative overflow-hidden">
+            <div className="relative">
               {/* Scroll left arrow */}
               {canScrollLeft && (
                 <button
@@ -1090,7 +1090,7 @@ export default function Tasks() {
               {/* Scrollable columns container */}
               <div
                 ref={scrollRef}
-                className="flex gap-4 overflow-x-auto pb-4"
+                className="flex gap-4 pb-4 overflow-x-auto"
                 style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
               >
                 {columnData.map((col) => (
