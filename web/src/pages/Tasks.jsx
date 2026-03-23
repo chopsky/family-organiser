@@ -143,12 +143,13 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
   return (
     <div className="relative group" style={{ opacity: completed ? 0.5 : 1 }}>
       <div
-        className="bg-white flex items-start gap-2.5 p-3"
+        className="bg-white flex items-start gap-2.5 p-3 cursor-pointer"
         style={{ borderRadius: 12, padding: '12px 14px' }}
+        onClick={() => !completed && onEdit(task)}
       >
         {/* Checkbox */}
         <button
-          onClick={() => completed ? (onRestore && onRestore(task)) : onToggle(task)}
+          onClick={(e) => { e.stopPropagation(); completed ? (onRestore && onRestore(task)) : onToggle(task); }}
           disabled={toggling?.has(task.id) || restoring?.has(task.id)}
           className="mt-0.5 shrink-0 flex items-center justify-center transition-colors"
           style={{
@@ -225,7 +226,7 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
                 e.stopPropagation();
                 onOpenMenu(openMenuId === task.id ? null : task.id);
               }}
-              className={`p-1 rounded-md transition-opacity cursor-pointer ${!isMobile ? 'opacity-0 group-hover:opacity-100' : ''}`}
+              className="p-1 rounded-md cursor-pointer"
               style={{
                 color: 'var(--warm-grey, #6B6774)',
               }}
