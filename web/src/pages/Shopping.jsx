@@ -505,8 +505,8 @@ export default function Shopping() {
 
       {/* Edit item popup modal */}
       {editItem && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-linen w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border p-5">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setEditItem(null)}>
+          <div className="bg-linen w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-bark">Edit item</h3>
               <button onClick={() => setEditItem(null)} className="text-cocoa hover:text-bark p-1">
