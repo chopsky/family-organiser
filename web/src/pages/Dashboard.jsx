@@ -197,11 +197,9 @@ export default function Dashboard() {
     );
   }
 
-  function getEventDotColor(ev) {
-    const member = getMemberForEvent(ev);
-    if (member?.color_theme) return dotColors[member.color_theme] || 'bg-sage';
-    // Unassigned / synced events default to sage
-    return 'bg-sage';
+  const EVENT_DOT_CYCLE = ['bg-plum', 'bg-coral', 'bg-[#E0A458]', 'bg-sage'];
+  function getEventDotColor(ev, index = 0) {
+    return EVENT_DOT_CYCLE[index % EVENT_DOT_CYCLE.length];
   }
 
   // Shopping list last updated info
@@ -284,7 +282,7 @@ export default function Dashboard() {
                   const member = getMemberForEvent(ev);
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 px-4 py-3.5 bg-cream rounded-xl">
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${getEventDotColor(ev)}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${getEventDotColor(ev, i)}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-bark truncate">{ev.title}</p>
                         <p className="text-xs text-cocoa">{formatTime(ev.start_time)}</p>
