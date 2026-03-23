@@ -29,19 +29,21 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       upcoming,
       household,
       members,
-      shoppingItems,
-      todayEvents,
-      weekMeals,
     ] = await Promise.all([
       db.getCompletedThisWeek(req.householdId),
       db.getTasks(req.householdId),       // overdue + today = "carrying over"
       db.getTasksDueNextWeek(req.householdId),
       db.getHouseholdById(req.householdId),
       db.getHouseholdMembers(req.householdId),
-      db.getShoppingList(req.householdId),
-      db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59'),
-      db.getMealPlanForWeek(req.householdId, weekStart, weekEnd),
     ]);
+
+    // These may fail if migrations haven't been run — fallback gracefully
+    let shoppingItems = [];
+    let todayEvents = [];
+    let weekMeals = [];
+    try { shoppingItems = await db.getShoppingList(req.householdId) || []; } catch (e) { console.warn('digest: shopping list fetch failed:', e.message); }
+    try { todayEvents = await db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59') || []; } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
+    try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
 
     return res.json({
       completed: { tasks: completedTasks, shopping: completedShopping },
