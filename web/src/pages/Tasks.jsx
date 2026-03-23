@@ -225,18 +225,10 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
                 e.stopPropagation();
                 onOpenMenu(openMenuId === task.id ? null : task.id);
               }}
-              className="p-1 rounded-md transition-opacity"
+              className={`p-1 rounded-md transition-opacity cursor-pointer ${!isMobile ? 'opacity-0 group-hover:opacity-100' : ''}`}
               style={{
                 color: 'var(--warm-grey, #6B6774)',
-                opacity: isMobile ? 1 : undefined,
               }}
-              {...(!isMobile && {
-                style: {
-                  color: 'var(--warm-grey, #6B6774)',
-                  opacity: 0,
-                },
-                className: 'p-1 rounded-md transition-opacity group-hover:!opacity-100',
-              })}
             >
               <DotsVerticalIcon />
             </button>
@@ -699,9 +691,9 @@ export default function Tasks() {
   /* ─ Render ─ */
 
   return (
-    <div className="space-y-5" style={{ maxWidth: isMobile ? undefined : '100%' }}>
+    <div className="space-y-5 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1
           className="flex items-center gap-2"
           style={{
@@ -1057,7 +1049,7 @@ export default function Tasks() {
               {canScrollLeft && (
                 <button
                   onClick={() => scrollRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center transition-colors"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center transition-colors cursor-pointer"
                   style={{
                     width: 36,
                     height: 36,
@@ -1065,8 +1057,7 @@ export default function Tasks() {
                     background: '#fff',
                     border: '1px solid var(--light-grey, #E8E5EC)',
                     color: 'var(--warm-grey, #6B6774)',
-                    boxShadow: '0 2px 8px rgba(107,63,160,0.06)',
-                    marginLeft: -8,
+                    boxShadow: '0 4px 16px rgba(107,63,160,0.08)',
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--plum, #6B3FA0)'}
                   onMouseLeave={(e) => e.currentTarget.style.color = 'var(--warm-grey, #6B6774)'}
@@ -1079,7 +1070,7 @@ export default function Tasks() {
               {canScrollRight && (
                 <button
                   onClick={() => scrollRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center transition-colors cursor-pointer"
                   style={{
                     width: 36,
                     height: 36,
@@ -1087,8 +1078,7 @@ export default function Tasks() {
                     background: '#fff',
                     border: '1px solid var(--light-grey, #E8E5EC)',
                     color: 'var(--warm-grey, #6B6774)',
-                    boxShadow: '0 2px 8px rgba(107,63,160,0.06)',
-                    marginRight: -8,
+                    boxShadow: '0 4px 16px rgba(107,63,160,0.08)',
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--plum, #6B3FA0)'}
                   onMouseLeave={(e) => e.currentTarget.style.color = 'var(--warm-grey, #6B6774)'}
