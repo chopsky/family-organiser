@@ -49,6 +49,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/household', require('./routes/household'));
 app.use('/api/shopping', require('./routes/shopping'));
+app.use('/api', require('./routes/shopping-lists'));
 app.use('/api/tasks',    require('./routes/tasks'));
 app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/classify', require('./routes/classify'));

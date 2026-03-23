@@ -56,7 +56,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         if (result.shopping_items?.length) {
           const toAdd    = result.shopping_items.filter((i) => i.action === 'add');
           const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
-          if (toAdd.length)    ops.push(db.addShoppingItems(req.householdId, toAdd, req.user.id));
+          if (toAdd.length) {
+            // Get Default list for this household
+            const defaultList = await db.getDefaultShoppingList(req.householdId);
+            const enriched = toAdd.map(i => ({
+              ...i,
+              list_id: defaultList.id,
+              aisle_category: i.category || 'Other',
+            }));
+            ops.push(db.addShoppingItems(req.householdId, enriched, req.user.id));
+          }
           if (toRemove.length) ops.push(db.completeShoppingItemsByName(req.householdId, toRemove.map((i) => i.item)));
         }
 

@@ -1,118 +1,164 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../lib/api';
+import { AISLE_CATEGORIES, AISLE_CONFIG, getItemEmoji } from '../lib/shopping-constants';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconCart } from '../components/Icons';
 
-const CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other'];
+function AisleIcon({ aisle, stroke }) {
+  const props = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke,
+    strokeWidth: 1.5,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  };
 
-const CATEGORY_EMOJI = {
-  groceries: '🥦', clothing: '👕', household: '🏠',
-  school: '🎒', pets: '🐾', party: '🎉', gifts: '🎁', other: '📦',
-};
+  switch (aisle) {
+    case 'Meat & Seafood':
+      return (
+        <svg {...props}>
+          <path d="M6 12c0-4 2-8 6-9 4 1 6 5 6 9s-2 8-6 9c-4-1-6-5-6-9z" />
+          <path d="M12 3v18" />
+        </svg>
+      );
+    case 'Produce':
+      return (
+        <svg {...props}>
+          <path d="M7 20c0 0 1-6 5-10s10-5 10-5-1 6-5 10-10 5-10 5z" />
+          <path d="M7 20L17 5" />
+        </svg>
+      );
+    case 'Dairy & Eggs':
+      return (
+        <svg {...props}>
+          <path d="M8 2h8l2 6v10a2 2 0 01-2 2H8a2 2 0 01-2-2V8l2-6z" />
+          <path d="M6 8h12" />
+        </svg>
+      );
+    case 'Pantry & Grains':
+      return (
+        <svg {...props}>
+          <path d="M12 2v8m0 0c-3 0-8 1-8 6v4a2 2 0 002 2h12a2 2 0 002-2v-4c0-5-5-6-8-6z" />
+        </svg>
+      );
+    case 'Bakery':
+      return (
+        <svg {...props}>
+          <path d="M5 12c0-4 3-7 7-7s7 3 7 7" />
+          <rect x="4" y="12" width="16" height="8" rx="2" />
+        </svg>
+      );
+    case 'Frozen Foods':
+      return (
+        <svg {...props}>
+          <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" />
+        </svg>
+      );
+    case 'Beverages':
+      return (
+        <svg {...props}>
+          <path d="M17 8h1a4 4 0 010 8h-1M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8z" />
+        </svg>
+      );
+    case 'Household & Cleaning':
+      return (
+        <svg {...props}>
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+      );
+    case 'Personal Care':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+      );
+    case 'Other':
+    default:
+      return (
+        <svg {...props}>
+          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+        </svg>
+      );
+  }
+}
 
 export default function Shopping() {
-  const [items, setItems]           = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState('');
-  const [filter, setFilter]         = useState('');          // category filter
-  const [showCompleted, setShowCompleted] = useState(true);
+  const [lists, setLists] = useState([]);
+  const [activeListId, setActiveListId] = useState(null);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [addText, setAddText] = useState('');
+  const [addAisle, setAddAisle] = useState('auto');
+  const [adding, setAdding] = useState(false);
+  const [collapsedAisles, setCollapsedAisles] = useState(new Set());
+  const [showPurchased, setShowPurchased] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [showNewListInput, setShowNewListInput] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [editFields, setEditFields] = useState({});
 
-  // Add form state
-  const [addText, setAddText]       = useState('');
-  const [addCat, setAddCat]         = useState('groceries');
-  const [adding, setAdding]         = useState(false);
-  const [toggling, setToggling]     = useState(new Set());
-  const [restoring, setRestoring]   = useState(new Set());
-  const [deleting, setDeleting]     = useState(new Set());
-
-  // Edit popup state
-  const [editItem, setEditItem]     = useState(null);
-  const [editName, setEditName]     = useState('');
-  const [editQty, setEditQty]       = useState('');
-  const [editUnit, setEditUnit]     = useState('');
-  const [editDesc, setEditDesc]     = useState('');
-  const [editCat, setEditCat]       = useState('');
-  const [saving, setSaving]         = useState(false);
-  const popupRef = useRef(null);
-
-  const load = useCallback(async () => {
+  // Load lists on mount
+  const loadLists = useCallback(async () => {
     try {
-      const params = {};
-      if (filter) params.category = filter;
-      if (showCompleted) params.completed = 'true';
-      const res = await api.get('/shopping', { params });
+      const res = await api.get('/shopping-lists');
+      const fetched = res.data.lists ?? res.data ?? [];
+      setLists(fetched);
+      if (fetched.length > 0 && !activeListId) {
+        setActiveListId(fetched[0].id);
+      }
+    } catch {
+      setError('Could not load shopping lists.');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLists();
+  }, [loadLists]);
+
+  // Load items when active list changes
+  const loadItems = useCallback(async () => {
+    if (!activeListId) return;
+    setLoading(true);
+    try {
+      const res = await api.get('/shopping', { params: { list_id: activeListId, completed: 'true' } });
       setItems(res.data.items ?? []);
     } catch {
-      setError('Could not load shopping list.');
+      setError('Could not load shopping items.');
     } finally {
       setLoading(false);
     }
-  }, [filter, showCompleted]);
+  }, [activeListId]);
 
-  useEffect(() => { setLoading(true); load(); }, [load]);
-
-  // Close popup on outside click
   useEffect(() => {
-    if (!editItem) return;
-    function handleClick(e) {
-      if (popupRef.current && !popupRef.current.contains(e.target)) {
-        setEditItem(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [editItem]);
+    loadItems();
+  }, [loadItems]);
 
-  function openEdit(item) {
-    setEditItem(item);
-    setEditName(item.item || '');
-    setEditQty(item.quantity || '');
-    setEditUnit(item.unit || '');
-    setEditDesc(item.description || '');
-    setEditCat(item.category || 'other');
-  }
+  // Computed values
+  const incompleteItems = items.filter(i => !i.completed);
+  const completedItems = items.filter(i => i.completed).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
 
-  async function saveEdit() {
-    if (!editItem || !editName.trim()) return;
-    setSaving(true);
-    try {
-      await api.patch(`/shopping/${editItem.id}`, {
-        item: editName.trim(),
-        quantity: editQty.trim() || null,
-        unit: editUnit.trim() || null,
-        description: editDesc.trim() || null,
-        category: editCat,
-      });
-      setEditItem(null);
-      await load();
-    } catch {
-      setError('Could not update item.');
-    } finally {
-      setSaving(false);
-    }
-  }
+  const groupedByAisle = AISLE_CATEGORIES
+    .map(aisle => [aisle, incompleteItems.filter(i => (i.aisle_category || 'Other') === aisle)])
+    .filter(([, aisleItems]) => aisleItems.length > 0);
 
-  async function deleteFromEdit() {
-    if (!editItem) return;
-    if (!window.confirm(`Delete "${editItem.item}"? This can't be undone.`)) return;
-    try {
-      await api.delete(`/shopping/${editItem.id}`);
-      setEditItem(null);
-      await load();
-    } catch {
-      setError('Could not delete item.');
-    }
-  }
+  const itemCount = incompleteItems.length;
 
-  async function addItem(e) {
-    e.preventDefault();
+  // Handlers
+  async function addItem() {
     if (!addText.trim()) return;
     setAdding(true);
     try {
-      await api.post('/shopping', { item: addText.trim(), category: addCat });
+      const payload = { item: addText.trim(), list_id: activeListId };
+      if (addAisle !== 'auto') payload.aisle_category = addAisle;
+      await api.post('/shopping', payload);
       setAddText('');
-      await load();
+      await loadItems();
     } catch {
       setError('Could not add item.');
     } finally {
@@ -120,321 +166,365 @@ export default function Shopping() {
     }
   }
 
-  async function restore(item) {
-    setRestoring((s) => new Set([...s, item.id]));
-    try {
-      await api.patch(`/shopping/${item.id}`, { completed: false });
-      await load();
-    } catch {
-      setError('Could not restore item.');
-    } finally {
-      setRestoring((s) => { const n = new Set(s); n.delete(item.id); return n; });
-    }
-  }
-
-  async function confirmDelete(item) {
-    if (!window.confirm(`Delete "${item.item}"? This can't be undone.`)) return;
-    setDeleting((s) => new Set([...s, item.id]));
-    try {
-      await api.delete(`/shopping/${item.id}`);
-      await load();
-    } catch {
-      setError('Could not delete item.');
-    } finally {
-      setDeleting((s) => { const n = new Set(s); n.delete(item.id); return n; });
-    }
-  }
-
-  async function toggle(item) {
-    setToggling((s) => new Set([...s, item.id]));
+  async function toggleItem(item) {
     try {
       await api.patch(`/shopping/${item.id}`, { completed: !item.completed });
-      await load();
+      await loadItems();
     } catch {
       setError('Could not update item.');
-    } finally {
-      setToggling((s) => { const n = new Set(s); n.delete(item.id); return n; });
     }
   }
 
-  const incomplete = items.filter((i) => !i.completed);
-  const complete   = items.filter((i) => i.completed)
-    .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+  async function deleteItem(id) {
+    try {
+      await api.delete(`/shopping/${id}`);
+      await loadItems();
+    } catch {
+      setError('Could not delete item.');
+    }
+  }
 
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  async function restoreItem(item) {
+    try {
+      await api.patch(`/shopping/${item.id}`, { completed: false });
+      await loadItems();
+    } catch {
+      setError('Could not restore item.');
+    }
+  }
+
+  async function createList() {
+    if (!newListName.trim()) return;
+    try {
+      await api.post('/shopping-lists', { name: newListName.trim() });
+      setNewListName('');
+      setShowNewListInput(false);
+      await loadLists();
+    } catch {
+      setError('Could not create list.');
+    }
+  }
+
+  function selectList(id) {
+    setActiveListId(id);
+  }
+
+  function toggleAisle(aisle) {
+    setCollapsedAisles(prev => {
+      const next = new Set(prev);
+      if (next.has(aisle)) {
+        next.delete(aisle);
+      } else {
+        next.add(aisle);
+      }
+      return next;
+    });
+  }
+
+  function openEditPopup(item) {
+    setEditItem(item);
+    setEditFields({
+      item: item.item || '',
+      quantity: item.quantity || '',
+      unit: item.unit || '',
+      aisle_category: item.aisle_category || 'Other',
+      description: item.description || '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editItem || !editFields.item?.trim()) return;
+    try {
+      await api.patch(`/shopping/${editItem.id}`, {
+        item: editFields.item.trim(),
+        quantity: editFields.quantity || null,
+        unit: editFields.unit || null,
+        aisle_category: editFields.aisle_category,
+        description: editFields.description || null,
+      });
+      setEditItem(null);
+      await loadItems();
+    } catch {
+      setError('Could not update item.');
+    }
   }
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2"><IconCart className="h-6 w-6" /> Shopping</h1>
-        <button
-          onClick={() => setShowCompleted((v) => !v)}
-          className="text-sm text-primary hover:underline"
-        >
-          {showCompleted ? 'Hide purchased' : 'Show purchased'}
-        </button>
+      {/* Page header */}
+      <div className="flex items-center gap-3">
+        <svg className="h-6 w-6 text-plum" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+        </svg>
+        <h1 className="font-display text-2xl font-semibold text-bark">Shopping</h1>
+        <span className="text-sm font-medium text-cocoa">{itemCount} items</span>
       </div>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* Add item */}
-      <form onSubmit={addItem} className="bg-linen rounded-2xl shadow-sm border border-cream-border p-4 flex flex-wrap gap-2">
+      {/* List selector - horizontal pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {lists.map(list => (
+          <button
+            key={list.id}
+            onClick={() => selectList(list.id)}
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border-[1.5px] transition-all ${
+              activeListId === list.id
+                ? 'bg-plum text-white border-plum'
+                : 'bg-white text-warm-grey border-light-grey hover:border-plum hover:text-plum'
+            }`}
+          >
+            {list.name}
+          </button>
+        ))}
+        {showNewListInput ? (
+          <input
+            type="text"
+            value={newListName}
+            onChange={e => setNewListName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') createList(); if (e.key === 'Escape') { setShowNewListInput(false); setNewListName(''); } }}
+            onBlur={() => { if (!newListName.trim()) setShowNewListInput(false); }}
+            placeholder="List name..."
+            className="shrink-0 w-32 px-3 py-2 rounded-full text-sm border-[1.5px] border-plum bg-white focus:outline-none"
+            autoFocus
+          />
+        ) : (
+          <button
+            onClick={() => setShowNewListInput(true)}
+            className="shrink-0 w-8 h-8 rounded-full border-[1.5px] border-dashed border-light-grey flex items-center justify-center text-warm-grey hover:border-plum hover:text-plum hover:bg-plum-light transition-all"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          </button>
+        )}
+      </div>
+
+      {/* Add item bar */}
+      <div className="flex gap-2.5 items-center">
         <input
           type="text"
           value={addText}
-          onChange={(e) => setAddText(e.target.value)}
-          placeholder="Add item…"
-          className="flex-1 min-w-0 border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          onChange={e => setAddText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') addItem(); }}
+          placeholder="Add item..."
+          className="flex-1 h-[46px] border-[1.5px] border-light-grey rounded-xl px-4 text-sm bg-white focus:outline-none focus:border-plum transition-colors"
         />
-        <div className="flex gap-2">
-          <select
-            value={addCat}
-            onChange={(e) => setAddCat(e.target.value)}
-            className="border border-cream-border rounded-2xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            disabled={adding || !addText.trim()}
-            className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white rounded-2xl px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
-          >
-            {adding ? '…' : '+ Add'}
-          </button>
-        </div>
-      </form>
-
-      {/* Category filter */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setFilter('')}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            !filter ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
-          }`}
+        {/* Desktop only: aisle dropdown */}
+        <select
+          value={addAisle}
+          onChange={e => setAddAisle(e.target.value)}
+          className="hidden md:block h-[46px] border-[1.5px] border-light-grey rounded-xl px-3 pr-8 text-sm bg-white focus:outline-none cursor-pointer min-w-[160px] appearance-none"
+          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B6774' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
         >
-          All
+          <option value="auto">Auto-detect aisle</option>
+          {AISLE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {/* Desktop: Add button */}
+        <button
+          onClick={addItem}
+          disabled={adding || !addText.trim()}
+          className="hidden md:flex h-[46px] px-5 bg-plum hover:bg-primary-pressed disabled:bg-plum/50 text-white rounded-xl text-sm font-semibold transition-colors items-center gap-1"
+        >
+          + Add
         </button>
-        {CATEGORIES.map((c) => (
-          <button
-            key={c}
-            onClick={() => setFilter(c === filter ? '' : c)}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              filter === c ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
-            }`}
-          >
-            {CATEGORY_EMOJI[c]} {c}
-          </button>
-        ))}
+        {/* Mobile: + button */}
+        <button
+          onClick={addItem}
+          disabled={adding || !addText.trim()}
+          className="md:hidden h-[42px] w-[42px] shrink-0 bg-plum hover:bg-primary-pressed disabled:bg-plum/50 text-white rounded-xl flex items-center justify-center transition-colors"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        </button>
       </div>
 
       {loading ? <Spinner /> : (
         <>
-          {/* Incomplete items */}
-          {incomplete.length === 0 && !showCompleted && (
-            <p className="text-center text-cocoa py-8">All done! Nothing left to buy.</p>
-          )}
-          <ul className="space-y-2">
-            {incomplete.map((item) => (
-              <ItemRow key={item.id} item={item} toggle={toggle} loading={toggling.has(item.id)} onEdit={openEdit} />
-            ))}
-          </ul>
+          {/* Aisle groups */}
+          {groupedByAisle.map(([aisle, aisleItems]) => {
+            const config = AISLE_CONFIG[aisle] || AISLE_CONFIG.Other;
+            const isCollapsed = collapsedAisles.has(aisle);
+            return (
+              <div key={aisle} className="mb-5">
+                {/* Aisle header - clickable to collapse */}
+                <button
+                  onClick={() => toggleAisle(aisle)}
+                  className="flex items-center gap-2.5 py-2 w-full text-left"
+                >
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: config.bg }}>
+                    <AisleIcon aisle={aisle} stroke={config.stroke} />
+                  </div>
+                  <span className="font-display text-base font-semibold text-bark">{aisle}</span>
+                  <span className="text-sm font-medium text-cocoa">({aisleItems.length})</span>
+                  <svg
+                    className={`ml-auto h-4 w-4 text-cocoa transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
 
-          {/* Completed items */}
-          {showCompleted && complete.length > 0 && (
-            <>
-              <h2 className="text-sm font-semibold text-cocoa uppercase tracking-wide mt-4">Previously purchased</h2>
-              <ul className="space-y-2">
-                {complete.map((item) => (
-                  <li key={item.id} className="bg-oat rounded-2xl border border-cream-border px-4 py-3 flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-success/20 text-success flex items-center justify-center shrink-0 text-xs font-bold">
-                      ✓
-                    </div>
-                    <button onClick={() => openEdit(item)} className="flex-1 min-w-0 text-left">
-                      <p className="text-sm text-cocoa">{item.item}</p>
-                      <div className="flex gap-x-3 mt-0.5">
-                        <span className="text-xs text-cocoa">
-                          {CATEGORY_EMOJI[item.category]} {item.category}
+                {/* Items - hidden when collapsed */}
+                {!isCollapsed && (
+                  <div className="flex flex-col gap-1.5 py-2">
+                    {aisleItems.map(item => (
+                      <div
+                        key={item.id}
+                        className="group flex items-center gap-3 px-4 py-3 bg-white rounded-xl transition-all hover:shadow-sm hover:border-light-grey border border-transparent cursor-pointer"
+                        onClick={() => openEditPopup(item)}
+                      >
+                        {/* Checkbox */}
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleItem(item); }}
+                          className={`w-[22px] h-[22px] rounded-[7px] border-2 shrink-0 flex items-center justify-center transition-all ${
+                            item.completed ? 'bg-sage border-sage' : 'border-light-grey hover:border-sage'
+                          }`}
+                        >
+                          {item.completed && (
+                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+                          )}
+                        </button>
+
+                        {/* Emoji */}
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-[10px] bg-cream border border-light-grey flex items-center justify-center text-xl md:text-[22px] shrink-0">
+                          {getItemEmoji(item.item, item.aisle_category)}
+                        </div>
+
+                        {/* Name */}
+                        <span className={`flex-1 text-sm font-medium ${item.completed ? 'line-through text-warm-grey' : 'text-bark'}`}>
+                          {item.item}
                         </span>
-                        {item.completed_at && (
-                          <span className="text-xs text-cocoa">Last purchased: {formatDate(item.completed_at)}</span>
+
+                        {/* Quantity badge */}
+                        {(item.quantity || item.unit) && (
+                          <span className="text-xs font-semibold text-plum bg-plum-light px-2.5 py-0.5 rounded-full">
+                            {item.quantity}{item.unit ? ` ${item.unit}` : ''}
+                          </span>
                         )}
+
+                        {/* Delete button (hover only on desktop) */}
+                        <button
+                          onClick={e => { e.stopPropagation(); deleteItem(item.id); }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-warm-grey hover:bg-coral-light hover:text-coral transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
+                        </button>
                       </div>
-                    </button>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={() => restore(item)}
-                        disabled={restoring.has(item.id)}
-                        className="text-xs font-medium text-warn hover:text-warn bg-warn/10 hover:bg-warn/20 px-3 py-1.5 rounded-2xl transition-colors"
-                      >
-                        {restoring.has(item.id) ? '…' : 'Restore'}
-                      </button>
-                      <button
-                        onClick={() => confirmDelete(item)}
-                        disabled={deleting.has(item.id)}
-                        className="text-xs text-error hover:text-error hover:bg-error/10 p-1.5 rounded-2xl transition-colors"
-                        title="Delete permanently"
-                      >
-                        {deleting.has(item.id) ? '…' : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Empty state */}
+          {incompleteItems.length === 0 && !loading && (
+            <div className="text-center py-12 text-cocoa text-sm">
+              No items on this list yet. Add something above!
+            </div>
+          )}
+
+          {/* Previously purchased section */}
+          {completedItems.length > 0 && (
+            <div className="mt-8 pt-5 border-t border-light-grey">
+              <button
+                onClick={() => setShowPurchased(!showPurchased)}
+                className="flex items-center justify-between w-full mb-3"
+              >
+                <span className="font-display text-base font-semibold text-warm-grey">Previously purchased</span>
+                <span className="text-xs font-semibold text-plum">{showPurchased ? 'Hide' : 'Show'}</span>
+              </button>
+              {showPurchased && (
+                <div className="flex flex-col gap-1.5">
+                  {completedItems.map(item => {
+                    const config = AISLE_CONFIG[item.aisle_category] || AISLE_CONFIG.Other;
+                    return (
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl opacity-60">
+                        {/* Checked circle */}
+                        <div className="w-[22px] h-[22px] rounded-[7px] bg-sage flex items-center justify-center shrink-0">
+                          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+                        </div>
+                        {/* Name */}
+                        <span className="flex-1 text-sm font-medium text-bark" style={{ opacity: 0.7 }}>{item.item}</span>
+                        {/* Aisle pill */}
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
+                          style={{ background: config.pillBg, color: config.pillText }}
+                        >
+                          {(item.aisle_category || 'Other').replace(' & Cleaning', '').replace(' & Eggs', '').replace(' & Seafood', '').replace(' & Grains', '').replace(' Foods', '')}
+                        </span>
+                        {/* Date */}
+                        <span className="text-[11px] text-cocoa whitespace-nowrap">
+                          {item.completed_at ? new Date(item.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}
+                        </span>
+                        {/* Restore button */}
+                        <button
+                          onClick={() => restoreItem(item)}
+                          className="text-xs font-semibold text-plum bg-plum-light px-3 py-1 rounded-lg hover:bg-plum hover:text-white transition-all whitespace-nowrap"
+                        >
+                          Restore
+                        </button>
+                        {/* Delete button */}
+                        <button
+                          onClick={() => deleteItem(item.id)}
+                          className="w-6 h-6 rounded-md flex items-center justify-center text-coral hover:bg-coral-light transition-all"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
 
-      {/* Edit item popup */}
+      {/* Edit item popup modal */}
       {editItem && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div
-            ref={popupRef}
-            className="bg-linen w-full sm:w-[420px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border p-5 space-y-4 max-h-[80vh] overflow-y-auto"
-          >
-            {/* Item name */}
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full text-lg font-semibold text-bark bg-transparent border-b border-cream-border pb-2 focus:outline-none focus:border-primary"
-              placeholder="Item name"
-            />
-
-            {/* Qty + Unit row */}
-            <div className="flex items-center gap-3">
-              <span className="text-cocoa shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" x2="21" y1="6" y2="6" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={editQty}
-                onChange={(e) => setEditQty(e.target.value)}
-                placeholder="Qty"
-                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-              <input
-                type="text"
-                value={editUnit}
-                onChange={(e) => setEditUnit(e.target.value)}
-                placeholder="Unit (kg, litres, packs…)"
-                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            {/* Category */}
-            <div className="flex items-center gap-3">
-              <span className="text-cocoa shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 9h16" /><path d="M4 15h16" /><path d="M10 3 8 21" /><path d="M16 3l-2 18" />
-                </svg>
-              </span>
-              <select
-                value={editCat}
-                onChange={(e) => setEditCat(e.target.value)}
-                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Description */}
-            <div className="flex items-start gap-3">
-              <span className="text-cocoa shrink-0 mt-2.5">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" />
-                </svg>
-              </span>
-              <textarea
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
-                placeholder="Add description"
-                rows={2}
-                className="flex-1 border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent resize-none"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-2">
-              <button
-                onClick={deleteFromEdit}
-                className="flex items-center gap-1.5 text-sm text-error hover:text-error/80 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                Delete
+          <div className="bg-linen w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-bark">Edit item</h3>
+              <button onClick={() => setEditItem(null)} className="text-cocoa hover:text-bark p-1">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setEditItem(null)}
-                  className="px-4 py-2 text-sm font-medium text-cocoa bg-oat hover:bg-cream-border rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveEdit}
-                  disabled={saving || !editName.trim()}
-                  className="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-pressed disabled:bg-primary/50 rounded-xl transition-colors"
-                >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-bark mb-1">Item name</label>
+                <input type="text" value={editFields.item} onChange={e => setEditFields(f => ({...f, item: e.target.value}))} className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-bark mb-1">Quantity</label>
+                  <input type="text" value={editFields.quantity || ''} onChange={e => setEditFields(f => ({...f, quantity: e.target.value}))} className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-bark mb-1">Unit</label>
+                  <select value={editFields.unit || ''} onChange={e => setEditFields(f => ({...f, unit: e.target.value}))} className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent">
+                    <option value="">—</option>
+                    {['g', 'kg', 'ml', 'l', 'pcs', 'pack', 'tin', 'bunch', 'loaf'].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-bark mb-1">Aisle</label>
+                <select value={editFields.aisle_category || 'Other'} onChange={e => setEditFields(f => ({...f, aisle_category: e.target.value}))} className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent">
+                  {AISLE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-bark mb-1">Notes</label>
+                <textarea value={editFields.description || ''} onChange={e => setEditFields(f => ({...f, description: e.target.value}))} rows={2} className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditItem(null)} className="flex-1 py-3 bg-oat hover:bg-cream-border text-bark rounded-xl text-sm font-medium transition-colors">Cancel</button>
+                <button onClick={saveEdit} className="flex-1 py-3 bg-plum hover:bg-primary-pressed text-white rounded-xl text-sm font-medium transition-colors">Save</button>
               </div>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function ItemRow({ item, toggle, loading, onEdit }) {
-  return (
-    <li className="bg-linen rounded-2xl shadow-sm border border-cream-border px-4 py-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onEdit(item)}>
-      <button
-        onClick={(e) => { e.stopPropagation(); toggle(item); }}
-        disabled={loading}
-        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-          item.completed
-            ? 'bg-success border-success text-white'
-            : 'border-cream-border hover:border-primary'
-        }`}
-      >
-        {item.completed && '✓'}
-      </button>
-      <button onClick={() => onEdit(item)} className="flex-1 min-w-0 text-left">
-        <div className="flex items-baseline gap-1.5">
-          <span className={`text-sm ${item.completed ? 'line-through text-cocoa' : 'text-bark'}`}>
-            {item.item}
-          </span>
-          {(item.quantity || item.unit) && (
-            <span className="text-cocoa text-xs">
-              ({[item.quantity, item.unit].filter(Boolean).join(' ')})
-            </span>
-          )}
-        </div>
-        {item.description && (
-          <p className="text-xs text-cocoa mt-0.5 truncate">{item.description}</p>
-        )}
-      </button>
-      <span className="text-xs text-cocoa shrink-0">
-        {CATEGORY_EMOJI[item.category]} {item.category}
-      </span>
-    </li>
   );
 }

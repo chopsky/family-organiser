@@ -41,12 +41,17 @@ CALENDAR EVENT RULES:
 - Default end_time to 1 hour after start_time if not specified
 
 SHOPPING ITEM RULES:
-- Infer category from context: groceries | clothing | household | school | pets | party | gifts | other
-- clothing = any wearable items (t-shirts, shoes, jackets, socks, uniforms, etc.)
-- household = cleaning products, toiletries, DIY, furniture, homeware
-- groceries = food and drink items ONLY
-- school = stationery, school supplies, book bags
-- pets = pet food, pet accessories
+- Infer aisle_category from context: Dairy & Eggs | Produce | Meat & Seafood | Pantry & Grains | Bakery | Frozen Foods | Beverages | Household & Cleaning | Personal Care | Other
+- Dairy & Eggs = milk, cheese, yoghurt, butter, eggs, cream
+- Produce = fresh fruit and vegetables
+- Meat & Seafood = chicken, beef, pork, lamb, fish, sausages, bacon, ham, seafood
+- Pantry & Grains = rice, pasta, cereal, flour, sugar, oil, sauces, tinned goods, spices
+- Bakery = bread, rolls, croissants, cakes, pastries
+- Frozen Foods = frozen items, ice cream, frozen pizza, fish fingers
+- Beverages = juice, water, coffee, tea, squash, wine, beer, soft drinks
+- Household & Cleaning = cleaning products, paper towels, bin bags, foil, sponges, laundry, DIY
+- Personal Care = soap, shampoo, toothpaste, deodorant, nappies, wipes
+- Other = everything else (clothing, school, pets, gifts, party, etc.)
 - Extract quantity if mentioned (e.g. "2 litres", "a dozen")
 - action must be "add" or "remove"
 - Normalise item names to plain English (e.g. "some milk" → "milk")
@@ -74,7 +79,7 @@ Respond only with valid JSON matching this schema:
   "shopping_items": [
     {
       "item": string,
-      "category": "groceries" | "clothing" | "household" | "school" | "pets" | "party" | "gifts" | "other",
+      "category": "Dairy & Eggs" | "Produce" | "Meat & Seafood" | "Pantry & Grains" | "Bakery" | "Frozen Foods" | "Beverages" | "Household & Cleaning" | "Personal Care" | "Other",
       "quantity": string | null,
       "action": "add" | "remove"
     }
@@ -211,9 +216,9 @@ For all-day events, set all_day to true and omit start_time/end_time. assigned_t
 
 ### Shopping Items
 \`\`\`json
-{"action": "add_shopping", "items": [{"item": "item name", "category": "groceries"}]}
+{"action": "add_shopping", "items": [{"item": "item name", "category": "Produce"}]}
 \`\`\`
-Valid categories: groceries, clothing, household, school, pets, party, gifts, other.
+Valid categories: Dairy & Eggs, Produce, Meat & Seafood, Pantry & Grains, Bakery, Frozen Foods, Beverages, Household & Cleaning, Personal Care, Other.
 
 ### Tasks
 \`\`\`json

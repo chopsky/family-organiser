@@ -685,19 +685,22 @@ async function addShoppingItems(householdId, items, addedByUserId) {
     category: i.category || 'other',
     quantity: i.quantity || null,
     added_by: addedByUserId,
+    list_id: i.list_id || null,
+    aisle_category: i.aisle_category || 'Other',
   }));
   const { data, error } = await supabase.from('shopping_items').insert(rows).select();
   if (error) throw error;
   return data;
 }
 
-async function getShoppingList(householdId, { includeCompleted = false } = {}) {
+async function getShoppingList(householdId, { includeCompleted = false, listId } = {}) {
   let query = supabase
     .from('shopping_items')
     .select()
     .eq('household_id', householdId)
     .order('created_at');
   if (!includeCompleted) query = query.eq('completed', false);
+  if (listId) query = query.eq('list_id', listId);
   const { data, error } = await query;
   if (error) throw error;
   return data;
@@ -972,6 +975,57 @@ async function deleteShoppingItem(itemId, householdId) {
     .eq('id', itemId)
     .eq('household_id', householdId);
   if (error) throw error;
+}
+
+// ─── Shopping Lists ──────────────────────────────────────────────────────────
+
+async function getShoppingLists(householdId) {
+  const { data, error } = await supabase
+    .from('shopping_lists')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at');
+  if (error) throw error;
+  return data;
+}
+
+async function createShoppingList(householdId, name) {
+  const { data, error } = await supabase
+    .from('shopping_lists')
+    .insert({ household_id: householdId, name })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteShoppingList(listId, householdId) {
+  const { data, error } = await supabase
+    .from('shopping_lists')
+    .delete()
+    .eq('id', listId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+  return data;
+}
+
+async function getDefaultShoppingList(householdId) {
+  let { data } = await supabase
+    .from('shopping_lists')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('name', 'Default')
+    .single();
+  if (!data) {
+    // Create Default list if it doesn't exist
+    const result = await supabase
+      .from('shopping_lists')
+      .insert({ household_id: householdId, name: 'Default' })
+      .select()
+      .single();
+    data = result.data;
+  }
+  return data;
 }
 
 async function getOverdueTasksForUser(householdId, userId) {
@@ -1689,6 +1743,10 @@ module.exports = {
   getPendingInvites,
   addShoppingItems,
   getShoppingList,
+  getShoppingLists,
+  createShoppingList,
+  deleteShoppingList,
+  getDefaultShoppingList,
   completeShoppingItemsByName,
   completeShoppingItemById,
   addTasks,
