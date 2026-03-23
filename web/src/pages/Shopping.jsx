@@ -97,7 +97,7 @@ export default function Shopping() {
   const [addAisle, setAddAisle] = useState('auto');
   const [adding, setAdding] = useState(false);
   const [collapsedAisles, setCollapsedAisles] = useState(new Set());
-  const [showPurchased, setShowPurchased] = useState(false);
+  const [showPurchased, setShowPurchased] = useState(true);
   const [newListName, setNewListName] = useState('');
   const [showNewListInput, setShowNewListInput] = useState(false);
   const [editItem, setEditItem] = useState(null);
