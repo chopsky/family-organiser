@@ -23,10 +23,11 @@ async function authResponse(user) {
     householdId: user.household_id,
     name: user.name,
     role: user.role,
+    isPlatformAdmin: user.is_platform_admin || false,
   });
   return {
     token,
-    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null },
+    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false },
     household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time } : null,
   };
 }
@@ -476,11 +477,12 @@ router.post('/join', async (req, res) => {
       householdId: household.id,
       name: user.name,
       role: user.role,
+      isPlatformAdmin: user.is_platform_admin || false,
     });
 
     return res.json({
       token,
-      user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null },
+      user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false },
       household: { id: household.id, name: household.name, join_code: household.join_code },
     });
   } catch (err) {

@@ -19,7 +19,7 @@ function requireAuth(req, res, next) {
   const token = header.slice(7);
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: payload.userId, name: payload.name, role: payload.role };
+    req.user = { id: payload.userId, name: payload.name, role: payload.role, isPlatformAdmin: payload.isPlatformAdmin || false };
     req.householdId = payload.householdId;
     return next();
   } catch (err) {
@@ -49,4 +49,15 @@ function requireHousehold(req, res, next) {
   return next();
 }
 
-module.exports = { signToken, requireAuth, requireAdmin, requireHousehold };
+/**
+ * Middleware: requires the user to be a platform admin.
+ * Must be chained after requireAuth.
+ */
+function requirePlatformAdmin(req, res, next) {
+  if (!req.user.isPlatformAdmin) {
+    return res.status(403).json({ error: 'Platform admin access required' });
+  }
+  return next();
+}
+
+module.exports = { signToken, requireAuth, requireAdmin, requireHousehold, requirePlatformAdmin };

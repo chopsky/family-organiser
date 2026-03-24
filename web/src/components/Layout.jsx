@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield } from './Icons';
 import ChatWidget from './ChatWidget';
 
 const mainNav = [
@@ -54,7 +54,7 @@ const avatarColors = {
 };
 
 export default function Layout({ children }) {
-  const { household, user, token, login, logout } = useAuth();
+  const { household, user, token, login, logout, isPlatformAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -179,6 +179,11 @@ export default function Layout({ children }) {
             <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
             <p className="text-[11px] text-warm-grey capitalize">{user?.role || 'Member'}</p>
           </div>
+          {isPlatformAdmin && (
+            <Link to="/admin" className="text-warm-grey hover:text-plum transition-colors" title="Admin Dashboard">
+              <IconShield className="h-5 w-5" />
+            </Link>
+          )}
           <Link to="/settings" className="text-warm-grey hover:text-charcoal transition-colors" title="Settings">
             <IconSettings className="h-5 w-5" />
           </Link>

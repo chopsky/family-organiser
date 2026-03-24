@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import AdminLayout from './components/AdminLayout';
 import Login         from './pages/Login';
 import Signup        from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
@@ -15,6 +16,11 @@ import Receipt       from './pages/Receipt';
 import Settings      from './pages/Settings';
 import FamilySetup   from './pages/FamilySetup';
 import Meals         from './pages/Meals';
+import AdminDashboard       from './pages/admin/AdminDashboard';
+import AdminUsers           from './pages/admin/AdminUsers';
+import AdminUserDetail      from './pages/admin/AdminUserDetail';
+import AdminHouseholds      from './pages/admin/AdminHouseholds';
+import AdminHouseholdDetail from './pages/admin/AdminHouseholdDetail';
 
 function RequireAuth({ children }) {
   const { token, needsHousehold } = useAuth();
@@ -26,6 +32,13 @@ function RequireAuth({ children }) {
 function RequireAuthOnly({ children }) {
   const { token } = useAuth();
   return token ? children : <Navigate to="/login" replace />;
+}
+
+function RequirePlatformAdmin({ children }) {
+  const { token, isPlatformAdmin } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  if (!isPlatformAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
 }
 
 function AppRoutes() {
@@ -47,6 +60,12 @@ function AppRoutes() {
       <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
       <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
       <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+      {/* Admin routes */}
+      <Route path="/admin" element={<RequirePlatformAdmin><AdminLayout><AdminDashboard /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/users" element={<RequirePlatformAdmin><AdminLayout><AdminUsers /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/users/:id" element={<RequirePlatformAdmin><AdminLayout><AdminUserDetail /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/households" element={<RequirePlatformAdmin><AdminLayout><AdminHouseholds /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/households/:id" element={<RequirePlatformAdmin><AdminLayout><AdminHouseholdDetail /></AdminLayout></RequirePlatformAdmin>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

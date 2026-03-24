@@ -1756,6 +1756,160 @@ async function getRecentPurchases(householdId, days = 14) {
   return data;
 }
 
+// ─── Platform Admin ──────────────────────────────────────────────────────────
+
+async function getAllUsersAdmin({ search, page = 1, limit = 50 } = {}) {
+  let query = supabase
+    .from('users')
+    .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  }
+
+  const from = (page - 1) * limit;
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(from, from + limit - 1);
+
+  if (error) throw error;
+  return { users: data, total: count };
+}
+
+async function getUserByIdAdmin(userId) {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select()
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+
+  let household = null;
+  if (user.household_id) {
+    const { data: h } = await supabase
+      .from('households')
+      .select()
+      .eq('id', user.household_id)
+      .single();
+    household = h;
+  }
+
+  return { ...user, household };
+}
+
+async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}) {
+  let query = supabase
+    .from('households')
+    .select('id, name, join_code, timezone, reminder_time, created_at', { count: 'exact' });
+
+  if (search) {
+    query = query.ilike('name', `%${search}%`);
+  }
+
+  const from = (page - 1) * limit;
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(from, from + limit - 1);
+
+  if (error) throw error;
+
+  // Attach member counts
+  const householdIds = data.map((h) => h.id);
+  if (householdIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('household_id')
+      .in('household_id', householdIds);
+
+    const countMap = {};
+    for (const u of users || []) {
+      countMap[u.household_id] = (countMap[u.household_id] || 0) + 1;
+    }
+    for (const h of data) {
+      h.member_count = countMap[h.id] || 0;
+    }
+  }
+
+  return { households: data, total: count };
+}
+
+async function getHouseholdDetailAdmin(householdId) {
+  const { data: household, error } = await supabase
+    .from('households')
+    .select()
+    .eq('id', householdId)
+    .single();
+  if (error) throw error;
+
+  const { data: members } = await supabase
+    .from('users')
+    .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at')
+    .eq('household_id', householdId)
+    .order('created_at');
+
+  return { ...household, members: members || [] };
+}
+
+async function getPlatformStats() {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult] = await Promise.all([
+    supabase.from('users').select('id', { count: 'exact', head: true }),
+    supabase.from('households').select('id', { count: 'exact', head: true }),
+    supabase.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+    supabase.from('households').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+  ]);
+
+  return {
+    totalUsers: usersResult.count || 0,
+    totalHouseholds: householdsResult.count || 0,
+    newUsersThisWeek: newUsersResult.count || 0,
+    newHouseholdsThisWeek: newHouseholdsResult.count || 0,
+  };
+}
+
+async function disableUser(userId) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ disabled_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function enableUser(userId) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ disabled_at: null })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteUser(userId) {
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+async function setUserPlatformAdmin(userId, isPlatformAdmin) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ is_platform_admin: isPlatformAdmin })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -1898,4 +2052,14 @@ module.exports = {
   getRecentMeals,
   getRecentPurchases,
   getSupabase: () => supabase,
+  // Platform admin
+  getAllUsersAdmin,
+  getUserByIdAdmin,
+  getAllHouseholdsAdmin,
+  getHouseholdDetailAdmin,
+  getPlatformStats,
+  disableUser,
+  enableUser,
+  deleteUser,
+  setUserPlatformAdmin,
 };

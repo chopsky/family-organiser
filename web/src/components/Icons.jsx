@@ -82,3 +82,51 @@ export function IconUtensils(p) {
 export function IconWave(p) {
   return <Icon {...p}><path d="M18.36 18.36A9 9 0 005.64 5.64" /><path d="M15.54 15.54A5 5 0 008.46 8.46" /><circle cx="12" cy="12" r="1" /></Icon>;
 }
+
+export function IconShield(p) {
+  return <Icon {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></Icon>;
+}
+
+export function IconBarChart(p) {
+  return <Icon {...p}><line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></Icon>;
+}
+
+export function IconArrowLeft(p) {
+  return <Icon {...p}><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></Icon>;
+}
+
+export function IconChevronLeft(p) {
+  return <Icon {...p}><polyline points="15 18 9 12 15 6" /></Icon>;
+}
+
+export function IconChevronRight(p) {
+  return <Icon {...p}><polyline points="9 18 15 12 9 6" /></Icon>;
+}
+
+export function IconTrash(p) {
+  return <Icon {...p}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></Icon>;
+}
+
+export function IconBan(p) {
+  return <Icon {...p}><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></Icon>;
+}
+
+export function IconCheckCircle(p) {
+  return <Icon {...p}><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></Icon>;
+}
+
+export function IconCpu(p) {
+  return <Icon {...p}><rect x="4" y="4" width="16" height="16" rx="2" ry="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></Icon>;
+}
+
+export function IconMessageCircle(p) {
+  return <Icon {...p}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></Icon>;
+}
+
+export function IconRefresh(p) {
+  return <Icon {...p}><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></Icon>;
+}
+
+export function IconTrendingUp(p) {
+  return <Icon {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></Icon>;
+}
