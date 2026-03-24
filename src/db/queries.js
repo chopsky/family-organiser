@@ -237,14 +237,15 @@ async function deleteDependent(id, householdId) {
 // ─── Chat message helpers ────────────────────────────────────────────────────
 
 async function getChatHistory(userId, limit = 50) {
+  // Fetch the most recent N messages (descending), then reverse for chronological display
   const { data, error } = await supabase
     .from('chat_messages')
     .select()
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data || [];
+  return (data || []).reverse();
 }
 
 async function saveChatMessage(householdId, userId, role, content) {
