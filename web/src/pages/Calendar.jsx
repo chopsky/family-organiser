@@ -1096,7 +1096,7 @@ export default function Calendar() {
 
           {/* ── Day Detail Panel (Month view only) ────────────── */}
           {selectedDate && (
-            <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-5 space-y-4">
+            <div className="bg-linen rounded-2xl shadow-[0_2px_8px_rgba(107,63,160,0.06)] p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-bark">{formatLongDate(selectedDate)}</h2>
                 <button onClick={() => openAddForm(selectedDate)} className="text-sm text-primary hover:text-primary-pressed font-medium flex items-center gap-1">
