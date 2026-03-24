@@ -698,7 +698,7 @@ export default function Calendar() {
     const colCount = dates.length;
 
     return (
-      <div className="bg-linen rounded-2xl shadow-sm border border-cream-border overflow-hidden">
+      <div className="bg-linen rounded-2xl shadow-[0_2px_8px_rgba(107,63,160,0.06)] overflow-hidden">
         {/* Day headers */}
         <div className="border-b border-cream-border sticky top-0 bg-linen z-20">
           <div className="flex">
@@ -1033,7 +1033,7 @@ export default function Calendar() {
       {/* ── Month View ──────────────────────────────────────── */}
       {viewMode === 'month' && (
         <>
-          <div className="bg-linen rounded-2xl shadow-sm border border-cream-border p-3 sm:p-5">
+          <div className="bg-linen rounded-2xl shadow-[0_2px_8px_rgba(107,63,160,0.06)] p-3 sm:p-5">
             {/* Day-of-week headers */}
             <div className="grid grid-cols-7 mb-1">
               {DAY_HEADERS.map(d => (
