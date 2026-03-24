@@ -41,7 +41,7 @@ const COLOR_HEX = {
   leaf: '#7BAE4E', emerald: '#3A9E6E', teal: '#3AADA0', sky: '#4A9FCC',
   cobalt: '#3A6FD4', indigo: '#6558C7', purple: '#9050B5', magenta: '#C74E95',
   rose: '#E06888', terracotta: '#C47A5E', moss: '#7C8A6E', slate: '#7A8694',
-  sage: '#7DAE82', plum: '#6B3FA0', coral: '#E8724A',
+  sage: '#7DAE82', plum: '#6B3FA0', coral: '#E8724A', pink: '#D4537E',
   lavender: '#6558C7', orange: '#E8A040', blue: '#4A9FCC', green: '#7DAE82', gray: '#7A8694',
 };
 
@@ -661,13 +661,16 @@ export default function Calendar() {
     }
   }
 
-  // Resolve event colour: prefer assigned member's theme, fallback to sage
+  // Resolve event colour: prefer assigned member's theme, then category, fallback to plum
   function getEventColor(ev) {
     if (ev.assigned_to_name) {
       const m = members.find(member => member.name === ev.assigned_to_name);
       if (m?.color_theme) return m.color_theme;
     }
-    return 'sage';
+    if (ev.category === 'public_holiday') return 'sage';
+    if (ev.category === 'birthday') return 'pink';
+    if (ev.category === 'school') return 'amber';
+    return 'plum';
   }
 
   function getEventHex(ev) {
