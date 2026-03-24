@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { classify } = require('../services/ai');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
+const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
@@ -42,6 +43,30 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // Strip any leaked JSON action blocks from the response message
     if (result.response_message) {
       result.response_message = stripActionBlocks(result.response_message);
+    }
+
+    // Handle weather intent — fetch weather before responding
+    if (result.intent === 'weather') {
+      try {
+        const fullUser = members.find(m => m.id === req.user.id);
+        let lat = fullUser?.latitude;
+        let lon = fullUser?.longitude;
+        const tz = fullUser?.timezone || 'Europe/London';
+        if (!lat || !lon) {
+          const tzCoords = getCoordsFromTimezone(tz);
+          if (tzCoords) [lat, lon] = tzCoords;
+        }
+        if (lat && lon) {
+          const weatherReport = await getWeatherReport(lat, lon, tz);
+          result.response_message = weatherReport;
+        } else {
+          result.response_message = "I couldn't determine your location for weather. Please check your profile settings. 📍";
+        }
+      } catch (err) {
+        console.error('Weather fetch failed:', err.message);
+        result.response_message = "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️";
+      }
+      return res.json({ result });
     }
 
     // Send the AI response immediately — don't wait for DB saves
