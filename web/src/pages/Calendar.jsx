@@ -271,6 +271,7 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState('month');
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(new Date(today));
+  const [morePopup, setMorePopup] = useState(null); // { date, items, rect }
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1117,10 +1118,9 @@ export default function Calendar() {
                     return (
                       <div
                         key={idx}
-                        onClick={() => { setSelectedDate(new Date(date)); }}
-                        className={`min-h-[90px] p-1.5 cursor-pointer transition-colors border-b border-light-grey ${
+                        className={`min-h-[90px] p-1.5 transition-colors border-b border-light-grey ${
                           idx % 7 !== 6 ? 'border-r' : ''
-                        } ${!isCurrent ? 'bg-[#F8F6F2]' : isToday_ ? 'bg-plum-light' : 'bg-white hover:bg-cream'}`}
+                        } ${!isCurrent ? 'bg-[#F8F6F2]' : isToday_ ? 'bg-plum-light' : 'bg-white'}`}
                       >
                         <div className={`text-xs font-semibold mb-0.5 w-6 h-6 flex items-center justify-center ${
                           !isCurrent ? 'text-light-grey' : isToday_ ? 'bg-plum text-white rounded-full' : 'text-charcoal'
@@ -1148,7 +1148,14 @@ export default function Calendar() {
                           );
                         })}
                         {overflow > 0 && (
-                          <div className="text-[9px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date(date)); setViewMode('day'); }}>
+                          <div
+                            className="text-[9px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMorePopup({ date, items: allItems, rect: { top: rect.bottom + 4, left: rect.left } });
+                            }}
+                          >
                             +{overflow} more
                           </div>
                         )}
@@ -1159,6 +1166,44 @@ export default function Calendar() {
               </div>
             </div>
           </div>
+
+          {/* "+N more" popup */}
+          {morePopup && (
+            <div className="fixed inset-0 z-40" onClick={() => setMorePopup(null)}>
+              <div
+                className="absolute bg-white rounded-xl border border-light-grey p-3 min-w-[200px] max-w-[280px] max-h-[320px] overflow-y-auto"
+                style={{
+                  top: `${Math.min(morePopup.rect.top, window.innerHeight - 340)}px`,
+                  left: `${Math.min(morePopup.rect.left, window.innerWidth - 300)}px`,
+                  boxShadow: '0 8px 24px rgba(107,63,160,0.12)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-xs font-semibold text-charcoal mb-2">
+                  {morePopup.date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </div>
+                <div className="flex flex-col gap-1">
+                  {morePopup.items.map(item => {
+                    const pillStyle = item._isTask ? { bg: '#E8724A18', text: '#E8724A' } : getEventStyle(item);
+                    return (
+                      <div
+                        key={item.id}
+                        className="text-[11px] font-semibold px-2 py-1.5 rounded-md cursor-pointer hover:opacity-80 truncate"
+                        style={{ background: pillStyle.bg, color: pillStyle.text }}
+                        onClick={() => {
+                          setMorePopup(null);
+                          if (item._isTask) openTaskEditForm(item);
+                          else if (item.category !== 'public_holiday' && item.category !== 'birthday') openEditForm(item);
+                        }}
+                      >
+                        {item.title}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Mobile mini calendar */}
           <div className="md:hidden">
@@ -1507,8 +1552,19 @@ export default function Calendar() {
                     else if (item.category !== 'public_holiday' && item.category !== 'birthday') openEditForm(item);
                   }}
                 >
+                  {item._type === 'task' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleTask(item); }}
+                      disabled={toggling.has(item.id)}
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        item.completed ? 'bg-sage border-sage text-white' : 'border-light-grey hover:border-sage'
+                      }`}
+                    >
+                      {item.completed && <IconCheck className="h-3 w-3" />}
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-charcoal truncate">{item.title}</div>
+                    <div className={`text-sm font-semibold truncate ${item._type === 'task' && item.completed ? 'line-through text-warm-grey' : 'text-charcoal'}`}>{item.title}</div>
                     <div className="text-xs text-warm-grey">
                       {item._type === 'task'
                         ? (item.due_time ? new Date(`2000-01-01T${item.due_time}`).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }) : 'All day')
@@ -1534,112 +1590,7 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* ── Day Detail Panel (Month view selected date) ────── */}
-      {viewMode === 'month' && selectedDate && !isSameDay(selectedDate, today) && (
-        <div className="hidden md:block bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: '0 2px 8px rgba(107,63,160,0.06)' }}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>{formatLongDate(selectedDate)}</h2>
-            <button onClick={() => openAddForm(selectedDate)} className="text-sm text-plum hover:text-plum-dark font-medium flex items-center gap-1">
-              <IconPlus className="h-4 w-4" /> Add event
-            </button>
-          </div>
-
-          {selectedEvents.length > 0 ? (
-            <div className="space-y-2">
-              <h3 className="text-[11px] text-warm-grey uppercase tracking-wider font-semibold">Events</h3>
-              {selectedEvents.map(ev => {
-                const hex = getEventHex(ev);
-                const colors = EVENT_COLORS[getEventColor(ev)] || EVENT_COLORS.lavender;
-                return (
-                  <div key={ev.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-lg px-3 py-2`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className={`font-medium ${colors.text}`}>{ev.title}</p>
-                        <p className="text-xs text-warm-grey">
-                          {ev.all_day ? 'All day' : `${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}`}
-                          {ev.location ? ` · ${ev.location}` : ''}
-                        </p>
-                        {ev.assigned_to_name && (
-                          <p className="text-xs text-warm-grey flex items-center gap-1 mt-0.5">
-                            <IconUser className="h-3 w-3" /> {ev.assigned_to_name}
-                          </p>
-                        )}
-                      </div>
-                      {ev.category !== 'public_holiday' && ev.category !== 'birthday' && (
-                        <div className="flex gap-1 shrink-0">
-                          <button onClick={() => openEditForm(ev)} className="text-warm-grey hover:text-plum p-1 rounded transition-colors" title="Edit">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                          </button>
-                          <button onClick={() => deleteEvent(ev.id)} className="text-warm-grey hover:text-coral p-1 rounded transition-colors" title="Delete">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : selectedTasks.length === 0 ? (
-            <p className="text-sm text-warm-grey">No events or tasks for this day</p>
-          ) : null}
-
-          {selectedTasks.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] text-warm-grey uppercase tracking-wider font-semibold">Tasks</h3>
-              {selectedTasks.map(tk => (
-                <div key={tk.id} className="flex items-center gap-3 py-1.5">
-                  <button
-                    onClick={() => toggleTask(tk)}
-                    disabled={toggling.has(tk.id)}
-                    className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                      tk.completed ? 'bg-plum border-plum text-white' : 'border-light-grey hover:border-plum'
-                    }`}
-                  >
-                    {tk.completed && <IconCheck className="h-3 w-3" />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-sm ${tk.completed ? 'line-through text-warm-grey' : 'text-charcoal'}`}>{tk.title}</span>
-                    {tk.due_time && !tk.completed && (
-                      <span className="text-xs text-warm-grey ml-1">at {tk.due_time.substring(0, 5)}</span>
-                    )}
-                    {tk.assigned_to_name && (
-                      <span className="text-xs text-warm-grey flex items-center gap-1 mt-0.5">
-                        <IconUser className="h-3 w-3" /> {tk.assigned_to_name}
-                      </span>
-                    )}
-                  </div>
-                  {!tk.completed && (
-                    <div className="flex gap-1 shrink-0">
-                      <button onClick={() => openTaskEditForm(tk)} className="text-warm-grey hover:text-plum p-1 rounded transition-colors" title="Edit">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => deleteTask(tk)}
-                        disabled={deletingTask.has(tk.id)}
-                        className="text-warm-grey hover:text-coral p-1 rounded transition-colors"
-                        title="Delete"
-                      >
-                        {deletingTask.has(tk.id) ? '...' : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Day Detail Panel removed — "+N more" popup handles overflow */}
 
       {/* ── Event Form Modal ───────────────────────────────────── */}
       {showForm && (
