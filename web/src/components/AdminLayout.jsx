@@ -7,16 +7,13 @@ import {
 } from './Icons';
 
 const adminNav = [
-  { to: '/admin',            label: 'Overview',    Icon: IconBarChart },
-  { to: '/admin/users',      label: 'Users',       Icon: IconUsers },
-  { to: '/admin/households', label: 'Households',  Icon: IconHome },
-];
-
-const phase2Nav = [
-  { label: 'AI Usage',       Icon: IconCpu },
-  { label: 'WhatsApp',       Icon: IconMessageCircle },
-  { label: 'Calendar Sync',  Icon: IconRefresh },
-  { label: 'Analytics',      Icon: IconTrendingUp },
+  { to: '/admin',               label: 'Overview',       Icon: IconBarChart },
+  { to: '/admin/users',         label: 'Users',          Icon: IconUsers },
+  { to: '/admin/households',    label: 'Households',     Icon: IconHome },
+  { to: '/admin/ai-usage',      label: 'AI Usage',       Icon: IconCpu },
+  { to: '/admin/whatsapp',      label: 'WhatsApp',       Icon: IconMessageCircle },
+  { to: '/admin/calendar-sync', label: 'Calendar Sync',  Icon: IconRefresh },
+  { to: '/admin/analytics',     label: 'Analytics',      Icon: IconTrendingUp },
 ];
 
 export default function AdminLayout({ children }) {
@@ -57,18 +54,6 @@ export default function AdminLayout({ children }) {
         {/* Nav */}
         <nav className="flex-1 px-3 flex flex-col gap-0.5 mt-2">
           {adminNav.map(renderNavLink)}
-
-          {/* Phase 2 placeholder */}
-          <div className="mt-6 mb-2 px-3 text-[11px] font-semibold text-warm-grey uppercase tracking-wider">Coming Soon</div>
-          {phase2Nav.map(({ label, Icon }) => (
-            <div
-              key={label}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-light-grey cursor-not-allowed"
-            >
-              <Icon className="h-5 w-5" />
-              {label}
-            </div>
-          ))}
         </nav>
 
         {/* Footer */}

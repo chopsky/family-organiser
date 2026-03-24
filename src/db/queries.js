@@ -1910,6 +1910,252 @@ async function setUserPlatformAdmin(userId, isPlatformAdmin) {
   return data;
 }
 
+// ─── Phase 2 Admin: AI Usage ─────────────────────────────────────────────────
+
+async function getAiUsageStats({ days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const [totalRes, byProviderRes, byFeatureRes, failoverRes, avgLatencyRes] = await Promise.all([
+    supabase.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since),
+    supabase.from('ai_usage_log').select('provider').gte('created_at', since),
+    supabase.from('ai_usage_log').select('feature').gte('created_at', since),
+    supabase.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since).eq('is_failover', true),
+    supabase.from('ai_usage_log').select('latency_ms').gte('created_at', since).not('latency_ms', 'is', null),
+  ]);
+
+  // Count by provider
+  const byProvider = {};
+  for (const row of byProviderRes.data || []) {
+    byProvider[row.provider] = (byProvider[row.provider] || 0) + 1;
+  }
+
+  // Count by feature
+  const byFeature = {};
+  for (const row of byFeatureRes.data || []) {
+    byFeature[row.feature] = (byFeature[row.feature] || 0) + 1;
+  }
+
+  // Avg latency
+  const latencies = (avgLatencyRes.data || []).map((r) => r.latency_ms);
+  const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
+
+  return {
+    totalCalls: totalRes.count || 0,
+    failoverCalls: failoverRes.count || 0,
+    failoverRate: totalRes.count > 0 ? Math.round((failoverRes.count / totalRes.count) * 100) : 0,
+    avgLatencyMs: avgLatency,
+    byProvider,
+    byFeature,
+  };
+}
+
+async function getAiUsageTimeline({ days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('ai_usage_log')
+    .select('provider, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  // Group by date
+  const timeline = {};
+  for (const row of data || []) {
+    const date = row.created_at.split('T')[0];
+    if (!timeline[date]) timeline[date] = { date, total: 0, gemini: 0, claude: 0, 'gpt-4o': 0 };
+    timeline[date].total++;
+    timeline[date][row.provider] = (timeline[date][row.provider] || 0) + 1;
+  }
+  return Object.values(timeline);
+}
+
+// ─── Phase 2 Admin: WhatsApp Stats ──────────────────────────────────────────
+
+async function logWhatsAppMessage({ householdId, userId, direction, messageType, intent, processingMs, error }) {
+  supabase
+    .from('whatsapp_message_log')
+    .insert({
+      household_id: householdId || null,
+      user_id: userId || null,
+      direction,
+      message_type: messageType,
+      intent: intent || null,
+      processing_ms: processingMs || null,
+      error: error || null,
+    })
+    .then(() => {})
+    .catch((err) => console.error('[whatsapp-log] Failed to log message:', err.message));
+}
+
+async function getWhatsAppStats({ days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('whatsapp_message_log')
+    .select('direction, message_type, intent, processing_ms, error, user_id')
+    .gte('created_at', since);
+  if (error) throw error;
+
+  const rows = data || [];
+  const inbound = rows.filter((r) => r.direction === 'inbound');
+  const withErrors = rows.filter((r) => r.error);
+  const processingTimes = inbound.filter((r) => r.processing_ms).map((r) => r.processing_ms);
+  const avgProcessing = processingTimes.length > 0 ? Math.round(processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length) : 0;
+  const uniqueUsers = new Set(rows.map((r) => r.user_id).filter(Boolean)).size;
+
+  // By type
+  const byType = {};
+  for (const r of inbound) {
+    byType[r.message_type] = (byType[r.message_type] || 0) + 1;
+  }
+
+  // By intent
+  const byIntent = {};
+  for (const r of inbound) {
+    const intent = r.intent || 'unknown';
+    byIntent[intent] = (byIntent[intent] || 0) + 1;
+  }
+
+  return {
+    totalMessages: rows.length,
+    inboundMessages: inbound.length,
+    errorCount: withErrors.length,
+    errorRate: rows.length > 0 ? Math.round((withErrors.length / rows.length) * 100) : 0,
+    avgProcessingMs: avgProcessing,
+    uniqueUsers,
+    byType,
+    byIntent,
+  };
+}
+
+async function getWhatsAppTimeline({ days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('whatsapp_message_log')
+    .select('direction, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  const timeline = {};
+  for (const row of data || []) {
+    const date = row.created_at.split('T')[0];
+    if (!timeline[date]) timeline[date] = { date, inbound: 0, outbound: 0 };
+    timeline[date][row.direction]++;
+  }
+  return Object.values(timeline);
+}
+
+// ─── Phase 2 Admin: Calendar Sync Health ────────────────────────────────────
+
+async function getCalendarSyncHealth() {
+  const { data: connections, error } = await supabase
+    .from('calendar_connections')
+    .select('id, user_id, household_id, provider, sync_enabled, token_expires_at, created_at');
+  if (error) throw error;
+
+  // Get user names
+  const userIds = [...new Set((connections || []).map((c) => c.user_id))];
+  let userMap = {};
+  if (userIds.length > 0) {
+    const { data: users } = await supabase.from('users').select('id, name, email').in('id', userIds);
+    for (const u of users || []) userMap[u.id] = u;
+  }
+
+  // Get sync mapping stats per connection
+  const result = [];
+  for (const conn of connections || []) {
+    const { data: mappings } = await supabase
+      .from('calendar_sync_mappings')
+      .select('last_synced_at')
+      .eq('connection_id', conn.id);
+
+    const syncedEvents = mappings?.length || 0;
+    const lastSynced = mappings?.length > 0
+      ? mappings.reduce((max, m) => (m.last_synced_at > max ? m.last_synced_at : max), '')
+      : null;
+
+    result.push({
+      ...conn,
+      user_name: userMap[conn.user_id]?.name || 'Unknown',
+      user_email: userMap[conn.user_id]?.email || '',
+      synced_events: syncedEvents,
+      last_synced_at: lastSynced,
+    });
+  }
+
+  return result;
+}
+
+// ─── Phase 2 Admin: Analytics ───────────────────────────────────────────────
+
+async function getAnalytics({ days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  // DAU: distinct users with activity per day
+  const [shoppingRes, tasksRes, calendarRes, chatRes] = await Promise.all([
+    supabase.from('shopping_items').select('added_by, created_at').gte('created_at', since),
+    supabase.from('tasks').select('added_by, created_at').gte('created_at', since),
+    supabase.from('calendar_events').select('created_by, created_at').gte('created_at', since),
+    supabase.from('chat_messages').select('user_id, created_at').gte('created_at', since).eq('role', 'user'),
+  ]);
+
+  // Build DAU map
+  const dauMap = {};
+  function addActivity(rows, userField) {
+    for (const row of rows || []) {
+      const date = row.created_at.split('T')[0];
+      if (!dauMap[date]) dauMap[date] = new Set();
+      if (row[userField]) dauMap[date].add(row[userField]);
+    }
+  }
+  addActivity(shoppingRes.data, 'added_by');
+  addActivity(tasksRes.data, 'added_by');
+  addActivity(calendarRes.data, 'created_by');
+  addActivity(chatRes.data, 'user_id');
+
+  const dau = Object.entries(dauMap)
+    .map(([date, users]) => ({ date, activeUsers: users.size }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Feature usage counts
+  const featureUsage = {
+    shopping: shoppingRes.data?.length || 0,
+    tasks: tasksRes.data?.length || 0,
+    calendar: calendarRes.data?.length || 0,
+    chat: chatRes.data?.length || 0,
+  };
+
+  // Onboarding funnel
+  const [totalUsersRes, verifiedRes, withHouseholdRes, invitesRes] = await Promise.all([
+    supabase.from('users').select('id', { count: 'exact', head: true }).not('email', 'is', null),
+    supabase.from('users').select('id', { count: 'exact', head: true }).eq('email_verified', true),
+    supabase.from('users').select('id', { count: 'exact', head: true }).not('household_id', 'is', null),
+    supabase.from('invites').select('id, accepted_at', { count: 'exact' }),
+  ]);
+
+  const invitesAccepted = (invitesRes.data || []).filter((i) => i.accepted_at).length;
+
+  const funnel = {
+    registered: totalUsersRes.count || 0,
+    verified: verifiedRes.count || 0,
+    joinedHousehold: withHouseholdRes.count || 0,
+    invitesSent: invitesRes.count || 0,
+    invitesAccepted,
+  };
+
+  // WAU (current week avg)
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const weeklyUsers = new Set();
+  for (const [date, users] of Object.entries(dauMap)) {
+    if (date >= weekAgo) {
+      for (const u of users) weeklyUsers.add(u);
+    }
+  }
+
+  return { dau, featureUsage, funnel, wau: weeklyUsers.size };
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -2052,7 +2298,7 @@ module.exports = {
   getRecentMeals,
   getRecentPurchases,
   getSupabase: () => supabase,
-  // Platform admin
+  // Platform admin Phase 1
   getAllUsersAdmin,
   getUserByIdAdmin,
   getAllHouseholdsAdmin,
@@ -2062,4 +2308,12 @@ module.exports = {
   enableUser,
   deleteUser,
   setUserPlatformAdmin,
+  // Platform admin Phase 2
+  getAiUsageStats,
+  getAiUsageTimeline,
+  logWhatsAppMessage,
+  getWhatsAppStats,
+  getWhatsAppTimeline,
+  getCalendarSyncHealth,
+  getAnalytics,
 };

@@ -66,16 +66,19 @@ router.post('/webhook', async (req, res) => {
 
       if (mediaType.startsWith('audio/')) {
         // Voice note
+        const start = Date.now();
         try {
           const audioBuffer = await whatsapp.downloadMedia(mediaUrl);
           const result = await handlers.handleVoiceNote(audioBuffer, 'voice.ogg', user, household);
           await whatsapp.sendMessage(phone, result.response);
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: null, processingMs: Date.now() - start });
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions);
           if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Voice note error:', err.message);
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', processingMs: Date.now() - start, error: err.message });
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble processing that voice note. Please try again.');
         }
         return;
@@ -83,16 +86,19 @@ router.post('/webhook', async (req, res) => {
 
       if (mediaType.startsWith('image/')) {
         // Photo (receipt scanning)
+        const start = Date.now();
         try {
           const imageBuffer = await whatsapp.downloadMedia(mediaUrl);
           const result = await handlers.handlePhoto(imageBuffer, mediaType, user, household);
           await whatsapp.sendMessage(phone, result.response);
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start });
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions);
           if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Photo error:', err.message);
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', processingMs: Date.now() - start, error: err.message });
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble scanning that receipt. Please try again with a clearer photo.');
         }
         return;
@@ -102,16 +108,19 @@ router.post('/webhook', async (req, res) => {
     // Handle text messages
     if (Body && Body.trim()) {
       const text = Body.trim();
+      const start = Date.now();
 
       try {
         const result = await handlers.handleTextMessage(text, user, household);
         await whatsapp.sendMessage(phone, result.response);
+        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: result.intent || null, processingMs: Date.now() - start });
 
         // Broadcast to other members
         const notification = handlers.buildBroadcastMessage(user.name, result.actions);
         if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
         console.error('[whatsapp] Text handler error:', err.message);
+        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, error: err.message });
         await whatsapp.sendMessage(phone, 'Sorry, I had trouble understanding that. Please try again.');
       }
     }

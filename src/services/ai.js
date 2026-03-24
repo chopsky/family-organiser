@@ -10,7 +10,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = []) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const notesStr = notes.length > 0
@@ -28,6 +28,9 @@ async function classify(message, memberNames = [], notes = []) {
       messages: [{ role: 'user', content: message }],
       useThinking: false,
       maxTokens: 2048,
+      feature: 'classify',
+      householdId,
+      userId,
     });
     return parseJSON(text, 'classification');
   });

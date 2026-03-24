@@ -21,6 +21,10 @@ import AdminUsers           from './pages/admin/AdminUsers';
 import AdminUserDetail      from './pages/admin/AdminUserDetail';
 import AdminHouseholds      from './pages/admin/AdminHouseholds';
 import AdminHouseholdDetail from './pages/admin/AdminHouseholdDetail';
+import AdminAiUsage        from './pages/admin/AdminAiUsage';
+import AdminWhatsApp       from './pages/admin/AdminWhatsApp';
+import AdminCalendarSync   from './pages/admin/AdminCalendarSync';
+import AdminAnalytics      from './pages/admin/AdminAnalytics';
 
 function RequireAuth({ children }) {
   const { token, needsHousehold } = useAuth();
@@ -66,6 +70,10 @@ function AppRoutes() {
       <Route path="/admin/users/:id" element={<RequirePlatformAdmin><AdminLayout><AdminUserDetail /></AdminLayout></RequirePlatformAdmin>} />
       <Route path="/admin/households" element={<RequirePlatformAdmin><AdminLayout><AdminHouseholds /></AdminLayout></RequirePlatformAdmin>} />
       <Route path="/admin/households/:id" element={<RequirePlatformAdmin><AdminLayout><AdminHouseholdDetail /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/ai-usage" element={<RequirePlatformAdmin><AdminLayout><AdminAiUsage /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/whatsapp" element={<RequirePlatformAdmin><AdminLayout><AdminWhatsApp /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/calendar-sync" element={<RequirePlatformAdmin><AdminLayout><AdminCalendarSync /></AdminLayout></RequirePlatformAdmin>} />
+      <Route path="/admin/analytics" element={<RequirePlatformAdmin><AdminLayout><AdminAnalytics /></AdminLayout></RequirePlatformAdmin>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

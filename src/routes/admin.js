@@ -135,4 +135,61 @@ router.get('/households/:id', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/ai-usage ─────────────────────────────────────────────────
+
+router.get('/ai-usage', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const [stats, timeline] = await Promise.all([
+      db.getAiUsageStats({ days }),
+      db.getAiUsageTimeline({ days }),
+    ]);
+    return res.json({ stats, timeline });
+  } catch (err) {
+    console.error('GET /api/admin/ai-usage error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/admin/whatsapp-stats ──────────────────────────────────────────
+
+router.get('/whatsapp-stats', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const [stats, timeline] = await Promise.all([
+      db.getWhatsAppStats({ days }),
+      db.getWhatsAppTimeline({ days }),
+    ]);
+    return res.json({ stats, timeline });
+  } catch (err) {
+    console.error('GET /api/admin/whatsapp-stats error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/admin/calendar-sync ───────────────────────────────────────────
+
+router.get('/calendar-sync', async (req, res) => {
+  try {
+    const connections = await db.getCalendarSyncHealth();
+    return res.json({ connections });
+  } catch (err) {
+    console.error('GET /api/admin/calendar-sync error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/admin/analytics ───────────────────────────────────────────────
+
+router.get('/analytics', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const analytics = await db.getAnalytics({ days });
+    return res.json(analytics);
+  } catch (err) {
+    console.error('GET /api/admin/analytics error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

@@ -217,6 +217,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     const { text: aiText, provider } = await callWithFailover({
       system: systemPrompt,
       messages,
+      feature: 'chat',
+      householdId: req.householdId,
+      userId: req.user.id,
     });
     if (provider !== 'claude') {
       console.log(`[chat] Response served by ${provider}`);

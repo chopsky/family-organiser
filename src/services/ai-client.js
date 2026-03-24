@@ -9,6 +9,7 @@ require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
+const { supabase } = require('../db/client');
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
@@ -188,29 +189,64 @@ async function callGPT({ system, messages, maxTokens = 2048 }) {
  * @param {number} [opts.maxTokens=2048]
  * @returns {Promise<{ text: string, provider: string }>}
  */
+/**
+ * Fire-and-forget: log AI usage to the ai_usage_log table.
+ */
+function logAiUsage({ householdId, userId, provider, model, feature, latencyMs, isFailover, error }) {
+  supabase
+    .from('ai_usage_log')
+    .insert({
+      household_id: householdId || null,
+      user_id: userId || null,
+      provider,
+      model,
+      feature: feature || 'unknown',
+      latency_ms: latencyMs,
+      is_failover: isFailover || false,
+      error: error || null,
+    })
+    .then(() => {})
+    .catch((err) => console.error('[ai-log] Failed to log usage:', err.message));
+}
+
 async function callWithFailover(opts) {
+  const start = Date.now();
+  const { feature, householdId, userId } = opts;
+  let attempt = 0;
+
   // Try Gemini first (if API key is set)
   if (process.env.GEMINI_API_KEY) {
     try {
-      return await callGemini(opts);
+      const result = await callGemini(opts);
+      logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - start, isFailover: false });
+      return result;
     } catch (err) {
       console.warn(`[ai-failover] Gemini failed (${err.message || err.code}), falling back to Claude`);
+      attempt++;
     }
   }
 
   // Try Claude
+  const claudeStart = Date.now();
   try {
-    return await callClaude(opts);
+    const result = await callClaude(opts);
+    logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: attempt > 0 });
+    return result;
   } catch (err) {
     if (isTransient(err) && process.env.OPENAI_API_KEY) {
       console.warn(`[ai-failover] Claude failed (${err.message || err.code}), falling back to GPT-4o`);
+      const gptStart = Date.now();
       try {
-        return await callGPT(opts);
+        const result = await callGPT(opts);
+        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true });
+        return result;
       } catch (gptErr) {
         console.error('[ai-failover] GPT-4o also failed:', gptErr.message);
+        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true, error: gptErr.message });
         throw gptErr;
       }
     }
+    logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: attempt > 0, error: err.message });
     throw err;
   }
 }
