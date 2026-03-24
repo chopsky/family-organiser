@@ -1325,9 +1325,9 @@ export default function Calendar() {
                             }}
                             onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                           >
-                            {ev.title}
+                            <div className="truncate">{ev.title}</div>
                             {pos.height > 28 && (
-                              <div className="text-[8px] font-medium opacity-75 mt-0.5">
+                              <div className="text-[8px] font-medium opacity-75 mt-0.5 truncate">
                                 {formatTime(ev.start_time)}{ev.end_time ? `–${formatTime(ev.end_time)}` : ''}
                               </div>
                             )}
@@ -1426,32 +1426,31 @@ export default function Calendar() {
                   return (
                     <div
                       key={ev.id}
-                      className="absolute rounded-lg px-3 py-2 text-[13px] font-semibold text-white z-[2] cursor-pointer hover:opacity-90 flex items-center gap-2.5"
+                      className="absolute rounded-lg px-2.5 py-1.5 text-white z-[2] cursor-pointer hover:opacity-90 flex items-start gap-2 overflow-hidden"
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
-                        left: `calc(52px + ${leftPct}% * (100% - 52px) / 100)`,
-                        right: `calc(${100 - leftPct - widthPct}% * (100% - 52px) / 100)`,
-                        marginLeft: `calc(${leftPct}% * 0)`,
+                        left: `calc(52px + ${leftPct}%)`,
+                        width: `calc(${widthPct}% - 52px * ${widthPct / 100} - 4px)`,
                         background: hex,
-                        // Simplified positioning
-                        position: 'absolute',
                       }}
                       onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate">{ev.title}</div>
-                        <div className="text-[11px] font-medium opacity-80 mt-0.5">
-                          {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
-                        </div>
-                        {ev.location && height > 60 && (
-                          <div className="text-[10px] opacity-75 mt-0.5 flex items-center gap-1">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="text-[13px] font-semibold truncate leading-tight">{ev.title}</div>
+                        {height > 32 && (
+                          <div className="text-[10px] font-medium opacity-80 mt-0.5 truncate">
+                            {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
+                          </div>
+                        )}
+                        {ev.location && height > 56 && (
+                          <div className="text-[9px] opacity-75 mt-0.5 flex items-center gap-1 truncate">
                             <MapPinIcon /> {ev.location}
                           </div>
                         )}
                       </div>
-                      {memberInfo && (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ background: hex, border: '2px solid rgba(255,255,255,0.3)' }}>
+                      {memberInfo && height > 32 && (
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 mt-0.5" style={{ background: hex, border: '2px solid rgba(255,255,255,0.3)' }}>
                           {memberInfo.initial}
                         </div>
                       )}
