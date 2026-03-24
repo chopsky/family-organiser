@@ -813,7 +813,7 @@ export default function FamilySetup() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* Household card */}
-      <div className="bg-linen rounded-2xl p-5">
+      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
         <h2 className="font-semibold text-bark mb-4 flex items-center gap-2"><IconHome className="h-4 w-4" /> Household</h2>
 
         {isAdmin ? (
@@ -858,7 +858,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Members */}
-      <div className="bg-linen rounded-2xl p-5">
+      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Family Members</h2>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-2">
@@ -968,7 +968,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Other Family Members (dependents) */}
-      <div className="bg-linen rounded-2xl p-5">
+      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Other Family Members</h2>
         <p className="text-xs text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
