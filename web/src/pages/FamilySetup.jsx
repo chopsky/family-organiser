@@ -863,19 +863,7 @@ export default function FamilySetup() {
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-2">
             {members.filter(m => m.member_type !== 'dependent').map((m) => {
-              const avatarColors = {
-                sage: 'bg-sage text-white',
-                plum: 'bg-plum text-white',
-                coral: 'bg-coral text-white',
-                amber: 'bg-amber text-white',
-                sky: 'bg-sky text-white',
-                rose: 'bg-rose text-white',
-                teal: 'bg-teal text-white',
-                lavender: 'bg-lavender text-white',
-                terracotta: 'bg-terracotta text-white',
-                slate: 'bg-slate text-white',
-              };
-              const avatarClass = avatarColors[m.color_theme] || avatarColors.sage;
+              const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
               return (
               <li key={m.id} className="flex items-center gap-3">
                 {m.avatar_url ? (
