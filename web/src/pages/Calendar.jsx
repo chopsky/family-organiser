@@ -677,6 +677,12 @@ export default function Calendar() {
     return COLOR_HEX[getEventColor(ev)] || COLOR_HEX.sage;
   }
 
+  // Returns { bg, text } — light background with coloured text for softer event pills
+  function getEventStyle(ev) {
+    const hex = getEventHex(ev);
+    return { bg: hex + '18', text: hex }; // 18 = ~9% opacity in hex alpha
+  }
+
   async function deleteEvent(id) {
     if (!window.confirm('Delete this event? This cannot be undone.')) return;
     try {
@@ -1121,11 +1127,13 @@ export default function Calendar() {
                         }`}>
                           {date.getDate()}
                         </div>
-                        {allItems.slice(0, maxShow).map(item => (
+                        {allItems.slice(0, maxShow).map(item => {
+                          const pillStyle = item._isTask ? { bg: '#E8724A18', text: '#E8724A' } : getEventStyle(item);
+                          return (
                           <div
                             key={item.id}
-                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-[3px] mb-0.5 text-white truncate"
-                            style={{ background: item._isTask ? '#E8724A' : getEventHex(item) }}
+                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-[3px] mb-0.5 truncate"
+                            style={{ background: pillStyle.bg, color: pillStyle.text }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (item._isTask) {
@@ -1137,7 +1145,8 @@ export default function Calendar() {
                           >
                             {item.title}
                           </div>
-                        ))}
+                          );
+                        })}
                         {overflow > 0 && (
                           <div className="text-[9px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date(date)); setViewMode('day'); }}>
                             +{overflow} more
@@ -1264,8 +1273,8 @@ export default function Calendar() {
                     {dayEvs.map(ev => (
                       <div
                         key={ev.id}
-                        className="text-[9px] font-semibold px-1 py-0.5 rounded text-white truncate cursor-pointer hover:opacity-85"
-                        style={{ background: getEventHex(ev) }}
+                        className="text-[9px] font-semibold px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-85"
+                        style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
                         onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                       >
                         {ev.title}
@@ -1318,13 +1327,14 @@ export default function Calendar() {
                         return (
                           <div
                             key={ev.id}
-                            className="absolute rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold text-white overflow-hidden z-[2] cursor-pointer hover:opacity-85 leading-snug"
+                            className="absolute rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold overflow-hidden z-[2] cursor-pointer hover:opacity-85 leading-snug"
                             style={{
                               top: `${pos.top}px`,
                               height: `${pos.height}px`,
                               left: `calc(${leftPct}% + 2px)`,
                               width: `calc(${widthPct}% - 4px)`,
-                              background: getEventHex(ev),
+                              background: getEventHex(ev) + '18',
+                              color: getEventHex(ev),
                             }}
                             onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                           >
@@ -1378,8 +1388,8 @@ export default function Calendar() {
                 {allDay.map(ev => (
                   <div
                     key={ev.id}
-                    className="text-[10px] font-semibold text-white px-2 py-0.5 rounded cursor-pointer hover:opacity-85"
-                    style={{ background: getEventHex(ev) }}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded cursor-pointer hover:opacity-85"
+                    style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
                     onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                   >
                     {ev.title}
@@ -1429,13 +1439,14 @@ export default function Calendar() {
                   return (
                     <div
                       key={ev.id}
-                      className="absolute rounded-lg px-2.5 py-1.5 text-white z-[2] cursor-pointer hover:opacity-90 flex items-start gap-2 overflow-hidden"
+                      className="absolute rounded-lg px-2.5 py-1.5 z-[2] cursor-pointer hover:opacity-90 flex items-start gap-2 overflow-hidden"
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
                         left: `calc(52px + ${leftPct}%)`,
                         width: `calc(${widthPct}% - 52px * ${widthPct / 100} - 4px)`,
-                        background: hex,
+                        background: hex + '18',
+                        color: hex,
                       }}
                       onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                     >
