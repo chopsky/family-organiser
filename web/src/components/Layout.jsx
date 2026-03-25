@@ -128,7 +128,7 @@ export default function Layout({ children }) {
         key={to}
         to={to}
         className={({ isActive }) =>
-          `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+          `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-150 ${
             isActive
               ? 'bg-plum-light text-plum'
               : 'text-warm-grey hover:bg-cream hover:text-charcoal'
@@ -146,8 +146,8 @@ export default function Layout({ children }) {
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
-        <div className="px-5 pt-6 pb-3 flex items-center gap-2.5">
-          <img src="/housemait-logo.png" alt="HouseMait" className="h-8" />
+        <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: '30px', paddingBottom: '30px' }}>
+          <img src="/housemait-logo.png" alt="HouseMait" className="h-7" />
         </div>
 
         {/* Household pill */}
