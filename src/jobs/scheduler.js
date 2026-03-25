@@ -328,6 +328,8 @@ Only return valid JSON array, nothing else.`;
           timeoutMs: LONG_TIMEOUT_MS,
           maxTokens: 4096,
           useThinking: false,
+          feature: 'school_ical_sync',
+          householdId: school.household_id,
         });
 
         let categorised;

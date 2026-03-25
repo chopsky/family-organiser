@@ -38,7 +38,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map((m) => m.name);
-    const result = await classify(text.trim(), memberNames);
+    const result = await classify(text.trim(), memberNames, [], { householdId: req.householdId, userId: req.user.id });
 
     // Strip any leaked JSON action blocks from the response message
     if (result.response_message) {
@@ -165,6 +165,9 @@ Return ONLY valid JSON:
                 useThinking: false,
                 maxTokens: 2048,
                 timeoutMs: LONG_TIMEOUT_MS,
+                feature: 'recipe_generate',
+                householdId: req.householdId,
+                userId: req.user.id,
               });
               const cleaned = aiText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
               const parsed = JSON.parse(cleaned);

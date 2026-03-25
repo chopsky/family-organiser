@@ -306,6 +306,9 @@ Only return valid JSON array, nothing else.`;
       timeoutMs: LONG_TIMEOUT_MS,
       maxTokens: 4096,
       useThinking: false,
+      feature: 'school_ical_categorize',
+      householdId: req.householdId,
+      userId: req.user.id,
     });
 
     let categorised;
@@ -430,6 +433,9 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
         timeoutMs: LONG_TIMEOUT_MS,
         maxTokens: 4096,
         useThinking: false,
+        feature: 'school_la_term_dates',
+        householdId: req.householdId,
+        userId: req.user.id,
       });
 
       try {
@@ -627,6 +633,9 @@ Do NOT wrap in markdown code fences.`,
       timeoutMs: LONG_TIMEOUT_MS,
       maxTokens: 4096,
       useThinking: false,
+      feature: 'school_website_extraction',
+      householdId: req.householdId,
+      userId: req.user.id,
     });
 
     let dates;
@@ -761,6 +770,9 @@ Only return valid JSON array, nothing else.`;
       timeoutMs: LONG_TIMEOUT_MS,
       maxTokens: 4096,
       useThinking: false,
+      feature: 'school_ical_categorize',
+      householdId: req.householdId,
+      userId: req.user.id,
     });
 
     let categorised;

@@ -116,7 +116,7 @@ async function handleTextMessage(text, user, household) {
 
   // Fetch saved notes for context
   const notes = await db.getHouseholdNotes(household.id);
-  const result = await classify(text, memberNames, notes);
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id });
 
   const actions = {
     shoppingAdded: [],
@@ -606,6 +606,8 @@ Rules:
     useThinking: false,
     maxTokens: 2048,
     timeoutMs: 30000,
+    feature: 'recipe_generate',
+    householdId,
   });
 
   const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();

@@ -189,6 +189,9 @@ Return ONLY valid JSON:
       useThinking: false,
       maxTokens: 2048,
       timeoutMs: 30000,
+      feature: 'meal_suggestions',
+      householdId: req.householdId,
+      userId: req.user.id,
     });
 
     let parsed;
@@ -317,6 +320,9 @@ router.post('/meals/to-shopping-list', requireAuth, requireHousehold, async (req
 
     const { text } = await callWithFailover({
       system: 'You are a smart grocery list assistant for a UK family. Return only valid JSON.',
+      feature: 'ingredient_dedup',
+      householdId: req.householdId,
+      userId: req.user.id,
       messages: [{ role: 'user', content: `Compare these recipe ingredients against recently purchased items and determine what needs to be bought.
 
 Ingredients needed:
@@ -497,6 +503,9 @@ router.post('/recipes/import-url', requireAuth, requireHousehold, async (req, re
 
     const { text } = await callWithFailover({
       system: 'You extract recipes from web pages. Return only valid JSON.',
+      feature: 'recipe_import_url',
+      householdId: req.householdId,
+      userId: req.user.id,
       messages: [{ role: 'user', content: `Extract the recipe from this web page content.
 Return ONLY valid JSON:
 {
@@ -571,6 +580,9 @@ router.post('/recipes/import-photo', requireAuth, requireHousehold, async (req, 
   try {
     const { text } = await callWithFailover({
       system: 'You extract recipes from photos. Return only valid JSON.',
+      feature: 'recipe_import_photo',
+      householdId: req.householdId,
+      userId: req.user.id,
       messages: [{
         role: 'user',
         content: [
@@ -677,6 +689,9 @@ Return ONLY valid JSON:
       useThinking: false,
       maxTokens: 4096,
       timeoutMs: 30000,
+      feature: 'recipe_generate',
+      householdId: req.householdId,
+      userId: req.user.id,
     });
 
     let parsed;
