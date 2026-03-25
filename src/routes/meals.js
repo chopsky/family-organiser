@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { callWithFailover } = require('../services/ai-client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -762,6 +763,10 @@ router.delete('/recipes/:id', requireAuth, requireHousehold, async (req, res) =>
  */
 router.get('/meal-categories', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const cacheKey = `meal-categories:${req.householdId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     let categories = await db.getMealCategories(req.householdId);
 
     if (!categories || categories.length === 0) {
@@ -769,7 +774,9 @@ router.get('/meal-categories', requireAuth, requireHousehold, async (req, res) =
       categories = await db.getMealCategories(req.householdId);
     }
 
-    return res.json({ categories });
+    const result = { categories };
+    cache.set(cacheKey, result, 1800); // 30 min TTL
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/meal-categories error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -795,6 +802,7 @@ router.patch('/meal-categories/:id', requireAuth, requireHousehold, async (req, 
 
   try {
     const category = await db.updateMealCategory(req.params.id, req.householdId, updates);
+    cache.invalidate(`meal-categories:${req.householdId}`);
     return res.json({ category });
   } catch (err) {
     if (err.code === 'PGRST116') return res.status(404).json({ error: 'Category not found' });

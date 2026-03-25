@@ -11,6 +11,7 @@ async function getIcal() {
 }
 const db = require('../db/queries');
 const { requireAuth } = require('../middleware/auth');
+const cache = require('../services/cache');
 const calendarSync = require('../services/calendarSync');
 const googleProvider = require('../services/providers/google');
 const microsoftProvider = require('../services/providers/microsoft');
@@ -325,6 +326,7 @@ router.post('/events', async (req, res) => {
     // Push to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'create').catch(() => {});
 
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ event });
   } catch (err) {
     console.error('POST /api/calendar/events error:', err);
@@ -368,6 +370,7 @@ router.patch('/events/:id', async (req, res) => {
     // Push update to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'update').catch(() => {});
 
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ event });
   } catch (err) {
     console.error('PATCH /api/calendar/events/:id error:', err);
@@ -384,6 +387,7 @@ router.delete('/events/:id', async (req, res) => {
     calendarSync.pushEventToConnections(req.householdId, { id: req.params.id }, 'delete').catch(() => {});
 
     await db.deleteCalendarEvent(req.params.id, req.householdId);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/calendar/events/:id error:', err);

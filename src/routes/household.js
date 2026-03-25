@@ -6,6 +6,7 @@ const db = require('../db/queries');
 const { supabase } = require('../db/client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const email = require('../services/email');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -27,11 +28,17 @@ const avatarUpload = multer({
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const cacheKey = `members:${req.householdId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const [household, members] = await Promise.all([
       db.getHouseholdById(req.householdId),
       db.getHouseholdMembers(req.householdId),
     ]);
-    return res.json({ household, members });
+    const result = { household, members };
+    cache.set(cacheKey, result, 300); // 5 min TTL
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/household error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -198,6 +205,8 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
       }
     }
 
+    cache.invalidate(`members:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ user: updated });
   } catch (err) {
     console.error('PATCH /api/household/profile error:', err);
@@ -241,6 +250,7 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
 
     // Save to DB
     const updated = await db.updateUser(req.user.id, { avatar_url: avatarUrl });
+    cache.invalidate(`members:${req.householdId}`);
     return res.json({ avatar_url: updated.avatar_url });
   } catch (err) {
     console.error('POST /api/household/profile/avatar error:', err);
@@ -265,6 +275,7 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
 
     // Clear in DB
     const updated = await db.updateUser(req.user.id, { avatar_url: null });
+    cache.invalidate(`members:${req.householdId}`);
     return res.json({ avatar_url: null });
   } catch (err) {
     console.error('DELETE /api/household/profile/avatar error:', err);
@@ -308,6 +319,8 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
       }
     }
 
+    cache.invalidate(`members:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'Member removed.' });
   } catch (err) {
     console.error('DELETE /api/household/members error:', err);
@@ -335,6 +348,8 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
       school_id: school_id || null,
       year_group: year_group || null,
     });
+    cache.invalidate(`members:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ member: dependent });
   } catch (err) {
     console.error('POST /api/household/dependents error:', err);
@@ -349,6 +364,8 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
 router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
     await db.deleteDependent(req.params.id, req.householdId);
+    cache.invalidate(`members:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'Dependent removed.' });
   } catch (err) {
     console.error('DELETE /api/household/dependents error:', err);

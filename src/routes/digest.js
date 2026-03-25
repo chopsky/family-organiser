@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -12,6 +13,10 @@ const router = Router();
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const cacheKey = `digest:${req.householdId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     // Today's date in YYYY-MM-DD format
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
@@ -45,7 +50,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     try { todayEvents = await db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59') || []; } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
     try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
 
-    return res.json({
+    const result = {
       completed: { tasks: completedTasks, shopping: completedShopping },
       outstanding,
       upcoming,
@@ -55,7 +60,9 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       todayEvents,
       shoppingItems: shoppingItems.filter((i) => !i.completed),
       weekMeals,
-    });
+    };
+    cache.set(cacheKey, result, 60); // 60 sec TTL
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/digest error:', err);
     return res.status(500).json({ error: 'Internal server error' });

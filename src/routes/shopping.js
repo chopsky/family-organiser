@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { AISLE_CATEGORIES, detectAisle } = require('../utils/aisle-detect');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -90,6 +91,8 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     }));
 
     const saved = await db.addShoppingItems(req.householdId, enrichedItems, req.user.id);
+    cache.invalidate(`shopping-lists:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ items: saved });
   } catch (err) {
     console.error('POST /api/shopping error:', err);
@@ -144,6 +147,8 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       if (error.code === 'PGRST116') return res.status(404).json({ error: 'Item not found' });
       throw error;
     }
+    cache.invalidate(`shopping-lists:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ item: data });
   } catch (err) {
     console.error('PATCH /api/shopping/:id error:', err);
@@ -158,6 +163,8 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     await db.deleteShoppingItem(req.params.id, req.householdId);
+    cache.invalidate(`shopping-lists:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/shopping/:id error:', err);

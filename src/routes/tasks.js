@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { supabase } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -95,6 +96,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const members = await db.getHouseholdMembers(req.householdId);
     const saved = await db.addTasks(req.householdId, tasksInput, req.user.id, members);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ tasks: saved });
   } catch (err) {
     console.error('POST /api/tasks error:', err);
@@ -189,6 +191,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       nextTask = await db.generateNextRecurrence(task);
     }
 
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ task: updated, nextTask });
   } catch (err) {
     console.error('PATCH /api/tasks/:id error:', err);
@@ -203,6 +206,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     await db.deleteTask(req.params.id, req.householdId);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/tasks/:id error:', err);

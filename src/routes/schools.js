@@ -4,6 +4,7 @@ const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -32,6 +33,10 @@ router.get('/search', async (req, res) => {
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const cacheKey = `schools:${req.householdId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const [schools, members] = await Promise.all([
       db.getHouseholdSchools(req.householdId),
       db.getHouseholdMembers(req.householdId),
@@ -78,7 +83,9 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       _children: undefined,
     }));
 
-    return res.json({ schools: enriched });
+    const result = { schools: enriched };
+    cache.set(cacheKey, result, 1800); // 30 min TTL
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/schools error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -115,6 +122,8 @@ router.post('/', requireAuth, requireHousehold, requireAdmin, async (req, res) =
       colour,
     });
 
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ school, existing: false });
   } catch (err) {
     console.error('POST /api/schools error:', err);
@@ -129,6 +138,8 @@ router.post('/', requireAuth, requireHousehold, requireAdmin, async (req, res) =
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     await db.deleteHouseholdSchool(req.params.id, req.householdId);
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'School removed.' });
   } catch (err) {
     console.error('DELETE /api/schools error:', err);
@@ -148,6 +159,8 @@ router.post('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin
 
   try {
     const created = await db.addSchoolTermDates(req.params.schoolId, dates);
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ term_dates: created });
   } catch (err) {
     console.error('POST /api/schools/:id/term-dates error:', err);
@@ -176,6 +189,8 @@ router.get('/:schoolId/term-dates', requireAuth, requireHousehold, async (req, r
 router.delete('/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
     await db.deleteSchoolTermDate(req.params.dateId);
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'Term date removed.' });
   } catch (err) {
     console.error('DELETE /api/schools/term-dates error:', err);
@@ -207,6 +222,7 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
       time_end: time_end || null,
       reminder_text: reminder_text || null,
     });
+    cache.invalidate(`schools:${req.householdId}`);
     return res.status(201).json({ activity: created });
   } catch (err) {
     console.error('POST /api/schools/activities error:', err);
@@ -235,6 +251,7 @@ router.get('/activities/:childId', requireAuth, requireHousehold, async (req, re
 router.delete('/activities/:activityId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
     await db.deleteChildActivity(req.params.activityId);
+    cache.invalidate(`schools:${req.householdId}`);
     return res.json({ message: 'Activity removed.' });
   } catch (err) {
     console.error('DELETE /api/schools/activities error:', err);
@@ -337,6 +354,8 @@ Only return valid JSON array, nothing else.`;
       ical_last_sync_status: 'success',
     });
 
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({
       imported: termDates.length,
       total_events: eventList.length,
@@ -450,6 +469,8 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
       term_dates_last_updated: new Date().toISOString(),
     });
 
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({
       imported: termDates.length,
       local_authority: school.local_authority,
@@ -649,6 +670,8 @@ Do NOT wrap in markdown code fences.`,
       term_dates_last_updated: new Date().toISOString(),
     });
 
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     const countMessages = yearCounts.map(yc => `${yc.count} dates for ${yc.year}`);
     return res.json({
       imported: termDates.length,
@@ -678,6 +701,8 @@ router.patch('/:schoolId/term-dates/:dateId', requireAuth, requireHousehold, req
 
   try {
     const updated = await db.updateSchoolTermDate(req.params.dateId, updates);
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ term_date: updated });
   } catch (err) {
     console.error('PATCH /api/schools/:schoolId/term-dates/:dateId error:', err);
@@ -793,6 +818,8 @@ Only return valid JSON array, nothing else.`;
       term_dates_last_updated: new Date().toISOString(),
     });
 
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({
       success: true,
       dates_synced: termDates.length,
@@ -829,6 +856,7 @@ router.patch('/:id', requireAuth, requireHousehold, requireAdmin, async (req, re
 
   try {
     const updated = await db.updateHouseholdSchool(req.params.id, updates);
+    cache.invalidate(`schools:${req.householdId}`);
     return res.json({ school: updated });
   } catch (err) {
     console.error('PATCH /api/schools/:id error:', err);

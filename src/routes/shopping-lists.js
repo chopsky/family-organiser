@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -10,8 +11,14 @@ const router = Router();
  */
 router.get('/shopping-lists', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const cacheKey = `shopping-lists:${req.householdId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const lists = await db.getShoppingLists(req.householdId);
-    return res.json({ lists });
+    const result = { lists };
+    cache.set(cacheKey, result, 300); // 5 min TTL
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/shopping-lists error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -32,6 +39,8 @@ router.post('/shopping-lists', requireAuth, requireHousehold, async (req, res) =
 
   try {
     const list = await db.createShoppingList(req.householdId, name.trim());
+    cache.invalidate(`shopping-lists:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ list });
   } catch (err) {
     console.error('POST /api/shopping-lists error:', err);
@@ -57,6 +66,8 @@ router.delete('/shopping-lists/:id', requireAuth, requireHousehold, async (req, 
     }
 
     await db.deleteShoppingList(req.params.id, req.householdId);
+    cache.invalidate(`shopping-lists:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/shopping-lists/:id error:', err);
