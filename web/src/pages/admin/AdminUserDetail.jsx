@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash } from '../../components/Icons';
+import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu, IconMessageCircle } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 
 const avatarColors = {
@@ -21,6 +21,8 @@ export default function AdminUserDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [usage, setUsage] = useState(null);
+  const [usageLoading, setUsageLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
     try {
@@ -34,6 +36,13 @@ export default function AdminUserDetail() {
   }, [id]);
 
   useEffect(() => { loadUser(); }, [loadUser]);
+
+  useEffect(() => {
+    api.get(`/admin/users/${id}/usage`)
+      .then(({ data }) => setUsage(data))
+      .catch((err) => console.error('Failed to load usage:', err))
+      .finally(() => setUsageLoading(false));
+  }, [id]);
 
   const isSelf = currentUser?.id === id;
 
@@ -205,6 +214,107 @@ export default function AdminUserDetail() {
           </div>
         </div>
       )}
+
+      {/* Usage Stats */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* AI Usage */}
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <IconCpu className="h-5 w-5 text-plum" />
+            <h3 className="font-display text-base font-semibold text-charcoal">AI Usage (30d)</h3>
+          </div>
+          {usageLoading ? (
+            <div className="flex justify-center py-4"><Spinner /></div>
+          ) : !usage?.ai?.totalCalls ? (
+            <p className="text-sm text-warm-grey">No AI calls recorded</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div>
+                  <p className="text-lg font-bold text-charcoal">{usage.ai.totalCalls}</p>
+                  <p className="text-[11px] text-warm-grey">Total Calls</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-charcoal">{usage.ai.avgLatencyMs}ms</p>
+                  <p className="text-[11px] text-warm-grey">Avg Latency</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-charcoal">{usage.ai.failoverCalls}</p>
+                  <p className="text-[11px] text-warm-grey">Failovers</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {Object.entries(usage.ai.byProvider || {}).map(([provider, count]) => (
+                  <div key={provider} className="flex items-center justify-between text-sm">
+                    <span className="text-warm-grey capitalize">{provider}</span>
+                    <span className="font-medium text-charcoal">{count}</span>
+                  </div>
+                ))}
+              </div>
+              {Object.keys(usage.ai.byFeature || {}).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-light-grey space-y-1.5">
+                  {Object.entries(usage.ai.byFeature).sort((a, b) => b[1] - a[1]).map(([feature, count]) => (
+                    <div key={feature} className="flex items-center justify-between text-sm">
+                      <span className="text-warm-grey capitalize">{feature}</span>
+                      <span className="font-medium text-charcoal">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* WhatsApp Usage */}
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <IconMessageCircle className="h-5 w-5 text-plum" />
+            <h3 className="font-display text-base font-semibold text-charcoal">WhatsApp (30d)</h3>
+          </div>
+          {usageLoading ? (
+            <div className="flex justify-center py-4"><Spinner /></div>
+          ) : !usage?.whatsapp?.totalMessages ? (
+            <p className="text-sm text-warm-grey">No WhatsApp messages recorded</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div>
+                  <p className="text-lg font-bold text-charcoal">{usage.whatsapp.totalMessages}</p>
+                  <p className="text-[11px] text-warm-grey">Total</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-charcoal">{usage.whatsapp.inbound}</p>
+                  <p className="text-[11px] text-warm-grey">Inbound</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-charcoal">{usage.whatsapp.errors}</p>
+                  <p className="text-[11px] text-warm-grey">Errors</p>
+                </div>
+              </div>
+              {Object.keys(usage.whatsapp.byType || {}).length > 0 && (
+                <div className="space-y-1.5">
+                  {Object.entries(usage.whatsapp.byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                    <div key={type} className="flex items-center justify-between text-sm">
+                      <span className="text-warm-grey capitalize">{type}</span>
+                      <span className="font-medium text-charcoal">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {Object.keys(usage.whatsapp.byIntent || {}).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-light-grey space-y-1.5">
+                  {Object.entries(usage.whatsapp.byIntent).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
+                    <div key={intent} className="flex items-center justify-between text-sm">
+                      <span className="text-warm-grey capitalize">{intent.replace(/_/g, ' ')}</span>
+                      <span className="font-medium text-charcoal">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

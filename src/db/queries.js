@@ -2157,6 +2157,111 @@ async function getAnalytics({ days = 30 } = {}) {
   return { dau, featureUsage, funnel, wau: weeklyUsers.size };
 }
 
+// ─── Phase 2 Admin: Per-user/household breakdowns ───────────────────────────
+
+async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('ai_usage_log')
+    .select('household_id')
+    .gte('created_at', since)
+    .not('household_id', 'is', null);
+  if (error) throw error;
+
+  const counts = {};
+  for (const row of data || []) {
+    counts[row.household_id] = (counts[row.household_id] || 0) + 1;
+  }
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  if (sorted.length === 0) return [];
+
+  const ids = sorted.map(([id]) => id);
+  const { data: households } = await supabase.from('households').select('id, name').in('id', ids);
+  const nameMap = {};
+  for (const h of households || []) nameMap[h.id] = h.name;
+
+  return sorted.map(([id, calls]) => ({ household_id: id, name: nameMap[id] || 'Unknown', calls }));
+}
+
+async function getAiUsageTopUsers({ days = 30, limit = 10 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('ai_usage_log')
+    .select('user_id')
+    .gte('created_at', since)
+    .not('user_id', 'is', null);
+  if (error) throw error;
+
+  const counts = {};
+  for (const row of data || []) {
+    counts[row.user_id] = (counts[row.user_id] || 0) + 1;
+  }
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  if (sorted.length === 0) return [];
+
+  const ids = sorted.map(([id]) => id);
+  const { data: users } = await supabase.from('users').select('id, name, email').in('id', ids);
+  const userMap = {};
+  for (const u of users || []) userMap[u.id] = u;
+
+  return sorted.map(([id, calls]) => ({ user_id: id, name: userMap[id]?.name || 'Unknown', email: userMap[id]?.email || '', calls }));
+}
+
+async function getUserUsageStats(userId, { days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const [aiRes, waRes] = await Promise.all([
+    supabase.from('ai_usage_log').select('provider, feature, latency_ms, is_failover, created_at').eq('user_id', userId).gte('created_at', since),
+    supabase.from('whatsapp_message_log').select('direction, message_type, intent, processing_ms, error, created_at').eq('user_id', userId).gte('created_at', since),
+  ]);
+
+  const aiRows = aiRes.data || [];
+  const waRows = waRes.data || [];
+
+  // AI stats
+  const aiByProvider = {};
+  const aiByFeature = {};
+  let aiTotalLatency = 0;
+  let aiLatencyCount = 0;
+  for (const r of aiRows) {
+    aiByProvider[r.provider] = (aiByProvider[r.provider] || 0) + 1;
+    aiByFeature[r.feature] = (aiByFeature[r.feature] || 0) + 1;
+    if (r.latency_ms) { aiTotalLatency += r.latency_ms; aiLatencyCount++; }
+  }
+
+  // WhatsApp stats
+  const waByType = {};
+  const waByIntent = {};
+  let waErrors = 0;
+  for (const r of waRows) {
+    if (r.direction === 'inbound') {
+      waByType[r.message_type] = (waByType[r.message_type] || 0) + 1;
+      const intent = r.intent || 'unknown';
+      waByIntent[intent] = (waByIntent[intent] || 0) + 1;
+    }
+    if (r.error) waErrors++;
+  }
+
+  return {
+    ai: {
+      totalCalls: aiRows.length,
+      avgLatencyMs: aiLatencyCount > 0 ? Math.round(aiTotalLatency / aiLatencyCount) : 0,
+      failoverCalls: aiRows.filter((r) => r.is_failover).length,
+      byProvider: aiByProvider,
+      byFeature: aiByFeature,
+    },
+    whatsapp: {
+      totalMessages: waRows.length,
+      inbound: waRows.filter((r) => r.direction === 'inbound').length,
+      errors: waErrors,
+      byType: waByType,
+      byIntent: waByIntent,
+    },
+  };
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -2317,4 +2422,7 @@ module.exports = {
   getWhatsAppTimeline,
   getCalendarSyncHealth,
   getAnalytics,
+  getAiUsageTopHouseholds,
+  getAiUsageTopUsers,
+  getUserUsageStats,
 };

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconCpu } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
@@ -18,6 +19,8 @@ export default function AdminAiUsage() {
 
   const stats = data?.stats || {};
   const timeline = data?.timeline || [];
+  const topHouseholds = data?.topHouseholds || [];
+  const topUsers = data?.topUsers || [];
 
   const statCards = [
     { label: 'Total Calls (30d)', value: stats.totalCalls ?? 0, color: 'text-plum bg-plum-light' },
@@ -89,6 +92,64 @@ export default function AdminAiUsage() {
                   </tr>
                 ))}
                 {Object.keys(stats.byFeature || {}).length === 0 && (
+                  <tr><td colSpan="2" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Households & Users */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div>
+          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Top Households</h2>
+          <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-light-grey text-left">
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Household</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Calls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topHouseholds.map((h) => (
+                  <tr key={h.household_id} className="border-b border-light-grey last:border-0">
+                    <td className="px-4 py-3">
+                      <Link to={`/admin/households/${h.household_id}`} className="font-medium text-plum hover:underline">{h.name}</Link>
+                    </td>
+                    <td className="px-4 py-3 text-right text-charcoal">{h.calls}</td>
+                  </tr>
+                ))}
+                {topHouseholds.length === 0 && (
+                  <tr><td colSpan="2" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Top Users</h2>
+          <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-light-grey text-left">
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">User</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Calls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topUsers.map((u) => (
+                  <tr key={u.user_id} className="border-b border-light-grey last:border-0">
+                    <td className="px-4 py-3">
+                      <Link to={`/admin/users/${u.user_id}`} className="font-medium text-plum hover:underline">{u.name}</Link>
+                      <p className="text-xs text-warm-grey">{u.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right text-charcoal">{u.calls}</td>
+                  </tr>
+                ))}
+                {topUsers.length === 0 && (
                   <tr><td colSpan="2" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
                 )}
               </tbody>

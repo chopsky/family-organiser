@@ -103,6 +103,19 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/users/:id/usage ─────────────────────────────────────────
+
+router.get('/users/:id/usage', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const usage = await db.getUserUsageStats(req.params.id, { days });
+    return res.json(usage);
+  } catch (err) {
+    console.error('GET /api/admin/users/:id/usage error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/households ──────────────────────────────────────────────
 
 router.get('/households', async (req, res) => {
@@ -140,11 +153,13 @@ router.get('/households/:id', async (req, res) => {
 router.get('/ai-usage', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
-    const [stats, timeline] = await Promise.all([
+    const [stats, timeline, topHouseholds, topUsers] = await Promise.all([
       db.getAiUsageStats({ days }),
       db.getAiUsageTimeline({ days }),
+      db.getAiUsageTopHouseholds({ days }),
+      db.getAiUsageTopUsers({ days }),
     ]);
-    return res.json({ stats, timeline });
+    return res.json({ stats, timeline, topHouseholds, topUsers });
   } catch (err) {
     console.error('GET /api/admin/ai-usage error:', err);
     return res.status(500).json({ error: 'Internal server error' });
