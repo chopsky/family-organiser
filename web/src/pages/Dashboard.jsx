@@ -120,7 +120,7 @@ function DashboardAiInput() {
         <input
           ref={aiInputRef}
           type="text"
-          placeholder="Ask anything... events, tasks, recipes, scan receipts"
+          placeholder="Ask AI to create events, tasks, recipes, scan receipts, and more..."
           className="flex-1 px-4 py-3.5 text-sm text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
         <div className="flex items-center gap-1 pr-2">
