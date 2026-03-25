@@ -247,11 +247,17 @@ router.get('/events', async (req, res) => {
     }
 
     const { category } = req.query;
+    const cacheKey = `cal-events:${req.householdId}:${month}:${category || 'all'}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const events = await db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
       userId: req.user.id,
       category: category || undefined,
     });
-    return res.json({ events });
+    const result = { events };
+    cache.set(cacheKey, result, 60); // cache for 60 seconds
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/calendar/events error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -274,8 +280,14 @@ router.get('/tasks', async (req, res) => {
       return res.status(400).json({ error: 'Invalid month format. Use "YYYY-MM".' });
     }
 
+    const cacheKey = `cal-tasks:${req.householdId}:${month}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const tasks = await db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate);
-    return res.json({ tasks });
+    const result = { tasks };
+    cache.set(cacheKey, result, 60);
+    return res.json(result);
   } catch (err) {
     console.error('GET /api/calendar/tasks error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -326,6 +338,8 @@ router.post('/events', async (req, res) => {
     // Push to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'create').catch(() => {});
 
+    cache.invalidatePattern(`cal-events:${req.householdId}:`);
+    cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ event });
   } catch (err) {
@@ -370,6 +384,8 @@ router.patch('/events/:id', async (req, res) => {
     // Push update to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'update').catch(() => {});
 
+    cache.invalidatePattern(`cal-events:${req.householdId}:`);
+    cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ event });
   } catch (err) {
@@ -387,6 +403,8 @@ router.delete('/events/:id', async (req, res) => {
     calendarSync.pushEventToConnections(req.householdId, { id: req.params.id }, 'delete').catch(() => {});
 
     await db.deleteCalendarEvent(req.params.id, req.householdId);
+    cache.invalidatePattern(`cal-events:${req.householdId}:`);
+    cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
