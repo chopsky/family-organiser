@@ -1064,32 +1064,6 @@ export default function Calendar() {
                   </div>
                 </div>
 
-                {/* Connected calendars */}
-                <div className="h-px bg-light-grey my-4" />
-                <div className="text-[11px] font-semibold text-warm-grey uppercase tracking-wider mb-2">Connected calendars</div>
-                <div className="flex flex-col gap-1.5">
-                  {[
-                    { name: 'Google Calendar', status: 'Connected', statusColor: '#7DAE82', iconBg: '#E8F0FE' },
-                    { name: 'Outlook Calendar', status: 'Connect', statusColor: '#6B6774', iconBg: '#E6F1FB' },
-                    { name: 'Apple Calendar', status: 'Connect', statusColor: '#6B6774', iconBg: '#F1EFE8' },
-                  ].map(cal => (
-                    <div
-                      key={cal.name}
-                      className="flex items-center gap-2.5 p-2.5 rounded-lg border-[1.5px] border-light-grey cursor-pointer hover:border-plum hover:bg-plum-light transition-all"
-                    >
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: cal.iconBg }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <rect x="3" y="4" width="18" height="18" rx="2" stroke="#555" strokeWidth="1.5" />
-                          <path d="M3 10h18" stroke="#555" strokeWidth="1.5" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs font-semibold">{cal.name}</div>
-                        <div className="text-[10px]" style={{ color: cal.statusColor }}>{cal.status}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </div>
