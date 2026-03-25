@@ -184,8 +184,30 @@ async function processChange(connection, subscription, change) {
       }
     } else if (action === 'delete') {
       if (existingMapping) {
-        await db.softDeleteCalendarEvent(existingMapping.event_id, connection.household_id);
-        await db.deleteSyncMapping(existingMapping.event_id, connection.id);
+        // Guard: don't soft-delete events that are recent or upcoming — Apple CalDAV
+        // sometimes fails to return events that still exist. Only delete events
+        // that ended more than 7 days ago to avoid losing active events.
+        let shouldDelete = true;
+        try {
+          const event = await db.getCalendarEventById(existingMapping.event_id, connection.household_id);
+          if (event) {
+            const eventEnd = new Date(event.end_time || event.start_time);
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            if (eventEnd > sevenDaysAgo) {
+              console.warn(
+                `[calendar-sync] Skipping deletion of recent/future event "${event.title}" (${event.start_time}) — Apple CalDAV may be inconsistent`
+              );
+              shouldDelete = false;
+            }
+          }
+        } catch (guardErr) {
+          console.warn(`[calendar-sync] Could not verify event for deletion guard, skipping:`, guardErr.message);
+          shouldDelete = false;
+        }
+        if (shouldDelete) {
+          await db.softDeleteCalendarEvent(existingMapping.event_id, connection.household_id);
+          await db.deleteSyncMapping(existingMapping.event_id, connection.id);
+        }
       }
     }
   } catch (err) {
