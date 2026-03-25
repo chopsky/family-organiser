@@ -92,13 +92,15 @@ export default function Layout({ children }) {
       })
       .catch(() => {});
 
-    // Sync browser timezone to backend (fire-and-forget)
+    // Sync browser timezone to backend once per session (fire-and-forget)
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (browserTz) {
+    const tzSynced = sessionStorage.getItem('tz_synced');
+    if (browserTz && !tzSynced) {
+      sessionStorage.setItem('tz_synced', '1');
       api.patch('/household/profile', { timezone: browserTz }).catch(() => {});
     }
 
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- only sync on mount/login, not every nav
 
   function handleLogout() {
     logout();
