@@ -84,39 +84,50 @@ export default function ChatWidget() {
   }, [isOpen]);
 
   // Listen for external "open chat with message" events
+  const pendingMessageRef = useRef(null);
+
   useEffect(() => {
     function handleOpenChat(e) {
-      const msg = e.detail?.message;
-      setIsOpen(true);
+      const msg = e.detail?.message?.trim();
       if (msg) {
-        // Auto-send the message after a short delay for history to load
-        setTimeout(() => {
-          setInput(msg);
-          // Trigger send programmatically
-          setTimeout(() => {
-            const text = msg.trim();
-            if (!text) return;
-            setInput('');
-            const userMsg = { role: 'user', content: text, created_at: new Date().toISOString() };
-            setMessages(prev => [...prev, userMsg]);
-            setLoading(true);
-            api.post('/chat', { message: text })
-              .then(({ data }) => {
-                const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
-                setMessages(prev => [...prev, assistantMsg]);
-              })
-              .catch(() => {
-                const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble responding. Please try again.', created_at: new Date().toISOString() };
-                setMessages(prev => [...prev, errorMsg]);
-              })
-              .finally(() => setLoading(false));
-          }, 100);
-        }, 200);
+        pendingMessageRef.current = msg;
+      }
+      setIsOpen(true);
+      // If history is already loaded, send immediately
+      if (historyLoaded && msg) {
+        sendExternalMessage(msg);
+        pendingMessageRef.current = null;
       }
     }
     window.addEventListener('openChatWidget', handleOpenChat);
     return () => window.removeEventListener('openChatWidget', handleOpenChat);
-  }, []);
+  }, [historyLoaded]);
+
+  // When history finishes loading, check if there's a pending message to send
+  useEffect(() => {
+    if (historyLoaded && pendingMessageRef.current) {
+      const msg = pendingMessageRef.current;
+      pendingMessageRef.current = null;
+      // Small delay to ensure state has settled after history load
+      setTimeout(() => sendExternalMessage(msg), 50);
+    }
+  }, [historyLoaded]);
+
+  function sendExternalMessage(text) {
+    const userMsg = { role: 'user', content: text, created_at: new Date().toISOString() };
+    setMessages(prev => [...prev, userMsg]);
+    setLoading(true);
+    api.post('/chat', { message: text })
+      .then(({ data }) => {
+        const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
+        setMessages(prev => [...prev, assistantMsg]);
+      })
+      .catch(() => {
+        const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble responding. Please try again.', created_at: new Date().toISOString() };
+        setMessages(prev => [...prev, errorMsg]);
+      })
+      .finally(() => setLoading(false));
+  }
 
   async function handleSend(e) {
     e?.preventDefault();
