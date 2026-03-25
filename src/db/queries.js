@@ -1159,6 +1159,20 @@ async function getCalendarEventById(eventId, householdId) {
   return data || null;
 }
 
+async function findCalendarEventByTitleAndTime(householdId, title, startTime) {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('id')
+    .eq('household_id', householdId)
+    .eq('title', title)
+    .eq('start_time', startTime)
+    .is('deleted_at', null)
+    .limit(1)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 async function getTasksByDateRange(householdId, startDate, endDate) {
   const { data, error } = await supabase
     .from('tasks')
@@ -2378,6 +2392,7 @@ module.exports = {
   // Calendar
   getCalendarEvents,
   getCalendarEventById,
+  findCalendarEventByTitleAndTime,
   getTasksByDateRange,
   createCalendarEvent,
   updateCalendarEvent,

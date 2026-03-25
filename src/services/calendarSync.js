@@ -169,18 +169,40 @@ async function processChange(connection, subscription, change) {
           existingMapping.event_id, connection.id, subscription.id, externalEventId, etag,
         );
       } else {
-        // Create new event
-        const newEvent = await db.createCalendarEventFromSync(
-          connection.household_id,
-          eventData,
-          connection.user_id,
-          subscription.id,
-          subscription.category,
-          subscription.visibility,
-        );
-        await db.createSyncMappingWithSubscription(
-          newEvent.id, connection.id, subscription.id, externalEventId, etag,
-        );
+        // Before creating, check for duplicate by title + start_time to prevent
+        // re-importing events whose sync mapping was lost
+        let duplicateEvent = null;
+        if (eventData.title && eventData.start_time) {
+          try {
+            duplicateEvent = await db.findCalendarEventByTitleAndTime(
+              connection.household_id, eventData.title, eventData.start_time,
+            );
+          } catch (e) {
+            // Non-fatal — proceed with create
+          }
+        }
+
+        if (duplicateEvent) {
+          // Re-link the existing event instead of creating a duplicate
+          console.log(`[calendar-sync] Re-linking existing event "${eventData.title}" (${eventData.start_time}) instead of creating duplicate`);
+          await db.updateCalendarEvent(duplicateEvent.id, connection.household_id, eventData);
+          await db.createSyncMappingWithSubscription(
+            duplicateEvent.id, connection.id, subscription.id, externalEventId, etag,
+          );
+        } else {
+          // Create new event
+          const newEvent = await db.createCalendarEventFromSync(
+            connection.household_id,
+            eventData,
+            connection.user_id,
+            subscription.id,
+            subscription.category,
+            subscription.visibility,
+          );
+          await db.createSyncMappingWithSubscription(
+            newEvent.id, connection.id, subscription.id, externalEventId, etag,
+          );
+        }
       }
     } else if (action === 'delete') {
       if (existingMapping) {
