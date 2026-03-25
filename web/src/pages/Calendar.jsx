@@ -333,6 +333,40 @@ export default function Calendar() {
 
   const HOUR_HEIGHT = 52; // matches mockup
 
+  // ── Client-side month cache (avoids re-fetching already loaded months) ──
+  const monthCacheRef = useRef({}); // { '2026-03': { events: [...], tasks: [...], ts: Date.now() } }
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  function invalidateMonthCache() {
+    monthCacheRef.current = {};
+  }
+
+  async function fetchMonth(mp) {
+    const cached = monthCacheRef.current[mp];
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return { events: cached.events, tasks: cached.tasks };
+    }
+    const [evRes, tkRes] = await Promise.all([
+      api.get('/calendar/events', { params: { month: mp } }),
+      api.get('/calendar/tasks', { params: { month: mp } }),
+    ]);
+    const entry = { events: evRes.data.events ?? [], tasks: tkRes.data.tasks ?? [], ts: Date.now() };
+    monthCacheRef.current[mp] = entry;
+    return entry;
+  }
+
+  // Prefetch adjacent months in the background
+  function prefetchAdjacent(date) {
+    const prev = new Date(date.getFullYear(), date.getMonth() - 1, 1);
+    const next = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+    [prev, next].forEach(d => {
+      const mp = monthParam(d);
+      if (!monthCacheRef.current[mp]) {
+        fetchMonth(mp).catch(() => {}); // fire-and-forget
+      }
+    });
+  }
+
   // ── Data loading ────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -349,17 +383,15 @@ export default function Calendar() {
         monthsToFetch = [monthParam(currentMonth)];
       }
 
-      const monthFetches = monthsToFetch.map(mp =>
-        Promise.all([
-          api.get('/calendar/events', { params: { month: mp } }),
-          api.get('/calendar/tasks', { params: { month: mp } }),
-        ])
-      );
+      const monthResults = await Promise.all(monthsToFetch.map(fetchMonth));
       const schoolFetch = schoolData ? Promise.resolve(null) : api.get('/schools').catch(() => null);
-      const [results, freshSchoolData] = await Promise.all([Promise.all(monthFetches), schoolFetch]);
+      const freshSchoolData = await schoolFetch;
 
-      const allEvents = results.flatMap(([evRes]) => evRes.data.events ?? []);
-      const allTasks = results.flatMap(([, tkRes]) => tkRes.data.tasks ?? []);
+      const allEvents = monthResults.flatMap(r => r.events);
+      const allTasks = monthResults.flatMap(r => r.tasks);
+
+      // Prefetch adjacent months in background
+      prefetchAdjacent(viewMode === 'month' ? currentMonth : selectedDate);
 
       // Dedup by ID first, then by title+date
       const byId = [...new Map(allEvents.map(e => [e.id, e])).values()];
@@ -654,6 +686,7 @@ export default function Calendar() {
       }
       setShowForm(false);
       resetForm();
+      invalidateMonthCache();
       await load();
     } catch {
       setError('Could not save event.');
@@ -690,6 +723,7 @@ export default function Calendar() {
       await api.delete(`/calendar/events/${id}`);
       setShowForm(false);
       resetForm();
+      invalidateMonthCache();
       await load();
     } catch {
       setError('Could not delete event.');
@@ -701,6 +735,7 @@ export default function Calendar() {
     setToggling(prev => new Set(prev).add(task.id));
     try {
       await api.patch(`/tasks/${task.id}`, { completed: !task.completed });
+      invalidateMonthCache();
       await load();
     } catch {
       setError('Could not update task.');
@@ -714,6 +749,7 @@ export default function Calendar() {
     setDeletingTask(prev => new Set(prev).add(task.id));
     try {
       await api.delete(`/tasks/${task.id}`);
+      invalidateMonthCache();
       await load();
     } catch {
       setError('Could not delete task.');
@@ -756,6 +792,7 @@ export default function Calendar() {
         notification: taskNotification || null,
       });
       closeTaskForm();
+      invalidateMonthCache();
       await load();
     } catch {
       setError('Could not update task.');
