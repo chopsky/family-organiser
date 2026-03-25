@@ -146,8 +146,8 @@ export default function Layout({ children }) {
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
-        <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: '30px', paddingBottom: '30px' }}>
-          <img src="/housemait-logo.png" alt="HouseMait" className="h-7" />
+        <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: '35px', paddingBottom: '30px' }}>
+          <img src="/housemait-logo.png" alt="HouseMait" className="h-6" />
         </div>
 
         {/* Household pill */}
