@@ -443,11 +443,12 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
   const memberNames = members.map(m => m.name);
 
   // Smart classify: receipt, event, or unknown
-  const scan = await scanImage(imageBuffer, mimeType, memberNames);
+  const ctx = { householdId: household.id, userId: user.id };
+  const scan = await scanImage(imageBuffer, mimeType, memberNames, ctx);
 
   // ── Receipt handling ──
   if (scan.type === 'receipt') {
-    const extracted = await scanReceipt(imageBuffer, mimeType);
+    const extracted = await scanReceipt(imageBuffer, mimeType, ctx);
 
     if (!extracted.items?.length) {
       return {
@@ -457,7 +458,7 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
     }
 
     const shoppingList = await db.getShoppingList(household.id);
-    const matchResult = await matchReceiptToList(extracted.items, shoppingList);
+    const matchResult = await matchReceiptToList(extracted.items, shoppingList, ctx);
 
     const checkedOff = [];
     for (const match of matchResult.matches || []) {

@@ -33,7 +33,7 @@ router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async 
   try {
     // Start scanning receipt and fetching shopping list in parallel
     const [extracted, shoppingList] = await Promise.all([
-      scanReceipt(req.file.buffer, req.file.mimetype),
+      scanReceipt(req.file.buffer, req.file.mimetype, { householdId: req.householdId, userId: req.user.id }),
       db.getShoppingList(req.householdId),
     ]);
 
@@ -47,7 +47,7 @@ router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async 
       });
     }
 
-    const matchResult = await matchReceiptToList(extracted.items, shoppingList);
+    const matchResult = await matchReceiptToList(extracted.items, shoppingList, { householdId: req.householdId, userId: req.user.id });
 
     // Complete matched items (confidence ≥ 0.7) in parallel
     const toCheckOff = (matchResult.matches || []).filter((m) => m.confidence >= 0.7);

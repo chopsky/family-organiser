@@ -39,7 +39,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
 /**
  * Extract items from a receipt image.
  */
-async function scanReceipt(imageData, mediaType = 'image/jpeg') {
+async function scanReceipt(imageData, mediaType = 'image/jpeg', { householdId, userId } = {}) {
   const base64 = Buffer.isBuffer(imageData)
     ? imageData.toString('base64')
     : imageData;
@@ -61,6 +61,9 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg') {
       ],
       useThinking: false,
       maxTokens: 2048,
+      feature: 'receipt_scan',
+      householdId,
+      userId,
     });
     return parseJSON(text, 'receipt extraction');
   });
@@ -69,7 +72,7 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg') {
 /**
  * Fuzzy-match receipt items against the current shopping list.
  */
-async function matchReceiptToList(receiptItems, shoppingList) {
+async function matchReceiptToList(receiptItems, shoppingList, { householdId, userId } = {}) {
   if (!receiptItems.length || !shoppingList.length) {
     return { matches: [], unmatched_receipt_items: receiptItems.map((i) => i.normalised_name), summary: 'Nothing to match.' };
   }
@@ -90,6 +93,9 @@ async function matchReceiptToList(receiptItems, shoppingList) {
       messages: [{ role: 'user', content: userMessage }],
       useThinking: false,
       maxTokens: 1024,
+      feature: 'receipt_match',
+      householdId,
+      userId,
     });
     return parseJSON(text, 'receipt matching');
   });
@@ -98,7 +104,7 @@ async function matchReceiptToList(receiptItems, shoppingList) {
 /**
  * Scan an image to determine if it's a receipt or contains calendar events.
  */
-async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = []) {
+async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], { householdId, userId } = {}) {
   const base64 = Buffer.isBuffer(imageData)
     ? imageData.toString('base64')
     : imageData;
@@ -126,6 +132,9 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = []) 
       ],
       useThinking: false,
       maxTokens: 2048,
+      feature: 'image_scan',
+      householdId,
+      userId,
     });
     return parseJSON(text, 'image scan');
   });

@@ -336,7 +336,8 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
   try {
     const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map(m => m.name);
-    const scan = await scanImage(req.file.buffer, req.file.mimetype, memberNames);
+    const aiCtx = { householdId: req.householdId, userId: req.user.id };
+    const scan = await scanImage(req.file.buffer, req.file.mimetype, memberNames, aiCtx);
 
     const currentUser = members.find(m => m.id === req.user.id);
     const household = await db.getHouseholdById(req.householdId);
@@ -345,11 +346,11 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
 
     // ── Receipt handling ──
     if (scan.type === 'receipt') {
-      const extracted = await scanReceipt(req.file.buffer, req.file.mimetype);
+      const extracted = await scanReceipt(req.file.buffer, req.file.mimetype, aiCtx);
 
       if (extracted.items?.length) {
         const shoppingList = await db.getShoppingList(req.householdId);
-        const matchResult = await matchReceiptToList(extracted.items, shoppingList);
+        const matchResult = await matchReceiptToList(extracted.items, shoppingList, aiCtx);
 
         const checkedOff = [];
         for (const match of matchResult.matches || []) {
