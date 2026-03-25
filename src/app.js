@@ -20,11 +20,11 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false })); // Twilio sends webhooks as URL-encoded form data
 
-// Global rate limiter: 100 requests per 15 minutes per IP
+// Global rate limiter: 300 requests per minute per IP
 if (process.env.NODE_ENV !== 'test') {
   const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 60 * 1000,
+    max: 300,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please slow down.' },
