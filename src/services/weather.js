@@ -53,7 +53,7 @@ async function getWeatherReport(lat, lon, timezone = 'auto') {
 
   // Current conditions
   const lines = [
-    `🌡️ *Right now:* ${Math.round(current.temperature_2m)}°C (feels like ${Math.round(current.apparent_temperature)}°C)`,
+    `🌡️ **Right now:** ${Math.round(current.temperature_2m)}°C (feels like ${Math.round(current.apparent_temperature)}°C)`,
     `${describeWeatherCode(current.weather_code)}`,
     `💨 Wind: ${Math.round(current.wind_speed_10m)} km/h · 💧 Humidity: ${current.relative_humidity_2m}%`,
     '',
@@ -68,7 +68,7 @@ async function getWeatherReport(lat, lon, timezone = 'auto') {
     const rain = daily.precipitation_probability_max[i];
     const desc = describeWeatherCode(daily.weather_code[i]);
 
-    lines.push(`*${dayLabel}:* ${desc} ${lo}°–${hi}°C${rain > 20 ? ` · 🌧️ ${rain}% rain` : ''}`);
+    lines.push(`**${dayLabel}:** ${desc} ${lo}°–${hi}°C${rain > 20 ? ` · 🌧️ ${rain}% rain` : ''}`);
   }
 
   return lines.join('\n');
