@@ -160,14 +160,57 @@ function extractActions(content) {
   return { cleanContent: cleanContent.trim(), actions };
 }
 
+// List conversations
+router.get('/conversations', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const conversations = await db.getConversations(req.user.id);
+    // Get last message preview for each conversation
+    const withPreviews = await Promise.all(conversations.map(async (conv) => {
+      const msgs = await db.getChatHistory(conv.id, 1);
+      return { ...conv, lastMessage: msgs[0]?.content?.substring(0, 80) || null };
+    }));
+    return res.json({ conversations: withPreviews });
+  } catch (err) {
+    console.error('GET /api/chat/conversations error:', err);
+    return res.status(500).json({ error: 'Failed to load conversations.' });
+  }
+});
+
+// Create new conversation
+router.post('/conversations', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const { title } = req.body;
+    const conversation = await db.createConversation(req.householdId, req.user.id, title);
+    return res.status(201).json({ conversation });
+  } catch (err) {
+    console.error('POST /api/chat/conversations error:', err);
+    return res.status(500).json({ error: 'Failed to create conversation.' });
+  }
+});
+
+// Delete conversation
+router.delete('/conversations/:id', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    await db.deleteConversation(req.params.id, req.user.id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/chat/conversations error:', err);
+    return res.status(500).json({ error: 'Failed to delete conversation.' });
+  }
+});
+
 /**
  * GET /api/chat/history
- * Returns recent chat messages for the authenticated user.
+ * Returns recent chat messages for a conversation.
  */
 router.get('/history', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const messages = await db.getChatHistory(req.user.id, 50);
-    return res.json({ messages });
+    const { conversation_id } = req.query;
+    if (conversation_id) {
+      const messages = await db.getChatHistory(conversation_id, 50);
+      return res.json({ messages });
+    }
+    return res.json({ messages: [] });
   } catch (err) {
     console.error('GET /api/chat/history error:', err);
     return res.status(500).json({ error: 'Failed to load chat history.' });
@@ -176,11 +219,12 @@ router.get('/history', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * DELETE /api/chat/history
- * Clear all chat messages for the authenticated user.
+ * Clear all chat messages for a conversation.
  */
 router.delete('/history', requireAuth, requireHousehold, async (req, res) => {
   try {
-    await db.clearChatHistory(req.user.id);
+    const { conversation_id } = req.body;
+    await db.clearChatHistory(conversation_id);
     return res.json({ message: 'Chat history cleared.' });
   } catch (err) {
     console.error('DELETE /api/chat/history error:', err);
@@ -193,19 +237,26 @@ router.delete('/history', requireAuth, requireHousehold, async (req, res) => {
  * Send a message to the AI assistant and get a response.
  */
 router.post('/', requireAuth, requireHousehold, async (req, res) => {
-  const { message } = req.body;
+  const { message, conversation_id } = req.body;
 
   if (!message?.trim()) {
     return res.status(400).json({ error: 'Message is required.' });
   }
 
   try {
+    // Resolve or create conversation
+    let conversationId = conversation_id;
+    if (!conversationId) {
+      const conv = await db.createConversation(req.householdId, req.user.id, message.substring(0, 50));
+      conversationId = conv.id;
+    }
+
     // Build context-rich system prompt
     const household = await db.getHouseholdById(req.householdId);
     const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id);
 
     // Get recent conversation history for context
-    const history = await db.getChatHistory(req.user.id, 30);
+    const history = await db.getChatHistory(conversationId, 30);
 
     // Build messages array
     const messages = [
@@ -311,11 +362,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     }
 
     // Save both messages to DB
-    await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim());
-    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', cleanContent);
+    await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);
+    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', cleanContent, conversationId);
+    await db.touchConversation(conversationId);
 
     return res.json({
       message: cleanContent,
+      conversation_id: conversationId,
       actions: executedActions.length > 0 ? executedActions : undefined,
     });
   } catch (err) {
@@ -334,6 +387,13 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
   }
 
   try {
+    // Resolve or create conversation
+    let conversationId = req.body.conversation_id;
+    if (!conversationId) {
+      const conv = await db.createConversation(req.householdId, req.user.id, 'Image scan');
+      conversationId = conv.id;
+    }
+
     const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map(m => m.name);
     const aiCtx = { householdId: req.householdId, userId: req.user.id };
@@ -373,16 +433,18 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
 
         executedActions.push({ type: 'receipt_scan', checked_off: checkedOff.length });
 
-        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent a receipt image]');
-        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg);
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent a receipt image]', conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
+        await db.touchConversation(conversationId);
 
-        return res.json({ message: msg, actions: executedActions });
+        return res.json({ message: msg, conversation_id: conversationId, actions: executedActions });
       }
 
       const noItemsMsg = "🧾 I couldn't find any items on that receipt. Try sending a clearer photo.";
-      await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]');
-      await db.saveChatMessage(req.householdId, req.user.id, 'assistant', noItemsMsg);
-      return res.json({ message: noItemsMsg });
+      await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]', conversationId);
+      await db.saveChatMessage(req.householdId, req.user.id, 'assistant', noItemsMsg, conversationId);
+      await db.touchConversation(conversationId);
+      return res.json({ message: noItemsMsg, conversation_id: conversationId });
     }
 
     // ── Event/invitation handling ──
@@ -425,18 +487,20 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
         if (scan.summary) msg += `\n${scan.summary}`;
         executedActions.push({ type: 'create_events', count: created.length });
 
-        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]');
-        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg);
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]', conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
+        await db.touchConversation(conversationId);
 
-        return res.json({ message: msg, actions: executedActions });
+        return res.json({ message: msg, conversation_id: conversationId, actions: executedActions });
       }
     }
 
     // ── Unknown ──
     const unknownMsg = `🤔 ${scan.summary || "I wasn't sure what to do with that image. Try sending a receipt or an event invitation."}`;
-    await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]');
-    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', unknownMsg);
-    return res.json({ message: unknownMsg });
+    await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]', conversationId);
+    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', unknownMsg, conversationId);
+    await db.touchConversation(conversationId);
+    return res.json({ message: unknownMsg, conversation_id: conversationId });
 
   } catch (err) {
     console.error('POST /api/chat/image error:', err);

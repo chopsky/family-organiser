@@ -236,33 +236,78 @@ async function deleteDependent(id, householdId) {
 
 // ─── Chat message helpers ────────────────────────────────────────────────────
 
-async function getChatHistory(userId, limit = 50) {
-  // Fetch the most recent N messages (descending), then reverse for chronological display
+async function getChatHistory(conversationId, limit = 50) {
   const { data, error } = await supabase
     .from('chat_messages')
     .select()
-    .eq('user_id', userId)
+    .eq('conversation_id', conversationId)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
   return (data || []).reverse();
 }
 
-async function saveChatMessage(householdId, userId, role, content) {
+async function saveChatMessage(householdId, userId, role, content, conversationId) {
   const { data, error } = await supabase
     .from('chat_messages')
-    .insert({ household_id: householdId, user_id: userId, role, content })
+    .insert({ household_id: householdId, user_id: userId, role, content, conversation_id: conversationId })
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-async function clearChatHistory(userId) {
+async function clearChatHistory(conversationId) {
   const { error } = await supabase
     .from('chat_messages')
     .delete()
+    .eq('conversation_id', conversationId);
+  if (error) throw error;
+}
+
+async function createConversation(householdId, userId, title) {
+  const { data, error } = await supabase
+    .from('chat_conversations')
+    .insert({ household_id: householdId, user_id: userId, title: title || 'New conversation' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getConversations(userId, limit = 30) {
+  const { data, error } = await supabase
+    .from('chat_conversations')
+    .select('id, title, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+async function deleteConversation(conversationId, userId) {
+  const { error } = await supabase
+    .from('chat_conversations')
+    .delete()
+    .eq('id', conversationId)
     .eq('user_id', userId);
+  if (error) throw error;
+}
+
+async function updateConversationTitle(conversationId, title) {
+  const { error } = await supabase
+    .from('chat_conversations')
+    .update({ title, updated_at: new Date().toISOString() })
+    .eq('id', conversationId);
+  if (error) throw error;
+}
+
+async function touchConversation(conversationId) {
+  const { error } = await supabase
+    .from('chat_conversations')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', conversationId);
   if (error) throw error;
 }
 
@@ -2361,6 +2406,11 @@ module.exports = {
   getChatHistory,
   saveChatMessage,
   clearChatHistory,
+  createConversation,
+  getConversations,
+  deleteConversation,
+  updateConversationTitle,
+  touchConversation,
   // Schools
   searchSchools,
   searchSchoolByUrn,
