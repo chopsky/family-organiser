@@ -83,6 +83,41 @@ export default function ChatWidget() {
     }
   }, [isOpen]);
 
+  // Listen for external "open chat with message" events
+  useEffect(() => {
+    function handleOpenChat(e) {
+      const msg = e.detail?.message;
+      setIsOpen(true);
+      if (msg) {
+        // Auto-send the message after a short delay for history to load
+        setTimeout(() => {
+          setInput(msg);
+          // Trigger send programmatically
+          setTimeout(() => {
+            const text = msg.trim();
+            if (!text) return;
+            setInput('');
+            const userMsg = { role: 'user', content: text, created_at: new Date().toISOString() };
+            setMessages(prev => [...prev, userMsg]);
+            setLoading(true);
+            api.post('/chat', { message: text })
+              .then(({ data }) => {
+                const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
+                setMessages(prev => [...prev, assistantMsg]);
+              })
+              .catch(() => {
+                const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble responding. Please try again.', created_at: new Date().toISOString() };
+                setMessages(prev => [...prev, errorMsg]);
+              })
+              .finally(() => setLoading(false));
+          }, 100);
+        }, 200);
+      }
+    }
+    window.addEventListener('openChatWidget', handleOpenChat);
+    return () => window.removeEventListener('openChatWidget', handleOpenChat);
+  }, []);
+
   async function handleSend(e) {
     e?.preventDefault();
     const text = input.trim();
@@ -245,7 +280,7 @@ export default function ChatWidget() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
                   </svg>
-                  <input type="file" accept="image/*" onChange={handleImageUpload} disabled={loading} className="hidden" />
+                  <input type="file" accept="image/*" onChange={handleImageUpload} disabled={loading} className="hidden" data-chat-file-input />
                 </label>
                 <input
                   ref={inputRef}
