@@ -5,6 +5,7 @@ const db = require('../db/queries');
 const { signToken, requireAuth } = require('../middleware/auth');
 const email = require('../services/email');
 const publicHolidays = require('../services/publicHolidays');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -423,6 +424,7 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     });
 
     await db.markWhatsAppVerificationCodeUsed(record.id);
+    if (req.householdId) cache.invalidate(`members:${req.householdId}`);
 
     return res.json({ success: true, phone: record.phone });
   } catch (err) {
@@ -439,6 +441,7 @@ router.post('/whatsapp-disconnect', requireAuth, async (req, res) => {
       whatsapp_phone: null,
       whatsapp_linked: false,
     });
+    if (req.householdId) cache.invalidate(`members:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('POST /api/auth/whatsapp-disconnect error:', err);
