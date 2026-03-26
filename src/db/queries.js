@@ -9,7 +9,8 @@ function generateJoinCode() {
 
 async function createHousehold(name, timezone) {
   const join_code = generateJoinCode();
-  const row = { name, join_code };
+  const inbound_email_token = crypto.randomBytes(6).toString('hex');
+  const row = { name, join_code, inbound_email_token };
   if (timezone) row.timezone = timezone;
   const { data, error } = await supabase
     .from('households')
@@ -2332,6 +2333,68 @@ async function getUserUsageStats(userId, { days = 30 } = {}) {
   };
 }
 
+// ─── Inbound Email ───────────────────────────────────────────────────────────
+
+async function getHouseholdByInboundToken(token) {
+  const { data, error } = await supabase
+    .from('households')
+    .select()
+    .eq('inbound_email_token', token)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function createInboundEmailLog(householdId, fromEmail, subject) {
+  const { data, error } = await supabase
+    .from('inbound_email_log')
+    .insert({
+      household_id: householdId,
+      from_email: fromEmail,
+      subject: subject || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateInboundEmailLog(logId, updates) {
+  const { data, error } = await supabase
+    .from('inbound_email_log')
+    .update(updates)
+    .eq('id', logId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getRecentInboundEmails(householdId, limit = 10) {
+  const { data, error } = await supabase
+    .from('inbound_email_log')
+    .select()
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data;
+}
+
+async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinutes = 60) {
+  const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('inbound_email_log')
+    .select('id')
+    .eq('household_id', householdId)
+    .eq('from_email', fromEmail)
+    .eq('subject', subject)
+    .gte('created_at', cutoff)
+    .limit(1);
+  if (error) throw error;
+  return data && data.length > 0;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -2502,4 +2565,10 @@ module.exports = {
   getAiUsageTopHouseholds,
   getAiUsageTopUsers,
   getUserUsageStats,
+  // Inbound email
+  getHouseholdByInboundToken,
+  createInboundEmailLog,
+  updateInboundEmailLog,
+  getRecentInboundEmails,
+  checkDuplicateEmail,
 };

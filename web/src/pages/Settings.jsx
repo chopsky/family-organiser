@@ -29,6 +29,11 @@ export default function Settings() {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedCopied, setFeedCopied] = useState(false);
 
+  // Receipt email forwarding state
+  const [receiptEmail, setReceiptEmail] = useState('');
+  const [receiptCopied, setReceiptCopied] = useState(false);
+  const [regeneratingReceipt, setRegeneratingReceipt] = useState(false);
+
   // Calendar connections state
   const [calConnections, setCalConnections] = useState([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
@@ -255,6 +260,36 @@ export default function Settings() {
       setFeedCopied(true);
       setTimeout(() => setFeedCopied(false), 2000);
     });
+  }
+
+  // Build receipt email address from household token
+  useEffect(() => {
+    if (household?.inbound_email_token) {
+      setReceiptEmail(`receipts-${household.inbound_email_token}@inbound.housemait.com`);
+    }
+  }, [household?.inbound_email_token]);
+
+  function handleCopyReceiptEmail() {
+    navigator.clipboard.writeText(receiptEmail).then(() => {
+      setReceiptCopied(true);
+      setTimeout(() => setReceiptCopied(false), 2000);
+    });
+  }
+
+  async function handleRegenerateReceiptEmail() {
+    if (!window.confirm('Regenerate your receipt email address? The old address will stop working.')) return;
+    setRegeneratingReceipt(true);
+    setReceiptCopied(false);
+    try {
+      const { data } = await api.post('/household/regenerate-receipt-email');
+      setReceiptEmail(data.receipt_email);
+      setSuccess('Receipt email address regenerated.');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not regenerate receipt email.');
+    } finally {
+      setRegeneratingReceipt(false);
+    }
   }
 
   async function handleConnectGoogle() {
@@ -724,6 +759,57 @@ export default function Settings() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Receipt Email Forwarding */}
+      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
+          <svg className="h-4 w-4 text-plum" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+          Receipt Email Forwarding
+        </h2>
+        <p className="text-sm text-cocoa mb-3">
+          Forward email receipts from supermarkets and delivery services to automatically add items to your shopping list.
+        </p>
+        {receiptEmail ? (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={receiptEmail}
+                className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-sm bg-oat text-cocoa select-all"
+                onClick={(e) => e.target.select()}
+              />
+              <button
+                onClick={handleCopyReceiptEmail}
+                className="bg-primary hover:bg-primary-pressed text-white font-medium px-4 py-2 rounded-2xl text-sm transition-colors whitespace-nowrap"
+              >
+                {receiptCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <div className="text-xs text-cocoa space-y-1">
+              <p className="font-medium text-cocoa">How to use:</p>
+              <p>Forward order confirmation emails from Tesco, Sainsbury's, Ocado, Amazon, Deliveroo, and other retailers to this address.</p>
+              <p>Items will be automatically extracted and added to your default shopping list.</p>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={handleRegenerateReceiptEmail}
+                disabled={regeneratingReceipt}
+                className="text-xs text-cocoa hover:text-error transition-colors"
+              >
+                {regeneratingReceipt ? 'Regenerating...' : 'Regenerate address'}
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-cocoa">
+            Your household does not have a receipt email address yet. It will be generated automatically.
+          </p>
+        )}
       </div>
 
       {/* Signed in as */}

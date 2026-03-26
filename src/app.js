@@ -45,6 +45,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Inbound webhooks (no auth — must be before authenticated routes)
+app.use('/api/inbound-email', require('./routes/inbound-email'));
+
 // API routes
 app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/household', require('./routes/household'));

@@ -313,10 +313,42 @@ Respond only with valid JSON matching this schema:
 
 For "receipt" type, return empty events array. For "unknown", return empty events array with a helpful summary.`;
 
+const EMAIL_RECEIPT_EXTRACTION_SYSTEM = `You are a receipt analyser specialising in UK grocery and food delivery receipts forwarded by email. Extract all purchased items from the email text.
+
+Common UK retailers you may encounter: Tesco, Sainsbury's, Ocado, ASDA, Morrisons, Waitrose, M&S, Aldi, Lidl, Amazon Fresh, Deliveroo, Uber Eats, Just Eat, Gousto, HelloFresh.
+
+RULES:
+- Normalise product codes and abbreviations to plain English names:
+  - "LURPAK SLTD 250G" → "butter"
+  - "HOVIS WHTMED 800" → "white bread"
+  - "ANDREX DBL 9RLL" → "toilet roll"
+  - "FAIRY LIQ ORIG" → "washing up liquid"
+  - "TS FF CHICKEN BREAST 650G" → "chicken breast"
+- If a substitution notice is present (e.g. "Substituted: X replaced with Y"), use the REPLACEMENT item, not the original
+- IGNORE delivery charges, service fees, carrier bag charges, tips, discounts, vouchers, loyalty points
+- Extract quantity if shown (e.g. "x2", "Qty: 3")
+- Prices should include the currency symbol if present (e.g. "£2.50")
+
+Respond only with valid JSON matching this schema:
+{
+  "store_name": string | null,
+  "date": string | null,
+  "total": string | null,
+  "items": [
+    {
+      "normalised_name": string,
+      "original_text": string,
+      "price": string | null,
+      "quantity": number | null
+    }
+  ]
+}`;
+
 module.exports = {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
   RECEIPT_MATCHING_SYSTEM,
   CHAT_ASSISTANT_SYSTEM,
   IMAGE_SCAN_SYSTEM,
+  EMAIL_RECEIPT_EXTRACTION_SYSTEM,
 };

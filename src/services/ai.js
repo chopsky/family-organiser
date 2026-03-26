@@ -5,6 +5,7 @@ const {
   RECEIPT_EXTRACTION_SYSTEM,
   RECEIPT_MATCHING_SYSTEM,
   IMAGE_SCAN_SYSTEM,
+  EMAIL_RECEIPT_EXTRACTION_SYSTEM,
 } = require('./prompts');
 
 /**
@@ -173,4 +174,26 @@ function parseJSON(text, context) {
   }
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage };
+/**
+ * Extract receipt items from email text content.
+ */
+async function extractReceiptFromEmail(emailText, subject, { householdId, userId } = {}) {
+  const userMessage = subject
+    ? `Email subject: ${subject}\n\n${emailText}`
+    : emailText;
+
+  return withRetry(async () => {
+    const { text } = await callWithFailover({
+      system: EMAIL_RECEIPT_EXTRACTION_SYSTEM,
+      messages: [{ role: 'user', content: userMessage }],
+      useThinking: false,
+      maxTokens: 2048,
+      feature: 'email_receipt',
+      householdId,
+      userId,
+    });
+    return parseJSON(text, 'email receipt extraction');
+  });
+}
+
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractReceiptFromEmail };
