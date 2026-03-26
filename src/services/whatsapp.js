@@ -66,14 +66,18 @@ async function sendMessage(phone, body) {
   const client = getClient();
   if (!client) throw new Error('Twilio not configured');
 
+  const fromParams = getFromParams();
   const to = formatPhone(phone);
 
+  console.log('[WhatsApp] Sending message:', JSON.stringify({ ...fromParams, to: to }));
+
   const message = await client.messages.create({
-    ...getFromParams(),
+    ...fromParams,
     to,
     body,
   });
 
+  console.log('[WhatsApp] Message sent:', message.sid, message.status);
   return message;
 }
 
