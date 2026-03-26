@@ -1250,7 +1250,7 @@ export default function Calendar() {
             {selectedDate && (
               <div>
                 <h3 className="text-[15px] font-semibold mb-2.5" style={{ fontFamily: 'var(--font-display)' }}>
-                  {isSameDay(selectedDate, today) ? 'Today' : selectedDate.toLocaleDateString('en-GB', { weekday: 'short' })}, {selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
+                  {isSameDay(selectedDate, today) ? 'Today, ' : `${selectedDate.toLocaleDateString('en-GB', { weekday: 'short' })}, `}{selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
                 </h3>
                 {[...eventsForDate(selectedDate).map(e => ({ ...e, _type: 'event' })), ...tasksForDate(selectedDate).map(t => ({ ...t, _type: 'task' }))].map(item => {
                   const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
@@ -1543,9 +1543,9 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* ── Today's Events Panel (below month/week, hidden in day) ── */}
+      {/* ── Today's Events Panel (below month/week, hidden in day, hidden on mobile month since selected day panel covers it) ── */}
       {viewMode !== 'day' && todayEvents.length > 0 && (
-        <div className="mt-5">
+        <div className={`mt-5 ${viewMode === 'month' ? 'hidden md:block' : ''}`}>
           <h3 className="text-[17px] font-semibold mb-3" style={{ fontFamily: 'var(--font-display)' }}>Today's events</h3>
           <div className="flex flex-col gap-2">
             {todayEvents.map(item => {
