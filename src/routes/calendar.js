@@ -295,6 +295,43 @@ router.get('/tasks', async (req, res) => {
 });
 
 /**
+ * GET /api/calendar/month
+ * Combined endpoint — returns events + tasks for a month in a single request.
+ * Query params: month (e.g. "2026-03"), category? (optional)
+ */
+router.get('/month', async (req, res) => {
+  try {
+    const { month, category } = req.query;
+    if (!month) {
+      return res.status(400).json({ error: '"month" query parameter is required (e.g. "2026-03")' });
+    }
+    const parsed = parseMonth(month);
+    if (!parsed) {
+      return res.status(400).json({ error: 'Invalid month format. Use "YYYY-MM".' });
+    }
+
+    const cacheKey = `cal-month:${req.householdId}:${month}:${category || 'all'}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const [events, tasks] = await Promise.all([
+      db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
+        userId: req.user.id,
+        category: category || undefined,
+      }),
+      db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate),
+    ]);
+
+    const result = { events, tasks };
+    cache.set(cacheKey, result, 60);
+    return res.json(result);
+  } catch (err) {
+    console.error('GET /api/calendar/month error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/calendar/events
  * Body: { title, start_time, end_time, all_day?, description?, location?, color?, recurrence?, assigned_to_name? }
  */

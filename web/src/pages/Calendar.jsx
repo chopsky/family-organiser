@@ -346,11 +346,8 @@ export default function Calendar() {
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       return { events: cached.events, tasks: cached.tasks };
     }
-    const [evRes, tkRes] = await Promise.all([
-      api.get('/calendar/events', { params: { month: mp } }),
-      api.get('/calendar/tasks', { params: { month: mp } }),
-    ]);
-    const entry = { events: evRes.data.events ?? [], tasks: tkRes.data.tasks ?? [], ts: Date.now() };
+    const res = await api.get('/calendar/month', { params: { month: mp } });
+    const entry = { events: res.data.events ?? [], tasks: res.data.tasks ?? [], ts: Date.now() };
     monthCacheRef.current[mp] = entry;
     return entry;
   }
