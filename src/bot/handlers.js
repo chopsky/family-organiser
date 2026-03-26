@@ -118,6 +118,8 @@ async function handleTextMessage(text, user, household) {
   const notes = await db.getHouseholdNotes(household.id);
   const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id });
 
+  console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
+
   const actions = {
     shoppingAdded: [],
     shoppingCompleted: [],
@@ -151,7 +153,7 @@ async function handleTextMessage(text, user, household) {
         }
       }
       if (!lat || !lon) {
-        return { response: "I couldn't determine your location. Please open the Anora app in your browser to sync your timezone, then ask me again! 📍", actions };
+        return { response: "I couldn't determine your location. Please open the Housemait app in your browser to sync your timezone, then ask me again! 📍", actions };
       }
       const report = await getWeatherReport(lat, lon, tz);
       return { response: report, actions };
