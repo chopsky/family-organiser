@@ -29,8 +29,16 @@ function isConfigured() {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
     process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_WHATSAPP_NUMBER
+    (process.env.TWILIO_MESSAGING_SERVICE_SID || process.env.TWILIO_WHATSAPP_NUMBER)
   );
+}
+
+/**
+ * Build the "from" params for a Twilio message.
+ * Uses direct WhatsApp number (works for replies within 24hr window).
+ */
+function getFromParams() {
+  return { from: formatPhone(process.env.TWILIO_WHATSAPP_NUMBER) };
 }
 
 /**
@@ -58,11 +66,10 @@ async function sendMessage(phone, body) {
   const client = getClient();
   if (!client) throw new Error('Twilio not configured');
 
-  const from = formatPhone(process.env.TWILIO_WHATSAPP_NUMBER);
   const to = formatPhone(phone);
 
   const message = await client.messages.create({
-    from,
+    ...getFromParams(),
     to,
     body,
   });
@@ -90,10 +97,9 @@ async function sendTemplate(phone, body, contentSid, contentVars) {
   const client = getClient();
   if (!client) throw new Error('Twilio not configured');
 
-  const from = formatPhone(process.env.TWILIO_WHATSAPP_NUMBER);
   const to = formatPhone(phone);
 
-  const params = { from, to };
+  const params = { ...getFromParams(), to };
 
   if (contentSid) {
     // Production: use approved content template
@@ -142,7 +148,7 @@ async function downloadMedia(mediaUrl) {
  * @param {string} code  - 6-digit verification code
  */
 async function sendVerificationCode(phone, code) {
-  return sendMessage(phone, `Your Anora verification code is: ${code}\n\nThis code expires in 10 minutes.`);
+  return sendMessage(phone, `Your Housemait verification code is: ${code}\n\nThis code expires in 10 minutes.`);
 }
 
 module.exports = {
