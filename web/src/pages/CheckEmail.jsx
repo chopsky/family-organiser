@@ -5,7 +5,7 @@ export default function CheckEmail() {
     <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md text-center">
         <div className="mb-8">
-          <img src="/housemait-logomark.png" alt="Nestd" className="h-16 mx-auto mb-4 rounded-2xl" />
+          <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
           <div className="text-5xl mb-4">📧</div>

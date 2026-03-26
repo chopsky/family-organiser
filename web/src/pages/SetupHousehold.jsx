@@ -32,8 +32,8 @@ export default function SetupHousehold() {
     <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/housemait-logomark.png" alt="Nestd" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-2xl font-semibold text-bark">Welcome to Anora!</h1>
+          <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
+          <h1 className="text-2xl font-semibold text-bark">Welcome to Housemait!</h1>
           <p className="text-cocoa mt-2">Create your household to get started.</p>
         </div>
 

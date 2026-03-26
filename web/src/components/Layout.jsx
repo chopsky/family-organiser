@@ -182,7 +182,7 @@ export default function Layout({ children }) {
           </Link>
           <div className="flex-1 min-w-0 text-center">
             <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">
-              {household?.name ?? 'Nestd'}
+              {household?.name ?? 'Housemait'}
             </Link>
           </div>
           <Link to="/settings" className="shrink-0">
