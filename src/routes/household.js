@@ -443,10 +443,10 @@ router.delete('/invites/:inviteId', requireAuth, requireHousehold, requireAdmin,
 });
 
 /**
- * POST /api/household/regenerate-receipt-email
- * Generate a new inbound email token for receipt forwarding. Admin only.
+ * POST /api/household/regenerate-email-address
+ * Generate a new inbound email token. Admin only.
  */
-router.post('/regenerate-receipt-email', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+router.post('/regenerate-email-address', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
     const newToken = crypto.randomBytes(6).toString('hex');
     const updated = await db.updateHouseholdSettings(req.householdId, {
@@ -454,10 +454,9 @@ router.post('/regenerate-receipt-email', requireAuth, requireHousehold, requireA
     });
     return res.json({
       inbound_email_token: updated.inbound_email_token,
-      receipt_email: `receipts-${updated.inbound_email_token}@inbound.housemait.com`,
     });
   } catch (err) {
-    console.error('POST /api/household/regenerate-receipt-email error:', err);
+    console.error('POST /api/household/regenerate-email-address error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

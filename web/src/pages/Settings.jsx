@@ -265,7 +265,7 @@ export default function Settings() {
   // Build receipt email address from household token
   useEffect(() => {
     if (household?.inbound_email_token) {
-      setReceiptEmail(`receipts-${household.inbound_email_token}@inbound.housemait.com`);
+      setReceiptEmail(`${household.inbound_email_token}@inbound.housemait.com`);
     }
   }, [household?.inbound_email_token]);
 
@@ -281,7 +281,7 @@ export default function Settings() {
     setRegeneratingReceipt(true);
     setReceiptCopied(false);
     try {
-      const { data } = await api.post('/household/regenerate-receipt-email');
+      const { data } = await api.post('/household/regenerate-email-address');
       setReceiptEmail(data.receipt_email);
       setSuccess('Receipt email address regenerated.');
       setTimeout(() => setSuccess(''), 2000);
@@ -761,17 +761,17 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Receipt Email Forwarding */}
+      {/* Email Forwarding */}
       <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2">
           <svg className="h-4 w-4 text-plum" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2"/>
             <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
           </svg>
-          Receipt Email Forwarding
+          Email Forwarding
         </h2>
         <p className="text-sm text-cocoa mb-3">
-          Forward email receipts from supermarkets and delivery services to automatically add items to your shopping list.
+          Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
         {receiptEmail ? (
           <div className="space-y-3">
@@ -791,9 +791,12 @@ export default function Settings() {
               </button>
             </div>
             <div className="text-xs text-cocoa space-y-1">
-              <p className="font-medium text-cocoa">How to use:</p>
-              <p>Forward order confirmation emails from Tesco, Sainsbury's, Ocado, Amazon, Deliveroo, and other retailers to this address.</p>
-              <p>Items will be automatically extracted and added to your default shopping list.</p>
+              <p className="font-medium text-cocoa">What you can forward:</p>
+              <p>🛒 <strong>Receipts & orders</strong> — Tesco, Amazon, Deliveroo, Uber Eats → items added to shopping list</p>
+              <p>✈️ <strong>Travel bookings</strong> — flights, hotels, train tickets → added to calendar</p>
+              <p>🏫 <strong>School emails</strong> — newsletters, term dates, trips → events added to calendar</p>
+              <p>🏥 <strong>Appointments</strong> — dentist, doctor, vet → added to calendar</p>
+              <p>🍽️ <strong>Reservations</strong> — restaurants, events, tickets → added to calendar</p>
             </div>
             {isAdmin && (
               <button
@@ -807,7 +810,7 @@ export default function Settings() {
           </div>
         ) : (
           <p className="text-sm text-cocoa">
-            Your household does not have a receipt email address yet. It will be generated automatically.
+            Your household does not have a forwarding email address yet. It will be generated automatically.
           </p>
         )}
       </div>

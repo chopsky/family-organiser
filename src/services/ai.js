@@ -5,7 +5,7 @@ const {
   RECEIPT_EXTRACTION_SYSTEM,
   RECEIPT_MATCHING_SYSTEM,
   IMAGE_SCAN_SYSTEM,
-  EMAIL_RECEIPT_EXTRACTION_SYSTEM,
+  EMAIL_EXTRACTION_SYSTEM,
 } = require('./prompts');
 
 /**
@@ -175,25 +175,32 @@ function parseJSON(text, context) {
 }
 
 /**
- * Extract receipt items from email text content.
+ * Extract structured data from any forwarded email — receipts, flights, school newsletters, appointments, etc.
  */
-async function extractReceiptFromEmail(emailText, subject, { householdId, userId } = {}) {
+async function extractFromEmail(emailText, subject, memberNames = [], { householdId, userId } = {}) {
+  const today = new Date().toISOString().split('T')[0];
+  const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
+
+  const systemPrompt = EMAIL_EXTRACTION_SYSTEM
+    .replace(/{{DATE}}/g, today)
+    .replace(/{{MEMBERS}}/g, membersStr);
+
   const userMessage = subject
     ? `Email subject: ${subject}\n\n${emailText}`
     : emailText;
 
   return withRetry(async () => {
     const { text } = await callWithFailover({
-      system: EMAIL_RECEIPT_EXTRACTION_SYSTEM,
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
       useThinking: false,
-      maxTokens: 2048,
-      feature: 'email_receipt',
+      maxTokens: 4096,
+      feature: 'email_extraction',
       householdId,
       userId,
     });
-    return parseJSON(text, 'email receipt extraction');
+    return parseJSON(text, 'email extraction');
   });
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractReceiptFromEmail };
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail };

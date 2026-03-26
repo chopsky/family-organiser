@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
-const { scanReceipt, extractReceiptFromEmail } = require('../services/ai');
+const { scanReceipt, extractFromEmail } = require('../services/ai');
 const { extractEmailContent, extractPdfText } = require('../services/email-parser');
 const { detectAisle } = require('../utils/aisle-detect');
 
@@ -18,24 +18,40 @@ const inboundLimiter = rateLimit({
 
 /**
  * Parse the inbound email token from the To address.
- * Expected format: receipts-{token}@inbound.housemait.com
+ * Expected format: {token}@inbound.housemait.com
  */
 function parseTokenFromAddress(toAddress) {
   if (!toAddress) return null;
-  // Handle Postmark's full address format: "Name <email>" or just "email"
   const emailMatch = toAddress.match(/<([^>]+)>/) || [null, toAddress];
   const email = (emailMatch[1] || '').toLowerCase().trim();
-  const match = email.match(/^receipts-([a-f0-9]+)@/);
+  const match = email.match(/^([a-f0-9]+)@/);
   return match ? match[1] : null;
 }
 
 /**
- * POST /api/inbound-email/receipt
+ * Helper: convert local date+time to UTC ISO string
+ */
+function localToUTC(dateStr, timeStr, tz) {
+  try {
+    const dt = new Date(`${dateStr}T${timeStr}:00`);
+    // Use Intl to get offset for the timezone
+    const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: tz, timeZoneName: 'shortOffset' });
+    const parts = formatter.formatToParts(dt);
+    const offsetPart = parts.find(p => p.type === 'timeZoneName');
+    // Simple fallback: assume UK timezone
+    return dt.toISOString();
+  } catch {
+    return `${dateStr}T${timeStr}:00Z`;
+  }
+}
+
+/**
+ * POST /api/inbound-email/webhook
  * Postmark inbound webhook handler.
  * No auth middleware — this is a webhook.
  * Always returns 200 to avoid Postmark retries.
  */
-router.post('/receipt', inboundLimiter, async (req, res) => {
+router.post('/webhook', inboundLimiter, async (req, res) => {
   // Always return 200 immediately — don't leak info about valid/invalid tokens
   res.status(200).json({ ok: true });
 
@@ -46,7 +62,6 @@ router.post('/receipt', inboundLimiter, async (req, res) => {
 
     try {
       // Extract token from To address
-      // Postmark sends To as a string or the ToFull array
       const toAddress = req.body.ToFull?.[0]?.Email || req.body.To || '';
       const token = parseTokenFromAddress(toAddress);
 
@@ -79,80 +94,130 @@ router.post('/receipt', inboundLimiter, async (req, res) => {
 
       await db.updateInboundEmailLog(logId, { status: 'processing' });
 
+      // Get household members for assignment
+      const members = await db.getHouseholdMembers(householdId);
+      const memberNames = members.map(m => m.name);
+
       // Extract PDF text if any
       const pdfText = await extractPdfText(req.body);
 
-      // Collect all extraction results
-      const allItems = [];
+      // Combine all text content
+      const combinedText = [text, pdfText].filter(Boolean).join('\n\n---\n\n');
 
-      // 1. If images found, use existing scanReceipt for each
+      // Process image attachments (receipt photos)
+      const receiptItems = [];
       for (const img of images) {
         try {
           const result = await scanReceipt(img.data, img.mediaType, { householdId });
           if (result?.items?.length) {
-            allItems.push(...result.items);
+            receiptItems.push(...result.items);
           }
         } catch (err) {
           console.warn('[inbound-email] Image scan failed:', err.message);
         }
       }
 
-      // 2. If text content found (email body or PDF), use extractReceiptFromEmail
-      const combinedText = [text, pdfText].filter(Boolean).join('\n\n---\n\n');
+      // Use AI to classify and extract from the email text
+      let emailResult = null;
       if (combinedText.trim()) {
         try {
-          const result = await extractReceiptFromEmail(combinedText, subject, { householdId });
-          if (result?.items?.length) {
-            allItems.push(...result.items);
-          }
+          emailResult = await extractFromEmail(combinedText, subject, memberNames, { householdId });
         } catch (err) {
-          console.warn('[inbound-email] Text extraction failed:', err.message);
+          console.warn('[inbound-email] Email extraction failed:', err.message);
         }
       }
 
-      if (!allItems.length) {
-        await db.updateInboundEmailLog(logId, {
-          status: 'completed',
-          items_extracted: 0,
-          items_added: 0,
-        });
-        console.log('[inbound-email] No items extracted from email:', subject);
-        return;
+      let itemsAdded = 0;
+      let eventsCreated = 0;
+      let tasksCreated = 0;
+
+      // Handle receipt/shopping items (from images or email-extracted items)
+      const allShoppingItems = [...receiptItems];
+      if (emailResult?.shopping_items?.length) {
+        allShoppingItems.push(...emailResult.shopping_items);
       }
 
-      // Deduplicate by normalised_name (case-insensitive)
-      const seen = new Set();
-      const uniqueItems = [];
-      for (const item of allItems) {
-        const key = (item.normalised_name || '').toLowerCase().trim();
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          uniqueItems.push(item);
+      if (allShoppingItems.length) {
+        const seen = new Set();
+        const uniqueItems = [];
+        for (const item of allShoppingItems) {
+          const name = (item.normalised_name || item.item || '').toLowerCase().trim();
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            uniqueItems.push({ ...item, normalised_name: name });
+          }
+        }
+
+        const defaultList = await db.getDefaultShoppingList(householdId);
+        const enrichedItems = uniqueItems.map((item) => ({
+          item: item.normalised_name || item.item,
+          category: detectAisle(item.normalised_name || item.item) || 'Other',
+          quantity: item.quantity ? String(item.quantity) : null,
+          list_id: defaultList?.id,
+          aisle_category: detectAisle(item.normalised_name || item.item) || 'Other',
+          source: 'email_forward',
+        }));
+
+        await db.addShoppingItems(householdId, enrichedItems, null);
+        itemsAdded = enrichedItems.length;
+      }
+
+      // Handle calendar events
+      if (emailResult?.events?.length) {
+        for (const ev of emailResult.events) {
+          try {
+            const assignee = ev.assigned_to_name
+              ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+              : null;
+
+            const startTime = ev.all_day
+              ? `${ev.date}T00:00:00Z`
+              : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+            const endTime = ev.all_day
+              ? `${ev.date}T23:59:59Z`
+              : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+
+            await db.createCalendarEvent(householdId, {
+              title: ev.title,
+              start_time: startTime,
+              end_time: endTime,
+              all_day: !!ev.all_day,
+              assigned_to: assignee?.id || null,
+              assigned_to_name: assignee?.name || ev.assigned_to_name || null,
+              color: assignee?.color_theme || 'lavender',
+              location: ev.location || null,
+              description: ev.description || null,
+              source: 'email_forward',
+            }, null);
+            eventsCreated++;
+          } catch (err) {
+            console.warn('[inbound-email] Event creation failed:', err.message);
+          }
         }
       }
 
-      // Enrich with aisle categories
-      const defaultList = await db.getDefaultShoppingList(householdId);
-      const enrichedItems = uniqueItems.map((item) => ({
-        item: item.normalised_name,
-        category: detectAisle(item.normalised_name) || 'Other',
-        quantity: item.quantity ? String(item.quantity) : null,
-        list_id: defaultList.id,
-        aisle_category: detectAisle(item.normalised_name) || 'Other',
-        source: 'email',
-      }));
-
-      // Add items to shopping list
-      await db.addShoppingItems(householdId, enrichedItems, null);
+      // Handle tasks
+      if (emailResult?.tasks?.length) {
+        try {
+          await db.addTasks(householdId, emailResult.tasks.map(t => ({
+            ...t,
+            action: 'add',
+          })), null, members);
+          tasksCreated = emailResult.tasks.length;
+        } catch (err) {
+          console.warn('[inbound-email] Task creation failed:', err.message);
+        }
+      }
 
       // Update log
+      const totalActions = itemsAdded + eventsCreated + tasksCreated;
       await db.updateInboundEmailLog(logId, {
         status: 'completed',
-        items_extracted: uniqueItems.length,
-        items_added: enrichedItems.length,
+        items_extracted: totalActions,
+        items_added: itemsAdded,
       });
 
-      console.log(`[inbound-email] Added ${enrichedItems.length} items from email "${subject}" for household ${householdId}`);
+      console.log(`[inbound-email] Processed "${subject}" for household ${householdId}: ${itemsAdded} shopping items, ${eventsCreated} events, ${tasksCreated} tasks`);
     } catch (err) {
       console.error('[inbound-email] Processing error:', err);
       if (logId) {
