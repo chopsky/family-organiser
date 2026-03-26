@@ -67,12 +67,18 @@ async function sendMessage(phone, body) {
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   if (!accountSid || !authToken) throw new Error('Twilio not configured');
 
-  const from = formatPhone(process.env.TWILIO_WHATSAPP_NUMBER);
   const to = formatPhone(phone);
+  const msid = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
-  console.log('[WhatsApp] Sending via REST API:', JSON.stringify({ from, to }));
+  const params = { To: to, Body: body };
+  if (msid) {
+    params.MessagingServiceSid = msid;
+  } else {
+    params.From = formatPhone(process.env.TWILIO_WHATSAPP_NUMBER);
+  }
 
-  // Use REST API directly instead of SDK to avoid channel resolution issues
+  console.log('[WhatsApp] Sending via REST API:', JSON.stringify(params));
+
   const response = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
@@ -81,7 +87,7 @@ async function sendMessage(phone, body) {
         'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ From: from, To: to, Body: body }).toString(),
+      body: new URLSearchParams(params).toString(),
     }
   );
 
@@ -115,26 +121,9 @@ async function sendMessage(phone, body) {
  * @returns {Promise<object>}
  */
 async function sendTemplate(phone, body, contentSid, contentVars) {
-  const client = getClient();
-  if (!client) throw new Error('Twilio not configured');
-
-  const to = formatPhone(phone);
-
-  const params = { ...getFromParams(), to };
-
-  if (contentSid) {
-    // Production: use approved content template
-    params.contentSid = contentSid;
-    if (contentVars) {
-      params.contentVariables = JSON.stringify(contentVars);
-    }
-  } else {
-    // Sandbox / development: send as free-form body
-    params.body = body;
-  }
-
-  const message = await client.messages.create(params);
-  return message;
+  // For templates, use sendMessage for now (works within 24hr window)
+  // TODO: Add content template support for business-initiated messages
+  return sendMessage(phone, body);
 }
 
 /**
