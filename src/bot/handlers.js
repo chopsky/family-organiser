@@ -307,16 +307,19 @@ async function handleTextMessage(text, user, household) {
   }
 
   // Handle recipe request — generate, save to Recipe Box, format nicely
-  if (result.intent === 'recipe' && result.recipe_request) {
+  if (result.intent === 'recipe') {
     try {
-      const req = result.recipe_request;
-      const recipe = await generateAndSaveRecipe(household.id, req.description, req.dietary, req.servings);
+      // Extract description from recipe_request or infer from the original message
+      const description = result.recipe_request?.description || text;
+      const dietary = result.recipe_request?.dietary || null;
+      const servings = result.recipe_request?.servings || null;
+      console.log('[handlers] Generating recipe for:', description);
+      const recipe = await generateAndSaveRecipe(household.id, description, dietary, servings);
       const response = formatRecipeResponse(recipe);
       return { response, actions };
     } catch (err) {
       console.error('Recipe generation failed:', err.message);
-      // Fall back to chat response
-      return { response: result.response_message || "Sorry, I couldn't create that recipe right now. Try again in a moment!", actions };
+      return { response: "Sorry, I couldn't create that recipe right now. Try again in a moment! 🍳", actions };
     }
   }
 
