@@ -63,22 +63,39 @@ function formatPhone(phone) {
  * @returns {Promise<object>} Twilio message SID
  */
 async function sendMessage(phone, body) {
-  const client = getClient();
-  if (!client) throw new Error('Twilio not configured');
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) throw new Error('Twilio not configured');
 
-  const fromParams = getFromParams();
+  const from = formatPhone(process.env.TWILIO_WHATSAPP_NUMBER);
   const to = formatPhone(phone);
 
-  console.log('[WhatsApp] Sending message:', JSON.stringify({ ...fromParams, to: to }));
+  console.log('[WhatsApp] Sending via REST API:', JSON.stringify({ from, to }));
 
-  const message = await client.messages.create({
-    ...fromParams,
-    to,
-    body,
-  });
+  // Use REST API directly instead of SDK to avoid channel resolution issues
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ From: from, To: to, Body: body }).toString(),
+    }
+  );
 
-  console.log('[WhatsApp] Message sent:', message.sid, message.status);
-  return message;
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error('[WhatsApp] REST API error:', data);
+    const err = new Error(data.message || 'Twilio API error');
+    err.code = data.code;
+    throw err;
+  }
+
+  console.log('[WhatsApp] Message sent:', data.sid, data.status);
+  return data;
 }
 
 /**
