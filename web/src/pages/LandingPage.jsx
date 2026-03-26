@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 
-const SIGNUP_URL = 'https://family-organiser-seven.vercel.app/signup'
+const SIGNUP_URL = '/signup'
+const LOGIN_URL = '/login'
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
@@ -240,7 +242,7 @@ function useScrollReveal() {
 
 /* ─── Main App ─── */
 
-export default function App() {
+export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const whatsappRef = useScrollReveal()
@@ -977,7 +979,7 @@ export default function App() {
               <h4 className="text-sm font-semibold text-charcoal mb-4 font-sans">Get Started</h4>
               <div className="space-y-3">
                 <a href={SIGNUP_URL} className="block text-sm text-warm-grey hover:text-plum transition-colors">Sign Up</a>
-                <a href="https://family-organiser-seven.vercel.app/login" className="block text-sm text-warm-grey hover:text-plum transition-colors">Log In</a>
+                <a href={LOGIN_URL} className="block text-sm text-warm-grey hover:text-plum transition-colors">Log In</a>
               </div>
             </div>
           </div>

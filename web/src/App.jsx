@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
+import LandingPage   from './pages/LandingPage';
 import Login         from './pages/Login';
 import Signup        from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
@@ -49,7 +50,7 @@ function AppRoutes() {
   const { token, needsHousehold } = useAuth();
   return (
     <Routes>
-      <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
+      <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

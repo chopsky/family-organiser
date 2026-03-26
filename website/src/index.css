@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'DM Sans', system-ui, sans-serif;
+
+  /* Primary */
+  --color-plum: #6B3FA0;
+  --color-plum-dark: #5A3488;
+  --color-plum-mid: #8B6DB5;
+  --color-coral: #E8724A;
+  --color-sage: #7DAE82;
+  --color-charcoal: #2D2A33;
+
+  /* Supporting */
+  --color-plum-light: #F3EDFC;
+  --color-coral-light: #FDF0EB;
+  --color-sage-light: #EDF5EE;
+  --color-cream: #FBF8F3;
+
+  /* Neutrals */
+  --color-warm-grey: #6B6774;
+  --color-light-grey: #E8E5EC;
+
+  /* WhatsApp */
+  --color-wa-green: #25D366;
+  --color-wa-dark: #075E54;
+  --color-wa-teal: #128C7E;
+  --color-wa-light: #DCF8C6;
+  --color-wa-bg: #ECE5DD;
+
+  /* Animations */
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-delayed: float 6s ease-in-out 2s infinite;
+  --animate-float-slow: float 8s ease-in-out 1s infinite;
+  --animate-fade-in-up: fade-in-up 0.6s ease-out forwards;
+  --animate-typing: typing-dot 1.4s ease-in-out infinite;
+  --animate-pulse-soft: pulse-soft 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typing-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: #2D2A33;
+    background: #FBF8F3;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    letter-spacing: -0.04em;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .text-gradient-plum {
+    background: linear-gradient(135deg, #6B3FA0, #E8724A);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
