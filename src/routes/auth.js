@@ -398,8 +398,8 @@ router.post('/whatsapp-send-code', requireAuth, async (req, res) => {
 
     return res.json({ success: true, message: 'Verification code sent via WhatsApp' });
   } catch (err) {
-    console.error('POST /api/auth/whatsapp-send-code error:', err);
-    return res.status(500).json({ error: 'Failed to send verification code. Check your phone number and try again.' });
+    console.error('POST /api/auth/whatsapp-send-code error:', err.message, err.code, err.moreInfo);
+    return res.status(500).json({ error: `Failed to send verification code: ${err.message || 'Unknown error'}` });
   }
 });
 
