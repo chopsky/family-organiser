@@ -253,7 +253,7 @@ export default function LandingPage() {
   const faqRef = useScrollReveal()
 
   return (
-    <div className="min-h-screen bg-cream font-sans antialiased">
+    <div className="landing-page min-h-screen bg-cream font-sans antialiased">
       {/* ═══ Navbar ═══ */}
       <nav className="sticky top-0 z-50 glass border-b border-light-grey">
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">

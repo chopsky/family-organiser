@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  /* Font stacks */
+  /* Font stacks — system fonts only, no external loads */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
-  --font-display: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* ── Remapped legacy tokens (pages reference these) ── */
   --color-primary: #6B3FA0;
@@ -85,6 +85,16 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
+}
+
+/* ── Landing page scoped styles ── */
+
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.landing-page h4 {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.04em;
 }
 
 /* ── Landing page keyframes ── */
