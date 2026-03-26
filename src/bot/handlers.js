@@ -114,6 +114,32 @@ function formatTaskList(tasks, heading = 'Tasks') {
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
 
+  // Pre-classify: detect weather intent before AI call to avoid misclassification
+  const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
+  if (weatherPattern.test(text)) {
+    console.log('[handlers] Pre-classified as weather for:', text.slice(0, 50));
+    const result = { intent: 'weather', response_message: '' };
+    const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+    try {
+      const fullUser = household.members.find(m => m.id === user.id);
+      let lat = fullUser?.latitude;
+      let lon = fullUser?.longitude;
+      const tz = fullUser?.timezone || household.timezone || 'Europe/London';
+      if (!lat || !lon) {
+        const tzCoords = getCoordsFromTimezone(tz);
+        if (tzCoords) [lat, lon] = tzCoords;
+      }
+      if (!lat || !lon) {
+        return { response: "I couldn't determine your location. Please open the Housemait app in your browser to sync your timezone, then ask me again! 📍", actions };
+      }
+      const report = await getWeatherReport(lat, lon, tz);
+      return { response: report, actions };
+    } catch (err) {
+      console.error('Weather fetch failed:', err.message);
+      return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
+    }
+  }
+
   // Fetch saved notes for context
   const notes = await db.getHouseholdNotes(household.id);
   const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id });
