@@ -274,10 +274,17 @@ export default function Settings() {
     });
   }
 
-  // Build receipt email address from household token
+  // Build receipt email address from household token — fetch fresh if not in context
   useEffect(() => {
     if (household?.inbound_email_token) {
       setReceiptEmail(`${household.inbound_email_token}@inbound.housemait.com`);
+    } else {
+      // Token might not be in the cached auth context — fetch fresh from API
+      api.get('/household').then(({ data }) => {
+        if (data.household?.inbound_email_token) {
+          setReceiptEmail(`${data.household.inbound_email_token}@inbound.housemait.com`);
+        }
+      }).catch(() => {});
     }
   }, [household?.inbound_email_token]);
 
