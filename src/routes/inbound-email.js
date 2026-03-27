@@ -103,6 +103,8 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
 
       // Combine all text content
       const combinedText = [text, pdfText].filter(Boolean).join('\n\n---\n\n');
+      console.log('[inbound-email] Email text length:', combinedText.length, '| Subject:', subject);
+      console.log('[inbound-email] First 500 chars:', combinedText.slice(0, 500));
 
       // Process image attachments (receipt photos)
       const receiptItems = [];
@@ -122,9 +124,12 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       if (combinedText.trim()) {
         try {
           emailResult = await extractFromEmail(combinedText, subject, memberNames, { householdId });
+          console.log('[inbound-email] AI extraction result:', JSON.stringify(emailResult, null, 2));
         } catch (err) {
           console.warn('[inbound-email] Email extraction failed:', err.message);
         }
+      } else {
+        console.warn('[inbound-email] No text content extracted from email');
       }
 
       let itemsAdded = 0;
