@@ -178,12 +178,14 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
               : null;
 
+            // AI extracts local times — store without Z suffix so the app
+            // interprets them in the user's timezone (same as manually created events)
             const startTime = ev.all_day
-              ? `${ev.date}T00:00:00Z`
-              : `${ev.date}T${ev.start_time || '09:00'}:00Z`;
+              ? `${ev.date}T00:00:00`
+              : `${ev.date}T${ev.start_time || '09:00'}:00`;
             const endTime = ev.all_day
-              ? `${ev.date}T23:59:59Z`
-              : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00Z`;
+              ? `${ev.date}T23:59:59`
+              : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00`;
 
             await db.createCalendarEvent(householdId, {
               title: ev.title,
