@@ -79,7 +79,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
-  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group, allergies } = req.body;
 
   // Determine target user — admins can edit others, members only themselves
   let targetUserId = req.user.id;
@@ -122,6 +122,10 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   }
   if (school_id !== undefined) updates.school_id = school_id || null;
   if (year_group !== undefined) updates.year_group = year_group || null;
+  if (allergies !== undefined) {
+    // Store as JSON string array
+    updates.allergies = JSON.stringify(Array.isArray(allergies) ? allergies : []);
+  }
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update.' });

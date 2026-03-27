@@ -37,7 +37,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
   try {
     const members = await db.getHouseholdMembers(req.householdId);
-    const memberNames = members.map((m) => m.name);
+    const memberNames = members.map((m) => {
+      let str = m.name;
+      const allergens = (() => { try { return JSON.parse(m.allergies || '[]'); } catch { return []; } })();
+      if (allergens.length > 0) str += ` [Allergies: ${allergens.join(', ')}]`;
+      return str;
+    });
 
     // Fetch notes and upcoming calendar events for context
     const notes = await db.getHouseholdNotes(req.householdId).catch(() => []);

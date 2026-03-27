@@ -100,6 +100,7 @@ export default function FamilySetup() {
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('teal');
   const [profileReminderTime, setProfileReminderTime] = useState('');
+  const [profileAllergies, setProfileAllergies] = useState([]);
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -280,6 +281,7 @@ export default function FamilySetup() {
     setProfileBirthday(member.birthday || '');
     setProfileColor(member.color_theme || 'sage');
     setProfileReminderTime(member.reminder_time ? member.reminder_time.substring(0, 5) : '');
+    try { setProfileAllergies(JSON.parse(member.allergies || '[]')); } catch { setProfileAllergies([]); }
     setProfileAvatar(member.avatar_url || null);
     setProfileSchoolId(member.school_id || null);
     setProfileYearGroup(member.year_group || '');
@@ -662,6 +664,7 @@ export default function FamilySetup() {
         color_theme: profileColor,
         reminder_time: profileReminderTime || null,
         year_group: profileYearGroup || null,
+        allergies: profileAllergies,
       };
 
       // Handle school assignment for dependents
@@ -1477,6 +1480,54 @@ export default function FamilySetup() {
                       )}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Allergies & Dietary */}
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1.5">Allergies & dietary requirements</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: 'celery', label: 'Celery' },
+                    { key: 'gluten', label: 'Gluten' },
+                    { key: 'crustaceans', label: 'Crustaceans' },
+                    { key: 'eggs', label: 'Eggs' },
+                    { key: 'fish', label: 'Fish' },
+                    { key: 'lupin', label: 'Lupin' },
+                    { key: 'milk', label: 'Milk / Dairy' },
+                    { key: 'molluscs', label: 'Molluscs' },
+                    { key: 'mustard', label: 'Mustard' },
+                    { key: 'nuts', label: 'Tree Nuts' },
+                    { key: 'peanuts', label: 'Peanuts' },
+                    { key: 'sesame', label: 'Sesame' },
+                    { key: 'soya', label: 'Soya' },
+                    { key: 'sulphites', label: 'Sulphites' },
+                    { key: 'vegetarian', label: 'Vegetarian' },
+                    { key: 'vegan', label: 'Vegan' },
+                    { key: 'halal', label: 'Halal' },
+                    { key: 'kosher', label: 'Kosher' },
+                  ].map(({ key, label }) => {
+                    const selected = profileAllergies.includes(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setProfileAllergies(prev =>
+                            selected ? prev.filter(a => a !== key) : [...prev, key]
+                          );
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          selected
+                            ? 'bg-coral/10 border-coral text-coral'
+                            : 'border-cream-border text-cocoa hover:border-bark'
+                        }`}
+                      >
+                        {selected && <span className="mr-1">&#10003;</span>}
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
