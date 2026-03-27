@@ -192,7 +192,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               all_day: !!ev.all_day,
               assigned_to: assignee?.id || null,
               assigned_to_name: assignee?.name || ev.assigned_to_name || null,
-              color: assignee?.color_theme || 'lavender',
+              color: assignee?.color_theme || 'sage',
               location: ev.location || null,
               description: ev.description || null,
               source: 'email_forward',
