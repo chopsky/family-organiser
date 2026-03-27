@@ -95,8 +95,23 @@ router.delete('/users/:id', async (req, res) => {
   }
 
   try {
+    // Look up user's household before deleting
+    const user = await db.getUserByIdAdmin(id);
+    const householdId = user?.household_id;
+
     await db.deleteUser(id);
-    return res.json({ success: true });
+
+    // If user was in a household, check if it's now empty
+    let householdDeleted = false;
+    if (householdId) {
+      const remaining = await db.getHouseholdMembers(householdId);
+      if (remaining.length === 0) {
+        await db.deleteHouseholdCascade(householdId);
+        householdDeleted = true;
+      }
+    }
+
+    return res.json({ success: true, householdDeleted });
   } catch (err) {
     console.error('DELETE /api/admin/users/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });

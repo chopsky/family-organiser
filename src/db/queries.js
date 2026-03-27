@@ -1971,6 +1971,15 @@ async function deleteUser(userId) {
   if (error) throw error;
 }
 
+async function deleteHouseholdCascade(householdId) {
+  // All child tables have ON DELETE CASCADE, so this cleans up everything
+  const { error } = await supabase
+    .from('households')
+    .delete()
+    .eq('id', householdId);
+  if (error) throw error;
+}
+
 async function setUserPlatformAdmin(userId, isPlatformAdmin) {
   const { data, error } = await supabase
     .from('users')
@@ -2716,6 +2725,7 @@ module.exports = {
   enableUser,
   deleteUser,
   setUserPlatformAdmin,
+  deleteHouseholdCascade,
   // Platform admin Phase 2
   getAiUsageStats,
   getAiUsageTimeline,
