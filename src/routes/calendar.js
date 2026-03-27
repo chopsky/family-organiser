@@ -255,6 +255,21 @@ router.get('/events', async (req, res) => {
       userId: req.user.id,
       category: category || undefined,
     });
+
+    // Attach assignees to events
+    const eventIds = events.map((e) => e.id);
+    const allAssignees = eventIds.length > 0
+      ? await db.getEventAssigneesBatch(eventIds)
+      : [];
+    const assigneesByEvent = {};
+    for (const a of allAssignees) {
+      if (!assigneesByEvent[a.event_id]) assigneesByEvent[a.event_id] = [];
+      assigneesByEvent[a.event_id].push(a);
+    }
+    for (const event of events) {
+      event.assignees = assigneesByEvent[event.id] || [];
+    }
+
     const result = { events };
     cache.set(cacheKey, result, 60); // cache for 60 seconds
     return res.json(result);
@@ -322,6 +337,20 @@ router.get('/month', async (req, res) => {
       db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate),
     ]);
 
+    // Attach assignees to events
+    const eventIds = events.map((e) => e.id);
+    const allAssignees = eventIds.length > 0
+      ? await db.getEventAssigneesBatch(eventIds)
+      : [];
+    const assigneesByEvent = {};
+    for (const a of allAssignees) {
+      if (!assigneesByEvent[a.event_id]) assigneesByEvent[a.event_id] = [];
+      assigneesByEvent[a.event_id].push(a);
+    }
+    for (const event of events) {
+      event.assignees = assigneesByEvent[event.id] || [];
+    }
+
     const result = { events, tasks };
     cache.set(cacheKey, result, 60);
     return res.json(result);
@@ -333,10 +362,10 @@ router.get('/month', async (req, res) => {
 
 /**
  * POST /api/calendar/events
- * Body: { title, start_time, end_time, all_day?, description?, location?, color?, recurrence?, assigned_to_name? }
+ * Body: { title, start_time, end_time, all_day?, description?, location?, color?, recurrence?, assigned_to_name?, reminders?, assigned_to_names? }
  */
 router.post('/events', async (req, res) => {
-  const { title, start_time, end_time, all_day, description, location, color, recurrence, assigned_to_name } = req.body;
+  const { title, start_time, end_time, all_day, description, location, color, recurrence, assigned_to_name, reminders, assigned_to_names } = req.body;
 
   if (!title?.trim()) {
     return res.status(400).json({ error: '"title" is required' });
@@ -372,6 +401,18 @@ router.post('/events', async (req, res) => {
 
     const event = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
 
+    // Save reminders and assignees (fire-and-forget errors to avoid blocking response)
+    try {
+      if (reminders && Array.isArray(reminders) && reminders.length > 0) {
+        await db.saveEventReminders(event.id, req.householdId, reminders, event.start_time);
+      }
+      if (assigned_to_names && Array.isArray(assigned_to_names) && assigned_to_names.length > 0) {
+        await db.saveEventAssignees(event.id, req.householdId, assigned_to_names);
+      }
+    } catch (err) {
+      console.error('Failed to save reminders/assignees:', err.message);
+    }
+
     // Push to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'create').catch(() => {});
 
@@ -390,7 +431,7 @@ router.post('/events', async (req, res) => {
  * Body: any subset of event fields
  */
 router.patch('/events/:id', async (req, res) => {
-  const { color, recurrence, assigned_to_name, ...rest } = req.body;
+  const { color, recurrence, assigned_to_name, reminders, assigned_to_names, ...rest } = req.body;
 
   if (color && !VALID_COLORS.includes(color)) {
     return res.status(400).json({ error: `Invalid color "${color}". Must be one of: ${VALID_COLORS.join(', ')}` });
@@ -417,6 +458,18 @@ router.patch('/events/:id', async (req, res) => {
     }
 
     const event = await db.updateCalendarEvent(req.params.id, req.householdId, updates);
+
+    // Re-save reminders and assignees on edit
+    try {
+      if (reminders !== undefined) {
+        await db.saveEventReminders(event.id, req.householdId, reminders || [], event.start_time);
+      }
+      if (assigned_to_names !== undefined) {
+        await db.saveEventAssignees(event.id, req.householdId, assigned_to_names || []);
+      }
+    } catch (err) {
+      console.error('Failed to update reminders/assignees:', err.message);
+    }
 
     // Push update to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'update').catch(() => {});

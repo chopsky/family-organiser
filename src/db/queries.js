@@ -2395,6 +2395,168 @@ async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinute
   return data && data.length > 0;
 }
 
+// ─── Event Reminders ─────────────────────────────────────────────────────────
+
+/**
+ * Convert a reminder offset ({time, unit}) to milliseconds.
+ */
+function reminderOffsetToMs(time, unit) {
+  const t = parseInt(time, 10);
+  if (isNaN(t) || t <= 0) return 0;
+  switch (unit) {
+    case 'minutes': return t * 60 * 1000;
+    case 'hours':   return t * 60 * 60 * 1000;
+    case 'days':    return t * 24 * 60 * 60 * 1000;
+    case 'weeks':   return t * 7 * 24 * 60 * 60 * 1000;
+    default:        return 0;
+  }
+}
+
+/**
+ * Save reminders for a calendar event.
+ * Deletes existing reminders first (safe for both create and edit).
+ */
+async function saveEventReminders(eventId, householdId, reminders, eventStartTime) {
+  // Delete existing reminders for this event
+  const { error: deleteErr } = await supabase
+    .from('event_reminders')
+    .delete()
+    .eq('event_id', eventId);
+  if (deleteErr) throw deleteErr;
+
+  if (!reminders || !Array.isArray(reminders) || reminders.length === 0) return [];
+
+  const eventStart = new Date(eventStartTime);
+  const rows = reminders
+    .map((r) => {
+      const offsetMs = reminderOffsetToMs(r.time, r.unit);
+      if (offsetMs <= 0) return null;
+      const remindAt = new Date(eventStart.getTime() - offsetMs);
+      const offsetLabel = `${r.time} ${r.unit}`;
+      return {
+        event_id: eventId,
+        household_id: householdId,
+        remind_at: remindAt.toISOString(),
+        reminder_offset: offsetLabel,
+      };
+    })
+    .filter(Boolean);
+
+  if (rows.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('event_reminders')
+    .insert(rows)
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Save assignees for a calendar event.
+ * Deletes existing assignees first (safe for both create and edit).
+ */
+async function saveEventAssignees(eventId, householdId, memberNames, members) {
+  // Delete existing assignees for this event
+  const { error: deleteErr } = await supabase
+    .from('event_assignees')
+    .delete()
+    .eq('event_id', eventId);
+  if (deleteErr) throw deleteErr;
+
+  if (!memberNames || !Array.isArray(memberNames) || memberNames.length === 0) return [];
+
+  // If members list not provided, fetch from household
+  const memberList = members || await getHouseholdMembers(householdId);
+
+  const rows = memberNames
+    .map((name) => {
+      const member = memberList.find((m) => m.name.toLowerCase() === name.toLowerCase());
+      if (!member) return null;
+      return {
+        event_id: eventId,
+        member_id: member.id,
+        member_name: member.name,
+      };
+    })
+    .filter(Boolean);
+
+  if (rows.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('event_assignees')
+    .insert(rows)
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Get pending reminders that are due to be sent.
+ * Joins with calendar_events and event_assignees.
+ */
+async function getPendingReminders() {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('event_reminders')
+    .select(`
+      id,
+      event_id,
+      household_id,
+      remind_at,
+      reminder_offset,
+      calendar_events!inner (
+        id,
+        title,
+        start_time,
+        end_time,
+        household_id,
+        deleted_at
+      )
+    `)
+    .eq('sent', false)
+    .lte('remind_at', now)
+    .is('calendar_events.deleted_at', null);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Mark a reminder as sent.
+ */
+async function markReminderSent(reminderId) {
+  const { error } = await supabase
+    .from('event_reminders')
+    .update({ sent: true })
+    .eq('id', reminderId);
+  if (error) throw error;
+}
+
+/**
+ * Get assignees for a specific event.
+ */
+async function getEventAssignees(eventId) {
+  const { data, error } = await supabase
+    .from('event_assignees')
+    .select('id, event_id, member_id, member_name')
+    .eq('event_id', eventId);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Get assignees for multiple events in a single query.
+ */
+async function getEventAssigneesBatch(eventIds) {
+  if (!eventIds || eventIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('event_assignees')
+    .select('id, event_id, member_id, member_name')
+    .in('event_id', eventIds);
+  if (error) throw error;
+  return data || [];
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -2571,4 +2733,11 @@ module.exports = {
   updateInboundEmailLog,
   getRecentInboundEmails,
   checkDuplicateEmail,
+  // Event reminders & assignees
+  saveEventReminders,
+  saveEventAssignees,
+  getPendingReminders,
+  markReminderSent,
+  getEventAssignees,
+  getEventAssigneesBatch,
 };

@@ -4,6 +4,7 @@ const db = require('../db/queries');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
+const { processEventReminders } = require('./event-reminders');
 const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
@@ -419,6 +420,10 @@ function startScheduler() {
   cron.schedule('* * * * *', () => runTaskNotificationCheck());
   console.log('✓ Task notification scheduler started (checks every minute)');
 
+  // ── Event reminders: check every minute ────────────────────────────────────
+  cron.schedule('* * * * *', () => processEventReminders());
+  console.log('✓ Event reminder scheduler started (checks every minute)');
+
   // ── Evening school prep reminders: check every minute (fires at 19:00) ─────
   cron.schedule('* * * * *', () => runEveningSchoolPrepCheck());
   console.log('✓ Evening school prep reminder started (19:00 per household timezone)');
@@ -453,4 +458,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, currentHHMMInTZ };
+module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, currentHHMMInTZ, processEventReminders };
