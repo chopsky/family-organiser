@@ -335,7 +335,13 @@ EMAIL TYPES YOU HANDLE:
 8. **Bills & reminders** (payments due, subscription renewals) → extract tasks
 9. **General actionable emails** → extract any tasks or events
 
-RULES:
+CRITICAL CLASSIFICATION RULES:
+- **Booking confirmations** (shows, concerts, theatre, cinema, festivals, experiences, activities) are ALWAYS calendar events, NEVER shopping items. They have a date, time, and venue — extract them as events.
+- **Ticket purchases** are calendar events, not shopping items. The ticket is for attending something on a specific date.
+- Only extract shopping_items for actual **grocery/retail receipts** where the items are physical products bought from a shop or supermarket (Tesco, Sainsbury's, Amazon products, etc.).
+- If an email mentions a price/total but is for a **service, event, or booking**, it is NOT a receipt — it's an event.
+
+OTHER RULES:
 - For receipts: normalise product names to plain English (e.g. "LURPAK SLTD 250G" → "butter"). IGNORE delivery charges, fees, tips, discounts.
 - For events: resolve dates to YYYY-MM-DD. If a year is not mentioned, assume the next occurrence.
 - For member assignment: match names mentioned in the email to household members. If "Mason" or "Year 4" is mentioned and Mason is a household member, assign to Mason.
