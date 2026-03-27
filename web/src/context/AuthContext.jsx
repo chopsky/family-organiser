@@ -2,24 +2,34 @@ import { createContext, useContext, useState, useCallback } from 'react';
 
 const AuthContext = createContext(null);
 
+function safeGetItem(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSetItem(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* Safari private browsing */ }
+}
+function safeRemoveItem(key) {
+  try { localStorage.removeItem(key); } catch { /* Safari private browsing */ }
+}
+
 export function AuthProvider({ children }) {
-  const [token, setToken]       = useState(() => localStorage.getItem('token'));
-  const [user, setUser]         = useState(() => JSON.parse(localStorage.getItem('user') || 'null'));
-  const [household, setHousehold] = useState(() => JSON.parse(localStorage.getItem('household') || 'null'));
+  const [token, setToken]       = useState(() => safeGetItem('token'));
+  const [user, setUser]         = useState(() => JSON.parse(safeGetItem('user') || 'null'));
+  const [household, setHousehold] = useState(() => JSON.parse(safeGetItem('household') || 'null'));
 
   const login = useCallback(({ token, user, household }) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('household', JSON.stringify(household));
+    safeSetItem('token', token);
+    safeSetItem('user', JSON.stringify(user));
+    safeSetItem('household', JSON.stringify(household));
     setToken(token);
     setUser(user);
     setHousehold(household);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('household');
+    safeRemoveItem('token');
+    safeRemoveItem('user');
+    safeRemoveItem('household');
     setToken(null);
     setUser(null);
     setHousehold(null);
