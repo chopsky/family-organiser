@@ -148,7 +148,7 @@ router.delete('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
  * Body: { category, count?, preferences?, dietary? }
  */
 router.post('/meals/suggest', requireAuth, requireHousehold, async (req, res) => {
-  const { category, count = 5, preferences, dietary } = req.body;
+  const { category, count = 3, preferences, dietary } = req.body;
 
   try {
     const [recentMeals, recentPurchases] = await Promise.all([
@@ -187,8 +187,8 @@ Return ONLY valid JSON:
       system: 'You are a helpful UK family meal planner. Return only valid JSON.',
       messages: [{ role: 'user', content: prompt }],
       useThinking: false,
-      maxTokens: 2048,
-      timeoutMs: 30000,
+      maxTokens: 4096,
+      timeoutMs: 45000,
       feature: 'meal_suggestions',
       householdId: req.householdId,
       userId: req.user.id,
