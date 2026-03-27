@@ -11,17 +11,26 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, calendarEvents = [] } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const notesStr = notes.length > 0
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
     : '(none saved yet)';
+  const calendarStr = calendarEvents.length > 0
+    ? calendarEvents.map(e => {
+        const date = new Date(e.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        const time = e.all_day ? 'All day' : new Date(e.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const who = e.assigned_to_name ? ` (${e.assigned_to_name})` : '';
+        return `- ${date} ${time}: ${e.title}${who}${e.location ? ` @ ${e.location}` : ''}`;
+      }).join('\n')
+    : '(no upcoming events)';
 
   const systemPrompt = CLASSIFICATION_SYSTEM
     .replace(/{{DATE}}/g, today)
     .replace(/{{MEMBERS}}/g, membersStr)
-    .replace(/{{NOTES}}/g, notesStr);
+    .replace(/{{NOTES}}/g, notesStr)
+    .replace(/{{CALENDAR_EVENTS}}/g, calendarStr);
 
   return withRetry(async () => {
     const { text } = await callWithFailover({

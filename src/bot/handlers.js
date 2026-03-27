@@ -140,9 +140,18 @@ async function handleTextMessage(text, user, household) {
     }
   }
 
-  // Fetch saved notes for context
+  // Fetch saved notes and upcoming calendar events for context
   const notes = await db.getHouseholdNotes(household.id);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id });
+  const now = new Date();
+  const sixtyDaysLater = new Date(now);
+  sixtyDaysLater.setDate(sixtyDaysLater.getDate() + 60);
+  const calendarEvents = await db.getCalendarEvents(
+    household.id,
+    now.toISOString(),
+    sixtyDaysLater.toISOString(),
+    { userId: user.id }
+  ).catch(() => []);
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 
@@ -161,6 +170,11 @@ async function handleTextMessage(text, user, household) {
   if (result.intent === 'query_tasks') {
     const taskResponse = await handleTasks(user, household);
     return { response: taskResponse, actions };
+  }
+
+  // Handle calendar queries — AI already has calendar context and answered in response_message
+  if (result.intent === 'query_calendar') {
+    return { response: result.response_message || "I couldn't find that event. Try checking the calendar in the app.", actions };
   }
 
   // Handle weather request

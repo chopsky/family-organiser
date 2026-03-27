@@ -38,7 +38,20 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map((m) => m.name);
-    const result = await classify(text.trim(), memberNames, [], { householdId: req.householdId, userId: req.user.id });
+
+    // Fetch notes and upcoming calendar events for context
+    const notes = await db.getHouseholdNotes(req.householdId).catch(() => []);
+    const now = new Date();
+    const sixtyDaysLater = new Date(now);
+    sixtyDaysLater.setDate(sixtyDaysLater.getDate() + 60);
+    const calendarEvents = await db.getCalendarEvents(
+      req.householdId,
+      now.toISOString(),
+      sixtyDaysLater.toISOString(),
+      { userId: req.user.id }
+    ).catch(() => []);
+
+    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, calendarEvents });
 
     // Strip any leaked JSON action blocks from the response message
     if (result.response_message) {

@@ -11,6 +11,9 @@ Household members: {{MEMBERS}}.
 SAVED HOUSEHOLD NOTES:
 {{NOTES}}
 
+UPCOMING CALENDAR EVENTS (next 60 days):
+{{CALENDAR_EVENTS}}
+
 You will be given a raw message from a family member. Parse it and return structured data.
 
 INTENT DETECTION:
@@ -22,6 +25,7 @@ INTENT DETECTION:
 - "note_save": User wants you to remember/save something (e.g. "remember our wifi password is ABC123", "save the alarm code as 4567", "our vet's number is 012 345 6789"). Extract the key (what it is) and value (the info to save).
 - "note_recall": User is asking about something that IS in the saved household notes above. Look up the answer from the notes and include it in response_message.
 - "create_event": User wants to add a calendar event (e.g. "add dentist on Monday at 10am", "schedule Logan's tennis for Saturday 5pm", "put anniversary on 20 March"). Extract event details into the "calendar_event" field.
+- "query_calendar": User is asking about what's on the calendar, when an event is, what's happening on a date, or asking about someone's schedule (e.g. "when is Hillelfest?", "what's on Saturday?", "what's on the calendar this week?", "when is Mason's tennis?", "do I have anything tomorrow?", "what's happening next Friday?"). Look up the answer from the UPCOMING CALENDAR EVENTS below and include it in response_message. If you can't find the event, say you couldn't find it and suggest they check the calendar.
 - "weather": User is asking about the weather (e.g. "what's the weather?", "will it rain today?", "do I need an umbrella?", "how's the weather this week?").
 - "school_activity": User is adding/updating a child's weekly school activity (e.g. "Mason has PE on Tuesdays", "Emma starts art club Wednesday until 4", "Jake's stopped coding club"). Extract into "school_activity" field.
 - "school_event": User is adding a one-off school event (e.g. "Jake has a school trip next Thursday", "non-uniform day Friday £1", "INSET day on the 14th"). Extract into "calendar_event" field with school context.
@@ -75,7 +79,7 @@ RESPONSE MESSAGE:
 
 Respond only with valid JSON matching this schema:
 {
-  "intent": "add" | "remove" | "query_list" | "query_tasks" | "mixed" | "note_save" | "note_recall" | "create_event" | "recipe" | "recipe_followup" | "chat",
+  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "create_event" | "recipe" | "recipe_followup" | "chat",
   "shopping_items": [
     {
       "item": string,
