@@ -20,7 +20,13 @@ const publicHolidays = require('../services/publicHolidays');
 
 const router = Router();
 
-const VALID_COLORS = ['sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate'];
+const VALID_COLORS = [
+  // Calendar event colors
+  'sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate',
+  // Profile/member color themes
+  'red', 'sunset', 'tangerine', 'gold', 'leaf', 'ocean', 'steel', 'denim', 'iris', 'grape',
+  'blush', 'bubblegum', 'cocoa', 'stone', 'charcoal', 'midnight',
+];
 const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
 /**
