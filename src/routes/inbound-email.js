@@ -138,28 +138,31 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       }
 
       if (allShoppingItems.length) {
-        const seen = new Set();
-        const uniqueItems = [];
-        for (const item of allShoppingItems) {
-          const name = (item.normalised_name || item.item || '').toLowerCase().trim();
-          if (name && !seen.has(name)) {
-            seen.add(name);
-            uniqueItems.push({ ...item, normalised_name: name });
+        try {
+          const seen = new Set();
+          const uniqueItems = [];
+          for (const item of allShoppingItems) {
+            const name = (item.normalised_name || item.item || '').toLowerCase().trim();
+            if (name && !seen.has(name)) {
+              seen.add(name);
+              uniqueItems.push({ ...item, normalised_name: name });
+            }
           }
+
+          const defaultList = await db.getDefaultShoppingList(householdId);
+          const enrichedItems = uniqueItems.map((item) => ({
+            item: item.normalised_name || item.item,
+            quantity: item.quantity ? String(item.quantity) : null,
+            list_id: defaultList?.id,
+            aisle_category: detectAisle(item.normalised_name || item.item) || 'Other',
+            source: 'email_forward',
+          }));
+
+          await db.addShoppingItems(householdId, enrichedItems, null);
+          itemsAdded = enrichedItems.length;
+        } catch (err) {
+          console.warn('[inbound-email] Shopping items failed:', err.message);
         }
-
-        const defaultList = await db.getDefaultShoppingList(householdId);
-        const enrichedItems = uniqueItems.map((item) => ({
-          item: item.normalised_name || item.item,
-          category: detectAisle(item.normalised_name || item.item) || 'Other',
-          quantity: item.quantity ? String(item.quantity) : null,
-          list_id: defaultList?.id,
-          aisle_category: detectAisle(item.normalised_name || item.item) || 'Other',
-          source: 'email_forward',
-        }));
-
-        await db.addShoppingItems(householdId, enrichedItems, null);
-        itemsAdded = enrichedItems.length;
       }
 
       // Handle calendar events
