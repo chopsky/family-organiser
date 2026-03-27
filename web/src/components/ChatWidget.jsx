@@ -99,6 +99,29 @@ export default function ChatWidget() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const pendingMessageRef = useRef(null);
+  const initializedRef = useRef(false);
+
+  // On first mount (login), load the most recent conversation or start fresh
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    (async () => {
+      try {
+        const { data } = await api.get('/chat/conversations');
+        const convs = data.conversations || [];
+        setConversations(convs);
+        if (convs.length > 0) {
+          // Load the most recent conversation
+          const latest = convs[0];
+          const histRes = await api.get('/chat/history', { params: { conversation_id: latest.id } });
+          setMessages(histRes.data.messages || []);
+          setActiveConversationId(latest.id);
+        }
+      } catch {
+        // ignore — fresh conversation
+      }
+    })();
+  }, []);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -239,9 +262,6 @@ export default function ChatWidget() {
   useEffect(() => {
     function handleOpenChat(e) {
       const msg = e.detail?.message?.trim();
-      // Always start a new conversation for external messages
-      setMessages([]);
-      setActiveConversationId(null);
       setShowHistory(false);
       setIsOpen(true);
 
@@ -274,7 +294,7 @@ export default function ChatWidget() {
       {/* Floating button */}
       {!isOpen && (
         <button
-          onClick={() => { startNewConversation(); setIsOpen(true); }}
+          onClick={() => setIsOpen(true)}
           className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg flex items-center justify-center transition-all hover:scale-105"
           title="Chat with AI Assistant"
         >
