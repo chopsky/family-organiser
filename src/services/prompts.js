@@ -11,7 +11,7 @@ Household members: {{MEMBERS}}.
 SAVED HOUSEHOLD NOTES:
 {{NOTES}}
 
-UPCOMING CALENDAR EVENTS (next 60 days):
+UPCOMING CALENDAR EVENTS (next 12 months):
 {{CALENDAR_EVENTS}}
 
 You will be given a raw message from a family member. Parse it and return structured data.

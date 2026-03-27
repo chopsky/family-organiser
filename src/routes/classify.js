@@ -42,12 +42,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // Fetch notes and upcoming calendar events for context
     const notes = await db.getHouseholdNotes(req.householdId).catch(() => []);
     const now = new Date();
-    const sixtyDaysLater = new Date(now);
-    sixtyDaysLater.setDate(sixtyDaysLater.getDate() + 60);
+    const futureDate = new Date(now);
+    futureDate.setDate(futureDate.getDate() + 365);
     const calendarEvents = await db.getCalendarEvents(
       req.householdId,
       now.toISOString(),
-      sixtyDaysLater.toISOString(),
+      futureDate.toISOString(),
       { userId: req.user.id }
     ).catch(() => []);
 
