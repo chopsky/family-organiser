@@ -222,8 +222,10 @@ async function handleTextMessage(text, user, household) {
   if (result.intent === 'create_event' && result.calendar_event) {
     try {
       const ev = result.calendar_event;
-      const assignee = ev.assigned_to_name
-        ? household.members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+      // Support both assigned_to_names (array) and legacy assigned_to_name (string)
+      const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+      const firstAssignee = assigneeNames.length > 0
+        ? household.members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
         : null;
 
       const userTz = user.timezone || household.timezone || 'Europe/London';
@@ -234,17 +236,21 @@ async function handleTextMessage(text, user, household) {
         ? `${ev.date}T23:59:59Z`
         : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
-      await db.createCalendarEvent(household.id, {
+      const created = await db.createCalendarEvent(household.id, {
         title: ev.title,
         start_time: startTime,
         end_time: endTime,
         all_day: !!ev.all_day,
-        assigned_to: assignee?.id || null,
-        assigned_to_name: assignee?.name || ev.assigned_to_name || null,
-        color: assignee?.color_theme || 'lavender',
+        assigned_to: firstAssignee?.id || null,
+        assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+        color: firstAssignee?.color_theme || 'lavender',
         location: ev.location || null,
         description: ev.description || null,
       }, user.id);
+
+      if (created && assigneeNames.length > 0) {
+        await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
+      }
 
       actions.eventsAdded = [ev.title];
     } catch (eventErr) {
@@ -293,26 +299,31 @@ async function handleTextMessage(text, user, household) {
   if (result.intent === 'school_event' && result.calendar_event) {
     try {
       const ev = result.calendar_event;
-      const assignee = ev.assigned_to_name
-        ? household.members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+      const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+      const firstAssignee = assigneeNames.length > 0
+        ? household.members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
         : null;
 
       const userTz = user.timezone || household.timezone || 'Europe/London';
       const startTime = ev.all_day ? `${ev.date}T00:00:00Z` : localToUTC(ev.date, ev.start_time || '09:00', userTz);
       const endTime = ev.all_day ? `${ev.date}T23:59:59Z` : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
-      await db.createCalendarEvent(household.id, {
+      const created = await db.createCalendarEvent(household.id, {
         title: ev.title,
         start_time: startTime,
         end_time: endTime,
         all_day: !!ev.all_day,
-        assigned_to: assignee?.id || null,
-        assigned_to_name: assignee?.name || ev.assigned_to_name || null,
-        color: assignee?.color_theme || 'sky',
+        assigned_to: firstAssignee?.id || null,
+        assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+        color: firstAssignee?.color_theme || 'sky',
         location: ev.location || null,
         description: ev.description || null,
         category: 'school',
       }, user.id);
+
+      if (created && assigneeNames.length > 0) {
+        await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
+      }
     } catch (err) {
       console.error('School event creation failed:', err.message);
       return { response: `⚠️ I understood the event but couldn't save it: ${err.message}`, actions };
@@ -538,8 +549,9 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
     const created = [];
     for (const ev of scan.events) {
       try {
-        const assignee = ev.assigned_to_name
-          ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+        const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+        const firstAssignee = assigneeNames.length > 0
+          ? members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
           : null;
 
         const startTime = ev.all_day
@@ -549,17 +561,21 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
           ? `${ev.date}T23:59:59Z`
           : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
-        await db.createCalendarEvent(household.id, {
+        const createdEvent = await db.createCalendarEvent(household.id, {
           title: ev.title,
           start_time: startTime,
           end_time: endTime,
           all_day: !!ev.all_day,
-          assigned_to: assignee?.id || null,
-          assigned_to_name: assignee?.name || null,
-          color: assignee?.color_theme || 'lavender',
+          assigned_to: firstAssignee?.id || null,
+          assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+          color: firstAssignee?.color_theme || 'lavender',
           location: ev.location || null,
           description: ev.description || null,
         }, user.id);
+
+        if (createdEvent && assigneeNames.length > 0) {
+          await db.saveEventAssignees(createdEvent.id, household.id, assigneeNames, members);
+        }
 
         created.push(ev.title);
       } catch (err) {

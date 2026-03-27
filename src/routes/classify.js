@@ -141,15 +141,21 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             category: ev.category || 'general',
             recurrence: ev.recurrence || null,
           };
-          const assigneeName = ev.assigned_to_name || ev.assigned_to;
-          if (assigneeName) {
-            const match = members.find(m => m.name.toLowerCase() === assigneeName.toLowerCase());
-            if (match) {
-              eventData.assigned_to = match.id;
-              eventData.assigned_to_name = match.name;
+          // Support both assigned_to_names (array) and legacy assigned_to_name (string)
+          const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+          if (assigneeNames.length > 0) {
+            const firstMatch = members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase());
+            if (firstMatch) {
+              eventData.assigned_to = firstMatch.id;
+              eventData.assigned_to_name = firstMatch.name;
             }
           }
-          ops.push(db.createCalendarEvent(req.householdId, eventData, req.user.id));
+          ops.push((async () => {
+            const created = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
+            if (created && assigneeNames.length > 0) {
+              await db.saveEventAssignees(created.id, req.householdId, assigneeNames, members);
+            }
+          })());
         }
 
         // Recipe generation (intent = 'recipe')

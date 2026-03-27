@@ -174,8 +174,9 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       if (emailResult?.events?.length) {
         for (const ev of emailResult.events) {
           try {
-            const assignee = ev.assigned_to_name
-              ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+            const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+            const firstAssignee = assigneeNames.length > 0
+              ? members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
               : null;
 
             // AI extracts local times — store without Z suffix so the app
@@ -187,18 +188,22 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               ? `${ev.date}T23:59:59`
               : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00`;
 
-            await db.createCalendarEvent(householdId, {
+            const created = await db.createCalendarEvent(householdId, {
               title: ev.title,
               start_time: startTime,
               end_time: endTime,
               all_day: !!ev.all_day,
-              assigned_to: assignee?.id || null,
-              assigned_to_name: assignee?.name || ev.assigned_to_name || null,
-              color: assignee?.color_theme || 'sage',
+              assigned_to: firstAssignee?.id || null,
+              assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+              color: firstAssignee?.color_theme || 'sage',
               location: ev.location || null,
               description: ev.description || null,
               source: 'email_forward',
             }, null);
+
+            if (created && assigneeNames.length > 0) {
+              await db.saveEventAssignees(created.id, householdId, assigneeNames, members);
+            }
             eventsCreated++;
           } catch (err) {
             console.warn('[inbound-email] Event creation failed:', err.message);

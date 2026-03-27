@@ -36,9 +36,9 @@ INTENT DETECTION:
 IMPORTANT: If a user asks about something and the answer IS in the saved household notes, use "note_recall" NOT "chat". If the answer is NOT in the notes, use "chat".
 
 CALENDAR EVENT RULES:
-- Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), assigned_to_name, location, and description
+- Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), assigned_to_names, location, and description
 - Resolve relative dates: "Monday", "next Saturday", "tomorrow" → actual YYYY-MM-DD
-- assigned_to_name: exact name from member list, or null
+- assigned_to_names: array of exact names from member list who are involved in this event, e.g. ["Grant", "Mason"]. If only one person, still use an array: ["Mason"]. Use null if no one specific is mentioned.
 - location: venue or address if mentioned, or null
 - description: any extra details, or null
 - For events with no specific time, set all_day to true
@@ -104,7 +104,7 @@ Respond only with valid JSON matching this schema:
     "start_time": "HH:MM" | null,
     "end_time": "HH:MM" | null,
     "all_day": boolean,
-    "assigned_to_name": string | null,
+    "assigned_to_names": string[] | null,
     "location": string | null,
     "description": string | null
   } | null,
@@ -293,7 +293,7 @@ For "event" type images, extract ALL events/dates you can find. For each event e
 - all_day: true if no specific time, false otherwise
 - location: venue/address if mentioned, or null
 - description: any extra details (dress code, what to bring, booking ref, flight number etc.), or null
-- assigned_to_name: if a specific family member is mentioned or implied, use their exact name from the member list, or null
+- assigned_to_names: array of exact names from member list who are involved, e.g. ["Grant", "Mason"]. Use null if no one specific is mentioned.
 
 Family members: {{MEMBERS}}
 
@@ -309,7 +309,7 @@ Respond only with valid JSON matching this schema:
       "all_day": boolean,
       "location": string | null,
       "description": string | null,
-      "assigned_to_name": string | null
+      "assigned_to_names": string[] | null
     }
   ],
   "summary": string
@@ -367,7 +367,7 @@ Respond only with valid JSON matching this schema:
       "start_time": "HH:MM" | null,
       "end_time": "HH:MM" | null,
       "all_day": boolean,
-      "assigned_to_name": string | null,
+      "assigned_to_names": string[] | null,
       "location": string | null,
       "description": string | null
     }
