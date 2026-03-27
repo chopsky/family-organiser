@@ -676,9 +676,9 @@ export default function Calendar() {
     const assignedMember = members.find(m => m.name === ev.assigned_to_name);
     setFormColor(assignedMember?.color_theme || ev.color || 'lavender');
     setFormAssignee(ev.assigned_to_name || '');
-    // Populate multi-select assignees
-    if (ev.assigned_to_names && Array.isArray(ev.assigned_to_names)) {
-      setFormAssignees(ev.assigned_to_names);
+    // Populate multi-select assignees from assignees array or fallback to single name
+    if (ev.assignees && Array.isArray(ev.assignees) && ev.assignees.length > 0) {
+      setFormAssignees(ev.assignees.map(a => a.member_name));
     } else if (ev.assigned_to_name) {
       setFormAssignees([ev.assigned_to_name]);
     } else {
