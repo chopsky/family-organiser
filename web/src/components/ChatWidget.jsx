@@ -146,7 +146,11 @@ I'm always here if you need me!`;
           }
         }
       } catch {
-        // ignore — fresh conversation
+        // API failed — still show welcome for new users
+        const dismissed = safeGetItem('housemait_welcome_dismissed');
+        if (!dismissed) {
+          setTimeout(() => setShowWelcomeBubble(true), 1500);
+        }
       }
     })();
   }, []);
