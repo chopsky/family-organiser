@@ -6,6 +6,18 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconSettings, IconUser, IconCalendar } from '../components/Icons';
 
+const avatarColors = {
+  red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
+  amber: 'bg-amber text-white', gold: 'bg-gold text-white',
+  leaf: 'bg-leaf text-white', emerald: 'bg-emerald text-white',
+  teal: 'bg-teal text-white', sky: 'bg-sky text-white',
+  cobalt: 'bg-cobalt text-white', indigo: 'bg-indigo text-white',
+  purple: 'bg-purple text-white', magenta: 'bg-magenta text-white',
+  rose: 'bg-rose text-white', terracotta: 'bg-terracotta text-white',
+  moss: 'bg-moss text-white', slate: 'bg-slate text-white',
+  sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', lavender: 'bg-indigo text-white',
+};
+
 export default function Settings() {
   const { household, user, isAdmin, login, logout, token } = useAuth();
   const navigate = useNavigate();
@@ -417,17 +429,6 @@ export default function Settings() {
       {/* My profile */}
       {(() => {
         const me = members.find((m) => m.id === user?.id);
-        const avatarColors = {
-          red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
-          amber: 'bg-amber text-white', gold: 'bg-gold text-white',
-          leaf: 'bg-leaf text-white', emerald: 'bg-emerald text-white',
-          teal: 'bg-teal text-white', sky: 'bg-sky text-white',
-          cobalt: 'bg-cobalt text-white', indigo: 'bg-indigo text-white',
-          purple: 'bg-purple text-white', magenta: 'bg-magenta text-white',
-          rose: 'bg-rose text-white', terracotta: 'bg-terracotta text-white',
-          moss: 'bg-moss text-white', slate: 'bg-slate text-white',
-          sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', lavender: 'bg-indigo text-white',
-        };
         const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
         return (
           <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
