@@ -330,7 +330,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             }
           }
           if (lat && lon) {
-            const report = await getWeatherReport(lat, lon, userTz);
+            const report = await getWeatherReport(lat, lon, userTz, { userMessage: message });
             cleanContent += '\n\n' + report;
             executedActions.push({ type: 'fetch_weather' });
           } else {

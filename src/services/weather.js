@@ -33,14 +33,64 @@ function describeWeatherCode(code) {
 }
 
 /**
- * Fetch current weather and today's forecast for given coordinates.
+ * Parse a target day from the user's message (e.g. "Tuesday", "tomorrow", "this weekend").
+ * Returns a Date object for the target day, or null if asking about today/general.
+ */
+function parseTargetDay(message, referenceDate) {
+  if (!message) return null;
+  const msg = message.toLowerCase().trim();
+  const ref = referenceDate || new Date();
+
+  // "today" or general weather question — return null (show default)
+  if (/\btoday\b/.test(msg) || !/\b(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week|weekend)\b/.test(msg)) {
+    return null;
+  }
+
+  if (/\btomorrow\b/.test(msg)) {
+    const d = new Date(ref);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  if (/\bweekend\b/.test(msg)) {
+    // Return Saturday
+    const d = new Date(ref);
+    const dayOfWeek = d.getDay();
+    const daysUntilSat = (6 - dayOfWeek + 7) % 7 || 7;
+    d.setDate(d.getDate() + daysUntilSat);
+    return d;
+  }
+
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  for (let i = 0; i < dayNames.length; i++) {
+    if (msg.includes(dayNames[i])) {
+      const d = new Date(ref);
+      const currentDay = d.getDay();
+      let daysAhead = (i - currentDay + 7) % 7;
+      if (daysAhead === 0) daysAhead = 7; // Next occurrence, not today
+      d.setDate(d.getDate() + daysAhead);
+      return d;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Fetch weather for given coordinates.
  * @param {number} lat
  * @param {number} lon
  * @param {string} timezone - IANA timezone string
+ * @param {object} options - { targetDate, userMessage }
  * @returns {Promise<string>} Formatted weather report
  */
-async function getWeatherReport(lat, lon, timezone = 'auto') {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=${encodeURIComponent(timezone)}&forecast_days=3`;
+async function getWeatherReport(lat, lon, timezone = 'auto', options = {}) {
+  const { targetDate, userMessage } = options;
+
+  // Determine the target day from the user's message
+  const target = targetDate || parseTargetDay(userMessage);
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=${encodeURIComponent(timezone)}&forecast_days=7`;
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -51,7 +101,53 @@ async function getWeatherReport(lat, lon, timezone = 'auto') {
   const current = data.current;
   const daily = data.daily;
 
-  // Current conditions
+  // If asking about a specific future day
+  if (target) {
+    const targetStr = target.toISOString().split('T')[0];
+    const targetIdx = daily.time.indexOf(targetStr);
+
+    if (targetIdx >= 0) {
+      const dayLabel = target.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      const hi = Math.round(daily.temperature_2m_max[targetIdx]);
+      const lo = Math.round(daily.temperature_2m_min[targetIdx]);
+      const rain = daily.precipitation_probability_max[targetIdx];
+      const desc = describeWeatherCode(daily.weather_code[targetIdx]);
+
+      const lines = [
+        `**${dayLabel}:**`,
+        `${desc}`,
+        `🌡️ ${lo}°–${hi}°C${rain > 20 ? ` · 🌧️ ${rain}% chance of rain` : ''}`,
+      ];
+
+      // Also show the day before and after for context if available
+      const prevIdx = targetIdx - 1;
+      const nextIdx = targetIdx + 1;
+      if (prevIdx >= 0 || nextIdx < daily.time.length) {
+        lines.push('');
+        if (prevIdx >= 0) {
+          const prevLabel = new Date(daily.time[prevIdx]).toLocaleDateString('en-GB', { weekday: 'long' });
+          const prevDesc = describeWeatherCode(daily.weather_code[prevIdx]);
+          const prevHi = Math.round(daily.temperature_2m_max[prevIdx]);
+          const prevLo = Math.round(daily.temperature_2m_min[prevIdx]);
+          const prevRain = daily.precipitation_probability_max[prevIdx];
+          lines.push(`${prevLabel}: ${prevDesc} ${prevLo}°–${prevHi}°C${prevRain > 20 ? ` · 🌧️ ${prevRain}% rain` : ''}`);
+        }
+        if (nextIdx < daily.time.length) {
+          const nextLabel = new Date(daily.time[nextIdx]).toLocaleDateString('en-GB', { weekday: 'long' });
+          const nextDesc = describeWeatherCode(daily.weather_code[nextIdx]);
+          const nextHi = Math.round(daily.temperature_2m_max[nextIdx]);
+          const nextLo = Math.round(daily.temperature_2m_min[nextIdx]);
+          const nextRain = daily.precipitation_probability_max[nextIdx];
+          lines.push(`${nextLabel}: ${nextDesc} ${nextLo}°–${nextHi}°C${nextRain > 20 ? ` · 🌧️ ${nextRain}% rain` : ''}`);
+        }
+      }
+
+      return lines.join('\n');
+    }
+    // Target day not in forecast range — fall through to default
+  }
+
+  // Default: current conditions + 3-day forecast
   const lines = [
     `🌡️ **Right now:** ${Math.round(current.temperature_2m)}°C (feels like ${Math.round(current.apparent_temperature)}°C)`,
     `${describeWeatherCode(current.weather_code)}`,
@@ -116,7 +212,6 @@ const TIMEZONE_COORDS = {
 function getCoordsFromTimezone(tz) {
   if (!tz) return null;
   if (TIMEZONE_COORDS[tz]) return TIMEZONE_COORDS[tz];
-  // Try partial match (e.g. "Africa/Johannesburg" variants)
   const match = Object.keys(TIMEZONE_COORDS).find(k => k.toLowerCase() === tz.toLowerCase());
   if (match) return TIMEZONE_COORDS[match];
   return null;
