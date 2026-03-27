@@ -57,7 +57,21 @@ const NOTIFICATION_OPTIONS = [
   { value: '1_day', label: '1 day before' },
   { value: '2_days', label: '2 days before' },
 ];
-const RECURRENCE_LABELS = { '': 'Never', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', yearly: 'Yearly' };
+const RECURRENCE_LABELS = { '': 'Does not repeat', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', yearly: 'Yearly' };
+
+const REMINDER_OPTIONS = [
+  { value: '5', unit: 'minutes', label: '5 minutes before' },
+  { value: '10', unit: 'minutes', label: '10 minutes before' },
+  { value: '15', unit: 'minutes', label: '15 minutes before' },
+  { value: '30', unit: 'minutes', label: '30 minutes before' },
+  { value: '45', unit: 'minutes', label: '45 minutes before' },
+  { value: '1', unit: 'hours', label: '1 hour before' },
+  { value: '2', unit: 'hours', label: '2 hours before' },
+  { value: '3', unit: 'hours', label: '3 hours before' },
+  { value: '1', unit: 'days', label: '1 day before' },
+  { value: '2', unit: 'days', label: '2 days before' },
+  { value: '1', unit: 'weeks', label: '1 week before' },
+];
 
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -292,6 +306,10 @@ export default function Calendar() {
   const [formColor, setFormColor] = useState('lavender');
   const [formAssignee, setFormAssignee] = useState('');
   const [formRecurrence, setFormRecurrence] = useState('');
+  const [formEndDate, setFormEndDate] = useState(toDateStr(today));
+  const [formAssignees, setFormAssignees] = useState([]);
+  const [formReminders, setFormReminders] = useState([{ time: '5', unit: 'minutes' }]);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [toggling, setToggling] = useState(new Set());
@@ -618,6 +636,7 @@ export default function Calendar() {
     setEditingEvent(null);
     setFormTitle('');
     setFormDate(toDateStr(selectedDate || today));
+    setFormEndDate(toDateStr(selectedDate || today));
     setFormAllDay(false);
     setFormStart('09:00');
     setFormEnd('10:00');
@@ -625,12 +644,18 @@ export default function Calendar() {
     setFormLocation('');
     setFormColor('lavender');
     setFormAssignee('');
+    setFormAssignees([]);
     setFormRecurrence('');
+    setFormReminders([{ time: '5', unit: 'minutes' }]);
+    setShowMoreOptions(false);
   }
 
   function openAddForm(date, hour) {
     resetForm();
-    if (date) setFormDate(toDateStr(date));
+    if (date) {
+      setFormDate(toDateStr(date));
+      setFormEndDate(toDateStr(date));
+    }
     if (hour !== undefined) {
       setFormStart(`${String(hour).padStart(2, '0')}:00`);
       setFormEnd(`${String(Math.min(hour + 1, 23)).padStart(2, '0')}:00`);
@@ -642,6 +667,7 @@ export default function Calendar() {
     setEditingEvent(ev);
     setFormTitle(ev.title || '');
     setFormDate(ev.start_time?.split('T')[0] || toDateStr(selectedDate));
+    setFormEndDate(ev.end_time?.split('T')[0] || ev.start_time?.split('T')[0] || toDateStr(selectedDate));
     setFormAllDay(!!ev.all_day);
     setFormStart(ev.start_time ? formatTime(ev.start_time) : '09:00');
     setFormEnd(ev.end_time ? formatTime(ev.end_time) : '10:00');
@@ -650,7 +676,17 @@ export default function Calendar() {
     const assignedMember = members.find(m => m.name === ev.assigned_to_name);
     setFormColor(assignedMember?.color_theme || ev.color || 'lavender');
     setFormAssignee(ev.assigned_to_name || '');
+    // Populate multi-select assignees
+    if (ev.assigned_to_names && Array.isArray(ev.assigned_to_names)) {
+      setFormAssignees(ev.assigned_to_names);
+    } else if (ev.assigned_to_name) {
+      setFormAssignees([ev.assigned_to_name]);
+    } else {
+      setFormAssignees([]);
+    }
     setFormRecurrence(ev.recurrence || '');
+    setFormReminders(ev.reminders && Array.isArray(ev.reminders) ? ev.reminders : [{ time: '5', unit: 'minutes' }]);
+    setShowMoreOptions(false);
     setShowForm(true);
   }
 
@@ -666,14 +702,16 @@ export default function Calendar() {
         location: formLocation.trim() || null,
         color: formColor,
         recurrence: formRecurrence || null,
-        assigned_to_name: formAssignee || null,
+        assigned_to_name: formAssignees.length > 0 ? formAssignees[0] : (formAssignee || null),
+        assigned_to_names: formAssignees.length > 0 ? formAssignees : null,
+        reminders: formReminders.length > 0 ? formReminders : null,
       };
       if (formAllDay) {
         payload.start_time = `${formDate}T00:00:00`;
-        payload.end_time = `${formDate}T23:59:59`;
+        payload.end_time = `${formEndDate || formDate}T23:59:59`;
       } else {
         payload.start_time = `${formDate}T${formStart}:00`;
-        payload.end_time = `${formDate}T${formEnd}:00`;
+        payload.end_time = `${formEndDate || formDate}T${formEnd}:00`;
       }
 
       if (editingEvent) {
@@ -1604,137 +1642,289 @@ export default function Calendar() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setShowForm(false); resetForm(); }}>
           <div className="absolute inset-0 bg-black/40" />
-          <div ref={formRef} onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-2xl border border-light-grey p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
-            <div className="flex items-center justify-between mb-4">
+          <div ref={formRef} onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-2xl border border-light-grey w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-2">
               <h2 className="text-lg font-semibold text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>
                 {editingEvent ? 'Edit Event' : 'New Event'}
               </h2>
               <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="text-warm-grey hover:text-charcoal p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="text-[13px] font-medium text-charcoal mb-1 block">Title *</label>
-                <input
-                  type="text"
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)}
-                  required
-                  className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                  placeholder="Event title"
-                />
-              </div>
-              <div>
-                <label className="text-[13px] font-medium text-charcoal mb-1 block">Date</label>
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={e => setFormDate(e.target.value)}
-                  className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">
-                <input type="checkbox" checked={formAllDay} onChange={e => setFormAllDay(e.target.checked)} className="rounded" />
-                All day
-              </label>
-              {!formAllDay && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[13px] font-medium text-charcoal mb-1 block">Start time</label>
-                    <input
-                      type="time"
-                      value={formStart}
-                      onChange={e => setFormStart(e.target.value)}
-                      className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                    />
+
+            <form onSubmit={handleSubmit} className="px-6 pb-5">
+              {/* ── 1. Title ── */}
+              <input
+                type="text"
+                value={formTitle}
+                onChange={e => setFormTitle(e.target.value)}
+                required
+                className="w-full text-lg font-medium text-charcoal placeholder-warm-grey/60 border-0 border-b-2 border-light-grey bg-transparent py-3 focus:border-plum focus:outline-none transition-colors"
+                placeholder="Add title"
+              />
+
+              <div className="mt-5 space-y-4">
+                {/* ── 2. Date / Time ── */}
+                <div className="flex gap-3">
+                  {/* Clock icon */}
+                  <div className="flex-shrink-0 pt-2.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   </div>
-                  <div>
-                    <label className="text-[13px] font-medium text-charcoal mb-1 block">End time</label>
-                    <input
-                      type="time"
-                      value={formEnd}
-                      onChange={e => setFormEnd(e.target.value)}
-                      className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                    />
+                  <div className="flex-1 space-y-2">
+                    {/* Start row */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={formDate}
+                        onChange={e => {
+                          setFormDate(e.target.value);
+                          if (formEndDate < e.target.value) setFormEndDate(e.target.value);
+                        }}
+                        className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                      />
+                      {!formAllDay && (
+                        <input
+                          type="time"
+                          value={formStart}
+                          onChange={e => setFormStart(e.target.value)}
+                          className="w-[110px] h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        />
+                      )}
+                      {/* All day toggle */}
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-warm-grey cursor-pointer whitespace-nowrap select-none">
+                        <div
+                          className={`relative w-8 h-[18px] rounded-full transition-colors cursor-pointer ${formAllDay ? 'bg-plum' : 'bg-light-grey'}`}
+                          onClick={() => setFormAllDay(!formAllDay)}
+                        >
+                          <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${formAllDay ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                        </div>
+                        All day
+                      </label>
+                    </div>
+                    {/* End row */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={formEndDate}
+                        onChange={e => setFormEndDate(e.target.value)}
+                        min={formDate}
+                        className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                      />
+                      {!formAllDay && (
+                        <input
+                          type="time"
+                          value={formEnd}
+                          onChange={e => setFormEnd(e.target.value)}
+                          className="w-[110px] h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        />
+                      )}
+                      {/* Spacer to align with all-day toggle */}
+                      <div className="w-[82px]" />
+                    </div>
                   </div>
                 </div>
-              )}
-              <div>
-                <label className="text-[13px] font-medium text-charcoal mb-1 block">Description</label>
-                <textarea
-                  value={formDesc}
-                  onChange={e => setFormDesc(e.target.value)}
-                  rows={2}
-                  className="w-full border-[1.5px] border-light-grey rounded-[10px] px-3 py-2 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                  placeholder="Optional description"
-                />
+
+                {/* ── 3. Members multi-select ── */}
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 pt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-warm-grey mb-2">Select members:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {members.map(m => {
+                        const isSelected = formAssignees.includes(m.name);
+                        const hex = m.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage;
+                        return (
+                          <button
+                            key={m.name}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                const next = formAssignees.filter(n => n !== m.name);
+                                setFormAssignees(next);
+                                if (next.length > 0) {
+                                  const firstMember = members.find(mem => mem.name === next[0]);
+                                  setFormColor(firstMember?.color_theme || 'lavender');
+                                  setFormAssignee(next[0]);
+                                } else {
+                                  setFormColor('lavender');
+                                  setFormAssignee('');
+                                }
+                              } else {
+                                const next = [...formAssignees, m.name];
+                                setFormAssignees(next);
+                                if (next.length === 1) {
+                                  setFormColor(m.color_theme || 'lavender');
+                                  setFormAssignee(m.name);
+                                }
+                              }
+                            }}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-all"
+                            style={{
+                              border: `1.5px solid ${hex}`,
+                              background: isSelected ? hex : 'transparent',
+                              color: isSelected ? '#fff' : hex,
+                            }}
+                          >
+                            {/* Avatar circle */}
+                            <span
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                              style={{
+                                background: isSelected ? 'rgba(255,255,255,0.3)' : hex,
+                                color: isSelected ? '#fff' : '#fff',
+                              }}
+                            >
+                              {isSelected ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              ) : (
+                                m.name?.[0]?.toUpperCase() || '?'
+                              )}
+                            </span>
+                            {m.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 4. Repeat ── */}
+                <div className="flex gap-3 items-center">
+                  <div className="flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  </div>
+                  <select
+                    value={formRecurrence}
+                    onChange={e => setFormRecurrence(e.target.value)}
+                    className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                  >
+                    {RECURRENCES.map(r => (
+                      <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ── 5. Reminders ── */}
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 pt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    {formReminders.map((reminder, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <select
+                          value={`${reminder.time}_${reminder.unit}`}
+                          onChange={e => {
+                            const [time, unit] = e.target.value.split('_');
+                            const next = [...formReminders];
+                            next[idx] = { time, unit };
+                            setFormReminders(next);
+                          }}
+                          className="flex-1 h-9 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        >
+                          {REMINDER_OPTIONS.map(opt => (
+                            <option key={`${opt.value}_${opt.unit}`} value={`${opt.value}_${opt.unit}`}>{opt.label}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setFormReminders(formReminders.filter((_, i) => i !== idx))}
+                          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-warm-grey hover:bg-cream hover:text-charcoal transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFormReminders([...formReminders, { time: '10', unit: 'minutes' }])}
+                      className="text-xs font-semibold text-plum hover:text-plum-dark transition-colors"
+                    >
+                      + Add notification
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── 6. More options / Less options ── */}
+                {showMoreOptions && (
+                  <div className="space-y-4 pt-1">
+                    {/* Description */}
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 pt-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                      </div>
+                      <textarea
+                        value={formDesc}
+                        onChange={e => setFormDesc(e.target.value)}
+                        rows={2}
+                        className="flex-1 border-[1.5px] border-light-grey rounded-lg px-2.5 py-2 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        placeholder="Add description"
+                      />
+                    </div>
+                    {/* Location */}
+                    <div className="flex gap-3 items-center">
+                      <div className="flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      </div>
+                      <input
+                        type="text"
+                        value={formLocation}
+                        onChange={e => setFormLocation(e.target.value)}
+                        className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        placeholder="Add location"
+                      />
+                    </div>
+                    {/* Attachments placeholder */}
+                    <div className="flex gap-3 items-center">
+                      <div className="flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      </div>
+                      <button type="button" className="text-sm text-warm-grey hover:text-plum transition-colors">
+                        Add attachment
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="text-[13px] font-medium text-charcoal mb-1 block">Location</label>
-                <input
-                  type="text"
-                  value={formLocation}
-                  onChange={e => setFormLocation(e.target.value)}
-                  className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                  placeholder="Optional location"
-                />
-              </div>
-              <div>
-                <label className="text-[13px] font-medium text-charcoal mb-1 block">Assign to</label>
-                <select
-                  value={formAssignee}
-                  onChange={e => {
-                    setFormAssignee(e.target.value);
-                    const assignedMember = members.find(m => m.name === e.target.value);
-                    setFormColor(assignedMember?.color_theme || 'lavender');
-                  }}
-                  className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                >
-                  <option value="">Unassigned</option>
-                  {members.map(m => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[13px] font-medium text-charcoal mb-1 block">Recurrence</label>
-                <select
-                  value={formRecurrence}
-                  onChange={e => setFormRecurrence(e.target.value)}
-                  className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                >
-                  {RECURRENCES.map(r => (
-                    <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={saving || !formTitle.trim()}
-                  className="h-10 px-5 rounded-xl bg-plum hover:bg-plum-dark disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-                >
-                  {saving ? 'Saving...' : editingEvent ? 'Update' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowForm(false); resetForm(); }}
-                  className="h-10 px-5 rounded-xl border-[1.5px] border-light-grey text-warm-grey hover:bg-cream text-sm font-semibold transition-colors"
-                >
-                  Cancel
-                </button>
-                {editingEvent && (
+
+              {/* ── 7. Bottom bar ── */}
+              <div className="flex items-center justify-between mt-5 pt-4 border-t border-light-grey">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => deleteEvent(editingEvent.id)}
-                    className="ml-auto text-sm text-coral hover:text-coral font-semibold"
+                    onClick={() => setShowMoreOptions(!showMoreOptions)}
+                    className="text-xs font-semibold text-plum hover:text-plum-dark transition-colors"
                   >
-                    Delete
+                    {showMoreOptions ? 'Less options \u2227' : 'More options \u2228'}
                   </button>
-                )}
+                  {editingEvent && (
+                    <button
+                      type="button"
+                      onClick={() => deleteEvent(editingEvent.id)}
+                      className="text-xs font-semibold text-coral hover:text-coral/80 ml-2 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForm(false); resetForm(); }}
+                    className="h-9 px-4 rounded-xl border-[1.5px] border-light-grey text-warm-grey hover:bg-cream text-sm font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || !formTitle.trim()}
+                    className="h-9 px-5 rounded-xl bg-plum hover:bg-plum-dark disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                  >
+                    {saving ? 'Saving...' : editingEvent ? 'Update' : 'Save'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
