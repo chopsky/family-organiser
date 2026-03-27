@@ -498,6 +498,8 @@ router.delete('/events/:id', async (req, res) => {
     // Push delete to connected external calendars before removing from DB
     calendarSync.pushEventToConnections(req.householdId, { id: req.params.id }, 'delete').catch(() => {});
 
+    // Clean up assignees before soft-deleting
+    await db.saveEventAssignees(req.params.id, req.householdId, [], []).catch(() => {});
     await db.deleteCalendarEvent(req.params.id, req.householdId);
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
