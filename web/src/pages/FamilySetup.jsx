@@ -785,7 +785,11 @@ export default function FamilySetup() {
   async function handleSaveAllergies() {
     setSavingAllergies(true);
     try {
-      await api.patch('/settings/settings', { allergies: JSON.stringify(householdAllergies) });
+      const { data } = await api.patch('/settings/settings', { allergies: JSON.stringify(householdAllergies) });
+      // Update auth context so allergies persist across page navigations
+      if (data.household) {
+        login({ token, user, household: data.household });
+      }
     } catch (err) {
       console.error('Could not save allergies:', err);
     } finally {
