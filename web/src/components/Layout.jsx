@@ -147,7 +147,7 @@ export default function Layout({ children }) {
       <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
         <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: '35px', paddingBottom: '30px' }}>
-          <img src="/housemait-logo2.png" alt="HouseMait" className="h-6" />
+          <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
         </div>
 
         {/* Household pill */}
@@ -178,7 +178,7 @@ export default function Layout({ children }) {
       <header className="md:hidden bg-cream border-b border-light-grey z-30">
         <div className="px-4 py-3 flex items-center gap-3">
           <Link to="/dashboard" className="shrink-0">
-            <img src="/housemait-logo2.png" alt="HouseMait" className="h-6" />
+            <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
           </Link>
           <div className="flex-1 min-w-0 text-center">
             <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">
