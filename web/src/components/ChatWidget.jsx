@@ -87,6 +87,13 @@ const ImageIcon = ({ className }) => (
   </svg>
 );
 
+function safeGetItem(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSetItem(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* Safari private browsing */ }
+}
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -96,10 +103,25 @@ export default function ChatWidget() {
   const [conversations, setConversations] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showWelcomeBubble, setShowWelcomeBubble] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const pendingMessageRef = useRef(null);
   const initializedRef = useRef(false);
+
+  const WELCOME_MESSAGE = `Hey there! Welcome to Housemait — I'm your AI assistant, here to help your household stay organised.
+
+Here are a few things to get you started:
+
+**1. Set up your family** — Head to the **Family** page to add your household members.
+
+**2. Connect your calendars** — Go to **Settings** to link your Google, Apple, or Outlook calendar so everything syncs automatically.
+
+**3. Connect WhatsApp** — Also in **Settings**, link your WhatsApp so I can send you reminders and you can message me directly.
+
+**4. Just ask me anything!** — I can create events, add to your shopping list, suggest recipes, manage tasks, and much more.
+
+I'm always here if you need me!`;
 
   // On first mount (login), load the most recent conversation or start fresh
   useEffect(() => {
@@ -116,6 +138,12 @@ export default function ChatWidget() {
           const histRes = await api.get('/chat/history', { params: { conversation_id: latest.id } });
           setMessages(histRes.data.messages || []);
           setActiveConversationId(latest.id);
+        } else {
+          // First-time user — show welcome bubble after a short delay
+          const dismissed = safeGetItem('housemait_welcome_dismissed');
+          if (!dismissed) {
+            setTimeout(() => setShowWelcomeBubble(true), 1500);
+          }
         }
       } catch {
         // ignore — fresh conversation
@@ -291,10 +319,37 @@ export default function ChatWidget() {
 
   return (
     <>
+      {/* Welcome speech bubble for first-time users */}
+      {!isOpen && showWelcomeBubble && (
+        <div className="fixed bottom-40 md:bottom-[88px] right-4 md:right-6 z-50 max-w-[300px] animate-fade-in">
+          <div className="relative bg-white rounded-2xl shadow-lg border border-light-grey p-4">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowWelcomeBubble(false); safeSetItem('housemait_welcome_dismissed', '1'); }}
+              className="absolute top-2 right-2 text-warm-grey hover:text-charcoal p-1"
+            >
+              <CloseIcon className="h-4 w-4" />
+            </button>
+            <p className="text-sm text-charcoal pr-4">
+              <span className="font-semibold">Hey there!</span> I'm your AI assistant. Tap here to get started with setting up your household!
+            </p>
+            {/* Speech bubble tail */}
+            <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white border-b border-r border-light-grey transform rotate-45" />
+          </div>
+        </div>
+      )}
+
       {/* Floating button */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            if (showWelcomeBubble) {
+              setShowWelcomeBubble(false);
+              safeSetItem('housemait_welcome_dismissed', '1');
+              // Open chat with the full welcome message
+              setMessages([{ role: 'assistant', content: WELCOME_MESSAGE, created_at: new Date().toISOString() }]);
+            }
+            setIsOpen(true);
+          }}
           className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg flex items-center justify-center transition-all hover:scale-105"
           title="Chat with AI Assistant"
         >
