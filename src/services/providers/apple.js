@@ -65,11 +65,66 @@ function parseVEvent(icalData) {
     return match ? match[1].trim() : '';
   };
 
+  // Extract TZID from DTSTART/DTEND if present
+  const getTzid = (key) => {
+    const regex = new RegExp(`^${key};[^:]*TZID=([^;:]+)`, 'm');
+    const match = icalData.match(regex);
+    return match ? match[1].trim() : null;
+  };
+
   const dtstart = getValue('DTSTART');
   const dtend = getValue('DTEND');
+  const startTzid = getTzid('DTSTART');
+  const endTzid = getTzid('DTEND');
   const allDay = dtstart.length === 8;
 
-  const parseICalDate = (value) => {
+  /**
+   * Convert a local datetime string + timezone into a UTC ISO string.
+   * E.g. "20260329T100000" with TZID "Europe/London" → "2026-03-29T09:00:00Z"
+   * because BST (UTC+1) is in effect on that date.
+   */
+  const localToUtc = (value, tzid) => {
+    const year = parseInt(value.substring(0, 4));
+    const month = parseInt(value.substring(4, 6)) - 1;
+    const day = parseInt(value.substring(6, 8));
+    const hour = parseInt(value.substring(9, 11));
+    const min = parseInt(value.substring(11, 13));
+    const sec = parseInt(value.substring(13, 15));
+
+    try {
+      // Use Intl.DateTimeFormat to find the UTC offset for this timezone at this date/time
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tzid,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false,
+      });
+
+      // Create a UTC date with the local time values, then find the offset
+      // by comparing what that UTC instant looks like in the target timezone
+      // Use iterative approach: guess UTC = local time, check the offset, adjust
+      let utcGuess = new Date(Date.UTC(year, month, day, hour, min, sec));
+      const parts = formatter.formatToParts(utcGuess);
+      const tzHour = parseInt(parts.find(p => p.type === 'hour').value);
+      const tzMin = parseInt(parts.find(p => p.type === 'minute').value);
+      const tzDay = parseInt(parts.find(p => p.type === 'day').value);
+
+      // Calculate offset in minutes: how far ahead is the timezone from UTC?
+      let offsetMinutes = (tzHour * 60 + tzMin) - (hour * 60 + min);
+      // Adjust for day boundary crossings
+      if (tzDay > day) offsetMinutes += 24 * 60;
+      else if (tzDay < day) offsetMinutes -= 24 * 60;
+
+      // The actual UTC time is: local time - offset
+      const utcDate = new Date(Date.UTC(year, month, day, hour, min, sec) - offsetMinutes * 60 * 1000);
+      return utcDate.toISOString().replace('.000Z', 'Z');
+    } catch (e) {
+      // If timezone conversion fails, fall back to treating as UTC
+      return `${value.substring(0, 4)}-${value.substring(4, 6)}-${value.substring(6, 8)}T${value.substring(9, 11)}:${value.substring(11, 13)}:${value.substring(13, 15)}Z`;
+    }
+  };
+
+  const parseICalDate = (value, tzid) => {
     if (value.length === 8) {
       // DATE format: YYYYMMDD
       const year = value.substring(0, 4);
@@ -77,7 +132,21 @@ function parseVEvent(icalData) {
       const day = value.substring(6, 8);
       return `${year}-${month}-${day}`;
     }
-    // DATETIME format: YYYYMMDDTHHMMSSZ
+    // If value already ends with Z, it's already UTC
+    if (value.endsWith('Z')) {
+      const year = value.substring(0, 4);
+      const month = value.substring(4, 6);
+      const day = value.substring(6, 8);
+      const hour = value.substring(9, 11);
+      const min = value.substring(11, 13);
+      const sec = value.substring(13, 15);
+      return `${year}-${month}-${day}T${hour}:${min}:${sec}Z`;
+    }
+    // If we have a TZID, convert local time to UTC
+    if (tzid) {
+      return localToUtc(value, tzid);
+    }
+    // No Z and no TZID — treat as UTC (legacy fallback)
     const year = value.substring(0, 4);
     const month = value.substring(4, 6);
     const day = value.substring(6, 8);
@@ -87,7 +156,7 @@ function parseVEvent(icalData) {
     return `${year}-${month}-${day}T${hour}:${min}:${sec}Z`;
   };
 
-  let endTime = dtend ? parseICalDate(dtend) : parseICalDate(dtstart);
+  let endTime = dtend ? parseICalDate(dtend, endTzid || startTzid) : parseICalDate(dtstart, startTzid);
 
   // iCalendar all-day events use an exclusive end date (DTEND is the day AFTER the event).
   // Subtract one day so the app doesn't show the event bleeding into the next day.
@@ -104,7 +173,7 @@ function parseVEvent(icalData) {
     title: getValue('SUMMARY'),
     description: getValue('DESCRIPTION'),
     location: getValue('LOCATION'),
-    start_time: parseICalDate(dtstart),
+    start_time: parseICalDate(dtstart, startTzid),
     end_time: endTime,
     all_day: allDay,
     rrule: getValue('RRULE') || null,
