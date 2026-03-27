@@ -393,13 +393,6 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               <span>📚</span> Recipe Box
             </button>
             <button
-              onClick={suggestMeals}
-              disabled={suggesting}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all disabled:opacity-50"
-            >
-              <span>✨</span> {suggesting ? 'Suggesting...' : 'Suggest Meals'}
-            </button>
-            <button
               onClick={addWeekToShoppingList}
               className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
             >
@@ -778,7 +771,6 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
           {[
             { key: 'recipes', label: 'Recipe Box' },
             { key: 'quick', label: 'Quick Add' },
-            { key: 'ai', label: 'AI Suggest' },
           ].map(t => (
             <button
               key={t.key}
