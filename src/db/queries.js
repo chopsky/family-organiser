@@ -2390,7 +2390,9 @@ async function getRecentInboundEmails(householdId, limit = 10) {
   return data;
 }
 
-async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinutes = 60) {
+async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinutes = 5) {
+  // Only dedup against successfully completed emails within 5 minutes
+  // (catches genuine double-sends from email clients, but allows re-forwards)
   const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('inbound_email_log')
@@ -2398,6 +2400,7 @@ async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinute
     .eq('household_id', householdId)
     .eq('from_email', fromEmail)
     .eq('subject', subject)
+    .eq('status', 'completed')
     .gte('created_at', cutoff)
     .limit(1);
   if (error) throw error;
