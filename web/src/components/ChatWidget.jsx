@@ -258,10 +258,21 @@ I'm always here if you need me!`;
     await sendMessage(text);
   }
 
-  async function handleImageUpload(e) {
-    const file = e.target.files?.[0];
+  function handlePaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) uploadImageFile(file);
+        return;
+      }
+    }
+  }
+
+  async function uploadImageFile(file) {
     if (!file || loading) return;
-    e.target.value = '';
 
     const userMsg = { role: 'user', content: '📷 Scanning image...', created_at: new Date().toISOString() };
     setMessages(prev => [...prev, userMsg]);
@@ -288,6 +299,13 @@ I'm always here if you need me!`;
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    uploadImageFile(file);
   }
 
   // Listen for external "open chat with message" events (from dashboard AI input)
@@ -490,6 +508,7 @@ I'm always here if you need me!`;
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
+                      onPaste={handlePaste}
                       placeholder="Ask me anything..."
                       disabled={loading}
                       className="flex-1 border border-light-grey rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-plum/30 focus:border-plum bg-cream disabled:opacity-50"
