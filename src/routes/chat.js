@@ -77,13 +77,9 @@ async function buildSystemPrompt(householdId, householdName, userId) {
   const currentUser = members.find(m => m.id === userId);
   const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
 
-  const membersStr = members.map(m => {
-    let str = m.name;
-    if (m.family_role) str += ` (${m.family_role})`;
-    const allergens = (() => { try { return JSON.parse(m.allergies || '[]'); } catch { return []; } })();
-    if (allergens.length > 0) str += ` [Allergies: ${allergens.join(', ')}]`;
-    return str;
-  }).join(', ') || 'none';
+  const membersStr = members.map(m => `${m.name}${m.family_role ? ` (${m.family_role})` : ''}`).join(', ') || 'none';
+  const householdAllergies = (() => { try { return JSON.parse(household?.allergies || '[]'); } catch { return []; } })();
+  const allergiesStr = householdAllergies.length > 0 ? householdAllergies.join(', ') : null;
   const notesStr = notes.length > 0
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
     : '(none saved yet)';
@@ -111,7 +107,7 @@ async function buildSystemPrompt(householdId, householdName, userId) {
     if (schoolLines.length > 0) schoolsStr = schoolLines.join('\n');
   }
 
-  return CHAT_ASSISTANT_SYSTEM
+  let prompt = CHAT_ASSISTANT_SYSTEM
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
     .replace(/{{TIMEZONE}}/g, userTz)
@@ -121,6 +117,12 @@ async function buildSystemPrompt(householdId, householdName, userId) {
     .replace(/{{EVENTS}}/g, eventsStr)
     .replace(/{{SCHOOLS}}/g, schoolsStr)
     .replace(/{{NOTES}}/g, notesStr);
+
+  if (allergiesStr) {
+    prompt += `\n\nHOUSEHOLD ALLERGIES & DIETARY REQUIREMENTS: ${allergiesStr}\nALWAYS avoid these allergens/restrictions when suggesting recipes, meals, or food-related advice.`;
+  }
+
+  return prompt;
 }
 
 /**

@@ -52,12 +52,13 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * Body: { name?: string, reminder_time?: string, timezone?: string }
  */
 router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, reminder_time, timezone } = req.body;
+  const { name, reminder_time, timezone, allergies } = req.body;
   const updates = {};
 
   if (name !== undefined) updates.name = name.trim();
   if (reminder_time !== undefined) updates.reminder_time = reminder_time;
   if (timezone !== undefined) updates.timezone = timezone;
+  if (allergies !== undefined) updates.allergies = allergies;
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update' });
@@ -79,7 +80,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
-  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group, allergies } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group } = req.body;
 
   // Determine target user — admins can edit others, members only themselves
   let targetUserId = req.user.id;
@@ -122,10 +123,6 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   }
   if (school_id !== undefined) updates.school_id = school_id || null;
   if (year_group !== undefined) updates.year_group = year_group || null;
-  if (allergies !== undefined) {
-    // Store as JSON string array
-    updates.allergies = JSON.stringify(Array.isArray(allergies) ? allergies : []);
-  }
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update.' });
