@@ -506,7 +506,7 @@ router.delete('/events/:id', async (req, res) => {
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
-    console.error('DELETE /api/calendar/events/:id error:', err);
+    console.error('DELETE /api/calendar/events/:id error:', err?.message || err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

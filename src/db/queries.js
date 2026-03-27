@@ -1230,10 +1230,9 @@ async function softDeleteCalendarEvent(eventId, householdId) {
     .eq('id', eventId)
     .eq('household_id', householdId)
     .is('deleted_at', null)
-    .select()
-    .single();
+    .select();
   if (error) throw error;
-  return data;
+  return data?.[0] || null;
 }
 
 async function deleteCalendarEvent(eventId, householdId) {
