@@ -196,9 +196,51 @@ function parseVEvent(icalData) {
 }
 
 /**
+ * Convert a local date/time in a specific timezone to a UTC ISO string.
+ * Used by expandRecurrence to individually convert each occurrence,
+ * so DST is correctly applied per-date (e.g. GMT vs BST).
+ */
+function localDateToUtc(year, month, day, hour, min, sec, tzid) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tzid,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+
+    const getOffsetMs = (utcInstant) => {
+      const parts = formatter.formatToParts(utcInstant);
+      const tzYear = parseInt(parts.find(p => p.type === 'year').value);
+      const tzMonth = parseInt(parts.find(p => p.type === 'month').value) - 1;
+      const tzDay = parseInt(parts.find(p => p.type === 'day').value);
+      let tzHour = parseInt(parts.find(p => p.type === 'hour').value);
+      if (tzHour === 24) tzHour = 0;
+      const tzMin = parseInt(parts.find(p => p.type === 'minute').value);
+      const tzSec = parseInt(parts.find(p => p.type === 'second').value);
+      const tzAsUtc = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMin, tzSec);
+      return tzAsUtc - utcInstant.getTime();
+    };
+
+    const guess1 = new Date(Date.UTC(year, month, day, hour, min, sec));
+    const offset1 = getOffsetMs(guess1);
+    const guess2 = new Date(Date.UTC(year, month, day, hour, min, sec) - offset1);
+    const offset2 = getOffsetMs(guess2);
+    return new Date(Date.UTC(year, month, day, hour, min, sec) - offset2);
+  } catch {
+    return new Date(Date.UTC(year, month, day, hour, min, sec));
+  }
+}
+
+/**
  * Expand a recurring event into individual instances.
  * Returns an array of eventData objects (one per occurrence).
  * Window: 6 months in past → 12 months in future (matches Google/Microsoft).
+ *
+ * KEY: Expansion happens in *local time* (the event's original timezone) so that:
+ *  1. RRULE UNTIL boundaries are evaluated correctly (UNTIL is local)
+ *  2. Each occurrence is then individually converted to UTC, so DST changes
+ *     (e.g. GMT → BST) are applied per-date rather than using a fixed offset.
  */
 function expandRecurrence(eventData, externalEventId) {
   if (!eventData.rrule) return null;
@@ -209,51 +251,95 @@ function expandRecurrence(eventData, externalEventId) {
     const windowEnd = new Date();
     windowEnd.setMonth(windowEnd.getMonth() + 12);
 
-    // Calculate duration between start and end (already in UTC)
-    const startMs = new Date(eventData.start_time + (eventData.all_day ? 'T00:00:00Z' : '')).getTime();
-    const endMs = new Date(eventData.end_time + (eventData.all_day ? 'T00:00:00Z' : '')).getTime();
-    const durationMs = endMs - startMs;
-
-    // Build RRule from the RRULE string
-    // rrulestr treats DTSTART without Z as local — for timed events with a timezone,
-    // we need to pass the already-converted UTC start so occurrences are generated in UTC
     const rawDt = eventData._rawDtstart;
-    let dtStartStr;
+    const tzid = eventData._startTzid;
+
+    // Parse the original local start time components
+    let startHour = 0, startMin = 0, startSec = 0;
+    let durationMs;
+
     if (eventData.all_day || rawDt.length === 8) {
-      // All-day events: use raw date
-      dtStartStr = rawDt;
-    } else if (rawDt.endsWith('Z')) {
-      // Already UTC
-      dtStartStr = rawDt;
-    } else {
-      // Timed event with timezone — use the already-converted UTC start_time
-      // Format back to iCal UTC format: "20260522T140000Z"
-      const utcStart = eventData.start_time.replace(/[-:]/g, '');
-      dtStartStr = utcStart;
+      // All-day event — expand with raw date, no timezone conversion needed
+      const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`);
+      const occurrences = rule.between(windowStart, windowEnd, true);
+
+      return occurrences.map((occDate) => ({
+        externalEventId: `${externalEventId}_${occDate.toISOString().split('T')[0]}`,
+        eventData: {
+          title: eventData.title,
+          description: eventData.description,
+          location: eventData.location,
+          start_time: occDate.toISOString().split('T')[0],
+          end_time: occDate.toISOString().split('T')[0],
+          all_day: true,
+        },
+      }));
     }
 
+    // Timed event — parse local time from raw DTSTART
+    startHour = parseInt(rawDt.substring(9, 11));
+    startMin = parseInt(rawDt.substring(11, 13));
+    startSec = parseInt(rawDt.substring(13, 15));
+
+    // Calculate duration from the already-converted UTC times
+    const startMs = new Date(eventData.start_time).getTime();
+    const endMs = new Date(eventData.end_time).getTime();
+    durationMs = endMs - startMs;
+
+    if (tzid && !rawDt.endsWith('Z')) {
+      // ── DST-aware expansion ──
+      // Expand in LOCAL time so UNTIL boundaries and occurrence dates are correct,
+      // then convert each occurrence individually to UTC.
+      // Use raw local DTSTART (without Z) so rrule treats it as local.
+      const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`, { tzid });
+      const occurrences = rule.between(windowStart, windowEnd, true);
+
+      return occurrences.map((occDate) => {
+        // rrule gives us a Date object — extract the local time components it represents
+        // For rrule with tzid, the occurrence dates represent local times
+        const occYear = occDate.getUTCFullYear();
+        const occMonth = occDate.getUTCMonth();
+        const occDay = occDate.getUTCDate();
+        const occHour = occDate.getUTCHours();
+        const occMin = occDate.getUTCMinutes();
+        const occSec = occDate.getUTCSeconds();
+
+        // Convert this local time to UTC using the timezone (DST-aware per-date)
+        const utcStart = localDateToUtc(occYear, occMonth, occDay, occHour, occMin, occSec, tzid);
+        const utcEnd = new Date(utcStart.getTime() + durationMs);
+
+        const dateStr = `${occYear}-${String(occMonth + 1).padStart(2, '0')}-${String(occDay).padStart(2, '0')}`;
+
+        return {
+          externalEventId: `${externalEventId}_${dateStr}`,
+          eventData: {
+            title: eventData.title,
+            description: eventData.description,
+            location: eventData.location,
+            start_time: utcStart.toISOString().replace('.000Z', 'Z'),
+            end_time: utcEnd.toISOString().replace('.000Z', 'Z'),
+            all_day: false,
+          },
+        };
+      });
+    }
+
+    // ── No timezone (already UTC) — use existing approach ──
+    const dtStartStr = rawDt.endsWith('Z') ? rawDt : eventData.start_time.replace(/[-:]/g, '');
     const rule = rrulestr(`DTSTART:${dtStartStr}\nRRULE:${eventData.rrule}`);
     const occurrences = rule.between(windowStart, windowEnd, true);
 
-    return occurrences.map((occDate, idx) => {
+    return occurrences.map((occDate) => {
       const occEnd = new Date(occDate.getTime() + durationMs);
-
-      const formatDate = (d) => {
-        if (eventData.all_day) {
-          return d.toISOString().split('T')[0];
-        }
-        return d.toISOString().replace('.000Z', 'Z');
-      };
-
       return {
         externalEventId: `${externalEventId}_${occDate.toISOString().split('T')[0]}`,
         eventData: {
           title: eventData.title,
           description: eventData.description,
           location: eventData.location,
-          start_time: formatDate(occDate),
-          end_time: formatDate(occEnd),
-          all_day: eventData.all_day,
+          start_time: occDate.toISOString().replace('.000Z', 'Z'),
+          end_time: occEnd.toISOString().replace('.000Z', 'Z'),
+          all_day: false,
         },
       };
     });
