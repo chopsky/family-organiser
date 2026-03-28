@@ -82,6 +82,9 @@ function parseVEvent(icalData) {
    * Convert a local datetime string + timezone into a UTC ISO string.
    * E.g. "20260329T100000" with TZID "Europe/London" → "2026-03-29T09:00:00Z"
    * because BST (UTC+1) is in effect on that date.
+   *
+   * Uses a two-pass iterative approach to correctly handle DST transitions
+   * and month-boundary crossings.
    */
   const localToUtc = (value, tzid) => {
     const year = parseInt(value.substring(0, 4));
@@ -92,7 +95,6 @@ function parseVEvent(icalData) {
     const sec = parseInt(value.substring(13, 15));
 
     try {
-      // Use Intl.DateTimeFormat to find the UTC offset for this timezone at this date/time
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: tzid,
         year: 'numeric', month: '2-digit', day: '2-digit',
@@ -100,23 +102,34 @@ function parseVEvent(icalData) {
         hour12: false,
       });
 
-      // Create a UTC date with the local time values, then find the offset
-      // by comparing what that UTC instant looks like in the target timezone
-      // Use iterative approach: guess UTC = local time, check the offset, adjust
-      let utcGuess = new Date(Date.UTC(year, month, day, hour, min, sec));
-      const parts = formatter.formatToParts(utcGuess);
-      const tzHour = parseInt(parts.find(p => p.type === 'hour').value);
-      const tzMin = parseInt(parts.find(p => p.type === 'minute').value);
-      const tzDay = parseInt(parts.find(p => p.type === 'day').value);
+      // Helper: extract full date/time from formatter parts and compute offset in ms
+      const getOffsetMs = (utcInstant) => {
+        const parts = formatter.formatToParts(utcInstant);
+        const tzYear = parseInt(parts.find(p => p.type === 'year').value);
+        const tzMonth = parseInt(parts.find(p => p.type === 'month').value) - 1;
+        const tzDay = parseInt(parts.find(p => p.type === 'day').value);
+        let tzHour = parseInt(parts.find(p => p.type === 'hour').value);
+        // Intl hour12:false gives 24 for midnight in some engines
+        if (tzHour === 24) tzHour = 0;
+        const tzMin = parseInt(parts.find(p => p.type === 'minute').value);
+        const tzSec = parseInt(parts.find(p => p.type === 'second').value);
+        // What the timezone thinks this instant is (as a UTC-equivalent timestamp)
+        const tzAsUtc = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMin, tzSec);
+        // Offset = tzLocal - utc  (positive means timezone is ahead of UTC)
+        return tzAsUtc - utcInstant.getTime();
+      };
 
-      // Calculate offset in minutes: how far ahead is the timezone from UTC?
-      let offsetMinutes = (tzHour * 60 + tzMin) - (hour * 60 + min);
-      // Adjust for day boundary crossings
-      if (tzDay > day) offsetMinutes += 24 * 60;
-      else if (tzDay < day) offsetMinutes -= 24 * 60;
+      // Pass 1: assume local time IS UTC, find approximate offset
+      const guess1 = new Date(Date.UTC(year, month, day, hour, min, sec));
+      const offset1 = getOffsetMs(guess1);
 
-      // The actual UTC time is: local time - offset
-      const utcDate = new Date(Date.UTC(year, month, day, hour, min, sec) - offsetMinutes * 60 * 1000);
+      // Pass 2: subtract offset to get better UTC guess, recalculate offset
+      // This handles DST boundaries where pass 1's offset was for wrong side of transition
+      const guess2 = new Date(Date.UTC(year, month, day, hour, min, sec) - offset1);
+      const offset2 = getOffsetMs(guess2);
+
+      // Use the second (refined) offset for the final conversion
+      const utcDate = new Date(Date.UTC(year, month, day, hour, min, sec) - offset2);
       return utcDate.toISOString().replace('.000Z', 'Z');
     } catch (e) {
       // If timezone conversion fails, fall back to treating as UTC
@@ -178,6 +191,7 @@ function parseVEvent(icalData) {
     all_day: allDay,
     rrule: getValue('RRULE') || null,
     _rawDtstart: dtstart,
+    _startTzid: startTzid || null,
   };
 }
 
@@ -195,24 +209,30 @@ function expandRecurrence(eventData, externalEventId) {
     const windowEnd = new Date();
     windowEnd.setMonth(windowEnd.getMonth() + 12);
 
-    // Parse the original start date to get the base time
-    const rawDt = eventData._rawDtstart;
-    let dtDate;
-    if (rawDt.length === 8) {
-      dtDate = new Date(`${rawDt.substring(0,4)}-${rawDt.substring(4,6)}-${rawDt.substring(6,8)}T00:00:00Z`);
-    } else {
-      const y = rawDt.substring(0,4), mo = rawDt.substring(4,6), d = rawDt.substring(6,8);
-      const h = rawDt.substring(9,11), mi = rawDt.substring(11,13), s = rawDt.substring(13,15);
-      dtDate = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`);
-    }
-
-    // Calculate duration between start and end
+    // Calculate duration between start and end (already in UTC)
     const startMs = new Date(eventData.start_time + (eventData.all_day ? 'T00:00:00Z' : '')).getTime();
     const endMs = new Date(eventData.end_time + (eventData.all_day ? 'T00:00:00Z' : '')).getTime();
     const durationMs = endMs - startMs;
 
     // Build RRule from the RRULE string
-    const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`);
+    // rrulestr treats DTSTART without Z as local — for timed events with a timezone,
+    // we need to pass the already-converted UTC start so occurrences are generated in UTC
+    const rawDt = eventData._rawDtstart;
+    let dtStartStr;
+    if (eventData.all_day || rawDt.length === 8) {
+      // All-day events: use raw date
+      dtStartStr = rawDt;
+    } else if (rawDt.endsWith('Z')) {
+      // Already UTC
+      dtStartStr = rawDt;
+    } else {
+      // Timed event with timezone — use the already-converted UTC start_time
+      // Format back to iCal UTC format: "20260522T140000Z"
+      const utcStart = eventData.start_time.replace(/[-:]/g, '');
+      dtStartStr = utcStart;
+    }
+
+    const rule = rrulestr(`DTSTART:${dtStartStr}\nRRULE:${eventData.rrule}`);
     const occurrences = rule.between(windowStart, windowEnd, true);
 
     return occurrences.map((occDate, idx) => {
