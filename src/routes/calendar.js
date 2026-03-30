@@ -646,7 +646,7 @@ router.post('/connect/apple', async (req, res) => {
     if (connection) {
       try {
         const calendars = await appleProvider.listCalendars(connection);
-        console.log(`[connect/apple] Found ${calendars.length} calendars, auto-subscribing...`);
+        console.log(`[connect/apple] Found ${calendars.length} calendars:`, calendars.map(c => `"${c.displayName}" (${c.id})`).join(', '));
         for (const cal of calendars) {
           const sub = await db.upsertSubscription(connection.id, {
             external_calendar_id: cal.id,

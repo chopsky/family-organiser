@@ -105,23 +105,31 @@ async function pullChangesFromProvider(connection) {
  * Called when a subscription is first created.
  */
 async function initialImportFromSubscription(connection, subscription) {
+  console.log(`[initialImport] Starting for "${subscription.display_name}" (sub=${subscription.id}, conn=${connection.id})`);
   try {
     await refreshTokenIfNeeded(connection);
   } catch (err) {
-    console.error(`Failed to refresh token for initial import, connection ${connection.id}:`, err);
+    console.error(`[initialImport] Failed to refresh token for connection ${connection.id}:`, err);
     return;
   }
 
   const provider = getProvider(connection.provider);
 
   try {
+    console.log(`[initialImport] Fetching all events from "${subscription.display_name}" (${subscription.external_calendar_id})`);
     const events = await provider.pullAllEvents(connection, subscription.external_calendar_id);
+    console.log(`[initialImport] Fetched ${events.length} events from "${subscription.display_name}"`);
 
     let imported = 0;
+    let skipped = 0;
+    let failed = 0;
     for (const change of events) {
       try {
         const existing = await db.getSyncMappingByExternalId(connection.id, change.externalEventId);
-        if (existing) continue; // Already imported
+        if (existing) {
+          skipped++;
+          continue;
+        }
 
         const newEvent = await db.createCalendarEventFromSync(
           connection.household_id,
@@ -141,14 +149,15 @@ async function initialImportFromSubscription(connection, subscription) {
         );
         imported++;
       } catch (err) {
-        console.error(`Failed to import event ${change.externalEventId}:`, err);
+        failed++;
+        console.error(`[initialImport] Failed to import event "${change.eventData?.title}" (${change.externalEventId}):`, err.message);
       }
     }
 
     await db.updateSubscription(subscription.id, { last_synced_at: new Date().toISOString() });
-    console.log(`Imported ${imported} events for subscription ${subscription.id} (${subscription.display_name})`);
+    console.log(`[initialImport] Done "${subscription.display_name}": ${imported} imported, ${skipped} skipped (existing), ${failed} failed, ${events.length} total`);
   } catch (err) {
-    console.error(`Initial import failed for subscription ${subscription.id}:`, err);
+    console.error(`[initialImport] Pull failed for "${subscription.display_name}" (sub=${subscription.id}):`, err);
   }
 }
 
