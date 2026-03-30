@@ -5,6 +5,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// Trust proxy (Railway runs behind a reverse proxy)
+app.set('trust proxy', 1);
+
 // CORS must come before helmet so preflight OPTIONS requests are handled correctly
 const allowedOrigins = process.env.WEB_URL
   ? [process.env.WEB_URL]

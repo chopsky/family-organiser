@@ -752,6 +752,51 @@ router.get('/connections/:provider/calendars', async (req, res) => {
 });
 
 /**
+ * GET /api/calendar/connections/:provider/debug-search?q=flicky
+ * Debug endpoint: search raw CalDAV data for events matching a query.
+ * Returns matching event titles + dates from ALL subscribed calendars.
+ */
+router.get('/connections/:provider/debug-search', async (req, res) => {
+  const { provider } = req.params;
+  const query = (req.query.q || '').toLowerCase();
+  if (!query) return res.status(400).json({ error: 'q parameter required' });
+
+  try {
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
+    if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
+
+    const providerModule = PROVIDERS[provider];
+    const subscriptions = await db.getSubscriptionsByConnection(connection.id);
+    const results = [];
+
+    for (const sub of subscriptions) {
+      try {
+        const events = await providerModule.pullAllEvents(connection, sub.external_calendar_id);
+        for (const evt of events) {
+          if (evt.eventData?.title?.toLowerCase().includes(query)) {
+            results.push({
+              calendar: sub.display_name,
+              title: evt.eventData.title,
+              start: evt.eventData.start_time,
+              end: evt.eventData.end_time,
+              allDay: evt.eventData.all_day,
+              externalId: evt.externalEventId,
+            });
+          }
+        }
+      } catch (err) {
+        results.push({ calendar: sub.display_name, error: err.message });
+      }
+    }
+
+    return res.json({ query, matches: results.length, results });
+  } catch (err) {
+    console.error(`debug-search error:`, err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/calendar/connections/:provider/subscriptions
  * Get current calendar subscriptions for a provider.
  */
