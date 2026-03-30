@@ -57,18 +57,27 @@ function buildVEvent(event, uid) {
 
 /**
  * Parse a VEVENT from iCal data into a Anora event object.
+ * Extracts the VEVENT block first to avoid matching properties from
+ * VTIMEZONE or other components (which have their own DTSTART etc.).
  */
 function parseVEvent(icalData) {
+  // Extract just the VEVENT block to avoid matching VTIMEZONE properties
+  const veventMatch = icalData.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/);
+  const veventBlock = veventMatch ? veventMatch[0] : icalData;
+
+  // Unfold iCal line continuations (RFC 5545: lines folded with CRLF + space/tab)
+  const unfolded = veventBlock.replace(/\r?\n[ \t]/g, '');
+
   const getValue = (key) => {
     const regex = new RegExp(`^${key}[^:]*:(.*)$`, 'm');
-    const match = icalData.match(regex);
+    const match = unfolded.match(regex);
     return match ? match[1].trim() : '';
   };
 
   // Extract TZID from DTSTART/DTEND if present
   const getTzid = (key) => {
     const regex = new RegExp(`^${key};[^:]*TZID=([^;:]+)`, 'm');
-    const match = icalData.match(regex);
+    const match = unfolded.match(regex);
     return match ? match[1].trim() : null;
   };
 
