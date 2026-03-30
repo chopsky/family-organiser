@@ -692,17 +692,24 @@ router.delete('/connections/:provider', async (req, res) => {
 
     console.log(`[disconnect] Found connection ${connection.id} for user=${req.user.id} provider=${provider}`);
 
-    // Soft-delete all synced calendar events for this connection's subscriptions
+    // Bulk soft-delete all synced calendar events for this connection
     try {
-      const subscriptions = await db.getSubscriptionsByConnection(connection.id);
-      for (const sub of subscriptions) {
-        const mappings = await db.getSyncMappingsBySubscription(sub.id);
-        for (const mapping of mappings) {
-          if (mapping.event_id) {
-            await db.softDeleteCalendarEvent(mapping.event_id, connection.household_id);
-          }
+      const { supabase } = require('../db/client');
+      const { data: eventIds } = await supabase
+        .from('calendar_sync_mappings')
+        .select('event_id')
+        .eq('connection_id', connection.id);
+
+      if (eventIds && eventIds.length > 0) {
+        const ids = eventIds.map(e => e.event_id).filter(Boolean);
+        if (ids.length > 0) {
+          await supabase
+            .from('calendar_events')
+            .update({ deleted_at: new Date().toISOString() })
+            .in('id', ids)
+            .is('deleted_at', null);
+          console.log(`[disconnect] Bulk soft-deleted ${ids.length} synced events`);
         }
-        console.log(`[disconnect] Soft-deleted ${mappings.length} events for subscription "${sub.display_name}"`);
       }
     } catch (cleanupErr) {
       console.error('[disconnect] Event cleanup error (non-fatal):', cleanupErr.message);
@@ -710,13 +717,6 @@ router.delete('/connections/:provider', async (req, res) => {
 
     // Delete the connection (cascades to subscriptions and sync_mappings)
     await db.deleteCalendarConnection(req.user.id, provider);
-
-    // Verify it's actually gone
-    const check = await db.getConnectionByUserAndProvider(req.user.id, provider);
-    if (check) {
-      console.error(`[disconnect] Connection ${connection.id} STILL EXISTS after delete!`);
-      return res.status(500).json({ error: 'Failed to disconnect. Please try again.' });
-    }
 
     console.log(`[disconnect] Successfully disconnected ${provider} for user ${req.user.id}`);
     return res.json({ success: true });
