@@ -1376,6 +1376,29 @@ async function upsertCalendarConnection(userId, householdId, provider, connectio
 }
 
 async function deleteCalendarConnection(userId, provider) {
+  // First, find the connection to get its ID for cleanup
+  const { data: conn } = await supabase
+    .from('calendar_connections')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .single();
+
+  if (conn) {
+    // Delete sync mappings linked to this connection
+    await supabase
+      .from('calendar_sync_mappings')
+      .delete()
+      .eq('connection_id', conn.id);
+
+    // Delete subscriptions linked to this connection
+    await supabase
+      .from('calendar_subscriptions')
+      .delete()
+      .eq('connection_id', conn.id);
+  }
+
+  // Delete the connection itself
   const { error } = await supabase
     .from('calendar_connections')
     .delete()
