@@ -641,7 +641,32 @@ router.post('/connect/apple', async (req, res) => {
       sync_enabled: true,
     });
 
-    return res.json({ success: true, message: 'Apple Calendar connected.' });
+    // Auto-subscribe to all available VEVENT calendars and trigger initial import
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, 'apple');
+    if (connection) {
+      try {
+        const calendars = await appleProvider.listCalendars(connection);
+        console.log(`[connect/apple] Found ${calendars.length} calendars, auto-subscribing...`);
+        for (const cal of calendars) {
+          const sub = await db.upsertSubscription(connection.id, {
+            external_calendar_id: cal.id,
+            display_name: cal.displayName,
+            category: cal.suggestedCategory || 'general',
+            visibility: 'family',
+          });
+          // Trigger initial import in background (don't block the response)
+          calendarSync.initialImportFromSubscription(connection, sub).catch((err) => {
+            console.error(`[connect/apple] Initial import failed for "${cal.displayName}":`, err.message);
+          });
+        }
+        console.log(`[connect/apple] Auto-subscribed to ${calendars.length} calendars for user ${req.user.id}`);
+      } catch (err) {
+        // Non-fatal — the connection is saved, user can manually manage calendars later
+        console.error('[connect/apple] Auto-subscribe failed (non-fatal):', err.message);
+      }
+    }
+
+    return res.json({ success: true, message: 'Apple Calendar connected. Importing events — this may take a few minutes.' });
   } catch (err) {
     console.error('POST /api/calendar/connect/apple error:', err);
     return res.status(500).json({ error: err.message || 'Could not connect Apple Calendar.' });
@@ -658,7 +683,42 @@ router.delete('/connections/:provider', async (req, res) => {
     return res.status(400).json({ error: 'Invalid provider.' });
   }
   try {
+    // First get the connection so we can clean up events
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
+    if (!connection) {
+      console.warn(`[disconnect] No connection found for user=${req.user.id} provider=${provider}`);
+      return res.json({ success: true }); // Already disconnected
+    }
+
+    console.log(`[disconnect] Found connection ${connection.id} for user=${req.user.id} provider=${provider}`);
+
+    // Soft-delete all synced calendar events for this connection's subscriptions
+    try {
+      const subscriptions = await db.getSubscriptionsByConnection(connection.id);
+      for (const sub of subscriptions) {
+        const mappings = await db.getSyncMappingsBySubscription(sub.id);
+        for (const mapping of mappings) {
+          if (mapping.event_id) {
+            await db.softDeleteCalendarEvent(mapping.event_id, connection.household_id);
+          }
+        }
+        console.log(`[disconnect] Soft-deleted ${mappings.length} events for subscription "${sub.display_name}"`);
+      }
+    } catch (cleanupErr) {
+      console.error('[disconnect] Event cleanup error (non-fatal):', cleanupErr.message);
+    }
+
+    // Delete the connection (cascades to subscriptions and sync_mappings)
     await db.deleteCalendarConnection(req.user.id, provider);
+
+    // Verify it's actually gone
+    const check = await db.getConnectionByUserAndProvider(req.user.id, provider);
+    if (check) {
+      console.error(`[disconnect] Connection ${connection.id} STILL EXISTS after delete!`);
+      return res.status(500).json({ error: 'Failed to disconnect. Please try again.' });
+    }
+
+    console.log(`[disconnect] Successfully disconnected ${provider} for user ${req.user.id}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/calendar/connections error:', err);

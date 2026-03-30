@@ -383,8 +383,13 @@ export default function Settings() {
         };
       }
       setCalendarSelections(selections);
-    } catch {
-      setError('Could not load calendars.');
+    } catch (err) {
+      const msg = err.response?.status === 404
+        ? 'Calendar not connected. Please reconnect first.'
+        : err.message?.includes('timed out')
+          ? 'Connection to Apple timed out. Please try again.'
+          : 'Could not load calendars. Please try again.';
+      setError(msg);
       setSelectingProvider(null);
     } finally {
       setLoadingCalendars(false);
@@ -418,12 +423,18 @@ export default function Settings() {
   }
 
   async function handleDisconnect(provider) {
-    if (!window.confirm(`Disconnect ${provider.charAt(0).toUpperCase() + provider.slice(1)} Calendar?`)) return;
+    if (!window.confirm(`Disconnect ${provider.charAt(0).toUpperCase() + provider.slice(1)} Calendar? All synced events from this calendar will be removed.`)) return;
     try {
       await api.delete(`/calendar/connections/${provider}`);
+      // Optimistically update, then verify from the server
       setCalConnections(prev => prev.filter(c => c.provider !== provider));
+      setSuccess(`${provider.charAt(0).toUpperCase() + provider.slice(1)} Calendar disconnected.`);
+      // Re-fetch to confirm it's actually gone
+      await loadConnections();
     } catch (err) {
-      setError('Could not disconnect calendar.');
+      setError('Could not disconnect calendar. Please try again.');
+      // Re-fetch to show actual state
+      await loadConnections();
     }
   }
 
