@@ -1610,6 +1610,46 @@ async function createCalendarEventFromSync(householdId, eventData, sourceUserId,
   return data;
 }
 
+// ─── Batch Calendar Sync ────────────────────────────────────────────────────
+
+async function getSyncMappingsByExternalIds(connectionId, externalIds) {
+  if (!externalIds || externalIds.length === 0) return [];
+  // Supabase .in() has a limit of ~1000, so chunk if needed
+  const CHUNK = 500;
+  const results = [];
+  for (let i = 0; i < externalIds.length; i += CHUNK) {
+    const chunk = externalIds.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from('calendar_sync_mappings')
+      .select('external_event_id')
+      .eq('connection_id', connectionId)
+      .in('external_event_id', chunk);
+    if (error) throw error;
+    results.push(...(data || []));
+  }
+  return results;
+}
+
+async function batchCreateCalendarEvents(eventRows) {
+  if (!eventRows || eventRows.length === 0) return [];
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .insert(eventRows)
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+async function batchCreateSyncMappings(mappingRows) {
+  if (!mappingRows || mappingRows.length === 0) return [];
+  const { data, error } = await supabase
+    .from('calendar_sync_mappings')
+    .upsert(mappingRows, { onConflict: 'event_id,connection_id' })
+    .select();
+  if (error) throw error;
+  return data;
+}
+
 // ─── Meal Plan ──────────────────────────────────────────────────────────────
 
 async function getMealPlanForWeek(householdId, startDate, endDate) {
@@ -2671,6 +2711,9 @@ module.exports = {
   deleteSubscription,
   getConnectionByUserAndProvider,
   getSyncMappingsBySubscription,
+  getSyncMappingsByExternalIds,
+  batchCreateCalendarEvents,
+  batchCreateSyncMappings,
   createSyncMappingWithSubscription,
   createCalendarEventFromSync,
   // Dependents

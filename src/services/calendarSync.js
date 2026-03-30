@@ -120,42 +120,93 @@ async function initialImportFromSubscription(connection, subscription) {
     const events = await provider.pullAllEvents(connection, subscription.external_calendar_id);
     console.log(`[initialImport] Fetched ${events.length} events from "${subscription.display_name}"`);
 
+    // Filter out already-imported events in one batch query
+    const externalIds = events.map(e => e.externalEventId);
+    const existingMappings = await db.getSyncMappingsByExternalIds(connection.id, externalIds);
+    const existingSet = new Set(existingMappings.map(m => m.external_event_id));
+
+    const newEvents = events.filter(e => !existingSet.has(e.externalEventId));
+    const skipped = events.length - newEvents.length;
+    console.log(`[initialImport] "${subscription.display_name}": ${newEvents.length} new, ${skipped} already exist`);
+
+    if (newEvents.length === 0) {
+      await db.updateSubscription(subscription.id, { last_synced_at: new Date().toISOString() });
+      console.log(`[initialImport] Done "${subscription.display_name}": nothing new to import`);
+      return;
+    }
+
+    // Batch insert events in chunks of 100
+    const BATCH_SIZE = 100;
     let imported = 0;
-    let skipped = 0;
     let failed = 0;
-    for (const change of events) {
+    const color = subscription.category === 'birthday' ? 'plum' : subscription.category === 'public_holiday' ? 'coral' : 'sky';
+
+    for (let i = 0; i < newEvents.length; i += BATCH_SIZE) {
+      const batch = newEvents.slice(i, i + BATCH_SIZE);
       try {
-        const existing = await db.getSyncMappingByExternalId(connection.id, change.externalEventId);
-        if (existing) {
-          skipped++;
-          continue;
-        }
+        // Prepare event rows
+        const eventRows = batch.map(change => {
+          let startTime = change.eventData.start_time;
+          let endTime = change.eventData.end_time;
+          if (startTime && !startTime.includes('T')) startTime = `${startTime}T00:00:00Z`;
+          if (endTime && !endTime.includes('T')) endTime = `${endTime}T00:00:00Z`;
+          return {
+            household_id: connection.household_id,
+            title: change.eventData.title || 'Untitled event',
+            description: change.eventData.description || null,
+            start_time: startTime,
+            end_time: endTime || startTime,
+            all_day: change.eventData.all_day || false,
+            location: change.eventData.location || null,
+            color,
+            source_user_id: connection.user_id,
+            subscription_id: subscription.id,
+            category: subscription.category,
+            visibility: subscription.visibility,
+          };
+        });
 
-        const newEvent = await db.createCalendarEventFromSync(
-          connection.household_id,
-          change.eventData,
-          connection.user_id,
-          subscription.id,
-          subscription.category,
-          subscription.visibility,
-        );
+        // Batch insert events
+        const insertedEvents = await db.batchCreateCalendarEvents(eventRows);
 
-        await db.createSyncMappingWithSubscription(
-          newEvent.id,
-          connection.id,
-          subscription.id,
-          change.externalEventId,
-          change.etag || null,
-        );
-        imported++;
+        // Build sync mapping rows
+        const mappingRows = insertedEvents.map((evt, idx) => ({
+          event_id: evt.id,
+          connection_id: connection.id,
+          subscription_id: subscription.id,
+          external_event_id: batch[idx].externalEventId,
+          external_etag: batch[idx].etag || null,
+          last_synced_at: new Date().toISOString(),
+        }));
+
+        // Batch insert sync mappings
+        await db.batchCreateSyncMappings(mappingRows);
+        imported += insertedEvents.length;
+        console.log(`[initialImport] "${subscription.display_name}": batch ${Math.floor(i / BATCH_SIZE) + 1} — ${insertedEvents.length} imported (${imported}/${newEvents.length})`);
       } catch (err) {
-        failed++;
-        console.error(`[initialImport] Failed to import event "${change.eventData?.title}" (${change.externalEventId}):`, err.message);
+        // Fall back to one-by-one for this batch so a single bad event doesn't kill the whole batch
+        console.warn(`[initialImport] Batch insert failed, falling back to individual: ${err.message}`);
+        for (const change of batch) {
+          try {
+            const newEvent = await db.createCalendarEventFromSync(
+              connection.household_id, change.eventData, connection.user_id,
+              subscription.id, subscription.category, subscription.visibility,
+            );
+            await db.createSyncMappingWithSubscription(
+              newEvent.id, connection.id, subscription.id,
+              change.externalEventId, change.etag || null,
+            );
+            imported++;
+          } catch (innerErr) {
+            failed++;
+            console.error(`[initialImport] Failed: "${change.eventData?.title}" — ${innerErr.message}`);
+          }
+        }
       }
     }
 
     await db.updateSubscription(subscription.id, { last_synced_at: new Date().toISOString() });
-    console.log(`[initialImport] Done "${subscription.display_name}": ${imported} imported, ${skipped} skipped (existing), ${failed} failed, ${events.length} total`);
+    console.log(`[initialImport] Done "${subscription.display_name}": ${imported} imported, ${skipped} skipped, ${failed} failed, ${events.length} total`);
   } catch (err) {
     console.error(`[initialImport] Pull failed for "${subscription.display_name}" (sub=${subscription.id}):`, err);
   }
