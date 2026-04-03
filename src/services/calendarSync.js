@@ -120,10 +120,13 @@ async function initialImportFromSubscription(connection, subscription) {
     const events = await provider.pullAllEvents(connection, subscription.external_calendar_id);
     console.log(`[initialImport] Fetched ${events.length} events from "${subscription.display_name}"`);
 
-    // Filter out already-imported events in one batch query
-    const externalIds = events.map(e => e.externalEventId);
-    const existingMappings = await db.getSyncMappingsByExternalIds(connection.id, externalIds);
-    const existingSet = new Set(existingMappings.map(m => m.external_event_id));
+    // Load ALL existing sync mappings for this connection at once (single query, no URL overflow)
+    const { supabase } = require('../db/client');
+    const { data: existingMappings } = await supabase
+      .from('calendar_sync_mappings')
+      .select('external_event_id')
+      .eq('connection_id', connection.id);
+    const existingSet = new Set((existingMappings || []).map(m => m.external_event_id));
 
     const newEvents = events.filter(e => !existingSet.has(e.externalEventId));
     const skipped = events.length - newEvents.length;
@@ -135,8 +138,8 @@ async function initialImportFromSubscription(connection, subscription) {
       return;
     }
 
-    // Batch insert events in chunks of 100
-    const BATCH_SIZE = 100;
+    // Batch insert events in chunks of 25 (CalDAV events can have large fields)
+    const BATCH_SIZE = 25;
     let imported = 0;
     let failed = 0;
     const color = subscription.category === 'birthday' ? 'plum' : subscription.category === 'public_holiday' ? 'coral' : 'sky';
