@@ -169,7 +169,7 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
             className="leading-snug"
             style={{
               fontSize: 13,
-              fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
+              fontFamily: 'var(--font-sans, system-ui, sans-serif)',
               fontWeight: 500,
               color: completed ? 'var(--warm-grey, #6B6774)' : 'var(--charcoal, #2D2A33)',
               textDecoration: completed ? 'line-through' : 'none',
@@ -334,7 +334,7 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
             color: '#fff',
             fontSize: 15,
             fontWeight: 600,
-            fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
+            fontFamily: 'var(--font-sans, system-ui, sans-serif)',
             border: '2px solid #fff',
           }}
         >
