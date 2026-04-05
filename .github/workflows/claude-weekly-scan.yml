@@ -1,0 +1,124 @@
+# .github/workflows/claude-weekly-scan.yml
+#
+# Weekly Full Codebase Security Scan
+# Runs every Monday at 8am UTC and can be triggered manually.
+#
+# This does a deeper scan of the entire codebase, not just changed files.
+# Results are saved as artifacts and optionally posted as a GitHub issue.
+
+name: Claude Weekly Security Scan
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Every Monday at 8am UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  full-scan:
+    name: Full Codebase Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run full security scan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "
+          You are performing a comprehensive weekly security audit of a UK-facing 
+          family organiser web app called Housemait.
+
+          Stack: React 18 + Vite + Tailwind (frontend), Node.js + Express (backend), 
+          Supabase (PostgreSQL), Vercel (frontend hosting), Railway (backend hosting),
+          SendGrid (email), Gemini Flash 3 API (AI features), WhatsApp bot integration.
+
+          Perform a FULL audit covering:
+
+          1. API ROUTE SECURITY
+             - List every Express route and its auth status
+             - Check for missing middleware (auth, rate limiting, validation)
+             - Verify household data isolation on every data-fetching route
+
+          2. SUPABASE & DATABASE
+             - Review Row Level Security (RLS) policies
+             - Check for direct table access without RLS
+             - Look for raw SQL that bypasses Supabase client protections
+             - Verify foreign key constraints on household relationships
+
+          3. ENVIRONMENT & SECRETS
+             - Scan for hardcoded credentials or API keys
+             - Check that .env files are gitignored
+             - Verify no secrets leak to the frontend bundle
+             - Check Vite config for exposed env vars (only VITE_ prefixed should be public)
+
+          4. INPUT HANDLING
+             - Review all user input paths (forms, API bodies, URL params, file uploads)
+             - Check for XSS in React components (dangerouslySetInnerHTML, etc.)
+             - Verify file upload restrictions (type, size, sanitisation)
+             - Check WhatsApp bot input handling
+
+          5. ERROR HANDLING & LOGGING
+             - Check for stack traces or internal details in API responses
+             - Verify consistent error response format
+             - Look for unhandled promise rejections
+             - Check that personal data is not logged
+
+          6. DEPENDENCIES
+             - Flag any packages with known vulnerabilities
+             - Identify outdated packages with security implications
+             - Check for unnecessary dependencies that increase attack surface
+
+          7. UK GDPR COMPLIANCE (code-level)
+             - Can user data be fully exported?
+             - Can user data be fully deleted (right to erasure)?
+             - Is personal data encrypted at rest?
+             - Are data processing records maintained?
+
+          Output a structured report with:
+          - CRITICAL / HIGH / MEDIUM / LOW severity ratings
+          - Specific file paths and line numbers
+          - Recommended fixes for each issue
+          - A summary score (e.g., '14 issues found: 2 critical, 3 high, 5 medium, 4 low')
+          " \
+          --allowedTools "Read,Glob,Grep" \
+          --output-format text \
+          --max-turns 30 | tee weekly-scan-report.txt
+
+      - name: Create GitHub issue with results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('weekly-scan-report.txt', 'utf8');
+            const date = new Date().toISOString().split('T')[0];
+
+            const maxLen = 60000;
+            const body = report.length > maxLen
+              ? report.substring(0, maxLen) + '\n\n...(truncated — see full report in Actions artifacts)'
+              : report;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔒 Weekly Security Scan — ${date}`,
+              body: `## Weekly Security Scan Report\n\n${body}`,
+              labels: ['security', 'automated-scan']
+            });
+
+      - name: Upload full report
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-scan-report
+          path: weekly-scan-report.txt
+          retention-days: 90
