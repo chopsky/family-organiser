@@ -43,6 +43,13 @@ jobs:
           Supabase (PostgreSQL), Vercel (frontend hosting), Railway (backend hosting),
           SendGrid (email), Gemini Flash 3 API (AI features), WhatsApp bot integration.
 
+          Project structure:
+          - src/          → Backend (Express API, routes, middleware)
+          - web/          → Frontend (React app)
+          - website/      → Marketing/public site
+          - supabase/     → Database migrations, RLS policies, functions
+          - scripts/      → Build/deploy scripts
+
           Perform a FULL audit covering:
 
           1. API ROUTE SECURITY
