@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "dev:web": "cd web && npm run dev",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:verbose": "jest --verbose"
@@ -46,6 +48,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
     "jest": "^30.3.0",
     "nodemon": "^3.1.14",
     "supertest": "^7.2.2"

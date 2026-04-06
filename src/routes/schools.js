@@ -657,8 +657,12 @@ Do NOT wrap in markdown code fences.`,
       source: 'website_scrape',
     }));
 
+    // Load school metadata to check current source
+    const school = await db.getHouseholdSchools(req.householdId)
+      .then(schools => schools.find(s => s.id === req.params.schoolId));
+
     // If source changed, clear ALL existing dates first to avoid conflicts
-    if (school.term_dates_source && school.term_dates_source !== 'website_scrape') {
+    if (school?.term_dates_source && school.term_dates_source !== 'website_scrape') {
       await db.deleteAllTermDatesBySchool(req.params.schoolId);
     } else {
       // Same source — merge by academic year
@@ -681,10 +685,9 @@ Do NOT wrap in markdown code fences.`,
 
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
-    const countMessages = yearCounts.map(yc => `${yc.count} dates for ${yc.year}`);
     return res.json({
       imported: termDates.length,
-      message: `Updated ${countMessages.join('. Added ')}.`,
+      message: `Imported ${termDates.length} term date(s) from website.`,
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-website error:', err);

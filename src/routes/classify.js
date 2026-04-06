@@ -70,7 +70,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           if (tzCoords) [lat, lon] = tzCoords;
         }
         if (lat && lon) {
-          const weatherReport = await getWeatherReport(lat, lon, tz, { userMessage: message });
+          const weatherReport = await getWeatherReport(lat, lon, tz, { userMessage: text });
           result.response_message = weatherReport;
         } else {
           result.response_message = "I couldn't determine your location for weather. Please check your profile settings. 📍";

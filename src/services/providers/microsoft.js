@@ -104,7 +104,7 @@ async function pushEvent(connection, event, action) {
   if (action === 'delete') {
     const { externalEventId } = event;
     await client.api(`/me/events/${externalEventId}`).delete();
-    return;
+    
   }
 }
 
@@ -237,7 +237,7 @@ async function pullAllEvents(connection, calendarId) {
     ? `/me/calendars/${calendarId}/calendarView`
     : '/me/calendarView';
 
-  let url = `${basePath}?startDateTime=${encodeURIComponent(
+  const url = `${basePath}?startDateTime=${encodeURIComponent(
     startDateTime
   )}&endDateTime=${encodeURIComponent(endDateTime)}`;
 

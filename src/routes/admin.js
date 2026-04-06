@@ -99,7 +99,7 @@ router.delete('/users/:id', async (req, res) => {
     const user = await db.getUserByIdAdmin(id);
     const householdId = user?.household_id;
 
-    await db.deleteUser(id);
+    await db.deleteUserAdmin(id);
 
     // If user was in a household, check if it's now empty
     let householdDeleted = false;

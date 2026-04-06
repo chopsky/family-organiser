@@ -2013,7 +2013,7 @@ async function enableUser(userId, db = supabase) {
   return data;
 }
 
-async function deleteUser(userId, db = supabase) {
+async function deleteUserAdmin(userId, db = supabase) {
   const { error } = await db
     .from('users')
     .delete()
@@ -2187,7 +2187,7 @@ async function getCalendarSyncHealth(db = supabase) {
 
   // Get user names
   const userIds = [...new Set((connections || []).map((c) => c.user_id))];
-  let userMap = {};
+  const userMap = {};
   if (userIds.length > 0) {
     const { data: users } = await db.from('users').select('id, name, email').in('id', userIds);
     for (const u of users || []) userMap[u.id] = u;
@@ -2779,7 +2779,7 @@ module.exports = {
   getPlatformStats,
   disableUser,
   enableUser,
-  deleteUser,
+  deleteUserAdmin,
   setUserPlatformAdmin,
   deleteHouseholdCascade,
   // Platform admin Phase 2

@@ -1,0 +1,36 @@
+# .github/workflows/lint.yml
+#
+# ESLint check on every push and PR.
+# Fails the build if there are any errors (warnings are allowed up to a threshold).
+# No untrusted input is used in run commands.
+
+name: Lint
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**"]
+  pull_request:
+    paths: ["src/**"]
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npx eslint src/ --max-warnings 50
