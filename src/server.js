@@ -1,5 +1,8 @@
 require('dotenv').config();
 
+const { checkEnv } = require('./utils/check-env');
+checkEnv(); // Fail fast if required env vars are missing
+
 const app = require('./app');
 const { testConnection } = require('./db/client');
 const { startScheduler } = require('./jobs/scheduler');
