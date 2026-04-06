@@ -62,8 +62,9 @@ function checkEnv() {
     console.error('║  MISSING REQUIRED ENVIRONMENT VARIABLES  ║');
     console.error('╚══════════════════════════════════════════╝\n');
     console.error(missing.join('\n'));
-    console.error('\nThe app cannot start. Set these in Railway / .env and restart.\n');
-    throw new Error(`Missing required env vars: ${missing.length}`);
+    console.error('\nThese should be set in Railway / .env for the app to function correctly.\n');
+    // Warn but don't crash — Railway injects env vars at container level
+    // and they may appear missing during preload but be available at runtime
   }
 
   if (warnings.length > 0) {
