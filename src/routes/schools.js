@@ -811,8 +811,9 @@ Only return valid JSON array, nothing else.`;
     }
 
     // Delete ALL existing ical_import dates for this school, then insert fresh
-    const { supabase } = require('../db/client');
-    const { error: deleteErr } = await supabase
+    const { getUserClient } = require('../db/client');
+    const userDb = getUserClient(req.token);
+    const { error: deleteErr } = await userDb
       .from('school_term_dates')
       .delete()
       .eq('school_id', req.params.schoolId)

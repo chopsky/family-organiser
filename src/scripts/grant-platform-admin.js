@@ -9,7 +9,7 @@
  */
 
 require('dotenv').config();
-const { supabase } = require('../db/client');
+const { supabaseAdmin: supabase } = require('../db/client');
 
 async function main() {
   const [action, email] = process.argv.slice(2);

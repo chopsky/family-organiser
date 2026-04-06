@@ -9,7 +9,7 @@ require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
-const { supabase } = require('../db/client');
+const { supabaseAdmin: supabase } = require('../db/client');
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';

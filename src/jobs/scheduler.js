@@ -207,7 +207,7 @@ const NOTIFICATION_OFFSETS = {
  */
 async function runTaskNotificationCheck() {
   try {
-    const { supabase } = require('../db/client');
+    const { supabaseAdmin: supabase } = require('../db/client');
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('*, households!inner(timezone)')
@@ -368,7 +368,7 @@ Only return valid JSON array, nothing else.`;
         }
 
         // Delete all existing ical_import dates for this school, then insert fresh
-        const { supabase } = require('../db/client');
+        const { supabaseAdmin: supabase } = require('../db/client');
         const { error: deleteErr } = await supabase
           .from('school_term_dates')
           .delete()

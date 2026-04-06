@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
 const db = require('../db/queries');
-const { supabase } = require('../db/client');
+const { getUserClient } = require('../db/client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const email = require('../services/email');
 const cache = require('../services/cache');
@@ -229,7 +229,8 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
     const storagePath = `${req.householdId}/${req.user.id}${ext}`;
 
     // Upload to Supabase Storage (upsert overwrites previous avatar)
-    const { error: uploadError } = await supabase.storage
+    const userDb = getUserClient(req.token);
+    const { error: uploadError } = await userDb.storage
       .from('avatars')
       .upload(storagePath, req.file.buffer, {
         contentType: req.file.mimetype,
@@ -242,7 +243,7 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = userDb.storage
       .from('avatars')
       .getPublicUrl(storagePath);
 
@@ -267,11 +268,12 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
   try {
     // Try to remove files from storage (best effort — may not exist or may have different ext)
     const prefix = `${req.householdId}/${req.user.id}`;
-    const { data: files } = await supabase.storage.from('avatars').list(req.householdId, {
+    const userDb = getUserClient(req.token);
+    const { data: files } = await userDb.storage.from('avatars').list(req.householdId, {
       prefix: req.user.id,
     });
     if (files?.length) {
-      await supabase.storage.from('avatars').remove(files.map(f => `${req.householdId}/${f.name}`));
+      await userDb.storage.from('avatars').remove(files.map(f => `${req.householdId}/${f.name}`));
     }
 
     // Clear in DB

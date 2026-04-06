@@ -21,6 +21,7 @@ function requireAuth(req, res, next) {
   }
 
   const token = header.slice(7);
+  req.token = token;
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = { id: payload.userId, name: payload.name, role: payload.role, isPlatformAdmin: payload.isPlatformAdmin || false };

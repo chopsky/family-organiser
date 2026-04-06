@@ -81,7 +81,7 @@ async function sendWeeklyDigest(householdId) {
   const { tasks: completedTasks, shoppingItems: completedShopping } = await db.getCompletedThisWeek(householdId);
 
   // Outstanding = all incomplete tasks (overdue + carrying over)
-  const { data: outstandingTasks } = await require('../db/client').supabase
+  const { data: outstandingTasks } = await require('../db/client').supabaseAdmin
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -128,7 +128,7 @@ async function sendWeeklyDigestEmail(householdId) {
 
   const { tasks: completedTasks, shoppingItems: completedShopping } = await db.getCompletedThisWeek(householdId);
 
-  const { data: outstandingTasks } = await require('../db/client').supabase
+  const { data: outstandingTasks } = await require('../db/client').supabaseAdmin
     .from('tasks')
     .select()
     .eq('household_id', householdId)

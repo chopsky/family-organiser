@@ -92,7 +92,7 @@ async function sendDailyReminders(householdId, singleMember) {
   const shoppingCount = shoppingItems.length;
 
   // All tasks due today or overdue, assigned to everyone (null)
-  const { data: everyoneTasks } = await require('../db/client').supabase
+  const { data: everyoneTasks } = await require('../db/client').supabaseAdmin
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -107,7 +107,7 @@ async function sendDailyReminders(householdId, singleMember) {
     if (!hasWhatsApp) continue;
 
     // Tasks assigned specifically to this member, due today or overdue
-    const { data: myTasks } = await require('../db/client').supabase
+    const { data: myTasks } = await require('../db/client').supabaseAdmin
       .from('tasks')
       .select()
       .eq('household_id', householdId)

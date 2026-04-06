@@ -281,12 +281,12 @@ router.post('/meals/to-shopping-list', requireAuth, requireHousehold, async (req
       // Fetch specific meals by IDs
       const allMeals = [];
       for (const mealId of meal_ids) {
-        const { supabase } = require('../db/client');
-        const { data } = await supabase
+        const { getUserClient } = require('../db/client');
+        const userDb = getUserClient(req.token);
+        const { data } = await userDb
           .from('meal_plan')
           .select('*, recipes(*)')
           .eq('id', mealId)
-          .eq('household_id', req.householdId)
           .single();
         if (data) allMeals.push(data);
       }

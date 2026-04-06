@@ -121,7 +121,7 @@ async function initialImportFromSubscription(connection, subscription) {
     console.log(`[initialImport] Fetched ${events.length} events from "${subscription.display_name}"`);
 
     // Load ALL existing sync mappings for this connection at once (single query, no URL overflow)
-    const { supabase } = require('../db/client');
+    const { supabaseAdmin: supabase } = require('../db/client');
     const { data: existingMappings } = await supabase
       .from('calendar_sync_mappings')
       .select('external_event_id')

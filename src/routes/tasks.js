@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
-const { supabase } = require('../db/client');
+const { getUserClient } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 
@@ -45,10 +45,10 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     }
 
     if (req.query.completed === 'true') {
-      const { data, error } = await supabase
+      const userDb = getUserClient(req.token);
+      const { data, error } = await userDb
         .from('tasks')
         .select()
-        .eq('household_id', req.householdId)
         .eq('completed', true)
         .order('completed_at', { ascending: false })
         .limit(50);
@@ -129,11 +129,11 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 
   try {
     // Fetch the task first (and verify household ownership)
-    const { data: task, error: fetchErr } = await supabase
+    const userDb = getUserClient(req.token);
+    const { data: task, error: fetchErr } = await userDb
       .from('tasks')
       .select()
       .eq('id', req.params.id)
-      .eq('household_id', req.householdId)
       .single();
 
     if (fetchErr || !task) return res.status(404).json({ error: 'Task not found' });
@@ -176,7 +176,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    const { data: updated, error: updateErr } = await supabase
+    const { data: updated, error: updateErr } = await userDb
       .from('tasks')
       .update(updateData)
       .eq('id', req.params.id)

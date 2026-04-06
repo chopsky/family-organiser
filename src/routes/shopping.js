@@ -117,7 +117,8 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const { supabase } = require('../db/client');
+    const { getUserClient } = require('../db/client');
+    const userDb = getUserClient(req.token);
     const updateData = {};
 
     if (typeof completed === 'boolean') {
@@ -135,11 +136,10 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await userDb
       .from('shopping_items')
       .update(updateData)
       .eq('id', req.params.id)
-      .eq('household_id', req.householdId)
       .select()
       .single();
 

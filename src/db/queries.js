@@ -1,4 +1,4 @@
-const { supabase } = require('./client');
+const { supabaseAdmin: supabase, getUserClient } = require('./client');
 const crypto = require('crypto');
 
 // ─── Households ───────────────────────────────────────────────────────────────
