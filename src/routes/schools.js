@@ -33,14 +33,13 @@ router.get('/search', async (req, res) => {
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const cacheKey = `schools:${req.householdId}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
     const [schools, members] = await Promise.all([
-      q.getHouseholdSchools(req.householdId),
-      q.getHouseholdMembers(req.householdId),
+      db.getHouseholdSchools(req.householdId),
+      db.getHouseholdMembers(req.householdId),
     ]);
 
     // Auto-cleanup orphaned schools (no children linked)
@@ -48,7 +47,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     for (const school of schools) {
       const children = members.filter(m => m.school_id === school.id);
       if (children.length === 0) {
-        q.deleteHouseholdSchool(school.id, req.householdId).catch(e =>
+        db.deleteHouseholdSchool(school.id, req.householdId).catch(e =>
           console.error('Auto-cleanup failed:', e.message)
         );
         continue;
@@ -60,8 +59,8 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const schoolIds = activeSchools.map(s => s.id);
     const childIds = activeSchools.flatMap(s => s._children.map(c => c.id));
     const [allTermDates, allActivities] = await Promise.all([
-      q.getTermDatesBySchoolIds(schoolIds),
-      q.getActivitiesByChildIds(childIds),
+      db.getTermDatesBySchoolIds(schoolIds),
+      db.getActivitiesByChildIds(childIds),
     ]);
 
     // Group by school/child
@@ -105,16 +104,15 @@ router.post('/', requireAuth, requireHousehold, requireAdmin, async (req, res) =
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Check if this school (by URN) is already linked to this household
     if (school_urn) {
-      const existing = await q.getHouseholdSchoolByUrn(req.householdId, school_urn);
+      const existing = await db.getHouseholdSchoolByUrn(req.householdId, school_urn);
       if (existing) {
         return res.json({ school: existing, existing: true });
       }
     }
 
-    const school = await q.createHouseholdSchool(req.householdId, {
+    const school = await db.createHouseholdSchool(req.householdId, {
       school_name: school_name.trim(),
       school_urn,
       school_type,
@@ -139,8 +137,7 @@ router.post('/', requireAuth, requireHousehold, requireAdmin, async (req, res) =
  */
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    await q.deleteHouseholdSchool(req.params.id, req.householdId);
+    await db.deleteHouseholdSchool(req.params.id, req.householdId);
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'School removed.' });
@@ -161,8 +158,7 @@ router.post('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const created = await q.addSchoolTermDates(req.params.schoolId, dates);
+    const created = await db.addSchoolTermDates(req.params.schoolId, dates);
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ term_dates: created });
@@ -178,8 +174,7 @@ router.post('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin
  */
 router.get('/:schoolId/term-dates', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const termDates = await q.getSchoolTermDates(req.params.schoolId);
+    const termDates = await db.getSchoolTermDates(req.params.schoolId);
     return res.json({ term_dates: termDates });
   } catch (err) {
     console.error('GET /api/schools/:id/term-dates error:', err);
@@ -193,8 +188,7 @@ router.get('/:schoolId/term-dates', requireAuth, requireHousehold, async (req, r
  */
 router.delete('/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    await q.deleteSchoolTermDate(req.params.dateId);
+    await db.deleteSchoolTermDate(req.params.dateId);
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'Term date removed.' });
@@ -220,8 +214,7 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const created = await q.addChildActivity({
+    const created = await db.addChildActivity({
       child_id,
       day_of_week,
       activity: activity.trim(),
@@ -243,8 +236,7 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
  */
 router.get('/activities/:childId', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const activities = await q.getChildActivities(req.params.childId);
+    const activities = await db.getChildActivities(req.params.childId);
     return res.json({ activities });
   } catch (err) {
     console.error('GET /api/schools/activities/:childId error:', err);
@@ -258,8 +250,7 @@ router.get('/activities/:childId', requireAuth, requireHousehold, async (req, re
  */
 router.delete('/activities/:activityId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    await q.deleteChildActivity(req.params.activityId);
+    await db.deleteChildActivity(req.params.activityId);
     cache.invalidate(`schools:${req.householdId}`);
     return res.json({ message: 'Activity removed.' });
   } catch (err) {
@@ -280,7 +271,6 @@ router.post('/:schoolId/import-ical', requireAuth, requireHousehold, requireAdmi
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Fetch and parse the iCal feed
     const events = await ical.async.fromURL(ical_url.trim());
     const eventList = Object.values(events)
@@ -352,15 +342,15 @@ Only return valid JSON array, nothing else.`;
     }
 
     // Clear all existing dates when switching to iCal (full replacement)
-    await q.deleteAllTermDatesBySchool(req.params.schoolId);
+    await db.deleteAllTermDatesBySchool(req.params.schoolId);
 
     if (termDates.length > 0) {
-      await q.addSchoolTermDates(req.params.schoolId, termDates);
+      await db.addSchoolTermDates(req.params.schoolId, termDates);
     }
 
     // Save iCal URL on the school and update metadata
-    await q.updateHouseholdSchool(req.params.schoolId, { ical_url: ical_url.trim() });
-    await q.updateHouseholdSchoolMeta(req.params.schoolId, {
+    await db.updateHouseholdSchool(req.params.schoolId, { ical_url: ical_url.trim() });
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: 'ical_import',
       term_dates_last_updated: new Date().toISOString(),
       ical_last_sync: new Date().toISOString(),
@@ -386,19 +376,18 @@ Only return valid JSON array, nothing else.`;
  */
 router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Get the school's LA
-    const schools = await q.getHouseholdSchools(req.householdId);
+    const schools = await db.getHouseholdSchools(req.householdId);
     const school = schools.find(s => s.id === req.params.schoolId);
     if (!school) return res.status(404).json({ error: 'School not found.' });
 
     // If local_authority is missing, try to look it up from GIAS directory
     if (!school.local_authority && school.school_urn) {
-      const giasResults = await q.searchSchoolByUrn(school.school_urn);
+      const giasResults = await db.searchSchoolByUrn(school.school_urn);
       if (giasResults?.local_authority) {
         school.local_authority = giasResults.local_authority;
         // Also update the household school record for next time
-        await q.updateHouseholdSchool(school.id, { local_authority: giasResults.local_authority });
+        await db.updateHouseholdSchool(school.id, { local_authority: giasResults.local_authority });
       }
     }
     if (!school.local_authority) return res.status(400).json({ error: 'No local authority associated with this school. Please check the school details.' });
@@ -407,7 +396,7 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
 
     // Check shared cache first — another family may have already imported this LA's dates
-    const cached = await q.getCachedLATermDates(school.local_authority, academicYear);
+    const cached = await db.getCachedLATermDates(school.local_authority, academicYear);
     let dates;
     let fromCache = false;
 
@@ -461,7 +450,7 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
       }
 
       // Cache the results for other families in the same LA
-      await q.cacheLATermDates(school.local_authority, academicYear, dates);
+      await db.cacheLATermDates(school.local_authority, academicYear, dates);
     }
 
     // Add academic year and source to each date
@@ -474,14 +463,14 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
     // If source changed (e.g. website_scrape → local_authority), clear ALL existing dates first
     // Otherwise just clear the matching academic year for a clean merge
     if (school.term_dates_source && school.term_dates_source !== 'local_authority') {
-      await q.deleteAllTermDatesBySchool(req.params.schoolId);
+      await db.deleteAllTermDatesBySchool(req.params.schoolId);
     } else {
-      await q.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, academicYear);
+      await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, academicYear);
     }
-    await q.addSchoolTermDates(req.params.schoolId, termDates);
+    await db.addSchoolTermDates(req.params.schoolId, termDates);
 
     // Update household_schools metadata
-    await q.updateHouseholdSchoolMeta(req.params.schoolId, {
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: 'local_authority',
       term_dates_last_updated: new Date().toISOString(),
     });
@@ -510,7 +499,6 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     const now = new Date();
     const currentAY = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
     const nextAY = `${parseInt(currentAY.split('-')[1])}-${parseInt(currentAY.split('-')[1]) + 1}`;
@@ -671,7 +659,7 @@ Do NOT wrap in markdown code fences.`,
 
     // If source changed, clear ALL existing dates first to avoid conflicts
     if (school.term_dates_source && school.term_dates_source !== 'website_scrape') {
-      await q.deleteAllTermDatesBySchool(req.params.schoolId);
+      await db.deleteAllTermDatesBySchool(req.params.schoolId);
     } else {
       // Same source — merge by academic year
       const datesByYear = {};
@@ -679,14 +667,14 @@ Do NOT wrap in markdown code fences.`,
         (datesByYear[td.academic_year] ??= []).push(td);
       }
       for (const ay of Object.keys(datesByYear)) {
-        await q.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, ay);
+        await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, ay);
       }
     }
 
-    await q.addSchoolTermDates(req.params.schoolId, termDates);
+    await db.addSchoolTermDates(req.params.schoolId, termDates);
 
     // Update household_schools metadata
-    await q.updateHouseholdSchoolMeta(req.params.schoolId, {
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: 'website_scrape',
       term_dates_last_updated: new Date().toISOString(),
     });
@@ -721,8 +709,7 @@ router.patch('/:schoolId/term-dates/:dateId', requireAuth, requireHousehold, req
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const updated = await q.updateSchoolTermDate(req.params.dateId, updates);
+    const updated = await db.updateSchoolTermDate(req.params.dateId, updates);
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ term_date: updated });
@@ -738,10 +725,8 @@ router.patch('/:schoolId/term-dates/:dateId', requireAuth, requireHousehold, req
  */
 router.post('/:schoolId/sync-ical', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    const userDb = getUserClient(req.token);
-    const q = db.withClient(userDb);
     // Get the school record and check it has an ical_url
-    const schools = await q.getHouseholdSchools(req.householdId);
+    const schools = await db.getHouseholdSchools(req.householdId);
     const school = schools.find(s => s.id === req.params.schoolId);
     if (!school) return res.status(404).json({ error: 'School not found.' });
     if (!school.ical_url) return res.status(400).json({ error: 'No iCal URL configured for this school.' });
@@ -759,7 +744,7 @@ router.post('/:schoolId/sync-ical', requireAuth, requireHousehold, requireAdmin,
       .filter(e => e.date);
 
     if (eventList.length === 0) {
-      await q.updateHouseholdSchoolMeta(req.params.schoolId, {
+      await db.updateHouseholdSchoolMeta(req.params.schoolId, {
         ical_last_sync: new Date().toISOString(),
         ical_last_sync_status: 'success_empty',
       });
@@ -826,6 +811,8 @@ Only return valid JSON array, nothing else.`;
     }
 
     // Delete ALL existing ical_import dates for this school, then insert fresh
+    const { getUserClient } = require('../db/client');
+    const userDb = getUserClient(req.token);
     const { error: deleteErr } = await userDb
       .from('school_term_dates')
       .delete()
@@ -834,11 +821,11 @@ Only return valid JSON array, nothing else.`;
     if (deleteErr) throw deleteErr;
 
     if (termDates.length > 0) {
-      await q.addSchoolTermDates(req.params.schoolId, termDates);
+      await db.addSchoolTermDates(req.params.schoolId, termDates);
     }
 
     // Update metadata
-    await q.updateHouseholdSchoolMeta(req.params.schoolId, {
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       ical_last_sync: new Date().toISOString(),
       ical_last_sync_status: 'success',
       term_dates_last_updated: new Date().toISOString(),
@@ -854,7 +841,7 @@ Only return valid JSON array, nothing else.`;
   } catch (err) {
     // Update metadata with failure status
     try {
-      await q.updateHouseholdSchoolMeta(req.params.schoolId, {
+      await db.updateHouseholdSchoolMeta(req.params.schoolId, {
         ical_last_sync: new Date().toISOString(),
         ical_last_sync_status: `error: ${err.message}`,
       });
@@ -881,8 +868,7 @@ router.patch('/:id', requireAuth, requireHousehold, requireAdmin, async (req, re
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const updated = await q.updateHouseholdSchool(req.params.id, updates);
+    const updated = await db.updateHouseholdSchool(req.params.id, updates);
     cache.invalidate(`schools:${req.householdId}`);
     return res.json({ school: updated });
   } catch (err) {

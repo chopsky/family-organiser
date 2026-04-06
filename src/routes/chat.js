@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const multer = require('multer');
 const db = require('../db/queries');
-const { getUserClient } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
@@ -172,11 +171,10 @@ function extractActions(content) {
 // List conversations
 router.get('/conversations', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const conversations = await q.getConversations(req.user.id);
+    const conversations = await db.getConversations(req.user.id);
     // Get last message preview for each conversation
     const withPreviews = await Promise.all(conversations.map(async (conv) => {
-      const msgs = await q.getChatHistory(conv.id, 1);
+      const msgs = await db.getChatHistory(conv.id, 1);
       return { ...conv, lastMessage: msgs[0]?.content?.substring(0, 80) || null };
     }));
     return res.json({ conversations: withPreviews });
@@ -189,9 +187,8 @@ router.get('/conversations', requireAuth, requireHousehold, async (req, res) => 
 // Create new conversation
 router.post('/conversations', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { title } = req.body;
-    const conversation = await q.createConversation(req.householdId, req.user.id, title);
+    const conversation = await db.createConversation(req.householdId, req.user.id, title);
     return res.status(201).json({ conversation });
   } catch (err) {
     console.error('POST /api/chat/conversations error:', err);
@@ -202,8 +199,7 @@ router.post('/conversations', requireAuth, requireHousehold, async (req, res) =>
 // Delete conversation
 router.delete('/conversations/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    await q.deleteConversation(req.params.id, req.user.id);
+    await db.deleteConversation(req.params.id, req.user.id);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/chat/conversations error:', err);
@@ -217,10 +213,9 @@ router.delete('/conversations/:id', requireAuth, requireHousehold, async (req, r
  */
 router.get('/history', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { conversation_id } = req.query;
     if (conversation_id) {
-      const messages = await q.getChatHistory(conversation_id, 50);
+      const messages = await db.getChatHistory(conversation_id, 50);
       return res.json({ messages });
     }
     return res.json({ messages: [] });
@@ -236,9 +231,8 @@ router.get('/history', requireAuth, requireHousehold, async (req, res) => {
  */
 router.delete('/history', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { conversation_id } = req.body;
-    await q.clearChatHistory(conversation_id);
+    await db.clearChatHistory(conversation_id);
     return res.json({ message: 'Chat history cleared.' });
   } catch (err) {
     console.error('DELETE /api/chat/history error:', err);
@@ -258,20 +252,19 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Resolve or create conversation
     let conversationId = conversation_id;
     if (!conversationId) {
-      const conv = await q.createConversation(req.householdId, req.user.id, message.substring(0, 50));
+      const conv = await db.createConversation(req.householdId, req.user.id, message.substring(0, 50));
       conversationId = conv.id;
     }
 
     // Build context-rich system prompt
-    const household = await q.getHouseholdById(req.householdId);
+    const household = await db.getHouseholdById(req.householdId);
     const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id);
 
     // Get recent conversation history for context
-    const history = await q.getChatHistory(conversationId, 30);
+    const history = await db.getChatHistory(conversationId, 30);
 
     // Build messages array
     const messages = [
@@ -293,7 +286,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     // Extract and process all actions
     let { cleanContent, actions } = extractActions(aiText);
-    const members = await q.getHouseholdMembers(req.householdId);
+    const members = await db.getHouseholdMembers(req.householdId);
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
     const executedActions = [];
@@ -301,11 +294,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     for (const act of actions) {
       try {
         if (act.action === 'save_note' && act.key && act.value) {
-          await q.upsertHouseholdNote(req.householdId, act.key, act.value, req.user.id);
+          await db.upsertHouseholdNote(req.householdId, act.key, act.value, req.user.id);
           executedActions.push({ type: 'save_note', key: act.key });
 
         } else if (act.action === 'delete_note' && act.key) {
-          await q.deleteHouseholdNote(req.householdId, act.key);
+          await db.deleteHouseholdNote(req.householdId, act.key);
           executedActions.push({ type: 'delete_note', key: act.key });
 
         } else if (act.action === 'create_event') {
@@ -317,7 +310,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             ? `${act.date}T23:59:59Z`
             : localToUTC(act.date, act.end_time || act.start_time || '10:00', userTz);
 
-          await q.createCalendarEvent(req.householdId, {
+          await db.createCalendarEvent(req.householdId, {
             title: act.title,
             start_time: startTime,
             end_time: endTime,
@@ -331,7 +324,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'create_event', title: act.title });
 
         } else if (act.action === 'add_shopping' && act.items?.length) {
-          await q.addShoppingItems(req.householdId, act.items, req.user.id);
+          await db.addShoppingItems(req.householdId, act.items, req.user.id);
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
@@ -353,7 +346,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           }
 
         } else if (act.action === 'create_task') {
-          await q.addTasks(req.householdId, [{
+          await db.addTasks(req.householdId, [{
             title: act.title,
             assigned_to_name: act.assigned_to || null,
             due_date: act.due_date || null,
@@ -377,9 +370,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     }
 
     // Save both messages to DB
-    await q.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);
-    await q.saveChatMessage(req.householdId, req.user.id, 'assistant', cleanContent, conversationId);
-    await q.touchConversation(conversationId);
+    await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);
+    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', cleanContent, conversationId);
+    await db.touchConversation(conversationId);
 
     return res.json({
       message: cleanContent,
@@ -402,21 +395,20 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Resolve or create conversation
     let conversationId = req.body.conversation_id;
     if (!conversationId) {
-      const conv = await q.createConversation(req.householdId, req.user.id, 'Image scan');
+      const conv = await db.createConversation(req.householdId, req.user.id, 'Image scan');
       conversationId = conv.id;
     }
 
-    const members = await q.getHouseholdMembers(req.householdId);
+    const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map(m => m.name);
     const aiCtx = { householdId: req.householdId, userId: req.user.id };
     const scan = await scanImage(req.file.buffer, req.file.mimetype, memberNames, aiCtx);
 
     const currentUser = members.find(m => m.id === req.user.id);
-    const household = await q.getHouseholdById(req.householdId);
+    const household = await db.getHouseholdById(req.householdId);
     const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
     const executedActions = [];
 
@@ -425,13 +417,13 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
       const extracted = await scanReceipt(req.file.buffer, req.file.mimetype, aiCtx);
 
       if (extracted.items?.length) {
-        const shoppingList = await q.getShoppingList(req.householdId);
+        const shoppingList = await db.getShoppingList(req.householdId);
         const matchResult = await matchReceiptToList(extracted.items, shoppingList, aiCtx);
 
         const checkedOff = [];
         for (const match of matchResult.matches || []) {
           if (match.confidence >= 0.7) {
-            await q.completeShoppingItemById(match.list_item_id);
+            await db.completeShoppingItemById(match.list_item_id);
             checkedOff.push(match.list_item_name);
           }
         }
@@ -449,17 +441,17 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
 
         executedActions.push({ type: 'receipt_scan', checked_off: checkedOff.length });
 
-        await q.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent a receipt image]', conversationId);
-        await q.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
-        await q.touchConversation(conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent a receipt image]', conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
+        await db.touchConversation(conversationId);
 
         return res.json({ message: msg, conversation_id: conversationId, actions: executedActions });
       }
 
       const noItemsMsg = "🧾 I couldn't find any items on that receipt. Try sending a clearer photo.";
-      await q.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]', conversationId);
-      await q.saveChatMessage(req.householdId, req.user.id, 'assistant', noItemsMsg, conversationId);
-      await q.touchConversation(conversationId);
+      await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]', conversationId);
+      await db.saveChatMessage(req.householdId, req.user.id, 'assistant', noItemsMsg, conversationId);
+      await db.touchConversation(conversationId);
       return res.json({ message: noItemsMsg, conversation_id: conversationId });
     }
 
@@ -479,7 +471,7 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
             ? `${ev.date}T23:59:59Z`
             : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
-          await q.createCalendarEvent(req.householdId, {
+          await db.createCalendarEvent(req.householdId, {
             title: ev.title,
             start_time: startTime,
             end_time: endTime,
@@ -503,9 +495,9 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
         if (scan.summary) msg += `\n${scan.summary}`;
         executedActions.push({ type: 'create_events', count: created.length });
 
-        await q.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]', conversationId);
-        await q.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
-        await q.touchConversation(conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]', conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
+        await db.touchConversation(conversationId);
 
         return res.json({ message: msg, conversation_id: conversationId, actions: executedActions });
       }
@@ -513,9 +505,9 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
 
     // ── Unknown ──
     const unknownMsg = `🤔 ${scan.summary || "I wasn't sure what to do with that image. Try sending a receipt or an event invitation."}`;
-    await q.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]', conversationId);
-    await q.saveChatMessage(req.householdId, req.user.id, 'assistant', unknownMsg, conversationId);
-    await q.touchConversation(conversationId);
+    await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image]', conversationId);
+    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', unknownMsg, conversationId);
+    await db.touchConversation(conversationId);
     return res.json({ message: unknownMsg, conversation_id: conversationId });
 
   } catch (err) {

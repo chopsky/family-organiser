@@ -2619,28 +2619,7 @@ async function getEventAssigneesBatch(eventIds, db = supabase) {
   return data || [];
 }
 
-/**
- * Returns a copy of every exported function with `db` pre-bound to the given client.
- * Usage in route handlers:
- *   const q = db.withClient(getUserClient(req.token));
- *   const tasks = await q.getTasks(householdId);
- *
- * This avoids having to thread `userDb` as the last argument through every call.
- */
-function withClient(client) {
-  const bound = {};
-  for (const [key, value] of Object.entries(module.exports)) {
-    if (typeof value === 'function' && key !== 'withClient' && key !== 'getSupabase') {
-      bound[key] = (...args) => value(...args, client);
-    } else {
-      bound[key] = value;
-    }
-  }
-  return bound;
-}
-
 module.exports = {
-  withClient,
   getAllHouseholds,
   getTasksDueNextWeek,
   createHousehold,

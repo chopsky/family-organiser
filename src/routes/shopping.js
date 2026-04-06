@@ -14,8 +14,7 @@ const VALID_CATEGORIES = ['groceries', 'clothing', 'household', 'school', 'pets'
  */
 router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const items = await q.getRecentlyCompletedShopping(req.householdId);
+    const items = await db.getRecentlyCompletedShopping(req.householdId);
     return res.json({ items });
   } catch (err) {
     console.error('GET /api/shopping/recent error:', err);
@@ -29,17 +28,16 @@ router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const includeCompleted = req.query.completed === 'true';
     let listId = req.query.list_id;
 
     // If no list_id provided, use the Default list
     if (!listId) {
-      const defaultList = await q.getDefaultShoppingList(req.householdId);
+      const defaultList = await db.getDefaultShoppingList(req.householdId);
       listId = defaultList.id;
     }
 
-    let items = await q.getShoppingList(req.householdId, { includeCompleted, listId });
+    let items = await db.getShoppingList(req.householdId, { includeCompleted, listId });
 
     if (req.query.category) {
       items = items.filter((i) => i.category === req.query.category);
@@ -78,11 +76,10 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Resolve list_id: use provided value, or fall back to Default list
     let listId = req.body.list_id;
     if (!listId) {
-      const defaultList = await q.getDefaultShoppingList(req.householdId);
+      const defaultList = await db.getDefaultShoppingList(req.householdId);
       listId = defaultList.id;
     }
 
@@ -93,7 +90,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       aisle_category: i.aisle_category || detectAisle(i.item || i),
     }));
 
-    const saved = await q.addShoppingItems(req.householdId, enrichedItems, req.user.id);
+    const saved = await db.addShoppingItems(req.householdId, enrichedItems, req.user.id);
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ items: saved });
@@ -120,8 +117,8 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
+    const { getUserClient } = require('../db/client');
     const userDb = getUserClient(req.token);
-    const q = db.withClient(userDb);
     const updateData = {};
 
     if (typeof completed === 'boolean') {
@@ -165,8 +162,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
  */
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    await q.deleteShoppingItem(req.params.id, req.householdId);
+    await db.deleteShoppingItem(req.params.id, req.householdId);
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });

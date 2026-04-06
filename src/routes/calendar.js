@@ -242,7 +242,6 @@ router.use(requireAuth);
  */
 router.get('/events', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { month } = req.query;
     if (!month) {
       return res.status(400).json({ error: '"month" query parameter is required (e.g. "2026-03")' });
@@ -258,7 +257,7 @@ router.get('/events', async (req, res) => {
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const events = await q.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
+    const events = await db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
       userId: req.user.id,
       category: category || undefined,
     });
@@ -266,7 +265,7 @@ router.get('/events', async (req, res) => {
     // Attach assignees to events
     const eventIds = events.map((e) => e.id);
     const allAssignees = eventIds.length > 0
-      ? await q.getEventAssigneesBatch(eventIds)
+      ? await db.getEventAssigneesBatch(eventIds)
       : [];
     const assigneesByEvent = {};
     for (const a of allAssignees) {
@@ -292,7 +291,6 @@ router.get('/events', async (req, res) => {
  */
 router.get('/tasks', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { month } = req.query;
     if (!month) {
       return res.status(400).json({ error: '"month" query parameter is required (e.g. "2026-03")' });
@@ -307,7 +305,7 @@ router.get('/tasks', async (req, res) => {
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const tasks = await q.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate);
+    const tasks = await db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate);
     const result = { tasks };
     cache.set(cacheKey, result, 60);
     return res.json(result);
@@ -324,7 +322,6 @@ router.get('/tasks', async (req, res) => {
  */
 router.get('/month', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { month, category } = req.query;
     if (!month) {
       return res.status(400).json({ error: '"month" query parameter is required (e.g. "2026-03")' });
@@ -339,17 +336,17 @@ router.get('/month', async (req, res) => {
     if (cached) return res.json(cached);
 
     const [events, tasks] = await Promise.all([
-      q.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
+      db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
         userId: req.user.id,
         category: category || undefined,
       }),
-      q.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate),
+      db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate),
     ]);
 
     // Attach assignees to events
     const eventIds = events.map((e) => e.id);
     const allAssignees = eventIds.length > 0
-      ? await q.getEventAssigneesBatch(eventIds)
+      ? await db.getEventAssigneesBatch(eventIds)
       : [];
     const assigneesByEvent = {};
     for (const a of allAssignees) {
@@ -393,7 +390,6 @@ router.post('/events', async (req, res) => {
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     const eventData = { title: title.trim(), start_time, end_time };
     if (all_day !== undefined) eventData.all_day = all_day;
     if (description) eventData.description = description;
@@ -402,22 +398,22 @@ router.post('/events', async (req, res) => {
     if (recurrence) eventData.recurrence = recurrence;
 
     if (assigned_to_name) {
-      const user = await q.findUserByName(req.householdId, assigned_to_name);
+      const user = await db.findUserByName(req.householdId, assigned_to_name);
       if (user) {
         eventData.assigned_to = user.id;
         eventData.assigned_to_name = user.name;
       }
     }
 
-    const event = await q.createCalendarEvent(req.householdId, eventData, req.user.id);
+    const event = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
 
     // Save reminders and assignees (fire-and-forget errors to avoid blocking response)
     try {
       if (reminders && Array.isArray(reminders) && reminders.length > 0) {
-        await q.saveEventReminders(event.id, req.householdId, reminders, event.start_time);
+        await db.saveEventReminders(event.id, req.householdId, reminders, event.start_time);
       }
       if (assigned_to_names && Array.isArray(assigned_to_names) && assigned_to_names.length > 0) {
-        await q.saveEventAssignees(event.id, req.householdId, assigned_to_names);
+        await db.saveEventAssignees(event.id, req.householdId, assigned_to_names);
       }
     } catch (err) {
       console.error('Failed to save reminders/assignees:', err.message);
@@ -451,13 +447,12 @@ router.patch('/events/:id', async (req, res) => {
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
     const updates = { ...rest };
     if (color) updates.color = color;
     if (recurrence !== undefined) updates.recurrence = recurrence;
 
     if (assigned_to_name) {
-      const user = await q.findUserByName(req.householdId, assigned_to_name);
+      const user = await db.findUserByName(req.householdId, assigned_to_name);
       if (user) {
         updates.assigned_to = user.id;
         updates.assigned_to_name = user.name;
@@ -468,15 +463,15 @@ router.patch('/events/:id', async (req, res) => {
       updates.assigned_to_name = null;
     }
 
-    const event = await q.updateCalendarEvent(req.params.id, req.householdId, updates);
+    const event = await db.updateCalendarEvent(req.params.id, req.householdId, updates);
 
     // Re-save reminders and assignees on edit
     try {
       if (reminders !== undefined) {
-        await q.saveEventReminders(event.id, req.householdId, reminders || [], event.start_time);
+        await db.saveEventReminders(event.id, req.householdId, reminders || [], event.start_time);
       }
       if (assigned_to_names !== undefined) {
-        await q.saveEventAssignees(event.id, req.householdId, assigned_to_names || []);
+        await db.saveEventAssignees(event.id, req.householdId, assigned_to_names || []);
       }
     } catch (err) {
       console.error('Failed to update reminders/assignees:', err.message);
@@ -500,13 +495,12 @@ router.patch('/events/:id', async (req, res) => {
  */
 router.delete('/events/:id', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Push delete to connected external calendars before removing from DB
     calendarSync.pushEventToConnections(req.householdId, { id: req.params.id }, 'delete').catch(() => {});
 
     // Clean up assignees before soft-deleting
-    await q.saveEventAssignees(req.params.id, req.householdId, [], []).catch(() => {});
-    await q.deleteCalendarEvent(req.params.id, req.householdId);
+    await db.saveEventAssignees(req.params.id, req.householdId, [], []).catch(() => {});
+    await db.deleteCalendarEvent(req.params.id, req.householdId);
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
@@ -523,8 +517,7 @@ router.delete('/events/:id', async (req, res) => {
  */
 router.get('/deleted', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const events = await q.getDeletedCalendarEvents(req.householdId);
+    const events = await db.getDeletedCalendarEvents(req.householdId);
     return res.json({ events });
   } catch (err) {
     console.error('GET /api/calendar/deleted error:', err);
@@ -538,8 +531,7 @@ router.get('/deleted', async (req, res) => {
  */
 router.post('/:id/restore', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const event = await q.restoreCalendarEvent(req.params.id, req.householdId);
+    const event = await db.restoreCalendarEvent(req.params.id, req.householdId);
     return res.json({ event });
   } catch (err) {
     console.error('POST /api/calendar/:id/restore error:', err);
@@ -553,8 +545,7 @@ router.post('/:id/restore', async (req, res) => {
  */
 router.get('/feed-token', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const token = await q.getOrCreateFeedToken(req.user.id, req.householdId);
+    const token = await db.getOrCreateFeedToken(req.user.id, req.householdId);
     const baseUrl = process.env.API_URL || 'http://localhost:3000';
     const feedUrl = `${baseUrl}/api/calendar/feed/${token.token}.ics`;
     return res.json({ token: token.token, feedUrl });
@@ -570,8 +561,7 @@ router.get('/feed-token', async (req, res) => {
  */
 router.post('/feed-token', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const token = await q.regenerateFeedToken(req.user.id, req.householdId);
+    const token = await db.regenerateFeedToken(req.user.id, req.householdId);
     const baseUrl = process.env.API_URL || 'http://localhost:3000';
     const feedUrl = `${baseUrl}/api/calendar/feed/${token.token}.ics`;
     return res.json({ token: token.token, feedUrl });
@@ -591,8 +581,7 @@ router.post('/feed-token', async (req, res) => {
  */
 router.get('/connections', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const connections = await q.getCalendarConnections(req.user.id);
+    const connections = await db.getCalendarConnections(req.user.id);
     // Strip tokens from response
     const safe = connections.map(({ access_token, refresh_token, ...c }) => c);
     return res.json({ connections: safe });
@@ -641,26 +630,25 @@ router.post('/connect/apple', async (req, res) => {
     return res.status(400).json({ error: 'Email and app-specific password are required.' });
   }
   try {
-    const q = db.withClient(getUserClient(req.token));
     const result = await appleProvider.validateCredentials(email, appPassword);
     if (!result.valid) {
       return res.status(400).json({ error: result.error || 'Invalid credentials.' });
     }
 
-    await q.upsertCalendarConnection(req.user.id, req.householdId, 'apple', {
+    await db.upsertCalendarConnection(req.user.id, req.householdId, 'apple', {
       access_token: appPassword,
       caldav_username: email,
       sync_enabled: true,
     });
 
     // Auto-subscribe to all available VEVENT calendars and trigger initial import
-    const connection = await q.getConnectionByUserAndProvider(req.user.id, 'apple');
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, 'apple');
     if (connection) {
       try {
         const calendars = await appleProvider.listCalendars(connection);
         console.log(`[connect/apple] Found ${calendars.length} calendars:`, calendars.map(c => `"${c.displayName}" (${c.id})`).join(', '));
         for (const cal of calendars) {
-          const sub = await q.upsertSubscription(connection.id, {
+          const sub = await db.upsertSubscription(connection.id, {
             external_calendar_id: cal.id,
             display_name: cal.displayName,
             category: cal.suggestedCategory || 'general',
@@ -695,10 +683,8 @@ router.delete('/connections/:provider', async (req, res) => {
     return res.status(400).json({ error: 'Invalid provider.' });
   }
   try {
-    const userDb = getUserClient(req.token);
-    const q = db.withClient(userDb);
     // First get the connection so we can clean up events
-    const connection = await q.getConnectionByUserAndProvider(req.user.id, provider);
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
     if (!connection) {
       console.warn(`[disconnect] No connection found for user=${req.user.id} provider=${provider}`);
       return res.json({ success: true }); // Already disconnected
@@ -708,6 +694,8 @@ router.delete('/connections/:provider', async (req, res) => {
 
     // Bulk soft-delete all synced calendar events for this connection
     try {
+      const { getUserClient } = require('../db/client');
+      const userDb = getUserClient(req.token);
       const { data: eventIds } = await userDb
         .from('calendar_sync_mappings')
         .select('event_id')
@@ -729,7 +717,7 @@ router.delete('/connections/:provider', async (req, res) => {
     }
 
     // Delete the connection (cascades to subscriptions and sync_mappings)
-    await q.deleteCalendarConnection(req.user.id, provider);
+    await db.deleteCalendarConnection(req.user.id, provider);
 
     console.log(`[disconnect] Successfully disconnected ${provider} for user ${req.user.id}`);
     return res.json({ success: true });
@@ -753,8 +741,7 @@ router.get('/connections/:provider/calendars', async (req, res) => {
   if (!providerModule) return res.status(400).json({ error: 'Invalid provider.' });
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const connection = await q.getConnectionByUserAndProvider(req.user.id, provider);
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
     if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
 
     const calendars = await providerModule.listCalendars(connection);
@@ -776,12 +763,11 @@ router.get('/connections/:provider/debug-search', async (req, res) => {
   if (!query) return res.status(400).json({ error: 'q parameter required' });
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const connection = await q.getConnectionByUserAndProvider(req.user.id, provider);
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
     if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
 
     const providerModule = PROVIDERS[provider];
-    const subscriptions = await q.getSubscriptionsByConnection(connection.id);
+    const subscriptions = await db.getSubscriptionsByConnection(connection.id);
     const results = [];
 
     for (const sub of subscriptions) {
@@ -818,11 +804,10 @@ router.get('/connections/:provider/debug-search', async (req, res) => {
 router.get('/connections/:provider/subscriptions', async (req, res) => {
   const { provider } = req.params;
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const connection = await q.getConnectionByUserAndProvider(req.user.id, provider);
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
     if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
 
-    const subscriptions = await q.getSubscriptionsByConnection(connection.id);
+    const subscriptions = await db.getSubscriptionsByConnection(connection.id);
     return res.json({ subscriptions });
   } catch (err) {
     console.error(`GET /connections/${provider}/subscriptions error:`, err);
@@ -844,12 +829,11 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const connection = await q.getConnectionByUserAndProvider(req.user.id, provider);
+    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
     if (!connection) return res.status(404).json({ error: 'Provider not connected.' });
 
     // Get existing subscriptions for this connection
-    const existingSubs = await q.getSubscriptionsByConnection(connection.id);
+    const existingSubs = await db.getSubscriptionsByConnection(connection.id);
     const existingByCalId = {};
     for (const sub of existingSubs) {
       existingByCalId[sub.external_calendar_id] = sub;
@@ -862,7 +846,7 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
     let removed = 0;
     for (const sub of existingSubs) {
       if (!selectedCalIds.has(sub.external_calendar_id)) {
-        await q.deleteSubscription(sub.id);
+        await db.deleteSubscription(sub.id);
         removed++;
       }
     }
@@ -874,7 +858,7 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
       if (!cal.external_calendar_id || !cal.display_name) continue;
       const isNew = !existingByCalId[cal.external_calendar_id];
 
-      const sub = await q.upsertSubscription(connection.id, {
+      const sub = await db.upsertSubscription(connection.id, {
         external_calendar_id: cal.external_calendar_id,
         display_name: cal.display_name,
         category: cal.category || 'general',
@@ -904,9 +888,8 @@ router.post('/connections/:provider/subscriptions', async (req, res) => {
  */
 router.patch('/subscriptions/:id', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const { category, visibility, sync_enabled } = req.body;
-    const sub = await q.updateSubscription(req.params.id, { category, visibility, sync_enabled });
+    const sub = await db.updateSubscription(req.params.id, { category, visibility, sync_enabled });
     return res.json({ subscription: sub });
   } catch (err) {
     console.error('PATCH /subscriptions error:', err);
@@ -920,8 +903,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
  */
 router.delete('/subscriptions/:id', async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
-    await q.deleteSubscription(req.params.id);
+    await db.deleteSubscription(req.params.id);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /subscriptions error:', err);
@@ -936,8 +918,7 @@ router.post('/seed-holidays', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'No household' });
   }
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const household = await q.getHouseholdById(req.householdId);
+    const household = await db.getHouseholdById(req.householdId);
     const countryCode = publicHolidays.countryFromTimezone(household.timezone);
     if (!countryCode) {
       return res.status(400).json({ error: `Cannot determine country from timezone "${household.timezone}". Please update your household timezone in settings.` });

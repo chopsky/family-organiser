@@ -1,6 +1,5 @@
 const { Router } = require('express');
 const db = require('../db/queries');
-const { getUserClient } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 
@@ -12,12 +11,11 @@ const router = Router();
  */
 router.get('/shopping-lists', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     const cacheKey = `shopping-lists:${req.householdId}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const lists = await q.getShoppingLists(req.householdId);
+    const lists = await db.getShoppingLists(req.householdId);
     const result = { lists };
     cache.set(cacheKey, result, 300); // 5 min TTL
     return res.json(result);
@@ -40,8 +38,7 @@ router.post('/shopping-lists', requireAuth, requireHousehold, async (req, res) =
   }
 
   try {
-    const q = db.withClient(getUserClient(req.token));
-    const list = await q.createShoppingList(req.householdId, name.trim());
+    const list = await db.createShoppingList(req.householdId, name.trim());
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ list });
@@ -57,9 +54,8 @@ router.post('/shopping-lists', requireAuth, requireHousehold, async (req, res) =
  */
 router.delete('/shopping-lists/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const q = db.withClient(getUserClient(req.token));
     // Check if this is the Default list
-    const lists = await q.getShoppingLists(req.householdId);
+    const lists = await db.getShoppingLists(req.householdId);
     const target = lists.find((l) => l.id === req.params.id);
 
     if (!target) {
@@ -69,7 +65,7 @@ router.delete('/shopping-lists/:id', requireAuth, requireHousehold, async (req, 
       return res.status(400).json({ error: 'Cannot delete the Default list' });
     }
 
-    await q.deleteShoppingList(req.params.id, req.householdId);
+    await db.deleteShoppingList(req.params.id, req.householdId);
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
