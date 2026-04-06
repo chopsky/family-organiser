@@ -1,4 +1,4 @@
-const { supabaseAdmin: supabase, getUserClient } = require('./client');
+const { supabaseAdmin: supabase } = require('./client');
 const crypto = require('crypto');
 
 // ─── Households ───────────────────────────────────────────────────────────────
@@ -7,12 +7,12 @@ function generateJoinCode() {
   return crypto.randomBytes(3).toString('hex').toUpperCase(); // e.g. "A3F9B2"
 }
 
-async function createHousehold(name, timezone) {
+async function createHousehold(name, timezone, db = supabase) {
   const join_code = generateJoinCode();
   const inbound_email_token = crypto.randomBytes(6).toString('hex');
   const row = { name, join_code, inbound_email_token };
   if (timezone) row.timezone = timezone;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('households')
     .insert(row)
     .select()
@@ -21,8 +21,8 @@ async function createHousehold(name, timezone) {
   return data;
 }
 
-async function getHouseholdByCode(code) {
-  const { data, error } = await supabase
+async function getHouseholdByCode(code, db = supabase) {
+  const { data, error } = await db
     .from('households')
     .select()
     .eq('join_code', code.toUpperCase())
@@ -31,8 +31,8 @@ async function getHouseholdByCode(code) {
   return data || null;
 }
 
-async function getHouseholdById(id) {
-  const { data, error } = await supabase
+async function getHouseholdById(id, db = supabase) {
+  const { data, error } = await db
     .from('households')
     .select()
     .eq('id', id)
@@ -41,8 +41,8 @@ async function getHouseholdById(id) {
   return data;
 }
 
-async function updateHouseholdSettings(id, settings) {
-  const { data, error } = await supabase
+async function updateHouseholdSettings(id, settings, db = supabase) {
+  const { data, error } = await db
     .from('households')
     .update(settings)
     .eq('id', id)
@@ -54,8 +54,8 @@ async function updateHouseholdSettings(id, settings) {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-async function createUser({ householdId, name, role = 'member' }) {
-  const { data, error } = await supabase
+async function createUser({ householdId, name, role = 'member' }, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .insert({
       household_id: householdId,
@@ -68,8 +68,8 @@ async function createUser({ householdId, name, role = 'member' }) {
   return data;
 }
 
-async function getHouseholdMembers(householdId) {
-  const { data, error } = await supabase
+async function getHouseholdMembers(householdId, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .select()
     .eq('household_id', householdId)
@@ -78,8 +78,8 @@ async function getHouseholdMembers(householdId) {
   return data;
 }
 
-async function findUserByName(householdId, name) {
-  const { data, error } = await supabase
+async function findUserByName(householdId, name, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .select()
     .eq('household_id', householdId)
@@ -89,8 +89,8 @@ async function findUserByName(householdId, name) {
   return data || null;
 }
 
-async function getUserByEmail(email) {
-  const { data, error } = await supabase
+async function getUserByEmail(email, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .select()
     .ilike('email', email)
@@ -99,8 +99,8 @@ async function getUserByEmail(email) {
   return data || null;
 }
 
-async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member' }) {
-  const { data, error } = await supabase
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member' }, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .insert({
       email,
@@ -116,8 +116,8 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
   return data;
 }
 
-async function updateUser(userId, fields) {
-  const { data, error } = await supabase
+async function updateUser(userId, fields, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .update(fields)
     .eq('id', userId)
@@ -129,8 +129,8 @@ async function updateUser(userId, fields) {
 
 // ─── Token helpers (verification, reset) ─────────────────────────────────────
 
-async function createToken(table, { userId, token, expiresAt }) {
-  const { data, error } = await supabase
+async function createToken(table, { userId, token, expiresAt }, db = supabase) {
+  const { data, error } = await db
     .from(table)
     .insert({ user_id: userId, token, expires_at: expiresAt })
     .select()
@@ -139,8 +139,8 @@ async function createToken(table, { userId, token, expiresAt }) {
   return data;
 }
 
-async function getValidToken(table, token) {
-  const { data, error } = await supabase
+async function getValidToken(table, token, db = supabase) {
+  const { data, error } = await db
     .from(table)
     .select()
     .eq('token', token)
@@ -151,8 +151,8 @@ async function getValidToken(table, token) {
   return data || null;
 }
 
-async function markTokenUsed(table, tokenId) {
-  const { error } = await supabase
+async function markTokenUsed(table, tokenId, db = supabase) {
+  const { error } = await db
     .from(table)
     .update({ used: true })
     .eq('id', tokenId);
@@ -170,8 +170,8 @@ const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens'
 
 // ─── Household notes ─────────────────────────────────────────────────────────
 
-async function getHouseholdNotes(householdId) {
-  const { data, error } = await supabase
+async function getHouseholdNotes(householdId, db = supabase) {
+  const { data, error } = await db
     .from('household_notes')
     .select()
     .eq('household_id', householdId)
@@ -180,8 +180,8 @@ async function getHouseholdNotes(householdId) {
   return data || [];
 }
 
-async function upsertHouseholdNote(householdId, key, value, userId) {
-  const { data, error } = await supabase
+async function upsertHouseholdNote(householdId, key, value, userId, db = supabase) {
+  const { data, error } = await db
     .from('household_notes')
     .upsert(
       { household_id: householdId, key: key.toLowerCase().trim(), value, created_by: userId, updated_at: new Date().toISOString() },
@@ -193,8 +193,8 @@ async function upsertHouseholdNote(householdId, key, value, userId) {
   return data;
 }
 
-async function deleteHouseholdNote(householdId, key) {
-  const { error } = await supabase
+async function deleteHouseholdNote(householdId, key, db = supabase) {
+  const { error } = await db
     .from('household_notes')
     .delete()
     .eq('household_id', householdId)
@@ -204,8 +204,8 @@ async function deleteHouseholdNote(householdId, key) {
 
 // ─── Dependent helpers ───────────────────────────────────────────────────────
 
-async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, year_group }) {
-  const { data, error } = await supabase
+async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, year_group }, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .insert({
       household_id: householdId,
@@ -225,8 +225,8 @@ async function createDependent(householdId, { name, family_role, birthday, color
   return data;
 }
 
-async function deleteDependent(id, householdId) {
-  const { error } = await supabase
+async function deleteDependent(id, householdId, db = supabase) {
+  const { error } = await db
     .from('users')
     .delete()
     .eq('id', id)
@@ -237,8 +237,8 @@ async function deleteDependent(id, householdId) {
 
 // ─── Chat message helpers ────────────────────────────────────────────────────
 
-async function getChatHistory(conversationId, limit = 50) {
-  const { data, error } = await supabase
+async function getChatHistory(conversationId, limit = 50, db = supabase) {
+  const { data, error } = await db
     .from('chat_messages')
     .select()
     .eq('conversation_id', conversationId)
@@ -248,8 +248,8 @@ async function getChatHistory(conversationId, limit = 50) {
   return (data || []).reverse();
 }
 
-async function saveChatMessage(householdId, userId, role, content, conversationId) {
-  const { data, error } = await supabase
+async function saveChatMessage(householdId, userId, role, content, conversationId, db = supabase) {
+  const { data, error } = await db
     .from('chat_messages')
     .insert({ household_id: householdId, user_id: userId, role, content, conversation_id: conversationId })
     .select()
@@ -258,16 +258,16 @@ async function saveChatMessage(householdId, userId, role, content, conversationI
   return data;
 }
 
-async function clearChatHistory(conversationId) {
-  const { error } = await supabase
+async function clearChatHistory(conversationId, db = supabase) {
+  const { error } = await db
     .from('chat_messages')
     .delete()
     .eq('conversation_id', conversationId);
   if (error) throw error;
 }
 
-async function createConversation(householdId, userId, title) {
-  const { data, error } = await supabase
+async function createConversation(householdId, userId, title, db = supabase) {
+  const { data, error } = await db
     .from('chat_conversations')
     .insert({ household_id: householdId, user_id: userId, title: title || 'New conversation' })
     .select()
@@ -276,8 +276,8 @@ async function createConversation(householdId, userId, title) {
   return data;
 }
 
-async function getConversations(userId, limit = 30) {
-  const { data, error } = await supabase
+async function getConversations(userId, limit = 30, db = supabase) {
+  const { data, error } = await db
     .from('chat_conversations')
     .select('id, title, created_at, updated_at')
     .eq('user_id', userId)
@@ -287,8 +287,8 @@ async function getConversations(userId, limit = 30) {
   return data || [];
 }
 
-async function deleteConversation(conversationId, userId) {
-  const { error } = await supabase
+async function deleteConversation(conversationId, userId, db = supabase) {
+  const { error } = await db
     .from('chat_conversations')
     .delete()
     .eq('id', conversationId)
@@ -296,16 +296,16 @@ async function deleteConversation(conversationId, userId) {
   if (error) throw error;
 }
 
-async function updateConversationTitle(conversationId, title) {
-  const { error } = await supabase
+async function updateConversationTitle(conversationId, title, db = supabase) {
+  const { error } = await db
     .from('chat_conversations')
     .update({ title, updated_at: new Date().toISOString() })
     .eq('id', conversationId);
   if (error) throw error;
 }
 
-async function touchConversation(conversationId) {
-  const { error } = await supabase
+async function touchConversation(conversationId, db = supabase) {
+  const { error } = await db
     .from('chat_conversations')
     .update({ updated_at: new Date().toISOString() })
     .eq('id', conversationId);
@@ -314,8 +314,8 @@ async function touchConversation(conversationId) {
 
 // ─── School helpers ──────────────────────────────────────────────────────────
 
-async function searchSchools(query, postcode) {
-  let q = supabase
+async function searchSchools(query, postcode, db = supabase) {
+  let q = db
     .from('schools_directory')
     .select('urn, name, type, phase, local_authority, address, postcode')
     .ilike('name', `%${query}%`)
@@ -331,8 +331,8 @@ async function searchSchools(query, postcode) {
   return data || [];
 }
 
-async function searchSchoolByUrn(urn) {
-  const { data, error } = await supabase
+async function searchSchoolByUrn(urn, db = supabase) {
+  const { data, error } = await db
     .from('schools_directory')
     .select('urn, name, type, phase, local_authority, address, postcode')
     .eq('urn', urn)
@@ -341,8 +341,8 @@ async function searchSchoolByUrn(urn) {
   return data;
 }
 
-async function createHouseholdSchool(householdId, data) {
-  const { data: school, error } = await supabase
+async function createHouseholdSchool(householdId, data, db = supabase) {
+  const { data: school, error } = await db
     .from('household_schools')
     .insert({
       household_id: householdId,
@@ -360,8 +360,8 @@ async function createHouseholdSchool(householdId, data) {
   return school;
 }
 
-async function getHouseholdSchools(householdId) {
-  const { data, error } = await supabase
+async function getHouseholdSchools(householdId, db = supabase) {
+  const { data, error } = await db
     .from('household_schools')
     .select('*')
     .eq('household_id', householdId)
@@ -370,8 +370,8 @@ async function getHouseholdSchools(householdId) {
   return data || [];
 }
 
-async function getHouseholdSchoolByUrn(householdId, urn) {
-  const { data, error } = await supabase
+async function getHouseholdSchoolByUrn(householdId, urn, db = supabase) {
+  const { data, error } = await db
     .from('household_schools')
     .select('*')
     .eq('household_id', householdId)
@@ -381,8 +381,8 @@ async function getHouseholdSchoolByUrn(householdId, urn) {
   return data;
 }
 
-async function deleteHouseholdSchool(schoolId, householdId) {
-  const { error } = await supabase
+async function deleteHouseholdSchool(schoolId, householdId, db = supabase) {
+  const { error } = await db
     .from('household_schools')
     .delete()
     .eq('id', schoolId)
@@ -390,8 +390,8 @@ async function deleteHouseholdSchool(schoolId, householdId) {
   if (error) throw error;
 }
 
-async function updateHouseholdSchool(schoolId, updates) {
-  const { data, error } = await supabase
+async function updateHouseholdSchool(schoolId, updates, db = supabase) {
+  const { data, error } = await db
     .from('household_schools')
     .update(updates)
     .eq('id', schoolId)
@@ -401,8 +401,8 @@ async function updateHouseholdSchool(schoolId, updates) {
   return data;
 }
 
-async function getCachedLATermDates(localAuthority, academicYear) {
-  const { data, error } = await supabase
+async function getCachedLATermDates(localAuthority, academicYear, db = supabase) {
+  const { data, error } = await db
     .from('la_term_dates_cache')
     .select('dates')
     .eq('local_authority', localAuthority.toLowerCase().trim())
@@ -412,8 +412,8 @@ async function getCachedLATermDates(localAuthority, academicYear) {
   return data?.dates || null;
 }
 
-async function cacheLATermDates(localAuthority, academicYear, dates) {
-  const { error } = await supabase
+async function cacheLATermDates(localAuthority, academicYear, dates, db = supabase) {
+  const { error } = await db
     .from('la_term_dates_cache')
     .upsert({
       local_authority: localAuthority.toLowerCase().trim(),
@@ -423,7 +423,7 @@ async function cacheLATermDates(localAuthority, academicYear, dates) {
   if (error) console.error('Failed to cache LA term dates:', error.message);
 }
 
-async function addSchoolTermDates(schoolId, dates) {
+async function addSchoolTermDates(schoolId, dates, db = supabase) {
   const rows = dates.map(d => ({
     school_id: schoolId,
     academic_year: d.academic_year,
@@ -434,7 +434,7 @@ async function addSchoolTermDates(schoolId, dates) {
     applies_to_year_groups: d.applies_to_year_groups || null,
     source: d.source || 'manual',
   }));
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('school_term_dates')
     .insert(rows)
     .select();
@@ -442,8 +442,8 @@ async function addSchoolTermDates(schoolId, dates) {
   return data;
 }
 
-async function getSchoolTermDates(schoolId) {
-  const { data, error } = await supabase
+async function getSchoolTermDates(schoolId, db = supabase) {
+  const { data, error } = await db
     .from('school_term_dates')
     .select('*')
     .eq('school_id', schoolId)
@@ -452,9 +452,9 @@ async function getSchoolTermDates(schoolId) {
   return data || [];
 }
 
-async function getTermDatesBySchoolIds(schoolIds) {
+async function getTermDatesBySchoolIds(schoolIds, db = supabase) {
   if (!schoolIds.length) return [];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('school_term_dates')
     .select('*')
     .in('school_id', schoolIds)
@@ -463,9 +463,9 @@ async function getTermDatesBySchoolIds(schoolIds) {
   return data || [];
 }
 
-async function getActivitiesByChildIds(childIds) {
+async function getActivitiesByChildIds(childIds, db = supabase) {
   if (!childIds.length) return [];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('child_weekly_schedule')
     .select('*')
     .in('child_id', childIds)
@@ -474,21 +474,21 @@ async function getActivitiesByChildIds(childIds) {
   return data || [];
 }
 
-async function deleteSchoolTermDate(dateId) {
-  const { error } = await supabase
+async function deleteSchoolTermDate(dateId, db = supabase) {
+  const { error } = await db
     .from('school_term_dates')
     .delete()
     .eq('id', dateId);
   if (error) throw error;
 }
 
-async function updateSchoolTermDate(dateId, updates) {
+async function updateSchoolTermDate(dateId, updates, db = supabase) {
   const allowed = {};
   if (updates.date !== undefined) allowed.date = updates.date;
   if (updates.end_date !== undefined) allowed.end_date = updates.end_date;
   if (updates.label !== undefined) allowed.label = updates.label;
   if (updates.event_type !== undefined) allowed.event_type = updates.event_type;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('school_term_dates')
     .update(allowed)
     .eq('id', dateId)
@@ -498,13 +498,13 @@ async function updateSchoolTermDate(dateId, updates) {
   return data;
 }
 
-async function updateHouseholdSchoolMeta(schoolId, meta) {
+async function updateHouseholdSchoolMeta(schoolId, meta, db = supabase) {
   const allowed = {};
   if (meta.term_dates_source !== undefined) allowed.term_dates_source = meta.term_dates_source;
   if (meta.term_dates_last_updated !== undefined) allowed.term_dates_last_updated = meta.term_dates_last_updated;
   if (meta.ical_last_sync !== undefined) allowed.ical_last_sync = meta.ical_last_sync;
   if (meta.ical_last_sync_status !== undefined) allowed.ical_last_sync_status = meta.ical_last_sync_status;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('household_schools')
     .update(allowed)
     .eq('id', schoolId)
@@ -514,8 +514,8 @@ async function updateHouseholdSchoolMeta(schoolId, meta) {
   return data;
 }
 
-async function deleteTermDatesBySchoolAndAcademicYear(schoolId, academicYear) {
-  const { error } = await supabase
+async function deleteTermDatesBySchoolAndAcademicYear(schoolId, academicYear, db = supabase) {
+  const { error } = await db
     .from('school_term_dates')
     .delete()
     .eq('school_id', schoolId)
@@ -523,16 +523,16 @@ async function deleteTermDatesBySchoolAndAcademicYear(schoolId, academicYear) {
   if (error) throw error;
 }
 
-async function deleteAllTermDatesBySchool(schoolId) {
-  const { error } = await supabase
+async function deleteAllTermDatesBySchool(schoolId, db = supabase) {
+  const { error } = await db
     .from('school_term_dates')
     .delete()
     .eq('school_id', schoolId);
   if (error) throw error;
 }
 
-async function getSchoolsWithIcalUrls() {
-  const { data, error } = await supabase
+async function getSchoolsWithIcalUrls(db = supabase) {
+  const { data, error } = await db
     .from('household_schools')
     .select('*')
     .not('ical_url', 'is', null)
@@ -541,8 +541,8 @@ async function getSchoolsWithIcalUrls() {
   return data || [];
 }
 
-async function addChildActivity(data) {
-  const { data: activity, error } = await supabase
+async function addChildActivity(data, db = supabase) {
+  const { data: activity, error } = await db
     .from('child_weekly_schedule')
     .insert({
       child_id: data.child_id,
@@ -560,8 +560,8 @@ async function addChildActivity(data) {
   return activity;
 }
 
-async function getChildActivities(childId) {
-  const { data, error } = await supabase
+async function getChildActivities(childId, db = supabase) {
+  const { data, error } = await db
     .from('child_weekly_schedule')
     .select('*')
     .eq('child_id', childId)
@@ -570,16 +570,16 @@ async function getChildActivities(childId) {
   return data || [];
 }
 
-async function deleteChildActivity(activityId) {
-  const { error } = await supabase
+async function deleteChildActivity(activityId, db = supabase) {
+  const { error } = await db
     .from('child_weekly_schedule')
     .delete()
     .eq('id', activityId);
   if (error) throw error;
 }
 
-async function addChildSchoolEvent(data) {
-  const { data: event, error } = await supabase
+async function addChildSchoolEvent(data, db = supabase) {
+  const { data: event, error } = await db
     .from('child_school_events')
     .insert({
       child_id: data.child_id,
@@ -595,8 +595,8 @@ async function addChildSchoolEvent(data) {
   return event;
 }
 
-async function getChildSchoolEvents(childId) {
-  const { data, error } = await supabase
+async function getChildSchoolEvents(childId, db = supabase) {
+  const { data, error } = await db
     .from('child_school_events')
     .select('*')
     .eq('child_id', childId)
@@ -607,12 +607,12 @@ async function getChildSchoolEvents(childId) {
 
 // ─── WhatsApp helpers ────────────────────────────────────────────────────────
 
-async function getUserByWhatsAppPhone(phone) {
+async function getUserByWhatsAppPhone(phone, db = supabase) {
   // Normalise: strip whatsapp: prefix and ensure + prefix
   const clean = phone.replace(/^whatsapp:/, '').trim();
   const normalised = clean.startsWith('+') ? clean : `+${clean}`;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('users')
     .select()
     .eq('whatsapp_phone', normalised)
@@ -622,8 +622,8 @@ async function getUserByWhatsAppPhone(phone) {
   return data || null;
 }
 
-async function createWhatsAppVerificationCode(userId, phone, code, expiresAt) {
-  const { data, error } = await supabase
+async function createWhatsAppVerificationCode(userId, phone, code, expiresAt, db = supabase) {
+  const { data, error } = await db
     .from('whatsapp_verification_codes')
     .insert({ user_id: userId, phone, code, expires_at: expiresAt })
     .select()
@@ -632,8 +632,8 @@ async function createWhatsAppVerificationCode(userId, phone, code, expiresAt) {
   return data;
 }
 
-async function getWhatsAppVerificationCode(userId, code) {
-  const { data, error } = await supabase
+async function getWhatsAppVerificationCode(userId, code, db = supabase) {
+  const { data, error } = await db
     .from('whatsapp_verification_codes')
     .select()
     .eq('user_id', userId)
@@ -647,8 +647,8 @@ async function getWhatsAppVerificationCode(userId, code) {
   return data || null;
 }
 
-async function markWhatsAppVerificationCodeUsed(id) {
-  const { error } = await supabase
+async function markWhatsAppVerificationCodeUsed(id, db = supabase) {
+  const { error } = await db
     .from('whatsapp_verification_codes')
     .update({ used: true })
     .eq('id', id);
@@ -657,13 +657,13 @@ async function markWhatsAppVerificationCodeUsed(id) {
 
 // ─── Invites ────────────────────────────────────────────────────────────────
 
-async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme }) {
+async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme }, db = supabase) {
   const row = { household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt };
   if (name) row.name = name;
   if (family_role) row.family_role = family_role;
   if (birthday) row.birthday = birthday;
   if (color_theme) row.color_theme = color_theme;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('invites')
     .insert(row)
     .select()
@@ -672,8 +672,8 @@ async function createInvite({ householdId, email, token, invitedBy, expiresAt, n
   return data;
 }
 
-async function getInviteByToken(token) {
-  const { data, error } = await supabase
+async function getInviteByToken(token, db = supabase) {
+  const { data, error } = await db
     .from('invites')
     .select()
     .eq('token', token)
@@ -684,16 +684,16 @@ async function getInviteByToken(token) {
   return data || null;
 }
 
-async function markInviteAccepted(inviteId) {
-  const { error } = await supabase
+async function markInviteAccepted(inviteId, db = supabase) {
+  const { error } = await db
     .from('invites')
     .update({ accepted_at: new Date().toISOString() })
     .eq('id', inviteId);
   if (error) throw error;
 }
 
-async function deleteInvite(inviteId, householdId) {
-  const { error } = await supabase
+async function deleteInvite(inviteId, householdId, db = supabase) {
+  const { error } = await db
     .from('invites')
     .delete()
     .eq('id', inviteId)
@@ -701,8 +701,8 @@ async function deleteInvite(inviteId, householdId) {
   if (error) throw error;
 }
 
-async function getPendingInvites(householdId) {
-  const { data, error } = await supabase
+async function getPendingInvites(householdId, db = supabase) {
+  const { data, error } = await db
     .from('invites')
     .select()
     .eq('household_id', householdId)
@@ -713,8 +713,8 @@ async function getPendingInvites(householdId) {
   return data;
 }
 
-async function deleteUser(userId, householdId) {
-  const { error } = await supabase
+async function deleteUser(userId, householdId, db = supabase) {
+  const { error } = await db
     .from('users')
     .delete()
     .eq('id', userId)
@@ -724,7 +724,7 @@ async function deleteUser(userId, householdId) {
 
 // ─── Shopping Items ───────────────────────────────────────────────────────────
 
-async function addShoppingItems(householdId, items, addedByUserId) {
+async function addShoppingItems(householdId, items, addedByUserId, db = supabase) {
   if (!items.length) return [];
   const rows = items.map((i) => ({
     household_id: householdId,
@@ -735,13 +735,13 @@ async function addShoppingItems(householdId, items, addedByUserId) {
     list_id: i.list_id || null,
     aisle_category: i.aisle_category || 'Other',
   }));
-  const { data, error } = await supabase.from('shopping_items').insert(rows).select();
+  const { data, error } = await db.from('shopping_items').insert(rows).select();
   if (error) throw error;
   return data;
 }
 
-async function getShoppingList(householdId, { includeCompleted = false, listId } = {}) {
-  let query = supabase
+async function getShoppingList(householdId, { includeCompleted = false, listId } = {}, db = supabase) {
+  let query = db
     .from('shopping_items')
     .select()
     .eq('household_id', householdId)
@@ -753,10 +753,10 @@ async function getShoppingList(householdId, { includeCompleted = false, listId }
   return data;
 }
 
-async function completeShoppingItemsByName(householdId, itemNames) {
+async function completeShoppingItemsByName(householdId, itemNames, db = supabase) {
   // Find items matching the names (case-insensitive, incomplete only)
   const lowerNames = itemNames.map((n) => n.toLowerCase());
-  const { data: items, error: fetchErr } = await supabase
+  const { data: items, error: fetchErr } = await db
     .from('shopping_items')
     .select()
     .eq('household_id', householdId)
@@ -767,7 +767,7 @@ async function completeShoppingItemsByName(householdId, itemNames) {
   if (!matched.length) return [];
 
   const ids = matched.map((i) => i.id);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('shopping_items')
     .update({ completed: true, completed_at: new Date().toISOString() })
     .in('id', ids)
@@ -776,8 +776,8 @@ async function completeShoppingItemsByName(householdId, itemNames) {
   return data;
 }
 
-async function completeShoppingItemById(id) {
-  const { data, error } = await supabase
+async function completeShoppingItemById(id, db = supabase) {
+  const { data, error } = await db
     .from('shopping_items')
     .update({ completed: true, completed_at: new Date().toISOString() })
     .eq('id', id)
@@ -789,7 +789,7 @@ async function completeShoppingItemById(id) {
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
-async function addTasks(householdId, tasks, addedByUserId, members = []) {
+async function addTasks(householdId, tasks, addedByUserId, members = [], db = supabase) {
   if (!tasks.length) return [];
 
   const rows = await Promise.all(tasks.map(async (t) => {
@@ -813,13 +813,13 @@ async function addTasks(householdId, tasks, addedByUserId, members = []) {
     };
   }));
 
-  const { data, error } = await supabase.from('tasks').insert(rows).select();
+  const { data, error } = await db.from('tasks').insert(rows).select();
   if (error) throw error;
   return data;
 }
 
-async function getTasks(householdId, { assignedToId = null, includeCompleted = false, all = false } = {}) {
-  let query = supabase
+async function getTasks(householdId, { assignedToId = null, includeCompleted = false, all = false } = {}, db = supabase) {
+  let query = db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -839,8 +839,8 @@ async function getTasks(householdId, { assignedToId = null, includeCompleted = f
   return data;
 }
 
-async function getAllIncompleteTasks(householdId) {
-  const { data, error } = await supabase
+async function getAllIncompleteTasks(householdId, db = supabase) {
+  const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -851,8 +851,8 @@ async function getAllIncompleteTasks(householdId) {
   return data;
 }
 
-async function completeTask(taskId) {
-  const { data, error } = await supabase
+async function completeTask(taskId, db = supabase) {
+  const { data, error } = await db
     .from('tasks')
     .update({ completed: true, completed_at: new Date().toISOString() })
     .eq('id', taskId)
@@ -862,9 +862,9 @@ async function completeTask(taskId) {
   return data;
 }
 
-async function completeTasksByName(householdId, taskTitles, assigneeName = null) {
+async function completeTasksByName(householdId, taskTitles, assigneeName = null, db = supabase) {
   const lowerTitles = taskTitles.map((t) => t.toLowerCase());
-  let query = supabase
+  let query = db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -880,11 +880,11 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null)
   );
   if (!matched.length) return [];
 
-  const completed = await Promise.all(matched.map((t) => completeTask(t.id)));
+  const completed = await Promise.all(matched.map((t) => completeTask(t.id, db)));
   return completed;
 }
 
-async function generateNextRecurrence(task) {
+async function generateNextRecurrence(task, db = supabase) {
   const due = new Date(task.due_date);
   switch (task.recurrence) {
     case 'daily':     due.setDate(due.getDate() + 1); break;
@@ -895,7 +895,7 @@ async function generateNextRecurrence(task) {
     default: return null;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('tasks')
     .insert({
       household_id: task.household_id,
@@ -915,20 +915,20 @@ async function generateNextRecurrence(task) {
 
 // ─── Scheduler helpers ────────────────────────────────────────────────────────
 
-async function getAllHouseholds() {
-  const { data, error } = await supabase.from('households').select();
+async function getAllHouseholds(db = supabase) {
+  const { data, error } = await db.from('households').select();
   if (error) throw error;
   return data;
 }
 
-async function getTasksDueNextWeek(householdId) {
+async function getTasksDueNextWeek(householdId, db = supabase) {
   const today = new Date();
   const from = new Date(today);
   from.setDate(from.getDate() + 1);
   const to = new Date(today);
   to.setDate(to.getDate() + 7);
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -942,22 +942,22 @@ async function getTasksDueNextWeek(householdId) {
 
 // ─── Digest helpers ───────────────────────────────────────────────────────────
 
-async function getCompletedThisWeek(householdId) {
+async function getCompletedThisWeek(householdId, db = supabase) {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
   const [{ data: tasks }, { data: items }] = await Promise.all([
-    supabase.from('tasks').select().eq('household_id', householdId).eq('completed', true).gte('completed_at', weekAgo.toISOString()),
-    supabase.from('shopping_items').select().eq('household_id', householdId).eq('completed', true).gte('completed_at', weekAgo.toISOString()),
+    db.from('tasks').select().eq('household_id', householdId).eq('completed', true).gte('completed_at', weekAgo.toISOString()),
+    db.from('shopping_items').select().eq('household_id', householdId).eq('completed', true).gte('completed_at', weekAgo.toISOString()),
   ]);
 
   return { tasks: tasks || [], shoppingItems: items || [] };
 }
 
-async function getRecentlyCompletedTasks(householdId, hours = 24) {
+async function getRecentlyCompletedTasks(householdId, hours = 24, db = supabase) {
   const since = new Date();
   since.setHours(since.getHours() - hours);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -968,10 +968,10 @@ async function getRecentlyCompletedTasks(householdId, hours = 24) {
   return data;
 }
 
-async function getRecentlyCompletedShopping(householdId, hours = 24) {
+async function getRecentlyCompletedShopping(householdId, hours = 24, db = supabase) {
   const since = new Date();
   since.setHours(since.getHours() - hours);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('shopping_items')
     .select()
     .eq('household_id', householdId)
@@ -982,8 +982,8 @@ async function getRecentlyCompletedShopping(householdId, hours = 24) {
   return data;
 }
 
-async function uncompleteTask(taskId, householdId) {
-  const { data, error } = await supabase
+async function uncompleteTask(taskId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('tasks')
     .update({ completed: false, completed_at: null })
     .eq('id', taskId)
@@ -994,8 +994,8 @@ async function uncompleteTask(taskId, householdId) {
   return data;
 }
 
-async function uncompleteShoppingItem(itemId, householdId) {
-  const { data, error } = await supabase
+async function uncompleteShoppingItem(itemId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('shopping_items')
     .update({ completed: false, completed_at: null })
     .eq('id', itemId)
@@ -1006,8 +1006,8 @@ async function uncompleteShoppingItem(itemId, householdId) {
   return data;
 }
 
-async function deleteTask(taskId, householdId) {
-  const { error } = await supabase
+async function deleteTask(taskId, householdId, db = supabase) {
+  const { error } = await db
     .from('tasks')
     .delete()
     .eq('id', taskId)
@@ -1015,8 +1015,8 @@ async function deleteTask(taskId, householdId) {
   if (error) throw error;
 }
 
-async function deleteShoppingItem(itemId, householdId) {
-  const { error } = await supabase
+async function deleteShoppingItem(itemId, householdId, db = supabase) {
+  const { error } = await db
     .from('shopping_items')
     .delete()
     .eq('id', itemId)
@@ -1026,8 +1026,8 @@ async function deleteShoppingItem(itemId, householdId) {
 
 // ─── Shopping Lists ──────────────────────────────────────────────────────────
 
-async function getShoppingLists(householdId) {
-  const { data, error } = await supabase
+async function getShoppingLists(householdId, db = supabase) {
+  const { data, error } = await db
     .from('shopping_lists')
     .select('*')
     .eq('household_id', householdId)
@@ -1036,8 +1036,8 @@ async function getShoppingLists(householdId) {
   return data;
 }
 
-async function createShoppingList(householdId, name) {
-  const { data, error } = await supabase
+async function createShoppingList(householdId, name, db = supabase) {
+  const { data, error } = await db
     .from('shopping_lists')
     .insert({ household_id: householdId, name })
     .select()
@@ -1046,8 +1046,8 @@ async function createShoppingList(householdId, name) {
   return data;
 }
 
-async function deleteShoppingList(listId, householdId) {
-  const { data, error } = await supabase
+async function deleteShoppingList(listId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('shopping_lists')
     .delete()
     .eq('id', listId)
@@ -1058,8 +1058,8 @@ async function deleteShoppingList(listId, householdId) {
 
 const DEFAULT_SHOPPING_LISTS = ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'];
 
-async function getDefaultShoppingList(householdId) {
-  let { data } = await supabase
+async function getDefaultShoppingList(householdId, db = supabase) {
+  let { data } = await db
     .from('shopping_lists')
     .select('*')
     .eq('household_id', householdId)
@@ -1068,8 +1068,8 @@ async function getDefaultShoppingList(householdId) {
   if (!data) {
     // Create all default lists for this household
     const rows = DEFAULT_SHOPPING_LISTS.map(name => ({ household_id: householdId, name }));
-    await supabase.from('shopping_lists').insert(rows);
-    const result = await supabase
+    await db.from('shopping_lists').insert(rows);
+    const result = await db
       .from('shopping_lists')
       .select('*')
       .eq('household_id', householdId)
@@ -1080,9 +1080,9 @@ async function getDefaultShoppingList(householdId) {
   return data;
 }
 
-async function getOverdueTasksForUser(householdId, userId) {
+async function getOverdueTasksForUser(householdId, userId, db = supabase) {
   const today = new Date().toISOString().split('T')[0];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -1094,8 +1094,8 @@ async function getOverdueTasksForUser(householdId, userId) {
   return data;
 }
 
-async function getTasksForUser(householdId, userId) {
-  const { data, error } = await supabase
+async function getTasksForUser(householdId, userId, db = supabase) {
+  const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -1109,8 +1109,8 @@ async function getTasksForUser(householdId, userId) {
 
 // ─── Calendar Events ─────────────────────────────────────────────────────────
 
-async function getCalendarEvents(householdId, startDate, endDate, { userId, category } = {}) {
-  let query = supabase
+async function getCalendarEvents(householdId, startDate, endDate, { userId, category } = {}, db = supabase) {
+  let query = db
     .from('calendar_events')
     .select()
     .eq('household_id', householdId)
@@ -1133,7 +1133,7 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
 
   if (error && (category || userId)) {
     // Retry without category/visibility filters (columns may not exist yet)
-    const fallback = await supabase
+    const fallback = await db
       .from('calendar_events')
       .select()
       .eq('household_id', householdId)
@@ -1149,8 +1149,8 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
   return data;
 }
 
-async function getCalendarEventById(eventId, householdId) {
-  const { data, error } = await supabase
+async function getCalendarEventById(eventId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .select()
     .eq('id', eventId)
@@ -1160,8 +1160,8 @@ async function getCalendarEventById(eventId, householdId) {
   return data || null;
 }
 
-async function findCalendarEventByTitleAndTime(householdId, title, startTime) {
-  const { data, error } = await supabase
+async function findCalendarEventByTitleAndTime(householdId, title, startTime, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .select('id')
     .eq('household_id', householdId)
@@ -1174,8 +1174,8 @@ async function findCalendarEventByTitleAndTime(householdId, title, startTime) {
   return data || null;
 }
 
-async function getTasksByDateRange(householdId, startDate, endDate) {
-  const { data, error } = await supabase
+async function getTasksByDateRange(householdId, startDate, endDate, db = supabase) {
+  const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
@@ -1187,8 +1187,8 @@ async function getTasksByDateRange(householdId, startDate, endDate) {
   return data;
 }
 
-async function createCalendarEvent(householdId, eventData, createdByUserId) {
-  const { data, error } = await supabase
+async function createCalendarEvent(householdId, eventData, createdByUserId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .insert({
       household_id: householdId,
@@ -1211,8 +1211,8 @@ async function createCalendarEvent(householdId, eventData, createdByUserId) {
   return data;
 }
 
-async function updateCalendarEvent(eventId, householdId, updates) {
-  const { data, error } = await supabase
+async function updateCalendarEvent(eventId, householdId, updates, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .update(updates)
     .eq('id', eventId)
@@ -1223,8 +1223,8 @@ async function updateCalendarEvent(eventId, householdId, updates) {
   return data;
 }
 
-async function softDeleteCalendarEvent(eventId, householdId) {
-  const { data, error } = await supabase
+async function softDeleteCalendarEvent(eventId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', eventId)
@@ -1239,8 +1239,8 @@ async function deleteCalendarEvent(eventId, householdId) {
   return softDeleteCalendarEvent(eventId, householdId);
 }
 
-async function getDeletedCalendarEvents(householdId) {
-  const { data, error } = await supabase
+async function getDeletedCalendarEvents(householdId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .select()
     .eq('household_id', householdId)
@@ -1250,8 +1250,8 @@ async function getDeletedCalendarEvents(householdId) {
   return data;
 }
 
-async function restoreCalendarEvent(eventId, householdId) {
-  const { data, error } = await supabase
+async function restoreCalendarEvent(eventId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_events')
     .update({ deleted_at: null })
     .eq('id', eventId)
@@ -1263,8 +1263,8 @@ async function restoreCalendarEvent(eventId, householdId) {
   return data;
 }
 
-async function permanentlyDeleteCalendarEvent(eventId, householdId) {
-  const { error } = await supabase
+async function permanentlyDeleteCalendarEvent(eventId, householdId, db = supabase) {
+  const { error } = await db
     .from('calendar_events')
     .delete()
     .eq('id', eventId)
@@ -1272,9 +1272,9 @@ async function permanentlyDeleteCalendarEvent(eventId, householdId) {
   if (error) throw error;
 }
 
-async function getOrCreateFeedToken(userId, householdId) {
+async function getOrCreateFeedToken(userId, householdId, db = supabase) {
   // Check for existing token
-  const { data: existing } = await supabase
+  const { data: existing } = await db
     .from('calendar_feed_tokens')
     .select()
     .eq('user_id', userId)
@@ -1285,7 +1285,7 @@ async function getOrCreateFeedToken(userId, householdId) {
 
   // Create new token
   const token = crypto.randomBytes(32).toString('hex');
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_feed_tokens')
     .insert({ user_id: userId, household_id: householdId, token })
     .select()
@@ -1294,9 +1294,9 @@ async function getOrCreateFeedToken(userId, householdId) {
   return data;
 }
 
-async function regenerateFeedToken(userId, householdId) {
+async function regenerateFeedToken(userId, householdId, db = supabase) {
   // Delete old token
-  await supabase
+  await db
     .from('calendar_feed_tokens')
     .delete()
     .eq('user_id', userId)
@@ -1304,7 +1304,7 @@ async function regenerateFeedToken(userId, householdId) {
 
   // Create new token
   const token = crypto.randomBytes(32).toString('hex');
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_feed_tokens')
     .insert({ user_id: userId, household_id: householdId, token })
     .select()
@@ -1313,8 +1313,8 @@ async function regenerateFeedToken(userId, householdId) {
   return data;
 }
 
-async function getFeedTokenData(token) {
-  const { data, error } = await supabase
+async function getFeedTokenData(token, db = supabase) {
+  const { data, error } = await db
     .from('calendar_feed_tokens')
     .select()
     .eq('token', token)
@@ -1323,14 +1323,14 @@ async function getFeedTokenData(token) {
   return data || null;
 }
 
-async function getAllEventsForFeed(householdId) {
+async function getAllEventsForFeed(householdId, db = supabase) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const oneYearAhead = new Date();
   oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
   const [{ data: events }, { data: tasks }] = await Promise.all([
-    supabase
+    db
       .from('calendar_events')
       .select()
       .eq('household_id', householdId)
@@ -1338,7 +1338,7 @@ async function getAllEventsForFeed(householdId) {
       .gte('start_time', thirtyDaysAgo.toISOString())
       .lte('start_time', oneYearAhead.toISOString())
       .order('start_time'),
-    supabase
+    db
       .from('tasks')
       .select()
       .eq('household_id', householdId)
@@ -1351,8 +1351,8 @@ async function getAllEventsForFeed(householdId) {
 
 // ─── Calendar Connections (two-way sync) ─────────────────────────────────────
 
-async function getCalendarConnections(userId) {
-  const { data, error } = await supabase
+async function getCalendarConnections(userId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_connections')
     .select()
     .eq('user_id', userId);
@@ -1360,8 +1360,8 @@ async function getCalendarConnections(userId) {
   return data;
 }
 
-async function upsertCalendarConnection(userId, householdId, provider, connectionData) {
-  const { data, error } = await supabase
+async function upsertCalendarConnection(userId, householdId, provider, connectionData, db = supabase) {
+  const { data, error } = await db
     .from('calendar_connections')
     .upsert({
       user_id: userId,
@@ -1375,10 +1375,10 @@ async function upsertCalendarConnection(userId, householdId, provider, connectio
   return data;
 }
 
-async function deleteCalendarConnection(userId, provider) {
+async function deleteCalendarConnection(userId, provider, db = supabase) {
   // Schema has ON DELETE CASCADE on subscriptions and sync_mappings,
   // so deleting the connection row cascades automatically.
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_connections')
     .delete()
     .eq('user_id', userId)
@@ -1395,8 +1395,8 @@ async function deleteCalendarConnection(userId, provider) {
   }
 }
 
-async function getConnectionsByHousehold(householdId) {
-  const { data, error } = await supabase
+async function getConnectionsByHousehold(householdId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_connections')
     .select()
     .eq('household_id', householdId)
@@ -1405,8 +1405,8 @@ async function getConnectionsByHousehold(householdId) {
   return data;
 }
 
-async function createSyncMapping(eventId, connectionId, externalEventId, etag) {
-  const { data, error } = await supabase
+async function createSyncMapping(eventId, connectionId, externalEventId, etag, db = supabase) {
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .upsert({
       event_id: eventId,
@@ -1421,8 +1421,8 @@ async function createSyncMapping(eventId, connectionId, externalEventId, etag) {
   return data;
 }
 
-async function getSyncMapping(eventId, connectionId) {
-  const { data, error } = await supabase
+async function getSyncMapping(eventId, connectionId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .select()
     .eq('event_id', eventId)
@@ -1432,8 +1432,8 @@ async function getSyncMapping(eventId, connectionId) {
   return data || null;
 }
 
-async function getSyncMappingByExternalId(connectionId, externalEventId) {
-  const { data, error } = await supabase
+async function getSyncMappingByExternalId(connectionId, externalEventId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .select()
     .eq('connection_id', connectionId)
@@ -1443,8 +1443,8 @@ async function getSyncMappingByExternalId(connectionId, externalEventId) {
   return data || null;
 }
 
-async function getSyncMappingsByConnection(connectionId) {
-  const { data, error } = await supabase
+async function getSyncMappingsByConnection(connectionId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .select()
     .eq('connection_id', connectionId);
@@ -1452,8 +1452,8 @@ async function getSyncMappingsByConnection(connectionId) {
   return data || [];
 }
 
-async function deleteSyncMapping(eventId, connectionId) {
-  const { error } = await supabase
+async function deleteSyncMapping(eventId, connectionId, db = supabase) {
+  const { error } = await db
     .from('calendar_sync_mappings')
     .delete()
     .eq('event_id', eventId)
@@ -1463,8 +1463,8 @@ async function deleteSyncMapping(eventId, connectionId) {
 
 // ─── Calendar Subscriptions ──────────────────────────────────────────────────
 
-async function getSubscriptionsByConnection(connectionId) {
-  const { data, error } = await supabase
+async function getSubscriptionsByConnection(connectionId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_subscriptions')
     .select()
     .eq('connection_id', connectionId)
@@ -1475,8 +1475,8 @@ async function getSubscriptionsByConnection(connectionId) {
   return data;
 }
 
-async function getEnabledSubscriptionsByConnection(connectionId) {
-  const { data, error } = await supabase
+async function getEnabledSubscriptionsByConnection(connectionId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_subscriptions')
     .select()
     .eq('connection_id', connectionId)
@@ -1486,8 +1486,8 @@ async function getEnabledSubscriptionsByConnection(connectionId) {
   return data;
 }
 
-async function upsertSubscription(connectionId, subData) {
-  const { data, error } = await supabase
+async function upsertSubscription(connectionId, subData, db = supabase) {
+  const { data, error } = await db
     .from('calendar_subscriptions')
     .upsert({
       connection_id: connectionId,
@@ -1503,8 +1503,8 @@ async function upsertSubscription(connectionId, subData) {
   return data;
 }
 
-async function getSubscriptionById(subscriptionId) {
-  const { data, error } = await supabase
+async function getSubscriptionById(subscriptionId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_subscriptions')
     .select()
     .eq('id', subscriptionId)
@@ -1513,14 +1513,14 @@ async function getSubscriptionById(subscriptionId) {
   return data || null;
 }
 
-async function updateSubscription(subscriptionId, updates) {
+async function updateSubscription(subscriptionId, updates, db = supabase) {
   const allowed = {};
   if (updates.category !== undefined) allowed.category = updates.category;
   if (updates.visibility !== undefined) allowed.visibility = updates.visibility;
   if (updates.sync_enabled !== undefined) allowed.sync_enabled = updates.sync_enabled;
   if (updates.last_synced_at !== undefined) allowed.last_synced_at = updates.last_synced_at;
   if (updates.sync_token !== undefined) allowed.sync_token = updates.sync_token;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_subscriptions')
     .update(allowed)
     .eq('id', subscriptionId)
@@ -1530,22 +1530,22 @@ async function updateSubscription(subscriptionId, updates) {
   return data;
 }
 
-async function deleteSubscription(subscriptionId) {
+async function deleteSubscription(subscriptionId, db = supabase) {
   // Delete synced events first
-  await supabase
+  await db
     .from('calendar_events')
     .delete()
     .eq('subscription_id', subscriptionId);
   // Then delete the subscription (cascade deletes sync mappings)
-  const { error } = await supabase
+  const { error } = await db
     .from('calendar_subscriptions')
     .delete()
     .eq('id', subscriptionId);
   if (error) throw error;
 }
 
-async function getConnectionByUserAndProvider(userId, provider) {
-  const { data, error } = await supabase
+async function getConnectionByUserAndProvider(userId, provider, db = supabase) {
+  const { data, error } = await db
     .from('calendar_connections')
     .select()
     .eq('user_id', userId)
@@ -1555,8 +1555,8 @@ async function getConnectionByUserAndProvider(userId, provider) {
   return data || null;
 }
 
-async function getSyncMappingsBySubscription(subscriptionId) {
-  const { data, error } = await supabase
+async function getSyncMappingsBySubscription(subscriptionId, db = supabase) {
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .select()
     .eq('subscription_id', subscriptionId);
@@ -1564,8 +1564,8 @@ async function getSyncMappingsBySubscription(subscriptionId) {
   return data;
 }
 
-async function createSyncMappingWithSubscription(eventId, connectionId, subscriptionId, externalEventId, etag) {
-  const { data, error } = await supabase
+async function createSyncMappingWithSubscription(eventId, connectionId, subscriptionId, externalEventId, etag, db = supabase) {
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .upsert({
       event_id: eventId,
@@ -1581,14 +1581,14 @@ async function createSyncMappingWithSubscription(eventId, connectionId, subscrip
   return data;
 }
 
-async function createCalendarEventFromSync(householdId, eventData, sourceUserId, subscriptionId, category, visibility) {
+async function createCalendarEventFromSync(householdId, eventData, sourceUserId, subscriptionId, category, visibility, db = supabase) {
   // Ensure timestamps are valid for timestamptz columns (bare dates need time appended)
   let startTime = eventData.start_time;
   let endTime = eventData.end_time;
   if (startTime && !startTime.includes('T')) startTime = `${startTime}T00:00:00Z`;
   if (endTime && !endTime.includes('T')) endTime = `${endTime}T00:00:00Z`;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_events')
     .insert({
       household_id: householdId,
@@ -1612,14 +1612,14 @@ async function createCalendarEventFromSync(householdId, eventData, sourceUserId,
 
 // ─── Batch Calendar Sync ────────────────────────────────────────────────────
 
-async function getSyncMappingsByExternalIds(connectionId, externalIds) {
+async function getSyncMappingsByExternalIds(connectionId, externalIds, db = supabase) {
   if (!externalIds || externalIds.length === 0) return [];
   // Supabase .in() has a limit of ~1000, so chunk if needed
   const CHUNK = 500;
   const results = [];
   for (let i = 0; i < externalIds.length; i += CHUNK) {
     const chunk = externalIds.slice(i, i + CHUNK);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('calendar_sync_mappings')
       .select('external_event_id')
       .eq('connection_id', connectionId)
@@ -1630,9 +1630,9 @@ async function getSyncMappingsByExternalIds(connectionId, externalIds) {
   return results;
 }
 
-async function batchCreateCalendarEvents(eventRows) {
+async function batchCreateCalendarEvents(eventRows, db = supabase) {
   if (!eventRows || eventRows.length === 0) return [];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_events')
     .insert(eventRows)
     .select();
@@ -1640,9 +1640,9 @@ async function batchCreateCalendarEvents(eventRows) {
   return data;
 }
 
-async function batchCreateSyncMappings(mappingRows) {
+async function batchCreateSyncMappings(mappingRows, db = supabase) {
   if (!mappingRows || mappingRows.length === 0) return [];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('calendar_sync_mappings')
     .upsert(mappingRows, { onConflict: 'event_id,connection_id' })
     .select();
@@ -1652,8 +1652,8 @@ async function batchCreateSyncMappings(mappingRows) {
 
 // ─── Meal Plan ──────────────────────────────────────────────────────────────
 
-async function getMealPlanForWeek(householdId, startDate, endDate) {
-  const { data, error } = await supabase
+async function getMealPlanForWeek(householdId, startDate, endDate, db = supabase) {
+  const { data, error } = await db
     .from('meal_plan')
     .select('*, recipes(*)')
     .eq('household_id', householdId)
@@ -1665,8 +1665,8 @@ async function getMealPlanForWeek(householdId, startDate, endDate) {
   return data;
 }
 
-async function getRecurringMeals(householdId) {
-  const { data, error } = await supabase
+async function getRecurringMeals(householdId, db = supabase) {
+  const { data, error } = await db
     .from('meal_plan')
     .select('*')
     .eq('household_id', householdId)
@@ -1675,8 +1675,8 @@ async function getRecurringMeals(householdId) {
   return data;
 }
 
-async function createMealPlanEntry(householdId, data, userId) {
-  const { data: meal, error } = await supabase
+async function createMealPlanEntry(householdId, data, userId, db = supabase) {
+  const { data: meal, error } = await db
     .from('meal_plan')
     .insert({
       household_id: householdId,
@@ -1695,8 +1695,8 @@ async function createMealPlanEntry(householdId, data, userId) {
   return meal;
 }
 
-async function updateMealPlanEntry(mealId, householdId, updates) {
-  const { data, error } = await supabase
+async function updateMealPlanEntry(mealId, householdId, updates, db = supabase) {
+  const { data, error } = await db
     .from('meal_plan')
     .update(updates)
     .eq('id', mealId)
@@ -1707,8 +1707,8 @@ async function updateMealPlanEntry(mealId, householdId, updates) {
   return data;
 }
 
-async function deleteMealPlanEntry(mealId, householdId) {
-  const { error } = await supabase
+async function deleteMealPlanEntry(mealId, householdId, db = supabase) {
+  const { error } = await db
     .from('meal_plan')
     .delete()
     .eq('id', mealId)
@@ -1718,8 +1718,8 @@ async function deleteMealPlanEntry(mealId, householdId) {
 
 // ─── Recipes ────────────────────────────────────────────────────────────────
 
-async function getRecipes(householdId, filters = {}) {
-  let query = supabase
+async function getRecipes(householdId, filters = {}, db = supabase) {
+  let query = db
     .from('recipes')
     .select()
     .eq('household_id', householdId);
@@ -1742,8 +1742,8 @@ async function getRecipes(householdId, filters = {}) {
   return data;
 }
 
-async function getRecipeById(recipeId, householdId) {
-  const { data, error } = await supabase
+async function getRecipeById(recipeId, householdId, db = supabase) {
+  const { data, error } = await db
     .from('recipes')
     .select()
     .eq('id', recipeId)
@@ -1753,8 +1753,8 @@ async function getRecipeById(recipeId, householdId) {
   return data || null;
 }
 
-async function getLatestRecipe(householdId) {
-  const { data, error } = await supabase
+async function getLatestRecipe(householdId, db = supabase) {
+  const { data, error } = await db
     .from('recipes')
     .select()
     .eq('household_id', householdId)
@@ -1765,8 +1765,8 @@ async function getLatestRecipe(householdId) {
   return data || null;
 }
 
-async function createRecipe(householdId, recipeData) {
-  const { data, error } = await supabase
+async function createRecipe(householdId, recipeData, db = supabase) {
+  const { data, error } = await db
     .from('recipes')
     .insert({
       household_id: householdId,
@@ -1790,9 +1790,9 @@ async function createRecipe(householdId, recipeData) {
   return data;
 }
 
-async function updateRecipe(recipeId, householdId, updates) {
+async function updateRecipe(recipeId, householdId, updates, db = supabase) {
   updates.updated_at = new Date().toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('recipes')
     .update(updates)
     .eq('id', recipeId)
@@ -1803,8 +1803,8 @@ async function updateRecipe(recipeId, householdId, updates) {
   return data;
 }
 
-async function deleteRecipe(recipeId, householdId) {
-  const { error } = await supabase
+async function deleteRecipe(recipeId, householdId, db = supabase) {
+  const { error } = await db
     .from('recipes')
     .delete()
     .eq('id', recipeId)
@@ -1814,8 +1814,8 @@ async function deleteRecipe(recipeId, householdId) {
 
 // ─── Meal Categories ────────────────────────────────────────────────────────
 
-async function getMealCategories(householdId) {
-  const { data, error } = await supabase
+async function getMealCategories(householdId, db = supabase) {
+  const { data, error } = await db
     .from('meal_categories')
     .select()
     .eq('household_id', householdId)
@@ -1824,14 +1824,14 @@ async function getMealCategories(householdId) {
   return data;
 }
 
-async function createDefaultMealCategories(householdId) {
+async function createDefaultMealCategories(householdId, db = supabase) {
   const defaults = [
     { household_id: householdId, name: 'Breakfast', colour: '#F5CBA7', sort_order: 0, active: true },
     { household_id: householdId, name: 'Lunch', colour: '#A9DFBF', sort_order: 1, active: true },
     { household_id: householdId, name: 'Dinner', colour: '#AED6F1', sort_order: 2, active: true },
     { household_id: householdId, name: 'Snack', colour: '#D7BDE2', sort_order: 3, active: true },
   ];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('meal_categories')
     .insert(defaults)
     .select();
@@ -1839,8 +1839,8 @@ async function createDefaultMealCategories(householdId) {
   return data;
 }
 
-async function updateMealCategory(categoryId, householdId, updates) {
-  const { data, error } = await supabase
+async function updateMealCategory(categoryId, householdId, updates, db = supabase) {
+  const { data, error } = await db
     .from('meal_categories')
     .update(updates)
     .eq('id', categoryId)
@@ -1851,10 +1851,10 @@ async function updateMealCategory(categoryId, householdId, updates) {
   return data;
 }
 
-async function getRecentMeals(householdId, days = 14) {
+async function getRecentMeals(householdId, days = 14, db = supabase) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('meal_plan')
     .select()
     .eq('household_id', householdId)
@@ -1864,10 +1864,10 @@ async function getRecentMeals(householdId, days = 14) {
   return data;
 }
 
-async function getRecentPurchases(householdId, days = 14) {
+async function getRecentPurchases(householdId, days = 14, db = supabase) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('shopping_items')
     .select()
     .eq('household_id', householdId)
@@ -1880,8 +1880,8 @@ async function getRecentPurchases(householdId, days = 14) {
 
 // ─── Platform Admin ──────────────────────────────────────────────────────────
 
-async function getAllUsersAdmin({ search, page = 1, limit = 50 } = {}) {
-  let query = supabase
+async function getAllUsersAdmin({ search, page = 1, limit = 50 } = {}, db = supabase) {
+  let query = db
     .from('users')
     .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
 
@@ -1898,8 +1898,8 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50 } = {}) {
   return { users: data, total: count };
 }
 
-async function getUserByIdAdmin(userId) {
-  const { data: user, error } = await supabase
+async function getUserByIdAdmin(userId, db = supabase) {
+  const { data: user, error } = await db
     .from('users')
     .select()
     .eq('id', userId)
@@ -1908,7 +1908,7 @@ async function getUserByIdAdmin(userId) {
 
   let household = null;
   if (user.household_id) {
-    const { data: h } = await supabase
+    const { data: h } = await db
       .from('households')
       .select()
       .eq('id', user.household_id)
@@ -1919,8 +1919,8 @@ async function getUserByIdAdmin(userId) {
   return { ...user, household };
 }
 
-async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}) {
-  let query = supabase
+async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}, db = supabase) {
+  let query = db
     .from('households')
     .select('id, name, join_code, timezone, reminder_time, created_at', { count: 'exact' });
 
@@ -1938,7 +1938,7 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}) {
   // Attach member counts
   const householdIds = data.map((h) => h.id);
   if (householdIds.length > 0) {
-    const { data: users } = await supabase
+    const { data: users } = await db
       .from('users')
       .select('household_id')
       .in('household_id', householdIds);
@@ -1955,15 +1955,15 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}) {
   return { households: data, total: count };
 }
 
-async function getHouseholdDetailAdmin(householdId) {
-  const { data: household, error } = await supabase
+async function getHouseholdDetailAdmin(householdId, db = supabase) {
+  const { data: household, error } = await db
     .from('households')
     .select()
     .eq('id', householdId)
     .single();
   if (error) throw error;
 
-  const { data: members } = await supabase
+  const { data: members } = await db
     .from('users')
     .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at')
     .eq('household_id', householdId)
@@ -1972,15 +1972,15 @@ async function getHouseholdDetailAdmin(householdId) {
   return { ...household, members: members || [] };
 }
 
-async function getPlatformStats() {
+async function getPlatformStats(db = supabase) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const [usersResult, householdsResult, newUsersResult, newHouseholdsResult] = await Promise.all([
-    supabase.from('users').select('id', { count: 'exact', head: true }),
-    supabase.from('households').select('id', { count: 'exact', head: true }),
-    supabase.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
-    supabase.from('households').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+    db.from('users').select('id', { count: 'exact', head: true }),
+    db.from('households').select('id', { count: 'exact', head: true }),
+    db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+    db.from('households').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
   ]);
 
   return {
@@ -1991,8 +1991,8 @@ async function getPlatformStats() {
   };
 }
 
-async function disableUser(userId) {
-  const { data, error } = await supabase
+async function disableUser(userId, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .update({ disabled_at: new Date().toISOString() })
     .eq('id', userId)
@@ -2002,8 +2002,8 @@ async function disableUser(userId) {
   return data;
 }
 
-async function enableUser(userId) {
-  const { data, error } = await supabase
+async function enableUser(userId, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .update({ disabled_at: null })
     .eq('id', userId)
@@ -2013,25 +2013,25 @@ async function enableUser(userId) {
   return data;
 }
 
-async function deleteUser(userId) {
-  const { error } = await supabase
+async function deleteUser(userId, db = supabase) {
+  const { error } = await db
     .from('users')
     .delete()
     .eq('id', userId);
   if (error) throw error;
 }
 
-async function deleteHouseholdCascade(householdId) {
+async function deleteHouseholdCascade(householdId, db = supabase) {
   // All child tables have ON DELETE CASCADE, so this cleans up everything
-  const { error } = await supabase
+  const { error } = await db
     .from('households')
     .delete()
     .eq('id', householdId);
   if (error) throw error;
 }
 
-async function setUserPlatformAdmin(userId, isPlatformAdmin) {
-  const { data, error } = await supabase
+async function setUserPlatformAdmin(userId, isPlatformAdmin, db = supabase) {
+  const { data, error } = await db
     .from('users')
     .update({ is_platform_admin: isPlatformAdmin })
     .eq('id', userId)
@@ -2043,15 +2043,15 @@ async function setUserPlatformAdmin(userId, isPlatformAdmin) {
 
 // ─── Phase 2 Admin: AI Usage ─────────────────────────────────────────────────
 
-async function getAiUsageStats({ days = 30 } = {}) {
+async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const [totalRes, byProviderRes, byFeatureRes, failoverRes, avgLatencyRes] = await Promise.all([
-    supabase.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since),
-    supabase.from('ai_usage_log').select('provider').gte('created_at', since),
-    supabase.from('ai_usage_log').select('feature').gte('created_at', since),
-    supabase.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since).eq('is_failover', true),
-    supabase.from('ai_usage_log').select('latency_ms').gte('created_at', since).not('latency_ms', 'is', null),
+    db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since),
+    db.from('ai_usage_log').select('provider').gte('created_at', since),
+    db.from('ai_usage_log').select('feature').gte('created_at', since),
+    db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since).eq('is_failover', true),
+    db.from('ai_usage_log').select('latency_ms').gte('created_at', since).not('latency_ms', 'is', null),
   ]);
 
   // Count by provider
@@ -2080,9 +2080,9 @@ async function getAiUsageStats({ days = 30 } = {}) {
   };
 }
 
-async function getAiUsageTimeline({ days = 30 } = {}) {
+async function getAiUsageTimeline({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('ai_usage_log')
     .select('provider, created_at')
     .gte('created_at', since)
@@ -2102,8 +2102,8 @@ async function getAiUsageTimeline({ days = 30 } = {}) {
 
 // ─── Phase 2 Admin: WhatsApp Stats ──────────────────────────────────────────
 
-async function logWhatsAppMessage({ householdId, userId, direction, messageType, intent, processingMs, error }) {
-  supabase
+async function logWhatsAppMessage({ householdId, userId, direction, messageType, intent, processingMs, error }, db = supabase) {
+  db
     .from('whatsapp_message_log')
     .insert({
       household_id: householdId || null,
@@ -2118,10 +2118,10 @@ async function logWhatsAppMessage({ householdId, userId, direction, messageType,
     .catch((err) => console.error('[whatsapp-log] Failed to log message:', err.message));
 }
 
-async function getWhatsAppStats({ days = 30 } = {}) {
+async function getWhatsAppStats({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('whatsapp_message_log')
     .select('direction, message_type, intent, processing_ms, error, user_id')
     .gte('created_at', since);
@@ -2159,9 +2159,9 @@ async function getWhatsAppStats({ days = 30 } = {}) {
   };
 }
 
-async function getWhatsAppTimeline({ days = 30 } = {}) {
+async function getWhatsAppTimeline({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('whatsapp_message_log')
     .select('direction, created_at')
     .gte('created_at', since)
@@ -2179,8 +2179,8 @@ async function getWhatsAppTimeline({ days = 30 } = {}) {
 
 // ─── Phase 2 Admin: Calendar Sync Health ────────────────────────────────────
 
-async function getCalendarSyncHealth() {
-  const { data: connections, error } = await supabase
+async function getCalendarSyncHealth(db = supabase) {
+  const { data: connections, error } = await db
     .from('calendar_connections')
     .select('id, user_id, household_id, provider, sync_enabled, token_expires_at, created_at');
   if (error) throw error;
@@ -2189,14 +2189,14 @@ async function getCalendarSyncHealth() {
   const userIds = [...new Set((connections || []).map((c) => c.user_id))];
   let userMap = {};
   if (userIds.length > 0) {
-    const { data: users } = await supabase.from('users').select('id, name, email').in('id', userIds);
+    const { data: users } = await db.from('users').select('id, name, email').in('id', userIds);
     for (const u of users || []) userMap[u.id] = u;
   }
 
   // Get sync mapping stats per connection
   const result = [];
   for (const conn of connections || []) {
-    const { data: mappings } = await supabase
+    const { data: mappings } = await db
       .from('calendar_sync_mappings')
       .select('last_synced_at')
       .eq('connection_id', conn.id);
@@ -2220,15 +2220,15 @@ async function getCalendarSyncHealth() {
 
 // ─── Phase 2 Admin: Analytics ───────────────────────────────────────────────
 
-async function getAnalytics({ days = 30 } = {}) {
+async function getAnalytics({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   // DAU: distinct users with activity per day
   const [shoppingRes, tasksRes, calendarRes, chatRes] = await Promise.all([
-    supabase.from('shopping_items').select('added_by, created_at').gte('created_at', since),
-    supabase.from('tasks').select('added_by, created_at').gte('created_at', since),
-    supabase.from('calendar_events').select('created_by, created_at').gte('created_at', since),
-    supabase.from('chat_messages').select('user_id, created_at').gte('created_at', since).eq('role', 'user'),
+    db.from('shopping_items').select('added_by, created_at').gte('created_at', since),
+    db.from('tasks').select('added_by, created_at').gte('created_at', since),
+    db.from('calendar_events').select('created_by, created_at').gte('created_at', since),
+    db.from('chat_messages').select('user_id, created_at').gte('created_at', since).eq('role', 'user'),
   ]);
 
   // Build DAU map
@@ -2259,10 +2259,10 @@ async function getAnalytics({ days = 30 } = {}) {
 
   // Onboarding funnel
   const [totalUsersRes, verifiedRes, withHouseholdRes, invitesRes] = await Promise.all([
-    supabase.from('users').select('id', { count: 'exact', head: true }).not('email', 'is', null),
-    supabase.from('users').select('id', { count: 'exact', head: true }).eq('email_verified', true),
-    supabase.from('users').select('id', { count: 'exact', head: true }).not('household_id', 'is', null),
-    supabase.from('invites').select('id, accepted_at', { count: 'exact' }),
+    db.from('users').select('id', { count: 'exact', head: true }).not('email', 'is', null),
+    db.from('users').select('id', { count: 'exact', head: true }).eq('email_verified', true),
+    db.from('users').select('id', { count: 'exact', head: true }).not('household_id', 'is', null),
+    db.from('invites').select('id, accepted_at', { count: 'exact' }),
   ]);
 
   const invitesAccepted = (invitesRes.data || []).filter((i) => i.accepted_at).length;
@@ -2289,9 +2289,9 @@ async function getAnalytics({ days = 30 } = {}) {
 
 // ─── Phase 2 Admin: Per-user/household breakdowns ───────────────────────────
 
-async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}) {
+async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('ai_usage_log')
     .select('household_id')
     .gte('created_at', since)
@@ -2307,16 +2307,16 @@ async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}) {
   if (sorted.length === 0) return [];
 
   const ids = sorted.map(([id]) => id);
-  const { data: households } = await supabase.from('households').select('id, name').in('id', ids);
+  const { data: households } = await db.from('households').select('id, name').in('id', ids);
   const nameMap = {};
   for (const h of households || []) nameMap[h.id] = h.name;
 
   return sorted.map(([id, calls]) => ({ household_id: id, name: nameMap[id] || 'Unknown', calls }));
 }
 
-async function getAiUsageTopUsers({ days = 30, limit = 10 } = {}) {
+async function getAiUsageTopUsers({ days = 30, limit = 10 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('ai_usage_log')
     .select('user_id')
     .gte('created_at', since)
@@ -2332,19 +2332,19 @@ async function getAiUsageTopUsers({ days = 30, limit = 10 } = {}) {
   if (sorted.length === 0) return [];
 
   const ids = sorted.map(([id]) => id);
-  const { data: users } = await supabase.from('users').select('id, name, email').in('id', ids);
+  const { data: users } = await db.from('users').select('id, name, email').in('id', ids);
   const userMap = {};
   for (const u of users || []) userMap[u.id] = u;
 
   return sorted.map(([id, calls]) => ({ user_id: id, name: userMap[id]?.name || 'Unknown', email: userMap[id]?.email || '', calls }));
 }
 
-async function getUserUsageStats(userId, { days = 30 } = {}) {
+async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const [aiRes, waRes] = await Promise.all([
-    supabase.from('ai_usage_log').select('provider, feature, latency_ms, is_failover, created_at').eq('user_id', userId).gte('created_at', since),
-    supabase.from('whatsapp_message_log').select('direction, message_type, intent, processing_ms, error, created_at').eq('user_id', userId).gte('created_at', since),
+    db.from('ai_usage_log').select('provider, feature, latency_ms, is_failover, created_at').eq('user_id', userId).gte('created_at', since),
+    db.from('whatsapp_message_log').select('direction, message_type, intent, processing_ms, error, created_at').eq('user_id', userId).gte('created_at', since),
   ]);
 
   const aiRows = aiRes.data || [];
@@ -2394,8 +2394,8 @@ async function getUserUsageStats(userId, { days = 30 } = {}) {
 
 // ─── Inbound Email ───────────────────────────────────────────────────────────
 
-async function getHouseholdByInboundToken(token) {
-  const { data, error } = await supabase
+async function getHouseholdByInboundToken(token, db = supabase) {
+  const { data, error } = await db
     .from('households')
     .select()
     .eq('inbound_email_token', token)
@@ -2404,8 +2404,8 @@ async function getHouseholdByInboundToken(token) {
   return data || null;
 }
 
-async function createInboundEmailLog(householdId, fromEmail, subject) {
-  const { data, error } = await supabase
+async function createInboundEmailLog(householdId, fromEmail, subject, db = supabase) {
+  const { data, error } = await db
     .from('inbound_email_log')
     .insert({
       household_id: householdId,
@@ -2418,8 +2418,8 @@ async function createInboundEmailLog(householdId, fromEmail, subject) {
   return data;
 }
 
-async function updateInboundEmailLog(logId, updates) {
-  const { data, error } = await supabase
+async function updateInboundEmailLog(logId, updates, db = supabase) {
+  const { data, error } = await db
     .from('inbound_email_log')
     .update(updates)
     .eq('id', logId)
@@ -2429,8 +2429,8 @@ async function updateInboundEmailLog(logId, updates) {
   return data;
 }
 
-async function getRecentInboundEmails(householdId, limit = 10) {
-  const { data, error } = await supabase
+async function getRecentInboundEmails(householdId, limit = 10, db = supabase) {
+  const { data, error } = await db
     .from('inbound_email_log')
     .select()
     .eq('household_id', householdId)
@@ -2440,11 +2440,11 @@ async function getRecentInboundEmails(householdId, limit = 10) {
   return data;
 }
 
-async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinutes = 5) {
+async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinutes = 5, db = supabase) {
   // Only dedup against successfully completed emails within 5 minutes
   // (catches genuine double-sends from email clients, but allows re-forwards)
   const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000).toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('inbound_email_log')
     .select('id')
     .eq('household_id', householdId)
@@ -2478,9 +2478,9 @@ function reminderOffsetToMs(time, unit) {
  * Save reminders for a calendar event.
  * Deletes existing reminders first (safe for both create and edit).
  */
-async function saveEventReminders(eventId, householdId, reminders, eventStartTime) {
+async function saveEventReminders(eventId, householdId, reminders, eventStartTime, db = supabase) {
   // Delete existing reminders for this event
-  const { error: deleteErr } = await supabase
+  const { error: deleteErr } = await db
     .from('event_reminders')
     .delete()
     .eq('event_id', eventId);
@@ -2506,7 +2506,7 @@ async function saveEventReminders(eventId, householdId, reminders, eventStartTim
 
   if (rows.length === 0) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('event_reminders')
     .insert(rows)
     .select();
@@ -2518,9 +2518,9 @@ async function saveEventReminders(eventId, householdId, reminders, eventStartTim
  * Save assignees for a calendar event.
  * Deletes existing assignees first (safe for both create and edit).
  */
-async function saveEventAssignees(eventId, householdId, memberNames, members) {
+async function saveEventAssignees(eventId, householdId, memberNames, members, db = supabase) {
   // Delete existing assignees for this event
-  const { error: deleteErr } = await supabase
+  const { error: deleteErr } = await db
     .from('event_assignees')
     .delete()
     .eq('event_id', eventId);
@@ -2529,7 +2529,7 @@ async function saveEventAssignees(eventId, householdId, memberNames, members) {
   if (!memberNames || !Array.isArray(memberNames) || memberNames.length === 0) return [];
 
   // If members list not provided, fetch from household
-  const memberList = members || await getHouseholdMembers(householdId);
+  const memberList = members || await getHouseholdMembers(householdId, db);
 
   const rows = memberNames
     .map((name) => {
@@ -2545,7 +2545,7 @@ async function saveEventAssignees(eventId, householdId, memberNames, members) {
 
   if (rows.length === 0) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('event_assignees')
     .insert(rows)
     .select();
@@ -2557,9 +2557,9 @@ async function saveEventAssignees(eventId, householdId, memberNames, members) {
  * Get pending reminders that are due to be sent.
  * Joins with calendar_events and event_assignees.
  */
-async function getPendingReminders() {
+async function getPendingReminders(db = supabase) {
   const now = new Date().toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('event_reminders')
     .select(`
       id,
@@ -2586,8 +2586,8 @@ async function getPendingReminders() {
 /**
  * Mark a reminder as sent.
  */
-async function markReminderSent(reminderId) {
-  const { error } = await supabase
+async function markReminderSent(reminderId, db = supabase) {
+  const { error } = await db
     .from('event_reminders')
     .update({ sent: true })
     .eq('id', reminderId);
@@ -2597,8 +2597,8 @@ async function markReminderSent(reminderId) {
 /**
  * Get assignees for a specific event.
  */
-async function getEventAssignees(eventId) {
-  const { data, error } = await supabase
+async function getEventAssignees(eventId, db = supabase) {
+  const { data, error } = await db
     .from('event_assignees')
     .select('id, event_id, member_id, member_name')
     .eq('event_id', eventId);
@@ -2609,9 +2609,9 @@ async function getEventAssignees(eventId) {
 /**
  * Get assignees for multiple events in a single query.
  */
-async function getEventAssigneesBatch(eventIds) {
+async function getEventAssigneesBatch(eventIds, db = supabase) {
   if (!eventIds || eventIds.length === 0) return [];
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('event_assignees')
     .select('id, event_id, member_id, member_name')
     .in('event_id', eventIds);
