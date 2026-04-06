@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const multer = require('multer');
 const db = require('../db/queries');
+const { getUserClient } = require('../db/client');
 const { scanReceipt, matchReceiptToList } = require('../services/ai');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 
@@ -31,10 +32,11 @@ router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async 
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     // Start scanning receipt and fetching shopping list in parallel
     const [extracted, shoppingList] = await Promise.all([
       scanReceipt(req.file.buffer, req.file.mimetype, { householdId: req.householdId, userId: req.user.id }),
-      db.getShoppingList(req.householdId),
+      q.getShoppingList(req.householdId),
     ]);
 
     if (!extracted.items?.length) {
@@ -51,7 +53,7 @@ router.post('/', requireAuth, requireHousehold, upload.single('receipt'), async 
 
     // Complete matched items (confidence ≥ 0.7) in parallel
     const toCheckOff = (matchResult.matches || []).filter((m) => m.confidence >= 0.7);
-    await Promise.all(toCheckOff.map((m) => db.completeShoppingItemById(m.list_item_id)));
+    await Promise.all(toCheckOff.map((m) => q.completeShoppingItemById(m.list_item_id)));
     const checkedOff = toCheckOff.map((m) => ({
       id: m.list_item_id, name: m.list_item_name, confidence: m.confidence,
     }));

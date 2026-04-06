@@ -28,13 +28,14 @@ const avatarUpload = multer({
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const q = db.withClient(getUserClient(req.token));
     const cacheKey = `members:${req.householdId}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
     const [household, members] = await Promise.all([
-      db.getHouseholdById(req.householdId),
-      db.getHouseholdMembers(req.householdId),
+      q.getHouseholdById(req.householdId),
+      q.getHouseholdMembers(req.householdId),
     ]);
     const result = { household, members };
     cache.set(cacheKey, result, 300); // 5 min TTL
@@ -65,7 +66,8 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   }
 
   try {
-    const updated = await db.updateHouseholdSettings(req.householdId, updates);
+    const q = db.withClient(getUserClient(req.token));
+    const updated = await q.updateHouseholdSettings(req.householdId, updates);
     return res.json({ household: updated });
   } catch (err) {
     console.error('PATCH /api/settings error:', err);
@@ -129,29 +131,30 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     // Only fetch full user if birthday is being updated (expensive query)
     let fullUser = null;
     if (birthday !== undefined) {
-      fullUser = (await db.getHouseholdMembers(req.householdId)).find(m => m.id === targetUserId);
+      fullUser = (await q.getHouseholdMembers(req.householdId)).find(m => m.id === targetUserId);
     }
 
     // Capture the old school_id before updating (for orphan cleanup)
     let oldSchoolId = null;
     if (school_id !== undefined) {
-      const members = await db.getHouseholdMembers(req.householdId);
+      const members = await q.getHouseholdMembers(req.householdId);
       const targetMember = members.find(m => m.id === targetUserId);
       oldSchoolId = targetMember?.school_id || null;
     }
 
-    const updated = await db.updateUser(targetUserId, updates);
+    const updated = await q.updateUser(targetUserId, updates);
 
     // Clean up orphaned schools — if this was the last child at the old school, delete it
     if (oldSchoolId && oldSchoolId !== (school_id || null)) {
       try {
-        const members = await db.getHouseholdMembers(req.householdId);
+        const members = await q.getHouseholdMembers(req.householdId);
         const stillLinked = members.some(m => m.school_id === oldSchoolId);
         if (!stillLinked) {
-          await db.deleteHouseholdSchool(oldSchoolId, req.householdId);
+          await q.deleteHouseholdSchool(oldSchoolId, req.householdId);
           console.log(`[orphan-cleanup] Deleted orphaned school ${oldSchoolId} — no children remaining`);
         }
       } catch (cleanupErr) {
@@ -169,12 +172,12 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
 
         if (newStr !== currentStr) {
           // Remove any existing birthday events for this user
-          const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
+          const allEvents = await q.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
           const existingBirthdays = allEvents.filter(
             (e) => e.category === 'birthday' && e.source_user_id === targetUserId
           );
           for (const ev of existingBirthdays) {
-            await db.deleteCalendarEvent(ev.id, req.householdId);
+            await q.deleteCalendarEvent(ev.id, req.householdId);
           }
 
           // Create new birthday event if a birthday was provided
@@ -185,7 +188,7 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
             const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
             const startTime = `${eventDate.toISOString().split('T')[0]}T00:00:00Z`;
 
-            await db.createCalendarEventFromSync(
+            await q.createCalendarEventFromSync(
               req.householdId,
               {
                 title: `${displayName}'s Birthday 🎂`,
@@ -225,11 +228,12 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
   }
 
   try {
+    const userDb = getUserClient(req.token);
+    const q = db.withClient(userDb);
     const ext = path.extname(req.file.originalname || '.jpg').toLowerCase() || '.jpg';
     const storagePath = `${req.householdId}/${req.user.id}${ext}`;
 
     // Upload to Supabase Storage (upsert overwrites previous avatar)
-    const userDb = getUserClient(req.token);
     const { error: uploadError } = await userDb.storage
       .from('avatars')
       .upload(storagePath, req.file.buffer, {
@@ -251,7 +255,7 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
     const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
     // Save to DB
-    const updated = await db.updateUser(req.user.id, { avatar_url: avatarUrl });
+    const updated = await q.updateUser(req.user.id, { avatar_url: avatarUrl });
     cache.invalidate(`members:${req.householdId}`);
     return res.json({ avatar_url: updated.avatar_url });
   } catch (err) {
@@ -266,9 +270,10 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
  */
 router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const userDb = getUserClient(req.token);
+    const q = db.withClient(userDb);
     // Try to remove files from storage (best effort — may not exist or may have different ext)
     const prefix = `${req.householdId}/${req.user.id}`;
-    const userDb = getUserClient(req.token);
     const { data: files } = await userDb.storage.from('avatars').list(req.householdId, {
       prefix: req.user.id,
     });
@@ -277,7 +282,7 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
     }
 
     // Clear in DB
-    const updated = await db.updateUser(req.user.id, { avatar_url: null });
+    const updated = await q.updateUser(req.user.id, { avatar_url: null });
     cache.invalidate(`members:${req.householdId}`);
     return res.json({ avatar_url: null });
   } catch (err) {
@@ -298,23 +303,24 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     // Verify target user belongs to the same household
-    const members = await db.getHouseholdMembers(req.householdId);
+    const members = await q.getHouseholdMembers(req.householdId);
     const target = members.find((m) => m.id === userId);
     if (!target) {
       return res.status(404).json({ error: 'Member not found in this household.' });
     }
 
     const removedSchoolId = target.school_id;
-    await db.deleteUser(userId, req.householdId);
+    await q.deleteUser(userId, req.householdId);
 
     // Clean up orphaned school if this was the last child linked to it
     if (removedSchoolId) {
       try {
-        const remaining = await db.getHouseholdMembers(req.householdId);
+        const remaining = await q.getHouseholdMembers(req.householdId);
         const stillLinked = remaining.some(m => m.school_id === removedSchoolId);
         if (!stillLinked) {
-          await db.deleteHouseholdSchool(removedSchoolId, req.householdId);
+          await q.deleteHouseholdSchool(removedSchoolId, req.householdId);
           console.log(`[orphan-cleanup] Deleted orphaned school ${removedSchoolId} after member removal`);
         }
       } catch (e) {
@@ -343,7 +349,8 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
   }
 
   try {
-    const dependent = await db.createDependent(req.householdId, {
+    const q = db.withClient(getUserClient(req.token));
+    const dependent = await q.createDependent(req.householdId, {
       name: name.trim(),
       family_role: family_role?.trim() || null,
       birthday: birthday || null,
@@ -366,7 +373,8 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
  */
 router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    await db.deleteDependent(req.params.id, req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    await q.deleteDependent(req.params.id, req.householdId);
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ message: 'Dependent removed.' });
@@ -388,11 +396,12 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
   }
 
   try {
-    const household = await db.getHouseholdById(req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    const household = await q.getHouseholdById(req.householdId);
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
-    await db.createInvite({
+    await q.createInvite({
       householdId: req.householdId,
       email: inviteEmail.trim().toLowerCase(),
       token,
@@ -423,7 +432,8 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
  */
 router.get('/invites', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    const invites = await db.getPendingInvites(req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    const invites = await q.getPendingInvites(req.householdId);
     return res.json({ invites });
   } catch (err) {
     console.error('GET /api/household/invites error:', err);
@@ -437,7 +447,8 @@ router.get('/invites', requireAuth, requireHousehold, requireAdmin, async (req, 
  */
 router.delete('/invites/:inviteId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    await db.deleteInvite(req.params.inviteId, req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    await q.deleteInvite(req.params.inviteId, req.householdId);
     return res.json({ message: 'Invite cancelled.' });
   } catch (err) {
     console.error('DELETE /api/household/invites error:', err);
@@ -451,8 +462,9 @@ router.delete('/invites/:inviteId', requireAuth, requireHousehold, requireAdmin,
  */
 router.post('/regenerate-email-address', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
+    const q = db.withClient(getUserClient(req.token));
     const newToken = crypto.randomBytes(6).toString('hex');
-    const updated = await db.updateHouseholdSettings(req.householdId, {
+    const updated = await q.updateHouseholdSettings(req.householdId, {
       inbound_email_token: newToken,
     });
     return res.json({

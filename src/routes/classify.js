@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
+const { getUserClient } = require('../db/client');
 const { classify } = require('../services/ai');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
@@ -36,15 +37,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const members = await db.getHouseholdMembers(req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    const members = await q.getHouseholdMembers(req.householdId);
     const memberNames = members.map((m) => m.name);
 
     // Fetch notes and upcoming calendar events for context
-    const notes = await db.getHouseholdNotes(req.householdId).catch(() => []);
+    const notes = await q.getHouseholdNotes(req.householdId).catch(() => []);
     const now = new Date();
     const futureDate = new Date(now);
     futureDate.setDate(futureDate.getDate() + 365);
-    const calendarEvents = await db.getCalendarEvents(
+    const calendarEvents = await q.getCalendarEvents(
       req.householdId,
       now.toISOString(),
       futureDate.toISOString(),
@@ -96,28 +98,28 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
           if (toAdd.length) {
             // Get Default list for this household
-            const defaultList = await db.getDefaultShoppingList(req.householdId);
+            const defaultList = await q.getDefaultShoppingList(req.householdId);
             const enriched = toAdd.map(i => ({
               ...i,
               list_id: defaultList.id,
               aisle_category: i.category || 'Other',
             }));
-            ops.push(db.addShoppingItems(req.householdId, enriched, req.user.id));
+            ops.push(q.addShoppingItems(req.householdId, enriched, req.user.id));
           }
-          if (toRemove.length) ops.push(db.completeShoppingItemsByName(req.householdId, toRemove.map((i) => i.item)));
+          if (toRemove.length) ops.push(q.completeShoppingItemsByName(req.householdId, toRemove.map((i) => i.item)));
         }
 
         // Tasks (adds run in parallel, completes need sequential for recurrence)
         if (result.tasks?.length) {
           const toAdd      = result.tasks.filter((t) => t.action === 'add');
           const toComplete = result.tasks.filter((t) => t.action === 'complete');
-          if (toAdd.length) ops.push(db.addTasks(req.householdId, toAdd, req.user.id, members));
+          if (toAdd.length) ops.push(q.addTasks(req.householdId, toAdd, req.user.id, members));
           if (toComplete.length) {
             ops.push((async () => {
               for (const t of toComplete) {
-                const done = await db.completeTasksByName(req.householdId, [t.title], t.assigned_to_name);
+                const done = await q.completeTasksByName(req.householdId, [t.title], t.assigned_to_name);
                 for (const completedTask of done) {
-                  if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
+                  if (completedTask.recurrence) await q.generateNextRecurrence(completedTask);
                 }
               }
             })());
@@ -151,9 +153,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             }
           }
           ops.push((async () => {
-            const created = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
+            const created = await q.createCalendarEvent(req.householdId, eventData, req.user.id);
             if (created && assigneeNames.length > 0) {
-              await db.saveEventAssignees(created.id, req.householdId, assigneeNames, members);
+              await q.saveEventAssignees(created.id, req.householdId, assigneeNames, members);
             }
           })());
         }
@@ -190,7 +192,7 @@ Return ONLY valid JSON:
               });
               const cleaned = aiText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
               const parsed = JSON.parse(cleaned);
-              await db.createRecipe(req.householdId, {
+              await q.createRecipe(req.householdId, {
                 name: parsed.name,
                 category: (parsed.category || 'dinner').toLowerCase(),
                 ingredients: parsed.ingredients || [],

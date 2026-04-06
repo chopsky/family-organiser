@@ -16,7 +16,8 @@ const VALID_NOTIFICATIONS = ['at_time', '5_min', '15_min', '30_min', '1_hour', '
  */
 router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const tasks = await db.getRecentlyCompletedTasks(req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    const tasks = await q.getRecentlyCompletedTasks(req.householdId);
     return res.json({ tasks });
   } catch (err) {
     console.error('GET /api/tasks/recent error:', err);
@@ -33,15 +34,16 @@ router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const q = db.withClient(getUserClient(req.token));
     let tasks;
 
     if (req.query.all === 'true') {
-      tasks = await db.getAllIncompleteTasks(req.householdId);
+      tasks = await q.getAllIncompleteTasks(req.householdId);
     } else if (req.query.assignee) {
-      tasks = await db.getTasks(req.householdId, { assignedToId: req.query.assignee });
+      tasks = await q.getTasks(req.householdId, { assignedToId: req.query.assignee });
     } else {
       // Default: due today + overdue
-      tasks = await db.getTasks(req.householdId);
+      tasks = await q.getTasks(req.householdId);
     }
 
     if (req.query.completed === 'true') {
@@ -94,8 +96,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const members = await db.getHouseholdMembers(req.householdId);
-    const saved = await db.addTasks(req.householdId, tasksInput, req.user.id, members);
+    const q = db.withClient(getUserClient(req.token));
+    const members = await q.getHouseholdMembers(req.householdId);
+    const saved = await q.addTasks(req.householdId, tasksInput, req.user.id, members);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ tasks: saved });
   } catch (err) {
@@ -128,8 +131,9 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    // Fetch the task first (and verify household ownership)
     const userDb = getUserClient(req.token);
+    const q = db.withClient(userDb);
+    // Fetch the task first (and verify household ownership)
     const { data: task, error: fetchErr } = await userDb
       .from('tasks')
       .select()
@@ -159,7 +163,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
     if (assigned_to_name !== undefined) {
       updateData.assigned_to_name = assigned_to_name || null;
       if (assigned_to_name) {
-        const members = await db.getHouseholdMembers(req.householdId);
+        const members = await q.getHouseholdMembers(req.householdId);
         const member = members.find((m) => m.name.toLowerCase() === assigned_to_name.toLowerCase());
         updateData.assigned_to = member ? member.id : null;
       } else {
@@ -188,7 +192,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
     // If completing a recurring task, generate the next occurrence
     let nextTask = null;
     if (completed && task.recurrence) {
-      nextTask = await db.generateNextRecurrence(task);
+      nextTask = await q.generateNextRecurrence(task);
     }
 
     cache.invalidate(`digest:${req.householdId}`);
@@ -205,7 +209,8 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
  */
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    await db.deleteTask(req.params.id, req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    await q.deleteTask(req.params.id, req.householdId);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {

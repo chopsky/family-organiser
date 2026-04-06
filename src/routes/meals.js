@@ -14,6 +14,7 @@ const router = Router();
  */
 router.get('/meals', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const q = db.withClient(getUserClient(req.token));
     const { week } = req.query;
     if (!week) {
       return res.status(400).json({ error: 'week query parameter is required (YYYY-MM-DD of Monday)' });
@@ -24,10 +25,10 @@ router.get('/meals', requireAuth, requireHousehold, async (req, res) => {
       .toISOString().split('T')[0];
 
     // Get existing meals for the week
-    const meals = await db.getMealPlanForWeek(req.householdId, startDate, endDate);
+    const meals = await q.getMealPlanForWeek(req.householdId, startDate, endDate);
 
     // Get recurring meals and generate entries for any missing days
-    const recurring = await db.getRecurringMeals(req.householdId);
+    const recurring = await q.getRecurringMeals(req.householdId);
     const generatedMeals = [];
 
     for (const recurMeal of recurring) {
@@ -47,7 +48,7 @@ router.get('/meals', requireAuth, requireHousehold, async (req, res) => {
 
       if (!alreadyExists) {
         try {
-          const generated = await db.createMealPlanEntry(req.householdId, {
+          const generated = await q.createMealPlanEntry(req.householdId, {
             date: targetDate,
             category: recurMeal.category,
             recipe_id: recurMeal.recipe_id,
@@ -82,7 +83,8 @@ router.post('/meals', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const meal = await db.createMealPlanEntry(req.householdId, {
+    const q = db.withClient(getUserClient(req.token));
+    const meal = await q.createMealPlanEntry(req.householdId, {
       date,
       category: category || 'dinner',
       recipe_id: recipe_id || null,
@@ -117,7 +119,8 @@ router.patch('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const meal = await db.updateMealPlanEntry(req.params.id, req.householdId, updates);
+    const q = db.withClient(getUserClient(req.token));
+    const meal = await q.updateMealPlanEntry(req.params.id, req.householdId, updates);
     return res.json({ meal });
   } catch (err) {
     if (err.code === 'PGRST116') return res.status(404).json({ error: 'Meal not found' });
@@ -132,7 +135,8 @@ router.patch('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
  */
 router.delete('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    await db.deleteMealPlanEntry(req.params.id, req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    await q.deleteMealPlanEntry(req.params.id, req.householdId);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/meals/:id error:', err);
@@ -151,9 +155,10 @@ router.post('/meals/suggest', requireAuth, requireHousehold, async (req, res) =>
   const { category, count = 3, preferences, dietary } = req.body;
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     const [recentMeals, recentPurchases] = await Promise.all([
-      db.getRecentMeals(req.householdId, 14),
-      db.getRecentPurchases(req.householdId, 14),
+      q.getRecentMeals(req.householdId, 14),
+      q.getRecentPurchases(req.householdId, 14),
     ]);
 
     const recentMealNames = recentMeals.map(m => m.meal_name).join(', ');
@@ -226,8 +231,9 @@ router.post('/meals/accept-suggestion', requireAuth, requireHousehold, async (re
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     // 1. Create recipe in the Recipe Box
-    const recipe = await db.createRecipe(req.householdId, {
+    const recipe = await q.createRecipe(req.householdId, {
       name: suggestion.meal_name.trim(),
       category: (suggestion.category || category || 'dinner').toLowerCase(),
       ingredients: suggestion.ingredients || [],
@@ -240,7 +246,7 @@ router.post('/meals/accept-suggestion', requireAuth, requireHousehold, async (re
     });
 
     // 2. Create meal plan entry linked to the recipe
-    const meal = await db.createMealPlanEntry(req.householdId, {
+    const meal = await q.createMealPlanEntry(req.householdId, {
       date,
       category: (category || suggestion.category || 'dinner').toLowerCase(),
       recipe_id: recipe.id,
@@ -271,18 +277,18 @@ router.post('/meals/to-shopping-list', requireAuth, requireHousehold, async (req
   }
 
   try {
+    const userDb = getUserClient(req.token);
+    const q = db.withClient(userDb);
     let meals;
     if (week) {
       const startDate = week;
       const endDate = new Date(new Date(week).getTime() + 6 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
-      meals = await db.getMealPlanForWeek(req.householdId, startDate, endDate);
+      meals = await q.getMealPlanForWeek(req.householdId, startDate, endDate);
     } else {
       // Fetch specific meals by IDs
       const allMeals = [];
       for (const mealId of meal_ids) {
-        const { getUserClient } = require('../db/client');
-        const userDb = getUserClient(req.token);
         const { data } = await userDb
           .from('meal_plan')
           .select('*, recipes(*)')
@@ -310,7 +316,7 @@ router.post('/meals/to-shopping-list', requireAuth, requireHousehold, async (req
     }
 
     // Get recently purchased items
-    const recentPurchases = await db.getRecentPurchases(req.householdId, 14);
+    const recentPurchases = await q.getRecentPurchases(req.householdId, 14);
     const purchasedNames = recentPurchases.map(p => p.item).join(', ');
 
     // Use AI to deduplicate and cross-reference
@@ -361,7 +367,7 @@ Return ONLY valid JSON:
 
     let added = [];
     if (itemsToAdd.length > 0) {
-      added = await db.addShoppingItems(req.householdId, itemsToAdd, req.user.id);
+      added = await q.addShoppingItems(req.householdId, itemsToAdd, req.user.id);
     }
 
     return res.json({
@@ -383,6 +389,7 @@ Return ONLY valid JSON:
  */
 router.get('/recipes', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const q = db.withClient(getUserClient(req.token));
     const filters = {
       search: req.query.search || null,
       category: req.query.category || null,
@@ -390,7 +397,7 @@ router.get('/recipes', requireAuth, requireHousehold, async (req, res) => {
       favourites: req.query.favourites === 'true',
     };
 
-    const recipes = await db.getRecipes(req.householdId, filters);
+    const recipes = await q.getRecipes(req.householdId, filters);
     return res.json({ recipes });
   } catch (err) {
     console.error('GET /api/recipes error:', err);
@@ -404,7 +411,8 @@ router.get('/recipes', requireAuth, requireHousehold, async (req, res) => {
  */
 router.get('/recipes/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const recipe = await db.getRecipeById(req.params.id, req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    const recipe = await q.getRecipeById(req.params.id, req.householdId);
     if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
     return res.json({ recipe });
   } catch (err) {
@@ -426,7 +434,8 @@ router.post('/recipes', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const recipe = await db.createRecipe(req.householdId, {
+    const q = db.withClient(getUserClient(req.token));
+    const recipe = await q.createRecipe(req.householdId, {
       name: name.trim(),
       category: (category || 'dinner').toLowerCase(),
       ingredients: ingredients || [],
@@ -460,6 +469,7 @@ router.post('/recipes/import-url', requireAuth, requireHousehold, async (req, re
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     // Fetch the web page
     let pageText;
     try {
@@ -545,7 +555,7 @@ ${pageText}` }],
     }
 
     // Save the recipe
-    const recipe = await db.createRecipe(req.householdId, {
+    const recipe = await q.createRecipe(req.householdId, {
       name: parsed.name,
       category: parsed.category || null,
       ingredients: parsed.ingredients || [],
@@ -578,6 +588,7 @@ router.post('/recipes/import-photo', requireAuth, requireHousehold, async (req, 
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     const { text } = await callWithFailover({
       system: 'You extract recipes from photos. Return only valid JSON.',
       feature: 'recipe_import_photo',
@@ -634,7 +645,7 @@ Rules:
     }
 
     // Save the recipe
-    const recipe = await db.createRecipe(req.householdId, {
+    const recipe = await q.createRecipe(req.householdId, {
       name: parsed.name,
       category: parsed.category || null,
       ingredients: parsed.ingredients || [],
@@ -665,6 +676,7 @@ router.post('/recipes/generate', requireAuth, requireHousehold, async (req, res)
   }
 
   try {
+    const q = db.withClient(getUserClient(req.token));
     const prompt = `Create a complete recipe based on the user's request.
 ${dietary ? `Dietary requirements: ${dietary}` : ''}
 ${servings ? `Servings: ${servings}` : ''}
@@ -703,7 +715,7 @@ Return ONLY valid JSON:
     }
 
     // Save the recipe
-    const recipe = await db.createRecipe(req.householdId, {
+    const recipe = await q.createRecipe(req.householdId, {
       name: parsed.name,
       category: parsed.category || null,
       ingredients: parsed.ingredients || [],
@@ -747,7 +759,8 @@ router.patch('/recipes/:id', requireAuth, requireHousehold, async (req, res) => 
   }
 
   try {
-    const recipe = await db.updateRecipe(req.params.id, req.householdId, updates);
+    const q = db.withClient(getUserClient(req.token));
+    const recipe = await q.updateRecipe(req.params.id, req.householdId, updates);
     return res.json({ recipe });
   } catch (err) {
     if (err.code === 'PGRST116') return res.status(404).json({ error: 'Recipe not found' });
@@ -762,7 +775,8 @@ router.patch('/recipes/:id', requireAuth, requireHousehold, async (req, res) => 
  */
 router.delete('/recipes/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    await db.deleteRecipe(req.params.id, req.householdId);
+    const q = db.withClient(getUserClient(req.token));
+    await q.deleteRecipe(req.params.id, req.householdId);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/recipes/:id error:', err);
@@ -778,15 +792,16 @@ router.delete('/recipes/:id', requireAuth, requireHousehold, async (req, res) =>
  */
 router.get('/meal-categories', requireAuth, requireHousehold, async (req, res) => {
   try {
+    const q = db.withClient(getUserClient(req.token));
     const cacheKey = `meal-categories:${req.householdId}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    let categories = await db.getMealCategories(req.householdId);
+    let categories = await q.getMealCategories(req.householdId);
 
     if (!categories || categories.length === 0) {
-      await db.createDefaultMealCategories(req.householdId);
-      categories = await db.getMealCategories(req.householdId);
+      await q.createDefaultMealCategories(req.householdId);
+      categories = await q.getMealCategories(req.householdId);
     }
 
     const result = { categories };
@@ -816,7 +831,8 @@ router.patch('/meal-categories/:id', requireAuth, requireHousehold, async (req, 
   }
 
   try {
-    const category = await db.updateMealCategory(req.params.id, req.householdId, updates);
+    const q = db.withClient(getUserClient(req.token));
+    const category = await q.updateMealCategory(req.params.id, req.householdId, updates);
     cache.invalidate(`meal-categories:${req.householdId}`);
     return res.json({ category });
   } catch (err) {
