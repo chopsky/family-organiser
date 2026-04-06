@@ -8,10 +8,10 @@ const REQUIRED = [
   { key: 'JWT_SECRET', hint: 'Signs auth tokens — app cannot start without it' },
   { key: 'SUPABASE_URL', hint: 'Supabase project URL' },
   { key: 'SUPABASE_SERVICE_KEY', hint: 'Supabase service_role key (admin access)' },
-  { key: 'SUPABASE_ANON_KEY', hint: 'Supabase anon key (for RLS-scoped clients)' },
 ];
 
 const RECOMMENDED = [
+  { key: 'SUPABASE_ANON_KEY', hint: 'Supabase anon key (needed when RLS is enabled)' },
   { key: 'GEMINI_API_KEY', hint: 'Primary AI provider (Gemini Flash)' },
   { key: 'POSTMARK_SERVER_TOKEN', hint: 'Transactional email (invites, verification)' },
   { key: 'POSTMARK_FROM_EMAIL', hint: 'From address for outbound email' },
