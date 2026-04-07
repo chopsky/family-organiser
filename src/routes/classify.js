@@ -2,7 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { classify } = require('../services/ai');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
-const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
+const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
@@ -61,19 +61,38 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // Handle weather intent — fetch weather before responding
     if (result.intent === 'weather') {
       try {
-        const fullUser = members.find(m => m.id === req.user.id);
-        let lat = fullUser?.latitude;
-        let lon = fullUser?.longitude;
-        const tz = fullUser?.timezone || 'Europe/London';
-        if (!lat || !lon) {
-          const tzCoords = getCoordsFromTimezone(tz);
-          if (tzCoords) [lat, lon] = tzCoords;
+        let lat, lon, tz, locationLabel;
+
+        // Check if the user asked about a specific location
+        const locationName = extractLocationFromMessage(text);
+        if (locationName) {
+          const geo = await geocodeLocation(locationName);
+          if (geo) {
+            lat = geo.lat;
+            lon = geo.lon;
+            tz = geo.timezone || 'auto';
+            locationLabel = `${geo.name}, ${geo.country}`;
+          }
         }
+
+        // Fallback to user's profile location
+        if (!lat || !lon) {
+          const fullUser = members.find(m => m.id === req.user.id);
+          lat = fullUser?.latitude;
+          lon = fullUser?.longitude;
+          tz = fullUser?.timezone || 'Europe/London';
+          if (!lat || !lon) {
+            const tzCoords = getCoordsFromTimezone(tz);
+            if (tzCoords) [lat, lon] = tzCoords;
+          }
+        }
+
         if (lat && lon) {
           const weatherReport = await getWeatherReport(lat, lon, tz, { userMessage: text });
-          result.response_message = weatherReport;
+          const prefix = locationLabel ? `📍 **${locationLabel}**\n\n` : '';
+          result.response_message = prefix + weatherReport;
         } else {
-          result.response_message = "I couldn't determine your location for weather. Please check your profile settings. 📍";
+          result.response_message = "I couldn't determine your location. Try asking 'weather in Cape Town' or check your profile settings. 📍";
         }
       } catch (err) {
         console.error('Weather fetch failed:', err.message);

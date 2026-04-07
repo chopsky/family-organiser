@@ -9,7 +9,7 @@
 const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
-const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
+const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { callWithFailover } = require('../services/ai-client');
 
 // ─── Timezone helper ──────────────────────────────────────────────────────────
@@ -121,21 +121,40 @@ async function handleTextMessage(text, user, household) {
     const result = { intent: 'weather', response_message: '' };
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     try {
-      const fullUser = household.members.find(m => m.id === user.id);
-      let lat = fullUser?.latitude;
-      let lon = fullUser?.longitude;
-      const tz = fullUser?.timezone || household.timezone || 'Europe/London';
-      if (!lat || !lon) {
-        const tzCoords = getCoordsFromTimezone(tz);
-        if (tzCoords) [lat, lon] = tzCoords;
+      let lat, lon, tz, locationLabel;
+
+      // Check if the user asked about a specific location (e.g. "weather in Cape Town")
+      const locationName = extractLocationFromMessage(text);
+      if (locationName) {
+        const geo = await geocodeLocation(locationName);
+        if (geo) {
+          lat = geo.lat;
+          lon = geo.lon;
+          tz = geo.timezone || 'auto';
+          locationLabel = `${geo.name}, ${geo.country}`;
+        }
       }
+
+      // Fallback to user's profile location
       if (!lat || !lon) {
-        return { response: "I couldn't determine your location. Please open the Housemait app in your browser to sync your timezone, then ask me again! 📍", actions };
+        const fullUser = household.members.find(m => m.id === user.id);
+        lat = fullUser?.latitude;
+        lon = fullUser?.longitude;
+        tz = fullUser?.timezone || household.timezone || 'Europe/London';
+        if (!lat || !lon) {
+          const tzCoords = getCoordsFromTimezone(tz);
+          if (tzCoords) [lat, lon] = tzCoords;
+        }
+      }
+
+      if (!lat || !lon) {
+        return { response: "I couldn't determine your location. Try asking 'weather in Cape Town' or open the Housemait app to sync your timezone. 📍", actions };
       }
       const report = await getWeatherReport(lat, lon, tz, { userMessage: text });
-      return { response: report, actions };
+      const prefix = locationLabel ? `📍 *${locationLabel}*\n\n` : '';
+      return { response: prefix + report, actions };
     } catch (err) {
-      console.error('[handlers] Weather fetch failed:', err.message, '| lat:', lat, 'lon:', lon, 'tz:', tz);
+      console.error('[handlers] Weather fetch failed:', err.message);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
     }
   }
@@ -180,25 +199,40 @@ async function handleTextMessage(text, user, household) {
   // Handle weather request
   if (result.intent === 'weather') {
     try {
-      // Get user's geolocation from profile
-      const fullUser = household.members.find(m => m.id === user.id);
-      let lat = fullUser?.latitude;
-      let lon = fullUser?.longitude;
-      const tz = fullUser?.timezone || household.timezone || 'Europe/London';
-      // Fallback: derive coordinates from timezone if no GPS
-      if (!lat || !lon) {
-        const tzCoords = getCoordsFromTimezone(tz);
-        if (tzCoords) {
-          [lat, lon] = tzCoords;
+      let lat, lon, tz, locationLabel;
+
+      // Check if the user asked about a specific location
+      const locationName = extractLocationFromMessage(text);
+      if (locationName) {
+        const geo = await geocodeLocation(locationName);
+        if (geo) {
+          lat = geo.lat;
+          lon = geo.lon;
+          tz = geo.timezone || 'auto';
+          locationLabel = `${geo.name}, ${geo.country}`;
         }
       }
+
+      // Fallback to user's profile location
       if (!lat || !lon) {
-        return { response: "I couldn't determine your location. Please open the Housemait app in your browser to sync your timezone, then ask me again! 📍", actions };
+        const fullUser = household.members.find(m => m.id === user.id);
+        lat = fullUser?.latitude;
+        lon = fullUser?.longitude;
+        tz = fullUser?.timezone || household.timezone || 'Europe/London';
+        if (!lat || !lon) {
+          const tzCoords = getCoordsFromTimezone(tz);
+          if (tzCoords) [lat, lon] = tzCoords;
+        }
+      }
+
+      if (!lat || !lon) {
+        return { response: "I couldn't determine your location. Try asking 'weather in Cape Town' or open the Housemait app to sync your timezone. 📍", actions };
       }
       const report = await getWeatherReport(lat, lon, tz, { userMessage: text });
-      return { response: report, actions };
+      const prefix = locationLabel ? `📍 *${locationLabel}*\n\n` : '';
+      return { response: prefix + report, actions };
     } catch (err) {
-      console.error('[handlers] Weather fetch failed (post-classify):', err.message, '| lat:', lat, 'lon:', lon, 'tz:', tz);
+      console.error('[handlers] Weather fetch failed (post-classify):', err.message);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
     }
   }

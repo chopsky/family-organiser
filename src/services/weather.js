@@ -217,4 +217,52 @@ function getCoordsFromTimezone(tz) {
   return null;
 }
 
-module.exports = { getWeatherReport, getCoordsFromTimezone };
+/**
+ * Extract a location name from a weather query.
+ * e.g. "what's the weather in Cape Town?" → "Cape Town"
+ */
+function extractLocationFromMessage(message) {
+  if (!message) return null;
+  const patterns = [
+    /(?:weather|temperature|forecast)\s+(?:in|for|at)\s+(.+?)(?:\?|$)/i,
+    /(?:in|for|at)\s+(.+?)(?:\s+weather|\s+temperature|\s+forecast)/i,
+    /weather\s+(.+?)(?:\?|$)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      const location = match[1].trim().replace(/[?.!]+$/, '').trim();
+      // Ignore day names that might be captured
+      if (/^(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)$/i.test(location)) continue;
+      if (location.length > 1 && location.length < 100) return location;
+    }
+  }
+  return null;
+}
+
+/**
+ * Geocode a location name to coordinates using Open-Meteo's free geocoding API.
+ * @param {string} name - City or place name
+ * @returns {Promise<{lat: number, lon: number, name: string, timezone: string}|null>}
+ */
+async function geocodeLocation(name) {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.results?.length) return null;
+    const result = data.results[0];
+    return {
+      lat: result.latitude,
+      lon: result.longitude,
+      name: result.name,
+      country: result.country,
+      timezone: result.timezone,
+    };
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation };
