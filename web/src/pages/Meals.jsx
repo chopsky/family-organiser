@@ -1178,7 +1178,7 @@ function RecipeBoxView({ setError }) {
       {/* Add recipe FAB */}
       <button
         onClick={() => setAddModalOpen(true)}
-        className="fixed bottom-24 md:bottom-8 right-5 md:right-8 bg-primary hover:bg-primary-pressed text-white w-14 h-14 rounded-2xl  flex items-center justify-center transition-colors z-20"
+        className="fixed bottom-24 md:bottom-8 right-24 md:right-24 bg-primary hover:bg-primary-pressed text-white w-14 h-14 rounded-2xl flex items-center justify-center transition-colors z-20"
         title="Add recipe"
       >
         <IconPlus className="h-6 w-6" />
