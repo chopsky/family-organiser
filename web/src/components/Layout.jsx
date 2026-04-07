@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import { lazy, Suspense } from 'react';
 import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield } from './Icons';
-import ChatWidget from './ChatWidget';
+const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
   { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
@@ -246,7 +247,7 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      <ChatWidget />
+      <Suspense fallback={null}><ChatWidget /></Suspense>
     </div>
   );
 }
