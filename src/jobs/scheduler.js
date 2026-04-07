@@ -107,6 +107,7 @@ async function runWeeklyDigest() {
  * Evening school prep reminder (19:00 local time).
  * Sends a heads-up for tomorrow's school activities.
  */
+const eveningPrepSentToday = new Map(); // householdId → dateString
 async function runEveningSchoolPrepCheck() {
   try {
     const households = await db.getAllHouseholds();
@@ -118,6 +119,11 @@ async function runEveningSchoolPrepCheck() {
 
       // Only fire at 19:00
       if (hour !== 19 || minute !== 0) continue;
+
+      // Guard against duplicate sends (cron runs every minute)
+      const todayStr = now.toISOString().split('T')[0];
+      if (eveningPrepSentToday.get(household.id) === todayStr) continue;
+      eveningPrepSentToday.set(household.id, todayStr);
 
       const members = await db.getHouseholdMembers(household.id);
       const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
@@ -150,6 +156,7 @@ async function runEveningSchoolPrepCheck() {
 
       // Send to all WhatsApp-connected account members
       const accountMembers = members.filter(m => m.member_type !== 'dependent' && m.whatsapp_phone);
+      console.log(`[scheduler] Evening prep for ${household.name}: sending to ${accountMembers.length} member(s): ${accountMembers.map(m => m.name).join(', ')}`);
       for (const member of accountMembers) {
         try {
           await whatsapp.sendTemplate(member.whatsapp_phone, message);

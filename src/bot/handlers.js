@@ -132,10 +132,10 @@ async function handleTextMessage(text, user, household) {
       if (!lat || !lon) {
         return { response: "I couldn't determine your location. Please open the Housemait app in your browser to sync your timezone, then ask me again! 📍", actions };
       }
-      const report = await getWeatherReport(lat, lon, tz);
+      const report = await getWeatherReport(lat, lon, tz, { userMessage: text });
       return { response: report, actions };
     } catch (err) {
-      console.error('Weather fetch failed:', err.message);
+      console.error('[handlers] Weather fetch failed:', err.message, '| lat:', lat, 'lon:', lon, 'tz:', tz);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
     }
   }
@@ -195,10 +195,10 @@ async function handleTextMessage(text, user, household) {
       if (!lat || !lon) {
         return { response: "I couldn't determine your location. Please open the Housemait app in your browser to sync your timezone, then ask me again! 📍", actions };
       }
-      const report = await getWeatherReport(lat, lon, tz);
+      const report = await getWeatherReport(lat, lon, tz, { userMessage: text });
       return { response: report, actions };
     } catch (err) {
-      console.error('Weather fetch failed:', err.message);
+      console.error('[handlers] Weather fetch failed (post-classify):', err.message, '| lat:', lat, 'lon:', lon, 'tz:', tz);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
     }
   }
