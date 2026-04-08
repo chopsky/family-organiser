@@ -170,7 +170,9 @@ async function handleTextMessage(text, user, household) {
     futureDate.toISOString(),
     { userId: user.id }
   ).catch(() => []);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents });
+  const fullUserForTz = household.members.find(m => m.id === user.id);
+  const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents, timezone: userTz });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 

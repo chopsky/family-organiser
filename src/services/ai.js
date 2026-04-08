@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { callWithFailover } = require('./ai-client');
+const { getCityFromTimezone } = require('./weather');
 const {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
@@ -11,7 +12,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, calendarEvents = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, calendarEvents = [], timezone } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const notesStr = notes.length > 0
@@ -26,9 +27,15 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       }).join('\n')
     : '(no upcoming events)';
 
+  const userCity = getCityFromTimezone(timezone);
+  const locationStr = userCity
+    ? `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`
+    : '';
+
   const systemPrompt = CLASSIFICATION_SYSTEM
     .replace(/{{DATE}}/g, today)
     .replace(/{{MEMBERS}}/g, membersStr)
+    .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{NOTES}}/g, notesStr)
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr);
 

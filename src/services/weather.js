@@ -265,4 +265,52 @@ async function geocodeLocation(name) {
   }
 }
 
-module.exports = { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation };
+/**
+ * Derive a human-readable city/region from timezone string.
+ * e.g. 'Africa/Johannesburg' → 'Johannesburg, South Africa'
+ */
+const TIMEZONE_CITIES = {
+  'Africa/Johannesburg': 'Johannesburg, South Africa',
+  'Africa/Cape_Town': 'Cape Town, South Africa',
+  'Africa/Lagos': 'Lagos, Nigeria',
+  'Africa/Nairobi': 'Nairobi, Kenya',
+  'Africa/Cairo': 'Cairo, Egypt',
+  'Europe/London': 'London, United Kingdom',
+  'Europe/Paris': 'Paris, France',
+  'Europe/Berlin': 'Berlin, Germany',
+  'Europe/Madrid': 'Madrid, Spain',
+  'Europe/Rome': 'Rome, Italy',
+  'Europe/Amsterdam': 'Amsterdam, Netherlands',
+  'Europe/Zurich': 'Zurich, Switzerland',
+  'Europe/Dublin': 'Dublin, Ireland',
+  'Europe/Lisbon': 'Lisbon, Portugal',
+  'Europe/Moscow': 'Moscow, Russia',
+  'Europe/Istanbul': 'Istanbul, Turkey',
+  'America/New_York': 'New York, United States',
+  'America/Chicago': 'Chicago, United States',
+  'America/Denver': 'Denver, United States',
+  'America/Los_Angeles': 'Los Angeles, United States',
+  'America/Toronto': 'Toronto, Canada',
+  'America/Sao_Paulo': 'São Paulo, Brazil',
+  'Asia/Dubai': 'Dubai, UAE',
+  'Asia/Shanghai': 'Shanghai, China',
+  'Asia/Tokyo': 'Tokyo, Japan',
+  'Asia/Singapore': 'Singapore',
+  'Asia/Kolkata': 'Delhi, India',
+  'Asia/Hong_Kong': 'Hong Kong',
+  'Australia/Sydney': 'Sydney, Australia',
+  'Australia/Melbourne': 'Melbourne, Australia',
+  'Australia/Perth': 'Perth, Australia',
+  'Pacific/Auckland': 'Auckland, New Zealand',
+};
+
+function getCityFromTimezone(tz) {
+  if (!tz) return null;
+  if (TIMEZONE_CITIES[tz]) return TIMEZONE_CITIES[tz];
+  // Fallback: extract city from timezone string (e.g. 'America/New_York' → 'New York')
+  const parts = tz.split('/');
+  if (parts.length >= 2) return parts[parts.length - 1].replace(/_/g, ' ');
+  return null;
+}
+
+module.exports = { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation, getCityFromTimezone };

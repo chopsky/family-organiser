@@ -5,7 +5,7 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
-const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
+const { getWeatherReport, getCoordsFromTimezone, getCityFromTimezone } = require('../services/weather');
 
 // Multer config for chat image uploads (10 MB, images only)
 const chatImageUpload = multer({
@@ -76,6 +76,10 @@ async function buildSystemPrompt(householdId, householdName, userId) {
 
   const currentUser = members.find(m => m.id === userId);
   const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
+  const userCity = getCityFromTimezone(userTz);
+  const locationStr = userCity
+    ? `The family is based in **${userCity}**. Use this for local recommendations — suggest specific places, neighbourhoods, and services in this area.`
+    : '';
 
   const membersStr = members.map(m => `${m.name}${m.family_role ? ` (${m.family_role})` : ''}`).join(', ') || 'none';
   const householdAllergies = (() => { try { return JSON.parse(household?.allergies || '[]'); } catch { return []; } })();
@@ -111,6 +115,7 @@ async function buildSystemPrompt(householdId, householdName, userId) {
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
     .replace(/{{TIMEZONE}}/g, userTz)
+    .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{MEMBERS}}/g, membersStr)
     .replace(/{{SHOPPING_LIST}}/g, shoppingStr)
     .replace(/{{TASKS}}/g, tasksStr)
