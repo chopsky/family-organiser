@@ -62,9 +62,11 @@ export default function ForgotPassword() {
             </form>
           )}
         </div>
-        <p className="text-center text-sm text-cocoa mt-6">
-          <Link to="/login" className="text-primary font-medium hover:underline">Back to login</Link>
-        </p>
+        {!sent && (
+          <p className="text-center text-sm text-cocoa mt-6">
+            <Link to="/login" className="text-primary font-medium hover:underline">Back to login</Link>
+          </p>
+        )}
       </div>
     </div>
   );
