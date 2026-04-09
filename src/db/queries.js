@@ -1829,7 +1829,8 @@ async function createDefaultMealCategories(householdId, db = supabase) {
     { household_id: householdId, name: 'Breakfast', colour: '#F5CBA7', sort_order: 0, active: true },
     { household_id: householdId, name: 'Lunch', colour: '#A9DFBF', sort_order: 1, active: true },
     { household_id: householdId, name: 'Dinner', colour: '#AED6F1', sort_order: 2, active: true },
-    { household_id: householdId, name: 'Snack', colour: '#D7BDE2', sort_order: 3, active: true },
+    { household_id: householdId, name: 'Dessert', colour: '#F5B7B1', sort_order: 3, active: true },
+    { household_id: householdId, name: 'Snack', colour: '#D7BDE2', sort_order: 4, active: true },
   ];
   const { data, error } = await db
     .from('meal_categories')

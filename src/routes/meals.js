@@ -171,7 +171,7 @@ Return ONLY valid JSON:
   "suggestions": [
     {
       "meal_name": "Name of meal",
-      "category": "breakfast|lunch|dinner|snack",
+      "category": "breakfast|lunch|dinner|dessert|snack",
       "description": "Brief description",
       "prep_time_mins": 15,
       "cook_time_mins": 30,
@@ -510,7 +510,7 @@ router.post('/recipes/import-url', requireAuth, requireHousehold, async (req, re
 Return ONLY valid JSON:
 {
   "name": "recipe name",
-  "category": "breakfast|lunch|dinner|snack",
+  "category": "breakfast|lunch|dinner|dessert|snack",
   "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc", "optional": false}],
   "method": ["Step 1...", "Step 2..."],
   "prep_time_mins": 15,
@@ -600,7 +600,7 @@ router.post('/recipes/import-photo', requireAuth, requireHousehold, async (req, 
 Return ONLY valid JSON:
 {
   "name": "recipe name",
-  "category": "breakfast|lunch|dinner|snack",
+  "category": "breakfast|lunch|dinner|dessert|snack",
   "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc", "optional": false}],
   "method": ["Step 1...", "Step 2..."],
   "prep_time_mins": 15,
@@ -674,7 +674,7 @@ User's request: ${description}
 Return ONLY valid JSON:
 {
   "name": "recipe name",
-  "category": "breakfast|lunch|dinner|snack",
+  "category": "breakfast|lunch|dinner|dessert|snack",
   "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc", "optional": false}],
   "method": ["Step 1...", "Step 2..."],
   "prep_time_mins": 15,

@@ -6,11 +6,12 @@ import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
 
 // ── Constants ─────────────────────────────────────────────────────
 
-const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack'];
 const CATEGORY_COLOURS_MAP = {
   breakfast: { bg: 'bg-[#F5CBA7]', text: 'text-[#8B5E2B]', light: 'bg-[#F5CBA7]/20', border: 'border-[#F5CBA7]' },
   lunch:     { bg: 'bg-[#A9DFBF]', text: 'text-[#2E7D46]', light: 'bg-[#A9DFBF]/20', border: 'border-[#A9DFBF]' },
   dinner:    { bg: 'bg-[#AED6F1]', text: 'text-[#1F5F8B]', light: 'bg-[#AED6F1]/20', border: 'border-[#AED6F1]' },
+  dessert:   { bg: 'bg-[#F5B7B1]', text: 'text-[#943126]', light: 'bg-[#F5B7B1]/20', border: 'border-[#F5B7B1]' },
   snack:     { bg: 'bg-[#D7BDE2]', text: 'text-[#6C3483]', light: 'bg-[#D7BDE2]/20', border: 'border-[#D7BDE2]' },
 };
 function getCatColours(cat) {
@@ -689,14 +690,13 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
 
   const colors = getCatColours(cell.category);
 
-  // Load recipes filtered by category
+  // Load all recipes (not filtered by slot category — any recipe can go in any slot)
   useEffect(() => {
     async function load() {
       setLoadingRecipes(true);
       try {
         const params = {};
         if (search) params.search = search;
-        params.category = cell.category.toLowerCase();
         const res = await api.get('/recipes', { params });
         setRecipes(res.data.recipes ?? []);
       } catch {
@@ -706,7 +706,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
       }
     }
     if (tab === 'recipes') load();
-  }, [tab, search, cell.category, setError]);
+  }, [tab, search, setError]);
 
   // Close on outside click
   useEffect(() => {

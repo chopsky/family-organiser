@@ -683,7 +683,7 @@ Keep it simple — families are busy. Use common British supermarket ingredients
 Return ONLY valid JSON:
 {
   "name": "recipe name",
-  "category": "breakfast|lunch|dinner|snack",
+  "category": "breakfast|lunch|dinner|dessert|snack",
   "ingredients": [{"name": "ingredient", "quantity": "amount", "unit": "g|ml|tsp|etc", "optional": false}],
   "method": ["Step 1...", "Step 2..."],
   "prep_time_mins": 15,
