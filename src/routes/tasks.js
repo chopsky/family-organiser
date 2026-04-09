@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
-const { getUserClient } = require('../db/client');
+const { supabaseAdmin } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 
@@ -45,7 +45,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     }
 
     if (req.query.completed === 'true') {
-      const userDb = getUserClient(req.token);
+      const userDb = supabaseAdmin;
       const { data, error } = await userDb
         .from('tasks')
         .select()
@@ -129,7 +129,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 
   try {
     // Fetch the task first (and verify household ownership)
-    const userDb = getUserClient(req.token);
+    const userDb = supabaseAdmin;
     const { data: task, error: fetchErr } = await userDb
       .from('tasks')
       .select()

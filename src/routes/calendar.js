@@ -694,8 +694,8 @@ router.delete('/connections/:provider', async (req, res) => {
 
     // Bulk soft-delete all synced calendar events for this connection
     try {
-      const { getUserClient } = require('../db/client');
-      const userDb = getUserClient(req.token);
+      const { supabaseAdmin } = require('../db/client');
+      const userDb = supabaseAdmin;
       const { data: eventIds } = await userDb
         .from('calendar_sync_mappings')
         .select('event_id')

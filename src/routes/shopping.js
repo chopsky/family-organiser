@@ -117,8 +117,8 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    const { getUserClient } = require('../db/client');
-    const userDb = getUserClient(req.token);
+    const { supabaseAdmin } = require('../db/client');
+    const userDb = supabaseAdmin;
     const updateData = {};
 
     if (typeof completed === 'boolean') {
