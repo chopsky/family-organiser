@@ -56,12 +56,8 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       const windowEnd = todayStr + 'T23:59:59';
       const allTodayEvents = await db.getCalendarEvents(req.householdId, windowStart, windowEnd, { userId: req.user.id }) || [];
       // Log every event so we can see what's being counted
-      console.log(`[digest] todayStr=${todayStr}, allTodayEvents=${allTodayEvents.length}:`);
-      for (const e of allTodayEvents) {
-        const start = e.start_time?.split('T')[0];
-        const end = e.end_time?.split('T')[0];
-        console.log(`  [${e.category || 'general'}] "${e.title}" start=${start} end=${end}`);
-      }
+      console.log(`[digest] todayStr=${todayStr} tz=${tz} allTodayEvents=${allTodayEvents.length}`);
+      allTodayEvents.forEach((e, i) => console.log(`[digest] ${i+1}. [${e.category||'general'}] "${e.title}" start=${e.start_time} end=${e.end_time}`));
       // Filter to only events that actually fall on today (by date string, matching Calendar page logic)
       // and exclude public holidays and birthdays since they aren't actionable schedule items
       todayEvents = allTodayEvents.filter(e => {
