@@ -875,8 +875,27 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
   const { data: tasks, error: fetchErr } = await query;
   if (fetchErr) throw fetchErr;
 
+  // Match tasks using fuzzy word overlap — the AI often paraphrases task titles
+  // (e.g. "Mason's party planning" for "Plan Mason's party")
+  function extractWords(str) {
+    return str.toLowerCase().replace(/['']/g, '').split(/\s+/).filter(w => w.length > 2);
+  }
+
+  function fuzzyMatch(taskTitle, aiTitle) {
+    const tLower = taskTitle.toLowerCase();
+    const aLower = aiTitle.toLowerCase();
+    // Exact or substring match
+    if (tLower.includes(aLower) || aLower.includes(tLower)) return true;
+    // Word overlap: if more than half the significant words match, it's the same task
+    const taskWords = extractWords(taskTitle);
+    const aiWords = extractWords(aiTitle);
+    if (taskWords.length === 0 || aiWords.length === 0) return false;
+    const overlap = taskWords.filter(w => aiWords.some(aw => aw.includes(w) || w.includes(aw)));
+    return overlap.length >= Math.min(taskWords.length, aiWords.length) * 0.5;
+  }
+
   const matched = tasks.filter((t) =>
-    lowerTitles.some((n) => t.title.toLowerCase().includes(n) || n.includes(t.title.toLowerCase()))
+    lowerTitles.some((n) => fuzzyMatch(t.title, n))
   );
   if (!matched.length) return [];
 
