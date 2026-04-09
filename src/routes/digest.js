@@ -50,9 +50,19 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     let weekMeals = [];
     try { shoppingItems = await db.getShoppingList(req.householdId) || []; } catch (e) { console.warn('digest: shopping list fetch failed:', e.message); }
     try {
-      const allTodayEvents = await db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59', { userId: req.user.id }) || [];
-      // Filter out public holidays — they inflate the count and aren't actionable
-      todayEvents = allTodayEvents.filter(e => e.category !== 'public_holiday');
+      // Fetch a wide window then filter by date string — this matches how the Calendar page works
+      // and avoids timezone mismatches between the DB (timestamptz/UTC) and the household TZ
+      const windowStart = todayStr + 'T00:00:00';
+      const windowEnd = todayStr + 'T23:59:59';
+      const allTodayEvents = await db.getCalendarEvents(req.householdId, windowStart, windowEnd, { userId: req.user.id }) || [];
+      // Filter to only events that actually fall on today (by date string, matching Calendar page logic)
+      // and exclude public holidays and birthdays since they aren't actionable schedule items
+      todayEvents = allTodayEvents.filter(e => {
+        const start = e.start_time?.split('T')[0];
+        const end = e.end_time?.split('T')[0];
+        const isToday = start === todayStr || (start <= todayStr && end >= todayStr);
+        return isToday && e.category !== 'public_holiday' && e.category !== 'birthday';
+      });
     } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
     try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
 
