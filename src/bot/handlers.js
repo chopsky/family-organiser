@@ -163,7 +163,7 @@ async function handleTextMessage(text, user, household) {
   const notes = await db.getHouseholdNotes(household.id);
   const now = new Date();
   const futureDate = new Date(now);
-  futureDate.setDate(futureDate.getDate() + 365);
+  futureDate.setDate(futureDate.getDate() + 90); // 90 days is enough context; 365 made prompts too large
   const calendarEvents = await db.getCalendarEvents(
     household.id,
     now.toISOString(),
@@ -172,6 +172,8 @@ async function handleTextMessage(text, user, household) {
   ).catch(() => []);
   const fullUserForTz = household.members.find(m => m.id === user.id);
   const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
+
+  console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${notes.length} notes`);
   const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents, timezone: userTz });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));

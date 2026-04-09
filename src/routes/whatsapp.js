@@ -119,9 +119,10 @@ router.post('/webhook', async (req, res) => {
         const notification = handlers.buildBroadcastMessage(user.name, result.actions);
         if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
-        console.error('[whatsapp] Text handler error:', err.message);
+        console.error('[whatsapp] Text handler error:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, error: err.message });
-        await whatsapp.sendMessage(phone, 'Sorry, I had trouble understanding that. Please try again.');
+        const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+        await whatsapp.sendMessage(phone, `Sorry, I had trouble processing that (${elapsed}s). Please try again.`);
       }
     }
   } catch (err) {

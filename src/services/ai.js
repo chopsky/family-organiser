@@ -18,13 +18,15 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   const notesStr = notes.length > 0
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
     : '(none saved yet)';
-  const calendarStr = calendarEvents.length > 0
-    ? calendarEvents.map(e => {
+  // Cap at 100 events to keep the prompt size reasonable
+  const cappedEvents = calendarEvents.slice(0, 100);
+  const calendarStr = cappedEvents.length > 0
+    ? cappedEvents.map(e => {
         const date = new Date(e.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
         const time = e.all_day ? 'All day' : new Date(e.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         const who = e.assigned_to_name ? ` (${e.assigned_to_name})` : '';
         return `- ${date} ${time}: ${e.title}${who}${e.location ? ` @ ${e.location}` : ''}`;
-      }).join('\n')
+      }).join('\n') + (calendarEvents.length > 100 ? `\n... and ${calendarEvents.length - 100} more events` : '')
     : '(no upcoming events)';
 
   const userCity = getCityFromTimezone(timezone);
