@@ -10,7 +10,7 @@ app.set('trust proxy', 1);
 
 // CORS must come before helmet so preflight OPTIONS requests are handled correctly
 const allowedOrigins = process.env.WEB_URL
-  ? [process.env.WEB_URL]
+  ? [process.env.WEB_URL, 'capacitor://localhost', 'http://localhost']
   : true; // allow all in development
 const corsOptions = { origin: allowedOrigins, credentials: true };
 app.use(cors(corsOptions));
