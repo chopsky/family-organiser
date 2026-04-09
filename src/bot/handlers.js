@@ -163,7 +163,7 @@ async function handleTextMessage(text, user, household) {
   const notes = await db.getHouseholdNotes(household.id);
   const now = new Date();
   const futureDate = new Date(now);
-  futureDate.setDate(futureDate.getDate() + 90); // 90 days is enough context; 365 made prompts too large
+  futureDate.setDate(futureDate.getDate() + 365);
   const calendarEvents = await db.getCalendarEvents(
     household.id,
     now.toISOString(),
