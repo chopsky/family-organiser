@@ -17,28 +17,30 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    // Today's date in YYYY-MM-DD format
-    const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    // Fetch household first so we can use its timezone for date calculations
+    const household = await db.getHouseholdById(req.householdId);
+    const tz = household?.timezone || 'Europe/London';
+
+    // Today's date in YYYY-MM-DD format, in the household's timezone
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
 
     // Meals: today + next 6 days (covers the dashboard's "today + 3 days" view
     // even when it spans across a Mon-Sun week boundary)
-    const mealsEnd = new Date(today);
-    mealsEnd.setDate(today.getDate() + 6);
+    const mealsEnd = new Date(now);
+    mealsEnd.setDate(now.getDate() + 6);
     const weekStart = todayStr;
-    const weekEnd = mealsEnd.toISOString().slice(0, 10);
+    const weekEnd = mealsEnd.toLocaleDateString('en-CA', { timeZone: tz });
 
     const [
       { tasks: completedTasks, shoppingItems: completedShopping },
       outstanding,
       upcoming,
-      household,
       members,
     ] = await Promise.all([
       db.getCompletedThisWeek(req.householdId),
       db.getTasks(req.householdId),       // overdue + today = "carrying over"
       db.getTasksDueNextWeek(req.householdId),
-      db.getHouseholdById(req.householdId),
       db.getHouseholdMembers(req.householdId),
     ]);
 
@@ -47,7 +49,11 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     let todayEvents = [];
     let weekMeals = [];
     try { shoppingItems = await db.getShoppingList(req.householdId) || []; } catch (e) { console.warn('digest: shopping list fetch failed:', e.message); }
-    try { todayEvents = await db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59') || []; } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
+    try {
+      const allTodayEvents = await db.getCalendarEvents(req.householdId, todayStr, todayStr + 'T23:59:59', { userId: req.user.id }) || [];
+      // Filter out public holidays — they inflate the count and aren't actionable
+      todayEvents = allTodayEvents.filter(e => e.category !== 'public_holiday');
+    } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
     try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
 
     const result = {
