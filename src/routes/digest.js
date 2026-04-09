@@ -19,7 +19,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
 
     // Fetch household first so we can use its timezone for date calculations
     const household = await db.getHouseholdById(req.householdId);
-    const tz = household?.timezone || 'Europe/London';
+    const tz = household?.timezone || 'Africa/Johannesburg';
 
     // Today's date in YYYY-MM-DD format, in the household's timezone
     const now = new Date();
@@ -60,13 +60,21 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       allTodayEvents.forEach((e, i) => console.log(`[digest] ${i+1}. [${e.category||'general'}] "${e.title}" start=${e.start_time} end=${e.end_time}`));
       // Filter to only events that actually fall on today (by date string, matching Calendar page logic)
       // and exclude public holidays and birthdays since they aren't actionable schedule items
-      todayEvents = allTodayEvents.filter(e => {
+      const filtered = allTodayEvents.filter(e => {
         const start = e.start_time?.split('T')[0];
         const end = e.end_time?.split('T')[0];
         const isToday = start === todayStr || (start <= todayStr && end >= todayStr);
         return isToday && e.category !== 'public_holiday' && e.category !== 'birthday';
       });
-      console.log(`[digest] After filtering: ${todayEvents.length} events`);
+      // Deduplicate events — calendar sync can create duplicate rows with same title + start_time
+      const seen = new Set();
+      todayEvents = filtered.filter(e => {
+        const key = `${e.title}|${e.start_time}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      console.log(`[digest] DB returned ${allTodayEvents.length}, after filter+dedup: ${todayEvents.length}`);
     } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
     try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
 
