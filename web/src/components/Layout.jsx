@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText } from './Icons';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
@@ -13,6 +13,7 @@ const mainNav = [
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
   { to: '/meals',      label: 'Meals',     Icon: IconUtensils  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
+  { to: '/documents',  label: 'Documents', Icon: IconFileText  },
   { to: '/family',     label: 'Family',    Icon: IconUsers     },
 ];
 
@@ -25,9 +26,10 @@ const mobileNav = [
 ];
 
 const moreNav = [
-  { to: '/family',    label: 'Family Setup',     Icon: IconUsers    },
-  { to: '/receipt',   label: 'Receipt Scanner',   Icon: IconCamera   },
-  { to: '/settings',  label: 'Settings',          Icon: IconSettings  },
+  { to: '/family',     label: 'Family Setup',     Icon: IconUsers    },
+  { to: '/documents',  label: 'Documents',        Icon: IconFileText },
+  { to: '/receipt',    label: 'Receipt Scanner',   Icon: IconCamera   },
+  { to: '/settings',   label: 'Settings',          Icon: IconSettings  },
 ];
 
 const avatarColors = {

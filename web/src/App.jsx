@@ -22,6 +22,7 @@ const Meals           = lazy(() => import('./pages/Meals'));
 const Receipt         = lazy(() => import('./pages/Receipt'));
 const FamilySetup     = lazy(() => import('./pages/FamilySetup'));
 const Settings        = lazy(() => import('./pages/Settings'));
+const Documents       = lazy(() => import('./pages/Documents'));
 
 // Admin pages — only downloaded if user is a platform admin
 const AdminDashboard       = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -85,6 +86,7 @@ function AppRoutes() {
         <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
         <Route path="/meals" element={<RequireAuth><Layout><Meals /></Layout></RequireAuth>} />
         <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
+        <Route path="/documents" element={<RequireAuth><Layout><Documents /></Layout></RequireAuth>} />
         <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
         {/* Admin routes */}

@@ -2684,6 +2684,193 @@ async function cleanupSchedulerLocks() {
     .lt('lock_date', cutoff.toISOString().split('T')[0]);
 }
 
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+async function createDocumentFolder(householdId, { name, visibility = 'shared', created_by, parent_folder_id = null, color = '#6B3FA0', icon = 'folder' }) {
+  const { data, error } = await supabase
+    .from('document_folders')
+    .insert({ household_id: householdId, name, visibility, created_by, parent_folder_id, color, icon })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getDocumentFolders(householdId, userId, parentFolderId = null) {
+  let query = supabase
+    .from('document_folders')
+    .select('*, documents:documents(id)')
+    .eq('household_id', householdId)
+    .order('name');
+
+  if (parentFolderId) {
+    query = query.eq('parent_folder_id', parentFolderId);
+  } else {
+    query = query.is('parent_folder_id', null);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // Filter: shared folders visible to all, private only to creator
+  return (data || [])
+    .filter(f => f.visibility === 'shared' || f.created_by === userId)
+    .map(f => ({ ...f, file_count: f.documents?.length || 0, documents: undefined }));
+}
+
+async function getDocumentFolderById(folderId, householdId) {
+  const { data, error } = await supabase
+    .from('document_folders')
+    .select()
+    .eq('id', folderId)
+    .eq('household_id', householdId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function updateDocumentFolder(folderId, householdId, updates) {
+  const allowed = {};
+  if (updates.name !== undefined) allowed.name = updates.name;
+  if (updates.visibility !== undefined) allowed.visibility = updates.visibility;
+  if (updates.color !== undefined) allowed.color = updates.color;
+  if (updates.icon !== undefined) allowed.icon = updates.icon;
+  if (updates.parent_folder_id !== undefined) allowed.parent_folder_id = updates.parent_folder_id;
+
+  const { data, error } = await supabase
+    .from('document_folders')
+    .update(allowed)
+    .eq('id', folderId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteDocumentFolder(folderId, householdId) {
+  const { error } = await supabase
+    .from('document_folders')
+    .delete()
+    .eq('id', folderId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function createDocument(householdId, { name, file_path, file_size, mime_type, uploaded_by, folder_id = null }) {
+  const { data, error } = await supabase
+    .from('documents')
+    .insert({ household_id: householdId, name, file_path, file_size, mime_type, uploaded_by, folder_id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getDocuments(householdId, userId, folderId = null) {
+  let query = supabase
+    .from('documents')
+    .select('*, folder:document_folders(id, visibility, created_by)')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+
+  if (folderId) {
+    query = query.eq('folder_id', folderId);
+  } else {
+    query = query.is('folder_id', null);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // Filter: docs in private folders only visible to folder creator
+  return (data || []).filter(doc => {
+    if (!doc.folder) return true; // root-level docs visible to all
+    return doc.folder.visibility === 'shared' || doc.folder.created_by === userId;
+  });
+}
+
+async function getDocumentById(docId, householdId) {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*, folder:document_folders(id, visibility, created_by)')
+    .eq('id', docId)
+    .eq('household_id', householdId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function updateDocument(docId, householdId, updates) {
+  const allowed = {};
+  if (updates.name !== undefined) allowed.name = updates.name;
+  if (updates.folder_id !== undefined) allowed.folder_id = updates.folder_id;
+
+  const { data, error } = await supabase
+    .from('documents')
+    .update(allowed)
+    .eq('id', docId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteDocument(docId, householdId) {
+  const { error } = await supabase
+    .from('documents')
+    .delete()
+    .eq('id', docId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function getDocumentsByFolderIds(folderIds) {
+  if (!folderIds.length) return [];
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, file_path')
+    .in('folder_id', folderIds);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Get all descendant folder IDs (including the given folder) using iterative BFS.
+ */
+async function getDescendantFolderIds(folderId) {
+  const allIds = [folderId];
+  let currentIds = [folderId];
+
+  while (currentIds.length > 0) {
+    const { data, error } = await supabase
+      .from('document_folders')
+      .select('id')
+      .in('parent_folder_id', currentIds);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    const childIds = data.map(f => f.id);
+    allIds.push(...childIds);
+    currentIds = childIds;
+  }
+
+  return allIds;
+}
+
+/**
+ * Get storage usage for a household (total bytes and file count).
+ */
+async function getHouseholdStorageUsage(householdId) {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('file_size')
+    .eq('household_id', householdId);
+  if (error) throw error;
+  const totalBytes = (data || []).reduce((sum, d) => sum + (d.file_size || 0), 0);
+  return { totalBytes, fileCount: (data || []).length };
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -2874,4 +3061,18 @@ module.exports = {
   // Scheduler locks
   acquireSchedulerLock,
   cleanupSchedulerLocks,
+  // Documents
+  createDocumentFolder,
+  getDocumentFolders,
+  getDocumentFolderById,
+  updateDocumentFolder,
+  deleteDocumentFolder,
+  createDocument,
+  getDocuments,
+  getDocumentById,
+  updateDocument,
+  deleteDocument,
+  getDocumentsByFolderIds,
+  getDescendantFolderIds,
+  getHouseholdStorageUsage,
 };
