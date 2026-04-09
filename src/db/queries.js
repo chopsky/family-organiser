@@ -895,6 +895,18 @@ async function generateNextRecurrence(task, db = supabase) {
     default: return null;
   }
 
+  // Delete any previous uncompleted instances of this recurring task.
+  // A recurring task should only ever have one active instance — if the user
+  // didn't complete the old one before the new one is due, remove it.
+  await db
+    .from('tasks')
+    .delete()
+    .eq('household_id', task.household_id)
+    .eq('title', task.title)
+    .eq('recurrence', task.recurrence)
+    .eq('completed', false)
+    .neq('id', task.id);
+
   const { data, error } = await db
     .from('tasks')
     .insert({
