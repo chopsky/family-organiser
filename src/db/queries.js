@@ -2619,6 +2619,39 @@ async function getEventAssigneesBatch(eventIds, db = supabase) {
   return data || [];
 }
 
+/**
+ * Attempt to acquire a scheduler lock for a given key and date.
+ * Returns true if the lock was acquired (i.e. first caller), false if it already existed.
+ * Uses INSERT ... ON CONFLICT DO NOTHING to ensure only one instance sends.
+ */
+async function acquireSchedulerLock(lockKey, lockDate) {
+  const { data, error } = await supabase
+    .from('scheduler_locks')
+    .insert({ lock_key: lockKey, lock_date: lockDate })
+    .select();
+  if (error) {
+    // Unique constraint violation means another instance already sent
+    if (error.code === '23505') return false;
+    // Table doesn't exist yet — allow sending (don't block notifications)
+    if (error.code === '42P01') return true;
+    console.error('[scheduler-lock] Error:', error.message);
+    return true; // On unknown errors, allow sending (fail open)
+  }
+  return data && data.length > 0;
+}
+
+/**
+ * Clean up old scheduler locks (older than 7 days).
+ */
+async function cleanupSchedulerLocks() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  await supabase
+    .from('scheduler_locks')
+    .delete()
+    .lt('lock_date', cutoff.toISOString().split('T')[0]);
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -2806,4 +2839,7 @@ module.exports = {
   markReminderSent,
   getEventAssignees,
   getEventAssigneesBatch,
+  // Scheduler locks
+  acquireSchedulerLock,
+  cleanupSchedulerLocks,
 };

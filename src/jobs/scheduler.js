@@ -9,6 +9,7 @@ const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
+const { isSchoolInSession } = require('../utils/school-terms');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -40,6 +41,7 @@ function currentHHMMInTZ(timezone) {
 /**
  * Run daily reminders — checks each member's personal reminder_time,
  * falling back to the household default. Called every minute by cron.
+ * Uses DB lock to prevent duplicate sends during rolling deploys.
  */
 async function runDailyReminderCheck() {
   try {
@@ -49,12 +51,16 @@ async function runDailyReminderCheck() {
       const nowInTZ = currentHHMMInTZ(tz);
       const householdDefault = (household.reminder_time || '08:00:00').substring(0, 5);
       const members = await db.getHouseholdMembers(household.id);
+      const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
 
       for (const member of members) {
         const memberTime = member.reminder_time
           ? (member.reminder_time).substring(0, 5)
           : householdDefault;
         if (memberTime === nowInTZ) {
+          const lockKey = `daily_reminder:${member.id}`;
+          const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+          if (!acquired) continue;
           await sendDailyReminders(household.id, member);
         }
       }
@@ -74,8 +80,13 @@ async function runOverdueNudgeCheck() {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       // Nudge at 14:00 in the household's timezone
-      const nowInTZ = currentHHMMInTZ(household.timezone || 'Africa/Johannesburg');
+      const tz = household.timezone || 'Africa/Johannesburg';
+      const nowInTZ = currentHHMMInTZ(tz);
       if (nowInTZ === '14:00') {
+        const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
+        const lockKey = `overdue_nudge:${household.id}`;
+        const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+        if (!acquired) continue;
         console.log(`[scheduler] Sending overdue nudges for "${household.name}" (${household.id})`);
         await sendOverdueNudges(household.id);
       }
@@ -107,7 +118,6 @@ async function runWeeklyDigest() {
  * Evening school prep reminder (19:00 local time).
  * Sends a heads-up for tomorrow's school activities.
  */
-const eveningPrepSentToday = new Map(); // householdId → dateString
 async function runEveningSchoolPrepCheck() {
   try {
     const households = await db.getAllHouseholds();
@@ -120,10 +130,11 @@ async function runEveningSchoolPrepCheck() {
       // Only fire at 19:00
       if (hour !== 19 || minute !== 0) continue;
 
-      // Guard against duplicate sends (cron runs every minute)
+      // DB-level dedup to prevent duplicate sends across instances
       const todayStr = now.toISOString().split('T')[0];
-      if (eveningPrepSentToday.get(household.id) === todayStr) continue;
-      eveningPrepSentToday.set(household.id, todayStr);
+      const lockKey = `evening_prep:${household.id}`;
+      const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+      if (!acquired) continue;
 
       const members = await db.getHouseholdMembers(household.id);
       const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
@@ -135,11 +146,20 @@ async function runEveningSchoolPrepCheck() {
       const tomorrowDow = (tomorrow.getDay() + 6) % 7;
       if (tomorrowDow > 4) continue; // Skip if tomorrow is weekend
 
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
       const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
       const lines = [`📚 *Heads up for tomorrow (${DAY_NAMES[tomorrowDow]}):*\n`];
       let hasActivities = false;
 
       for (const child of dependents) {
+        // Skip if the child's school is NOT in session tomorrow (holidays, inset days, half terms)
+        const inSession = await isSchoolInSession(child.school_id, tomorrowStr);
+        if (!inSession) {
+          console.log(`[scheduler] Skipping ${child.name}'s activities — school not in session on ${tomorrowStr}`);
+          continue;
+        }
+
         const activities = await db.getChildActivities(child.id);
         const tomorrowActivities = activities.filter(a => a.day_of_week === tomorrowDow);
         for (const act of tomorrowActivities) {
@@ -439,6 +459,10 @@ function startScheduler() {
   cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());
   console.log('✓ Apple Calendar polling started (every 15 minutes)');
 
+  // ── Scheduler lock cleanup: daily at 03:00 UTC ─────────────────────────────
+  cron.schedule('0 3 * * *', () => db.cleanupSchedulerLocks());
+  console.log('✓ Scheduler lock cleanup scheduled (03:00 UTC daily)');
+
   // ── Daily iCal feed sync: 06:00 UTC ─────────────────────────────────────────
   cron.schedule('0 6 * * *', () => syncAllIcalFeeds());
   console.log('✓ Daily iCal sync scheduled (06:00 UTC)');
@@ -465,4 +489,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, currentHHMMInTZ, processEventReminders };
+module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };
