@@ -4,7 +4,7 @@
 
 const { Router } = require('express');
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const path = require('path');
 const db = require('../db/queries');
 const r2 = require('../services/r2');
@@ -211,7 +211,7 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
     const safeFilename = req.file.originalname
       ? req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')
       : `file${ext}`;
-    const storageKey = `${req.householdId}/${folderId || 'root'}/${uuidv4()}-${safeFilename}`;
+    const storageKey = `${req.householdId}/${folderId || 'root'}/${crypto.randomUUID()}-${safeFilename}`;
 
     // Upload to R2
     await r2.uploadFile(storageKey, req.file.buffer, req.file.mimetype);
