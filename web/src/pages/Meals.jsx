@@ -7,6 +7,8 @@ import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
 // ── Constants ─────────────────────────────────────────────────────
 
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack'];
+// Meal plan shows only the daily meal slots — desserts stay in the Recipes library
+const PLAN_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const CATEGORY_COLOURS_MAP = {
   breakfast: { bg: 'bg-[#F5CBA7]', text: 'text-[#8B5E2B]', light: 'bg-[#F5CBA7]/20', border: 'border-[#F5CBA7]' },
   lunch:     { bg: 'bg-[#A9DFBF]', text: 'text-[#2E7D46]', light: 'bg-[#A9DFBF]/20', border: 'border-[#A9DFBF]' },
@@ -340,7 +342,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {MEAL_CATEGORIES.map((category) => {
+                  {PLAN_CATEGORIES.map((category) => {
                     const colors = getCatColours(category);
                     return (
                       <tr key={category}>
@@ -1591,7 +1593,10 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
   const [shoppingListResult, setShoppingListResult] = useState(null);
   const [addingToPlan, setAddingToPlan] = useState(false);
   const [planDay, setPlanDay] = useState('');
-  const [planCategory, setPlanCategory] = useState(recipe.category || 'Dinner');
+  // If recipe is a Dessert, default to Dinner since Dessert isn't a meal plan slot
+  const [planCategory, setPlanCategory] = useState(
+    PLAN_CATEGORIES.includes(recipe.category) ? recipe.category : 'Dinner'
+  );
   const modalRef = useRef(null);
 
   const baseServings = recipe.servings || 4;
@@ -1784,7 +1789,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
                 onChange={e => setPlanCategory(e.target.value)}
                 className="w-28 border border-cream-border rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
               >
-                {MEAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {PLAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <button
