@@ -164,7 +164,24 @@ router.get('/usage', requireAuth, requireHousehold, async (req, res) => {
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const docs = await db.getDocuments(req.householdId, req.user.id, req.query.folder_id || null);
-    return res.json(docs);
+
+    // Attach a signed preview URL for image documents so the frontend can
+    // render thumbnails. Signing is cheap (HMAC only — no network), and the
+    // browser lazy-loads the actual image bytes only when the card scrolls
+    // into view. URLs are valid for 1 hour which is plenty for a session.
+    const withPreviews = await Promise.all(docs.map(async (doc) => {
+      if (doc.mime_type?.startsWith('image/')) {
+        try {
+          const preview_url = await r2.getSignedDownloadUrl(doc.file_path, 3600);
+          return { ...doc, preview_url };
+        } catch {
+          return doc;
+        }
+      }
+      return doc;
+    }));
+
+    return res.json(withPreviews);
   } catch (err) {
     console.error('GET /api/documents error:', err);
     return res.status(500).json({ error: 'Internal server error' });

@@ -488,16 +488,27 @@ function FolderCard({ folder, viewMode, userId, onOpen, onEdit, onDelete }) {
 function DocumentCard({ doc, viewMode, onPreview, onDownload, onDelete }) {
   const cat = getFileCategory(doc.mime_type);
   const fileInfo = FILE_ICONS[cat];
+  const isImage = cat === 'image' && doc.preview_url;
 
   if (viewMode === 'list') {
     return (
       <div className="flex items-center gap-3 bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow px-4 py-3 group">
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 cursor-pointer"
-          style={{ backgroundColor: fileInfo.color + '15' }}
+          className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0 cursor-pointer"
+          style={isImage ? undefined : { backgroundColor: fileInfo.color + '15' }}
           onClick={onPreview}
         >
-          <FileTypeIcon mimeType={doc.mime_type} color={fileInfo.color} />
+          {isImage ? (
+            <img
+              src={doc.preview_url}
+              alt={doc.name}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <FileTypeIcon mimeType={doc.mime_type} color={fileInfo.color} />
+          )}
         </div>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onPreview}>
           <span className="text-sm font-semibold text-charcoal truncate block">{doc.name}</span>
@@ -517,29 +528,57 @@ function DocumentCard({ doc, viewMode, onPreview, onDownload, onDelete }) {
     );
   }
 
+  // Grid view
   return (
-    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4 group relative">
-      <div className="flex items-start justify-between mb-3">
+    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden group relative flex flex-col">
+      {isImage ? (
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer"
-          style={{ backgroundColor: fileInfo.color + '15' }}
+          className="aspect-[4/3] bg-cream cursor-pointer overflow-hidden relative"
           onClick={onPreview}
         >
-          <FileTypeIcon mimeType={doc.mime_type} color={fileInfo.color} />
+          <img
+            src={doc.preview_url}
+            alt={doc.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+            <button onClick={onDownload} className="p-1.5 rounded-lg bg-white/90 text-warm-grey hover:text-plum shadow-sm">
+              <IconDownload className="h-3.5 w-3.5" />
+            </button>
+            <button onClick={onDelete} className="p-1.5 rounded-lg bg-white/90 text-warm-grey hover:text-coral shadow-sm">
+              <IconTrash className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onDownload} className="p-1 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
-            <IconDownload className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={onDelete} className="p-1 rounded-lg text-warm-grey hover:text-coral hover:bg-coral-light transition-colors">
-            <IconTrash className="h-3.5 w-3.5" />
-          </button>
+      ) : (
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer"
+              style={{ backgroundColor: fileInfo.color + '15' }}
+              onClick={onPreview}
+            >
+              <FileTypeIcon mimeType={doc.mime_type} color={fileInfo.color} />
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={onDownload} className="p-1 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
+                <IconDownload className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={onDelete} className="p-1 rounded-lg text-warm-grey hover:text-coral hover:bg-coral-light transition-colors">
+                <IconTrash className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
+      )}
+      <div className={`${isImage ? 'px-4 py-3' : 'px-4 pb-4'}`}>
+        <span className="text-sm font-semibold text-charcoal truncate block cursor-pointer" onClick={onPreview}>{doc.name}</span>
+        <span className="text-[11px] text-warm-grey">
+          {formatFileSize(doc.file_size)} &middot; {formatDate(doc.created_at)}
+        </span>
       </div>
-      <span className="text-sm font-semibold text-charcoal truncate block cursor-pointer" onClick={onPreview}>{doc.name}</span>
-      <span className="text-[11px] text-warm-grey">
-        {formatFileSize(doc.file_size)} &middot; {formatDate(doc.created_at)}
-      </span>
     </div>
   );
 }
