@@ -176,7 +176,10 @@ export default function Documents() {
       });
       fetchData();
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to upload file';
+      const data = err.response?.data;
+      const msg = data?.detail
+        ? `${data.error || 'Upload failed'}: ${data.detail}`
+        : (data?.error || 'Failed to upload file');
       setError(msg);
     } finally {
       setUploading(false);
