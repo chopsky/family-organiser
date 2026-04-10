@@ -74,15 +74,27 @@ export default function Documents() {
       const params = folderId ? { folder_id: folderId } : {};
       const folderParams = folderId ? { parent_id: folderId } : {};
 
-      const [foldersRes, docsRes, usageRes] = await Promise.all([
+      // Use allSettled so a single failing endpoint (e.g. during deploy)
+      // doesn't break the whole page
+      const [foldersRes, docsRes, usageRes] = await Promise.allSettled([
         api.get('/documents/folders', { params: folderParams }),
         api.get('/documents', { params }),
         api.get('/documents/usage'),
       ]);
 
-      setFolders(foldersRes.data);
-      setDocuments(docsRes.data);
-      setUsage(usageRes.data);
+      setFolders(foldersRes.status === 'fulfilled' ? foldersRes.value.data : []);
+      setDocuments(docsRes.status === 'fulfilled' ? docsRes.value.data : []);
+      setUsage(usageRes.status === 'fulfilled' ? usageRes.value.data : null);
+
+      // Only show an error if ALL three calls failed with a real error
+      // (not 404 — 404 usually means the backend hasn't finished deploying)
+      const failures = [foldersRes, docsRes, usageRes].filter(r => r.status === 'rejected');
+      const allFailed = failures.length === 3;
+      const nonNotFoundFailure = failures.find(f => f.reason?.response?.status !== 404);
+
+      if (allFailed && nonNotFoundFailure) {
+        setError(nonNotFoundFailure.reason?.response?.data?.error || 'Failed to load documents');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load documents');
     } finally {
@@ -204,27 +216,23 @@ export default function Documents() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold text-charcoal tracking-tight">
-            Documents
-          </h1>
-          {usage && (
-            <StorageBar usage={usage} />
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
-            className="p-2 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors"
-            title={viewMode === 'grid' ? 'List view' : 'Grid view'}
-          >
-            {viewMode === 'grid' ? <IconList className="h-5 w-5" /> : <IconGrid className="h-5 w-5" />}
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2">
+          <IconFileText className="h-6 w-6 text-plum" /> Documents
+        </h1>
+        <button
+          onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
+          className="p-2 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors"
+          title={viewMode === 'grid' ? 'List view' : 'Grid view'}
+        >
+          {viewMode === 'grid' ? <IconList className="h-5 w-5" /> : <IconGrid className="h-5 w-5" />}
+        </button>
       </div>
+
+      {/* Storage bar */}
+      {usage && <div className="mb-5"><StorageBar usage={usage} /></div>}
 
       {/* Breadcrumbs */}
       <Breadcrumbs breadcrumbs={breadcrumbs} onNavigate={navigateUp} />

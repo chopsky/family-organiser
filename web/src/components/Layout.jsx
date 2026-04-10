@@ -11,7 +11,7 @@ const mainNav = [
   { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
-  { to: '/meals',      label: 'Meals',     Icon: IconUtensils  },
+  { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
   { to: '/documents',  label: 'Documents', Icon: IconFileText  },
   { to: '/family',     label: 'Family',    Icon: IconUsers     },
@@ -22,7 +22,7 @@ const mobileNav = [
   { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
-  { to: '/meals',      label: 'Meals',     Icon: IconUtensils  },
+  { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
 ];
 
 const moreNav = [
