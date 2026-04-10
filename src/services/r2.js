@@ -20,6 +20,11 @@ const client = ACCOUNT_ID
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
       },
+      // R2 doesn't support the newer default "when_supported" checksum
+      // behavior added in @aws-sdk/client-s3 ≥3.729. Forcing both to
+      // "when_required" avoids R2 returning 501 Not Implemented.
+      requestChecksumCalculation: 'when_required',
+      responseChecksumValidation: 'when_required',
     })
   : null;
 

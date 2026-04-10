@@ -228,8 +228,16 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
 
     return res.status(201).json(doc);
   } catch (err) {
-    console.error('POST /api/documents/upload error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('POST /api/documents/upload error:', err.message);
+    console.error('  stack:', err.stack);
+    console.error('  name:', err.name);
+    if (err.$metadata) console.error('  S3 metadata:', JSON.stringify(err.$metadata));
+    if (err.Code) console.error('  S3 code:', err.Code);
+    // Surface the real error message in non-production for debugging
+    return res.status(500).json({
+      error: 'Upload failed',
+      detail: err.message || 'Unknown error',
+    });
   }
 });
 
