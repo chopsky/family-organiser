@@ -9,16 +9,21 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } 
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
-const ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const BUCKET = process.env.R2_BUCKET_NAME || 'housemait-documents';
+// Trim credentials to defend against stray whitespace/newlines when pasting
+// into Railway / .env — the AWS SDK rejects the Authorization header if the
+// secret contains a \n, producing "Invalid character in header content".
+const ACCOUNT_ID = process.env.R2_ACCOUNT_ID?.trim();
+const ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID?.trim();
+const SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY?.trim();
+const BUCKET = (process.env.R2_BUCKET_NAME || 'housemait-documents').trim();
 
 const client = ACCOUNT_ID
   ? new S3Client({
       region: 'auto',
       endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        accessKeyId: ACCESS_KEY_ID,
+        secretAccessKey: SECRET_ACCESS_KEY,
       },
       // R2 doesn't support the newer default "when_supported" checksum
       // behavior added in @aws-sdk/client-s3 ≥3.729. Forcing both to
