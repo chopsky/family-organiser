@@ -71,7 +71,9 @@ router.post('/webhook', async (req, res) => {
           const audioBuffer = await whatsapp.downloadMedia(mediaUrl);
           const result = await handlers.handleVoiceNote(audioBuffer, 'voice.ogg', user, household);
           await whatsapp.sendMessage(phone, result.response);
-          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: null, processingMs: Date.now() - start });
+          // Persist the transcribed text (if any) as the body so voice-note
+          // turns can be replayed as conversation context too.
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: null, processingMs: Date.now() - start, body: result.transcription || null, response: result.response });
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions);
@@ -91,7 +93,7 @@ router.post('/webhook', async (req, res) => {
           const imageBuffer = await whatsapp.downloadMedia(mediaUrl);
           const result = await handlers.handlePhoto(imageBuffer, mediaType, user, household);
           await whatsapp.sendMessage(phone, result.response);
-          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start });
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start, body: '[photo]', response: result.response });
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions);
@@ -113,7 +115,7 @@ router.post('/webhook', async (req, res) => {
       try {
         const result = await handlers.handleTextMessage(text, user, household);
         await whatsapp.sendMessage(phone, result.response);
-        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: result.intent || null, processingMs: Date.now() - start });
+        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: result.intent || null, processingMs: Date.now() - start, body: text, response: result.response });
 
         // Broadcast to other members
         const notification = handlers.buildBroadcastMessage(user.name, result.actions);

@@ -114,6 +114,10 @@ function formatTaskList(tasks, heading = 'Tasks') {
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
 
+  // Fetch recent WhatsApp conversation turns (last ~30 min) so the AI can
+  // resolve short follow-ups like "no, in sea point" or "what about tomorrow?".
+  const history = await db.getRecentWhatsAppTurns(user.id, { limit: 10, windowMinutes: 30 }).catch(() => []);
+
   // Pre-classify: detect weather intent before AI call to avoid misclassification
   const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
   if (weatherPattern.test(text)) {
@@ -173,8 +177,8 @@ async function handleTextMessage(text, user, household) {
   const fullUserForTz = household.members.find(m => m.id === user.id);
   const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
 
-  console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${notes.length} notes`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents, timezone: userTz });
+  console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${notes.length} notes, ${history.length} history turns`);
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents, timezone: userTz, history });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 

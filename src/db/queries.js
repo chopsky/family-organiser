@@ -2134,7 +2134,9 @@ async function getAiUsageTimeline({ days = 30 } = {}, db = supabase) {
 
 // ─── Phase 2 Admin: WhatsApp Stats ──────────────────────────────────────────
 
-async function logWhatsAppMessage({ householdId, userId, direction, messageType, intent, processingMs, error }, db = supabase) {
+async function logWhatsAppMessage({ householdId, userId, direction, messageType, intent, processingMs, error, body, response }, db = supabase) {
+  // Truncate stored text so one runaway message can't blow up the row.
+  const truncate = (s, max = 2000) => (typeof s === 'string' && s.length > max ? s.slice(0, max) : s);
   db
     .from('whatsapp_message_log')
     .insert({
@@ -2145,9 +2147,51 @@ async function logWhatsAppMessage({ householdId, userId, direction, messageType,
       intent: intent || null,
       processing_ms: processingMs || null,
       error: error || null,
+      body: truncate(body) || null,
+      response: truncate(response) || null,
     })
     .then(() => {})
     .catch((err) => console.error('[whatsapp-log] Failed to log message:', err.message));
+}
+
+/**
+ * Fetch the most recent WhatsApp turns for a user, to replay as conversation
+ * context for the AI. Only returns messages within `windowMinutes` of the most
+ * recent one (so an old thread doesn't bleed into a brand-new conversation).
+ *
+ * Returns an array of { role: 'user' | 'assistant', content: string } in
+ * chronological order (oldest first), ready to spread into an AI messages array.
+ */
+async function getRecentWhatsAppTurns(userId, { limit = 10, windowMinutes = 30 } = {}, db = supabase) {
+  if (!userId) return [];
+  const { data, error } = await db
+    .from('whatsapp_message_log')
+    .select('direction, body, response, created_at, error, message_type')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('[whatsapp-log] getRecentWhatsAppTurns failed:', error.message);
+    return [];
+  }
+  const rows = (data || []).filter((r) => !r.error);
+  if (!rows.length) return [];
+
+  // Only include rows from the same "conversation window" — i.e. within
+  // `windowMinutes` of the most recent row.
+  const mostRecentMs = new Date(rows[0].created_at).getTime();
+  const cutoffMs = mostRecentMs - windowMinutes * 60 * 1000;
+  const windowed = rows
+    .filter((r) => new Date(r.created_at).getTime() >= cutoffMs)
+    .reverse(); // chronological (oldest → newest)
+
+  const turns = [];
+  for (const r of windowed) {
+    // Only text-ish content is useful as replay context.
+    if (r.body) turns.push({ role: 'user', content: String(r.body).slice(0, 500) });
+    if (r.response) turns.push({ role: 'assistant', content: String(r.response).slice(0, 500) });
+  }
+  return turns;
 }
 
 async function getWhatsAppStats({ days = 30 } = {}, db = supabase) {
@@ -3038,6 +3082,7 @@ module.exports = {
   getAiUsageStats,
   getAiUsageTimeline,
   logWhatsAppMessage,
+  getRecentWhatsAppTurns,
   getWhatsAppStats,
   getWhatsAppTimeline,
   getCalendarSyncHealth,

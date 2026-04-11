@@ -12,7 +12,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, calendarEvents = [], timezone } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, calendarEvents = [], timezone, history = [] } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const notesStr = notes.length > 0
@@ -41,10 +41,23 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{NOTES}}/g, notesStr)
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr);
 
+  // Build message array: prior turns (if any) + current user message.
+  // History is expected to be [{ role, content }, ...] in chronological order.
+  // We keep assistant replies as plain text context even though the current
+  // turn returns JSON — the system prompt tells the model to treat history as
+  // reference only and still reply with the required JSON schema.
+  const priorTurns = Array.isArray(history)
+    ? history.filter((t) => t && t.role && t.content).slice(-10)
+    : [];
+  const messages = [
+    ...priorTurns.map((t) => ({ role: t.role, content: String(t.content) })),
+    { role: 'user', content: message },
+  ];
+
   return withRetry(async () => {
     const { text } = await callWithFailover({
       system: systemPrompt,
-      messages: [{ role: 'user', content: message }],
+      messages,
       useThinking: false,
       maxTokens: 2048,
       feature: 'classify',

@@ -17,6 +17,13 @@ UPCOMING CALENDAR EVENTS (next 12 months):
 
 You will be given a raw message from a family member. Parse it and return structured data.
 
+CONVERSATION CONTEXT:
+- The messages array may include prior turns from the ongoing WhatsApp conversation (earlier user questions and your previous replies).
+- Treat those prior turns as context only — use them to resolve follow-ups, pronouns, and short replies like "no", "yes", "the second one", "in sea point", "what about X?", "and their number?".
+- If the current message is a short follow-up that only makes sense relative to the previous exchange (e.g. "no, in sea point" after you asked about Joburg), interpret it in light of the prior turn and answer accordingly.
+- Prior assistant replies were sent as plain text. Your current reply must STILL be the required JSON schema — do not copy the format of prior replies.
+- If the conversation has clearly moved on to a new topic, you can ignore older turns.
+
 INTENT DETECTION:
 - "add": User is adding new items or tasks
 - "remove": User is marking items/tasks as done or removing them
