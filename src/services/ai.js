@@ -59,7 +59,10 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       system: systemPrompt,
       messages,
       useThinking: false,
-      maxTokens: 2048,
+      // 4096 gives chat responses (recommendations, advice) room to breathe.
+      // The JSON schema overhead alone is ~400 tokens, so 2048 was too tight
+      // for longer response_message values and caused truncation → JSON parse errors.
+      maxTokens: 4096,
       feature: 'classify',
       householdId,
       userId,
@@ -201,7 +204,15 @@ function parseJSON(text, context) {
   try {
     return JSON.parse(cleaned);
   } catch (err) {
-    throw new Error(`Failed to parse ${context} JSON: ${err.message}\nRaw: ${text.slice(0, 300)}`);
+    // Log the full raw output (up to 2000 chars) so truncation / max-tokens
+    // issues can be diagnosed from Railway logs. This is a server-side log only.
+    console.error(`[ai] Failed to parse ${context} JSON:`, err.message);
+    console.error(`[ai] Raw length: ${text.length} chars`);
+    console.error(`[ai] Raw output (first 2000 chars):\n${text.slice(0, 2000)}`);
+    if (text.length > 2000) {
+      console.error(`[ai] Raw output (last 500 chars):\n${text.slice(-500)}`);
+    }
+    throw new Error(`Failed to parse ${context} JSON: ${err.message}`);
   }
 }
 
