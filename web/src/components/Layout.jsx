@@ -178,7 +178,7 @@ export default function Layout({ children }) {
       </aside>
 
       {/* ── Mobile Top Bar ── */}
-      <header className="md:hidden bg-cream border-b border-light-grey z-30">
+      <header className="md:hidden bg-cream border-b border-light-grey z-30" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="px-4 py-3 flex items-center gap-3">
           <Link to="/dashboard" className="shrink-0">
             <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
@@ -196,13 +196,13 @@ export default function Layout({ children }) {
 
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">
-        <div className="px-5 md:px-8 py-6 md:py-7 pb-24 md:pb-7">
+        <div className="px-5 md:px-8 py-6 md:py-7 md:pb-7" style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
           {children}
         </div>
       </main>
 
       {/* ── Mobile Bottom Tab Bar ── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 h-[82px] border-t border-light-grey flex items-start justify-around pt-2.5" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-light-grey flex items-start justify-around pt-2.5" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', height: 'calc(82px + env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {mobileNav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
