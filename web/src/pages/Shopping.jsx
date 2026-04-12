@@ -107,7 +107,8 @@ export default function Shopping() {
   const loadLists = useCallback(async () => {
     try {
       const res = await api.get('/shopping-lists');
-      const fetched = res.data.lists ?? res.data ?? [];
+      const raw = res.data?.lists ?? res.data;
+      const fetched = Array.isArray(raw) ? raw : [];
       setLists(fetched);
       if (fetched.length > 0 && !activeListId) {
         setActiveListId(fetched[0].id);
@@ -127,7 +128,8 @@ export default function Shopping() {
     setLoading(true);
     try {
       const res = await api.get('/shopping', { params: { list_id: activeListId, completed: 'true' } });
-      setItems(res.data.items ?? []);
+      const rawItems = res.data?.items ?? res.data;
+      setItems(Array.isArray(rawItems) ? rawItems : []);
     } catch {
       setError('Could not load shopping items.');
     } finally {
@@ -274,7 +276,7 @@ export default function Shopping() {
 
       {/* List selector - horizontal pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {lists.map(list => (
+        {(Array.isArray(lists) ? lists : []).map(list => (
           <div key={list.id} className="shrink-0 relative group/pill">
             <button
               onClick={() => selectList(list.id)}
