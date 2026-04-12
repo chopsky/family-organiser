@@ -833,7 +833,7 @@ export default function FamilySetup() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold text-bark flex items-center gap-2"><IconUsers className="h-6 w-6 text-plum" /> Family Setup</h1>
+      <h1 className="hidden md:flex text-2xl font-semibold text-bark items-center gap-2"><IconUsers className="h-6 w-6 text-plum" /> Family Setup</h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 

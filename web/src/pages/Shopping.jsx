@@ -265,10 +265,10 @@ export default function Shopping() {
     <div className="max-w-3xl mx-auto space-y-5">
       {/* Page header */}
       <div className="flex items-center gap-3">
-        <svg className="h-6 w-6 text-plum" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="hidden md:block h-6 w-6 text-plum" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
         </svg>
-        <h1 className="font-display text-2xl font-semibold text-bark">Shopping</h1>
+        <h1 className="hidden md:block font-display text-2xl font-semibold text-bark">Shopping</h1>
         <span className="text-sm font-medium text-cocoa">{itemCount} items</span>
       </div>
 

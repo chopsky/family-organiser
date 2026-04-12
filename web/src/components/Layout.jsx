@@ -25,6 +25,18 @@ const mobileNav = [
   { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
 ];
 
+// Route → page title for mobile header (dashboard excluded — shows household name)
+const pageTitles = {
+  '/shopping': 'Shopping',
+  '/tasks': 'Tasks',
+  '/calendar': 'Calendar',
+  '/meals': 'Meal Plan',
+  '/receipt': 'Receipt Scanner',
+  '/documents': 'Documents',
+  '/family': 'Family',
+  '/settings': 'Settings',
+};
+
 const moreNav = [
   { to: '/family',     label: 'Family Setup',     Icon: IconUsers    },
   { to: '/documents',  label: 'Documents',        Icon: IconFileText },
@@ -178,21 +190,30 @@ export default function Layout({ children }) {
       </aside>
 
       {/* ── Mobile Top Bar ── */}
-      <header className="md:hidden bg-cream border-b border-light-grey z-30 sticky top-0 safe-top">
-        <div className="px-4 py-3 flex items-center">
-          <Link to="/dashboard" className="shrink-0 w-8">
-            <img src="/housemait-logomark.png" alt="Housemait" className="h-8 w-8 rounded-lg" />
-          </Link>
-          <div className="flex-1 min-w-0 text-center">
-            <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">
-              {household?.name ?? 'Housemait'}
-            </Link>
-          </div>
-          <Link to="/settings" className="shrink-0 w-8 flex justify-end">
-            {renderAvatar('w-8 h-8', 'text-xs')}
-          </Link>
-        </div>
-      </header>
+      {(() => {
+        const pageTitle = pageTitles[location.pathname];
+        return (
+          <header className="md:hidden bg-cream border-b border-light-grey z-30 sticky top-0 safe-top">
+            <div className="px-4 py-3 flex items-center">
+              <Link to="/dashboard" className="shrink-0 w-8">
+                <img src="/housemait-logomark.png" alt="Housemait" className="h-8 w-8 rounded-lg" />
+              </Link>
+              <div className="flex-1 min-w-0 text-center">
+                {pageTitle ? (
+                  <span className="font-semibold text-base text-charcoal truncate block">{pageTitle}</span>
+                ) : (
+                  <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">
+                    {household?.name ?? 'Housemait'}
+                  </Link>
+                )}
+              </div>
+              <Link to="/settings" className="shrink-0 w-8 flex justify-end">
+                {renderAvatar('w-8 h-8', 'text-xs')}
+              </Link>
+            </div>
+          </header>
+        );
+      })()}
 
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">

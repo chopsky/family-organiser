@@ -222,9 +222,10 @@ export default function Documents() {
     <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2">
+        <h1 className="hidden md:flex text-2xl font-semibold text-bark items-center gap-2">
           <IconFileText className="h-6 w-6 text-plum" /> Documents
         </h1>
+        <div className="flex-1 md:hidden" />
         <button
           onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
           className="p-2 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors"

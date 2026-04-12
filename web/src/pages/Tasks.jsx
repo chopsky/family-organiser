@@ -696,7 +696,7 @@ export default function Tasks() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1
-          className="flex items-center gap-2"
+          className="hidden md:flex items-center gap-2"
           style={{
             fontSize: 24,
             fontWeight: 600,
