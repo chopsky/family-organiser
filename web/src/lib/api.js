@@ -24,7 +24,34 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-logout on 401, retry with exponential backoff on 429
+// ── Token refresh state ──────────────────────────────────────────
+// When a 401 arrives, attempt a silent refresh using the stored
+// refresh token. Multiple concurrent 401s share a single refresh
+// call — failed requests queue up and replay once the refresh lands.
+let isRefreshing = false;
+let failedQueue = [];
+
+function processQueue(error, token = null) {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  failedQueue = [];
+}
+
+function forceLogout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  localStorage.removeItem('household');
+  localStorage.removeItem('lastActive');
+  window.location.href = '/login';
+}
+
+// Auto-refresh on 401, retry with exponential backoff on 429
 api.interceptors.response.use(
   (res) => {
     // Clear inflight entry on success
@@ -36,12 +63,61 @@ api.interceptors.response.use(
     const key = getDedupeKey(err.config);
     if (key) inflightGets.delete(key);
 
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('household');
-      window.location.href = '/login';
+    const originalRequest = err.config;
+
+    // ── Handle 401: attempt silent token refresh ──
+    if (err.response?.status === 401 && !originalRequest._retry) {
+      // If this IS the refresh call itself failing, force logout
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        forceLogout();
+        return Promise.reject(err);
+      }
+
+      if (isRefreshing) {
+        // Another refresh is already in-flight — queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((newToken) => {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return api(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        isRefreshing = false;
+        forceLogout();
+        return Promise.reject(err);
+      }
+
+      try {
+        // Use raw axios (not our `api` instance) to avoid interceptor loops
+        const { data } = await axios.post(`${BASE}/auth/refresh`, { refreshToken });
+
+        // Store new tokens
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.household) localStorage.setItem('household', JSON.stringify(data.household));
+
+        // Replay all queued requests with the new token
+        processQueue(null, data.token);
+
+        // Retry the original request
+        originalRequest.headers.Authorization = `Bearer ${data.token}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+        forceLogout();
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     // Retry up to 3 times on rate limit with exponential backoff
     const retryCount = err.config._retryCount || 0;
     if (err.response?.status === 429 && retryCount < 3) {

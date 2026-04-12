@@ -89,6 +89,16 @@ async function findUserByName(householdId, name, db = supabase) {
   return data || null;
 }
 
+async function getUserById(userId, db = supabase) {
+  const { data, error } = await db
+    .from('users')
+    .select()
+    .eq('id', userId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 async function getUserByEmail(email, db = supabase) {
   const { data, error } = await db
     .from('users')
@@ -167,6 +177,47 @@ const markEmailVerificationTokenUsed = (id) => markTokenUsed('email_verification
 const createPasswordResetToken = (userId, token, expiresAt) => createToken('password_reset_tokens', { userId, token, expiresAt });
 const getPasswordResetToken = (token) => getValidToken('password_reset_tokens', token);
 const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens', id);
+
+// ─── Refresh tokens (session security) ───────────────────────────────────────
+
+async function createRefreshToken(userId, token, expiresAt, db = supabase) {
+  const { data, error } = await db
+    .from('refresh_tokens')
+    .insert({ user_id: userId, token, expires_at: expiresAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getValidRefreshToken(token, db = supabase) {
+  const { data, error } = await db
+    .from('refresh_tokens')
+    .select()
+    .eq('token', token)
+    .eq('revoked', false)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function revokeRefreshToken(tokenId, db = supabase) {
+  const { error } = await db
+    .from('refresh_tokens')
+    .update({ revoked: true })
+    .eq('id', tokenId);
+  if (error) throw error;
+}
+
+async function revokeAllUserRefreshTokens(userId, db = supabase) {
+  const { error } = await db
+    .from('refresh_tokens')
+    .update({ revoked: true })
+    .eq('user_id', userId)
+    .eq('revoked', false);
+  if (error) throw error;
+}
 
 // ─── Household notes ─────────────────────────────────────────────────────────
 
@@ -2925,6 +2976,7 @@ module.exports = {
   createUser,
   getHouseholdMembers,
   findUserByName,
+  getUserById,
   getUserByEmail,
   createUserWithEmail,
   updateUser,
@@ -2935,6 +2987,11 @@ module.exports = {
   createPasswordResetToken,
   getPasswordResetToken,
   markPasswordResetTokenUsed,
+  // Refresh tokens (session security)
+  createRefreshToken,
+  getValidRefreshToken,
+  revokeRefreshToken,
+  revokeAllUserRefreshTokens,
   // Notes
   getHouseholdNotes,
   upsertHouseholdNote,

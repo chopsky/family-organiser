@@ -10,13 +10,14 @@ const cache = require('../services/cache');
 const router = Router();
 
 const BCRYPT_ROUNDS = 12;
+const REFRESH_TOKEN_DAYS = 7;
 
 // Helper: generate a crypto-random token
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// Helper: build the standard auth response
+// Helper: build the standard auth response (includes refresh token)
 async function authResponse(user) {
   const household = user.household_id ? await db.getHouseholdById(user.household_id) : null;
   const token = signToken({
@@ -26,8 +27,15 @@ async function authResponse(user) {
     role: user.role,
     isPlatformAdmin: user.is_platform_admin || false,
   });
+
+  // Issue a rotating refresh token (7-day lifetime)
+  const refreshToken = generateToken();
+  const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  await db.createRefreshToken(user.id, refreshToken, refreshExpiresAt);
+
   return {
     token,
+    refreshToken,
     user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false },
     household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time } : null,
   };
@@ -249,10 +257,76 @@ router.post('/reset-password', async (req, res) => {
     await db.updateUser(record.user_id, { password_hash: passwordHash });
     await db.markPasswordResetTokenUsed(record.id);
 
+    // Force logout on all devices by revoking every refresh token
+    await db.revokeAllUserRefreshTokens(record.user_id);
+
     return res.json({ message: 'Password updated. You can now log in.' });
   } catch (err) {
     console.error('POST /api/auth/reset-password error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/auth/me ──────────────────────────────────────────────────────
+// Lightweight authenticated check. Used by the frontend's visibility-change
+// idle detector to trigger the 401 → refresh flow after long absences.
+
+router.get('/me', requireAuth, (req, res) => {
+  return res.json({ id: req.user.id, name: req.user.name, role: req.user.role });
+});
+
+// ─── POST /api/auth/refresh ────────────────────────────────────────────────
+// Exchange a valid refresh token for a new access token + new refresh token.
+// No Bearer auth required (the access token will typically be expired).
+
+router.post('/refresh', async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'refreshToken is required' });
+  }
+
+  try {
+    const record = await db.getValidRefreshToken(refreshToken);
+    if (!record) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    // Revoke the old token (single-use rotation)
+    await db.revokeRefreshToken(record.id);
+
+    // Fetch fresh user data (picks up role/household changes since last login)
+    const user = await db.getUserById(record.user_id);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const response = await authResponse(user);
+    return res.json(response);
+  } catch (err) {
+    console.error('POST /api/auth/refresh error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/auth/logout ─────────────────────────────────────────────────
+// Revoke the refresh token server-side so it can't be reused.
+
+router.post('/logout', async (req, res) => {
+  const { refreshToken } = req.body;
+
+  try {
+    if (refreshToken) {
+      const record = await db.getValidRefreshToken(refreshToken);
+      if (record) {
+        await db.revokeRefreshToken(record.id);
+      }
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/auth/logout error:', err);
+    // Still return 200 — the client should clear local state regardless
+    return res.json({ success: true });
   }
 });
 
@@ -281,7 +355,7 @@ router.post('/google', async (req, res) => {
     if (!user) {
       // Handle invite
       let householdId = null;
-      let role = 'member';
+      const role = 'member';
       if (inviteToken) {
         const invite = await db.getInviteByToken(inviteToken);
         if (invite) {
@@ -475,19 +549,9 @@ router.post('/join', async (req, res) => {
       });
     }
 
-    const token = signToken({
-      userId: user.id,
-      householdId: household.id,
-      name: user.name,
-      role: user.role,
-      isPlatformAdmin: user.is_platform_admin || false,
-    });
-
-    return res.json({
-      token,
-      user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false },
-      household: { id: household.id, name: household.name, join_code: household.join_code },
-    });
+    // Use authResponse for consistency (includes refresh token)
+    const response = await authResponse({ ...user, household_id: household.id });
+    return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/join error:', err);
     return res.status(500).json({ error: 'Internal server error' });
