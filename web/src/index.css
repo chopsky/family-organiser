@@ -81,6 +81,14 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* ── iOS safe-area insets (Capacitor / PWA) ── */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;

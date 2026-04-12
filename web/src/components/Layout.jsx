@@ -178,17 +178,17 @@ export default function Layout({ children }) {
       </aside>
 
       {/* ── Mobile Top Bar ── */}
-      <header className="md:hidden bg-cream border-b border-light-grey z-30" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-        <div className="px-4 py-3 flex items-center gap-3">
-          <Link to="/dashboard" className="shrink-0">
-            <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
+      <header className="md:hidden bg-cream border-b border-light-grey z-30 sticky top-0 safe-top">
+        <div className="px-4 py-3 flex items-center">
+          <Link to="/dashboard" className="shrink-0 w-8">
+            <img src="/housemait-logomark.png" alt="Housemait" className="h-8 w-8 rounded-lg" />
           </Link>
           <div className="flex-1 min-w-0 text-center">
             <Link to="/dashboard" className="font-semibold text-base text-charcoal truncate block">
               {household?.name ?? 'Housemait'}
             </Link>
           </div>
-          <Link to="/settings" className="shrink-0">
+          <Link to="/settings" className="shrink-0 w-8 flex justify-end">
             {renderAvatar('w-8 h-8', 'text-xs')}
           </Link>
         </div>
@@ -196,13 +196,13 @@ export default function Layout({ children }) {
 
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">
-        <div className="px-5 md:px-8 py-6 md:py-7 md:pb-7" style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="px-5 md:px-8 py-6 md:py-7 pb-28 md:pb-7">
           {children}
         </div>
       </main>
 
       {/* ── Mobile Bottom Tab Bar ── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-light-grey flex items-start justify-around pt-2.5" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', height: 'calc(82px + env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-light-grey flex items-start justify-around pt-2.5 safe-bottom" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
         {mobileNav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
