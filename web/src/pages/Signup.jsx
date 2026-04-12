@@ -77,10 +77,12 @@ export default function Signup() {
             <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-cocoa">or sign up with email</span></div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-bark mb-1">Name</label>
+              <label htmlFor="signup-name" className="block text-sm font-medium text-bark mb-1">Name</label>
               <input
+                id="signup-name"
+                name="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -90,8 +92,10 @@ export default function Signup() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-bark mb-1">Email</label>
+              <label htmlFor="signup-email" className="block text-sm font-medium text-bark mb-1">Email</label>
               <input
+                id="signup-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -101,8 +105,10 @@ export default function Signup() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-bark mb-1">Password</label>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-bark mb-1">Password</label>
               <input
+                id="signup-password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

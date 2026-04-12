@@ -53,10 +53,12 @@ export default function ResetPassword() {
           {success ? (
             <p className="text-success bg-success/10 rounded-lg px-3 py-2">Password updated! Redirecting to login...</p>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-bark mb-1">New password</label>
+                <label htmlFor="reset-password" className="block text-sm font-medium text-bark mb-1">New password</label>
                 <input
+                  id="reset-password"
+                  name="new-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -66,8 +68,10 @@ export default function ResetPassword() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-bark mb-1">Confirm password</label>
+                <label htmlFor="reset-confirm" className="block text-sm font-medium text-bark mb-1">Confirm password</label>
                 <input
+                  id="reset-confirm"
+                  name="confirm-password"
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}

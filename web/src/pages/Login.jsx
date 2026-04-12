@@ -70,21 +70,25 @@ export default function Login() {
             <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-cocoa">or log in with email</span></div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-bark mb-1">Email</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-bark mb-1">Email</label>
               <input
+                id="login-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-bark mb-1">Password</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-bark mb-1">Password</label>
               <input
+                id="login-password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
