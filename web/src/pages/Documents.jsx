@@ -82,8 +82,10 @@ export default function Documents() {
         api.get('/documents/usage'),
       ]);
 
-      setFolders(foldersRes.status === 'fulfilled' ? foldersRes.value.data : []);
-      setDocuments(docsRes.status === 'fulfilled' ? docsRes.value.data : []);
+      const rawFolders = foldersRes.status === 'fulfilled' ? foldersRes.value.data : [];
+      const rawDocs = docsRes.status === 'fulfilled' ? docsRes.value.data : [];
+      setFolders(Array.isArray(rawFolders) ? rawFolders : []);
+      setDocuments(Array.isArray(rawDocs) ? rawDocs : []);
       setUsage(usageRes.status === 'fulfilled' ? usageRes.value.data : null);
 
       // Only show an error if ALL three calls failed with a real error

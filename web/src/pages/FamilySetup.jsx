@@ -147,7 +147,7 @@ export default function FamilySetup() {
 
   function loadMembers() {
     return api.get('/household')
-      .then(({ data }) => setMembers(data.members ?? []))
+      .then(({ data }) => { const m = data?.members; setMembers(Array.isArray(m) ? m : []); })
       .catch(() => setError('Could not load members.'))
       .finally(() => setLoadingMembers(false));
   }
@@ -157,10 +157,11 @@ export default function FamilySetup() {
   function loadSchools() {
     api.get('/schools')
       .then(({ data }) => {
-        setHouseholdSchools(data.schools || []);
+        const sch = Array.isArray(data?.schools) ? data.schools : [];
+        setHouseholdSchools(sch);
         // Build activities map from school data
         const actMap = {};
-        (data.schools || []).forEach(s => {
+        sch.forEach(s => {
           (s.children || []).forEach(c => {
             if (c.activities?.length) actMap[c.id] = c.activities;
           });

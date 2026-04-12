@@ -176,7 +176,7 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
 
     api.get('/schools')
-      .then(({ data }) => setSchoolData(data.schools || []))
+      .then(({ data }) => { const s = data?.schools; setSchoolData(Array.isArray(s) ? s : []); })
       .catch(() => {});
   }, []);
 

@@ -517,8 +517,10 @@ export default function Tasks() {
         api.get('/tasks', { params }),
         api.get('/tasks/recent'),
       ]);
-      setTasks(tasksRes.data.tasks ?? []);
-      setRecentDone(recentRes.data.tasks ?? []);
+      const rawTasks = tasksRes.data?.tasks ?? tasksRes.data;
+      const rawRecent = recentRes.data?.tasks ?? recentRes.data;
+      setTasks(Array.isArray(rawTasks) ? rawTasks : []);
+      setRecentDone(Array.isArray(rawRecent) ? rawRecent : []);
     } catch {
       setError('Could not load tasks.');
     } finally {

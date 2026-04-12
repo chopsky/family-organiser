@@ -121,7 +121,8 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   const loadMeals = useCallback(async () => {
     try {
       const res = await api.get('/meals', { params: { week: weekParam } });
-      setMeals(res.data.meals ?? []);
+      const rawMeals = res.data?.meals ?? res.data;
+      setMeals(Array.isArray(rawMeals) ? rawMeals : []);
     } catch {
       setError('Could not load meal plan.');
     } finally {
@@ -700,7 +701,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
         const params = {};
         if (search) params.search = search;
         const res = await api.get('/recipes', { params });
-        setRecipes(res.data.recipes ?? []);
+        { const r = res.data?.recipes ?? res.data; setRecipes(Array.isArray(r) ? r : []); }
       } catch {
         setError('Could not load recipes.');
       } finally {
@@ -956,7 +957,7 @@ function RecipeBoxView({ setError }) {
       if (tagFilter) params.tag = tagFilter;
       if (favOnly) params.favourites = 'true';
       const res = await api.get('/recipes', { params });
-      setRecipes(res.data.recipes ?? []);
+      { const r = res.data?.recipes ?? res.data; setRecipes(Array.isArray(r) ? r : []); }
     } catch {
       setError('Could not load recipes.');
     } finally {

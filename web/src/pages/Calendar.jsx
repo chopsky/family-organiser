@@ -365,7 +365,8 @@ export default function Calendar() {
       return { events: cached.events, tasks: cached.tasks };
     }
     const res = await api.get('/calendar/month', { params: { month: mp } });
-    const entry = { events: res.data.events ?? [], tasks: res.data.tasks ?? [], ts: Date.now() };
+    const rawEvents = res.data?.events; const rawTasks = res.data?.tasks;
+    const entry = { events: Array.isArray(rawEvents) ? rawEvents : [], tasks: Array.isArray(rawTasks) ? rawTasks : [], ts: Date.now() };
     monthCacheRef.current[mp] = entry;
     return entry;
   }
@@ -419,7 +420,8 @@ export default function Calendar() {
       });
       const uniqueTasks = [...new Map(allTasks.map(t => [t.id, t])).values()];
 
-      const schools = freshSchoolData ? freshSchoolData.data.schools || [] : schoolData || [];
+      const rawSchools = freshSchoolData ? freshSchoolData.data?.schools : schoolData;
+      const schools = Array.isArray(rawSchools) ? rawSchools : [];
       if (freshSchoolData) setSchoolData(schools);
 
       // Build school events
