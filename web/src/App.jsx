@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { lazy, Suspense } from 'react';
+import { Capacitor } from '@capacitor/core';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 
@@ -73,7 +74,7 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (window.Capacitor ? <Navigate to="/login" replace /> : <LandingPage />)} />
+        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <LandingPage />)} />
         <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
