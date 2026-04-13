@@ -121,7 +121,7 @@ function DashboardAiInput() {
           ref={aiInputRef}
           type="text"
           placeholder="Ask AI to create events, tasks, recipes, scan receipts, and more..."
-          className="flex-1 px-4 py-3.5 text-sm text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
+          className="flex-1 px-4 py-3.5 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
         <div className="flex items-center gap-1 pr-2">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />

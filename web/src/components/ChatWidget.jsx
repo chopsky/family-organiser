@@ -511,7 +511,7 @@ I'm always here if you need me!`;
                       onPaste={handlePaste}
                       placeholder="Ask me anything..."
                       disabled={loading}
-                      className="flex-1 border border-light-grey rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-plum/30 focus:border-plum bg-cream disabled:opacity-50"
+                      className="flex-1 border border-light-grey rounded-full px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-plum/30 focus:border-plum bg-cream disabled:opacity-50"
                     />
                     <button
                       type="submit"
