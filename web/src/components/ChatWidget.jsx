@@ -388,7 +388,7 @@ I'm always here if you need me!`;
           <div className="fixed top-0 right-0 bottom-0 w-full md:w-[380px] bg-white z-50 flex flex-col shadow-xl border-l border-light-grey">
 
             {/* Header */}
-            <div className="px-4 py-3 border-b border-light-grey flex items-center gap-2 shrink-0">
+            <div className="px-4 py-3 border-b border-light-grey flex items-center gap-2 shrink-0 safe-top">
               {showHistory ? (
                 <>
                   <button onClick={() => setShowHistory(false)} className="p-1 text-warm-grey hover:text-charcoal transition-colors">
@@ -497,7 +497,7 @@ I'm always here if you need me!`;
                 </div>
 
                 {/* Input */}
-                <form onSubmit={handleSend} className="px-4 py-3 border-t border-light-grey shrink-0">
+                <form onSubmit={handleSend} className="px-4 py-3 border-t border-light-grey shrink-0 safe-bottom">
                   <div className="flex items-center gap-2">
                     <label className={`w-10 h-10 rounded-full border border-light-grey flex items-center justify-center transition-colors shrink-0 ${loading ? 'opacity-50' : 'hover:bg-cream cursor-pointer text-warm-grey hover:text-plum'}`}>
                       <ImageIcon className="h-5 w-5" />
