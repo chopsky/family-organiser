@@ -5,5 +5,12 @@
   "ios": {
     "scheme": "Housemait",
     "backgroundColor": "#FBF8F3"
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "none",
+      "scrollAssist": false,
+      "hideFormAccessoryBar": true
+    }
   }
 }
