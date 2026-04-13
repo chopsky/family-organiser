@@ -1,13 +1,14 @@
 /**
  * Apple Push Notification service (APNs) — sends push notifications
- * to iOS devices via the `apn` (node-apn) package.
+ * to iOS devices using Node's built-in http2 module (no third-party deps).
  *
  * Fire-and-forget: errors are logged but never block the caller.
  * If APNs is not configured (missing env vars), all send functions
  * become silent no-ops so the app works fine without push.
  */
 
-const apn = require('apn');
+const http2 = require('http2');
+const crypto = require('crypto');
 const db = require('../db/queries');
 
 // ---------------------------------------------------------------------------
@@ -21,30 +22,159 @@ const APN_KEY_PATH = process.env.APN_KEY_PATH; // alternative: path to .p8 file
 const APN_BUNDLE_ID = process.env.APN_BUNDLE_ID || 'com.housemait.app';
 const APN_PRODUCTION = process.env.APN_PRODUCTION === 'true';
 
-let provider = null;
+const APN_HOST = APN_PRODUCTION
+  ? 'https://api.push.apple.com'
+  : 'https://api.sandbox.push.apple.com';
+
+let signingKey = null;
 let configured = false;
 
 if (APN_KEY_ID && APN_TEAM_ID && (APN_KEY || APN_KEY_PATH)) {
   try {
-    const tokenConfig = {
-      keyId: APN_KEY_ID,
-      teamId: APN_TEAM_ID,
-    };
     if (APN_KEY) {
-      // Key contents passed directly as env var
-      tokenConfig.key = APN_KEY.replace(/\\n/g, '\n');
+      signingKey = APN_KEY.replace(/\\n/g, '\n');
     } else {
-      // Key loaded from file path
-      tokenConfig.key = require('fs').readFileSync(APN_KEY_PATH);
+      signingKey = require('fs').readFileSync(APN_KEY_PATH, 'utf8');
     }
-    provider = new apn.Provider({ token: tokenConfig, production: APN_PRODUCTION });
     configured = true;
-    console.log('[push] APNs provider initialised', APN_PRODUCTION ? '(production)' : '(sandbox)');
+    console.log('[push] APNs configured', APN_PRODUCTION ? '(production)' : '(sandbox)');
   } catch (err) {
-    console.warn('[push] Failed to initialise APNs provider:', err.message);
+    console.warn('[push] Failed to load APNs key:', err.message);
   }
 } else {
   console.warn('[push] APNs not configured — need APN_KEY_ID, APN_TEAM_ID, and APN_KEY (or APN_KEY_PATH). Push notifications disabled.');
+}
+
+// ---------------------------------------------------------------------------
+// JWT token generation for APNs
+// ---------------------------------------------------------------------------
+
+let cachedJwt = null;
+let cachedJwtTime = 0;
+const JWT_LIFETIME = 50 * 60 * 1000; // Refresh every 50 minutes (Apple allows up to 60)
+
+function getApnsJwt() {
+  const now = Date.now();
+  if (cachedJwt && (now - cachedJwtTime) < JWT_LIFETIME) {
+    return cachedJwt;
+  }
+
+  const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: APN_KEY_ID })).toString('base64url');
+  const claims = Buffer.from(JSON.stringify({ iss: APN_TEAM_ID, iat: Math.floor(now / 1000) })).toString('base64url');
+  const signingInput = `${header}.${claims}`;
+
+  const sign = crypto.createSign('SHA256');
+  sign.update(signingInput);
+  const derSig = sign.sign(signingKey);
+
+  // Convert DER signature to raw r||s format for ES256
+  const rawSig = derToRaw(derSig);
+  const signature = rawSig.toString('base64url');
+
+  cachedJwt = `${signingInput}.${signature}`;
+  cachedJwtTime = now;
+  return cachedJwt;
+}
+
+/** Convert DER-encoded ECDSA signature to raw 64-byte r||s */
+function derToRaw(derSig) {
+  // DER: 0x30 [len] 0x02 [rLen] [r] 0x02 [sLen] [s]
+  let offset = 2; // skip 0x30 and total length
+  // r
+  offset += 1; // skip 0x02
+  const rLen = derSig[offset++];
+  const r = derSig.subarray(offset, offset + rLen);
+  offset += rLen;
+  // s
+  offset += 1; // skip 0x02
+  const sLen = derSig[offset++];
+  const s = derSig.subarray(offset, offset + sLen);
+
+  const raw = Buffer.alloc(64);
+  // Pad or trim r and s to 32 bytes each
+  r.subarray(Math.max(0, rLen - 32)).copy(raw, 32 - Math.min(rLen, 32));
+  s.subarray(Math.max(0, sLen - 32)).copy(raw, 64 - Math.min(sLen, 32));
+  return raw;
+}
+
+// ---------------------------------------------------------------------------
+// HTTP/2 connection management
+// ---------------------------------------------------------------------------
+
+let h2Session = null;
+let h2SessionTimer = null;
+
+function getH2Session() {
+  if (h2Session && !h2Session.closed && !h2Session.destroyed) {
+    return h2Session;
+  }
+  h2Session = http2.connect(APN_HOST);
+  h2Session.on('error', (err) => {
+    console.error('[push] HTTP/2 session error:', err.message);
+    h2Session = null;
+  });
+  h2Session.on('close', () => { h2Session = null; });
+  // Close idle sessions after 5 minutes
+  clearTimeout(h2SessionTimer);
+  h2SessionTimer = setTimeout(() => {
+    if (h2Session) { h2Session.close(); h2Session = null; }
+  }, 5 * 60 * 1000);
+  if (h2SessionTimer.unref) h2SessionTimer.unref();
+  return h2Session;
+}
+
+// ---------------------------------------------------------------------------
+// Send a single push notification to one device
+// ---------------------------------------------------------------------------
+
+function sendOne(deviceToken, payload) {
+  return new Promise((resolve) => {
+    try {
+      const session = getH2Session();
+      const jwt = getApnsJwt();
+      const body = JSON.stringify(payload);
+
+      const req = session.request({
+        ':method': 'POST',
+        ':path': `/3/device/${deviceToken}`,
+        'authorization': `bearer ${jwt}`,
+        'apns-topic': APN_BUNDLE_ID,
+        'apns-push-type': 'alert',
+        'apns-priority': '10',
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(body),
+      });
+
+      let status;
+      let responseBody = '';
+
+      req.on('response', (headers) => { status = headers[':status']; });
+      req.on('data', (chunk) => { responseBody += chunk; });
+      req.on('end', () => {
+        if (status === 200) {
+          resolve({ success: true });
+        } else {
+          console.error('[push] APNs error for token', deviceToken.substring(0, 8) + '...', '— status:', status, responseBody);
+          resolve({ success: false, status, reason: responseBody });
+        }
+      });
+      req.on('error', (err) => {
+        console.error('[push] Request error:', err.message);
+        resolve({ success: false, reason: err.message });
+      });
+
+      req.end(body);
+
+      // Timeout after 10 seconds
+      req.setTimeout(10000, () => {
+        req.close();
+        resolve({ success: false, reason: 'timeout' });
+      });
+    } catch (err) {
+      console.error('[push] sendOne error:', err.message);
+      resolve({ success: false, reason: err.message });
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +212,7 @@ function isCategoryEnabled(preferences, category) {
  * @returns {Promise<{ sent: number, failed: number }>}
  */
 async function sendPushNotification(deviceTokens, { title, body, data, badge, sound } = {}) {
-  if (!configured || !provider) {
+  if (!configured) {
     return { sent: 0, failed: 0 };
   }
 
@@ -90,35 +220,26 @@ async function sendPushNotification(deviceTokens, { title, body, data, badge, so
     return { sent: 0, failed: 0 };
   }
 
-  const notification = new apn.Notification();
-  notification.alert = { title, body };
-  notification.topic = APN_BUNDLE_ID;
-  notification.sound = sound || 'default';
+  const payload = {
+    aps: {
+      alert: { title, body },
+      sound: sound || 'default',
+    },
+  };
 
   if (badge !== undefined) {
-    notification.badge = badge;
+    payload.aps.badge = badge;
   }
 
   if (data) {
-    notification.payload = data;
+    Object.assign(payload, data);
   }
 
-  try {
-    const result = await provider.send(notification, deviceTokens);
-    const sent = result.sent ? result.sent.length : 0;
-    const failed = result.failed ? result.failed.length : 0;
+  const results = await Promise.all(deviceTokens.map((t) => sendOne(t, payload)));
+  const sent = results.filter((r) => r.success).length;
+  const failed = results.length - sent;
 
-    if (failed > 0) {
-      for (const failure of result.failed) {
-        console.error('[push] Delivery failed for token', failure.device, '—', failure.status, failure.response);
-      }
-    }
-
-    return { sent, failed };
-  } catch (err) {
-    console.error('[push] Send error:', err.message);
-    return { sent: 0, failed: deviceTokens.length };
-  }
+  return { sent, failed };
 }
 
 // ---------------------------------------------------------------------------
@@ -127,14 +248,6 @@ async function sendPushNotification(deviceTokens, { title, body, data, badge, so
 
 /**
  * Send a push notification to a specific user, respecting their preferences.
- *
- * @param {string} userId
- * @param {object} opts
- * @param {string} opts.title
- * @param {string} opts.body
- * @param {object} [opts.data]
- * @param {string} [opts.category] - One of VALID_CATEGORIES; skipped if user disabled it
- * @returns {Promise<{ sent: number, failed: number }>}
  */
 async function sendToUser(userId, { title, body, data, category } = {}) {
   if (!configured) {
@@ -170,15 +283,6 @@ async function sendToUser(userId, { title, body, data, category } = {}) {
 /**
  * Send a push notification to all household members except the sender,
  * respecting each member's notification preferences.
- *
- * @param {string}  householdId
- * @param {string}  excludeUserId - User ID to exclude (typically the sender)
- * @param {object}  opts
- * @param {string}  opts.title
- * @param {string}  opts.body
- * @param {object}  [opts.data]
- * @param {string}  [opts.category]
- * @returns {Promise<{ sent: number, failed: number }>}
  */
 async function sendToHousehold(householdId, excludeUserId, { title, body, data, category } = {}) {
   if (!configured) {
