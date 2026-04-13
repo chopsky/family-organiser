@@ -2966,6 +2966,90 @@ async function getHouseholdStorageUsage(householdId) {
   return { totalBytes, fileCount: (data || []).length };
 }
 
+// ─── Device Tokens & Notification Preferences ──────────────────────────────
+
+async function registerDeviceToken(userId, householdId, token, platform = 'ios') {
+  const { data, error } = await supabase
+    .from('device_tokens')
+    .upsert(
+      {
+        user_id: userId,
+        household_id: householdId,
+        token,
+        platform,
+        active: true,
+        updated_at: new Date(),
+      },
+      { onConflict: 'token' }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function unregisterDeviceToken(token) {
+  const { data, error } = await supabase
+    .from('device_tokens')
+    .update({ active: false, updated_at: new Date() })
+    .eq('token', token)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getActiveDeviceTokens(userId) {
+  const { data, error } = await supabase
+    .from('device_tokens')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('active', true);
+  if (error) throw error;
+  return data;
+}
+
+async function getHouseholdDeviceTokens(householdId, excludeUserId = null) {
+  let query = supabase
+    .from('device_tokens')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('active', true);
+  if (excludeUserId) {
+    query = query.neq('user_id', excludeUserId);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+async function getNotificationPreferences(userId) {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function upsertNotificationPreferences(userId, prefs) {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .upsert(
+      {
+        user_id: userId,
+        ...prefs,
+        updated_at: new Date(),
+      },
+      { onConflict: 'user_id' }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -3177,4 +3261,11 @@ module.exports = {
   getDocumentsByFolderIds,
   getDescendantFolderIds,
   getHouseholdStorageUsage,
+  // Device tokens & notification preferences
+  registerDeviceToken,
+  unregisterDeviceToken,
+  getActiveDeviceTokens,
+  getHouseholdDeviceTokens,
+  getNotificationPreferences,
+  upsertNotificationPreferences,
 };

@@ -28,6 +28,11 @@ export default function Settings() {
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
+  // Push notification preferences
+  const [notifPrefs, setNotifPrefs] = useState(null);
+  const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(true);
+  const [savingNotifPref, setSavingNotifPref] = useState(null); // which key is saving
+
   // WhatsApp link state
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [whatsappCode, setWhatsappCode] = useState('');
@@ -82,6 +87,28 @@ export default function Settings() {
   }
 
   useEffect(() => { loadMembers(); }, []);
+
+  // Load notification preferences
+  useEffect(() => {
+    api.get('/notifications/preferences')
+      .then(({ data }) => setNotifPrefs(data))
+      .catch(() => setNotifPrefs({ calendar_reminders: true, task_assigned: true, shopping_updated: true, meal_plan_updated: true, family_activity: true }))
+      .finally(() => setLoadingNotifPrefs(false));
+  }, []);
+
+  async function toggleNotifPref(key) {
+    if (!notifPrefs) return;
+    const newVal = !notifPrefs[key];
+    setSavingNotifPref(key);
+    try {
+      await api.put('/notifications/preferences', { ...notifPrefs, [key]: newVal });
+      setNotifPrefs(prev => ({ ...prev, [key]: newVal }));
+    } catch {
+      setError('Could not update notification preference.');
+    } finally {
+      setSavingNotifPref(null);
+    }
+  }
 
   async function openEditProfile() {
     let me = members.find((m) => m.id === user?.id);
@@ -845,6 +872,48 @@ export default function Settings() {
 
       {/* Schools (admin only) */}
       {isAdmin && <SchoolsSection />}
+
+      {/* Push Notifications */}
+      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+        <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          Push Notifications
+        </h2>
+        <p className="text-xs text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
+        {loadingNotifPrefs ? (
+          <div className="py-4 text-center text-sm text-cocoa">Loading...</div>
+        ) : notifPrefs ? (
+          <div className="space-y-1">
+            {[
+              { key: 'calendar_reminders', label: 'Calendar reminders', desc: 'New events and upcoming reminders' },
+              { key: 'task_assigned', label: 'Task assignments', desc: 'When a task is assigned to you' },
+              { key: 'shopping_updated', label: 'Shopping list updates', desc: 'When someone adds to the shopping list' },
+              { key: 'meal_plan_updated', label: 'Meal plan changes', desc: 'When the meal plan is updated' },
+              { key: 'family_activity', label: 'Family activity', desc: 'New members and household updates' },
+            ].map(({ key, label, desc }) => (
+              <div key={key} className="flex items-center justify-between py-3 px-1">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-bark">{label}</p>
+                  <p className="text-xs text-cocoa">{desc}</p>
+                </div>
+                <button
+                  onClick={() => toggleNotifPref(key)}
+                  disabled={savingNotifPref === key}
+                  className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${
+                    notifPrefs[key] ? 'bg-primary' : 'bg-sand'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                      notifPrefs[key] ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       {/* Log out */}
       <button

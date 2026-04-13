@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { supabaseAdmin } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
+const push = require('../services/push');
 
 const router = Router();
 
@@ -96,6 +97,14 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const members = await db.getHouseholdMembers(req.householdId);
     const saved = await db.addTasks(req.householdId, tasksInput, req.user.id, members);
+
+    // Push notifications for assigned tasks
+    for (const task of saved) {
+      if (task.assigned_to && task.assigned_to !== req.user.id) {
+        push.sendToUser(task.assigned_to, { title: 'New task assigned', body: task.title, category: 'task_assigned' }).catch(() => {});
+      }
+    }
+
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ tasks: saved });
   } catch (err) {

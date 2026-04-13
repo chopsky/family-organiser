@@ -12,6 +12,7 @@ async function getIcal() {
 const db = require('../db/queries');
 const { requireAuth } = require('../middleware/auth');
 const cache = require('../services/cache');
+const push = require('../services/push');
 const calendarSync = require('../services/calendarSync');
 const googleProvider = require('../services/providers/google');
 const microsoftProvider = require('../services/providers/microsoft');
@@ -421,6 +422,9 @@ router.post('/events', async (req, res) => {
 
     // Push to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'create').catch(() => {});
+
+    // Notify household about the new event
+    push.sendToHousehold(req.householdId, req.user.id, { title: 'New event', body: event.title, category: 'calendar_reminders' }).catch(() => {});
 
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);

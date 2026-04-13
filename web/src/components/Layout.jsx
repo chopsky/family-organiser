@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText } from './Icons';
+import usePushNotifications from '../hooks/usePushNotifications';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
@@ -75,6 +76,9 @@ export default function Layout({ children }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [members, setMembers] = useState([]);
   const moreRef = useRef(null);
+
+  // Register for push notifications on iOS
+  usePushNotifications(user);
 
   // Close "More" popover on navigation
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);
@@ -196,7 +200,7 @@ export default function Layout({ children }) {
           <header className="md:hidden bg-cream border-b border-light-grey z-30 sticky top-0 safe-top">
             <div className="px-4 py-3 flex items-center">
               <Link to="/dashboard" className="shrink-0 w-8">
-                <img src="/housemait-logomark.png" alt="Housemait" className="h-8 w-8 rounded-lg" />
+                <img src="/housemait-logomark-square.png" alt="Housemait" className="h-8 w-8 rounded-lg" />
               </Link>
               <div className="flex-1 min-w-0 text-center">
                 {pageTitle ? (

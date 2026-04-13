@@ -69,6 +69,7 @@ app.use('/api',          require('./routes/meals'));
 app.use('/api/settings', require('./routes/household'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/admin',    require('./routes/admin'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // 404 and error handlers are added in server.js AFTER the webhook route is registered
 

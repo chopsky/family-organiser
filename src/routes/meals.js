@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { callWithFailover } = require('../services/ai-client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
+const push = require('../services/push');
 
 const router = Router();
 
@@ -91,6 +92,9 @@ router.post('/meals', requireAuth, requireHousehold, async (req, res) => {
       is_recurring: is_recurring || false,
       recurrence_day: recurrence_day !== undefined ? recurrence_day : null,
     }, req.user.id);
+
+    // Notify household about the meal plan update
+    push.sendToHousehold(req.householdId, req.user.id, { title: 'Meal plan updated', body: meal_name.trim(), category: 'meal_plan_updated' }).catch(() => {});
 
     return res.status(201).json({ meal });
   } catch (err) {

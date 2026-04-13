@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { AISLE_CATEGORIES, detectAisle } = require('../utils/aisle-detect');
 const cache = require('../services/cache');
+const push = require('../services/push');
 
 const router = Router();
 
@@ -91,6 +92,10 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     }));
 
     const saved = await db.addShoppingItems(req.householdId, enrichedItems, req.user.id);
+
+    // Notify household that shopping list was updated
+    push.sendToHousehold(req.householdId, req.user.id, { title: 'Shopping list updated', body: `${req.user.name} added items`, category: 'shopping_updated' }).catch(() => {});
+
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ items: saved });
