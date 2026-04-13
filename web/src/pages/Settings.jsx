@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
@@ -88,8 +89,10 @@ export default function Settings() {
 
   useEffect(() => { loadMembers(); }, []);
 
-  // Load notification preferences
+  // Load notification preferences (native iOS/Android only)
+  const isNative = Capacitor.isNativePlatform();
   useEffect(() => {
+    if (!isNative) { setLoadingNotifPrefs(false); return; }
     api.get('/notifications/preferences')
       .then(({ data }) => setNotifPrefs(data))
       .catch(() => setNotifPrefs({ calendar_reminders: true, task_assigned: true, shopping_updated: true, meal_plan_updated: true, family_activity: true }))
@@ -873,8 +876,8 @@ export default function Settings() {
       {/* Schools (admin only) */}
       {isAdmin && <SchoolsSection />}
 
-      {/* Push Notifications */}
-      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+      {/* Push Notifications — native app only */}
+      {isNative && <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
         <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
           Push Notifications
@@ -913,7 +916,7 @@ export default function Settings() {
             ))}
           </div>
         ) : null}
-      </div>
+      </div>}
 
       {/* Log out */}
       <button
