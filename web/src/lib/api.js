@@ -48,7 +48,7 @@ function forceLogout() {
   localStorage.removeItem('user');
   localStorage.removeItem('household');
   localStorage.removeItem('lastActive');
-  window.location.href = '/login';
+  window.location.href = '/';
 }
 
 // Auto-refresh on 401, retry with exponential backoff on 429
