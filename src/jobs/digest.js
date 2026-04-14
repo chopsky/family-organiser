@@ -103,15 +103,35 @@ async function sendWeeklyDigest(householdId) {
 
   for (const member of members) {
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasWhatsApp) continue;
+    if (!hasWhatsApp) {
+      console.log(`[digest] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
+      continue;
+    }
 
     // Send via WhatsApp
     if (whatsapp.isConfigured()) {
       try {
         await whatsapp.sendTemplate(member.whatsapp_phone, message);
+        await db.logWhatsAppMessage({
+          householdId,
+          userId: member.id,
+          direction: 'outbound',
+          messageType: 'weekly_digest',
+          body: message,
+        });
       } catch (err) {
         console.error(`Failed to send digest to ${member.name} via WhatsApp:`, err.message);
+        await db.logWhatsAppMessage({
+          householdId,
+          userId: member.id,
+          direction: 'outbound',
+          messageType: 'weekly_digest',
+          body: message,
+          error: err.message,
+        });
       }
+    } else {
+      console.log(`[digest] Skipping ${member.name} — whatsapp service not configured`);
     }
   }
 }

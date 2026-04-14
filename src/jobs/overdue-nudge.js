@@ -39,7 +39,10 @@ async function sendOverdueNudges(householdId) {
 
   for (const member of members) {
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasWhatsApp) continue;
+    if (!hasWhatsApp) {
+      console.log(`[overdue-nudge] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
+      continue;
+    }
 
     const overdueTasks = await db.getOverdueTasksForUser(householdId, member.id);
     if (!overdueTasks.length) continue;
@@ -50,9 +53,26 @@ async function sendOverdueNudges(householdId) {
     if (whatsapp.isConfigured()) {
       try {
         await whatsapp.sendTemplate(member.whatsapp_phone, message);
+        await db.logWhatsAppMessage({
+          householdId,
+          userId: member.id,
+          direction: 'outbound',
+          messageType: 'overdue_nudge',
+          body: message,
+        });
       } catch (err) {
         console.error(`Failed to send overdue nudge to ${member.name} via WhatsApp:`, err.message);
+        await db.logWhatsAppMessage({
+          householdId,
+          userId: member.id,
+          direction: 'outbound',
+          messageType: 'overdue_nudge',
+          body: message,
+          error: err.message,
+        });
       }
+    } else {
+      console.log(`[overdue-nudge] Skipping ${member.name} — whatsapp service not configured`);
     }
   }
 }

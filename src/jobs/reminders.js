@@ -104,7 +104,10 @@ async function sendDailyReminders(householdId, singleMember) {
 
   for (const member of targets) {
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasWhatsApp) continue;
+    if (!hasWhatsApp) {
+      console.log(`[reminders] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
+      continue;
+    }
 
     // Tasks assigned specifically to this member, due today or overdue
     const { data: myTasks } = await require('../db/client').supabaseAdmin
@@ -176,9 +179,26 @@ async function sendDailyReminders(householdId, singleMember) {
     if (whatsapp.isConfigured()) {
       try {
         await whatsapp.sendTemplate(member.whatsapp_phone, message);
+        await db.logWhatsAppMessage({
+          householdId,
+          userId: member.id,
+          direction: 'outbound',
+          messageType: 'daily_reminder',
+          body: message,
+        });
       } catch (err) {
         console.error(`Failed to send reminder to ${member.name} via WhatsApp:`, err.message);
+        await db.logWhatsAppMessage({
+          householdId,
+          userId: member.id,
+          direction: 'outbound',
+          messageType: 'daily_reminder',
+          body: message,
+          error: err.message,
+        });
       }
+    } else {
+      console.log(`[reminders] Skipping ${member.name} — whatsapp service not configured`);
     }
   }
 }
