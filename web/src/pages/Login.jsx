@@ -6,20 +6,23 @@ import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 
 export default function Login() {
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const { login }               = useAuth();
-  const navigate                = useNavigate();
-  const [searchParams]          = useSearchParams();
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
+  const [resendState, setResendState] = useState('idle'); // idle | sending | sent
+  const { login }                 = useAuth();
+  const navigate                  = useNavigate();
+  const [searchParams]            = useSearchParams();
 
   const verified = searchParams.get('verified') === 'true';
   const tokenError = searchParams.get('error');
+  const needsVerification = error.toLowerCase().includes('verify your email');
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setResendState('idle');
     if (!email.trim() || !password) {
       setError('Email and password are required.');
       return;
@@ -36,6 +39,18 @@ export default function Login() {
       setError(err.response?.data?.error || 'Something went wrong.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!email.trim() || resendState === 'sending') return;
+    setResendState('sending');
+    try {
+      await api.post('/auth/resend-verification', { email: email.trim() });
+      setResendState('sent');
+    } catch {
+      // Endpoint always returns 200 to prevent enumeration, so only network errors land here
+      setResendState('sent');
     }
   }
 
@@ -62,6 +77,22 @@ export default function Login() {
           )}
 
           <ErrorBanner message={error} onDismiss={() => setError('')} />
+
+          {needsVerification && resendState !== 'sent' && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendState === 'sending' || !email.trim()}
+              className="text-sm text-primary hover:underline disabled:opacity-50 disabled:no-underline mb-4"
+            >
+              {resendState === 'sending' ? 'Sending…' : 'Resend verification email'}
+            </button>
+          )}
+          {resendState === 'sent' && (
+            <p className="text-sm text-success bg-success/10 rounded-lg px-3 py-2 mb-4">
+              If that email is registered and unverified, a new verification link has been sent. Check your inbox.
+            </p>
+          )}
 
           <SocialButtons onSuccess={handleSocialSuccess} onError={setError} />
 

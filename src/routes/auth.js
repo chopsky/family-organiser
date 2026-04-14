@@ -177,6 +177,39 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/resend-verification ─────────────────────────────────────
+
+router.post('/resend-verification', async (req, res) => {
+  const { email: userEmail } = req.body;
+
+  // Always return 200 to prevent email enumeration
+  const genericResponse = { message: 'If that email is registered and unverified, a new verification link has been sent.' };
+
+  if (!userEmail?.trim()) {
+    return res.json(genericResponse);
+  }
+
+  try {
+    const user = await db.getUserByEmail(userEmail.trim().toLowerCase());
+    // Only send if user exists AND is not already verified
+    if (user && !user.email_verified) {
+      const token = generateToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+      await db.createEmailVerificationToken(user.id, token, expiresAt);
+
+      try {
+        await email.sendVerificationEmail(user.email, user.name, token);
+      } catch (emailErr) {
+        console.error('Failed to resend verification email:', emailErr);
+      }
+    }
+  } catch (err) {
+    console.error('POST /api/auth/resend-verification error:', err);
+  }
+
+  return res.json(genericResponse);
+});
+
 // ─── POST /api/auth/create-household ────────────────────────────────────────
 
 router.post('/create-household', requireAuth, async (req, res) => {
