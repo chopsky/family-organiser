@@ -969,9 +969,9 @@ export default function LandingPage() {
             <div>
               <h4 className="text-sm font-semibold text-charcoal mb-4 font-sans">Company</h4>
               <div className="space-y-3">
-                {['Privacy Policy', 'Terms of Service', 'Contact'].map(l => (
-                  <a key={l} href="#" className="block text-sm text-warm-grey hover:text-plum transition-colors">{l}</a>
-                ))}
+                <Link to="/privacy" className="block text-sm text-warm-grey hover:text-plum transition-colors">Privacy Policy</Link>
+                <a href="#" className="block text-sm text-warm-grey hover:text-plum transition-colors">Terms of Service</a>
+                <a href="#" className="block text-sm text-warm-grey hover:text-plum transition-colors">Contact</a>
               </div>
             </div>
             {/* Connect */}

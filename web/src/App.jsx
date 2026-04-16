@@ -24,6 +24,7 @@ const Receipt         = lazy(() => import('./pages/Receipt'));
 const FamilySetup     = lazy(() => import('./pages/FamilySetup'));
 const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
+const Privacy         = lazy(() => import('./pages/Privacy'));
 
 // Admin pages — only downloaded if user is a platform admin
 const AdminDashboard       = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -80,6 +81,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/setup" element={<RequireAuthOnly><SetupHousehold /></RequireAuthOnly>} />
         <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
         <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
