@@ -4,6 +4,7 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { AISLE_CATEGORIES, detectAisle } = require('../utils/aisle-detect');
 const cache = require('../services/cache');
 const push = require('../services/push');
+const broadcast = require('../services/broadcast');
 
 const router = Router();
 
@@ -96,6 +97,18 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // Notify household that shopping list was updated
     push.sendToHousehold(req.householdId, req.user.id, { title: 'Shopping list updated', body: `${req.user.name} added items`, category: 'shopping_updated' }).catch(() => {});
 
+    // WhatsApp broadcast — mirrors the format the bot uses when items are
+    // added via a WhatsApp message, so in-app adds reach WhatsApp members too.
+    if (saved.length) {
+      try {
+        const members = await db.getHouseholdMembers(req.householdId);
+        const itemNames = saved.map((i) => i.item).join(', ');
+        broadcast.toHousehold(req.user.id, members, `🛒 ${req.user.name} added: ${itemNames}`);
+      } catch (err) {
+        console.error('[shopping] broadcast failed:', err.message);
+      }
+    }
+
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ items: saved });
@@ -141,6 +154,18 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
+    // Fetch the prior completion state so we only broadcast on a fresh
+    // check-off (not on repeated PATCHes or on un-checking).
+    let wasCompleted = null;
+    if (completed === true) {
+      const { data: prior } = await userDb
+        .from('shopping_items')
+        .select('completed')
+        .eq('id', req.params.id)
+        .single();
+      wasCompleted = prior?.completed ?? false;
+    }
+
     const { data, error } = await userDb
       .from('shopping_items')
       .update(updateData)
@@ -152,6 +177,17 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       if (error.code === 'PGRST116') return res.status(404).json({ error: 'Item not found' });
       throw error;
     }
+
+    // WhatsApp broadcast on fresh check-off only.
+    if (completed === true && wasCompleted === false) {
+      try {
+        const members = await db.getHouseholdMembers(req.householdId);
+        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} checked off: ${data.item}`);
+      } catch (err) {
+        console.error('[shopping] broadcast failed:', err.message);
+      }
+    }
+
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ item: data });

@@ -4,6 +4,7 @@ const { supabaseAdmin } = require('../db/client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 const push = require('../services/push');
+const broadcast = require('../services/broadcast');
 
 const router = Router();
 
@@ -105,6 +106,14 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       }
     }
 
+    // WhatsApp broadcast — mirrors the format the bot uses when tasks are
+    // added through a WhatsApp message, so in-app adds are visible to
+    // members who live in WhatsApp.
+    if (saved.length) {
+      const titles = saved.map((t) => t.title).join(', ');
+      broadcast.toHousehold(req.user.id, members, `📋 ${req.user.name} added task: ${titles}`);
+    }
+
     cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ tasks: saved });
   } catch (err) {
@@ -198,6 +207,17 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
     let nextTask = null;
     if (completed && task.recurrence) {
       nextTask = await db.generateNextRecurrence(task);
+    }
+
+    // WhatsApp broadcast only on fresh completions (not on repeated PATCHes
+    // that re-assert the same state, and not on un-completion).
+    if (completed === true && !task.completed) {
+      try {
+        const members = await db.getHouseholdMembers(req.householdId);
+        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} completed: ${updated.title}`);
+      } catch (err) {
+        console.error('[tasks] broadcast failed:', err.message);
+      }
     }
 
     cache.invalidate(`digest:${req.householdId}`);
