@@ -1639,6 +1639,99 @@ async function updateSubscription(subscriptionId, updates, db = supabase) {
   return data;
 }
 
+// ── Sync health tracking ───────────────────────────────────────────────
+//
+// Auto-disable threshold: after this many consecutive failures, flip
+// sync_enabled = false so we stop hammering the provider. At a 15-min
+// Apple poll cadence, 12 failures ≈ 3 hours of retries.
+const MAX_CONSECUTIVE_SYNC_FAILURES = 12;
+
+/**
+ * Mark a successful sync attempt on a subscription.
+ * Clears any prior error and resets the failure counter.
+ */
+async function recordSyncSuccess(subscriptionId, db = supabase) {
+  const now = new Date().toISOString();
+  const { error } = await db
+    .from('calendar_subscriptions')
+    .update({
+      last_synced_at: now,
+      last_attempted_at: now,
+      last_sync_error: null,
+      consecutive_failures: 0,
+    })
+    .eq('id', subscriptionId);
+  if (error) throw error;
+}
+
+/**
+ * Mark a failed sync attempt. Increments the failure counter, records the
+ * error message and attempt timestamp, and auto-disables the subscription
+ * once it has failed MAX_CONSECUTIVE_SYNC_FAILURES times in a row.
+ *
+ * Returns { consecutive_failures, auto_disabled } for logging.
+ */
+async function recordSyncFailure(subscriptionId, errorMessage, db = supabase) {
+  // Read current counter (the DB doesn't support atomic increment in the
+  // PostgREST query builder cleanly; a read-then-write is fine here — sync
+  // attempts for a given subscription are serialized by the scheduler).
+  const { data: current, error: readErr } = await db
+    .from('calendar_subscriptions')
+    .select('consecutive_failures')
+    .eq('id', subscriptionId)
+    .single();
+  if (readErr && readErr.code !== 'PGRST116') throw readErr;
+
+  const nextCount = (current?.consecutive_failures || 0) + 1;
+  const autoDisable = nextCount >= MAX_CONSECUTIVE_SYNC_FAILURES;
+
+  const updates = {
+    last_attempted_at: new Date().toISOString(),
+    last_sync_error: String(errorMessage || 'Unknown error').slice(0, 1000),
+    consecutive_failures: nextCount,
+  };
+  if (autoDisable) updates.sync_enabled = false;
+
+  const { error: writeErr } = await db
+    .from('calendar_subscriptions')
+    .update(updates)
+    .eq('id', subscriptionId);
+  if (writeErr) throw writeErr;
+
+  return { consecutive_failures: nextCount, auto_disabled: autoDisable };
+}
+
+/**
+ * Return any subscriptions in a failing state for the given household.
+ * Used by the UI to show a "sync broken" banner on the calendar page.
+ */
+async function getFailingSubscriptionsByHousehold(householdId, db = supabase) {
+  // Join via calendar_connections — there's no direct household_id on subs.
+  const { data, error } = await db
+    .from('calendar_subscriptions')
+    .select(`
+      id, display_name, last_synced_at, last_attempted_at,
+      last_sync_error, consecutive_failures, sync_enabled,
+      calendar_connections!inner (
+        id, provider, caldav_username, household_id
+      )
+    `)
+    .eq('calendar_connections.household_id', householdId)
+    .not('last_sync_error', 'is', null);
+  if (error) throw error;
+  return (data || []).map((sub) => ({
+    id: sub.id,
+    display_name: sub.display_name,
+    last_synced_at: sub.last_synced_at,
+    last_attempted_at: sub.last_attempted_at,
+    last_sync_error: sub.last_sync_error,
+    consecutive_failures: sub.consecutive_failures,
+    sync_enabled: sub.sync_enabled,
+    provider: sub.calendar_connections?.provider,
+    account: sub.calendar_connections?.caldav_username,
+  }));
+}
+
 async function deleteSubscription(subscriptionId, db = supabase) {
   // Delete synced events first
   await db
@@ -3170,6 +3263,10 @@ module.exports = {
   // Calendar subscriptions
   getSubscriptionsByConnection,
   getEnabledSubscriptionsByConnection,
+  recordSyncSuccess,
+  recordSyncFailure,
+  getFailingSubscriptionsByHousehold,
+  MAX_CONSECUTIVE_SYNC_FAILURES,
   upsertSubscription,
   getSubscriptionById,
   updateSubscription,

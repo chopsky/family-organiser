@@ -89,13 +89,24 @@ async function pullChangesFromProvider(connection) {
         await processChange(connection, sub, change);
       }
 
-      // Update last_synced_at
-      await db.updateSubscription(sub.id, { last_synced_at: new Date().toISOString() });
+      // Success: clears any prior error and resets the failure counter.
+      await db.recordSyncSuccess(sub.id);
     } catch (err) {
       console.error(
         `Failed to pull changes for subscription ${sub.id} (${sub.display_name}) on connection ${connection.id}:`,
         err
       );
+      try {
+        const { auto_disabled, consecutive_failures } = await db.recordSyncFailure(sub.id, err.message || String(err));
+        if (auto_disabled) {
+          console.warn(
+            `[calendar-sync] Auto-disabled subscription ${sub.id} (${sub.display_name}) after ${consecutive_failures} consecutive failures. Last error: ${err.message}`
+          );
+        }
+      } catch (trackErr) {
+        // If we can't even record the failure, log and move on — don't throw.
+        console.error(`[calendar-sync] Failed to record sync failure for ${sub.id}:`, trackErr.message);
+      }
     }
   }
 }

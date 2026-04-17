@@ -641,6 +641,23 @@ router.get('/connections', async (req, res) => {
 });
 
 /**
+ * GET /api/calendar/sync-health
+ *
+ * Returns any subscriptions in the caller's household whose last sync
+ * failed, so the UI can surface a "sync is broken" banner. Cheap enough
+ * to poll every few minutes from the Calendar page.
+ */
+router.get('/sync-health', async (req, res) => {
+  try {
+    const failing = await db.getFailingSubscriptionsByHousehold(req.householdId);
+    return res.json({ failing });
+  } catch (err) {
+    console.error('GET /api/calendar/sync-health error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/calendar/connect/google
  * Redirect user to Google OAuth2 consent screen.
  */
