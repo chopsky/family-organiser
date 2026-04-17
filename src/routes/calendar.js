@@ -771,37 +771,70 @@ router.delete('/connections/:provider', async (req, res) => {
 
     console.log(`[disconnect] Found ${connections.length} connection(s) for user=${req.user.id} provider=${provider}`);
 
-    // Soft-delete synced events for each connection. Batch the id list
-    // so a household with thousands of synced events can't blow the
-    // PostgREST URL-length limit.
-    const BATCH = 200;
+    // Don't rely on the schema's ON DELETE CASCADE — when a connection has
+    // tens of thousands of sync_mappings, the cascade blows the Postgres
+    // statement timeout and the whole DELETE fails. Do it explicitly in
+    // manageable batches instead.
+    const PAGE = 1000;   // PostgREST default select cap
+    const BATCH = 200;   // keep the `IN (...)` URL under the limit
+    const nowIso = new Date().toISOString();
+
     for (const connection of connections) {
       try {
-        const { data: mappings } = await supabaseAdmin
-          .from('calendar_sync_mappings')
-          .select('event_id')
-          .eq('connection_id', connection.id);
+        // 1. Paginate through all sync_mappings for this connection, so we
+        //    collect EVERY event_id (the old code only got the first 1000).
+        const allEventIds = [];
+        let offset = 0;
+        while (true) {
+          const { data: page, error: pageErr } = await supabaseAdmin
+            .from('calendar_sync_mappings')
+            .select('event_id')
+            .eq('connection_id', connection.id)
+            .range(offset, offset + PAGE - 1);
+          if (pageErr) throw pageErr;
+          if (!page || page.length === 0) break;
+          for (const row of page) if (row.event_id) allEventIds.push(row.event_id);
+          if (page.length < PAGE) break;
+          offset += PAGE;
+        }
 
-        const ids = (mappings || []).map((m) => m.event_id).filter(Boolean);
-        for (let i = 0; i < ids.length; i += BATCH) {
-          const chunk = ids.slice(i, i + BATCH);
+        // 2. Soft-delete all those events in batches of BATCH to avoid
+        //    blowing the URL length limit.
+        for (let i = 0; i < allEventIds.length; i += BATCH) {
+          const chunk = allEventIds.slice(i, i + BATCH);
           const { error: updErr } = await supabaseAdmin
             .from('calendar_events')
-            .update({ deleted_at: new Date().toISOString() })
+            .update({ deleted_at: nowIso })
             .in('id', chunk)
             .is('deleted_at', null);
           if (updErr) throw updErr;
         }
-        if (ids.length) console.log(`[disconnect] Soft-deleted ${ids.length} events for connection ${connection.id}`);
+        if (allEventIds.length) {
+          console.log(`[disconnect] Soft-deleted ${allEventIds.length} events for connection ${connection.id}`);
+        }
+
+        // 3. Explicitly delete sync_mappings for this connection. Doing this
+        //    before the connection delete means the cascade has nothing left
+        //    to chew through.
+        const { error: mapDelErr } = await supabaseAdmin
+          .from('calendar_sync_mappings')
+          .delete()
+          .eq('connection_id', connection.id);
+        if (mapDelErr) throw mapDelErr;
+
+        // 4. Explicitly delete subscriptions for this connection.
+        const { error: subDelErr } = await supabaseAdmin
+          .from('calendar_subscriptions')
+          .delete()
+          .eq('connection_id', connection.id);
+        if (subDelErr) throw subDelErr;
       } catch (cleanupErr) {
-        // Non-fatal — proceed with connection deletion so the user can at
-        // least reconnect. Orphaned events can be purged later.
-        console.error(`[disconnect] Event cleanup error for ${connection.id} (non-fatal):`, cleanupErr.message);
+        console.error(`[disconnect] Cleanup error for ${connection.id}:`, cleanupErr.message);
+        throw cleanupErr; // bubble up — we can't safely delete the connection with partial cleanup
       }
     }
 
-    // Delete every matching connection row (cascades to subscriptions +
-    // sync_mappings via the schema's ON DELETE CASCADE).
+    // 5. Now the connection has no dependent rows. Plain delete.
     const { error: delErr } = await supabaseAdmin
       .from('calendar_connections')
       .delete()
