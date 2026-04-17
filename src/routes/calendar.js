@@ -781,25 +781,32 @@ router.delete('/connections/:provider', async (req, res) => {
 
     for (const connection of connections) {
       try {
-        // 1. Paginate through all sync_mappings for this connection, so we
-        //    collect EVERY event_id (the old code only got the first 1000).
+        // 1. Paginate through all sync_mappings, collecting both event_ids
+        //    AND mapping_ids so we can batch-delete them later. A single
+        //    DELETE WHERE connection_id = ? times out at ~10k+ rows even
+        //    though connection_id is indexed; batching by PK avoids that.
         const allEventIds = [];
+        const allMappingIds = [];
         let offset = 0;
         while (true) {
           const { data: page, error: pageErr } = await supabaseAdmin
             .from('calendar_sync_mappings')
-            .select('event_id')
+            .select('id, event_id')
             .eq('connection_id', connection.id)
             .range(offset, offset + PAGE - 1);
           if (pageErr) throw pageErr;
           if (!page || page.length === 0) break;
-          for (const row of page) if (row.event_id) allEventIds.push(row.event_id);
+          for (const row of page) {
+            if (row.id) allMappingIds.push(row.id);
+            if (row.event_id) allEventIds.push(row.event_id);
+          }
           if (page.length < PAGE) break;
           offset += PAGE;
         }
+        console.log(`[disconnect] Collected ${allMappingIds.length} mappings / ${allEventIds.length} events for ${connection.id}`);
 
-        // 2. Soft-delete all those events in batches of BATCH to avoid
-        //    blowing the URL length limit.
+        // 2. Soft-delete events in batches (keeps the IN (...) URL small
+        //    and each statement well under the Postgres timeout).
         for (let i = 0; i < allEventIds.length; i += BATCH) {
           const chunk = allEventIds.slice(i, i + BATCH);
           const { error: updErr } = await supabaseAdmin
@@ -810,19 +817,25 @@ router.delete('/connections/:provider', async (req, res) => {
           if (updErr) throw updErr;
         }
         if (allEventIds.length) {
-          console.log(`[disconnect] Soft-deleted ${allEventIds.length} events for connection ${connection.id}`);
+          console.log(`[disconnect] Soft-deleted ${allEventIds.length} events for ${connection.id}`);
         }
 
-        // 3. Explicitly delete sync_mappings for this connection. Doing this
-        //    before the connection delete means the cascade has nothing left
-        //    to chew through.
-        const { error: mapDelErr } = await supabaseAdmin
-          .from('calendar_sync_mappings')
-          .delete()
-          .eq('connection_id', connection.id);
-        if (mapDelErr) throw mapDelErr;
+        // 3. Delete sync_mappings in batches by PK. This is what was timing
+        //    out when run as a single DELETE WHERE connection_id = ?.
+        for (let i = 0; i < allMappingIds.length; i += BATCH) {
+          const chunk = allMappingIds.slice(i, i + BATCH);
+          const { error: mapDelErr } = await supabaseAdmin
+            .from('calendar_sync_mappings')
+            .delete()
+            .in('id', chunk);
+          if (mapDelErr) throw mapDelErr;
+        }
+        if (allMappingIds.length) {
+          console.log(`[disconnect] Deleted ${allMappingIds.length} mappings for ${connection.id}`);
+        }
 
-        // 4. Explicitly delete subscriptions for this connection.
+        // 4. Delete subscriptions for this connection (small row count —
+        //    one bulk statement is fine here).
         const { error: subDelErr } = await supabaseAdmin
           .from('calendar_subscriptions')
           .delete()
