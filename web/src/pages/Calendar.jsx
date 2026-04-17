@@ -719,7 +719,25 @@ export default function Calendar() {
       if (editingEvent) {
         await api.patch(`/calendar/events/${editingEvent.id}`, payload);
       } else {
-        await api.post('/calendar/events', payload);
+        try {
+          await api.post('/calendar/events', payload);
+        } catch (err) {
+          // Backend returns 409 when a matching event already exists for the
+          // same date, to prevent silent duplicates. Ask the user whether to
+          // add a second copy anyway and, if yes, re-send with force: true.
+          if (err.response?.status === 409) {
+            const existingMsg = err.response?.data?.message || 'A similar event already exists.';
+            const confirmMsg = `${existingMsg}\n\nAdd it anyway?`;
+            if (window.confirm(confirmMsg)) {
+              await api.post('/calendar/events', { ...payload, force: true });
+            } else {
+              setSaving(false);
+              return; // keep the form open so the user can edit or cancel
+            }
+          } else {
+            throw err;
+          }
+        }
       }
       setShowForm(false);
       resetForm();

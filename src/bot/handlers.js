@@ -11,6 +11,7 @@ const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../ser
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { callWithFailover } = require('../services/ai-client');
+const push = require('../services/push');
 
 // ─── Timezone helper ──────────────────────────────────────────────────────────
 
@@ -278,6 +279,22 @@ async function handleTextMessage(text, user, household) {
         ? `${ev.date}T23:59:59Z`
         : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
+      // ── Duplicate detection ──
+      // If someone already added this event for the same date, don't silently
+      // create a second copy — tell the user it exists and let them decide.
+      const existing = await db.findSimilarEvent(household.id, ev.title, startTime);
+      if (existing) {
+        const existingCreator = existing.created_by
+          ? household.members.find(m => m.id === existing.created_by)
+          : null;
+        const who = existingCreator?.name || 'someone';
+        const dateLabel = new Date(existing.start_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+        return {
+          response: `📅 ${who} already added "${existing.title}" for ${dateLabel} — I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
+          actions,
+        };
+      }
+
       const created = await db.createCalendarEvent(household.id, {
         title: ev.title,
         start_time: startTime,
@@ -295,6 +312,15 @@ async function handleTextMessage(text, user, household) {
       }
 
       actions.eventsAdded = [ev.title];
+
+      // Cross-channel notification: the WhatsApp broadcast is sent by the caller
+      // via buildBroadcastMessage. Here we also fire an iOS push so household
+      // members who live in the native app (and don't check WhatsApp) see it.
+      push.sendToHousehold(household.id, user.id, {
+        title: 'New event',
+        body: `${user.name} added "${ev.title}"`,
+        category: 'calendar_reminders',
+      }).catch((err) => console.error('[handlers] calendar push failed:', err.message));
     } catch (eventErr) {
       console.error('Calendar event creation failed:', eventErr.message);
       return { response: `⚠️ I understood the event but couldn't save it: ${eventErr.message}`, actions };

@@ -1293,6 +1293,33 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
   return data;
 }
 
+/**
+ * Look for an existing calendar event with the same title on the same calendar
+ * day as the given start_time. Used to catch duplicates when multiple family
+ * members add the same event independently. Case-insensitive exact title match.
+ * Matches on UTC day — good enough for typical usage; edge cases near midnight
+ * in non-UTC timezones may not match and that's acceptable.
+ *
+ * @returns {Promise<object|null>} The existing event, or null if none found.
+ */
+async function findSimilarEvent(householdId, title, startTime, db = supabase) {
+  if (!title?.trim() || !startTime) return null;
+  const dateOnly = String(startTime).slice(0, 10); // "YYYY-MM-DD"
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
+  const dayStart = `${dateOnly}T00:00:00.000Z`;
+  const dayEnd   = `${dateOnly}T23:59:59.999Z`;
+  const { data, error } = await db
+    .from('calendar_events')
+    .select('id, title, start_time, created_by, assigned_to_name, all_day')
+    .eq('household_id', householdId)
+    .ilike('title', title.trim()) // case-insensitive exact match (no wildcards)
+    .gte('start_time', dayStart)
+    .lte('start_time', dayEnd)
+    .limit(1);
+  if (error) throw error;
+  return data && data.length > 0 ? data[0] : null;
+}
+
 async function updateCalendarEvent(eventId, householdId, updates, db = supabase) {
   const { data, error } = await db
     .from('calendar_events')
@@ -3119,6 +3146,7 @@ module.exports = {
   findCalendarEventByTitleAndTime,
   getTasksByDateRange,
   createCalendarEvent,
+  findSimilarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
   softDeleteCalendarEvent,

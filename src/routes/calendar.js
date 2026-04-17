@@ -13,6 +13,7 @@ const db = require('../db/queries');
 const { requireAuth } = require('../middleware/auth');
 const cache = require('../services/cache');
 const push = require('../services/push');
+const broadcast = require('../services/broadcast');
 const calendarSync = require('../services/calendarSync');
 const googleProvider = require('../services/providers/google');
 const microsoftProvider = require('../services/providers/microsoft');
@@ -372,7 +373,7 @@ router.get('/month', async (req, res) => {
  * Body: { title, start_time, end_time, all_day?, description?, location?, color?, recurrence?, assigned_to_name?, reminders?, assigned_to_names? }
  */
 router.post('/events', async (req, res) => {
-  const { title, start_time, end_time, all_day, description, location, color, recurrence, assigned_to_name, reminders, assigned_to_names } = req.body;
+  const { title, start_time, end_time, all_day, description, location, color, recurrence, assigned_to_name, reminders, assigned_to_names, force } = req.body;
 
   if (!title?.trim()) {
     return res.status(400).json({ error: '"title" is required' });
@@ -391,6 +392,33 @@ router.post('/events', async (req, res) => {
   }
 
   try {
+    // ── Duplicate detection ──
+    // If another member already added the same event on the same date, return
+    // 409 and let the client confirm before forcing a second copy. Skipped when
+    // the client explicitly passes `force: true`.
+    if (!force) {
+      const existing = await db.findSimilarEvent(req.householdId, title, start_time);
+      if (existing) {
+        let creatorName = 'Someone';
+        if (existing.created_by) {
+          const members = await db.getHouseholdMembers(req.householdId);
+          const creator = members.find(m => m.id === existing.created_by);
+          if (creator) creatorName = creator.name;
+        }
+        return res.status(409).json({
+          error: 'duplicate',
+          message: `${creatorName} already added "${existing.title}" on this date.`,
+          existing: {
+            id: existing.id,
+            title: existing.title,
+            start_time: existing.start_time,
+            all_day: existing.all_day,
+            created_by_name: creatorName,
+          },
+        });
+      }
+    }
+
     const eventData = { title: title.trim(), start_time, end_time };
     if (all_day !== undefined) eventData.all_day = all_day;
     if (description) eventData.description = description;
@@ -423,8 +451,25 @@ router.post('/events', async (req, res) => {
     // Push to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'create').catch(() => {});
 
-    // Notify household about the new event
-    push.sendToHousehold(req.householdId, req.user.id, { title: 'New event', body: event.title, category: 'calendar_reminders' }).catch(() => {});
+    // Notify household via BOTH channels so we reach members regardless of
+    // whether they've registered for iOS push, have WhatsApp linked, or both.
+    // Fire-and-forget — a failure in either channel must not block the response.
+    (async () => {
+      try {
+        const members = await db.getHouseholdMembers(req.householdId);
+        const creator = members.find(m => m.id === req.user.id);
+        const creatorName = creator?.name || 'Someone';
+        const pushBody = `${creatorName} added "${event.title}"`;
+        push.sendToHousehold(req.householdId, req.user.id, {
+          title: 'New event',
+          body: pushBody,
+          category: 'calendar_reminders',
+        }).catch((err) => console.error('[calendar] push failed:', err.message));
+        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${event.title}`);
+      } catch (err) {
+        console.error('[calendar] notify household failed:', err.message);
+      }
+    })();
 
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);

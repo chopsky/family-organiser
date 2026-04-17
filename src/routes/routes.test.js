@@ -286,6 +286,61 @@ describe('POST /api/classify', () => {
   });
 });
 
+// ─── POST /api/calendar/events (duplicate detection) ─────────────────────────
+
+describe('POST /api/calendar/events', () => {
+  const EVENT_PAYLOAD = {
+    title: "Yom Ha'atzma'ut Celebration",
+    start_time: '2026-07-17T10:00:00Z',
+    end_time:   '2026-07-17T11:00:00Z',
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns 409 when a matching event already exists on the same day', async () => {
+    db.findSimilarEvent.mockResolvedValue({
+      id: 'ev-existing',
+      title: "Yom Ha'atzma'ut Celebration",
+      start_time: '2026-07-17T09:00:00Z',
+      created_by: 'u-2',
+      all_day: false,
+    });
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+
+    const res = await request(app).post('/api/calendar/events').set(AUTH).send(EVENT_PAYLOAD);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('duplicate');
+    expect(res.body.existing.id).toBe('ev-existing');
+    expect(res.body.message).toContain('Jake'); // creator of the existing event
+    expect(db.createCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  test('creates the event when force: true, even if a duplicate exists', async () => {
+    db.findSimilarEvent.mockResolvedValue({ id: 'ev-existing', title: EVENT_PAYLOAD.title, start_time: EVENT_PAYLOAD.start_time, created_by: 'u-2' });
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    db.createCalendarEvent.mockResolvedValue({ id: 'ev-new', ...EVENT_PAYLOAD });
+
+    const res = await request(app).post('/api/calendar/events').set(AUTH).send({ ...EVENT_PAYLOAD, force: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.event.id).toBe('ev-new');
+    expect(db.findSimilarEvent).not.toHaveBeenCalled(); // force skips the check
+    expect(db.createCalendarEvent).toHaveBeenCalled();
+  });
+
+  test('creates the event normally when no duplicate exists', async () => {
+    db.findSimilarEvent.mockResolvedValue(null);
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    db.createCalendarEvent.mockResolvedValue({ id: 'ev-new', ...EVENT_PAYLOAD });
+
+    const res = await request(app).post('/api/calendar/events').set(AUTH).send(EVENT_PAYLOAD);
+
+    expect(res.status).toBe(201);
+    expect(res.body.event.id).toBe('ev-new');
+  });
+});
+
 // ─── GET /api/digest ──────────────────────────────────────────────────────────
 
 describe('GET /api/digest', () => {
