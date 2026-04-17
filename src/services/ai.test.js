@@ -6,7 +6,7 @@
 jest.mock('@anthropic-ai/sdk');
 const Anthropic = require('@anthropic-ai/sdk');
 
-const { classify, scanReceipt, matchReceiptToList } = require('./ai');
+const { classify, scanReceipt, matchReceiptToList, parseJSON } = require('./ai');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -308,3 +308,78 @@ describe('matchReceiptToList()', () => {
     expect(userMsg).toContain('milk');
   });
 });
+
+// ─── parseJSON() — AI output parsing robustness ─────────────────────────────
+
+describe('parseJSON()', () => {
+  const originalError = console.error;
+  beforeAll(() => { console.error = jest.fn(); });
+  afterAll(() => { console.error = originalError; });
+
+  test('parses plain JSON', () => {
+    expect(parseJSON('{"a":1}', 'test')).toEqual({ a: 1 });
+  });
+
+  test('parses JSON array', () => {
+    expect(parseJSON('[1,2,3]', 'test')).toEqual([1, 2, 3]);
+  });
+
+  test('strips markdown fences (```json)', () => {
+    const text = '```json\n{"title":"Book car service"}\n```';
+    expect(parseJSON(text, 'test')).toEqual({ title: 'Book car service' });
+  });
+
+  test('strips markdown fences (``` no language)', () => {
+    const text = '```\n{"ok":true}\n```';
+    expect(parseJSON(text, 'test')).toEqual({ ok: true });
+  });
+
+  test('extracts JSON wrapped in prose (before and after)', () => {
+    const text = "Sure! Here's the classification:\n{\"title\":\"Book car service & MOT\"}\nHope that helps!";
+    expect(parseJSON(text, 'test')).toEqual({ title: 'Book car service & MOT' });
+  });
+
+  test('extracts JSON wrapped only with trailing prose', () => {
+    const text = '{"intent":"task_add"}\n\nLet me know if you want to change anything!';
+    expect(parseJSON(text, 'test')).toEqual({ intent: 'task_add' });
+  });
+
+  test('respects braces inside string values', () => {
+    const text = 'Preamble.\n{"note":"use {curly} braces"}\nPostamble.';
+    expect(parseJSON(text, 'test')).toEqual({ note: 'use {curly} braces' });
+  });
+
+  test('respects escaped quotes inside strings', () => {
+    const text = 'Here: {"quote":"she said \\"hi\\""}';
+    expect(parseJSON(text, 'test')).toEqual({ quote: 'she said "hi"' });
+  });
+
+  test('repairs trailing comma before closing brace', () => {
+    const text = '{"a":1,"b":2,}';
+    expect(parseJSON(text, 'test')).toEqual({ a: 1, b: 2 });
+  });
+
+  test('repairs trailing comma before closing bracket', () => {
+    const text = '{"arr":[1,2,3,]}';
+    expect(parseJSON(text, 'test')).toEqual({ arr: [1, 2, 3] });
+  });
+
+  test('handles the ampersand regression case', () => {
+    // Gemini-style response wrapping JSON in prose when user text contains '&'
+    const text = 'I\'ll add that task for you.\n\n{"intent":"task_add","tasks":[{"action":"add","title":"Book car service & MOT"}],"response_message":"Got it!"}';
+    const parsed = parseJSON(text, 'test');
+    expect(parsed.intent).toBe('task_add');
+    expect(parsed.tasks[0].title).toBe('Book car service & MOT');
+  });
+
+  test('throws with informative message on total garbage', () => {
+    expect(() => parseJSON('this is not json at all', 'test'))
+      .toThrow(/Failed to parse test JSON/);
+  });
+
+  test('throws when no balanced block exists', () => {
+    expect(() => parseJSON('{"unclosed":"value', 'test'))
+      .toThrow(/Failed to parse test JSON/);
+  });
+});
+

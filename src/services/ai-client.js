@@ -216,12 +216,14 @@ async function callWithFailover(opts) {
 
   // Try Gemini first (if API key is set)
   if (process.env.GEMINI_API_KEY) {
+    const geminiStart = Date.now();
     try {
       const result = await callGemini(opts);
-      logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - start, isFailover: false });
+      logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: false });
       return result;
     } catch (err) {
       console.warn(`[ai-failover] Gemini failed (${err.message || err.code}), falling back to Claude`);
+      logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: false, error: err.message || String(err.code) });
       attempt++;
     }
   }

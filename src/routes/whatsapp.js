@@ -80,7 +80,7 @@ router.post('/webhook', async (req, res) => {
           if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Voice note error:', err.message);
-          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', processingMs: Date.now() - start, error: err.message });
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', processingMs: Date.now() - start, body: '[voice]', error: err.message });
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble processing that voice note. Please try again.');
         }
         return;
@@ -100,7 +100,7 @@ router.post('/webhook', async (req, res) => {
           if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Photo error:', err.message);
-          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', processingMs: Date.now() - start, error: err.message });
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', processingMs: Date.now() - start, body: '[photo]', error: err.message });
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble scanning that receipt. Please try again with a clearer photo.');
         }
         return;
@@ -122,7 +122,7 @@ router.post('/webhook', async (req, res) => {
         if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
         console.error('[whatsapp] Text handler error:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
-        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, error: err.message });
+        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, body: text, error: err.message });
         const elapsed = ((Date.now() - start) / 1000).toFixed(1);
         await whatsapp.sendMessage(phone, `Sorry, I had trouble processing that (${elapsed}s). Please try again.`);
       }

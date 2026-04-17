@@ -197,23 +197,85 @@ async function withRetry(fn, { maxRetries = 1, delayMs = 2000 } = {}) {
 }
 
 /**
- * Safely parse JSON from an AI response, stripping markdown fences if present.
+ * Extract the first balanced JSON object or array from anywhere in a string.
+ * Respects string literals so braces inside "..." don't throw off the counter.
+ * Returns null if no balanced block is found.
+ */
+function extractJsonBlock(text) {
+  let start = -1;
+  let openChar = '';
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{' || text[i] === '[') {
+      start = i;
+      openChar = text[i];
+      break;
+    }
+  }
+  if (start === -1) return null;
+  const closeChar = openChar === '{' ? '}' : ']';
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (c === '\\') escape = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') { inString = true; continue; }
+    if (c === openChar) depth++;
+    else if (c === closeChar) {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Safely parse JSON from an AI response.
+ * Tries a cascade of strategies to handle common model-output quirks:
+ *   1. Raw parse after stripping surrounding markdown fences.
+ *   2. Extract the first balanced JSON block from prose.
+ *   3. Remove trailing commas (a common Gemini quirk).
+ * Throws with the original error if every strategy fails.
  */
 function parseJSON(text, context) {
-  const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch (err) {
-    // Log the full raw output (up to 2000 chars) so truncation / max-tokens
-    // issues can be diagnosed from Railway logs. This is a server-side log only.
-    console.error(`[ai] Failed to parse ${context} JSON:`, err.message);
-    console.error(`[ai] Raw length: ${text.length} chars`);
-    console.error(`[ai] Raw output (first 2000 chars):\n${text.slice(0, 2000)}`);
-    if (text.length > 2000) {
-      console.error(`[ai] Raw output (last 500 chars):\n${text.slice(-500)}`);
-    }
-    throw new Error(`Failed to parse ${context} JSON: ${err.message}`);
+  // Strip surrounding markdown fences if present.
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+  const candidates = [stripped];
+  const block = extractJsonBlock(stripped);
+  if (block && block !== stripped) candidates.push(block);
+
+  // Trailing-comma repair on the extracted block (skip on the raw stripped
+  // version — more likely to corrupt a perfectly valid string).
+  if (block) {
+    const detrailed = block.replace(/,(\s*[}\]])/g, '$1');
+    if (detrailed !== block) candidates.push(detrailed);
   }
+
+  let firstErr;
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch (err) {
+      if (!firstErr) firstErr = err;
+    }
+  }
+
+  // Everything failed — log the raw output so the Railway logs show exactly
+  // what the model returned, and surface the first (most informative) error.
+  console.error(`[ai] Failed to parse ${context} JSON:`, firstErr.message);
+  console.error(`[ai] Raw length: ${text.length} chars`);
+  console.error(`[ai] Raw output (first 2000 chars):\n${text.slice(0, 2000)}`);
+  if (text.length > 2000) {
+    console.error(`[ai] Raw output (last 500 chars):\n${text.slice(-500)}`);
+  }
+  throw new Error(`Failed to parse ${context} JSON: ${firstErr.message}`);
 }
 
 /**
@@ -245,4 +307,4 @@ async function extractFromEmail(emailText, subject, memberNames = [], { househol
   });
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail };
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON };
