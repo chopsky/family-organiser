@@ -742,6 +742,11 @@ router.post('/connect/apple', async (req, res) => {
 /**
  * DELETE /api/calendar/connections/:provider
  * Disconnect a calendar provider.
+ *
+ * Handles the case where multiple connection rows exist for the same
+ * (user, provider) pair — a stale reconnect can leave duplicates and the
+ * old code using .single() would throw on that. We now clean up every
+ * matching row.
  */
 router.delete('/connections/:provider', async (req, res) => {
   const { provider } = req.params;
@@ -749,47 +754,66 @@ router.delete('/connections/:provider', async (req, res) => {
     return res.status(400).json({ error: 'Invalid provider.' });
   }
   try {
-    // First get the connection so we can clean up events
-    const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
-    if (!connection) {
+    const { supabaseAdmin } = require('../db/client');
+
+    // Fetch ALL connections for this user/provider (may be >1 on stale data).
+    const { data: connections, error: listErr } = await supabaseAdmin
+      .from('calendar_connections')
+      .select('id')
+      .eq('user_id', req.user.id)
+      .eq('provider', provider);
+    if (listErr) throw listErr;
+
+    if (!connections || connections.length === 0) {
       console.warn(`[disconnect] No connection found for user=${req.user.id} provider=${provider}`);
       return res.json({ success: true }); // Already disconnected
     }
 
-    console.log(`[disconnect] Found connection ${connection.id} for user=${req.user.id} provider=${provider}`);
+    console.log(`[disconnect] Found ${connections.length} connection(s) for user=${req.user.id} provider=${provider}`);
 
-    // Bulk soft-delete all synced calendar events for this connection
-    try {
-      const { supabaseAdmin } = require('../db/client');
-      const userDb = supabaseAdmin;
-      const { data: eventIds } = await userDb
-        .from('calendar_sync_mappings')
-        .select('event_id')
-        .eq('connection_id', connection.id);
+    // Soft-delete synced events for each connection. Batch the id list
+    // so a household with thousands of synced events can't blow the
+    // PostgREST URL-length limit.
+    const BATCH = 200;
+    for (const connection of connections) {
+      try {
+        const { data: mappings } = await supabaseAdmin
+          .from('calendar_sync_mappings')
+          .select('event_id')
+          .eq('connection_id', connection.id);
 
-      if (eventIds && eventIds.length > 0) {
-        const ids = eventIds.map(e => e.event_id).filter(Boolean);
-        if (ids.length > 0) {
-          await userDb
+        const ids = (mappings || []).map((m) => m.event_id).filter(Boolean);
+        for (let i = 0; i < ids.length; i += BATCH) {
+          const chunk = ids.slice(i, i + BATCH);
+          const { error: updErr } = await supabaseAdmin
             .from('calendar_events')
             .update({ deleted_at: new Date().toISOString() })
-            .in('id', ids)
+            .in('id', chunk)
             .is('deleted_at', null);
-          console.log(`[disconnect] Bulk soft-deleted ${ids.length} synced events`);
+          if (updErr) throw updErr;
         }
+        if (ids.length) console.log(`[disconnect] Soft-deleted ${ids.length} events for connection ${connection.id}`);
+      } catch (cleanupErr) {
+        // Non-fatal — proceed with connection deletion so the user can at
+        // least reconnect. Orphaned events can be purged later.
+        console.error(`[disconnect] Event cleanup error for ${connection.id} (non-fatal):`, cleanupErr.message);
       }
-    } catch (cleanupErr) {
-      console.error('[disconnect] Event cleanup error (non-fatal):', cleanupErr.message);
     }
 
-    // Delete the connection (cascades to subscriptions and sync_mappings)
-    await db.deleteCalendarConnection(req.user.id, provider);
+    // Delete every matching connection row (cascades to subscriptions +
+    // sync_mappings via the schema's ON DELETE CASCADE).
+    const { error: delErr } = await supabaseAdmin
+      .from('calendar_connections')
+      .delete()
+      .eq('user_id', req.user.id)
+      .eq('provider', provider);
+    if (delErr) throw delErr;
 
-    console.log(`[disconnect] Successfully disconnected ${provider} for user ${req.user.id}`);
-    return res.json({ success: true });
+    console.log(`[disconnect] Successfully disconnected ${provider} (${connections.length} row(s)) for user ${req.user.id}`);
+    return res.json({ success: true, removed: connections.length });
   } catch (err) {
     console.error('DELETE /api/calendar/connections error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
