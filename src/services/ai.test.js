@@ -139,6 +139,31 @@ describe('classify()', () => {
     expect(call.system).toContain(new Date().toISOString().split('T')[0]);
   });
 
+  test('includes the sender in the prompt so "me/I/my" can resolve', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'add', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify("remind me to book car service", ['Grant', 'Lynn'], [], { sender: 'Grant' });
+
+    const call = mockMessagesStream.mock.calls[0][0];
+    // Both the "current user" line and the example inside the sender-resolution
+    // block should reference the sender by name.
+    expect(call.system).toContain('The current user (sender of this message) is: Grant');
+    expect(call.system).toContain('assigned_to_name: "Grant"');
+  });
+
+  test('falls back to "Unknown" when no sender is provided', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'add', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify("test", ['Alice']);
+
+    const call = mockMessagesStream.mock.calls[0][0];
+    expect(call.system).toContain('The current user (sender of this message) is: Unknown');
+  });
+
   test('strips markdown fences from response', async () => {
     const payload = { intent: 'add', shopping_items: [], tasks: [], response_message: 'ok' };
     mockMessagesStream.mockReturnValue(mockStreamMarkdown(payload));

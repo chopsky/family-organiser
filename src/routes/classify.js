@@ -53,7 +53,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || 'Europe/London';
-    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, calendarEvents, timezone: userTz });
+    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, sender: currentUser?.name || req.user.name, calendarEvents, timezone: userTz });
 
     // Strip any leaked JSON action blocks from the response message
     if (result.response_message) {

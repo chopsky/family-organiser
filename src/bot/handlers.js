@@ -178,7 +178,7 @@ async function handleTextMessage(text, user, household) {
   const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
 
   console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, calendarEvents, timezone: userTz, history });
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, timezone: userTz, history });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 

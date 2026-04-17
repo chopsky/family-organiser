@@ -12,9 +12,13 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, calendarEvents = [], timezone, history = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], timezone, history = [] } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
+  // Sender is used so the model can resolve "me/I/my" to the actual person.
+  // Fall back to a neutral value when unknown — the prompt still works, it just
+  // can't resolve first-person pronouns.
+  const senderStr = sender || 'Unknown';
   const notesStr = notes.length > 0
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
     : '(none saved yet)';
@@ -37,6 +41,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   const systemPrompt = CLASSIFICATION_SYSTEM
     .replace(/{{DATE}}/g, today)
     .replace(/{{MEMBERS}}/g, membersStr)
+    .replace(/{{SENDER}}/g, senderStr)
     .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{NOTES}}/g, notesStr)
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr);
