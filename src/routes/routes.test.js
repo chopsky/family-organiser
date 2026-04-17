@@ -56,11 +56,15 @@ describe('POST /api/auth/join', () => {
   test('returns token and user when joining with valid code', async () => {
     db.getHouseholdByCode.mockResolvedValue(HOUSEHOLD);
     db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    // authResponse() now resolves the household + issues a refresh token
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.createRefreshToken.mockResolvedValue({ id: 'rt-1' });
 
     const res = await request(app).post('/api/auth/join').send({ code: 'ABC123', name: 'Sarah' });
 
     expect(res.status).toBe(200);
     expect(res.body.token).toBeTruthy();
+    expect(res.body.refreshToken).toBeTruthy();
     expect(res.body.household.name).toBe('The Smiths');
     expect(res.body.user.name).toBe('Sarah');
   });
@@ -69,6 +73,8 @@ describe('POST /api/auth/join', () => {
     db.getHouseholdByCode.mockResolvedValue(HOUSEHOLD);
     db.getHouseholdMembers.mockResolvedValue([]);
     db.createUser.mockResolvedValue({ id: 'u-new', name: 'Grandma', role: 'admin', household_id: 'hh-1' });
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.createRefreshToken.mockResolvedValue({ id: 'rt-1' });
 
     const res = await request(app).post('/api/auth/join').send({ code: 'ABC123', name: 'Grandma' });
 
@@ -122,8 +128,13 @@ describe('GET /api/shopping', () => {
     { id: 'i-1', item: 'milk',  category: 'groceries', completed: false },
     { id: 'i-2', item: 'jeans', category: 'clothing',  completed: false },
   ];
+  const DEFAULT_LIST = { id: 'list-default', name: 'Default' };
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Shopping routes auto-resolve the default list when no list_id is given
+    db.getDefaultShoppingList.mockResolvedValue(DEFAULT_LIST);
+  });
 
   test('returns shopping list', async () => {
     db.getShoppingList.mockResolvedValue(ITEMS);
@@ -149,7 +160,12 @@ describe('GET /api/shopping', () => {
 // ─── POST /api/shopping ───────────────────────────────────────────────────────
 
 describe('POST /api/shopping', () => {
-  beforeEach(() => jest.clearAllMocks());
+  const DEFAULT_LIST = { id: 'list-default', name: 'Default' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.getDefaultShoppingList.mockResolvedValue(DEFAULT_LIST);
+  });
 
   test('adds items and returns saved rows', async () => {
     const saved = [{ id: 'i-new', item: 'eggs', category: 'groceries' }];
@@ -231,9 +247,16 @@ describe('POST /api/tasks', () => {
 // ─── POST /api/classify ───────────────────────────────────────────────────────
 
 describe('POST /api/classify', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // classify route loads notes + calendar events with .catch() — the automock
+    // returns undefined by default, so give them real resolved promises.
+    db.getHouseholdNotes.mockResolvedValue([]);
+    db.getCalendarEvents.mockResolvedValue([]);
+    db.getDefaultShoppingList.mockResolvedValue({ id: 'list-default', name: 'Default' });
+  });
 
-  test('classifies text, saves results, and returns response_message', async () => {
+  test('classifies text and returns response_message', async () => {
     db.getHouseholdMembers.mockResolvedValue(MEMBERS);
     db.addShoppingItems.mockResolvedValue([{ id: 'i-1', item: 'milk' }]);
     db.addTasks.mockResolvedValue([{ id: 't-1', title: 'Do homework' }]);
@@ -248,10 +271,13 @@ describe('POST /api/classify', () => {
     const res = await request(app).post('/api/classify').set(AUTH)
       .send({ text: 'We need milk and remind Jake to do homework weekly' });
 
+    // Response is now sent immediately with just { result }; DB writes happen
+    // in the background (fire-and-forget) so there's no `saved` field anymore.
     expect(res.status).toBe(200);
     expect(res.body.result.response_message).toContain('milk');
-    expect(res.body.saved.shopping).toHaveLength(1);
-    expect(res.body.saved.tasks).toHaveLength(1);
+    expect(res.body.result.intent).toBe('add');
+    expect(res.body.result.shopping_items).toHaveLength(1);
+    expect(res.body.result.tasks).toHaveLength(1);
   });
 
   test('returns 400 when text is missing', async () => {
