@@ -743,10 +743,13 @@ router.post('/connect/apple', async (req, res) => {
  * DELETE /api/calendar/connections/:provider
  * Disconnect a calendar provider.
  *
- * Handles the case where multiple connection rows exist for the same
- * (user, provider) pair — a stale reconnect can leave duplicates and the
- * old code using .single() would throw on that. We now clean up every
- * matching row.
+ * All the hard work is delegated to the disconnect_calendar_connection
+ * Postgres function (supabase/migration-disconnect-function.sql). That
+ * function runs with statement_timeout = '5min' so the cascade can't be
+ * killed mid-flight by the default ~8s timeout — previously we were
+ * chasing timeout errors across three different cascade points and each
+ * fix exposed another one. One atomic server-side operation is simpler
+ * and more reliable.
  */
 router.delete('/connections/:provider', async (req, res) => {
   const { provider } = req.params;
@@ -756,149 +759,28 @@ router.delete('/connections/:provider', async (req, res) => {
   try {
     const { supabaseAdmin } = require('../db/client');
 
-    // Fetch ALL connections for this user/provider (may be >1 on stale data).
-    const { data: connections, error: listErr } = await supabaseAdmin
-      .from('calendar_connections')
-      .select('id')
-      .eq('user_id', req.user.id)
-      .eq('provider', provider);
-    if (listErr) throw listErr;
+    const { data, error } = await supabaseAdmin.rpc('disconnect_calendar_connection', {
+      p_user_id: req.user.id,
+      p_provider: provider,
+    });
+    if (error) throw error;
 
-    if (!connections || connections.length === 0) {
-      console.warn(`[disconnect] No connection found for user=${req.user.id} provider=${provider}`);
-      return res.json({ success: true }); // Already disconnected
-    }
+    const row = Array.isArray(data) ? (data[0] || {}) : (data || {});
+    const removed  = row.removed_connections   ?? 0;
+    const events   = row.events_deleted        ?? 0;
+    const mappings = row.mappings_deleted      ?? 0;
+    const subs     = row.subscriptions_deleted ?? 0;
 
-    console.log(`[disconnect] Found ${connections.length} connection(s) for user=${req.user.id} provider=${provider}`);
-
-    // Don't rely on the schema's ON DELETE CASCADE — when a connection has
-    // tens of thousands of sync_mappings, the cascade blows the Postgres
-    // statement timeout and the whole DELETE fails. Do it explicitly in
-    // manageable batches instead.
-    const PAGE = 1000;   // PostgREST default select cap
-    const BATCH = 200;   // keep the `IN (...)` URL under the limit
-    const nowIso = new Date().toISOString();
-
-    for (const connection of connections) {
-      try {
-        // 1. Paginate through all sync_mappings, collecting both event_ids
-        //    AND mapping_ids so we can batch-delete them later. A single
-        //    DELETE WHERE connection_id = ? times out at ~10k+ rows even
-        //    though connection_id is indexed; batching by PK avoids that.
-        const allEventIds = [];
-        const allMappingIds = [];
-        let offset = 0;
-        while (true) {
-          const { data: page, error: pageErr } = await supabaseAdmin
-            .from('calendar_sync_mappings')
-            .select('id, event_id')
-            .eq('connection_id', connection.id)
-            .range(offset, offset + PAGE - 1);
-          if (pageErr) throw pageErr;
-          if (!page || page.length === 0) break;
-          for (const row of page) {
-            if (row.id) allMappingIds.push(row.id);
-            if (row.event_id) allEventIds.push(row.event_id);
-          }
-          if (page.length < PAGE) break;
-          offset += PAGE;
-        }
-        console.log(`[disconnect] Collected ${allMappingIds.length} mappings / ${allEventIds.length} events for ${connection.id}`);
-
-        // 2. Soft-delete events in batches (keeps the IN (...) URL small
-        //    and each statement well under the Postgres timeout).
-        for (let i = 0; i < allEventIds.length; i += BATCH) {
-          const chunk = allEventIds.slice(i, i + BATCH);
-          const { error: updErr } = await supabaseAdmin
-            .from('calendar_events')
-            .update({ deleted_at: nowIso })
-            .in('id', chunk)
-            .is('deleted_at', null);
-          if (updErr) throw updErr;
-        }
-        if (allEventIds.length) {
-          console.log(`[disconnect] Soft-deleted ${allEventIds.length} events for ${connection.id}`);
-        }
-
-        // 3. Delete sync_mappings in batches by PK. This is what was timing
-        //    out when run as a single DELETE WHERE connection_id = ?.
-        for (let i = 0; i < allMappingIds.length; i += BATCH) {
-          const chunk = allMappingIds.slice(i, i + BATCH);
-          const { error: mapDelErr } = await supabaseAdmin
-            .from('calendar_sync_mappings')
-            .delete()
-            .in('id', chunk);
-          if (mapDelErr) throw mapDelErr;
-        }
-        if (allMappingIds.length) {
-          console.log(`[disconnect] Deleted ${allMappingIds.length} mappings for ${connection.id}`);
-        }
-
-        // 4a. Before deleting subscriptions, null out subscription_id on any
-        //     events still pointing at them. calendar_events.subscription_id
-        //     has ON DELETE SET NULL, so a straight DELETE cascades a massive
-        //     UPDATE across every linked event in one statement and hits the
-        //     timeout. Batching the NULL-out keeps each statement small.
-        const { data: subs, error: subSelErr } = await supabaseAdmin
-          .from('calendar_subscriptions')
-          .select('id')
-          .eq('connection_id', connection.id);
-        if (subSelErr) throw subSelErr;
-        const subIds = (subs || []).map(s => s.id);
-
-        if (subIds.length > 0) {
-          // Snapshot every affected event_id first, then batch-null — we
-          // don't mutate during the select so offset pagination is stable.
-          const affectedEventIds = [];
-          let subOffset = 0;
-          while (true) {
-            const { data: eventPage, error: eventPageErr } = await supabaseAdmin
-              .from('calendar_events')
-              .select('id')
-              .in('subscription_id', subIds)
-              .range(subOffset, subOffset + PAGE - 1);
-            if (eventPageErr) throw eventPageErr;
-            if (!eventPage || eventPage.length === 0) break;
-            for (const row of eventPage) if (row.id) affectedEventIds.push(row.id);
-            if (eventPage.length < PAGE) break;
-            subOffset += PAGE;
-          }
-
-          for (let i = 0; i < affectedEventIds.length; i += BATCH) {
-            const chunk = affectedEventIds.slice(i, i + BATCH);
-            const { error: nullErr } = await supabaseAdmin
-              .from('calendar_events')
-              .update({ subscription_id: null })
-              .in('id', chunk);
-            if (nullErr) throw nullErr;
-          }
-          if (affectedEventIds.length) {
-            console.log(`[disconnect] Nulled subscription_id on ${affectedEventIds.length} events for ${connection.id}`);
-          }
-        }
-
-        // 4b. Now delete subscriptions — nothing to cascade through.
-        const { error: subDelErr } = await supabaseAdmin
-          .from('calendar_subscriptions')
-          .delete()
-          .eq('connection_id', connection.id);
-        if (subDelErr) throw subDelErr;
-      } catch (cleanupErr) {
-        console.error(`[disconnect] Cleanup error for ${connection.id}:`, cleanupErr.message);
-        throw cleanupErr; // bubble up — we can't safely delete the connection with partial cleanup
-      }
-    }
-
-    // 5. Now the connection has no dependent rows. Plain delete.
-    const { error: delErr } = await supabaseAdmin
-      .from('calendar_connections')
-      .delete()
-      .eq('user_id', req.user.id)
-      .eq('provider', provider);
-    if (delErr) throw delErr;
-
-    console.log(`[disconnect] Successfully disconnected ${provider} (${connections.length} row(s)) for user ${req.user.id}`);
-    return res.json({ success: true, removed: connections.length });
+    console.log(
+      `[disconnect] ${provider} for user=${req.user.id}: connections=${removed}, events=${events}, mappings=${mappings}, subs=${subs}`
+    );
+    return res.json({
+      success: true,
+      removed,
+      events_deleted: events,
+      mappings_deleted: mappings,
+      subscriptions_deleted: subs,
+    });
   } catch (err) {
     console.error('DELETE /api/calendar/connections error:', err);
     return res.status(500).json({ error: err.message || 'Internal server error' });
