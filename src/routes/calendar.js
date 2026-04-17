@@ -834,8 +834,50 @@ router.delete('/connections/:provider', async (req, res) => {
           console.log(`[disconnect] Deleted ${allMappingIds.length} mappings for ${connection.id}`);
         }
 
-        // 4. Delete subscriptions for this connection (small row count —
-        //    one bulk statement is fine here).
+        // 4a. Before deleting subscriptions, null out subscription_id on any
+        //     events still pointing at them. calendar_events.subscription_id
+        //     has ON DELETE SET NULL, so a straight DELETE cascades a massive
+        //     UPDATE across every linked event in one statement and hits the
+        //     timeout. Batching the NULL-out keeps each statement small.
+        const { data: subs, error: subSelErr } = await supabaseAdmin
+          .from('calendar_subscriptions')
+          .select('id')
+          .eq('connection_id', connection.id);
+        if (subSelErr) throw subSelErr;
+        const subIds = (subs || []).map(s => s.id);
+
+        if (subIds.length > 0) {
+          // Snapshot every affected event_id first, then batch-null — we
+          // don't mutate during the select so offset pagination is stable.
+          const affectedEventIds = [];
+          let subOffset = 0;
+          while (true) {
+            const { data: eventPage, error: eventPageErr } = await supabaseAdmin
+              .from('calendar_events')
+              .select('id')
+              .in('subscription_id', subIds)
+              .range(subOffset, subOffset + PAGE - 1);
+            if (eventPageErr) throw eventPageErr;
+            if (!eventPage || eventPage.length === 0) break;
+            for (const row of eventPage) if (row.id) affectedEventIds.push(row.id);
+            if (eventPage.length < PAGE) break;
+            subOffset += PAGE;
+          }
+
+          for (let i = 0; i < affectedEventIds.length; i += BATCH) {
+            const chunk = affectedEventIds.slice(i, i + BATCH);
+            const { error: nullErr } = await supabaseAdmin
+              .from('calendar_events')
+              .update({ subscription_id: null })
+              .in('id', chunk);
+            if (nullErr) throw nullErr;
+          }
+          if (affectedEventIds.length) {
+            console.log(`[disconnect] Nulled subscription_id on ${affectedEventIds.length} events for ${connection.id}`);
+          }
+        }
+
+        // 4b. Now delete subscriptions — nothing to cascade through.
         const { error: subDelErr } = await supabaseAdmin
           .from('calendar_subscriptions')
           .delete()
