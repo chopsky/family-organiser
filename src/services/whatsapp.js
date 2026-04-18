@@ -55,6 +55,17 @@ function formatPhone(phone) {
 }
 
 /**
+ * Return the bot's own WhatsApp number (E.164, without the 'whatsapp:' prefix
+ * and without the + sign — suitable for building a wa.me/<number> deep link).
+ * Returns null if not configured.
+ */
+function getBotNumberForWaLink() {
+  const raw = process.env.TWILIO_WHATSAPP_NUMBER;
+  if (!raw) return null;
+  return raw.replace(/^whatsapp:/, '').replace(/^\+/, '').trim() || null;
+}
+
+/**
  * Send a free-form WhatsApp message.
  * Only works within the 24-hour messaging window (after the user has messaged you).
  *
@@ -168,5 +179,6 @@ module.exports = {
   downloadMedia,
   sendVerificationCode,
   formatPhone,
+  getBotNumberForWaLink,
   getClient,
 };

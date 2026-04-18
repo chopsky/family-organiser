@@ -533,11 +533,48 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     await db.markWhatsAppVerificationCodeUsed(record.id);
     if (req.householdId) cache.invalidate(`members:${req.householdId}`);
 
-    return res.json({ success: true, phone: record.phone });
+    // Send a welcome / onboarding message. Fire-and-forget — a WhatsApp
+    // hiccup must not break the connect flow since the DB is already updated.
+    const whatsapp = require('../services/whatsapp');
+    const welcome = [
+      `👋 Welcome to Housemait, ${req.user.name}!`,
+      '',
+      `Here's what you can do — just chat naturally:`,
+      '',
+      `🛒 "We need milk and eggs" — adds to shopping list`,
+      `📋 "Remind me to book car service" — creates a task`,
+      `📅 "Dentist on Tuesday at 3pm" — adds to calendar`,
+      `🍲 "Recipe for shepherd's pie" — generates a recipe`,
+      `🌤 "Will it rain today?" — weather`,
+      `❓ Ask me anything about your household`,
+      '',
+      `📌 *Pin this chat* so it stays at the top — swipe right (iOS) or tap-and-hold (Android), then tap Pin.`,
+    ].join('\n');
+
+    whatsapp.sendMessage(record.phone, welcome).catch((err) => {
+      console.error('[whatsapp-verify] welcome message failed:', err.message);
+    });
+
+    return res.json({
+      success: true,
+      phone: record.phone,
+      bot_number: whatsapp.getBotNumberForWaLink(),
+    });
   } catch (err) {
     console.error('POST /api/auth/whatsapp-verify-code error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ─── GET /api/auth/whatsapp-bot-info ──────────────────────────────────────────
+// Returns the bot's WhatsApp number so the UI can build a wa.me deep link.
+
+router.get('/whatsapp-bot-info', requireAuth, (req, res) => {
+  const whatsapp = require('../services/whatsapp');
+  return res.json({
+    configured: whatsapp.isConfigured(),
+    bot_number: whatsapp.getBotNumberForWaLink(),
+  });
 });
 
 // ─── POST /api/auth/whatsapp-disconnect ───────────────────────────────────────
