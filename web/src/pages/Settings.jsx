@@ -89,18 +89,13 @@ export default function Settings() {
 
   useEffect(() => { loadMembers(); }, []);
 
-  // Load notification preferences. Push toggles only render on native,
-  // but the WhatsApp toggle uses the same prefs and needs to work on web
-  // too — so we always fetch.
+  // Load notification preferences (native iOS/Android only)
   const isNative = Capacitor.isNativePlatform();
   useEffect(() => {
+    if (!isNative) { setLoadingNotifPrefs(false); return; }
     api.get('/notifications/preferences')
       .then(({ data }) => setNotifPrefs(data))
-      .catch(() => setNotifPrefs({
-        calendar_reminders: true, task_assigned: true, shopping_updated: true,
-        meal_plan_updated: true, family_activity: true,
-        whatsapp_activity: true,
-      }))
+      .catch(() => setNotifPrefs({ calendar_reminders: true, task_assigned: true, shopping_updated: true, meal_plan_updated: true, family_activity: true }))
       .finally(() => setLoadingNotifPrefs(false));
   }, []);
 
@@ -523,35 +518,6 @@ export default function Settings() {
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
               WhatsApp connected! You'll receive reminders and can message the bot.
             </p>
-
-            {/* Notification preference toggle — applies only while linked */}
-            {notifPrefs && (
-              <div className="flex items-center justify-between gap-3 pt-1">
-                <div className="min-w-0">
-                  <p className="text-sm text-bark font-medium">Activity broadcasts</p>
-                  <p className="text-xs text-cocoa">
-                    Get a WhatsApp message when a family member adds or completes a task,
-                    shopping item, or calendar event.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotifPref('whatsapp_activity')}
-                  disabled={savingNotifPref === 'whatsapp_activity'}
-                  aria-pressed={notifPrefs.whatsapp_activity !== false}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
-                    notifPrefs.whatsapp_activity !== false ? 'bg-primary' : 'bg-sand'
-                  } ${savingNotifPref === 'whatsapp_activity' ? 'opacity-50' : ''}`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                      notifPrefs.whatsapp_activity !== false ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-            )}
-
             <button
               onClick={handleDisconnectWhatsapp}
               disabled={disconnectingWhatsapp}

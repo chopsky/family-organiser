@@ -3153,23 +3153,6 @@ async function getNotificationPreferences(userId) {
   return data || null;
 }
 
-/**
- * Bulk-fetch notification_preferences rows for multiple users.
- * Returns a Map keyed by user_id. Users with no row are omitted — callers
- * should treat "no row" as "defaults apply" (all categories enabled).
- */
-async function getNotificationPreferencesForUsers(userIds) {
-  if (!userIds || userIds.length === 0) return new Map();
-  const { data, error } = await supabase
-    .from('notification_preferences')
-    .select('*')
-    .in('user_id', userIds);
-  if (error) throw error;
-  const map = new Map();
-  for (const row of data || []) map.set(row.user_id, row);
-  return map;
-}
-
 async function upsertNotificationPreferences(userId, prefs) {
   const { data, error } = await supabase
     .from('notification_preferences')
@@ -3409,6 +3392,5 @@ module.exports = {
   getActiveDeviceTokens,
   getHouseholdDeviceTokens,
   getNotificationPreferences,
-  getNotificationPreferencesForUsers,
   upsertNotificationPreferences,
 };

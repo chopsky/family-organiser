@@ -111,7 +111,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // members who live in WhatsApp.
     if (saved.length) {
       const titles = saved.map((t) => t.title).join(', ');
-      broadcast.toHousehold(req.user.id, members, `📋 ${req.user.name} added task: ${titles}`, { category: 'activity' });
+      broadcast.toHousehold(req.user.id, members, `📋 ${req.user.name} added task: ${titles}`);
     }
 
     cache.invalidate(`digest:${req.householdId}`);
@@ -214,7 +214,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
     if (completed === true && !task.completed) {
       try {
         const members = await db.getHouseholdMembers(req.householdId);
-        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} completed: ${updated.title}`, { category: 'activity' });
+        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} completed: ${updated.title}`);
       } catch (err) {
         console.error('[tasks] broadcast failed:', err.message);
       }

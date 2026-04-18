@@ -5,14 +5,11 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 const router = Router();
 
 const DEFAULT_PREFERENCES = {
-  // iOS push
   calendar_reminders: true,
   task_assigned: true,
   shopping_updated: true,
   meal_plan_updated: true,
   family_activity: true,
-  // WhatsApp
-  whatsapp_activity: true,
 };
 
 /**
