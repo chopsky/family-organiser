@@ -153,6 +153,21 @@ describe('classify()', () => {
     expect(call.system).toContain('assigned_to_name: "Grant"');
   });
 
+  test('prompt includes FORCE-ADD rules so "Yes" after a dupe prompt force-adds instead of looping', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+
+    const call = mockMessagesStream.mock.calls[0][0];
+    // The AI must be told how to handle an affirmative reply to a dupe prompt.
+    expect(call.system).toContain('FORCE-ADD');
+    expect(call.system).toContain('force: true');
+    // And the schema must expose the field so the model can actually emit it.
+    expect(call.system).toContain('"force": boolean');
+  });
+
   test('formats calendar event times in the user timezone, not the server timezone', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',

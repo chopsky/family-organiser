@@ -280,19 +280,22 @@ async function handleTextMessage(text, user, household) {
         : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
       // ── Duplicate detection ──
-      // If someone already added this event for the same date, don't silently
-      // create a second copy — tell the user it exists and let them decide.
-      const existing = await db.findSimilarEvent(household.id, ev.title, startTime);
-      if (existing) {
-        const existingCreator = existing.created_by
-          ? household.members.find(m => m.id === existing.created_by)
-          : null;
-        const who = existingCreator?.name || 'someone';
-        const dateLabel = new Date(existing.start_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-        return {
-          response: `📅 ${who} already added "${existing.title}" for ${dateLabel} — I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
-          actions,
-        };
+      // Skipped entirely when the classifier sets force: true — this happens
+      // when the user has affirmatively confirmed a duplicate should be added
+      // after a prior "already exists — add anyway?" prompt.
+      if (!ev.force) {
+        const existing = await db.findSimilarEvent(household.id, ev.title, startTime);
+        if (existing) {
+          const existingCreator = existing.created_by
+            ? household.members.find(m => m.id === existing.created_by)
+            : null;
+          const who = existingCreator?.name || 'someone';
+          const dateLabel = new Date(existing.start_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+          return {
+            response: `📅 ${who} already added "${existing.title}" for ${dateLabel} — I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
+            actions,
+          };
+        }
       }
 
       const created = await db.createCalendarEvent(household.id, {
