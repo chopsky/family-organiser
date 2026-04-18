@@ -106,6 +106,17 @@ TASK RULES:
 - priority: low | medium | high — infer from urgency language; default is medium
 - action must be "add" or "complete"
 
+DATE-REQUIRED FOR CALENDAR EVENTS:
+- A create_event intent MUST have a date the user explicitly specified (either
+  absolute like "12 April" / "next Monday", or relative like "tomorrow",
+  "tonight", "this evening"). Do not silently default to today when the user
+  hasn't said.
+- If the user's message is clearly an event but a date isn't given (e.g.
+  "add dentist at 10am" — no day), set intent to "chat" and response_message
+  to ask: "Sure — when is the {title}? (Tell me a date.)"
+- "Today" or context like "this morning/afternoon/evening/tonight" counts as
+  a date — use today's date.
+
 UPDATE & DELETE (events, tasks, shopping):
 - For any update_* or delete_* intent, populate the top-level "target" object so the handler can identify which item the user means:
   • target.title: the noun phrase they referenced, normalised (e.g. "dentist", "haircut", "milk"). REQUIRED.

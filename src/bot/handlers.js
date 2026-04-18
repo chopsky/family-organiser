@@ -13,6 +13,86 @@ const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geo
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 
+// ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
+//
+// Saves the 1–2 second AI round-trip + token cost on messages that don't
+// actually need classification (greetings, thanks, emoji-only). Only covers
+// patterns that can't plausibly be answering a bot question — "yes"/"no"/"ok"
+// are deliberately NOT matched here because they might be disambiguation
+// replies, dupe-confirm answers, etc.
+function matchTrivialMessage(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const lower = t.toLowerCase().replace(/[!.?]+$/, '').trim();
+
+  // Greetings
+  if (/^(hi|hey|hello|howdy|hiya|yo|morning|afternoon|evening|good (morning|afternoon|evening)|greetings)$/i.test(lower)) {
+    return { response: '👋 Hi! What can I help with?' };
+  }
+  // Thanks
+  if (/^(thanks|thank you|thankyou|ty|thx|cheers|ta|appreciate it|much appreciated|thanks so much|thanks a lot)$/i.test(lower)) {
+    return { response: 'Anytime! 😊' };
+  }
+  // Emoji-only up to a short length — reply in kind.
+  // \p{Extended_Pictographic} covers most emoji; allow spaces/punctuation around.
+  if (t.length <= 12 && /^[\s!?.\u200D\uFE0F\p{Extended_Pictographic}]+$/u.test(t)) {
+    return { response: '👍' };
+  }
+  return null;
+}
+
+// ─── Undo store (in-memory, per user, 2-minute TTL) ───────────────────────────
+//
+// Tracks the last add so the user can reverse it with 'undo' / 'scrap that'
+// within a short window. In-memory is fine for v1: Railway rarely restarts,
+// and if it does, the undo window expires within minutes anyway. Only ADDs
+// are tracked — deletes/updates get their own undo story later (need to
+// store the prior state to revert).
+const recentAdds = new Map(); // userId → { kind, ids: uuid[], label: string, timestamp }
+const UNDO_WINDOW_MS = 2 * 60 * 1000;
+
+function rememberAdd(userId, kind, ids, label) {
+  if (!userId || !ids?.length) return;
+  recentAdds.set(userId, { kind, ids: Array.isArray(ids) ? ids : [ids], label, timestamp: Date.now() });
+}
+
+function popRecentAdd(userId) {
+  const entry = recentAdds.get(userId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > UNDO_WINDOW_MS) {
+    recentAdds.delete(userId);
+    return null;
+  }
+  recentAdds.delete(userId);
+  return entry;
+}
+
+function isUndoRequest(text) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  return /^(undo|revert|scrap that|scrap it|nevermind|never mind|forget it|cancel that|oops|nope scrap that|wait no|undo that|take that back)$/i.test(t);
+}
+
+async function runUndo(user, household) {
+  const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+  const entry = popRecentAdd(user.id);
+  if (!entry) {
+    return { response: "Nothing to undo — either I haven't added anything recently, or the 2-minute window passed. You can still remove it from the app.", actions };
+  }
+  try {
+    if (entry.kind === 'event') {
+      for (const id of entry.ids) await db.softDeleteCalendarEvent(id, household.id);
+    } else if (entry.kind === 'task') {
+      for (const id of entry.ids) await db.deleteTask(id, household.id);
+    } else if (entry.kind === 'shopping') {
+      for (const id of entry.ids) await db.deleteShoppingItem(id, household.id);
+    }
+    return { response: `↩️ Undone — removed ${entry.label}.`, actions };
+  } catch (err) {
+    console.error('[handlers] undo failed:', err.message);
+    return { response: "⚠️ I couldn't undo that — please remove it from the app.", actions };
+  }
+}
+
 // ─── Timezone helper ──────────────────────────────────────────────────────────
 
 /**
@@ -341,6 +421,25 @@ function buildShoppingUpdates(updates) {
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
 
+  // ── Cheap regex pre-classifiers (no AI call) ──
+
+  // Undo recent add — must come before the trivial check because "scrap that"
+  // and similar phrases wouldn't match a greeting/thanks/emoji pattern anyway.
+  if (isUndoRequest(text)) {
+    console.log('[handlers] Pre-classified as undo for:', text.slice(0, 50));
+    return await runUndo(user, household);
+  }
+
+  // Trivial messages — greetings, thanks, emoji-only — get canned replies.
+  const trivial = matchTrivialMessage(text);
+  if (trivial) {
+    console.log('[handlers] Short-circuit trivial reply for:', text.slice(0, 50));
+    return {
+      response: trivial.response,
+      actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] },
+    };
+  }
+
   // Fetch recent WhatsApp conversation turns (last ~30 min) so the AI can
   // resolve short follow-ups like "no, in sea point" or "what about tomorrow?".
   const history = await db.getRecentWhatsAppTurns(user.id, { limit: 10, windowMinutes: 30 }).catch(() => []);
@@ -541,6 +640,7 @@ async function handleTextMessage(text, user, household) {
       }
 
       actions.eventsAdded = [ev.title];
+      rememberAdd(user.id, 'event', [created.id], `"${ev.title}"`);
 
       // Cross-channel notification: the WhatsApp broadcast is sent by the caller
       // via buildBroadcastMessage. Here we also fire an iOS push so household
@@ -705,8 +805,13 @@ async function handleTextMessage(text, user, household) {
     const toAdd = result.shopping_items.filter((i) => i.action === 'add');
     const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
     if (toAdd.length) {
-      await db.addShoppingItems(household.id, toAdd, user.id);
+      const saved = await db.addShoppingItems(household.id, toAdd, user.id);
       actions.shoppingAdded = toAdd.map((i) => i.item);
+      const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
+      if (savedIds.length) {
+        const names = toAdd.map((i) => i.item).join(', ');
+        rememberAdd(user.id, 'shopping', savedIds, names);
+      }
     }
     if (toRemove.length) {
       await db.completeShoppingItemsByName(household.id, toRemove.map((i) => i.item));
@@ -719,8 +824,13 @@ async function handleTextMessage(text, user, household) {
     const toAdd = result.tasks.filter((t) => t.action === 'add');
     const toComplete = result.tasks.filter((t) => t.action === 'complete');
     if (toAdd.length) {
-      await db.addTasks(household.id, toAdd, user.id, household.members);
+      const saved = await db.addTasks(household.id, toAdd, user.id, household.members);
       actions.tasksAdded = toAdd.map((t) => t.title);
+      const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
+      if (savedIds.length) {
+        const titles = toAdd.map((t) => t.title).join(', ');
+        rememberAdd(user.id, 'task', savedIds, titles);
+      }
     }
     for (const t of toComplete) {
       const done = await db.completeTasksByName(household.id, [t.title], t.assigned_to_name);

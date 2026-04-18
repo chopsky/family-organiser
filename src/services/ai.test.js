@@ -153,6 +153,16 @@ describe('classify()', () => {
     expect(call.system).toContain('assigned_to_name: "Grant"');
   });
 
+  test('prompt requires an explicit date for calendar events (no silent "today")', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+    await classify('add dentist', ['Grant'], [], { sender: 'Grant' });
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    expect(sys).toContain('DATE-REQUIRED FOR CALENDAR EVENTS');
+    expect(sys).toMatch(/do not silently default to today/i);
+  });
+
   test('prompt exposes update/delete intents and target/updates schema', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
