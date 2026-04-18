@@ -103,7 +103,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       try {
         const members = await db.getHouseholdMembers(req.householdId);
         const itemNames = saved.map((i) => i.item).join(', ');
-        broadcast.toHousehold(req.user.id, members, `🛒 ${req.user.name} added: ${itemNames}`);
+        broadcast.toHousehold(req.user.id, members, `🛒 ${req.user.name} added: ${itemNames}`, { category: 'activity' });
       } catch (err) {
         console.error('[shopping] broadcast failed:', err.message);
       }
@@ -182,7 +182,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
     if (completed === true && wasCompleted === false) {
       try {
         const members = await db.getHouseholdMembers(req.householdId);
-        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} checked off: ${data.item}`);
+        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} checked off: ${data.item}`, { category: 'activity' });
       } catch (err) {
         console.error('[shopping] broadcast failed:', err.message);
       }

@@ -465,7 +465,7 @@ router.post('/events', async (req, res) => {
           body: pushBody,
           category: 'calendar_reminders',
         }).catch((err) => console.error('[calendar] push failed:', err.message));
-        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${event.title}`);
+        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${event.title}`, { category: 'activity' });
       } catch (err) {
         console.error('[calendar] notify household failed:', err.message);
       }

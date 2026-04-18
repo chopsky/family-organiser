@@ -77,7 +77,7 @@ router.post('/webhook', async (req, res) => {
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions);
-          if (notification) broadcast.toHousehold(user.id, members, notification);
+          if (notification) broadcast.toHousehold(user.id, members, notification, { category: 'activity' });
         } catch (err) {
           console.error('[whatsapp] Voice note error:', err.message);
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', processingMs: Date.now() - start, body: '[voice]', error: err.message });
@@ -97,7 +97,7 @@ router.post('/webhook', async (req, res) => {
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions);
-          if (notification) broadcast.toHousehold(user.id, members, notification);
+          if (notification) broadcast.toHousehold(user.id, members, notification, { category: 'activity' });
         } catch (err) {
           console.error('[whatsapp] Photo error:', err.message);
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', processingMs: Date.now() - start, body: '[photo]', error: err.message });
@@ -119,7 +119,7 @@ router.post('/webhook', async (req, res) => {
 
         // Broadcast to other members
         const notification = handlers.buildBroadcastMessage(user.name, result.actions);
-        if (notification) broadcast.toHousehold(user.id, members, notification);
+        if (notification) broadcast.toHousehold(user.id, members, notification, { category: 'activity' });
       } catch (err) {
         console.error('[whatsapp] Text handler error:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, body: text, error: err.message });
