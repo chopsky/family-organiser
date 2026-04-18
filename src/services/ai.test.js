@@ -153,6 +153,31 @@ describe('classify()', () => {
     expect(call.system).toContain('assigned_to_name: "Grant"');
   });
 
+  test('formats calendar event times in the user timezone, not the server timezone', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    // 13:00 UTC on a July date = 14:00 BST (Europe/London in summer)
+    await classify('what time is my haircut?', ['Grant'], [], {
+      sender: 'Grant',
+      timezone: 'Europe/London',
+      calendarEvents: [{
+        start_time: '2026-07-17T13:00:00Z',
+        title: 'Haircut',
+        all_day: false,
+      }],
+    });
+
+    const call = mockMessagesStream.mock.calls[0][0];
+    // Must see 14:00 (local BST), never 13:00 (server UTC).
+    expect(call.system).toContain('Haircut');
+    expect(call.system).toContain('14:00');
+    // The substring "13:00" must not appear as a time for the event — this
+    // was the exact bug where the AI told users their 2PM event was at 1PM.
+    expect(call.system).not.toContain(' 13:00:');
+  });
+
   test('falls back to "Unknown" when no sender is provided', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'add', shopping_items: [], tasks: [], response_message: 'ok',

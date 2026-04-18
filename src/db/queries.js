@@ -1294,11 +1294,19 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
 }
 
 /**
- * Look for an existing calendar event with the same title on the same calendar
- * day as the given start_time. Used to catch duplicates when multiple family
- * members add the same event independently. Case-insensitive exact title match.
- * Matches on UTC day — good enough for typical usage; edge cases near midnight
- * in non-UTC timezones may not match and that's acceptable.
+ * Look for an existing calendar event with the same title close to the same
+ * time as the given start_time. Used to catch duplicates when multiple family
+ * members add the same event independently.
+ *
+ * For TIMED events: matches only if an existing event with the same title
+ * starts within ±30 minutes. "Haircut at 2PM" and "Haircut at 4:55PM" on the
+ * same day are legitimately different events and must not collide.
+ *
+ * For ALL-DAY events (start_time at 00:00Z): matches anywhere in the same
+ * UTC day — a second all-day event with the same title is almost always
+ * an actual duplicate.
+ *
+ * Case-insensitive exact title match.
  *
  * @returns {Promise<object|null>} The existing event, or null if none found.
  */
@@ -1306,15 +1314,33 @@ async function findSimilarEvent(householdId, title, startTime, db = supabase) {
   if (!title?.trim() || !startTime) return null;
   const dateOnly = String(startTime).slice(0, 10); // "YYYY-MM-DD"
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
-  const dayStart = `${dateOnly}T00:00:00.000Z`;
-  const dayEnd   = `${dateOnly}T23:59:59.999Z`;
+  const proposed = new Date(startTime);
+  if (isNaN(proposed.getTime())) return null;
+
+  // Treat a 00:00:00 UTC start_time as all-day. Not perfect (a deliberately-
+  // scheduled midnight event would be treated as all-day) but close enough
+  // for duplicate detection — and all-day events in our system are stored
+  // this way anyway.
+  const timePart = String(startTime).slice(11, 16);
+  const isAllDayLike = timePart === '00:00';
+
+  let rangeStart, rangeEnd;
+  if (isAllDayLike) {
+    rangeStart = `${dateOnly}T00:00:00.000Z`;
+    rangeEnd   = `${dateOnly}T23:59:59.999Z`;
+  } else {
+    const WINDOW_MS = 30 * 60 * 1000;
+    rangeStart = new Date(proposed.getTime() - WINDOW_MS).toISOString();
+    rangeEnd   = new Date(proposed.getTime() + WINDOW_MS).toISOString();
+  }
+
   const { data, error } = await db
     .from('calendar_events')
     .select('id, title, start_time, created_by, assigned_to_name, all_day')
     .eq('household_id', householdId)
     .ilike('title', title.trim()) // case-insensitive exact match (no wildcards)
-    .gte('start_time', dayStart)
-    .lte('start_time', dayEnd)
+    .gte('start_time', rangeStart)
+    .lte('start_time', rangeEnd)
     .limit(1);
   if (error) throw error;
   return data && data.length > 0 ? data[0] : null;

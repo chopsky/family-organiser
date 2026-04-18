@@ -22,12 +22,18 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   const notesStr = notes.length > 0
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
     : '(none saved yet)';
-  // Cap at 100 events to keep the prompt size reasonable
+  // Cap at 100 events to keep the prompt size reasonable.
+  // CRITICAL: format in the user's timezone, not the server's. Railway runs
+  // in UTC, so without timeZone: userTz a 2PM BST event (stored as 13:00Z)
+  // would be formatted as '13:00' and the AI would tell the user their
+  // event is at 1PM. Both date and time need the override because events
+  // near midnight can flip dates across timezones too.
+  const userTz = timezone || 'UTC';
   const cappedEvents = calendarEvents.slice(0, 100);
   const calendarStr = cappedEvents.length > 0
     ? cappedEvents.map(e => {
-        const date = new Date(e.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-        const time = e.all_day ? 'All day' : new Date(e.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const date = new Date(e.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: userTz });
+        const time = e.all_day ? 'All day' : new Date(e.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: userTz });
         const who = e.assigned_to_name ? ` (${e.assigned_to_name})` : '';
         return `- ${date} ${time}: ${e.title}${who}${e.location ? ` @ ${e.location}` : ''}`;
       }).join('\n') + (calendarEvents.length > 100 ? `\n... and ${calendarEvents.length - 100} more events` : '')
