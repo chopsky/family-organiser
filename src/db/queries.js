@@ -1106,6 +1106,122 @@ async function deleteShoppingItem(itemId, householdId, db = supabase) {
   if (error) throw error;
 }
 
+// ─── Fuzzy find + generic update helpers (used by WhatsApp edit/delete intents) ──
+
+/**
+ * Find open tasks in a household whose title contains the given substring
+ * (case-insensitive). Optional assignee filter.
+ *
+ * Returns up to `limit` matches, ordered by due_date ascending (nulls last).
+ */
+async function findTasksByFuzzyTitle(householdId, title, { assignedToName, limit = 10 } = {}, db = supabase) {
+  if (!title?.trim()) return [];
+  let query = db
+    .from('tasks')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false)
+    .ilike('title', `%${title.trim()}%`)
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .limit(limit);
+  if (assignedToName) query = query.ilike('assigned_to_name', assignedToName.trim());
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Find incomplete shopping items whose `item` contains the substring.
+ * Scoped to a list if listId given, otherwise all lists.
+ */
+async function findShoppingItemsByFuzzyName(householdId, name, { listId, limit = 10 } = {}, db = supabase) {
+  if (!name?.trim()) return [];
+  let query = db
+    .from('shopping_items')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false)
+    .ilike('item', `%${name.trim()}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (listId) query = query.eq('list_id', listId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Find non-deleted calendar events whose title contains the substring.
+ * Prefers future events (start_time >= now); falls back to any match
+ * (including past) if none are upcoming.
+ */
+async function findEventsByFuzzyTitle(householdId, title, { dateHint, limit = 10 } = {}, db = supabase) {
+  if (!title?.trim()) return [];
+  const nowIso = new Date().toISOString();
+
+  // Future events first. If a dateHint is given, constrain to that day.
+  let query = db
+    .from('calendar_events')
+    .select()
+    .eq('household_id', householdId)
+    .is('deleted_at', null)
+    .ilike('title', `%${title.trim()}%`)
+    .order('start_time', { ascending: true })
+    .limit(limit);
+  if (dateHint && /^\d{4}-\d{2}-\d{2}$/.test(dateHint)) {
+    query = query
+      .gte('start_time', `${dateHint}T00:00:00.000Z`)
+      .lte('start_time', `${dateHint}T23:59:59.999Z`);
+  } else {
+    query = query.gte('start_time', nowIso);
+  }
+  const { data: primary, error: primaryErr } = await query;
+  if (primaryErr) throw primaryErr;
+  if ((primary || []).length > 0) return primary;
+
+  // Fallback — no upcoming match, scan all (including past).
+  const { data: anyData, error: anyErr } = await db
+    .from('calendar_events')
+    .select()
+    .eq('household_id', householdId)
+    .is('deleted_at', null)
+    .ilike('title', `%${title.trim()}%`)
+    .order('start_time', { ascending: false })
+    .limit(limit);
+  if (anyErr) throw anyErr;
+  return anyData || [];
+}
+
+/**
+ * Generic task update — applies whichever fields are present in `updates`.
+ */
+async function updateTask(taskId, householdId, updates, db = supabase) {
+  const { data, error } = await db
+    .from('tasks')
+    .update(updates)
+    .eq('id', taskId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Generic shopping-item update.
+ */
+async function updateShoppingItem(itemId, householdId, updates, db = supabase) {
+  const { data, error } = await db
+    .from('shopping_items')
+    .update(updates)
+    .eq('id', itemId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // ─── Shopping Lists ──────────────────────────────────────────────────────────
 
 async function getShoppingLists(householdId, db = supabase) {
@@ -3259,6 +3375,11 @@ module.exports = {
   uncompleteShoppingItem,
   deleteShoppingItem,
   deleteTask,
+  findTasksByFuzzyTitle,
+  findShoppingItemsByFuzzyName,
+  findEventsByFuzzyTitle,
+  updateTask,
+  updateShoppingItem,
   // Calendar
   getCalendarEvents,
   getCalendarEventById,

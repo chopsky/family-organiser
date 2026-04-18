@@ -153,6 +153,23 @@ describe('classify()', () => {
     expect(call.system).toContain('assigned_to_name: "Grant"');
   });
 
+  test('prompt exposes update/delete intents and target/updates schema', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // Intents are in the enum
+    for (const intent of ['update_event', 'delete_event', 'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item']) {
+      expect(sys).toContain(`"${intent}"`);
+    }
+    // Rules block is present
+    expect(sys).toContain('UPDATE & DELETE');
+    // Schema carries target and updates
+    expect(sys).toContain('"target"');
+    expect(sys).toContain('"updates"');
+  });
+
   test('prompt includes FORCE-ADD rules so "Yes" after a dupe prompt force-adds instead of looping', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',

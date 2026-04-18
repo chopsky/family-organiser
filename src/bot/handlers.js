@@ -112,6 +112,232 @@ function formatTaskList(tasks, heading = 'Tasks') {
  * @param {object} household  - { id, members }
  * @returns {Promise<{response: string, actions: object}>} Response message and action details
  */
+
+// ─── Update / Delete intent handler (events, tasks, shopping items) ───────────
+
+/**
+ * Format a candidate into a short human-readable line for the "which one?"
+ * disambiguation message.
+ */
+function formatCandidate(kind, row) {
+  if (kind === 'event') {
+    const date = row.start_time
+      ? new Date(row.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+      : '';
+    const time = row.all_day ? 'all day' : (row.start_time ? new Date(row.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '');
+    return `${row.title}${date ? ` (${date}${time ? ` ${time}` : ''})` : ''}`;
+  }
+  if (kind === 'task') {
+    const due = row.due_date ? ` (due ${row.due_date})` : '';
+    const who = row.assigned_to_name ? ` — ${row.assigned_to_name}` : '';
+    return `${row.title}${due}${who}`;
+  }
+  // shopping
+  const qty = row.quantity ? ` (${row.quantity})` : '';
+  return `${row.item}${qty}`;
+}
+
+/**
+ * Handle update_* and delete_* intents.
+ *
+ * Contract: the classifier has provided `result.target` (title + optional
+ * context + optional assignee) and, for updates, `result.updates` with only
+ * the fields to change. This function does the fuzzy lookup + disambiguation.
+ */
+async function handleModifyIntent(result, user, household) {
+  const actions = {
+    shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [],
+  };
+  const target = result.target || {};
+  const updates = result.updates || {};
+  const title = (target.title || '').trim();
+  if (!title) {
+    return { response: "I couldn't work out which item you meant — try again with a title.", actions };
+  }
+
+  const isEvent   = result.intent === 'update_event' || result.intent === 'delete_event';
+  const isTask    = result.intent === 'update_task'  || result.intent === 'delete_task';
+  const isDelete  = result.intent.startsWith('delete_');
+
+  // 1. Fuzzy find candidates
+  let candidates = [];
+  let kind;
+  try {
+    if (isEvent) {
+      kind = 'event';
+      candidates = await db.findEventsByFuzzyTitle(household.id, title, { dateHint: extractDateFromContext(target.context, household) });
+    } else if (isTask) {
+      kind = 'task';
+      candidates = await db.findTasksByFuzzyTitle(household.id, title, { assignedToName: target.assigned_to_name });
+    } else {
+      kind = 'shopping';
+      candidates = await db.findShoppingItemsByFuzzyName(household.id, title);
+    }
+  } catch (err) {
+    console.error(`[handlers] fuzzy find failed for ${result.intent}:`, err.message);
+    return { response: "I had trouble looking that up. Try again in a moment.", actions };
+  }
+
+  // 2. No matches
+  if (candidates.length === 0) {
+    return {
+      response: `I couldn't find ${kind === 'shopping' ? 'a shopping item' : `a ${kind}`} matching "${title}"${target.context ? ` (${target.context})` : ''}. Check the name and try again.`,
+      actions,
+    };
+  }
+
+  // 3. Multiple matches — disambiguate
+  if (candidates.length > 1) {
+    const lines = candidates.slice(0, 5).map((c, i) => `${i + 1}. ${formatCandidate(kind, c)}`);
+    const more = candidates.length > 5 ? `\n  … and ${candidates.length - 5} more` : '';
+    const verb = isDelete ? (kind === 'shopping' ? 'remove' : 'cancel') : 'change';
+    return {
+      response: `I found a few matches — which one do you want to ${verb}?\n\n${lines.join('\n')}${more}\n\nReply with the number or a more specific detail.`,
+      actions,
+    };
+  }
+
+  // 4. One match — act
+  const hit = candidates[0];
+  try {
+    if (isEvent) {
+      if (isDelete) {
+        await db.softDeleteCalendarEvent(hit.id, household.id);
+        broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
+        return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance — reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
+      }
+      const eventUpdates = buildEventUpdates(updates, hit, household, user);
+      if (Object.keys(eventUpdates).length === 0) {
+        return { response: "Got it, but I didn't see any field to change. Tell me what to update (time, date, location…).", actions };
+      }
+      const updated = await db.updateCalendarEvent(hit.id, household.id, eventUpdates);
+      broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}`);
+      push.sendToHousehold(household.id, user.id, {
+        title: 'Event updated',
+        body: `${user.name} updated "${updated.title}"`,
+        category: 'calendar_reminders',
+      }).catch((err) => console.error('[handlers] update_event push failed:', err.message));
+      return { response: `✏️ Updated "${updated.title}".`, actions };
+    }
+
+    if (isTask) {
+      if (isDelete) {
+        await db.deleteTask(hit.id, household.id);
+        broadcast.toHousehold(user.id, household.members, `📋 ${user.name} cancelled task: ${hit.title}`);
+        return { response: `🗑️ Cancelled task "${hit.title}".`, actions };
+      }
+      const taskUpdates = buildTaskUpdates(updates, hit, household);
+      if (Object.keys(taskUpdates).length === 0) {
+        return { response: "Got it, but I didn't see any field to change. Tell me what to update (due date, assignee, priority…).", actions };
+      }
+      const updated = await db.updateTask(hit.id, household.id, taskUpdates);
+      broadcast.toHousehold(user.id, household.members, `📋 ${user.name} updated task: ${updated.title}`);
+      return { response: `✏️ Updated "${updated.title}".`, actions };
+    }
+
+    // shopping
+    if (isDelete) {
+      await db.deleteShoppingItem(hit.id, household.id);
+      broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} removed: ${hit.item}`);
+      return { response: `🗑️ Removed "${hit.item}" from the shopping list.`, actions };
+    }
+    const shopUpdates = buildShoppingUpdates(updates);
+    if (Object.keys(shopUpdates).length === 0) {
+      return { response: "Got it, but I didn't see any field to change.", actions };
+    }
+    const updated = await db.updateShoppingItem(hit.id, household.id, shopUpdates);
+    broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} updated: ${updated.item}`);
+    return { response: `✏️ Updated "${updated.item}".`, actions };
+  } catch (err) {
+    console.error(`[handlers] ${result.intent} failed:`, err.message);
+    return { response: `⚠️ I found it but couldn't save the change: ${err.message}`, actions };
+  }
+}
+
+/** Extract a YYYY-MM-DD hint from target.context if one's obvious. */
+function extractDateFromContext(context /*, household */) {
+  if (!context) return null;
+  const m = String(context).match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  return m ? m[1] : null;
+}
+
+/** Translate the AI's `updates` object into a calendar_events row patch. */
+function buildEventUpdates(updates, existing, household, user) {
+  const patch = {};
+  if (updates.title) patch.title = updates.title;
+  if (updates.location !== undefined && updates.location !== null) patch.location = updates.location;
+  if (updates.description !== undefined && updates.description !== null) patch.description = updates.description;
+  if (updates.all_day !== undefined && updates.all_day !== null) patch.all_day = !!updates.all_day;
+
+  // Reassign via names → ids
+  if (Array.isArray(updates.assigned_to_names) && updates.assigned_to_names.length > 0) {
+    const first = household.members.find(m => m.name.toLowerCase() === String(updates.assigned_to_names[0]).toLowerCase());
+    if (first) {
+      patch.assigned_to = first.id;
+      patch.assigned_to_name = first.name;
+    }
+  }
+
+  // Date/time changes: we rebuild start_time/end_time from the existing ones,
+  // overriding only the parts the user mentioned.
+  const tz = user?.timezone || household?.timezone || 'Europe/London';
+  const hasDate = !!updates.date;
+  const hasStart = !!updates.start_time;
+  const hasEnd   = !!updates.end_time;
+
+  if (hasDate || hasStart || hasEnd) {
+    const existingStart = new Date(existing.start_time);
+    const existingEnd   = existing.end_time ? new Date(existing.end_time) : null;
+    const existingDate  = isNaN(existingStart.getTime()) ? null : existingStart.toISOString().slice(0, 10);
+    const existingStartHHMM = isNaN(existingStart.getTime())
+      ? '09:00'
+      : existingStart.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
+    const existingEndHHMM = existingEnd && !isNaN(existingEnd.getTime())
+      ? existingEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz })
+      : existingStartHHMM;
+
+    const nextDate = updates.date || existingDate;
+    const nextStart = updates.start_time || existingStartHHMM;
+    const nextEnd   = updates.end_time   || existingEndHHMM;
+
+    if (existing.all_day) {
+      patch.start_time = `${nextDate}T00:00:00Z`;
+      patch.end_time   = `${nextDate}T23:59:59Z`;
+    } else {
+      patch.start_time = localToUTC(nextDate, nextStart, tz);
+      patch.end_time   = localToUTC(nextDate, nextEnd, tz);
+    }
+  }
+
+  return patch;
+}
+
+/** Translate updates → tasks row patch. */
+function buildTaskUpdates(updates, existing, household) {
+  const patch = {};
+  if (updates.title) patch.title = updates.title;
+  if (updates.due_date !== undefined && updates.due_date !== null) patch.due_date = updates.due_date;
+  if (updates.priority) patch.priority = updates.priority;
+  if (updates.recurrence !== undefined) patch.recurrence = updates.recurrence;
+
+  if (Array.isArray(updates.assigned_to_names) && updates.assigned_to_names.length > 0) {
+    const first = household.members.find(m => m.name.toLowerCase() === String(updates.assigned_to_names[0]).toLowerCase());
+    if (first) {
+      patch.assigned_to = first.id;
+      patch.assigned_to_name = first.name;
+    }
+  }
+  return patch;
+}
+
+/** Translate updates → shopping_items row patch. */
+function buildShoppingUpdates(updates) {
+  const patch = {};
+  if (updates.item)     patch.item = updates.item;
+  if (updates.quantity !== undefined && updates.quantity !== null) patch.quantity = updates.quantity;
+  return patch;
+}
+
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
 
@@ -329,6 +555,19 @@ async function handleTextMessage(text, user, household) {
       return { response: `⚠️ I understood the event but couldn't save it: ${eventErr.message}`, actions };
     }
     return { response: result.response_message || '📅 Event added! ✅', actions };
+  }
+
+  // ── Update / Delete intents (events, tasks, shopping items) ──
+  //
+  // All six share the same shape:
+  //   1. Fuzzy-find candidates by target.title (+ context filters)
+  //   2. 0 candidates → "I couldn't find that"
+  //   3. 1 candidate  → apply the change/deletion and confirm
+  //   4. 2+ candidates → list them and ask which
+  //
+  // Broadcasts fire on success so other household members see the change.
+  if (['update_event', 'delete_event', 'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item'].includes(result.intent)) {
+    return await handleModifyIntent(result, user, household);
   }
 
   // Handle school activity add/remove
