@@ -12,6 +12,7 @@ const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
+const broadcast = require('../services/broadcast');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -33,9 +34,13 @@ function matchTrivialMessage(text) {
   if (/^(thanks|thank you|thankyou|ty|thx|cheers|ta|appreciate it|much appreciated|thanks so much|thanks a lot)$/i.test(lower)) {
     return { response: 'Anytime! 😊' };
   }
-  // Emoji-only up to a short length — reply in kind.
-  // \p{Extended_Pictographic} covers most emoji; allow spaces/punctuation around.
-  if (t.length <= 12 && /^[\s!?.\u200D\uFE0F\p{Extended_Pictographic}]+$/u.test(t)) {
+  // Emoji-only up to a short length — reply in kind. Strip whitespace +
+  // simple punctuation, require the remainder to be entirely pictographs.
+  // Does NOT match complex ZWJ sequences (e.g. 👨‍👩‍👧) — they fall through
+  // to the AI path, which is fine; the short-circuit is an optimisation,
+  // not a correctness requirement.
+  const stripped = t.replace(/[\s!?.]/g, '');
+  if (stripped.length > 0 && stripped.length <= 12 && /^\p{Extended_Pictographic}+$/u.test(stripped)) {
     return { response: '👍' };
   }
   return null;
