@@ -262,6 +262,87 @@ describe('classify()', () => {
     expect(call.system).not.toContain(' 13:00:');
   });
 
+  test('prompt includes OPEN TASKS section with formatted task list', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    // Defends against the "Elementor paid" bug: the classifier needs to see
+    // open tasks in context to recognise a completion signal for an existing
+    // task instead of creating a brand-new one.
+    await classify('hi', ['Grant'], [], {
+      sender: 'Grant',
+      timezone: 'Europe/London',
+      tasks: [
+        { title: 'Pay Elementor', due_date: '2026-04-20', priority: 'medium', assigned_to_name: 'Grant' },
+        { title: 'Book car service', due_date: '2026-04-25', priority: 'high', assigned_to_name: 'Lynn' },
+      ],
+    });
+
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    expect(sys).toContain('OPEN TASKS');
+    expect(sys).toContain('Pay Elementor');
+    expect(sys).toContain('Book car service');
+    // Priority label only appears for non-medium priorities.
+    expect(sys).toContain('[high]');
+    // Assignee should be shown in parens.
+    expect(sys).toContain('(Grant)');
+    expect(sys).toContain('(Lynn)');
+  });
+
+  test('prompt shows "(no open tasks)" placeholder when task list is empty', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    expect(sys).toContain('OPEN TASKS');
+    expect(sys).toContain('(no open tasks)');
+  });
+
+  test('prompt includes TASK COMPLETION SIGNALS rules with the Elementor example', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // The rules block teaches the model to recognise past-tense / completion
+    // phrasing ("Elementor paid") and match it against an existing open task
+    // rather than creating a new task.
+    expect(sys).toContain('TASK COMPLETION SIGNALS');
+    expect(sys).toContain('BEFORE adding a new task, check the OPEN TASKS list');
+    expect(sys).toContain('Elementor paid');
+    expect(sys).toContain('Pay Elementor');
+    // And guards against over-matching future-intent phrasing.
+    expect(sys).toMatch(/Do NOT over-match/i);
+  });
+
+  test('caps open tasks at 50 and notes the overflow count', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    const manyTasks = Array.from({ length: 63 }, (_, i) => ({
+      title: `Task ${i + 1}`,
+      due_date: '2026-04-20',
+      priority: 'medium',
+      assigned_to_name: null,
+    }));
+
+    await classify('hi', ['Grant'], [], { sender: 'Grant', tasks: manyTasks });
+
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // First 50 should be rendered, 51+ should be truncated with a count.
+    expect(sys).toContain('Task 1');
+    expect(sys).toContain('Task 50');
+    expect(sys).not.toContain('"Task 51"');
+    expect(sys).toContain('... and 13 more tasks');
+  });
+
   test('falls back to "Unknown" when no sender is provided', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'add', shopping_items: [], tasks: [], response_message: 'ok',

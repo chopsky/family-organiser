@@ -505,11 +505,14 @@ async function handleTextMessage(text, user, household) {
     futureDate.toISOString(),
     { userId: user.id }
   ).catch(() => []);
+  // Open tasks give the classifier the context to turn "Elementor paid" into
+  // a completion of the existing "Pay Elementor" task instead of a new one.
+  const openTasks = await db.getAllIncompleteTasks(household.id).catch(() => []);
   const fullUserForTz = household.members.find(m => m.id === user.id);
   const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
 
-  console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, timezone: userTz, history });
+  console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${openTasks.length} open tasks, ${notes.length} notes, ${history.length} history turns`);
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 

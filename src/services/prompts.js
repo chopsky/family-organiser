@@ -22,6 +22,9 @@ SAVED HOUSEHOLD NOTES:
 UPCOMING CALENDAR EVENTS (next 12 months):
 {{CALENDAR_EVENTS}}
 
+OPEN TASKS (not yet completed):
+{{TASKS}}
+
 You will be given a raw message from a family member. Parse it and return structured data.
 
 CONVERSATION CONTEXT:
@@ -126,6 +129,19 @@ TASK RULES:
 - recurrence: daily | weekly | biweekly | monthly | yearly | null
 - priority: low | medium | high — infer from urgency language; default is medium
 - action must be "add" or "complete"
+
+TASK COMPLETION SIGNALS:
+- BEFORE adding a new task, check the OPEN TASKS list above. If the user is reporting that they DID something that matches an existing open task, treat it as a completion ("remove" intent for shopping, task with action: "complete" for tasks), NOT as a new task.
+- Past-tense statements, done/finished/paid/sorted/booked language, and casual "got the X" phrasing are completion signals — not new-task creation.
+- Match semantically, not literally. "Elementor paid" matches "Pay Elementor". "Kids fetched" matches "Fetch kids from school". "Car booked in" matches "Book car service". Be generous with fuzzy matching as long as the topic is clearly the same.
+- When you detect a completion, set the task's title to the EXACT title from the OPEN TASKS list (so the handler can find it), set action: "complete", and keep response_message short and natural ("Great, I've ticked off Pay Elementor. ✅").
+- Examples (assume these tasks exist in OPEN TASKS):
+  ✓ User: "Elementor paid" → intent: remove, tasks: [{ title: "Pay Elementor", action: "complete" }]
+  ✓ User: "Homework done" (task "Finish homework" exists) → tasks: [{ title: "Finish homework", action: "complete" }]
+  ✓ User: "Got the milk" (shopping item "milk" exists) → intent: remove, shopping_items: [{ item: "milk", action: "remove" }]
+  ✓ User: "Booked the car service" (task "Book car service" exists) → tasks: [{ title: "Book car service", action: "complete" }]
+- If there is NO matching task, fall through to normal handling (chat reply, or add as a new task only if the user explicitly asked to add one).
+- Do NOT over-match. "I need to pay Elementor" (future intent) is NOT a completion — it's a chat/ack. Only treat it as a completion when the user is reporting the thing is already DONE.
 
 DATE-REQUIRED FOR CALENDAR EVENTS:
 - A create_event intent MUST have a date the user explicitly specified (either

@@ -50,10 +50,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       futureDate.toISOString(),
       { userId: req.user.id }
     ).catch(() => []);
+    // Open tasks give the classifier the context to treat "Elementor paid"
+    // as a completion of an existing task instead of creating a new one.
+    const openTasks = await db.getAllIncompleteTasks(req.householdId).catch(() => []);
 
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || 'Europe/London';
-    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, sender: currentUser?.name || req.user.name, calendarEvents, timezone: userTz });
+    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, sender: currentUser?.name || req.user.name, calendarEvents, tasks: openTasks, timezone: userTz });
 
     // Strip any leaked JSON action blocks from the response message
     if (result.response_message) {

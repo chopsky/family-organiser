@@ -12,7 +12,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], timezone, history = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [] } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   // Sender is used so the model can resolve "me/I/my" to the actual person.
@@ -39,6 +39,21 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       }).join('\n') + (calendarEvents.length > 100 ? `\n... and ${calendarEvents.length - 100} more events` : '')
     : '(no upcoming events)';
 
+  // Cap at 50 open tasks — enough for the classifier to match completion
+  // signals like "Elementor paid" against "Pay Elementor", without blowing
+  // up the prompt for busy households.
+  const cappedTasks = tasks.slice(0, 50);
+  const tasksStr = cappedTasks.length > 0
+    ? cappedTasks.map(t => {
+        const due = t.due_date
+          ? new Date(`${t.due_date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: userTz })
+          : 'no due date';
+        const who = t.assigned_to_name ? ` (${t.assigned_to_name})` : '';
+        const priority = t.priority && t.priority !== 'medium' ? ` [${t.priority}]` : '';
+        return `- "${t.title}"${who} — due ${due}${priority}`;
+      }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
+    : '(no open tasks)';
+
   const userCity = getCityFromTimezone(timezone);
   const locationStr = userCity
     ? `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`
@@ -50,7 +65,8 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{SENDER}}/g, senderStr)
     .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{NOTES}}/g, notesStr)
-    .replace(/{{CALENDAR_EVENTS}}/g, calendarStr);
+    .replace(/{{CALENDAR_EVENTS}}/g, calendarStr)
+    .replace(/{{TASKS}}/g, tasksStr);
 
   // Build message array: prior turns (if any) + current user message.
   // History is expected to be [{ role, content }, ...] in chronological order.
