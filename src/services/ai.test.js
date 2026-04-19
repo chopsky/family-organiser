@@ -180,6 +180,20 @@ describe('classify()', () => {
     expect(sys).toContain('"updates"');
   });
 
+  test('prompt includes an accurate self-description so the bot can answer meta questions', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+    await classify('how do you work?', ['Grant'], [], { sender: 'Grant' });
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // Ensure the HOW YOU ACTUALLY WORK block is present with the key facts
+    // the bot must be able to describe when asked.
+    expect(sys).toContain('HOW YOU ACTUALLY WORK');
+    expect(sys).toContain('Automatic broadcasts');
+    expect(sys).toContain('whatsapp_linked');
+    expect(sys).toContain('Never invent or speculate about notification behaviour');
+  });
+
   test('prompt tells the model to be conservative about update_* / delete_* intents', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
