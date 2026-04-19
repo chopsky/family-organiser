@@ -180,6 +180,20 @@ describe('classify()', () => {
     expect(sys).toContain('"updates"');
   });
 
+  test('prompt tells the model to be conservative about update_* / delete_* intents', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // The "BE CONSERVATIVE" guidance and the trampoline worked example should
+    // both be present — they were added to prevent the classifier from
+    // hijacking new scheduling statements into updates of same-topic items.
+    expect(sys).toContain('BE CONSERVATIVE');
+    expect(sys).toContain('trampoline');
+    expect(sys).toContain('When in doubt between update and create, prefer create');
+  });
+
   test('prompt includes FORCE-ADD rules so "Yes" after a dupe prompt force-adds instead of looping', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',

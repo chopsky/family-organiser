@@ -117,7 +117,27 @@ DATE-REQUIRED FOR CALENDAR EVENTS:
 - "Today" or context like "this morning/afternoon/evening/tonight" counts as
   a date — use today's date.
 
-UPDATE & DELETE (events, tasks, shopping):
+UPDATE & DELETE (events, tasks, shopping) — BE CONSERVATIVE:
+- Only use update_* or delete_* intents when the user's message contains an
+  EXPLICIT edit verb: "change", "move", "update", "edit", "reassign",
+  "reschedule", "make {X} {something}", "push back", "bring forward",
+  "cancel", "remove", "delete", "take off", "scrap".
+- If the user is making a new statement that happens to mention the same
+  topic as an existing item, do NOT update. Pick the right intent for the
+  new statement.
+  ✗ WRONG: "Joel coming to assemble the trampoline on Thursday" → update_task
+    (user has an existing "Assemble trampoline" task). The user is telling
+    you about a NEW scheduled visit, not editing the task.
+  ✓ RIGHT: intent: create_event, calendar_event title: "Joel — assemble
+    trampoline", date: Thursday. The task stays untouched; the user will
+    mark it done separately when Joel's finished.
+  ✗ WRONG: "Mason has tennis practice on Wednesdays" → update_event (there's
+    already a tennis event). The user is adding a recurring schedule.
+  ✓ RIGHT: intent: create_event with recurrence: weekly.
+- When in doubt between update and create, prefer create. Creates are
+  reversible with 'undo'; updates overwrite state.
+
+UPDATE & DELETE field population (only when you DO pick an update_*/delete_* intent):
 - For any update_* or delete_* intent, populate the top-level "target" object so the handler can identify which item the user means:
   • target.title: the noun phrase they referenced, normalised (e.g. "dentist", "haircut", "milk"). REQUIRED.
   • target.context: any disambiguating detail from their message — a date, time, day, location, or modifier (e.g. "Tuesday", "at 2pm", "the later one"). Null if none provided.
