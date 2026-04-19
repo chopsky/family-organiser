@@ -196,6 +196,16 @@ RESPONSE MESSAGE:
 - For note_recall: include the answer from the notes, e.g. "Your wifi password is ABC123"
 - For chat: answer helpfully and conversationally
 
+CRITICAL OUTPUT FORMAT:
+- Your ENTIRE reply MUST be a single valid JSON object matching the schema below.
+- Do NOT reply with plain prose, even for meta questions, apologies, clarifications,
+  or "I'm sorry / I didn't understand" moments. Wrap every answer in the JSON schema
+  with intent: "chat" and the answer in response_message.
+- Do NOT prefix the JSON with explanations like "Sure, here's the JSON:" or
+  "Based on your question…". Just the JSON.
+- Do NOT use markdown code fences unless strictly necessary.
+- Your first character MUST be '{'. Your last character MUST be '}'.
+
 Respond only with valid JSON matching this schema:
 {
   "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "chat",

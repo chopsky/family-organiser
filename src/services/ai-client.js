@@ -52,7 +52,7 @@ function isTransient(err) {
  * Call Gemini 3.1 Pro. Returns { text, provider }.
  * Converts Claude-style messages to Gemini format.
  */
-async function callGemini({ system, messages, maxTokens = 2048, timeoutMs }) {
+async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, responseFormat }) {
   const client = getGeminiClient();
   const timeout = timeoutMs || DEFAULT_TIMEOUT_MS;
 
@@ -85,13 +85,23 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs }) {
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
+    // Force JSON output when the caller explicitly asks for it. Without this
+    // Gemini occasionally emits conversational prose ("My apologies…",
+    // "You would…") on meta or apologetic turns, bypassing the system-prompt
+    // instruction and tripping downstream parseJSON. With responseMimeType
+    // set, Gemini guarantees valid JSON at the API level.
+    const config = {
+      systemInstruction: system,
+      maxOutputTokens: maxTokens,
+    };
+    if (responseFormat === 'json') {
+      config.responseMimeType = 'application/json';
+    }
+
     const response = await client.models.generateContent({
       model: GEMINI_MODEL,
       contents,
-      config: {
-        systemInstruction: system,
-        maxOutputTokens: maxTokens,
-      },
+      config,
     }, { signal: controller.signal });
 
     clearTimeout(timer);

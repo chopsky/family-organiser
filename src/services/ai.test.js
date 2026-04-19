@@ -180,6 +180,20 @@ describe('classify()', () => {
     expect(sys).toContain('"updates"');
   });
 
+  test('prompt includes a strict JSON-only output enforcement block', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // Defends against the failure mode where Gemini/Claude emit plain prose
+    // ('My apologies…', 'I've added…') instead of JSON on meta or apologetic
+    // turns, tripping parseJSON with no recoverable block.
+    expect(sys).toContain('CRITICAL OUTPUT FORMAT');
+    expect(sys).toContain("Your ENTIRE reply MUST be a single valid JSON");
+    expect(sys).toContain("first character MUST be '{'");
+  });
+
   test('prompt includes an accurate self-description so the bot can answer meta questions', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',

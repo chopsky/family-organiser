@@ -75,6 +75,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       // for longer response_message values and caused truncation → JSON parse errors.
       maxTokens: 4096,
       feature: 'classify',
+      responseFormat: 'json', // force Gemini into structured-output mode
       householdId,
       userId,
     });
@@ -108,6 +109,7 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg', { householdId, u
       useThinking: false,
       maxTokens: 2048,
       feature: 'receipt_scan',
+      responseFormat: 'json',
       householdId,
       userId,
     });
@@ -140,6 +142,7 @@ async function matchReceiptToList(receiptItems, shoppingList, { householdId, use
       useThinking: false,
       maxTokens: 1024,
       feature: 'receipt_match',
+      responseFormat: 'json',
       householdId,
       userId,
     });
@@ -179,6 +182,7 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], 
       useThinking: false,
       maxTokens: 2048,
       feature: 'image_scan',
+      responseFormat: 'json',
       householdId,
       userId,
     });
@@ -311,6 +315,7 @@ async function extractFromEmail(emailText, subject, memberNames = [], { househol
       useThinking: false,
       maxTokens: 4096,
       feature: 'email_extraction',
+      responseFormat: 'json',
       householdId,
       userId,
     });
