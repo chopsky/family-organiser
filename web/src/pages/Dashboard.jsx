@@ -335,7 +335,7 @@ export default function Dashboard() {
         {/* Card 1 — Today's schedule */}
         <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-semibold text-bark">Today's schedule</h2>
+            <h2 className="font-sans font-semibold text-bark">Today's schedule</h2>
             <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">View calendar →</Link>
           </div>
           {todayEvents.length === 0 ? (
@@ -365,7 +365,7 @@ export default function Dashboard() {
         {/* Card 2 — Tasks */}
         <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-semibold text-bark">Tasks</h2>
+            <h2 className="font-sans font-semibold text-bark">Tasks</h2>
             <Link to="/tasks" className="text-xs font-medium text-primary hover:underline">View all →</Link>
           </div>
           {outstanding.length === 0 ? (
@@ -398,7 +398,7 @@ export default function Dashboard() {
         {/* Card 3 — Grocery list */}
         <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-semibold text-bark">Grocery list</h2>
+            <h2 className="font-sans font-semibold text-bark">Grocery list</h2>
             <Link to="/shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
           </div>
           {shoppingItems.length === 0 ? (
@@ -439,7 +439,7 @@ export default function Dashboard() {
         {/* Card 4 — This week's meals */}
         <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-semibold text-bark">This week's meals</h2>
+            <h2 className="font-sans font-semibold text-bark">This week's meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
           <div className="space-y-2">
