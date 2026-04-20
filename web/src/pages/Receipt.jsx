@@ -59,7 +59,20 @@ export default function Receipt() {
         className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
-        <IconCamera className="h-6 w-6 text-plum" /> Receipt Scanner
+        <div
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f1eef8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconCamera className="h-5 w-5 text-plum" />
+        </div>
+        Receipt Scanner
       </h1>
       <p className="text-sm text-cocoa">
         Upload a receipt photo to automatically check off matching items from your shopping list.

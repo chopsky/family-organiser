@@ -708,7 +708,19 @@ export default function Tasks() {
             letterSpacing: '-0.02em',
           }}
         >
-          <IconCheck className="h-6 w-6" style={{ color: 'var(--plum, #6B3FA0)' }} />
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: '#f1eef8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconCheck className="h-5 w-5" style={{ color: 'var(--plum, #6B3FA0)' }} />
+          </div>
           Tasks
         </h1>
         <div className="flex items-center gap-3">

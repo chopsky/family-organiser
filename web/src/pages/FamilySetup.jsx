@@ -838,7 +838,20 @@ export default function FamilySetup() {
         className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
-        <IconUsers className="h-6 w-6 text-plum" /> Family Setup
+        <div
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f1eef8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconUsers className="h-5 w-5 text-plum" />
+        </div>
+        Family Setup
       </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
