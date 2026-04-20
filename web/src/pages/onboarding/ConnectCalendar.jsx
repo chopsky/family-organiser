@@ -1,14 +1,14 @@
 /**
- * Step 4 — calendar sync. Same pattern as ConnectWhatsApp: sell the feature,
- * point at Settings (where the real OAuth flows live), let the user skip.
+ * Step 4 — calendar sync. Informational only.
  *
- * Connecting Apple / Google / Microsoft calendars is an OAuth redirect flow
- * that leaves the wizard, so we can't do it inline without losing progress.
- * The "Set up calendar sync" link opens Settings in a new tab.
+ * Unlike WhatsApp we can't inline this: connecting Apple / Google / Microsoft
+ * calendars is an OAuth redirect flow that leaves the app entirely, and our
+ * RequireAuth guard bounces any /settings visit back to /onboarding until the
+ * wizard is done. So this step describes the feature, tells the user where
+ * it lives, and moves on. They set it up after landing on the dashboard.
  */
 
-import { Link } from 'react-router-dom';
-import { serifHeading, serifHeadingStyle, kicker, primaryBtn, skipLink } from './_styles';
+import { serifHeading, serifHeadingStyle, kicker, primaryBtn } from './_styles';
 
 export default function ConnectCalendar({ next }) {
   return (
@@ -28,29 +28,24 @@ export default function ConnectCalendar({ next }) {
       </div>
 
       <div className="mt-8 grid grid-cols-3 gap-3">
-        <Provider label="Apple" emoji="" />
-        <Provider label="Google" emoji="" />
-        <Provider label="Microsoft" emoji="" />
+        <Provider label="Apple" />
+        <Provider label="Google" />
+        <Provider label="Microsoft" />
       </div>
 
-      <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
-        <Link
-          to="/settings"
-          className={primaryBtn}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Set up calendar sync
-        </Link>
-        <button type="button" onClick={next} className={primaryBtn + ' bg-cocoa hover:bg-bark'}>
-          Maybe later →
+      <div className="mt-8 p-4 rounded-xl bg-cream border border-cream-border text-sm text-cocoa">
+        <p>
+          <strong className="text-bark">You can connect it after this.</strong>{' '}
+          Once you're in the app, open <strong>Settings → Calendar sync</strong> to
+          link any of the three — it takes about 30 seconds.
+        </p>
+      </div>
+
+      <div className="mt-10 flex flex-col items-center gap-3">
+        <button type="button" onClick={next} className={primaryBtn}>
+          Got it, continue →
         </button>
       </div>
-      <p className="mt-3 text-center">
-        <button type="button" onClick={next} className={skipLink}>
-          Skip for now
-        </button>
-      </p>
     </div>
   );
 }
