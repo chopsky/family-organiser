@@ -214,7 +214,10 @@ export default function Dashboard() {
   if (loading) return <Spinner />;
 
   const now = new Date();
-  const todayStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  // Dropped the year to match the kicker format the greeting uses
+  // (e.g. "SATURDAY 18 APRIL · 3 EVENTS"). CSS text-transform: uppercase
+  // handles the all-caps rendering.
+  const todayStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const todayEvents = digest?.todayEvents ?? [];
   const eventCount = todayEvents.length;
   const members = digest?.members ?? [];
@@ -287,15 +290,36 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Greeting */}
+      {/* Greeting — kicker (date + event count) above, serif headline below.
+          Matches the Housemait editorial greeting style. */}
       <div>
-        <h1 className="font-display font-semibold text-bark" style={{ fontSize: 28 }}>
-          {getGreeting()}, {user?.name}! 👋
-        </h1>
-        <p className="text-cocoa text-sm mt-1">
+        <p
+          style={{
+            color: 'var(--color-plum)',
+            marginBottom: '6px',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+          }}
+        >
           {todayStr}
-          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''} today</span>}
+          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
         </p>
+        <h1
+          style={{
+            fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
+            fontSize: '56px',
+            lineHeight: 1.02,
+            fontWeight: 400,
+            letterSpacing: '-1px',
+            margin: 0,
+          }}
+        >
+          {getGreeting()},
+          <br />
+          <i>{user?.name}</i>.
+        </h1>
       </div>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
