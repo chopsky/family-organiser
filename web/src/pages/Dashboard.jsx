@@ -289,7 +289,7 @@ export default function Dashboard() {
   })() : null;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Greeting — kicker (date + event count) above, serif headline below.
           Matches the Housemait editorial greeting style. */}
       <div>
@@ -307,12 +307,14 @@ export default function Dashboard() {
           {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
         </p>
         <h1
+          // Responsive sizing via Tailwind arbitrary values — mobile gets
+          // the cosier 36px treatment, desktop the full 56px editorial
+          // headline. Inline styles cover properties Tailwind can't express
+          // with utilities here (custom font family + weight).
+          className="text-[36px] md:text-[56px] leading-[1.05] md:leading-[1.02] tracking-[-0.8px] md:tracking-[-1px]"
           style={{
             fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
-            fontSize: '56px',
-            lineHeight: 1.02,
             fontWeight: 400,
-            letterSpacing: '-1px',
             margin: 0,
           }}
         >
