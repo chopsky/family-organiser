@@ -15,6 +15,7 @@ const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
 const CheckEmail      = lazy(() => import('./pages/CheckEmail'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
+const Onboarding      = lazy(() => import('./pages/Onboarding'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
 const Shopping        = lazy(() => import('./pages/Shopping'));
 const Tasks           = lazy(() => import('./pages/Tasks'));
@@ -52,9 +53,12 @@ function PageLoader() {
 }
 
 function RequireAuth({ children }) {
-  const { token, needsHousehold } = useAuth();
+  const { token, needsHousehold, needsOnboarding } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
   if (needsHousehold) return <Navigate to="/setup" replace />;
+  // Any authenticated in-app route bounces to /onboarding until the wizard
+  // is done. Skipping the wizard by typing the URL directly is blocked too.
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
   return children;
 }
 
@@ -83,6 +87,10 @@ function AppRoutes() {
         <Route path="/check-email" element={<CheckEmail />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/setup" element={<RequireAuthOnly><SetupHousehold /></RequireAuthOnly>} />
+        {/* Onboarding wizard — requires auth + a household, but deliberately
+            NOT a completed onboarding (that's what it sets). Renders without
+            the regular Layout so the wizard owns the full viewport. */}
+        <Route path="/onboarding" element={<RequireAuthOnly><Onboarding /></RequireAuthOnly>} />
         <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
         <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
         <Route path="/tasks" element={<RequireAuth><Layout><Tasks /></Layout></RequireAuth>} />

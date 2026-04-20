@@ -34,7 +34,7 @@ export default function Login() {
         password,
       });
       login(data);
-      navigate(data.household ? '/dashboard' : '/setup');
+      navigate(postLoginRoute(data));
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong.');
     } finally {
@@ -56,7 +56,17 @@ export default function Login() {
 
   function handleSocialSuccess(data) {
     login(data);
-    navigate(data.household ? '/dashboard' : '/setup');
+    navigate(postLoginRoute(data));
+  }
+
+  // Shared router for every post-login path:
+  //   1. No household yet → create one first
+  //   2. Household exists but onboarding wizard not done → run wizard
+  //   3. Otherwise → straight to the dashboard
+  function postLoginRoute(data) {
+    if (!data.household) return '/setup';
+    if (!data.user?.onboarded_at) return '/onboarding';
+    return '/dashboard';
   }
 
   return (

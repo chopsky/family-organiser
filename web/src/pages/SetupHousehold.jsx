@@ -20,7 +20,10 @@ export default function SetupHousehold() {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
       const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone });
       login(data);
-      navigate('/dashboard');
+      // Fresh signups always have onboarded_at === null here, so they
+      // flow into the wizard. Existing users with old data ever end up
+      // here should still get routed somewhere reasonable.
+      navigate(data.user?.onboarded_at ? '/dashboard' : '/onboarding');
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong.');
     } finally {

@@ -29,6 +29,17 @@ export function AuthProvider({ children }) {
     setHousehold(household);
   }, []);
 
+  // After the onboarding wizard finishes, the backend flips users.onboarded_at.
+  // This helper updates the cached user object (localStorage + state) in-place
+  // so the next render sees the new value and stops redirecting to /onboarding.
+  const updateUser = useCallback((patch) => {
+    setUser((prev) => {
+      const next = { ...(prev || {}), ...patch };
+      safeSetItem('user', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const logout = useCallback(() => {
     // Revoke the refresh token server-side (fire-and-forget)
     const rt = safeGetItem('refreshToken');
@@ -70,7 +81,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, user, household, login, logout, isAdmin: user?.role === 'admin', isPlatformAdmin: user?.isPlatformAdmin === true, needsHousehold: !!token && !household }}>
+    <AuthContext.Provider value={{
+      token, user, household, login, logout, updateUser,
+      isAdmin: user?.role === 'admin',
+      isPlatformAdmin: user?.isPlatformAdmin === true,
+      needsHousehold: !!token && !household,
+      needsOnboarding: !!token && !!household && user && !user.onboarded_at,
+    }}>
       {children}
     </AuthContext.Provider>
   );
