@@ -86,7 +86,12 @@
     padding-top: env(safe-area-inset-top, 0px);
   }
   .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Guarantees at least 12px of bottom padding even on contexts where
+       env(safe-area-inset-bottom) resolves to 0 — e.g. a desktop browser
+       with the viewport narrowed to mobile width, or Android devices in
+       portrait without a home indicator. On iPhones with a home bar the
+       real ~34px safe-area value wins, so nothing changes there. */
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
   }
 
   h1, h2, h3, h4, h5, h6 {
