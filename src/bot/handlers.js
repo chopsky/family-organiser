@@ -423,6 +423,82 @@ function buildShoppingUpdates(updates) {
   return patch;
 }
 
+/**
+ * Create a calendar event from a classify() result.calendar_event payload.
+ *
+ * Factored out so two call sites can share it:
+ *   1. The primary `intent === 'create_event'` branch, where the user is
+ *      explicitly asking to add an event and we surface a dupe prompt so
+ *      they can confirm a duplicate with a follow-up "yes".
+ *   2. The fall-through path, where the classifier has emitted a
+ *      calendar_event alongside a task completion (e.g. "Booked car service
+ *      for Wednesday morning" → complete task + create event in one turn).
+ *      In that path, duplicates are skipped silently so the task-completion
+ *      confirmation still gets through.
+ *
+ * Returns one of:
+ *   { kind: 'created', created }           — event saved, actions updated
+ *   { kind: 'duplicate', existing }        — similar event found, nothing saved
+ *   { kind: 'error', message }             — DB/network error, nothing saved
+ */
+async function createCalendarEventFromResult(ev, user, household, actions) {
+  try {
+    // Support both assigned_to_names (array) and legacy assigned_to_name (string)
+    const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+    const firstAssignee = assigneeNames.length > 0
+      ? household.members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
+      : null;
+
+    const userTz = user.timezone || household.timezone || 'Europe/London';
+    const startTime = ev.all_day
+      ? `${ev.date}T00:00:00Z`
+      : localToUTC(ev.date, ev.start_time || '09:00', userTz);
+    const endTime = ev.all_day
+      ? `${ev.date}T23:59:59Z`
+      : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
+
+    // Dupe detection — skipped when classifier set force:true (user
+    // affirmatively confirmed a duplicate in a prior turn).
+    if (!ev.force) {
+      const existing = await db.findSimilarEvent(household.id, ev.title, startTime);
+      if (existing) return { kind: 'duplicate', existing };
+    }
+
+    const created = await db.createCalendarEvent(household.id, {
+      title: ev.title,
+      start_time: startTime,
+      end_time: endTime,
+      all_day: !!ev.all_day,
+      assigned_to: firstAssignee?.id || null,
+      assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+      color: firstAssignee?.color_theme || 'lavender',
+      location: ev.location || null,
+      description: ev.description || null,
+    }, user.id);
+
+    if (created && assigneeNames.length > 0) {
+      await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
+    }
+
+    // Update actions so the caller's confirmation/broadcast picks up the event.
+    actions.eventsAdded = actions.eventsAdded || [];
+    actions.eventsAdded.push(ev.title);
+    rememberAdd(user.id, 'event', [created.id], `"${ev.title}"`);
+
+    // iOS push for household members living in the native app.
+    push.sendToHousehold(household.id, user.id, {
+      title: 'New event',
+      body: `${user.name} added "${ev.title}"`,
+      category: 'calendar_reminders',
+    }).catch((err) => console.error('[handlers] calendar push failed:', err.message));
+
+    return { kind: 'created', created };
+  } catch (err) {
+    console.error('[handlers] Calendar event creation failed:', err.message);
+    return { kind: 'error', message: err.message };
+  }
+}
+
 async function handleTextMessage(text, user, household) {
   const memberNames = household.members.map((m) => m.name);
 
@@ -594,73 +670,26 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || "I couldn't find that in my notes.", actions };
   }
 
-  // Handle calendar event creation
+  // Handle calendar event creation (primary path — intent explicitly create_event)
   if (result.intent === 'create_event' && result.calendar_event) {
-    try {
-      const ev = result.calendar_event;
-      // Support both assigned_to_names (array) and legacy assigned_to_name (string)
-      const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
-      const firstAssignee = assigneeNames.length > 0
-        ? household.members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
+    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions);
+    if (outcome.kind === 'duplicate') {
+      // Surface the dupe prompt so the user can confirm with a follow-up "yes"
+      // (FORCE-ADD path) — this behaviour is specific to the create_event
+      // intent where adding the event is the user's primary goal.
+      const existing = outcome.existing;
+      const existingCreator = existing.created_by
+        ? household.members.find(m => m.id === existing.created_by)
         : null;
-
-      const userTz = user.timezone || household.timezone || 'Europe/London';
-      const startTime = ev.all_day
-        ? `${ev.date}T00:00:00Z`
-        : localToUTC(ev.date, ev.start_time || '09:00', userTz);
-      const endTime = ev.all_day
-        ? `${ev.date}T23:59:59Z`
-        : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
-
-      // ── Duplicate detection ──
-      // Skipped entirely when the classifier sets force: true — this happens
-      // when the user has affirmatively confirmed a duplicate should be added
-      // after a prior "already exists — add anyway?" prompt.
-      if (!ev.force) {
-        const existing = await db.findSimilarEvent(household.id, ev.title, startTime);
-        if (existing) {
-          const existingCreator = existing.created_by
-            ? household.members.find(m => m.id === existing.created_by)
-            : null;
-          const who = existingCreator?.name || 'someone';
-          const dateLabel = new Date(existing.start_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-          return {
-            response: `📅 ${who} already added "${existing.title}" for ${dateLabel} — I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
-            actions,
-          };
-        }
-      }
-
-      const created = await db.createCalendarEvent(household.id, {
-        title: ev.title,
-        start_time: startTime,
-        end_time: endTime,
-        all_day: !!ev.all_day,
-        assigned_to: firstAssignee?.id || null,
-        assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
-        color: firstAssignee?.color_theme || 'lavender',
-        location: ev.location || null,
-        description: ev.description || null,
-      }, user.id);
-
-      if (created && assigneeNames.length > 0) {
-        await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
-      }
-
-      actions.eventsAdded = [ev.title];
-      rememberAdd(user.id, 'event', [created.id], `"${ev.title}"`);
-
-      // Cross-channel notification: the WhatsApp broadcast is sent by the caller
-      // via buildBroadcastMessage. Here we also fire an iOS push so household
-      // members who live in the native app (and don't check WhatsApp) see it.
-      push.sendToHousehold(household.id, user.id, {
-        title: 'New event',
-        body: `${user.name} added "${ev.title}"`,
-        category: 'calendar_reminders',
-      }).catch((err) => console.error('[handlers] calendar push failed:', err.message));
-    } catch (eventErr) {
-      console.error('Calendar event creation failed:', eventErr.message);
-      return { response: `⚠️ I understood the event but couldn't save it: ${eventErr.message}`, actions };
+      const who = existingCreator?.name || 'someone';
+      const dateLabel = new Date(existing.start_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      return {
+        response: `📅 ${who} already added "${existing.title}" for ${dateLabel} — I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
+        actions,
+      };
+    }
+    if (outcome.kind === 'error') {
+      return { response: `⚠️ I understood the event but couldn't save it: ${outcome.message}`, actions };
     }
     return { response: result.response_message || '📅 Event added! ✅', actions };
   }
@@ -846,6 +875,20 @@ async function handleTextMessage(text, user, household) {
       for (const completedTask of done) {
         if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
       }
+    }
+  }
+
+  // Fall-through calendar event: covers "Booked car service for Wednesday
+  // morning"-style messages where the classifier detected a completion AND a
+  // scheduling detail in one turn. The primary intent handled the completion
+  // above; now also persist the event so the user doesn't have to ask twice.
+  // Skip the duplicate-prompt path from the create_event branch — it's a
+  // secondary action, not the user's main request, so a silent dupe skip is
+  // better UX than hijacking the confirmation flow.
+  if (result.calendar_event && result.intent !== 'create_event') {
+    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions);
+    if (outcome.kind === 'duplicate') {
+      console.log('[handlers] Skipped fall-through event create — duplicate:', outcome.existing.title);
     }
   }
 

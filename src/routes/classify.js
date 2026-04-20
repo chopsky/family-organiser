@@ -148,8 +148,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           }
         }
 
-        // Calendar events
-        if (result.intent === 'create_event' && result.calendar_event) {
+        // Calendar events. Deliberately NOT gated on intent === 'create_event'
+        // so the classifier can emit a calendar_event alongside a task
+        // completion (e.g. "Booked car service for Wednesday morning" →
+        // complete task + add event in the same turn).
+        if (result.calendar_event) {
           const ev = result.calendar_event;
           const eventData = {
             title: ev.title,

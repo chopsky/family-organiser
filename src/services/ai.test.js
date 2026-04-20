@@ -321,6 +321,32 @@ describe('classify()', () => {
     expect(sys).toMatch(/Do NOT over-match/i);
   });
 
+  test('prompt includes COMPLETION + SCHEDULING rules so "booked car service for Wednesday" creates an event too', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+
+    const sys = mockMessagesStream.mock.calls[0][0].system;
+    // Regression anchor for the reported bug where "Booked my car in for a
+    // service on Wednesday morning" completed the task but didn't create a
+    // calendar event. The prompt must teach the model to emit BOTH in a
+    // single turn when a completion message carries scheduling context.
+    expect(sys).toContain('COMPLETION + SCHEDULING');
+    expect(sys).toContain('populate BOTH');
+    // The car-service walked example — both the original failing phrasing
+    // and the hint to derive the event title from the task title.
+    expect(sys).toContain('Booked my car in for a service on Wednesday morning');
+    expect(sys).toContain('Book car service');
+    expect(sys).toContain('Car service');
+    // Vague-time resolution rules ("morning" → 09:00).
+    expect(sys).toMatch(/morning.*09:00/);
+    // Guard: no calendar_event when no date/time is mentioned (so plain
+    // "Elementor paid" still behaves as a pure completion).
+    expect(sys).toMatch(/no.*calendar_event.*doesn't mention a date/i);
+  });
+
   test('caps open tasks at 50 and notes the overflow count', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
