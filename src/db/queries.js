@@ -1298,6 +1298,11 @@ async function updateShoppingItem(itemId, householdId, updates, db = supabase) {
 
 // ─── Shopping Lists ──────────────────────────────────────────────────────────
 
+// Seeds every new household with this set on first access. Shared by
+// getShoppingLists (read path) and getDefaultShoppingList (write path) so
+// the two can't drift.
+const DEFAULT_SHOPPING_LISTS = ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'];
+
 async function getShoppingLists(householdId, db = supabase) {
   const { data, error } = await db
     .from('shopping_lists')
@@ -1305,6 +1310,25 @@ async function getShoppingLists(householdId, db = supabase) {
     .eq('household_id', householdId)
     .order('created_at');
   if (error) throw error;
+
+  // Lazy-create the default lists on first read so a brand-new household
+  // never sees an empty state. Before this, the lists were only created on
+  // the first write (adding an item), which left the Shopping page with an
+  // empty lists array, a null activeListId, and a loadItems() that early-
+  // returned without ever clearing its loading=true initial state — i.e. an
+  // infinite spinner for first-time users.
+  if (!data || data.length === 0) {
+    const rows = DEFAULT_SHOPPING_LISTS.map((name) => ({ household_id: householdId, name }));
+    await db.from('shopping_lists').insert(rows);
+    const { data: seeded, error: seedErr } = await db
+      .from('shopping_lists')
+      .select('*')
+      .eq('household_id', householdId)
+      .order('created_at');
+    if (seedErr) throw seedErr;
+    return seeded || [];
+  }
+
   return data;
 }
 
@@ -1328,8 +1352,6 @@ async function deleteShoppingList(listId, householdId, db = supabase) {
   return data;
 }
 
-const DEFAULT_SHOPPING_LISTS = ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'];
-
 async function getDefaultShoppingList(householdId, db = supabase) {
   let { data } = await db
     .from('shopping_lists')
@@ -1338,7 +1360,9 @@ async function getDefaultShoppingList(householdId, db = supabase) {
     .eq('name', 'Default')
     .single();
   if (!data) {
-    // Create all default lists for this household
+    // Create all default lists for this household (DEFAULT_SHOPPING_LISTS is
+    // declared above getShoppingLists — shared so the two seeding paths
+    // can't drift out of sync).
     const rows = DEFAULT_SHOPPING_LISTS.map(name => ({ household_id: householdId, name }));
     await db.from('shopping_lists').insert(rows);
     const result = await db

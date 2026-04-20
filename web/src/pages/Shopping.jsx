@@ -124,7 +124,12 @@ export default function Shopping() {
 
   // Load items when active list changes
   const loadItems = useCallback(async () => {
-    if (!activeListId) return;
+    // No list selected yet (e.g. the lists fetch hasn't completed, or
+    // returned an empty set). Clear the loading flag so the UI can render
+    // an empty state instead of spinning forever. The server now lazy-
+    // creates default lists on first read, so this branch is mostly a
+    // defensive fallback.
+    if (!activeListId) { setLoading(false); return; }
     setLoading(true);
     try {
       const res = await api.get('/shopping', { params: { list_id: activeListId, completed: 'true' } });
