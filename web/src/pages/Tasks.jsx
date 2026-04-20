@@ -700,8 +700,9 @@ export default function Tasks() {
         <h1
           className="hidden md:flex items-center gap-2"
           style={{
-            fontSize: 24,
-            fontWeight: 600,
+            fontSize: 38,
+            fontWeight: 400,
+            lineHeight: 1,
             fontFamily: 'var(--font-display, "Lora", Georgia, serif)',
             color: 'var(--charcoal, #2D2A33)',
             letterSpacing: '-0.02em',

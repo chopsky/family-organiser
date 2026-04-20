@@ -61,7 +61,7 @@ export default function Meals() {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <div className="hidden md:flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-bark flex items-center gap-2">
+        <h1 className="text-[38px] font-normal leading-none text-bark flex items-center gap-2">
           <IconUtensils className="h-6 w-6 text-plum" /> Meal Plan
         </h1>
       </div>

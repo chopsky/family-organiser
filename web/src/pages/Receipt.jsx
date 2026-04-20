@@ -55,7 +55,7 @@ export default function Receipt() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      <h1 className="hidden md:flex text-2xl font-semibold text-bark items-center gap-2"><IconCamera className="h-6 w-6 text-plum" /> Receipt Scanner</h1>
+      <h1 className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"><IconCamera className="h-6 w-6 text-plum" /> Receipt Scanner</h1>
       <p className="text-sm text-cocoa">
         Upload a receipt photo to automatically check off matching items from your shopping list.
       </p>
