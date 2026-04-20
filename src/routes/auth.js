@@ -334,6 +334,165 @@ router.post('/mark-onboarded', requireAuth, async (req, res) => {
   }
 });
 
+// ─── GET /api/auth/export ──────────────────────────────────────────────────
+// GDPR Article 20 — right to data portability. Returns a JSON bundle of
+// every row Housemait holds about the requester + their household, in a
+// structured machine-readable format.
+//
+// What's included
+//   - The user's own row (password_hash and all auth-credential fields
+//     redacted — those are session tokens, not personal data).
+//   - The household row they belong to.
+//   - Other household members: basic fields the user can already see in
+//     Family Setup (name, role, colour theme, etc.) — NOT other members'
+//     private fields like email or phone.
+//   - Every household-scoped table the user has access to via the app:
+//     tasks, calendar events, shopping lists + items, notes, meal plan,
+//     documents metadata (not the file bytes — those live in R2 and are
+//     too big to inline), invites, school dates, child schedules.
+//   - The user's own activity logs: chat messages, AI usage, WhatsApp
+//     message log.
+//
+// What's redacted / skipped
+//   - password_hash, refresh_tokens, email_verification_tokens,
+//     password_reset_tokens, device_tokens, OAuth credentials on
+//     calendar_connections — all session/auth material, not personal data.
+//   - Other members' email / phone / password_hash — belongs to them.
+//
+// Rate limiting is already handled by the /api/auth path limiter
+// (20 req/hour per IP), which is fine for a download-my-data flow.
+
+router.get('/export', requireAuth, async (req, res) => {
+  const { supabaseAdmin } = require('../db/client');
+  const userId = req.user.id;
+  const householdId = req.householdId;
+
+  // Defensive wrapper: a single failing query shouldn't blow up the whole
+  // export. Any table that errors (e.g. doesn't exist in this deployment,
+  // or RLS kicks in unexpectedly) gets logged and returns an empty array.
+  async function safe(name, promise) {
+    try {
+      const { data, error } = await promise;
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error(`[export] ${name} failed:`, err.message || err);
+      return [];
+    }
+  }
+  async function safeSingle(name, promise) {
+    try {
+      const { data, error } = await promise;
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || null;
+    } catch (err) {
+      console.error(`[export] ${name} failed:`, err.message || err);
+      return null;
+    }
+  }
+
+  try {
+    // ── Requester's own row (redact secrets) ────────────────────────────
+    const user = await safeSingle(
+      'user',
+      supabaseAdmin.from('users').select().eq('id', userId).single()
+    );
+    if (user) {
+      delete user.password_hash;
+    }
+
+    // ── Household scope ─────────────────────────────────────────────────
+    const [
+      household, members, tasks, events, shoppingLists, shoppingItems,
+      notes, mealPlan, documents, documentFolders, invites, schools,
+      childActivities, childSchoolEvents, termDates,
+      recipes, notificationPreferences,
+    ] = await Promise.all([
+      householdId ? safeSingle('household',
+        supabaseAdmin.from('households').select().eq('id', householdId).single()
+      ) : null,
+      // Members — only fields the requester already sees in Family Setup.
+      // Other members' email / phone / password_hash intentionally omitted.
+      householdId ? safe('members',
+        supabaseAdmin.from('users')
+          .select('id, name, role, color_theme, avatar_url, birthday, member_type, family_role, allergies, created_at')
+          .eq('household_id', householdId)
+      ) : Promise.resolve([]),
+      householdId ? safe('tasks', supabaseAdmin.from('tasks').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('events', supabaseAdmin.from('calendar_events').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('shopping_lists', supabaseAdmin.from('shopping_lists').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('shopping_items', supabaseAdmin.from('shopping_items').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('household_notes', supabaseAdmin.from('household_notes').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('meal_plan', supabaseAdmin.from('meal_plan').select().eq('household_id', householdId)) : Promise.resolve([]),
+      // Documents: metadata only — the file bytes live in Cloudflare R2.
+      householdId ? safe('documents',
+        supabaseAdmin.from('documents')
+          .select('id, folder_id, name, size_bytes, mime_type, uploaded_by, created_at')
+          .eq('household_id', householdId)
+      ) : Promise.resolve([]),
+      householdId ? safe('document_folders', supabaseAdmin.from('document_folders').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('invites', supabaseAdmin.from('invites').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('schools', supabaseAdmin.from('household_schools').select().eq('household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('child_activities', supabaseAdmin.from('child_weekly_schedule').select('*, users!inner(household_id)').eq('users.household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('child_school_events', supabaseAdmin.from('child_school_events').select('*, users!inner(household_id)').eq('users.household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('term_dates', supabaseAdmin.from('school_term_dates').select('*, household_schools!inner(household_id)').eq('household_schools.household_id', householdId)) : Promise.resolve([]),
+      householdId ? safe('recipes', supabaseAdmin.from('recipes').select().eq('household_id', householdId)) : Promise.resolve([]),
+      safe('notification_preferences',
+        supabaseAdmin.from('notification_preferences').select().eq('user_id', userId)
+      ),
+    ]);
+
+    // ── User-scoped activity logs ───────────────────────────────────────
+    const [chatConversations, chatMessages, whatsappLog, aiUsageLog] = await Promise.all([
+      safe('chat_conversations', supabaseAdmin.from('chat_conversations').select().eq('user_id', userId)),
+      safe('chat_messages', supabaseAdmin.from('chat_messages').select().eq('user_id', userId)),
+      safe('whatsapp_message_log', supabaseAdmin.from('whatsapp_message_log').select().eq('user_id', userId)),
+      safe('ai_usage_log', supabaseAdmin.from('ai_usage_log').select().eq('user_id', userId)),
+    ]);
+
+    const payload = {
+      schema_version: '1.0',
+      generated_at: new Date().toISOString(),
+      notice:
+        'This export contains every row Housemait holds about you and your household. ' +
+        'Document file contents are stored in Cloudflare R2 and are available on request — ' +
+        'only metadata (name, size, folder, created-at) is inlined here to keep the file ' +
+        'readable. Secrets such as password hashes and OAuth tokens are intentionally omitted.',
+      data_subject: user ? { id: user.id, name: user.name, email: user.email } : null,
+      user,
+      household,
+      members,
+      tasks,
+      calendar_events: events,
+      shopping_lists: shoppingLists,
+      shopping_items: shoppingItems,
+      household_notes: notes,
+      meal_plan: mealPlan,
+      documents,
+      document_folders: documentFolders,
+      invites,
+      schools,
+      child_activities: childActivities,
+      child_school_events: childSchoolEvents,
+      term_dates: termDates,
+      recipes,
+      notification_preferences: notificationPreferences,
+      chat_conversations: chatConversations,
+      chat_messages: chatMessages,
+      whatsapp_message_log: whatsappLog,
+      ai_usage_log: aiUsageLog,
+    };
+
+    const filename = `housemait-export-${new Date().toISOString().split('T')[0]}.json`;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.json(payload);
+  } catch (err) {
+    console.error('GET /api/auth/export error:', err);
+    return res.status(500).json({ error: 'Could not generate export.' });
+  }
+});
+
 // ─── DELETE /api/auth/account ──────────────────────────────────────────────
 // Self-service account deletion. Requires the user to re-enter their
 // password — the access token alone isn't enough for a destructive action

@@ -4,15 +4,20 @@
  */
 
 jest.mock('../db/queries');
-jest.mock('../db/client', () => ({
-  supabase: {
+jest.mock('../db/client', () => {
+  // Shared chainable stub returned by both `supabase` and `supabaseAdmin`.
+  // The export route in particular reaches into supabaseAdmin directly
+  // (because it hits many tables with consistent filters), so we need
+  // both clients available on the mock.
+  const chain = {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
-  },
-}));
+  };
+  return { supabase: chain, supabaseAdmin: chain };
+});
 jest.mock('../services/ai');
 jest.mock('../services/email', () => ({
   sendVerificationEmail: jest.fn().mockResolvedValue(),
@@ -728,6 +733,112 @@ describe('POST /api/auth/reset-password', () => {
   test('returns 400 when fields are missing', async () => {
     const res = await request(app).post('/api/auth/reset-password').send({});
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/auth/export ────────────────────────────────────────────────
+
+describe('GET /api/auth/export', () => {
+  // The export endpoint uses supabaseAdmin directly (rather than a queries.js
+  // helper) because it reaches into 15+ tables with consistent filters. We
+  // mock the supabase chain so every table read returns an empty set, then
+  // verify the response shape and the download-friendly headers.
+
+  const { supabaseAdmin } = require('../db/client');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    // Stub every chained call to resolve to { data: [], error: null } (or
+    // `null` for .single()), regardless of which table is being read.
+    // Re-chainable: every method returns the same stub, and the terminal
+    // awaited value is the data object.
+    const chain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+      // For non-.single() queries, the chain is awaited directly — make it
+      // thenable so it resolves to { data: [], error: null }.
+      then: (resolve) => resolve({ data: [], error: null }),
+    };
+    supabaseAdmin.from = jest.fn().mockReturnValue(chain);
+  });
+
+  test('returns 401 without a bearer token', async () => {
+    const res = await request(app).get('/api/auth/export');
+    expect(res.status).toBe(401);
+  });
+
+  test('responds with JSON + download headers when authenticated', async () => {
+    const res = await request(app).get('/api/auth/export').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.headers['content-disposition']).toMatch(
+      /attachment; filename="housemait-export-\d{4}-\d{2}-\d{2}\.json"/
+    );
+  });
+
+  test('payload has every documented top-level section', async () => {
+    // This test is the contract with the frontend / any external data-
+    // portability tool reading the export. Adding a new section here is
+    // fine, but removing one is a breaking change.
+    const res = await request(app).get('/api/auth/export').set(AUTH);
+    expect(res.status).toBe(200);
+    const body = res.body;
+    expect(body).toMatchObject({
+      schema_version: '1.0',
+      generated_at: expect.any(String),
+      notice: expect.any(String),
+    });
+    for (const key of [
+      'data_subject', 'user', 'household', 'members', 'tasks', 'calendar_events',
+      'shopping_lists', 'shopping_items', 'household_notes', 'meal_plan',
+      'documents', 'document_folders', 'invites', 'schools', 'child_activities',
+      'child_school_events', 'term_dates', 'recipes', 'notification_preferences',
+      'chat_conversations', 'chat_messages', 'whatsapp_message_log', 'ai_usage_log',
+    ]) {
+      expect(body).toHaveProperty(key);
+    }
+  });
+
+  test('strips password_hash from the exported user row', async () => {
+    // Regression anchor for the most important redaction: exporting the
+    // user's bcrypt hash to a downloadable JSON file would be extremely bad.
+    const chain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({
+        data: { id: USER.id, name: USER.name, email: 'grant@example.com', password_hash: '$2b$12$secret-hash' },
+        error: null,
+      }),
+      then: (resolve) => resolve({ data: [], error: null }),
+    };
+    supabaseAdmin.from = jest.fn().mockReturnValue(chain);
+
+    const res = await request(app).get('/api/auth/export').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ id: USER.id, name: USER.name });
+    expect(res.body.user).not.toHaveProperty('password_hash');
+  });
+
+  test('survives individual table read failures without crashing the whole export', async () => {
+    // Defensive behaviour: one broken table (schema drift, RLS quirk)
+    // shouldn't 500 the entire download. The endpoint logs the error and
+    // returns an empty array for that section.
+    const failChain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+      then: (resolve) => resolve({ data: null, error: { message: 'boom', code: '42P01' } }),
+    };
+    supabaseAdmin.from = jest.fn().mockReturnValue(failChain);
+
+    const res = await request(app).get('/api/auth/export').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.tasks)).toBe(true);
   });
 });
 

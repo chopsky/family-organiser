@@ -35,6 +35,9 @@ export default function Settings() {
   const [deleting, setDeleting]             = useState(false);
   const [deleteError, setDeleteError]       = useState('');
 
+  // Data export (GDPR Article 20 — right to portability)
+  const [exporting, setExporting] = useState(false);
+
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
@@ -271,6 +274,36 @@ export default function Settings() {
       setError(err.response?.data?.error || 'Invalid code. Please try again.');
     } finally {
       setVerifyingWhatsapp(false);
+    }
+  }
+
+  // ── Export my data (GDPR Article 20) ─────────────────────────────
+  // Downloads a JSON file with every row Housemait holds about the user
+  // and their household. The endpoint sets Content-Disposition; we also
+  // do a belt-and-braces Blob + anchor download so Capacitor/iOS and any
+  // odd browser picks it up reliably.
+  async function handleExportData() {
+    setError('');
+    setSuccess('');
+    setExporting(true);
+    try {
+      const { data } = await api.get('/auth/export');
+      const filename = `housemait-export-${new Date().toISOString().split('T')[0]}.json`;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Give the browser a tick before revoking so the download kicks in.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setSuccess('Export downloaded.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not generate your data export.');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -1005,6 +1038,27 @@ export default function Settings() {
       >
         Log out
       </button>
+
+      {/* Your data — GDPR right to portability (Article 20). Sits above
+          the danger zone because it's a non-destructive action and should
+          be the first thing users see in the "my rights" area. */}
+      <section className="mt-2 rounded-2xl p-5 border border-cream-border bg-white">
+        <h2 className="text-base font-semibold text-bark mb-1">Your data</h2>
+        <p className="text-sm text-cocoa">
+          Download a JSON file with every row Housemait holds about you and
+          your household — tasks, events, shopping lists, notes, documents
+          metadata, message history. Safe to generate any time; nothing is
+          deleted.
+        </p>
+        <button
+          type="button"
+          onClick={handleExportData}
+          disabled={exporting}
+          className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl border border-cream-border text-bark hover:bg-cream font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {exporting ? 'Preparing…' : 'Export my data'}
+        </button>
+      </section>
 
       {/* Danger zone — delete account. Placed last so it's below the
           mostly-safe Log out affordance and visually separated. */}
