@@ -750,6 +750,36 @@ async function touchWhatsAppInbound(userId, db = supabase) {
   if (error) console.error('[db] touchWhatsAppInbound failed:', error.message);
 }
 
+/**
+ * Mark a user as having completed the onboarding wizard.
+ * Idempotent — a subsequent call keeps the original timestamp so we don't
+ * overwrite when-did-you-onboard data if the client accidentally posts twice.
+ * Returns the updated row so the frontend can refresh its auth state.
+ */
+async function markUserOnboarded(userId, db = supabase) {
+  const { data, error } = await db
+    .from('users')
+    .update({ onboarded_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('onboarded_at', null) // only flip NULL → now; no-op if already set
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  // maybeSingle returns null when the WHERE didn't match (user was already
+  // onboarded). Fall back to a plain fetch so the caller always gets the
+  // current row.
+  if (!data) {
+    const { data: existing, error: fetchErr } = await db
+      .from('users')
+      .select()
+      .eq('id', userId)
+      .single();
+    if (fetchErr) throw fetchErr;
+    return existing;
+  }
+  return data;
+}
+
 // ─── Invites ────────────────────────────────────────────────────────────────
 
 async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme }, db = supabase) {
@@ -3392,6 +3422,7 @@ module.exports = {
   getWhatsAppVerificationCode,
   markWhatsAppVerificationCodeUsed,
   touchWhatsAppInbound,
+  markUserOnboarded,
   createInvite,
   getInviteByToken,
   markInviteAccepted,

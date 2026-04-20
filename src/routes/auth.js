@@ -36,7 +36,7 @@ async function authResponse(user) {
   return {
     token,
     refreshToken,
-    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false },
+    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false, onboarded_at: user.onboarded_at || null },
     household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time } : null,
   };
 }
@@ -306,6 +306,32 @@ router.post('/reset-password', async (req, res) => {
 
 router.get('/me', requireAuth, (req, res) => {
   return res.json({ id: req.user.id, name: req.user.name, role: req.user.role });
+});
+
+// ─── POST /api/auth/mark-onboarded ─────────────────────────────────────────
+// Called by the frontend when the user finishes the onboarding wizard.
+// Idempotent — if the column is already populated it leaves the original
+// timestamp intact. Returns the updated user fields the AuthContext cares
+// about so the client can refresh its local copy without another round-trip.
+
+router.post('/mark-onboarded', requireAuth, async (req, res) => {
+  try {
+    const updated = await db.markUserOnboarded(req.user.id);
+    return res.json({
+      user: {
+        id: updated.id,
+        name: updated.name,
+        role: updated.role,
+        color_theme: updated.color_theme || 'sage',
+        avatar_url: updated.avatar_url || null,
+        isPlatformAdmin: updated.is_platform_admin || false,
+        onboarded_at: updated.onboarded_at || null,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/auth/mark-onboarded error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ─── POST /api/auth/refresh ────────────────────────────────────────────────
