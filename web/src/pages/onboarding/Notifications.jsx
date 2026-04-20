@@ -98,7 +98,7 @@ export default function Notifications({ next, setError }) {
     <div>
       <div className="text-center">
         <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-          Step 4 — notifications
+          Step 3 — notifications
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
           Gentle <i>nudges</i>, when they matter.
