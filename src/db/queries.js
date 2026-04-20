@@ -365,21 +365,47 @@ async function touchConversation(conversationId, db = supabase) {
 
 // ─── School helpers ──────────────────────────────────────────────────────────
 
+const { tokenize, buildOrFilter, filterAndRank } = require('../utils/school-search');
+
+/**
+ * Search the GIAS schools directory.
+ *
+ * The old version ILIKE'd the raw query against the `name` column only, which
+ * missed a whole class of multi-word queries — e.g. "Queen Elizabeth's School
+ * in Barnet" returned nothing because "in Barnet" is not in the name (the DB
+ * row is stored as "Queen Elizabeth's School, Barnet" with a comma, and the
+ * town lives in the `local_authority` column anyway).
+ *
+ * Now:
+ *   1. Tokenise (drop connectives + generic school nouns).
+ *   2. DB filter: any token matches name / LA / address via PostgREST `or()`.
+ *   3. Pull 200 candidates, then JS-filter down to rows where *every* token
+ *      appears in the combined text. Rank name-matches above LA/address-only
+ *      matches.
+ *   4. Return the top 10.
+ */
 async function searchSchools(query, postcode, db = supabase) {
+  const { distinctive } = tokenize(query);
+  if (distinctive.length === 0) return [];
+
+  const orFilter = buildOrFilter(distinctive);
+  if (!orFilter) return [];
+
   let q = db
     .from('schools_directory')
     .select('urn, name, type, phase, local_authority, address, postcode')
-    .ilike('name', `%${query}%`)
     .eq('status', 'open')
-    .limit(10);
+    .or(orFilter)
+    .limit(200); // generous — JS filter below tightens this to 10
 
   if (postcode) {
     q = q.ilike('postcode', `${postcode}%`);
   }
 
-  const { data, error } = await q.order('name');
+  const { data, error } = await q;
   if (error) throw error;
-  return data || [];
+
+  return filterAndRank(data || [], distinctive).slice(0, 10);
 }
 
 async function searchSchoolByUrn(urn, db = supabase) {
