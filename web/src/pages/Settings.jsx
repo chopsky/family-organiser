@@ -480,7 +480,12 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"><IconSettings className="h-6 w-6 text-plum" /> Settings</h1>
+      <h1
+        className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"
+        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+      >
+        <IconSettings className="h-6 w-6 text-plum" /> Settings
+      </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 

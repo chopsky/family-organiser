@@ -224,7 +224,10 @@ export default function Documents() {
     <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2">
+        <h1
+          className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"
+          style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+        >
           <IconFileText className="h-6 w-6 text-plum" /> Documents
         </h1>
         <div className="flex-1 md:hidden" />

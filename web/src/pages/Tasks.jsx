@@ -703,7 +703,7 @@ export default function Tasks() {
             fontSize: 38,
             fontWeight: 400,
             lineHeight: 1,
-            fontFamily: 'var(--font-display, "Lora", Georgia, serif)',
+            fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
             color: 'var(--charcoal, #2D2A33)',
             letterSpacing: '-0.02em',
           }}
