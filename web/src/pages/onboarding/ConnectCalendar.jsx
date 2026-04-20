@@ -27,12 +27,6 @@ export default function ConnectCalendar({ next }) {
         </p>
       </div>
 
-      <div className="mt-8 grid grid-cols-3 gap-3">
-        <Provider label="Apple" />
-        <Provider label="Google" />
-        <Provider label="Microsoft" />
-      </div>
-
       <div className="mt-8 p-4 rounded-xl bg-cream border border-cream-border text-sm text-cocoa">
         <p>
           <strong className="text-bark">You can connect it after this.</strong>{' '}
@@ -46,14 +40,6 @@ export default function ConnectCalendar({ next }) {
           Got it, continue →
         </button>
       </div>
-    </div>
-  );
-}
-
-function Provider({ label }) {
-  return (
-    <div className="aspect-square rounded-xl bg-white border border-cream-border flex items-center justify-center">
-      <span className="text-sm font-semibold text-bark">{label}</span>
     </div>
   );
 }
