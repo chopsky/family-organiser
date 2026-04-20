@@ -1,11 +1,17 @@
 /**
  * Broadcast service — sends notifications to other household members
- * when someone makes a change via the bot.
+ * when someone makes a change via the bot or web app.
  *
  * Fire-and-forget: errors are logged but never block the caller.
+ *
+ * Under the hood each per-member send is routed by whatsapp-templates.js:
+ * free-form text when the member is inside Meta's 24-hour customer-service
+ * window, a pre-approved Content Template when they're outside it. That's
+ * what stops passive recipients (who rarely reply to the bot) from silently
+ * missing every notification 24 hours after their last inbound message.
  */
 
-const whatsapp = require('./whatsapp');
+const { sendBroadcastToMember } = require('./whatsapp-templates');
 
 /**
  * Send a notification to all household members except the sender.
@@ -17,13 +23,9 @@ const whatsapp = require('./whatsapp');
 function toHousehold(senderId, members, message) {
   for (const member of members) {
     if (member.id === senderId) continue;
-
-    // Send via WhatsApp
-    if (member.whatsapp_linked && member.whatsapp_phone && whatsapp.isConfigured()) {
-      whatsapp.sendMessage(member.whatsapp_phone, message).catch((err) => {
-        console.error(`[broadcast] WhatsApp failed for ${member.name}:`, err.message);
-      });
-    }
+    // Each send is async + fire-and-forget. Intentionally not awaited so one
+    // slow recipient can't hold up the rest.
+    sendBroadcastToMember(member, message);
   }
 }
 

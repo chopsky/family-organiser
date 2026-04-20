@@ -53,6 +53,13 @@ router.post('/webhook', async (req, res) => {
       return;
     }
 
+    // Refresh the user's 24h customer-service window. Fire-and-forget — the
+    // webhook has already returned 200 above, and a DB hiccup here must not
+    // block the reply. Once this write lands, broadcast.js can send free-form
+    // WhatsApp messages to this user for the next 24 hours; outside that
+    // window it falls back to a pre-approved Content Template.
+    db.touchWhatsAppInbound(user.id);
+
     // Load household context
     const members = await db.getHouseholdMembers(user.household_id);
     const household = { id: user.household_id, members };

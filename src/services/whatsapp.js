@@ -116,25 +116,71 @@ async function sendMessage(phone, body) {
 }
 
 /**
- * Send a template (content template) WhatsApp message.
- * Works outside the 24-hour window — used for notifications, reminders, digests.
+ * Send a WhatsApp message using a pre-approved Twilio Content Template.
  *
- * For Twilio, template messages are sent using Content Templates (content SID)
- * or by simply sending the message if you're in the sandbox.
+ * Unlike sendMessage, this works OUTSIDE the 24-hour customer-service
+ * window, which is the whole point: it's how we reach household members
+ * who haven't messaged the bot in the last day.
  *
- * In sandbox mode, free-form messages work fine.
- * In production, you'd use contentSid for approved templates.
+ * Requires a MessagingServiceSid to be configured (Content Templates are
+ * owned by a Messaging Service, not a raw From number). If only
+ * TWILIO_WHATSAPP_NUMBER is set, we fall back to sendMessage — which will
+ * fail with 63016 outside the window, but that's no worse than before.
  *
- * @param {string} phone         - Recipient phone number
- * @param {string} body          - Message body (used in sandbox mode)
- * @param {string} [contentSid]  - Twilio Content SID for approved template (production)
- * @param {object} [contentVars] - Template variable values
- * @returns {Promise<object>}
+ * @param {string} phone        - Recipient phone number (e.g. "+447700900000")
+ * @param {string} contentSid   - Twilio Content SID (HX...) for the approved template
+ * @param {object} contentVars  - Variable map, e.g. { "1": "Grant added task: ..." }
+ * @returns {Promise<object>}   - Parsed Twilio response
  */
-async function sendTemplate(phone, body, contentSid, contentVars) {
-  // For templates, use sendMessage for now (works within 24hr window)
-  // TODO: Add content template support for business-initiated messages
-  return sendMessage(phone, body);
+async function sendTemplate(phone, contentSid, contentVars = {}) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) throw new Error('Twilio not configured');
+  if (!contentSid) throw new Error('sendTemplate requires contentSid');
+
+  const msid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  if (!msid) {
+    // Content Templates need a Messaging Service. Without one we can't
+    // reach out-of-window recipients at all — log loudly and fall back
+    // so the caller isn't throwing on every broadcast.
+    console.warn('[WhatsApp] sendTemplate called without TWILIO_MESSAGING_SERVICE_SID — falling back to sendMessage (likely 63016)');
+    // Reconstitute an approximate body from {{1}} for the fallback.
+    return sendMessage(phone, contentVars['1'] || contentVars[1] || '');
+  }
+
+  const to = formatPhone(phone);
+  const params = {
+    To: to,
+    MessagingServiceSid: msid,
+    ContentSid: contentSid,
+    ContentVariables: JSON.stringify(contentVars),
+  };
+
+  console.log('[WhatsApp] Sending template via REST API:', JSON.stringify({ To: to, ContentSid: contentSid, vars: Object.keys(contentVars) }));
+
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(params).toString(),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error('[WhatsApp] Template REST API error:', data);
+    const err = new Error(data.message || 'Twilio API error');
+    err.code = data.code;
+    throw err;
+  }
+
+  console.log('[WhatsApp] Template sent:', data.sid, data.status);
+  return data;
 }
 
 /**

@@ -732,6 +732,24 @@ async function markWhatsAppVerificationCodeUsed(id, db = supabase) {
   if (error) throw error;
 }
 
+/**
+ * Record that we've just received an inbound WhatsApp message from a user.
+ * Used by the webhook to refresh their 24-hour customer-service window so
+ * broadcast.js knows when free-form outbound is allowed vs when we must
+ * fall back to a pre-approved Content Template.
+ *
+ * Fire-and-forget from the caller's perspective — the webhook has already
+ * returned 200 to Twilio before this runs, and a write failure here must
+ * never affect the user's reply. Errors are logged and swallowed.
+ */
+async function touchWhatsAppInbound(userId, db = supabase) {
+  const { error } = await db
+    .from('users')
+    .update({ whatsapp_last_inbound_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) console.error('[db] touchWhatsAppInbound failed:', error.message);
+}
+
 // ─── Invites ────────────────────────────────────────────────────────────────
 
 async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme }, db = supabase) {
@@ -3373,6 +3391,7 @@ module.exports = {
   createWhatsAppVerificationCode,
   getWhatsAppVerificationCode,
   markWhatsAppVerificationCodeUsed,
+  touchWhatsAppInbound,
   createInvite,
   getInviteByToken,
   markInviteAccepted,
