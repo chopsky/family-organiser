@@ -289,7 +289,7 @@ export default function Dashboard() {
   })() : null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Greeting — kicker (date + event count) above, serif headline below.
           Matches the Housemait editorial greeting style. */}
       <div>
@@ -416,7 +416,7 @@ export default function Dashboard() {
                       >
                         {badge.label}
                       </span>
-                      <span style={{ fontSize: 13 }} className="text-bark">
+                      <span className="text-sm text-bark">
                         {items.slice(0, 3).map(i => i.item).join(', ')}
                         {items.length > 3 && <span className="text-cocoa"> +{items.length - 3}</span>}
                       </span>
