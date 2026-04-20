@@ -26,6 +26,7 @@ const FamilySetup     = lazy(() => import('./pages/FamilySetup'));
 const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
 const Privacy         = lazy(() => import('./pages/Privacy'));
+const Terms           = lazy(() => import('./pages/Terms'));
 
 // Admin pages — only downloaded if user is a platform admin
 const AdminDashboard       = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -86,6 +87,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/setup" element={<RequireAuthOnly><SetupHousehold /></RequireAuthOnly>} />
         {/* Onboarding wizard — requires auth + a household, but deliberately
             NOT a completed onboarding (that's what it sets). Renders without

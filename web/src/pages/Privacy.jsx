@@ -206,23 +206,34 @@ export default function Privacy() {
 
           <Section title="7. Children's data">
             <p>
-              Housemait is designed for families. Adults (aged 16 or over in the UK, or the age of digital
-              consent in your jurisdiction) set up and manage the household account. An account holder
-              (parent or legal guardian) may add minor children as <strong>dependents</strong> so they
-              appear on the shared calendar, list assignments, and school term imports.
+              Housemait is designed for families and we take children's privacy seriously. Our
+              handling of children's data is guided by the{' '}
+              <a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/" target="_blank" rel="noopener noreferrer" className="text-plum hover:underline">
+                UK Age Appropriate Design Code (Children's Code)
+              </a>{' '}
+              published by the Information Commissioner's Office.
+            </p>
+            <p>
+              Adults (aged 16 or over in the UK, or the age of digital consent in your jurisdiction)
+              set up and manage the household account. An account holder (parent or legal guardian)
+              may add minor children as <strong>dependents</strong> so they appear on the shared
+              calendar, list assignments, and school term imports.
             </p>
             <p>
               Dependents do not have their own login and cannot directly interact with the Service.
-              Information about a dependent (name, birthday, allergies, etc.) is provided by the account
-              holder and is the account holder's responsibility. If you are a parent or guardian and you
-              wish to review, change, or remove any information about a child dependent in a Housemait
-              household, please contact us at{' '}
+              Information about a dependent (name, birthday, allergies, etc.) is provided by the
+              account holder and is the account holder's responsibility. Data collected about
+              dependents is kept to the minimum needed for the Service to function (no profiling,
+              no targeted advertising, no commercial use). If you are a parent or guardian and you
+              wish to review, change, or remove any information about a child dependent in a
+              Housemait household, you can do so directly from{' '}
+              <strong>Settings → Family Setup</strong>, or contact us at{' '}
               <a href="mailto:privacy@housemait.com" className="text-plum hover:underline">privacy@housemait.com</a>.
             </p>
             <p>
-              We do not knowingly create independent login accounts for children under 16. If we learn
-              that a child under 16 has created an independent account without parental consent, we will
-              delete it.
+              We do not knowingly create independent login accounts for children under 16. If we
+              learn that a child under 16 has created an independent account without parental
+              consent, we will delete it.
             </p>
           </Section>
 
@@ -240,12 +251,28 @@ export default function Privacy() {
           <Section title="9. Your rights">
             <p>Under the UK GDPR and EU GDPR you have the following rights:</p>
             <ul className="list-disc pl-6 space-y-1.5">
-              <li><strong>Access</strong> — obtain a copy of the personal data we hold about you.</li>
-              <li><strong>Rectification</strong> — ask us to correct inaccurate data.</li>
-              <li><strong>Erasure</strong> (“right to be forgotten”) — ask us to delete your data. Most data can be deleted in-app by deleting your account; contact us for anything else.</li>
+              <li>
+                <strong>Access</strong> — obtain a copy of the personal data we hold about you.
+                Self-service in-app from <strong>Settings → Your data → Export my data</strong>,
+                which downloads a machine-readable JSON file with every row we hold about you
+                and your household.
+              </li>
+              <li>
+                <strong>Rectification</strong> — ask us to correct inaccurate data. Self-service
+                from <strong>Settings → Edit profile</strong> and <strong>Family Setup</strong>.
+              </li>
+              <li>
+                <strong>Erasure</strong> (“right to be forgotten”) — ask us to delete your data.
+                Self-service from <strong>Settings → Delete account</strong>. If you're the only
+                member of your household, deleting your account also deletes the household and
+                everything in it.
+              </li>
               <li><strong>Restriction</strong> of processing in certain circumstances.</li>
               <li><strong>Objection</strong> to processing based on legitimate interests.</li>
-              <li><strong>Data portability</strong> — receive your data in a structured, machine-readable format.</li>
+              <li>
+                <strong>Data portability</strong> — receive your data in a structured,
+                machine-readable format. Same flow as Access above.
+              </li>
               <li><strong>Withdraw consent</strong> at any time where consent is the legal basis (e.g. disabling push notifications in Settings).</li>
               <li>
                 <strong>Lodge a complaint</strong> with a supervisory authority — in the UK, the{' '}
@@ -255,7 +282,7 @@ export default function Privacy() {
               </li>
             </ul>
             <p>
-              To exercise any of these rights, email{' '}
+              For anything the in-app self-service doesn't cover, email{' '}
               <a href="mailto:privacy@housemait.com" className="text-plum hover:underline">privacy@housemait.com</a>.
               We will respond within 30 days.
             </p>

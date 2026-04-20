@@ -5,6 +5,7 @@ const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
 const { processEventReminders } = require('./event-reminders');
+const { runRetentionCleanup } = require('./retention');
 const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
@@ -462,6 +463,12 @@ function startScheduler() {
   // ── Scheduler lock cleanup: daily at 03:00 UTC ─────────────────────────────
   cron.schedule('0 3 * * *', () => db.cleanupSchedulerLocks());
   console.log('✓ Scheduler lock cleanup scheduled (03:00 UTC daily)');
+
+  // ── Data retention cleanup: daily at 04:00 UTC ─────────────────────────────
+  // Implements the retention commitments in /privacy Section 8 — trims
+  // operational logs past 90 days and purges expired auth tokens.
+  cron.schedule('0 4 * * *', () => runRetentionCleanup());
+  console.log('✓ Data retention cleanup scheduled (04:00 UTC daily)');
 
   // ── Daily iCal feed sync: 06:00 UTC ─────────────────────────────────────────
   cron.schedule('0 6 * * *', () => syncAllIcalFeeds());
