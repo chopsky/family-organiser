@@ -8,11 +8,21 @@ const app = express();
 // Trust proxy (Railway runs behind a reverse proxy)
 app.set('trust proxy', 1);
 
-// CORS must come before helmet so preflight OPTIONS requests are handled correctly
-const allowedOrigins = process.env.WEB_URL
-  ? [process.env.WEB_URL, 'capacitor://localhost', 'http://localhost']
-  : true; // allow all in development
-const corsOptions = { origin: allowedOrigins, credentials: true };
+// CORS must come before helmet so preflight OPTIONS requests are handled
+// correctly. Origin check lives in ./cors-origins so it can be unit-tested
+// without booting the whole app (which requires Supabase env vars to load).
+const { isAllowedOrigin } = require('./cors-origins');
+const corsOptions = {
+  origin(origin, cb) {
+    if (isAllowedOrigin(origin)) return cb(null, true);
+    // Return false (not an Error) so the 'cors' package sends a response
+    // without the Access-Control-Allow-Origin header rather than crashing
+    // the request with a 500. The browser will still block it, but the
+    // network tab shows a clean CORS rejection instead of an Express error.
+    return cb(null, false);
+  },
+  credentials: true,
+};
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions)); // explicitly handle preflight for all routes
 
