@@ -26,6 +26,15 @@ export default function Settings() {
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
 
+  // ── Delete-account modal state ───────────────────────────────────
+  // Password-gated destructive action. Stays closed until the user opens
+  // the modal from the danger-zone section near the bottom of the page.
+  const [deleteOpen, setDeleteOpen]         = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleting, setDeleting]             = useState(false);
+  const [deleteError, setDeleteError]       = useState('');
+
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
@@ -262,6 +271,38 @@ export default function Settings() {
       setError(err.response?.data?.error || 'Invalid code. Please try again.');
     } finally {
       setVerifyingWhatsapp(false);
+    }
+  }
+
+  // ── Delete account ───────────────────────────────────────────────
+  // Re-posts the user's password to the server for re-auth, then the
+  // server decides whether to delete just this user or the whole
+  // household (sole-member case). On success we clear the local auth
+  // state and send the user back to the landing page — from their
+  // perspective they're logged out, because their session no longer
+  // corresponds to a valid user row.
+  async function handleDeleteAccount() {
+    setDeleteError('');
+    if (!deletePassword) {
+      setDeleteError('Enter your password to confirm.');
+      return;
+    }
+    if (!deleteConfirmed) {
+      setDeleteError('Please confirm you understand this cannot be undone.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete('/auth/account', { data: { password: deletePassword } });
+      // Clear the auth context without calling the server's /auth/logout
+      // endpoint — the refresh token we'd post there was just deleted with
+      // the rest of our data, so attempting it would 404.
+      logout();
+      navigate('/', { replace: true });
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Could not delete your account. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -964,6 +1005,126 @@ export default function Settings() {
       >
         Log out
       </button>
+
+      {/* Danger zone — delete account. Placed last so it's below the
+          mostly-safe Log out affordance and visually separated. */}
+      <section
+        className="mt-2 rounded-2xl p-5 border"
+        style={{ borderColor: 'rgba(215, 99, 83, 0.25)', background: 'rgba(215, 99, 83, 0.04)' }}
+      >
+        <h2 className="text-base font-semibold text-bark mb-1">Delete account</h2>
+        <p className="text-sm text-cocoa">
+          Permanently delete your Housemait account. If you're the only
+          member of your household, <strong className="text-bark">everything in it</strong>{' '}
+          — tasks, events, shopping lists, notes, documents — will also be
+          deleted. This cannot be undone.
+        </p>
+        <button
+          onClick={() => {
+            setDeleteOpen(true);
+            setDeletePassword('');
+            setDeleteConfirmed(false);
+            setDeleteError('');
+          }}
+          className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-error hover:bg-error/90 text-white font-semibold text-sm transition-colors"
+        >
+          Delete my account
+        </button>
+      </section>
+
+      {/* Delete Account Modal */}
+      {deleteOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => !deleting && setDeleteOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-bark">Delete your account?</h2>
+              <button
+                type="button"
+                onClick={() => !deleting && setDeleteOpen(false)}
+                className="text-cocoa hover:text-bark p-1"
+                disabled={deleting}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-sm text-cocoa mb-4">
+              This permanently deletes your Housemait account. If you're the only
+              member of <strong className="text-bark">{household?.name || 'your household'}</strong>,
+              the household and all its data will be deleted too.
+            </p>
+
+            {deleteError && (
+              <div className="mb-3 p-3 rounded-lg bg-error/10 border border-error/30 text-sm text-error">
+                {deleteError}
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleDeleteAccount();
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-bark mb-1.5">
+                  Your password
+                </label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  autoComplete="current-password"
+                  autoFocus
+                  disabled={deleting}
+                  className="w-full border border-cream-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-error/30 focus:border-error transition-all text-bark"
+                />
+              </div>
+
+              <label className="flex items-start gap-3 text-sm text-bark cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={deleteConfirmed}
+                  onChange={(e) => setDeleteConfirmed(e.target.checked)}
+                  disabled={deleting}
+                  className="mt-1 h-4 w-4 accent-error"
+                />
+                <span>
+                  I understand this cannot be undone.
+                </span>
+              </label>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteOpen(false)}
+                  disabled={deleting}
+                  className="flex-1 py-3 rounded-xl border border-cream-border text-bark font-medium text-sm hover:bg-cream transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleting || !deletePassword || !deleteConfirmed}
+                  className="flex-1 py-3 rounded-xl bg-error hover:bg-error/90 disabled:bg-error/40 text-white font-semibold text-sm transition-colors"
+                >
+                  {deleting ? 'Deleting…' : 'Delete account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Edit Profile Modal */}
       {editingProfile && (

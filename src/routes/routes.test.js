@@ -731,6 +731,111 @@ describe('POST /api/auth/reset-password', () => {
   });
 });
 
+// ─── DELETE /api/auth/account ────────────────────────────────────────────
+
+describe('DELETE /api/auth/account', () => {
+  const bcrypt = require('bcrypt');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    bcrypt.compare.mockResolvedValue(true); // most tests want the password to pass
+  });
+
+  test('returns 400 when password is missing', async () => {
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({});
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 401 when the password is wrong', async () => {
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$stored' });
+    bcrypt.compare.mockResolvedValueOnce(false);
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'nope' });
+    expect(res.status).toBe(401);
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+    expect(db.deleteHouseholdCascade).not.toHaveBeenCalled();
+  });
+
+  test('returns 403 for platform admins (they can\'t self-delete)', async () => {
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x', is_platform_admin: true });
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    expect(res.status).toBe(403);
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+  });
+
+  test('deletes the whole household when the user is the sole member', async () => {
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x' });
+    db.getHouseholdMembers.mockResolvedValue([USER]); // just them
+    db.deleteHouseholdCascade.mockResolvedValue();
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    expect(res.status).toBe(200);
+    expect(res.body.mode).toBe('household_deleted');
+    expect(db.deleteHouseholdCascade).toHaveBeenCalledWith(HOUSEHOLD.id);
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+  });
+
+  test('deletes just the user when other members remain and this user is non-admin', async () => {
+    const NON_ADMIN = { ...USER, role: 'member' };
+    db.getUserById.mockResolvedValue({ ...NON_ADMIN, password_hash: '$2b$12$x' });
+    db.getHouseholdMembers.mockResolvedValue([
+      NON_ADMIN,
+      { id: 'u-2', name: 'Jake', role: 'admin', household_id: HOUSEHOLD.id, created_at: '2024-01-01' },
+    ]);
+    db.deleteUserAdmin.mockResolvedValue();
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    expect(res.status).toBe(200);
+    expect(res.body.mode).toBe('user_only');
+    expect(db.deleteUserAdmin).toHaveBeenCalledWith(USER.id);
+    expect(db.deleteHouseholdCascade).not.toHaveBeenCalled();
+    expect(db.updateUser).not.toHaveBeenCalled(); // no promotion needed
+  });
+
+  test('promotes the oldest non-admin when the deleter is the only admin', async () => {
+    // Orphan-admin guard: if the only admin deletes, another member must
+    // become admin so the household stays operable. We pick the oldest
+    // non-admin by created_at so the choice is deterministic.
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x' });
+    db.getHouseholdMembers.mockResolvedValue([
+      USER, // admin, deleting
+      { id: 'u-newer', name: 'Newer', role: 'member', household_id: HOUSEHOLD.id, created_at: '2025-06-01' },
+      { id: 'u-older', name: 'Older', role: 'member', household_id: HOUSEHOLD.id, created_at: '2024-01-01' },
+    ]);
+    db.updateUser.mockResolvedValue();
+    db.deleteUserAdmin.mockResolvedValue();
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    expect(res.status).toBe(200);
+    expect(res.body.mode).toBe('user_only');
+    expect(db.updateUser).toHaveBeenCalledWith('u-older', { role: 'admin' });
+    expect(db.deleteUserAdmin).toHaveBeenCalledWith(USER.id);
+  });
+
+  test('does NOT promote anyone when another admin already exists', async () => {
+    // Co-admin case: the household keeps working without any role change,
+    // so we shouldn't touch anyone else on our way out.
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x' });
+    db.getHouseholdMembers.mockResolvedValue([
+      USER,
+      { id: 'u-2', name: 'Jake', role: 'admin', household_id: HOUSEHOLD.id, created_at: '2024-01-01' },
+      { id: 'u-3', name: 'Lily', role: 'member', household_id: HOUSEHOLD.id, created_at: '2024-02-01' },
+    ]);
+    db.deleteUserAdmin.mockResolvedValue();
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    expect(res.status).toBe(200);
+    expect(db.updateUser).not.toHaveBeenCalled();
+    expect(db.deleteUserAdmin).toHaveBeenCalledWith(USER.id);
+  });
+
+  test('returns 401 without a bearer token', async () => {
+    const res = await request(app).delete('/api/auth/account').send({ password: 'pw' });
+    expect(res.status).toBe(401);
+  });
+});
+
 // ─── POST /api/household/invite ──────────────────────────────────────────
 
 describe('POST /api/household/invite', () => {

@@ -334,6 +334,78 @@ router.post('/mark-onboarded', requireAuth, async (req, res) => {
   }
 });
 
+// ─── DELETE /api/auth/account ──────────────────────────────────────────────
+// Self-service account deletion. Requires the user to re-enter their
+// password — the access token alone isn't enough for a destructive action
+// like this.
+//
+// Behaviour based on household membership:
+//   - Sole member of the household → delete the household entirely. The DB's
+//     ON DELETE CASCADE wipes every task, event, shopping item, list, note,
+//     document row, invite, WhatsApp verification code, etc.
+//   - One of several members → delete just the user row. Strictly-personal
+//     rows (refresh tokens, push device tokens, chat messages, etc.) cascade
+//     away; household rows keep their content with added_by / assigned_to /
+//     completed_by set to NULL so the audit trail doesn't vanish.
+//   - Only admin with other members still present → promote the oldest non-
+//     admin first so the household isn't left without an admin.
+//
+// Guards:
+//   - Platform admins can't self-delete. Returns 403; they have to contact
+//     support. (Stops us accidentally orphaning the whole platform.)
+//   - Wrong password returns 401 without revealing which half failed.
+router.delete('/account', requireAuth, async (req, res) => {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required to delete your account.' });
+  }
+
+  try {
+    const user = await db.getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    if (user.is_platform_admin) {
+      return res.status(403).json({
+        error: 'Platform admins cannot delete their own account. Contact support.',
+      });
+    }
+
+    // Verify the password before proceeding. Constant-time compare is
+    // handled by bcrypt internally; we don't leak whether the user exists.
+    const valid = await bcrypt.compare(password, user.password_hash || '');
+    if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+
+    // Sole member → nuke the household (cascade-deletes everything).
+    if (user.household_id) {
+      const members = await db.getHouseholdMembers(user.household_id);
+      const otherMembers = members.filter((m) => m.id !== user.id);
+
+      if (otherMembers.length === 0) {
+        await db.deleteHouseholdCascade(user.household_id);
+        return res.json({ mode: 'household_deleted' });
+      }
+
+      // Only admin with other members → promote the oldest non-admin to
+      // admin so the household stays operable after we remove this user.
+      if (user.role === 'admin') {
+        const otherAdmins = otherMembers.filter((m) => m.role === 'admin');
+        if (otherAdmins.length === 0) {
+          const nextAdmin = [...otherMembers].sort(
+            (a, b) => new Date(a.created_at) - new Date(b.created_at)
+          )[0];
+          await db.updateUser(nextAdmin.id, { role: 'admin' });
+        }
+      }
+    }
+
+    await db.deleteUserAdmin(req.user.id);
+    return res.json({ mode: 'user_only' });
+  } catch (err) {
+    console.error('DELETE /api/auth/account error:', err);
+    return res.status(500).json({ error: 'Could not delete account. Please try again.' });
+  }
+});
+
 // ─── POST /api/auth/refresh ────────────────────────────────────────────────
 // Exchange a valid refresh token for a new access token + new refresh token.
 // No Bearer auth required (the access token will typically be expired).
