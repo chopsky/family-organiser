@@ -4,6 +4,7 @@ const db = require('../db/queries');
 const { scanReceipt, extractFromEmail } = require('../services/ai');
 const { extractEmailContent, extractPdfText } = require('../services/email-parser');
 const { detectAisle } = require('../utils/aisle-detect');
+const calendarSync = require('../services/calendarSync');
 
 const router = Router();
 
@@ -203,6 +204,11 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
 
             if (created && assigneeNames.length > 0) {
               await db.saveEventAssignees(created.id, householdId, assigneeNames, members);
+            }
+            // Mirror to connected external calendars. Fire-and-forget: a
+            // provider failure must not block email-extraction processing.
+            if (created) {
+              calendarSync.pushEventToConnections(householdId, created, 'create').catch(() => {});
             }
             eventsCreated++;
           } catch (err) {

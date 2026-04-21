@@ -13,6 +13,7 @@ const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geo
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
+const calendarSync = require('../services/calendarSync');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -480,6 +481,17 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
       await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
     }
 
+    // Mirror to any connected external calendars (Apple/Google/Microsoft).
+    // Fire-and-forget — if a provider push fails, it's logged inside
+    // pushEventToConnections but doesn't block the user's confirmation
+    // message. Matches the existing HTTP-route behaviour in
+    // src/routes/calendar.js so events added via the WhatsApp bot / AI
+    // chat / inbound email end up in the same external calendars as
+    // events added via the app form.
+    if (created) {
+      calendarSync.pushEventToConnections(household.id, created, 'create').catch(() => {});
+    }
+
     // Update actions so the caller's confirmation/broadcast picks up the event.
     actions.eventsAdded = actions.eventsAdded || [];
     actions.eventsAdded.push(ev.title);
@@ -771,6 +783,10 @@ async function handleTextMessage(text, user, household) {
       if (created && assigneeNames.length > 0) {
         await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
       }
+      // Mirror to connected external calendars (see main handler for notes).
+      if (created) {
+        calendarSync.pushEventToConnections(household.id, created, 'create').catch(() => {});
+      }
     } catch (err) {
       console.error('School event creation failed:', err.message);
       return { response: `⚠️ I understood the event but couldn't save it: ${err.message}`, actions };
@@ -1046,6 +1062,10 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
 
         if (createdEvent && assigneeNames.length > 0) {
           await db.saveEventAssignees(createdEvent.id, household.id, assigneeNames, members);
+        }
+        // Mirror to connected external calendars (see main handler for notes).
+        if (createdEvent) {
+          calendarSync.pushEventToConnections(household.id, createdEvent, 'create').catch(() => {});
         }
 
         created.push(ev.title);

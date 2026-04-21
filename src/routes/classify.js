@@ -4,6 +4,7 @@ const { classify } = require('../services/ai');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
+const calendarSync = require('../services/calendarSync');
 
 const router = Router();
 
@@ -181,6 +182,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             const created = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
             if (created && assigneeNames.length > 0) {
               await db.saveEventAssignees(created.id, req.householdId, assigneeNames, members);
+            }
+            // Mirror to connected external calendars (Apple/Google/Microsoft).
+            // Fire-and-forget: errors are logged inside pushEventToConnections
+            // but must not break the AI classify response.
+            if (created) {
+              calendarSync.pushEventToConnections(req.householdId, created, 'create').catch(() => {});
             }
           })());
         }
