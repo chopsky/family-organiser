@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
+import { IconSearch, IconPlus } from '../components/Icons';
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -60,27 +60,12 @@ export default function Meals() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
-        <h1
-          className="text-[38px] font-normal leading-none text-bark flex items-center gap-2"
-          style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
-        >
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#f1eef8',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IconUtensils className="h-5 w-5 text-plum" />
-          </div>
-          Meal Plan
-        </h1>
-      </div>
+      <h1
+        className="text-[38px] font-normal leading-none text-bark"
+        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+      >
+        Meal Plan
+      </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 

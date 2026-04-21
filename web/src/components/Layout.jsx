@@ -189,7 +189,7 @@ export default function Layout({ children }) {
       <header className="md:hidden bg-cream border-b border-light-grey z-30 sticky top-0 safe-top">
         <div className="px-4 py-3 flex items-center justify-between">
           <Link to="/dashboard" className="shrink-0 flex items-center">
-            <img src="/housemait-logo2.png" alt="Housemait" className="h-7 w-auto" />
+            <img src="/housemait-logo2.png" alt="Housemait" className="max-w-[140px] h-auto" />
           </Link>
           <Link to="/settings" className="shrink-0">
             {renderAvatar('w-8 h-8', 'text-xs')}
@@ -199,7 +199,7 @@ export default function Layout({ children }) {
 
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">
-        <div className="px-5 md:px-8 py-6 md:py-11 pb-28 md:pb-11 pt-11">
+        <div className="px-5 md:px-8 py-6 md:py-11 pb-28 md:pb-11 pt-8">
           {children}
         </div>
       </main>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
-import { IconCamera, IconReceipt, IconSearch, IconCheck, IconClipboard } from '../components/Icons';
+import { IconReceipt, IconSearch, IconCheck, IconClipboard } from '../components/Icons';
 
 export default function Receipt() {
   const [file, setFile]         = useState(null);
@@ -56,22 +56,9 @@ export default function Receipt() {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <h1
-        className="flex text-[38px] font-normal leading-none text-bark items-center gap-2"
+        className="text-[38px] font-normal leading-none text-bark"
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
-        <div
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: '#f1eef8',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconCamera className="h-5 w-5 text-plum" />
-        </div>
         Receipt Scanner
       </h1>
       <p className="text-sm text-cocoa">

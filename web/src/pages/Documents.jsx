@@ -225,22 +225,9 @@ export default function Documents() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1
-          className="flex text-[38px] font-normal leading-none text-bark items-center gap-2"
+          className="text-[38px] font-normal leading-none text-bark"
           style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
         >
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#f1eef8',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IconFileText className="h-5 w-5 text-plum" />
-          </div>
           Documents
         </h1>
         <button
