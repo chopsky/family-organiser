@@ -82,7 +82,12 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <LandingPage />)} />
         <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/signup" element={<Signup />} />
+        {/* /signup must be unreachable while a session is live — otherwise a
+            logged-in user creating a "new" account carries their token into
+            the flow, every API call inside onboarding acts as the original
+            user, and the new account row ends up half-created (no verification
+            email sent, wrong household, etc). Bounce authed users to /dashboard. */}
+        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />

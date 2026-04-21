@@ -67,6 +67,16 @@ api.interceptors.response.use(
 
     // ── Handle 401: attempt silent token refresh ──
     if (err.response?.status === 401 && !originalRequest._retry) {
+      // Public auth endpoints return 401 on bad credentials — that's
+      // semantic ("wrong password"), not a session-expiry signal. Don't
+      // force-logout or silently refresh; let the caller's catch block
+      // surface the real error. Before this guard, a bad-password login
+      // attempt triggered forceLogout → window.location='/' and the user
+      // saw the landing page with no visible error.
+      if (originalRequest.url?.match(/\/auth\/(login|register|forgot-password|reset-password|resend-verification|verify-email)/)) {
+        return Promise.reject(err);
+      }
+
       // If this IS the refresh call itself failing, force logout
       if (originalRequest.url?.includes('/auth/refresh')) {
         forceLogout();
