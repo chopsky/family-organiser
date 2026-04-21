@@ -194,7 +194,11 @@ router.get('/verify-email', async (req, res) => {
 
     await db.markEmailVerificationTokenUsed(record.id);
     await db.updateUser(record.user_id, { email_verified: true });
-    return res.redirect(`${frontendUrl}/login?verified=true`);
+    // Redirect to a dedicated confirmation page (not /login) — if the user
+    // clicked the verify link in a browser where another session is already
+    // active, bouncing via /login would trigger the logged-in redirect to
+    // /dashboard and they'd never see the confirmation.
+    return res.redirect(`${frontendUrl}/verified`);
   } catch (err) {
     console.error('GET /api/auth/verify-email error:', err);
     return res.redirect(`${frontendUrl}/login?error=server-error`);

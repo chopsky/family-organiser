@@ -14,6 +14,7 @@ const Signup          = lazy(() => import('./pages/Signup'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
 const CheckEmail      = lazy(() => import('./pages/CheckEmail'));
+const Verified        = lazy(() => import('./pages/Verified'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
@@ -91,6 +92,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />
+        <Route path="/verified" element={<Verified />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/setup" element={<RequireAuthOnly><SetupHousehold /></RequireAuthOnly>} />
