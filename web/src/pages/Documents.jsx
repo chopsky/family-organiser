@@ -225,7 +225,7 @@ export default function Documents() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1
-          className="hidden md:flex text-[38px] font-normal leading-none text-bark items-center gap-2"
+          className="flex text-[38px] font-normal leading-none text-bark items-center gap-2"
           style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
         >
           <div
@@ -243,7 +243,6 @@ export default function Documents() {
           </div>
           Documents
         </h1>
-        <div className="flex-1 md:hidden" />
         <button
           onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
           className="p-2 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors"

@@ -271,7 +271,7 @@ export default function Shopping() {
       {/* Page header */}
       <div className="flex items-center gap-3">
         <div
-          className="hidden md:flex"
+          className="flex"
           style={{
             width: '42px',
             height: '42px',
@@ -286,7 +286,7 @@ export default function Shopping() {
           </svg>
         </div>
         <h1
-          className="hidden md:block text-[38px] font-normal leading-none text-bark"
+          className="block text-[38px] font-normal leading-none text-bark"
           style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
         >
           Shopping
