@@ -1755,6 +1755,11 @@ async function getConnectionsByHousehold(householdId, db = supabase) {
 }
 
 async function createSyncMapping(eventId, connectionId, externalEventId, etag, db = supabase) {
+  // Conflict key aligns with the unique constraint added in
+  // migration-sync-mapping-unique-fix.sql. Keying on
+  // (connection_id, external_event_id) means each Apple UID owns its own
+  // mapping row instead of overwriting a previous UID's row, which is
+  // what caused the original "re-link every poll" ping-pong.
   const { data, error } = await db
     .from('calendar_sync_mappings')
     .upsert({
@@ -1763,7 +1768,7 @@ async function createSyncMapping(eventId, connectionId, externalEventId, etag, d
       external_event_id: externalEventId,
       external_etag: etag || null,
       last_synced_at: new Date().toISOString(),
-    }, { onConflict: 'event_id,connection_id' })
+    }, { onConflict: 'connection_id,external_event_id' })
     .select()
     .single();
   if (error) throw error;
@@ -1801,7 +1806,12 @@ async function getSyncMappingsByConnection(connectionId, db = supabase) {
   return data || [];
 }
 
-async function deleteSyncMapping(eventId, connectionId, db = supabase) {
+/**
+ * Remove every sync mapping an event has for a given connection. Called
+ * when we push a local delete to the provider — the event itself is
+ * being removed, so all of its remote tracking should go too.
+ */
+async function deleteSyncMappingsForEvent(eventId, connectionId, db = supabase) {
   const { error } = await db
     .from('calendar_sync_mappings')
     .delete()
@@ -1809,6 +1819,44 @@ async function deleteSyncMapping(eventId, connectionId, db = supabase) {
     .eq('connection_id', connectionId);
   if (error) throw error;
 }
+
+/**
+ * Remove a single mapping identified by the external UID. Called when an
+ * INCOMING delete arrives from the provider — Apple says "this UID is
+ * gone", we remove the mapping for THAT UID only. Other mappings for
+ * the same event (other UIDs, other calendar subscriptions, shared-
+ * calendar mirrors) stay intact. Caller is responsible for soft-deleting
+ * the event separately if no mappings remain.
+ */
+async function deleteSyncMappingByExternalId(connectionId, externalEventId, db = supabase) {
+  const { error } = await db
+    .from('calendar_sync_mappings')
+    .delete()
+    .eq('connection_id', connectionId)
+    .eq('external_event_id', externalEventId);
+  if (error) throw error;
+}
+
+/**
+ * Count how many mappings reference this event, across every connection.
+ * Used after processing an incoming delete: if zero mappings remain, the
+ * event has no external source left and can be safely soft-deleted.
+ * If any remain, we leave the event alone — another sync could have it
+ * mirrored.
+ */
+async function countSyncMappingsForEvent(eventId, db = supabase) {
+  const { count, error } = await db
+    .from('calendar_sync_mappings')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+  if (error) throw error;
+  return count || 0;
+}
+
+// Backwards-compat alias: original callers passed (eventId, connectionId)
+// and expected "nuke all mappings for this event+connection". Preserve
+// that meaning so existing call sites don't silently change behaviour.
+const deleteSyncMapping = deleteSyncMappingsForEvent;
 
 // ─── Calendar Subscriptions ──────────────────────────────────────────────────
 
@@ -2007,6 +2055,8 @@ async function getSyncMappingsBySubscription(subscriptionId, db = supabase) {
 }
 
 async function createSyncMappingWithSubscription(eventId, connectionId, subscriptionId, externalEventId, etag, db = supabase) {
+  // See createSyncMapping for why the conflict key is
+  // (connection_id, external_event_id) and not (event_id, connection_id).
   const { data, error } = await db
     .from('calendar_sync_mappings')
     .upsert({
@@ -2016,7 +2066,7 @@ async function createSyncMappingWithSubscription(eventId, connectionId, subscrip
       external_event_id: externalEventId,
       external_etag: etag || null,
       last_synced_at: new Date().toISOString(),
-    }, { onConflict: 'event_id,connection_id' })
+    }, { onConflict: 'connection_id,external_event_id' })
     .select()
     .single();
   if (error) throw error;
@@ -3519,6 +3569,9 @@ module.exports = {
   getSyncMappingByExternalId,
   getSyncMappingsByConnection,
   deleteSyncMapping,
+  deleteSyncMappingsForEvent,
+  deleteSyncMappingByExternalId,
+  countSyncMappingsForEvent,
   // Calendar subscriptions
   getSubscriptionsByConnection,
   getEnabledSubscriptionsByConnection,

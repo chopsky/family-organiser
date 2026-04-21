@@ -336,8 +336,17 @@ async function processChange(connection, subscription, change, stats = null) {
           shouldDelete = false;
         }
         if (shouldDelete) {
-          await db.softDeleteCalendarEvent(existingMapping.event_id, connection.household_id);
-          await db.deleteSyncMapping(existingMapping.event_id, connection.id);
+          // Remove only the mapping for THIS external UID — an event may
+          // now have multiple mappings after the unique-constraint change
+          // in migration-sync-mapping-unique-fix.sql (e.g. two Apple UIDs
+          // referring to the same event, or a cross-subscription mirror).
+          // Only soft-delete the event itself if no other mapping still
+          // references it from anywhere.
+          await db.deleteSyncMappingByExternalId(connection.id, externalEventId);
+          const remaining = await db.countSyncMappingsForEvent(existingMapping.event_id);
+          if (remaining === 0) {
+            await db.softDeleteCalendarEvent(existingMapping.event_id, connection.household_id);
+          }
           if (stats) stats.deleted += 1;
         } else if (stats) {
           stats.skipDeleted += 1;
