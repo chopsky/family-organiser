@@ -26,20 +26,28 @@ const BRAND = {
 };
 
 function emailTemplate(title, body) {
+  // Logo is a pre-whitened 2× PNG (64px tall, displayed at 32px) so it looks
+  // crisp on retina without a CSS filter hack. SVG would be nicer but Gmail,
+  // Outlook desktop, Yahoo, and Outlook.com all strip <img src="*.svg">.
+  //
+  // `border-radius: 0 0 16px 16px` on the footer is belt-and-braces: the
+  // outer container already has `overflow:hidden`, but several clients
+  // (notably older Outlook and some webmail) strip `overflow`, leaving square
+  // bottom corners. Setting it on the footer directly guarantees the look.
   return `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:${BRAND.cream};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    <div style="background:${BRAND.plum};padding:24px;text-align:center;">
-      <h1 style="color:#fff;margin:0;font-size:24px;letter-spacing:-0.01em;">Housemait</h1>
+    <div style="background:${BRAND.plum};padding:24px;text-align:center;border-radius:16px 16px 0 0;">
+      <img src="${BASE_URL}/housemait-logo-white@2x.png" alt="Housemait" height="32" style="height:32px;display:inline-block;border:0;" />
     </div>
     <div style="padding:32px 24px;">
       <h2 style="color:${BRAND.charcoal};margin:0 0 16px;font-size:20px;">${title}</h2>
       ${body}
     </div>
-    <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;">
+    <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;border-radius:0 0 16px 16px;">
       <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait — shopping lists, tasks &amp; reminders, together.</p>
     </div>
   </div>
@@ -62,8 +70,8 @@ async function sendEmail(to, subject, html) {
 async function sendVerificationEmail(to, name, token) {
   const url = `${API_URL}/api/auth/verify-email?token=${token}`;
   const html = emailTemplate('Verify your email', `
-    <p style="color:${BRAND.ink};line-height:1.6;">Hi ${name},</p>
-    <p style="color:${BRAND.ink};line-height:1.6;">Click the button below to verify your email address and get started with Housemait.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Hi ${name},</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click the button below to verify your email address and get started with Housemait.</p>
     <div style="text-align:center;">${button('Verify email', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;">This link expires in 24 hours.</p>
   `);
@@ -73,8 +81,8 @@ async function sendVerificationEmail(to, name, token) {
 async function sendInviteEmail(to, inviterName, householdName, token) {
   const url = `${BASE_URL}/signup?invite=${token}`;
   const html = emailTemplate(`You're invited!`, `
-    <p style="color:${BRAND.ink};line-height:1.6;">${inviterName} has invited you to join <strong>${householdName}</strong> on Housemait.</p>
-    <p style="color:${BRAND.ink};line-height:1.6;">Click below to create your account and join the household.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">${inviterName} has invited you to join <strong>${householdName}</strong> on Housemait.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click below to create your account and join the household.</p>
     <div style="text-align:center;">${button('Join household', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;">This invite expires in 7 days.</p>
   `);
@@ -84,8 +92,8 @@ async function sendInviteEmail(to, inviterName, householdName, token) {
 async function sendPasswordResetEmail(to, name, token) {
   const url = `${BASE_URL}/reset-password?token=${token}`;
   const html = emailTemplate('Reset your password', `
-    <p style="color:${BRAND.ink};line-height:1.6;">Hi ${name},</p>
-    <p style="color:${BRAND.ink};line-height:1.6;">We received a request to reset your password. Click the button below to set a new one.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Hi ${name},</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">We received a request to reset your password. Click the button below to set a new one.</p>
     <div style="text-align:center;">${button('Reset password', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
   `);
@@ -150,13 +158,13 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
   <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 
     <!-- Header -->
-    <div style="background:${BRAND.plum};padding:32px 24px;text-align:center;">
-      <h1 style="color:#fff;margin:0 0 4px;font-size:24px;letter-spacing:-0.01em;">Housemait</h1>
+    <div style="background:${BRAND.plum};padding:32px 24px;text-align:center;border-radius:16px 16px 0 0;">
+      <img src="${BASE_URL}/housemait-logo-white@2x.png" alt="Housemait" height="32" style="height:32px;display:inline-block;border:0;margin-bottom:6px;" />
       <p style="color:${BRAND.plumLight};margin:0;font-size:14px;">Weekly Digest for ${householdName}</p>
     </div>
 
     <div style="padding:32px 24px;">
-      <p style="color:${BRAND.ink};line-height:1.6;margin:0 0 24px;">Hi ${memberName}, here's your week in review:</p>
+      <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 24px;">Hi ${memberName}, here's your week in review:</p>
 
       <!-- ✅ Completed This Week -->
       <div style="margin-bottom:28px;">
@@ -202,7 +210,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
     </div>
 
     <!-- Footer -->
-    <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;">
+    <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;border-radius:0 0 16px 16px;">
       <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait — shopping lists, tasks &amp; reminders, together.</p>
     </div>
   </div>
