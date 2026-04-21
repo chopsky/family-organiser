@@ -83,10 +83,31 @@ async function pullChangesFromProvider(connection) {
 
   for (const sub of subscriptions) {
     try {
+      const startMs = Date.now();
       const changes = await provider.pullChanges(connection, sub.external_calendar_id, sub.sync_token);
 
+      // Per-subscription counters — populated by processChange, logged once
+      // at the end. Used to be one console.log/warn PER EVENT which drowned
+      // Railway logs (hundreds of lines every 15 min per user) and made real
+      // errors invisible. Now: one summary line per sync.
+      const stats = {
+        total: 0, created: 0, updated: 0, relinked: 0,
+        deleted: 0, skipDeleted: 0, errors: 0,
+      };
       for (const change of changes) {
-        await processChange(connection, sub, change);
+        await processChange(connection, sub, change, stats);
+      }
+
+      // Only emit a summary if there was actually something to report —
+      // avoids a noisy "0 events" line every 15 minutes for idle calendars.
+      if (stats.total > 0) {
+        console.log(
+          `[calendar-sync] "${sub.display_name}" (${connection.provider}): ` +
+          `${stats.total} events, ${stats.created} created, ${stats.updated} updated, ` +
+          `${stats.relinked} re-linked, ${stats.deleted} deleted, ` +
+          `${stats.skipDeleted} skip-delete, ${stats.errors} errors, ` +
+          `${Date.now() - startMs}ms`
+        );
       }
 
       // Success: clears any prior error and resets the failure counter.
@@ -228,9 +249,17 @@ async function initialImportFromSubscription(connection, subscription) {
 
 /**
  * Process a single change from an external provider.
+ *
+ * The optional `stats` parameter is a counter object (see pullChangesFrom-
+ * Provider) — this function increments the right field rather than logging
+ * per event, because the previous per-event logging generated hundreds of
+ * lines per sync and drowned out real errors. Still logs on actual errors.
+ *
+ * Passing stats is optional so direct/test callers don't have to care.
  */
-async function processChange(connection, subscription, change) {
+async function processChange(connection, subscription, change, stats = null) {
   const { externalEventId, action, eventData, etag } = change;
+  if (stats) stats.total += 1;
 
   try {
     const existingMapping = await db.getSyncMappingByExternalId(connection.id, externalEventId);
@@ -242,6 +271,7 @@ async function processChange(connection, subscription, change) {
         await db.createSyncMappingWithSubscription(
           existingMapping.event_id, connection.id, subscription.id, externalEventId, etag,
         );
+        if (stats) stats.updated += 1;
       } else {
         // Before creating, check for duplicate by title + start_time to prevent
         // re-importing events whose sync mapping was lost
@@ -257,12 +287,15 @@ async function processChange(connection, subscription, change) {
         }
 
         if (duplicateEvent) {
-          // Re-link the existing event instead of creating a duplicate
-          console.log(`[calendar-sync] Re-linking existing event "${eventData.title}" (${eventData.start_time}) instead of creating duplicate`);
+          // Re-link the existing event instead of creating a duplicate. Very
+          // common when Apple CalDAV hands back a different UID for the same
+          // event (recurring-series expansions, iCloud re-indexes). Summary
+          // is printed once per sync — see pullChangesFromProvider.
           await db.updateCalendarEvent(duplicateEvent.id, connection.household_id, eventData);
           await db.createSyncMappingWithSubscription(
             duplicateEvent.id, connection.id, subscription.id, externalEventId, etag,
           );
+          if (stats) stats.relinked += 1;
         } else {
           // Create new event
           const newEvent = await db.createCalendarEventFromSync(
@@ -276,6 +309,7 @@ async function processChange(connection, subscription, change) {
           await db.createSyncMappingWithSubscription(
             newEvent.id, connection.id, subscription.id, externalEventId, etag,
           );
+          if (stats) stats.created += 1;
         }
       }
     } else if (action === 'delete') {
@@ -290,23 +324,28 @@ async function processChange(connection, subscription, change) {
             const eventEnd = new Date(event.end_time || event.start_time);
             const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
             if (eventEnd > sevenDaysAgo) {
-              console.warn(
-                `[calendar-sync] Skipping deletion of recent/future event "${event.title}" (${event.start_time}) — Apple CalDAV may be inconsistent`
-              );
+              // Common on Apple CalDAV — future events drop out of one poll,
+              // come back on the next. Summary-logged only.
               shouldDelete = false;
             }
           }
-        } catch (guardErr) {
-          console.warn(`[calendar-sync] Could not verify event for deletion guard, skipping:`, guardErr.message);
+        } catch {
+          // Defensive: couldn't look up the event. Still safer to skip
+          // than to accidentally nuke a row. Tracked via the skip counter
+          // rather than a per-event warn (see summary log).
           shouldDelete = false;
         }
         if (shouldDelete) {
           await db.softDeleteCalendarEvent(existingMapping.event_id, connection.household_id);
           await db.deleteSyncMapping(existingMapping.event_id, connection.id);
+          if (stats) stats.deleted += 1;
+        } else if (stats) {
+          stats.skipDeleted += 1;
         }
       }
     }
   } catch (err) {
+    if (stats) stats.errors += 1;
     console.error(
       `Failed to process ${action} for external event ${externalEventId} on connection ${connection.id}:`,
       err
