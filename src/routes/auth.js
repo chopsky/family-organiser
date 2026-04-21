@@ -540,6 +540,24 @@ router.delete('/account', requireAuth, async (req, res) => {
       const otherMembers = members.filter((m) => m.id !== user.id);
 
       if (otherMembers.length === 0) {
+        // Defensive pre-cleanup: a historical schema quirk left
+        // event_reminders.household_id without ON DELETE CASCADE, so
+        // Postgres blocks the household delete when any event reminders
+        // exist for it. The migration at
+        // supabase/migration-event-reminders-cascade-fix.sql fixes the FK
+        // for new installs, but we clean them up explicitly here too so
+        // deletion works even on databases that haven't applied the
+        // migration yet. Safe to run unconditionally — if the FK is
+        // already CASCADE, this just removes the rows slightly earlier.
+        try {
+          const { supabaseAdmin } = require('../db/client');
+          await supabaseAdmin.from('event_reminders').delete().eq('household_id', user.household_id);
+        } catch (cleanupErr) {
+          console.warn('[delete-account] event_reminders pre-clean failed:', cleanupErr.message || cleanupErr);
+          // Don't fail the whole deletion on the pre-clean — the cascade
+          // might still work if the FK has already been fixed.
+        }
+
         await db.deleteHouseholdCascade(user.household_id);
         return res.json({ mode: 'household_deleted' });
       }
@@ -560,7 +578,17 @@ router.delete('/account', requireAuth, async (req, res) => {
     await db.deleteUserAdmin(req.user.id);
     return res.json({ mode: 'user_only' });
   } catch (err) {
-    console.error('DELETE /api/auth/account error:', err);
+    // Log the full Supabase/Postgres error so next time we hit this we can
+    // see the actual cause in Railway logs instead of a generic 500.
+    // Supabase errors expose .code (Postgres SQLSTATE), .details, .hint,
+    // .message — all useful for FK-violation debugging.
+    console.error('DELETE /api/auth/account error:', {
+      code: err.code,
+      message: err.message,
+      details: err.details,
+      hint: err.hint,
+      userId: req.user?.id,
+    });
     return res.status(500).json({ error: 'Could not delete account. Please try again.' });
   }
 });
