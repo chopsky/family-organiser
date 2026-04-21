@@ -84,7 +84,13 @@ async function pullChangesFromProvider(connection) {
   for (const sub of subscriptions) {
     try {
       const startMs = Date.now();
-      const changes = await provider.pullChanges(connection, sub.external_calendar_id, sub.sync_token);
+      // pullChanges now returns { changes, syncToken } — providers that
+      // support RFC 6578 sync-collection (Apple) rotate and return a new
+      // token each call. Other providers return syncToken: null, which
+      // means "leave the stored sync_token alone".
+      const { changes, syncToken: newSyncToken } = await provider.pullChanges(
+        connection, sub.external_calendar_id, sub.sync_token
+      );
 
       // Per-subscription counters — populated by processChange, logged once
       // at the end. Used to be one console.log/warn PER EVENT which drowned
@@ -96,6 +102,15 @@ async function pullChangesFromProvider(connection) {
       };
       for (const change of changes) {
         await processChange(connection, sub, change, stats);
+      }
+
+      // Persist the new sync token AFTER all changes have been applied.
+      // If processChange above threw, we'd skip this line — which is the
+      // desired behaviour: a failed sync shouldn't advance the token and
+      // accidentally mask unsynced changes. Next poll will re-request from
+      // the same token and re-process anything that didn't land.
+      if (newSyncToken && newSyncToken !== sub.sync_token) {
+        await db.updateSubscription(sub.id, { sync_token: newSyncToken });
       }
 
       // Only emit a summary if there was actually something to report —

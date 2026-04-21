@@ -172,7 +172,10 @@ async function pullChanges(connection, calendarId) {
     }
   }
 
-  return changes;
+  // Microsoft Graph uses its own delta-link mechanism (connection.deltaLink)
+  // rather than a CalDAV-style sync token. Return null so the Apple-specific
+  // sync_token field on the subscription row is left untouched.
+  return { changes, syncToken: null };
 }
 
 /**

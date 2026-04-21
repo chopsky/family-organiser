@@ -471,28 +471,114 @@ async function pushEvent(connection, event, action) {
 }
 
 /**
- * Fetch changed events from Apple Calendar via CalDAV.
- * Compares etags with stored sync mappings to detect changes.
- * Used for polling (every 15 mins) since CalDAV has no webhooks.
+ * Translate one VEVENT iCal blob into the list of change records the rest
+ * of the sync pipeline expects. Extracted so both the sync-collection
+ * (fast path) and full-fetch (reconciliation) paths can share it.
+ *
+ * - Pulls the UID out of the iCal data.
+ * - Expands RRULEs into per-occurrence changes (with dated external IDs).
+ * - Skips if etag matches an existing mapping (passed in so the full-fetch
+ *   path can still suppress unchanged events).
  */
-async function pullChanges(connection, calendarUrl) {
-  const client = await connect(connection);
+function icalToChanges(icalData, etag, existingByExternalId) {
+  if (!icalData) return [];
+  const uidMatch = icalData.match(/^UID[^:]*:(.*)$/m);
+  const externalEventId = uidMatch ? uidMatch[1].trim() : null;
+  if (!externalEventId) return [];
 
-  let calendar;
-  if (calendarUrl) {
-    calendar = { url: calendarUrl };
+  const eventData = parseVEvent(icalData);
+  const out = [];
+
+  const expanded = expandRecurrence(eventData, externalEventId);
+  if (expanded && expanded.length > 0) {
+    for (const instance of expanded) {
+      const existing = existingByExternalId && existingByExternalId.get(instance.externalEventId);
+      if (!existing || existing.etag !== etag) {
+        out.push({
+          externalEventId: instance.externalEventId,
+          action: 'upsert',
+          eventData: instance.eventData,
+          etag,
+        });
+      }
+    }
   } else {
-    const calendars = await client.fetchCalendars();
-    calendar = findCalendar(calendars, connection);
+    const existing = existingByExternalId && existingByExternalId.get(externalEventId);
+    if (!existing || existing.etag !== etag) {
+      out.push({
+        externalEventId,
+        action: 'upsert',
+        eventData: {
+          title: eventData.title,
+          description: eventData.description,
+          location: eventData.location,
+          start_time: eventData.start_time,
+          end_time: eventData.end_time,
+          all_day: eventData.all_day,
+        },
+        etag,
+      });
+    }
   }
+  return { changes: out, seenIds: [externalEventId, ...(expanded || []).map((i) => i.externalEventId)] };
+}
 
-  if (!calendar) {
-    throw new Error('No calendar found on Apple account');
-  }
-
-  const calendarObjects = await client.fetchCalendarObjects({
-    calendar,
+/**
+ * Incremental fetch via CalDAV sync-collection (RFC 6578). Apple iCloud
+ * responds to this REPORT with only the objects that have changed since
+ * the stored sync token — orders of magnitude less work than re-fetching
+ * every event on every poll.
+ *
+ * smartCollectionSync handles the RFC machinery: it issues the REPORT,
+ * rotates the sync token, and returns a detailed result with created /
+ * updated / deleted object arrays.
+ *
+ * We ignore `deleted` for now: entries come through with only a `url`,
+ * and our sync-mapping table doesn't store hrefs, so there's no way to
+ * map a deleted URL back to an external_event_id without a schema
+ * change. Deletes still get reconciled on the next full-fetch pass
+ * (triggered by token expiry or any sync-collection error) — which on
+ * Apple happens frequently enough to keep state consistent.
+ *
+ * Throws on any tsdav error; callers should catch and fall back to the
+ * full-fetch path.
+ */
+async function syncCollectionFetch(client, calendar, syncToken) {
+  const result = await client.smartCollectionSync({
+    collection: { ...calendar, syncToken, objects: [] },
+    method: 'webdav',
+    detailedResult: true,
   });
+
+  const newToken = result.syncToken || null;
+  const changes = [];
+
+  for (const obj of [...result.objects.created, ...result.objects.updated]) {
+    // No existingByExternalId passed — sync-collection already filters to
+    // only changed objects, so the etag-compare gate isn't needed.
+    const { changes: objChanges } = icalToChanges(obj.data, obj.etag, null);
+    changes.push(...objChanges);
+  }
+
+  if (result.objects.deleted.length > 0) {
+    console.log(
+      `[apple-sync] ${calendar.url || 'calendar'}: skipping ${result.objects.deleted.length} deleted object(s) ` +
+      `— will reconcile on next full-fetch pass`
+    );
+  }
+
+  return { changes, syncToken: newToken };
+}
+
+/**
+ * Reconciliation path: fetch every calendar object and diff against stored
+ * mappings. Used on first sync, when no sync token exists, and as a
+ * fallback whenever sync-collection fails (token expired, server error,
+ * etc.). Handles delete detection via "mapping exists but server didn't
+ * return it" — the only path that does.
+ */
+async function fullFetch(client, calendar, connection) {
+  const calendarObjects = await client.fetchCalendarObjects({ calendar });
 
   const existingMappings = connection.sync_mappings || [];
   const existingByExternalId = new Map(
@@ -503,65 +589,10 @@ async function pullChanges(connection, calendarUrl) {
   const seenExternalIds = new Set();
 
   for (const obj of calendarObjects) {
-    const icalData = obj.data;
-    if (!icalData) continue;
-
-    const uidMatch = icalData.match(/^UID[^:]*:(.*)$/m);
-    const externalEventId = uidMatch ? uidMatch[1].trim() : null;
-    if (!externalEventId) continue;
-
-    seenExternalIds.add(externalEventId);
-    const currentEtag = obj.etag;
-    const eventData = parseVEvent(icalData);
-
-    // Expand recurring events
-    const expanded = expandRecurrence(eventData, externalEventId);
-    if (expanded && expanded.length > 0) {
-      for (const instance of expanded) {
-        seenExternalIds.add(instance.externalEventId);
-        const existingInstance = existingByExternalId.get(instance.externalEventId);
-        if (!existingInstance || existingInstance.etag !== currentEtag) {
-          changes.push({
-            externalEventId: instance.externalEventId,
-            action: 'upsert',
-            eventData: instance.eventData,
-            etag: currentEtag,
-          });
-        }
-      }
-    } else {
-      // Non-recurring event
-      const existing = existingByExternalId.get(externalEventId);
-      if (!existing) {
-        changes.push({
-          externalEventId,
-          action: 'upsert',
-          eventData: {
-            title: eventData.title,
-            description: eventData.description,
-            location: eventData.location,
-            start_time: eventData.start_time,
-            end_time: eventData.end_time,
-            all_day: eventData.all_day,
-          },
-          etag: currentEtag,
-        });
-      } else if (existing.etag !== currentEtag) {
-        changes.push({
-          externalEventId,
-          action: 'upsert',
-          eventData: {
-            title: eventData.title,
-            description: eventData.description,
-            location: eventData.location,
-            start_time: eventData.start_time,
-            end_time: eventData.end_time,
-            all_day: eventData.all_day,
-          },
-          etag: currentEtag,
-        });
-      }
-    }
+    const result = icalToChanges(obj.data, obj.etag, existingByExternalId);
+    if (!result.changes) continue; // empty iCal
+    changes.push(...result.changes);
+    for (const id of result.seenIds || []) seenExternalIds.add(id);
   }
 
   // Detect deletions: mappings that no longer appear in the calendar
@@ -576,7 +607,55 @@ async function pullChanges(connection, calendarUrl) {
     }
   }
 
-  return changes;
+  // Full-fetch doesn't produce a new sync token. Returning null leaves the
+  // stored token untouched (see calendarSync.js) — if we had one before,
+  // we'll try sync-collection again on the next poll.
+  return { changes, syncToken: null };
+}
+
+/**
+ * Fetch changed events from Apple Calendar via CalDAV.
+ *
+ * Tries the RFC 6578 sync-collection fast path when a sync token exists,
+ * then falls back to a full fetch (which is also how first syncs and
+ * error-recovery run). Called every 15 minutes from the scheduler.
+ *
+ * Return shape:
+ *   { changes: Change[], syncToken: string | null }
+ *
+ * The caller persists `syncToken` back to the subscription row after a
+ * successful sync — null means "leave the stored token as-is" (full-fetch
+ * doesn't rotate it).
+ */
+async function pullChanges(connection, calendarUrl, syncToken = null) {
+  const client = await connect(connection);
+
+  let calendar;
+  if (calendarUrl) {
+    calendar = { url: calendarUrl };
+  } else {
+    const calendars = await client.fetchCalendars();
+    calendar = findCalendar(calendars, connection);
+  }
+
+  if (!calendar) {
+    throw new Error('No calendar found on Apple account');
+  }
+
+  if (syncToken) {
+    try {
+      return await syncCollectionFetch(client, calendar, syncToken);
+    } catch (err) {
+      console.warn(
+        `[apple-sync] sync-collection failed for ${calendar.url || 'calendar'}, ` +
+        `falling back to full fetch: ${err.message || err}`
+      );
+      // Fall through to fullFetch — which will also handle any deletes
+      // that accumulated during the sync-collection window.
+    }
+  }
+
+  return await fullFetch(client, calendar, connection);
 }
 
 /**

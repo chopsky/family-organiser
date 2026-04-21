@@ -161,7 +161,7 @@ async function pullChanges(connection, calendarId) {
 
   const events = result.data.items || [];
 
-  return events.map((googleEvent) => {
+  const changes = events.map((googleEvent) => {
     const isCancelled = googleEvent.status === 'cancelled';
     return {
       externalEventId: googleEvent.id,
@@ -170,6 +170,11 @@ async function pullChanges(connection, calendarId) {
       etag: googleEvent.etag,
     };
   });
+
+  // Google uses updatedMin (last_synced_at) to scope incremental pulls
+  // rather than a CalDAV-style sync token. Return null so calendarSync.js
+  // doesn't touch the subscription's sync_token field.
+  return { changes, syncToken: null };
 }
 
 /**
