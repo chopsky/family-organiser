@@ -38,6 +38,12 @@ export default function Settings() {
   // Data export (GDPR Article 20 — right to portability)
   const [exporting, setExporting] = useState(false);
 
+  // Active sessions (Settings → Active sessions)
+  const [sessions, setSessions]             = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [revokingSessionId, setRevokingSessionId] = useState(null);
+  const [revokingAllOthers, setRevokingAllOthers] = useState(false);
+
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
@@ -275,6 +281,113 @@ export default function Settings() {
     } finally {
       setVerifyingWhatsapp(false);
     }
+  }
+
+  // ── Active sessions ──────────────────────────────────────────────
+  // Pulls the caller's live refresh tokens from /api/auth/sessions with
+  // device + IP + last-used metadata, lets them revoke any of them, and
+  // offers a 'sign out everywhere else' shortcut.
+
+  function loadSessions() {
+    setLoadingSessions(true);
+    const refreshToken = (() => {
+      try { return localStorage.getItem('refreshToken') || ''; } catch { return ''; }
+    })();
+    return api
+      .get('/auth/sessions', {
+        // Passed as a header so the server can mark the current row —
+        // the raw token never appears in the response.
+        headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : {},
+      })
+      .then(({ data }) => setSessions(data.sessions || []))
+      .catch(() => setSessions([]))
+      .finally(() => setLoadingSessions(false));
+  }
+
+  useEffect(() => { loadSessions(); }, []);
+
+  async function handleRevokeSession(sessionId, isCurrent) {
+    if (isCurrent) {
+      if (!window.confirm('This is your current session — revoking will sign you out of this browser. Continue?')) return;
+    }
+    setRevokingSessionId(sessionId);
+    setError('');
+    try {
+      await api.delete(`/auth/sessions/${sessionId}`);
+      if (isCurrent) {
+        // Revoked the session we're using — force a fresh login. Clears
+        // tokens locally too in case the refresh interceptor misses it.
+        try { localStorage.removeItem('token'); localStorage.removeItem('refreshToken'); } catch { /* noop */ }
+        window.location.href = '/login';
+        return;
+      }
+      await loadSessions();
+      setSuccess('Session revoked.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not revoke that session.');
+    } finally {
+      setRevokingSessionId(null);
+    }
+  }
+
+  async function handleRevokeAllOthers() {
+    if (!window.confirm('Revoke every other device signed into your account? You\'ll stay signed in here.')) return;
+    setRevokingAllOthers(true);
+    setError('');
+    try {
+      await api.delete('/auth/sessions?except=current', {
+        headers: (() => {
+          try {
+            const rt = localStorage.getItem('refreshToken');
+            return rt ? { 'X-Refresh-Token': rt } : {};
+          } catch { return {}; }
+        })(),
+      });
+      await loadSessions();
+      setSuccess('All other sessions revoked.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not revoke other sessions.');
+    } finally {
+      setRevokingAllOthers(false);
+    }
+  }
+
+  // Turn a user-agent string into a short, readable label. UA parsing is
+  // famously unreliable — we only try to catch the common cases and fall
+  // back to "Unknown device" rather than risking nonsense.
+  function describeDevice(ua) {
+    if (!ua) return 'Unknown device';
+    const s = String(ua);
+    const platform =
+      /iPad/i.test(s) ? 'iPad' :
+      /iPhone/i.test(s) ? 'iPhone' :
+      /Android/i.test(s) ? 'Android' :
+      /Macintosh|Mac OS X/i.test(s) ? 'Mac' :
+      /Windows/i.test(s) ? 'Windows' :
+      /Linux/i.test(s) ? 'Linux' :
+      '';
+    const browser =
+      /Capacitor/i.test(s) ? 'Housemait app' :
+      /Edg\//i.test(s) ? 'Edge' :
+      /Chrome\//i.test(s) && !/Edg\//i.test(s) ? 'Chrome' :
+      /Firefox\//i.test(s) ? 'Firefox' :
+      /Safari\//i.test(s) ? 'Safari' :
+      'Browser';
+    if (platform && browser) return `${browser} on ${platform}`;
+    return platform || browser || 'Unknown device';
+  }
+
+  function formatWhen(iso) {
+    if (!iso) return '';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.round(diffMs / 60_000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
 
   // ── Export my data (GDPR Article 20) ─────────────────────────────
@@ -1058,6 +1171,68 @@ export default function Settings() {
         >
           {exporting ? 'Preparing…' : 'Export my data'}
         </button>
+      </section>
+
+      {/* Active sessions — lets users see + revoke live refresh tokens.
+          Sits between "Your data" (non-destructive GDPR surface) and the
+          delete-account danger zone since it's security-adjacent but
+          non-destructive to the account itself. */}
+      <section className="mt-2 rounded-2xl p-5 border border-cream-border bg-white">
+        <h2 className="text-base font-semibold text-bark mb-1">Active sessions</h2>
+        <p className="text-sm text-cocoa">
+          Everywhere you're signed into Housemait right now. Revoke any you
+          don't recognise — the device gets signed out immediately.
+        </p>
+
+        <div className="mt-4 space-y-2">
+          {loadingSessions ? (
+            <p className="text-sm text-cocoa">Loading…</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-cocoa">No active sessions found.</p>
+          ) : (
+            sessions.map((s) => (
+              <div
+                key={s.id}
+                className="rounded-xl border border-cream-border p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-bark truncate">
+                    {describeDevice(s.userAgent)}
+                    {s.isCurrent && (
+                      <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-plum-light text-plum">
+                        This session
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-cocoa mt-0.5">
+                    {s.ipAddress || 'Unknown IP'} · Last used {formatWhen(s.lastUsedAt)}
+                    {s.createdAt && <> · Signed in {formatWhen(s.createdAt)}</>}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRevokeSession(s.id, s.isCurrent)}
+                  disabled={revokingSessionId === s.id}
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-cream-border text-sm font-medium text-bark hover:bg-cream disabled:opacity-50 transition-colors"
+                >
+                  {revokingSessionId === s.id ? 'Revoking…' : 'Revoke'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Bulk action — show only when more than one session exists. */}
+        {sessions.length > 1 && (
+          <button
+            type="button"
+            onClick={handleRevokeAllOthers}
+            disabled={revokingAllOthers}
+            className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl border border-cream-border text-bark hover:bg-cream font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {revokingAllOthers ? 'Revoking…' : 'Revoke all other sessions'}
+          </button>
+        )}
       </section>
 
       {/* Danger zone — delete account. Placed last so it's below the
