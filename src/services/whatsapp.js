@@ -132,7 +132,30 @@ async function sendMessage(phone, body) {
  * @param {object} contentVars  - Variable map, e.g. { "1": "Grant added task: ..." }
  * @returns {Promise<object>}   - Parsed Twilio response
  */
-async function sendTemplate(phone, contentSid, contentVars = {}) {
+async function sendTemplate(phone, contentSidOrBody, contentVars = {}) {
+  // ── Backward compatibility ──────────────────────────────────────────
+  // Before the Content Template work, sendTemplate was a stub: it took
+  // (phone, body) and silently called sendMessage under the hood. Six
+  // cron jobs still use that old signature (daily reminder, weekly
+  // digest, overdue nudge, event reminders, school prep, evening prep).
+  // When the signature changed, those callers started passing the
+  // reminder text as a "contentSid" which Twilio rejected with
+  // "Invalid Parameter" / "A text message body or media urls must be
+  // specified." for months.
+  //
+  // Detect a real Content SID by its shape (always "HX" + 32 hex chars).
+  // Anything else falls back to the old stub behaviour — sendMessage
+  // with the second arg as a free-form body. Net effect: the pre-
+  // refactor behaviour is restored for legacy callers, and the new
+  // Content-Template path still works for callers that pass a real
+  // contentSid (currently just whatsapp-templates.js:sendBroadcastToMember).
+  const isContentSid = typeof contentSidOrBody === 'string'
+    && /^HX[a-f0-9]{32}$/i.test(contentSidOrBody);
+  if (!isContentSid) {
+    return sendMessage(phone, contentSidOrBody);
+  }
+  const contentSid = contentSidOrBody;
+
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   if (!accountSid || !authToken) throw new Error('Twilio not configured');
