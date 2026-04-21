@@ -2465,12 +2465,24 @@ async function deleteUserAdmin(userId, db = supabase) {
 }
 
 async function deleteHouseholdCascade(householdId, db = supabase) {
-  // All child tables have ON DELETE CASCADE, so this cleans up everything
-  const { error } = await db
-    .from('households')
-    .delete()
-    .eq('id', householdId);
-  if (error) throw error;
+  // Delegates to the delete_household_cascade() Postgres function (see
+  // supabase/migration-household-delete-fix.sql). The function runs with
+  // SET statement_timeout = '5min' so the cascade across a fully-loaded
+  // household doesn't hit Supabase's default ~30s timeout.
+  //
+  // Falls back to a plain DELETE if the function isn't installed yet —
+  // covers the brief window between code deploy and migration run.
+  const { error: rpcErr } = await db.rpc('delete_household_cascade', { p_household_id: householdId });
+  if (!rpcErr) return;
+
+  // 42883 = undefined_function — function isn't deployed yet.
+  if (rpcErr.code === '42883' || /function .*does not exist/i.test(rpcErr.message || '')) {
+    console.warn('[db] delete_household_cascade() not installed — falling back to direct DELETE. Run migration-household-delete-fix.sql.');
+    const { error } = await db.from('households').delete().eq('id', householdId);
+    if (error) throw error;
+    return;
+  }
+  throw rpcErr;
 }
 
 async function setUserPlatformAdmin(userId, isPlatformAdmin, db = supabase) {
