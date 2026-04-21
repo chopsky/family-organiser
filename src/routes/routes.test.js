@@ -29,6 +29,18 @@ jest.mock('bcrypt', () => ({
   compare: jest.fn().mockResolvedValue(true),
 }));
 
+// Stub global fetch so the password-strength validator's HIBP check is a
+// no-op during tests — always reports "not breached". Tests aren't about
+// HaveIBeenPwned; the dedicated password-strength test suite covers the
+// breach-detection behaviour. Without this, 'password123' in test
+// fixtures would trip the real HIBP API (if reachable) and reject the
+// request with a 400 — which is correct production behaviour but breaks
+// every register/reset route test.
+global.fetch = jest.fn().mockResolvedValue({
+  ok: true,
+  text: async () => '',
+});
+
 const request = require('supertest');
 const app = require('../app');
 const db = require('../db/queries');

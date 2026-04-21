@@ -6,6 +6,7 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const email = require('../services/email');
 const publicHolidays = require('../services/publicHolidays');
 const cache = require('../services/cache');
+const { validatePassword } = require('../utils/password-strength');
 
 const router = Router();
 
@@ -49,11 +50,15 @@ router.post('/register', async (req, res) => {
   if (!userEmail?.trim() || !password || !name?.trim()) {
     return res.status(400).json({ error: 'email, password, and name are required' });
   }
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
 
   const emailLower = userEmail.trim().toLowerCase();
+
+  // Strength gate: minimum length, no personal-info, not in HaveIBeenPwned's
+  // breach corpus. See src/utils/password-strength.js for policy + rationale.
+  const strength = await validatePassword(password, { email: emailLower, name: name.trim() });
+  if (!strength.valid) {
+    return res.status(400).json({ error: strength.error });
+  }
 
   try {
     const existing = await db.getUserByEmail(emailLower);
@@ -276,14 +281,22 @@ router.post('/reset-password', async (req, res) => {
   if (!token || !password) {
     return res.status(400).json({ error: 'token and password are required' });
   }
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
 
   try {
     const record = await db.getPasswordResetToken(token);
     if (!record) {
       return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    // Strength gate — we know the user's email + name from the lookup
+    // above, so we pass them in for the personal-info check.
+    const owner = await db.getUserById(record.user_id);
+    const strength = await validatePassword(password, {
+      email: owner?.email,
+      name: owner?.name,
+    });
+    if (!strength.valid) {
+      return res.status(400).json({ error: strength.error });
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
