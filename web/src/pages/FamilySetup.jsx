@@ -835,9 +835,22 @@ export default function FamilySetup() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h1
-        className="text-[38px] font-normal leading-none text-bark"
+        className="flex text-[36px] font-normal leading-none text-bark items-center gap-2"
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
+        <div
+          className="hidden md:flex"
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f1eef8',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconUsers className="h-5 w-5 text-plum" />
+        </div>
         Family Setup
       </h1>
 

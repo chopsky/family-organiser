@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconSearch, IconPlus } from '../components/Icons';
+import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -61,9 +61,22 @@ export default function Meals() {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <h1
-        className="text-[38px] font-normal leading-none text-bark"
+        className="text-[36px] font-normal leading-none text-bark flex items-center gap-2"
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
+        <div
+          className="hidden md:flex"
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f1eef8',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconUtensils className="h-5 w-5 text-plum" />
+        </div>
         Meal Plan
       </h1>
 
