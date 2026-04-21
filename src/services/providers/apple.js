@@ -40,7 +40,7 @@ function buildVEvent(event, uid) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Anora//Calendar//EN',
+    'PRODID:-//Housemait//Calendar//EN',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTART${valueParam}:${dtstart}`,
