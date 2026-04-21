@@ -128,10 +128,42 @@ router.post('/webhook', async (req, res) => {
         const notification = handlers.buildBroadcastMessage(user.name, result.actions);
         if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
-        console.error('[whatsapp] Text handler error:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
-        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, body: text, error: err.message });
+        // Verbose error logging — the old single-line console.error ate
+        // the most useful fields (err.code / err.name / Supabase
+        // .details + .hint / full stack). This block emits a structured
+        // object that Railway preserves as-is, so any future 'Sorry I
+        // had trouble processing that' is instantly diagnosable.
         const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-        await whatsapp.sendMessage(phone, `Sorry, I had trouble processing that (${elapsed}s). Please try again.`);
+        console.error('[whatsapp-text-handler-error]', {
+          userId: user.id,
+          householdId: user.household_id,
+          elapsedMs: Date.now() - start,
+          bodyPreview: text.slice(0, 80),
+          errName: err.name,
+          errMessage: err.message,
+          errCode: err.code,          // Supabase / Postgres SQLSTATE when applicable
+          errStatus: err.status,       // HTTP status from provider APIs
+          errDetails: err.details,     // Supabase error details
+          errHint: err.hint,           // Supabase error hint
+          stack: err.stack,            // full stack, not just 3 lines
+        });
+        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, body: text, error: err.message });
+
+        // A slightly more diagnostic user-facing message — picks a
+        // rough category from the error shape so the user knows whether
+        // to retry now or later.
+        let userMsg;
+        if (err.name === 'AbortError' || /timeout/i.test(err.message || '')) {
+          userMsg = `Sorry, the AI took too long (${elapsed}s). Please try again in a moment.`;
+        } else if (err.code && typeof err.code === 'string' && err.code.startsWith('2')) {
+          // Postgres SQLSTATE 2xxxx = data exception / constraint violation
+          userMsg = `Sorry, I couldn't save that (database error). Please try again or rephrase.`;
+        } else if (/parse|JSON|unexpected token/i.test(err.message || '')) {
+          userMsg = `Sorry, the AI replied in a format I couldn't read (${elapsed}s). Please try again.`;
+        } else {
+          userMsg = `Sorry, I had trouble processing that (${elapsed}s). Please try again.`;
+        }
+        await whatsapp.sendMessage(phone, userMsg);
       }
     }
   } catch (err) {
