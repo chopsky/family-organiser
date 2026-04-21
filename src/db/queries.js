@@ -849,17 +849,45 @@ async function deleteUser(userId, householdId, db = supabase) {
 
 // ─── Shopping Items ───────────────────────────────────────────────────────────
 
+// Coarse-grained shopping category — shopping_items.category has a CHECK
+// constraint limiting it to this set (see migration-shopping-categories.sql).
+// Keep in sync with that migration.
+const VALID_SHOPPING_CATEGORIES = new Set([
+  'groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other',
+]);
+
 async function addShoppingItems(householdId, items, addedByUserId, db = supabase) {
   if (!items.length) return [];
-  const rows = items.map((i) => ({
-    household_id: householdId,
-    item: i.item,
-    category: i.category || 'other',
-    quantity: i.quantity || null,
-    added_by: addedByUserId,
-    list_id: i.list_id || null,
-    aisle_category: i.aisle_category || 'Other',
-  }));
+  const rows = items.map((i) => {
+    // Two columns that sound alike but aren't:
+    //   `category`        — coarse DB enum (groceries/clothing/household/…)
+    //   `aisle_category`  — grocery-aisle enum the classifier returns
+    //                       (Dairy & Eggs / Produce / Meat & Seafood / …)
+    //
+    // The AI paths (classifier, chat, image-scan, inbound email) give us an
+    // AISLE name as `i.category` because the classifier's own schema names
+    // that field "category" even though it's aisle-scoped. Older app-form
+    // callers give us a real DB category. Detect which one we got by
+    // checking it against the DB enum, and route it to the right column.
+    const rawCategory = typeof i.category === 'string' ? i.category.toLowerCase() : '';
+    const isValidDbCategory = VALID_SHOPPING_CATEGORIES.has(rawCategory);
+    // If i.category is an aisle name and the caller didn't separately set
+    // aisle_category, promote it there rather than losing it.
+    const aisleFromCategory = !isValidDbCategory && i.category ? i.category : null;
+
+    return {
+      household_id: householdId,
+      item: i.item,
+      // Default to 'groceries' for AI-classified rows — they're almost
+      // always groceries, and the old 'other' default silently stripped
+      // every aisle-categorised item's category signal.
+      category: isValidDbCategory ? rawCategory : 'groceries',
+      quantity: i.quantity || null,
+      added_by: addedByUserId,
+      list_id: i.list_id || null,
+      aisle_category: i.aisle_category || aisleFromCategory || 'Other',
+    };
+  });
   const { data, error } = await db.from('shopping_items').insert(rows).select();
   if (error) throw error;
   return data;
