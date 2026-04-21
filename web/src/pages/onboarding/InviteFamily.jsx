@@ -49,8 +49,9 @@ export default function InviteFamily({ user, household, next, setError }) {
           You're in.
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
-          You've joined <strong>{household?.name || 'your household'}</strong>. The
-          admins can invite more members from Family Setup whenever they like.
+          You've joined <strong>{household?.name || 'your household'}</strong>.
+          You'll see whatever your family adds — tasks, shopping lists, the
+          calendar — all shared. Let's finish setting up your account.
         </p>
         <button type="button" onClick={next} className={primaryBtn + ' mt-8'}>
           Continue →
