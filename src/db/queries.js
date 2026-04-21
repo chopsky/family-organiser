@@ -180,10 +180,17 @@ const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens'
 
 // ─── Refresh tokens (session security) ───────────────────────────────────────
 
-async function createRefreshToken(userId, token, expiresAt, db = supabase) {
+async function createRefreshToken(userId, token, expiresAt, meta = {}, db = supabase) {
   const { data, error } = await db
     .from('refresh_tokens')
-    .insert({ user_id: userId, token, expires_at: expiresAt })
+    .insert({
+      user_id: userId,
+      token,
+      expires_at: expiresAt,
+      user_agent: meta.userAgent || null,
+      ip_address: meta.ipAddress || null,
+      last_used_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -217,6 +224,56 @@ async function revokeAllUserRefreshTokens(userId, db = supabase) {
     .eq('user_id', userId)
     .eq('revoked', false);
   if (error) throw error;
+}
+
+/**
+ * Return the caller's active (non-revoked, non-expired) refresh tokens
+ * with their session metadata. Used by Settings → Active sessions.
+ *
+ * The token string itself is deliberately NOT returned — only enough to
+ * identify the session in the UI (id, device, location, timestamps).
+ * `current_token_id` parameter lets the UI flag "this is the one you're
+ * using right now" and show a distinct button label.
+ */
+async function getActiveSessionsForUser(userId, db = supabase) {
+  const { data, error } = await db
+    .from('refresh_tokens')
+    .select('id, user_agent, ip_address, created_at, last_used_at, expires_at')
+    .eq('user_id', userId)
+    .eq('revoked', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('last_used_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Revoke every active refresh token for this user EXCEPT one (typically
+ * the caller's current session, identified by the token string they hold).
+ * Safe if keepTokenId is null — revokes everything.
+ */
+async function revokeOtherUserRefreshTokens(userId, keepTokenId, db = supabase) {
+  let query = db
+    .from('refresh_tokens')
+    .update({ revoked: true })
+    .eq('user_id', userId)
+    .eq('revoked', false);
+  if (keepTokenId) query = query.neq('id', keepTokenId);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+/**
+ * Update last_used_at on an existing refresh token. Called each time the
+ * token is rotated via /auth/refresh so the "last used X ago" timestamp
+ * in Settings reflects reality.
+ */
+async function touchRefreshToken(tokenId, db = supabase) {
+  const { error } = await db
+    .from('refresh_tokens')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', tokenId);
+  if (error) console.warn('[db] touchRefreshToken failed:', error.message);
 }
 
 // ─── Household notes ─────────────────────────────────────────────────────────
@@ -3526,6 +3583,9 @@ module.exports = {
   getValidRefreshToken,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
+  revokeOtherUserRefreshTokens,
+  getActiveSessionsForUser,
+  touchRefreshToken,
   // Notes
   getHouseholdNotes,
   upsertHouseholdNote,

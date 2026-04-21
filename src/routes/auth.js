@@ -18,8 +18,27 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+/**
+ * Helper to extract session metadata (user-agent, client IP) from the
+ * inbound request. Safe to call with a falsy req — returns an empty
+ * object so callers without a request object still work.
+ */
+function sessionMetaFromReq(req) {
+  if (!req) return {};
+  return {
+    userAgent: req.get?.('user-agent') || null,
+    // Express populates req.ip by default; falls back to the raw socket
+    // if a proxy header isn't configured. `trust proxy` is set in
+    // src/app.js so req.ip is already the client's IP on Railway.
+    ipAddress: req.ip || req.connection?.remoteAddress || null,
+  };
+}
+
 // Helper: build the standard auth response (includes refresh token)
-async function authResponse(user) {
+// `req` is optional — when provided we record session metadata against
+// the newly-issued refresh token so Settings → Active sessions can show
+// device + IP + last-used for it.
+async function authResponse(user, req = null) {
   const household = user.household_id ? await db.getHouseholdById(user.household_id) : null;
   const token = signToken({
     userId: user.id,
@@ -32,7 +51,7 @@ async function authResponse(user) {
   // Issue a rotating refresh token (7-day lifetime)
   const refreshToken = generateToken();
   const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  await db.createRefreshToken(user.id, refreshToken, refreshExpiresAt);
+  await db.createRefreshToken(user.id, refreshToken, refreshExpiresAt, sessionMetaFromReq(req));
 
   return {
     token,
@@ -97,7 +116,7 @@ router.post('/register', async (req, res) => {
       const updatedUser = Object.keys(profileUpdates).length > 0
         ? await db.updateUser(user.id, {}) // re-fetch isn't needed, merge locally
         : user;
-      const response = await authResponse({ ...user, ...profileUpdates });
+      const response = await authResponse({ ...user, ...profileUpdates }, req);
       return res.status(201).json(response);
     }
 
@@ -149,7 +168,7 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'Please verify your email first.' });
     }
 
-    const response = await authResponse(user);
+    const response = await authResponse(user, req);
     return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/login error:', err);
@@ -236,7 +255,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id)
       .catch((err) => console.error('Failed to seed public holidays:', err));
 
-    const response = await authResponse(user);
+    const response = await authResponse(user, req);
     return res.status(201).json(response);
   } catch (err) {
     console.error('POST /api/auth/create-household error:', err);
@@ -632,7 +651,7 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    const response = await authResponse(user);
+    const response = await authResponse(user, req);
     return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/refresh error:', err);
@@ -658,6 +677,87 @@ router.post('/logout', async (req, res) => {
     console.error('POST /api/auth/logout error:', err);
     // Still return 200 — the client should clear local state regardless
     return res.json({ success: true });
+  }
+});
+
+// ─── Session management ────────────────────────────────────────────────────
+// GET  /api/auth/sessions                         list my active sessions
+// DELETE /api/auth/sessions/:id                   revoke one by id
+// DELETE /api/auth/sessions?except=current        revoke all others (keeps current)
+//
+// The `/sessions` listing shows the caller which devices have live refresh
+// tokens against their account, with user-agent + IP + last-used for each.
+// The current session is flagged with isCurrent:true so the UI can style it
+// differently and confirm before the user revokes their own browser.
+
+/**
+ * Resolve the session ID of the caller's CURRENT refresh token. The client
+ * sends its refresh token as a header (X-Refresh-Token) or in the body —
+ * the server looks up its ID so the UI can mark the current row. Returns
+ * null if no valid refresh token matches (the user's session is access-
+ * token-only right now, which happens when they're within the 1h access
+ * window since their last refresh).
+ */
+async function resolveCurrentSessionId(req) {
+  const refreshToken = req.get('x-refresh-token') || req.body?.refreshToken;
+  if (!refreshToken) return null;
+  const record = await db.getValidRefreshToken(refreshToken);
+  return record?.id || null;
+}
+
+router.get('/sessions', requireAuth, async (req, res) => {
+  try {
+    const [sessions, currentId] = await Promise.all([
+      db.getActiveSessionsForUser(req.user.id),
+      resolveCurrentSessionId(req),
+    ]);
+    const rows = sessions.map((s) => ({
+      id: s.id,
+      userAgent: s.user_agent,
+      ipAddress: s.ip_address,
+      createdAt: s.created_at,
+      lastUsedAt: s.last_used_at,
+      expiresAt: s.expires_at,
+      isCurrent: s.id === currentId,
+    }));
+    return res.json({ sessions: rows });
+  } catch (err) {
+    console.error('GET /api/auth/sessions error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/sessions/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Confirm the session belongs to the caller before revoking. Prevents
+    // id-guessing / horizontal privilege escalation — someone with a valid
+    // auth token for user A shouldn't be able to revoke user B's sessions.
+    const mine = await db.getActiveSessionsForUser(req.user.id);
+    if (!mine.some((s) => s.id === id)) {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+    await db.revokeRefreshToken(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/auth/sessions/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/sessions', requireAuth, async (req, res) => {
+  try {
+    // The client opts in to preserving the current session via the
+    // ?except=current query flag. Without it, every active session
+    // (including the caller's) is revoked — which is what you want from
+    // a "sign out everywhere" button.
+    const keepCurrent = req.query.except === 'current';
+    const currentId = keepCurrent ? await resolveCurrentSessionId(req) : null;
+    await db.revokeOtherUserRefreshTokens(req.user.id, currentId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/auth/sessions error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -705,7 +805,7 @@ router.post('/google', async (req, res) => {
       });
     }
 
-    const response = await authResponse(user);
+    const response = await authResponse(user, req);
     return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/google error:', err);
@@ -768,7 +868,7 @@ router.post('/apple', async (req, res) => {
       });
     }
 
-    const response = await authResponse(user);
+    const response = await authResponse(user, req);
     return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/apple error:', err);
@@ -918,7 +1018,7 @@ router.post('/join', async (req, res) => {
     }
 
     // Use authResponse for consistency (includes refresh token)
-    const response = await authResponse({ ...user, household_id: household.id });
+    const response = await authResponse({ ...user, household_id: household.id }, req);
     return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/join error:', err);
