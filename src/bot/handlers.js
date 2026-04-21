@@ -822,7 +822,10 @@ async function handleTextMessage(text, user, household) {
       if (!recipe?.ingredients?.length) {
         return { response: "That recipe doesn't have any ingredients listed. Try asking me for a new recipe!", actions };
       }
-      // Add ingredients to shopping list
+      // Add ingredients to shopping list. Needs list_id (NOT NULL) + the
+      // DB column is aisle_category (not category) — same enrichment
+      // pattern as the main shopping-add branch above.
+      const defaultList = await db.getDefaultShoppingList(household.id);
       const ingredientItems = recipe.ingredients
         .filter(ing => ing.name && !ing.optional)
         .map(ing => ({
@@ -831,7 +834,8 @@ async function handleTextMessage(text, user, household) {
             : ing.quantity
               ? `${ing.quantity} ${ing.name}`
               : ing.name,
-          category: 'groceries',
+          list_id: defaultList.id,
+          aisle_category: 'Other',
           quantity: null,
         }));
       if (ingredientItems.length) {
@@ -858,7 +862,20 @@ async function handleTextMessage(text, user, household) {
     const toAdd = result.shopping_items.filter((i) => i.action === 'add');
     const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
     if (toAdd.length) {
-      const saved = await db.addShoppingItems(household.id, toAdd, user.id);
+      // Every shopping_items row needs a list_id — the column has a NOT
+      // NULL constraint added with multi-list support. The in-app classify
+      // route enriches items with the default list before save; the
+      // WhatsApp bot path previously didn't, so classifier-produced items
+      // landed without list_id and Postgres rejected the insert. Match the
+      // /api/classify behaviour: look up (or lazy-create) the default list
+      // and attach list_id + aisle_category to each row.
+      const defaultList = await db.getDefaultShoppingList(household.id);
+      const enriched = toAdd.map((i) => ({
+        ...i,
+        list_id: defaultList.id,
+        aisle_category: i.category || 'Other',
+      }));
+      const saved = await db.addShoppingItems(household.id, enriched, user.id);
       actions.shoppingAdded = toAdd.map((i) => i.item);
       const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
       if (savedIds.length) {

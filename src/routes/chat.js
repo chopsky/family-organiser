@@ -334,7 +334,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'create_event', title: act.title });
 
         } else if (act.action === 'add_shopping' && act.items?.length) {
-          await db.addShoppingItems(req.householdId, act.items, req.user.id);
+          // shopping_items.list_id is NOT NULL since multi-list support
+          // landed — attach the default list + aisle_category before
+          // insert, matching the classify.js / shopping.js pattern.
+          const defaultList = await db.getDefaultShoppingList(req.householdId);
+          const enriched = act.items.map((i) => ({
+            ...i,
+            list_id: defaultList.id,
+            aisle_category: i.aisle_category || i.category || 'Other',
+          }));
+          await db.addShoppingItems(req.householdId, enriched, req.user.id);
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
