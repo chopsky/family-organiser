@@ -248,6 +248,7 @@ function useScrollReveal() {
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [billing, setBilling] = useState('annual') // 'monthly' | 'annual'
 
   const whatsappRef = useScrollReveal()
   const featuresRef = useScrollReveal()
@@ -924,7 +925,7 @@ export default function LandingPage() {
       {/* ═══ Pricing ═══ */}
       <section id="pricing" className="bg-cream py-20 md:py-32">
         <div className="max-w-5xl mx-auto px-5 md:px-8">
-          <div className="text-center mb-14">
+          <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-plum-light text-plum text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full mb-5">
               <span className="w-1.5 h-1.5 rounded-full bg-plum animate-pulse-soft" />
               Simple pricing
@@ -933,25 +934,66 @@ export default function LandingPage() {
               Try Housemait free for <span className="text-coral">30 days</span>
             </h2>
             <p className="text-warm-grey text-lg max-w-2xl mx-auto">
-              No credit card required upfront. Pick a plan when the trial ends — or don't, we won't charge you automatically.
+              One plan, everything included. No credit card required upfront — we won't charge you automatically when your trial ends.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
-            {/* Monthly plan */}
-            <div className="bg-white rounded-2xl p-8 border border-light-grey shadow-[0_2px_8px_rgba(107,63,160,0.06)] flex flex-col">
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-charcoal mb-1 font-sans">Monthly</h3>
-                <p className="text-sm text-warm-grey">Flexible, month-to-month</p>
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center mb-10">
+            <div className="inline-flex items-center bg-white border border-light-grey rounded-full p-1 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+              <button
+                onClick={() => setBilling('monthly')}
+                className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
+                  billing === 'monthly' ? 'bg-plum text-white' : 'text-warm-grey hover:text-charcoal'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBilling('annual')}
+                className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 inline-flex items-center gap-2 ${
+                  billing === 'annual' ? 'bg-plum text-white' : 'text-warm-grey hover:text-charcoal'
+                }`}
+              >
+                Annual
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  billing === 'annual' ? 'bg-white/20 text-white' : 'bg-coral-light text-coral'
+                }`}>
+                  Save 17%
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Single plan card */}
+          <div className="max-w-md mx-auto">
+            <div className="relative bg-white rounded-2xl p-8 md:p-10 border-2 border-plum shadow-[0_8px_24px_rgba(107,63,160,0.12)]">
+              <div className="mb-6 text-center">
+                <h3 className="text-xl font-bold text-charcoal mb-1 font-sans">Housemait</h3>
+                <p className="text-sm text-warm-grey">Everything your household needs</p>
               </div>
-              <div className="mb-6">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-5xl font-bold text-charcoal">£4.99</span>
-                  <span className="text-warm-grey">/month</span>
+
+              {/* Price */}
+              <div className="mb-8 text-center">
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-6xl font-bold text-charcoal">
+                    £{billing === 'monthly' ? '4.99' : '4.08'}
+                  </span>
+                  <span className="text-warm-grey text-lg">/month</span>
                 </div>
-                <p className="text-xs text-warm-grey mt-2">Billed monthly after your free trial</p>
+                <p className="text-sm text-warm-grey mt-3">
+                  {billing === 'monthly' ? (
+                    <>Billed monthly after your 30-day trial</>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-charcoal">£49/year</span> — billed annually, 2 months free
+                    </>
+                  )}
+                </p>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
+
+              {/* Features */}
+              <ul className="space-y-3 mb-8">
                 {[
                   'Unlimited household members',
                   'Shared lists, tasks & calendar',
@@ -959,6 +1001,8 @@ export default function LandingPage() {
                   'School term dates & INSET days',
                   'Meal planner & recipe library',
                   'Documents & photos vault',
+                  'Receipt scanner',
+                  'Weekly family digest',
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full bg-sage-light flex items-center justify-center mt-0.5 shrink-0">
@@ -968,53 +1012,12 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <a
-                href={SIGNUP_URL}
-                className="w-full text-center bg-white border-[1.5px] border-plum text-plum hover:bg-plum-light font-semibold py-3 rounded-full transition-colors duration-200"
-              >
-                Start free trial
-              </a>
-            </div>
 
-            {/* Annual plan (featured) */}
-            <div className="relative bg-white rounded-2xl p-8 border-2 border-plum shadow-[0_8px_24px_rgba(107,63,160,0.12)] flex flex-col">
-              {/* Best value badge */}
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-coral text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-[0_4px_12px_rgba(232,114,74,0.3)]">
-                Best value · 2 months free
-              </div>
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-charcoal mb-1 font-sans">Annual</h3>
-                <p className="text-sm text-warm-grey">Best for committed households</p>
-              </div>
-              <div className="mb-6">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-5xl font-bold text-charcoal">£49</span>
-                  <span className="text-warm-grey">/year</span>
-                </div>
-                <p className="text-xs text-warm-grey mt-2">
-                  Just <span className="font-semibold text-charcoal">£4.08/month</span> — save £11 vs monthly
-                </p>
-              </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  'Everything in Monthly, plus…',
-                  '2 months free (save £11/year)',
-                  'Priority support',
-                  'Early access to new features',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-plum-light flex items-center justify-center mt-0.5 shrink-0">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="3" className="w-3 h-3"><polyline points="20 6 9 17 4 12" /></svg>
-                    </div>
-                    <span className="text-sm text-charcoal">{item}</span>
-                  </li>
-                ))}
-              </ul>
               <a
                 href={SIGNUP_URL}
-                className="w-full text-center bg-plum hover:bg-plum-dark text-white font-semibold py-3 rounded-full transition-colors duration-200 shadow-[0_4px_16px_rgba(107,63,160,0.25)]"
+                className="block w-full text-center bg-plum hover:bg-plum-dark text-white font-semibold py-3.5 rounded-full transition-colors duration-200 shadow-[0_4px_16px_rgba(107,63,160,0.25)]"
               >
-                Start free trial
+                Start your free 30-day trial
               </a>
             </div>
           </div>
