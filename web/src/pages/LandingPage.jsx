@@ -1044,6 +1044,23 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ═══ FAQ ═══ */}
+      <section id="faq" className="bg-white py-20 md:py-32">
+        <div ref={faqRef} className="max-w-3xl mx-auto px-5 md:px-8">
+          <h2 className="text-3xl md:text-5xl font-bold text-charcoal mb-4 text-center">
+            Frequently asked questions
+          </h2>
+          <p className="text-warm-grey text-lg text-center mb-12">
+            Everything you need to know about Housemait.
+          </p>
+          <div>
+            {FAQS.map((faq, i) => (
+              <FaqItem key={i} {...faq} />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ═══ CTA Banner ═══ */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #6B3FA0 0%, #8B6DB5 50%, #E8724A 100%)' }} />
@@ -1072,23 +1089,6 @@ export default function LandingPage() {
           <p className="mt-5 text-sm text-white/70">
             No card required · Cancel anytime
           </p>
-        </div>
-      </section>
-
-      {/* ═══ FAQ ═══ */}
-      <section id="faq" className="bg-white py-20 md:py-32">
-        <div ref={faqRef} className="max-w-3xl mx-auto px-5 md:px-8">
-          <h2 className="text-3xl md:text-5xl font-bold text-charcoal mb-4 text-center">
-            Frequently asked questions
-          </h2>
-          <p className="text-warm-grey text-lg text-center mb-12">
-            Everything you need to know about Housemait.
-          </p>
-          <div>
-            {FAQS.map((faq, i) => (
-              <FaqItem key={i} {...faq} />
-            ))}
-          </div>
         </div>
       </section>
 
