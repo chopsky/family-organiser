@@ -7,7 +7,7 @@ const LOGIN_URL = '/login'
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'WhatsApp', href: '#whatsapp' },
-  { label: 'How it works', href: '#how-it-works' },
+  { label: 'Pricing', href: '#pricing' },
   { label: 'FAQ', href: '#faq' },
 ]
 
@@ -65,11 +65,11 @@ const FEATURES = [
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><circle cx="10" cy="13" r="2" /><path d="M20 17l-3.5-3.5-4.5 4.5" />
       </svg>
     ),
-    title: 'Receipt Scanner',
-    description: 'Snap a photo of your receipt and Housemait automatically checks off what you bought from the shopping list.',
+    title: 'Documents & Photos',
+    description: 'Share school letters, appointment slips, receipts and family photos in one secure household vault. Everyone has access when they need it.',
     color: 'coral',
   },
 ]
@@ -99,16 +99,20 @@ const STEPS = [
 
 const FAQS = [
   {
-    q: 'Is Housemait free?',
-    a: 'Yes. Housemait is completely free for families to use. We believe every household deserves great organisation tools.',
+    q: 'How does the free trial work?',
+    a: "You get full access to every Housemait feature for 30 days — no credit card required to start. We'll only ask for payment details at the end of the trial if you want to continue. If you do nothing, your account simply pauses.",
+  },
+  {
+    q: 'How much does Housemait cost after the trial?',
+    a: 'Housemait is £4.99/month or £49/year (which works out to about £4.08/month — roughly 2 months free). Both plans include everything — there are no feature gates. You can switch between plans or cancel anytime.',
   },
   {
     q: 'How does the WhatsApp bot work?',
     a: 'Each family member messages the Housemait bot directly on WhatsApp. Just send a message to add items, assign tasks, plan meals or check the shopping list. The bot understands natural language and even voice notes.',
   },
   {
-    q: 'How does the receipt scanner work?',
-    a: "Take a photo of your grocery receipt and Housemait uses AI to read the items. It automatically ticks off matching items from your shopping list so you know exactly what's been bought.",
+    q: 'Can I share documents and photos with my household?',
+    a: "Yes. Housemait has a secure Documents section where you can upload school letters, appointment slips, receipts, family photos and more. Everyone in the household has access — no more digging through email attachments.",
   },
   {
     q: 'Can I use Housemait without WhatsApp?',
@@ -116,7 +120,7 @@ const FAQS = [
   },
   {
     q: 'How many people can be in a household?',
-    a: "There's no limit. Invite as many family members as you need — parents, grandparents, older kids, au pairs, anyone who helps run the household.",
+    a: "There's no limit. Invite as many family members as you need — parents, grandparents, older kids, au pairs, anyone who helps run the household. One subscription covers everyone.",
   },
   {
     q: 'Is my family data safe?',
@@ -265,12 +269,18 @@ export default function LandingPage() {
               <a key={l.href} href={l.href} className="text-sm font-medium text-warm-grey hover:text-plum transition-colors duration-200">{l.label}</a>
             ))}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <a
+              href={LOGIN_URL}
+              className="hidden sm:inline-flex text-sm font-semibold text-charcoal hover:text-plum px-3 py-2 transition-colors duration-200"
+            >
+              Log in
+            </a>
             <a
               href={SIGNUP_URL}
-              className="hidden sm:inline-flex bg-plum hover:bg-plum-dark text-white text-sm font-semibold px-6 py-2.5 rounded-full transition-colors duration-200"
+              className="hidden sm:inline-flex bg-plum hover:bg-plum-dark text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors duration-200"
             >
-              Get started
+              Start free trial
             </a>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -293,8 +303,9 @@ export default function LandingPage() {
             {NAV_LINKS.map(l => (
               <a key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-charcoal hover:text-plum transition-colors">{l.label}</a>
             ))}
+            <a href={LOGIN_URL} onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-charcoal hover:text-plum transition-colors">Log in</a>
             <a href={SIGNUP_URL} className="bg-plum text-white text-sm font-semibold px-6 py-3 rounded-full text-center transition-colors hover:bg-plum-dark mt-2">
-              Get started — it's free
+              Start free trial
             </a>
           </div>
         </div>
@@ -341,7 +352,7 @@ export default function LandingPage() {
                 href={SIGNUP_URL}
                 className="bg-plum hover:bg-plum-dark text-white font-semibold px-8 py-3.5 rounded-full text-base transition-all duration-200 shadow-[0_4px_16px_rgba(107,63,160,0.25)] hover:shadow-[0_8px_24px_rgba(107,63,160,0.3)]"
               >
-                Get started — it's free
+                Start your free 30-day trial
               </a>
               <a
                 href="#features"
@@ -351,6 +362,18 @@ export default function LandingPage() {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 mt-0.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5" /></svg>
               </a>
             </div>
+            {/* Trial reassurance */}
+            <p className="mt-5 text-sm text-warm-grey flex items-center justify-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="3" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12" /></svg>
+                No credit card required
+              </span>
+              <span className="text-light-grey">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="3" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12" /></svg>
+                Cancel anytime
+              </span>
+            </p>
           </div>
 
           {/* Hero floating cards */}
@@ -898,6 +921,126 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ═══ Pricing ═══ */}
+      <section id="pricing" className="bg-cream py-20 md:py-32">
+        <div className="max-w-5xl mx-auto px-5 md:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 bg-plum-light text-plum text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full mb-5">
+              <span className="w-1.5 h-1.5 rounded-full bg-plum animate-pulse-soft" />
+              Simple pricing
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold text-charcoal mb-4">
+              Try Housemait free for <span className="text-coral">30 days</span>
+            </h2>
+            <p className="text-warm-grey text-lg max-w-2xl mx-auto">
+              No credit card required upfront. Pick a plan when the trial ends — or don't, we won't charge you automatically.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+            {/* Monthly plan */}
+            <div className="bg-white rounded-2xl p-8 border border-light-grey shadow-[0_2px_8px_rgba(107,63,160,0.06)] flex flex-col">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-charcoal mb-1 font-sans">Monthly</h3>
+                <p className="text-sm text-warm-grey">Flexible, month-to-month</p>
+              </div>
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-5xl font-bold text-charcoal">£4.99</span>
+                  <span className="text-warm-grey">/month</span>
+                </div>
+                <p className="text-xs text-warm-grey mt-2">Billed monthly after your free trial</p>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  'Unlimited household members',
+                  'Shared lists, tasks & calendar',
+                  'AI-powered WhatsApp assistant',
+                  'School term dates & INSET days',
+                  'Meal planner & recipe library',
+                  'Documents & photos vault',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="w-5 h-5 rounded-full bg-sage-light flex items-center justify-center mt-0.5 shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="3" className="w-3 h-3"><polyline points="20 6 9 17 4 12" /></svg>
+                    </div>
+                    <span className="text-sm text-charcoal">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={SIGNUP_URL}
+                className="w-full text-center bg-white border-[1.5px] border-plum text-plum hover:bg-plum-light font-semibold py-3 rounded-full transition-colors duration-200"
+              >
+                Start free trial
+              </a>
+            </div>
+
+            {/* Annual plan (featured) */}
+            <div className="relative bg-white rounded-2xl p-8 border-2 border-plum shadow-[0_8px_24px_rgba(107,63,160,0.12)] flex flex-col">
+              {/* Best value badge */}
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-coral text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-[0_4px_12px_rgba(232,114,74,0.3)]">
+                Best value · 2 months free
+              </div>
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-charcoal mb-1 font-sans">Annual</h3>
+                <p className="text-sm text-warm-grey">Best for committed households</p>
+              </div>
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-5xl font-bold text-charcoal">£49</span>
+                  <span className="text-warm-grey">/year</span>
+                </div>
+                <p className="text-xs text-warm-grey mt-2">
+                  Just <span className="font-semibold text-charcoal">£4.08/month</span> — save £11 vs monthly
+                </p>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  'Everything in Monthly, plus…',
+                  '2 months free (save £11/year)',
+                  'Priority support',
+                  'Early access to new features',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="w-5 h-5 rounded-full bg-plum-light flex items-center justify-center mt-0.5 shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="3" className="w-3 h-3"><polyline points="20 6 9 17 4 12" /></svg>
+                    </div>
+                    <span className="text-sm text-charcoal">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={SIGNUP_URL}
+                className="w-full text-center bg-plum hover:bg-plum-dark text-white font-semibold py-3 rounded-full transition-colors duration-200 shadow-[0_4px_16px_rgba(107,63,160,0.25)]"
+              >
+                Start free trial
+              </a>
+            </div>
+          </div>
+
+          {/* Reassurance row */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-warm-grey">
+            <span className="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="2.5" className="w-4 h-4"><polyline points="20 6 9 17 4 12" /></svg>
+              30-day free trial
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="2.5" className="w-4 h-4"><polyline points="20 6 9 17 4 12" /></svg>
+              No credit card to start
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="2.5" className="w-4 h-4"><polyline points="20 6 9 17 4 12" /></svg>
+              Cancel anytime
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#7DAE82" strokeWidth="2.5" className="w-4 h-4"><polyline points="20 6 9 17 4 12" /></svg>
+              GDPR compliant
+            </span>
+          </div>
+        </div>
+      </section>
+
       {/* ═══ CTA Banner ═══ */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #6B3FA0 0%, #8B6DB5 50%, #E8724A 100%)' }} />
@@ -915,14 +1058,17 @@ export default function LandingPage() {
             Your family deserves less mental load
           </h2>
           <p className="text-white/75 text-lg mb-10 max-w-xl mx-auto leading-relaxed">
-            Join families across the UK who've simplified their daily routines with Housemait. It's free to get started.
+            Join families across the UK who've simplified their daily routines with Housemait. Try it free for 30 days — no credit card required.
           </p>
           <a
             href={SIGNUP_URL}
             className="inline-flex bg-white hover:bg-gray-50 text-plum font-semibold px-8 py-3.5 rounded-full text-base transition-colors duration-200 shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
           >
-            Get started for free
+            Start your free 30-day trial
           </a>
+          <p className="mt-5 text-sm text-white/70">
+            No card required · Cancel anytime
+          </p>
         </div>
       </section>
 
@@ -960,9 +1106,10 @@ export default function LandingPage() {
             <div>
               <h4 className="text-sm font-semibold text-charcoal mb-4 font-sans">Product</h4>
               <div className="space-y-3">
-                {['Features', 'WhatsApp Bot', 'Meal Planning', 'How it Works'].map(l => (
-                  <a key={l} href={`#${l.toLowerCase().replace(/\s+/g, '-')}`} className="block text-sm text-warm-grey hover:text-plum transition-colors">{l}</a>
-                ))}
+                <a href="#features" className="block text-sm text-warm-grey hover:text-plum transition-colors">Features</a>
+                <a href="#whatsapp" className="block text-sm text-warm-grey hover:text-plum transition-colors">WhatsApp Bot</a>
+                <a href="#pricing" className="block text-sm text-warm-grey hover:text-plum transition-colors">Pricing</a>
+                <a href="#faq" className="block text-sm text-warm-grey hover:text-plum transition-colors">FAQ</a>
               </div>
             </div>
             {/* Company */}
@@ -970,8 +1117,8 @@ export default function LandingPage() {
               <h4 className="text-sm font-semibold text-charcoal mb-4 font-sans">Company</h4>
               <div className="space-y-3">
                 <Link to="/privacy" className="block text-sm text-warm-grey hover:text-plum transition-colors">Privacy Policy</Link>
-                <a href="#" className="block text-sm text-warm-grey hover:text-plum transition-colors">Terms of Service</a>
-                <a href="#" className="block text-sm text-warm-grey hover:text-plum transition-colors">Contact</a>
+                <Link to="/terms" className="block text-sm text-warm-grey hover:text-plum transition-colors">Terms of Service</Link>
+                <a href="mailto:hello@housemait.com" className="block text-sm text-warm-grey hover:text-plum transition-colors">Contact</a>
               </div>
             </div>
             {/* Connect */}
