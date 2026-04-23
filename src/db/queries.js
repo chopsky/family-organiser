@@ -1074,15 +1074,18 @@ async function completeTask(taskId, db = supabase) {
 
 async function completeTasksByName(householdId, taskTitles, assigneeName = null, db = supabase) {
   const lowerTitles = taskTitles.map((t) => t.toLowerCase());
-  let query = db
+
+  // Fetch ALL incomplete household tasks and match client-side. The AI's
+  // paraphrasing + potential assignee mis-guessing makes DB-side filters
+  // too strict — "CREO website done" said by Grant should match "Do CREO
+  // website updates" whether that task is assigned to Grant, Everyone
+  // (null), or someone else. Assignee is a soft disambiguator, not a
+  // hard filter — see bottom of the function.
+  const { data: tasks, error: fetchErr } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
     .eq('completed', false);
-
-  if (assigneeName) query = query.ilike('assigned_to_name', assigneeName);
-
-  const { data: tasks, error: fetchErr } = await query;
   if (fetchErr) throw fetchErr;
 
   // Match tasks using fuzzy word overlap — the AI often paraphrases task titles
@@ -1104,9 +1107,23 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
     return overlap.length >= Math.min(taskWords.length, aiWords.length) * 0.5;
   }
 
-  const matched = tasks.filter((t) =>
+  let matched = tasks.filter((t) =>
     lowerTitles.some((n) => fuzzyMatch(t.title, n))
   );
+
+  // Soft assignee preference: when the AI provides an assignee AND the
+  // fuzzy title matched multiple candidates, prefer the ones assigned
+  // to that person. If none of the candidates match the assignee, we
+  // keep the full matched set rather than returning empty — assignee
+  // was a hint, not a gate. This stops "tasks assigned to Everyone"
+  // from being invisible just because the AI guessed a person's name.
+  if (assigneeName && matched.length > 1) {
+    const preferred = matched.filter((t) =>
+      t.assigned_to_name && t.assigned_to_name.toLowerCase() === assigneeName.toLowerCase()
+    );
+    if (preferred.length > 0) matched = preferred;
+  }
+
   if (!matched.length) return [];
 
   const completed = await Promise.all(matched.map((t) => completeTask(t.id, db)));

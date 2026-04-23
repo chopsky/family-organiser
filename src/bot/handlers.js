@@ -617,7 +617,15 @@ async function handleTextMessage(text, user, household) {
     return { response: listResponse, actions };
   }
   if (result.intent === 'query_tasks') {
-    const taskResponse = await handleTasks(user, household);
+    // "Show me my tasks" / "what are my tasks" → scope to the asker
+    // plus anything assigned to Everyone (null assigned_to). A plain
+    // "show tasks" stays household-wide. The classifier doesn't emit a
+    // separate intent for this, so we check the raw text — word-bounded
+    // so "family's tasks" / "mason's tasks" don't false-match.
+    const asksForMine = /\bmy\s+(tasks?|to[- ]?dos?|list)\b/i.test(text);
+    const taskResponse = asksForMine
+      ? await handleMyTasks(user, household)
+      : await handleTasks(user, household);
     return { response: taskResponse, actions };
   }
 
@@ -902,13 +910,23 @@ async function handleTextMessage(text, user, household) {
         rememberAdd(user.id, 'task', savedIds, titles);
       }
     }
+    const unmatchedCompletions = [];
     for (const t of toComplete) {
       const done = await db.completeTasksByName(household.id, [t.title], t.assigned_to_name);
-      actions.tasksCompleted.push(t.title);
+      if (done.length === 0) {
+        // Nothing actually got ticked. Track the requested title so we
+        // can correct the AI's (overconfident) response message below.
+        unmatchedCompletions.push(t.title);
+        continue;
+      }
+      // Push the ACTUAL matched titles so actions mirror reality —
+      // important for the broadcast notification other members see.
+      actions.tasksCompleted.push(...done.map((d) => d.title));
       for (const completedTask of done) {
         if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
       }
     }
+    actions.tasksUnmatched = unmatchedCompletions;
   }
 
   // Fall-through calendar event: covers "Booked car service for Wednesday
@@ -925,8 +943,27 @@ async function handleTextMessage(text, user, household) {
     }
   }
 
+  // Override the AI's confident "Great, I've ticked off X" when nothing
+  // actually matched. The AI generates its response BEFORE the DB write,
+  // so a no-op completion otherwise gets a false-positive confirmation
+  // (observed live: user said "CREO website done", got "ticked off!"
+  // reply, task still showed as open in the next query).
+  let response = result.response_message || 'Done! ✅';
+  const unmatched = actions.tasksUnmatched || [];
+  if (unmatched.length > 0 && actions.tasksCompleted.length === 0) {
+    // Every attempted completion missed — be honest.
+    const list = unmatched.map((t) => `"${t}"`).join(', ');
+    response = unmatched.length === 1
+      ? `I couldn't find a task matching ${list} in your open tasks. Try checking the exact name with "show my tasks".`
+      : `I couldn't find tasks matching ${list}. Try checking names with "show my tasks".`;
+  } else if (unmatched.length > 0) {
+    // Partial success — at least one matched, at least one didn't.
+    const list = unmatched.map((t) => `"${t}"`).join(', ');
+    response += `\n\n(I couldn't find ${list} in your open tasks.)`;
+  }
+
   return {
-    response: result.response_message || 'Done! ✅',
+    response,
     actions,
   };
 }
