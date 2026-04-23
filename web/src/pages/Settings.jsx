@@ -956,7 +956,7 @@ export default function Settings() {
               <button
                 type="submit"
                 disabled={sendingWhatsappCode}
-                className="inline-flex items-center gap-2 bg-[#42a741] hover:bg-[#368736] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-2 bg-[#51ad50] hover:bg-[#418c40] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors whitespace-nowrap"
               >
                 {sendingWhatsappCode ? 'Sending…' : 'Send code'}
               </button>
