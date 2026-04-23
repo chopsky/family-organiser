@@ -314,6 +314,24 @@ function buildListUnsubscribeHeaders(householdId) {
   ];
 }
 
+/**
+ * Translate our internal usage-count keys into the names the Postmark
+ * templates reference. Backend-side the internal names are clearer
+ * (shopping_item_count) but the template copy reads more naturally
+ * with semantic names (items_added, tasks_completed, etc.). Keeping
+ * the mapping in this one place avoids leaking template vocabulary
+ * into db/queries.js.
+ */
+function usageToTemplateModel(usage) {
+  return {
+    items_added:          usage?.shopping_item_count  ?? 0,
+    meals_planned:        usage?.meal_plan_count      ?? 0,
+    tasks_completed:      usage?.task_count           ?? 0,
+    events_added:         usage?.calendar_event_count ?? 0,
+    family_members_count: usage?.member_count         ?? 0,
+  };
+}
+
 // ── Day 1 — Welcome ────────────────────────────────────────────────
 // Transactional. Always sends on household creation (ignores the
 // trial_emails_enabled flag — the spec carves out welcome + expiry as
@@ -354,11 +372,7 @@ async function sendTrialDay20Email({ to, firstName, trialEndsAt, householdId, us
       app_url: BASE_URL,
       subscribe_url: `${BASE_URL}/subscribe`,
       unsubscribe_url: unsubscribeUrl(householdId),
-      shopping_item_count: usage?.shopping_item_count ?? 0,
-      meal_plan_count:     usage?.meal_plan_count     ?? 0,
-      task_count:          usage?.task_count          ?? 0,
-      calendar_event_count: usage?.calendar_event_count ?? 0,
-      member_count:        usage?.member_count        ?? 0,
+      ...usageToTemplateModel(usage),
     },
   });
 }
@@ -377,11 +391,7 @@ async function sendTrialDay25Email({ to, firstName, trialEndsAt, householdId, us
       app_url: BASE_URL,
       subscribe_url: `${BASE_URL}/subscribe`,
       unsubscribe_url: unsubscribeUrl(householdId),
-      shopping_item_count: usage?.shopping_item_count ?? 0,
-      meal_plan_count:     usage?.meal_plan_count     ?? 0,
-      task_count:          usage?.task_count          ?? 0,
-      calendar_event_count: usage?.calendar_event_count ?? 0,
-      member_count:        usage?.member_count        ?? 0,
+      ...usageToTemplateModel(usage),
     },
   });
 }
@@ -400,11 +410,7 @@ async function sendTrialDay28Email({ to, firstName, trialEndsAt, householdId, us
       app_url: BASE_URL,
       subscribe_url: `${BASE_URL}/subscribe`,
       unsubscribe_url: unsubscribeUrl(householdId),
-      shopping_item_count: usage?.shopping_item_count ?? 0,
-      meal_plan_count:     usage?.meal_plan_count     ?? 0,
-      task_count:          usage?.task_count          ?? 0,
-      calendar_event_count: usage?.calendar_event_count ?? 0,
-      member_count:        usage?.member_count        ?? 0,
+      ...usageToTemplateModel(usage),
     },
   });
 }
