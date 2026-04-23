@@ -35,34 +35,17 @@ const avatarColors = {
  *   • loading   → subtle loading state (no spinner — this card is ambient)
  */
 function PlanSection() {
-  const { household, isAdmin } = useAuth();
   const { isActive, isTrialing, isExpired, isInternal, plan, daysRemaining, trialEndsAt, loading } = useSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
 
-  // Local mirror of the email-preference flag so the toggle responds
-  // instantly without waiting for a refetch. Keep it in sync with the
-  // AuthContext household on first render only; subsequent edits go
-  // through the PATCH endpoint and update this state on success.
-  const [emailsEnabled, setEmailsEnabled] = useState(household?.trial_emails_enabled !== false);
-  const [emailsSaving, setEmailsSaving] = useState(false);
-  const [emailsError, setEmailsError] = useState('');
-
-  async function toggleTrialEmails(next) {
-    setEmailsSaving(true);
-    setEmailsError('');
-    const previous = emailsEnabled;
-    setEmailsEnabled(next); // optimistic
-    try {
-      await api.patch('/settings/settings', { trial_emails_enabled: next });
-    } catch (err) {
-      console.error('[Settings] toggle trial_emails_enabled failed:', err);
-      setEmailsEnabled(previous); // rollback
-      setEmailsError(err.response?.data?.error || "Couldn't save that. Try again?");
-    } finally {
-      setEmailsSaving(false);
-    }
-  }
+  // NB: there's no "trial reminder emails" toggle here. PECR covers us
+  // as long as the email-footer unsubscribe link works, and the footer
+  // link already flips trial_emails_enabled=false via /api/unsubscribe.
+  // Surfacing a duplicate toggle in Settings didn't add value and gave
+  // users two ways to disable (one of which only they'd discover).
+  // If you ever want to re-add it, the PATCH /api/settings/settings
+  // endpoint still accepts trial_emails_enabled — just wire a UI back.
 
   async function openCustomerPortal() {
     if (portalLoading) return;
@@ -122,44 +105,6 @@ function PlanSection() {
           >
             Subscribe
           </Link>
-        </div>
-      )}
-
-      {/* Trial reminder email preference — only surfaced while trialing
-          (irrelevant for active / expired / internal). Admin-only edit
-          to match the rest of this endpoint; non-admins see the state
-          but can't toggle it. */}
-      {!isInternal && isTrialing && (
-        <div className="mt-4 pt-4 border-t border-cream-border">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-cocoa">Trial reminder emails</p>
-              <p className="text-xs text-warm-grey mt-0.5">
-                Gentle nudges at 10, 5 and 2 days left. The welcome and trial-ended emails always send.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={emailsEnabled}
-              disabled={!isAdmin || emailsSaving}
-              onClick={() => toggleTrialEmails(!emailsEnabled)}
-              title={!isAdmin ? 'Only household admins can change this' : ''}
-              className={
-                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed ' +
-                (emailsEnabled ? 'bg-plum' : 'bg-light-grey')
-              }
-            >
-              <span className="sr-only">Toggle trial reminder emails</span>
-              <span
-                className={
-                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ' +
-                  (emailsEnabled ? 'translate-x-6' : 'translate-x-1')
-                }
-              />
-            </button>
-          </div>
-          {emailsError && <p className="text-xs text-coral mt-2">{emailsError}</p>}
         </div>
       )}
 
