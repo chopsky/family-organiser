@@ -112,7 +112,7 @@ function PlanSection() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <p className="text-sm text-cocoa">
-              <strong className="text-sage font-semibold">Active</strong>
+              <strong className="text-emerald font-semibold">Active</strong>
               {plan && (
                 <span className="text-charcoal">
                   {' '}· {plan === 'annual' ? 'Annual plan (£49/year)' : 'Monthly plan (£4.99/month)'}
@@ -956,7 +956,7 @@ export default function Settings() {
               <button
                 type="submit"
                 disabled={sendingWhatsappCode}
-                className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#1DA851] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-2 bg-[#42a741] hover:bg-[#368736] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors whitespace-nowrap"
               >
                 {sendingWhatsappCode ? 'Sending…' : 'Send code'}
               </button>
