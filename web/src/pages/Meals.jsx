@@ -3,6 +3,8 @@ import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
+import { useCanWrite } from '../context/SubscriptionContext';
+import SubscribePrompt from '../components/SubscribePrompt';
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ function getWeekDates(monday) {
 export default function Meals() {
   const [activeTab, setActiveTab] = useState('plan'); // 'plan' | 'recipes'
   const [error, setError] = useState('');
+  const canWrite = useCanWrite();
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -81,6 +84,7 @@ export default function Meals() {
       </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
+      {!canWrite && <SubscribePrompt message="Subscribe to plan meals, save recipes, and generate shopping lists" />}
 
       {/* Tab toggle */}
       <div className="flex gap-1 bg-oat rounded-xl p-1 border border-cream-border">

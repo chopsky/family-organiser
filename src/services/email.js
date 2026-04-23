@@ -220,4 +220,223 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
   await sendEmail(to, `Weekly Digest — ${householdName}`, html);
 }
 
-module.exports = { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail, sendWeeklyDigestEmail };
+// ─── Subscription lifecycle emails (Phase 7) ────────────────────────────────
+// These use Postmark's Template feature (not the inline emailTemplate above)
+// so copy can be edited in the Postmark dashboard without a code deploy.
+// Template aliases are hardcoded below — they must match the aliases you
+// create in the Postmark dashboard for the templates to resolve.
+
+const { unsubscribeUrl } = require('./unsubscribe-token');
+
+const TEMPLATE_ALIASES = {
+  welcome:        'housemait-welcome',
+  trialDay20:     'housemait-trial-day-20',
+  trialDay25:     'housemait-trial-day-25',
+  trialDay28:     'housemait-trial-day-28',
+  trialExpired:   'housemait-trial-expired',
+};
+
+// Message streams — Postmark splits transactional (user-initiated,
+// always-delivered) from broadcast (marketing-ish, must honour opt-out
+// and carry List-Unsubscribe headers). The `broadcast` stream ID must
+// match what you created in the Postmark dashboard.
+const STREAM = {
+  transactional: 'outbound',   // Postmark's default transactional stream
+  broadcast:     'broadcast',  // created manually in the Postmark dashboard
+};
+
+/**
+ * Format a Date / ISO string as "21 May 2026" in Europe/London. Matches
+ * the format the welcome email copy expects and the in-app trial
+ * indicators already use.
+ */
+function formatTrialEndDate(when) {
+  if (!when) return '';
+  const d = when instanceof Date ? when : new Date(when);
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London',
+  }).format(d);
+}
+
+/**
+ * Send a Postmark Template. Thin wrapper around sendEmailWithTemplate
+ * so the individual senders stay declarative.
+ *
+ * @param {Object} args
+ * @param {string} args.to              recipient email
+ * @param {string} args.templateAlias   Postmark template alias
+ * @param {Object} args.model           template variables (Mustachio {{key}})
+ * @param {'transactional'|'broadcast'} args.stream
+ * @param {string[]} [args.listUnsubscribeHeaders]  headers for broadcast emails
+ */
+async function sendTemplate({ to, templateAlias, model, stream, listUnsubscribeHeaders }) {
+  if (!client) {
+    console.warn(`[email] Postmark not configured — skipping "${templateAlias}" to ${to}`);
+    return;
+  }
+  const payload = {
+    From: FROM,
+    To: to,
+    TemplateAlias: templateAlias,
+    TemplateModel: model,
+    MessageStream: STREAM[stream] || STREAM.transactional,
+  };
+  if (listUnsubscribeHeaders?.length) {
+    payload.Headers = listUnsubscribeHeaders;
+  }
+  try {
+    await client.sendEmailWithTemplate(payload);
+  } catch (err) {
+    // Postmark errors carry a numeric `code` on the exception.
+    // 1101 = template not found (alias mismatch) — log extra-loudly so a
+    // dashboard typo surfaces before the cron silently drops every send.
+    if (err.code === 1101) {
+      console.error(
+        `[email] Postmark template "${templateAlias}" not found. ` +
+        `Create it in the dashboard with that alias and try again.`
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Build the two List-Unsubscribe headers required for Gmail / Apple
+ * Mail one-click unsubscribe. RFC 8058 says both headers together mean
+ * "this mail supports List-Unsubscribe-Post=List-Unsubscribe=One-Click",
+ * which surfaces the unsubscribe button in Gmail's UI.
+ */
+function buildListUnsubscribeHeaders(householdId) {
+  const url = unsubscribeUrl(householdId);
+  return [
+    { Name: 'List-Unsubscribe', Value: `<${url}>` },
+    { Name: 'List-Unsubscribe-Post', Value: 'List-Unsubscribe=One-Click' },
+  ];
+}
+
+// ── Day 1 — Welcome ────────────────────────────────────────────────
+// Transactional. Always sends on household creation (ignores the
+// trial_emails_enabled flag — the spec carves out welcome + expiry as
+// transactional).
+async function sendWelcomeEmail({ to, firstName, trialEndsAt, householdId }) {
+  return sendTemplate({
+    to,
+    templateAlias: TEMPLATE_ALIASES.welcome,
+    stream: 'transactional',
+    model: {
+      first_name: firstName || 'there',
+      trial_end_date: formatTrialEndDate(trialEndsAt),
+      app_url: BASE_URL,
+      // unsubscribe_url is unused in the welcome template but passed for
+      // consistency so test households can include it if you ever want
+      // the welcome email to carry the footer too.
+      unsubscribe_url: householdId ? unsubscribeUrl(householdId) : '',
+    },
+  });
+}
+
+// ── Day 20 — Gentle reminder ───────────────────────────────────────
+// Broadcast. Skipped if trial_emails_enabled=false. Carries usage stats
+// so the message is "here's what you've built up" not "you're about to
+// lose access".
+async function sendTrialDay20Email({ to, firstName, trialEndsAt, householdId, usage }) {
+  return sendTemplate({
+    to,
+    templateAlias: TEMPLATE_ALIASES.trialDay20,
+    stream: 'broadcast',
+    listUnsubscribeHeaders: buildListUnsubscribeHeaders(householdId),
+    model: {
+      first_name: firstName || 'there',
+      trial_end_date: formatTrialEndDate(trialEndsAt),
+      days_remaining: 10,
+      app_url: BASE_URL,
+      subscribe_url: `${BASE_URL}/subscribe`,
+      unsubscribe_url: unsubscribeUrl(householdId),
+      shopping_item_count: usage?.shopping_item_count ?? 0,
+      meal_plan_count:     usage?.meal_plan_count     ?? 0,
+      task_count:          usage?.task_count          ?? 0,
+      calendar_event_count: usage?.calendar_event_count ?? 0,
+      member_count:        usage?.member_count        ?? 0,
+    },
+  });
+}
+
+// ── Day 25 — Stronger nudge ────────────────────────────────────────
+async function sendTrialDay25Email({ to, firstName, trialEndsAt, householdId, usage }) {
+  return sendTemplate({
+    to,
+    templateAlias: TEMPLATE_ALIASES.trialDay25,
+    stream: 'broadcast',
+    listUnsubscribeHeaders: buildListUnsubscribeHeaders(householdId),
+    model: {
+      first_name: firstName || 'there',
+      trial_end_date: formatTrialEndDate(trialEndsAt),
+      days_remaining: 5,
+      app_url: BASE_URL,
+      subscribe_url: `${BASE_URL}/subscribe`,
+      unsubscribe_url: unsubscribeUrl(householdId),
+      shopping_item_count: usage?.shopping_item_count ?? 0,
+      meal_plan_count:     usage?.meal_plan_count     ?? 0,
+      task_count:          usage?.task_count          ?? 0,
+      calendar_event_count: usage?.calendar_event_count ?? 0,
+      member_count:        usage?.member_count        ?? 0,
+    },
+  });
+}
+
+// ── Day 28 — Final push ────────────────────────────────────────────
+async function sendTrialDay28Email({ to, firstName, trialEndsAt, householdId, usage }) {
+  return sendTemplate({
+    to,
+    templateAlias: TEMPLATE_ALIASES.trialDay28,
+    stream: 'broadcast',
+    listUnsubscribeHeaders: buildListUnsubscribeHeaders(householdId),
+    model: {
+      first_name: firstName || 'there',
+      trial_end_date: formatTrialEndDate(trialEndsAt),
+      days_remaining: 2,
+      app_url: BASE_URL,
+      subscribe_url: `${BASE_URL}/subscribe`,
+      unsubscribe_url: unsubscribeUrl(householdId),
+      shopping_item_count: usage?.shopping_item_count ?? 0,
+      meal_plan_count:     usage?.meal_plan_count     ?? 0,
+      task_count:          usage?.task_count          ?? 0,
+      calendar_event_count: usage?.calendar_event_count ?? 0,
+      member_count:        usage?.member_count        ?? 0,
+    },
+  });
+}
+
+// ── Day 30 — Trial expired ─────────────────────────────────────────
+// Transactional. Always sends — the spec carves this out as "account-
+// related, not promotional". Users who opted out of nudges still need
+// to know their trial ended.
+async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId }) {
+  return sendTemplate({
+    to,
+    templateAlias: TEMPLATE_ALIASES.trialExpired,
+    stream: 'transactional',
+    model: {
+      first_name: firstName || 'there',
+      trial_end_date: formatTrialEndDate(trialEndsAt),
+      app_url: BASE_URL,
+      subscribe_url: `${BASE_URL}/subscribe`,
+      // Unsubscribe link deliberately omitted — this email is transactional.
+    },
+  });
+}
+
+module.exports = {
+  sendVerificationEmail,
+  sendInviteEmail,
+  sendPasswordResetEmail,
+  sendWeeklyDigestEmail,
+  // Phase 7 — subscription lifecycle
+  sendWelcomeEmail,
+  sendTrialDay20Email,
+  sendTrialDay25Email,
+  sendTrialDay28Email,
+  sendTrialExpiredEmail,
+  // Exposed for tests
+  _internal: { formatTrialEndDate, TEMPLATE_ALIASES, STREAM },
+};

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconSettings, IconUser, IconCalendar } from '../components/Icons';
+import { TrialIndicatorSubtle } from '../components/TrialIndicator';
+import { useSubscription } from '../context/SubscriptionContext';
 
 const avatarColors = {
   red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
@@ -18,6 +20,200 @@ const avatarColors = {
   moss: 'bg-moss text-white', slate: 'bg-slate text-white',
   sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', lavender: 'bg-indigo text-white',
 };
+
+/**
+ * Settings → Plan card. Renders subscription state + the right CTA for
+ * the current status. Extracted into its own component so the Settings
+ * page layout stays readable; it only reads from SubscriptionContext
+ * and doesn't need any props.
+ *
+ *   • internal  → "Internal account — unlimited access"
+ *   • trialing  → "Free trial · X days left" + Subscribe CTA
+ *   • active    → Plan name + "Manage subscription" (opens Stripe Portal)
+ *   • expired   → "Your subscription has ended" + Subscribe CTA
+ *   • cancelled → same as expired
+ *   • loading   → subtle loading state (no spinner — this card is ambient)
+ */
+function PlanSection() {
+  const { household, isAdmin } = useAuth();
+  const { isActive, isTrialing, isExpired, isInternal, plan, daysRemaining, trialEndsAt, loading } = useSubscription();
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState('');
+
+  // Local mirror of the email-preference flag so the toggle responds
+  // instantly without waiting for a refetch. Keep it in sync with the
+  // AuthContext household on first render only; subsequent edits go
+  // through the PATCH endpoint and update this state on success.
+  const [emailsEnabled, setEmailsEnabled] = useState(household?.trial_emails_enabled !== false);
+  const [emailsSaving, setEmailsSaving] = useState(false);
+  const [emailsError, setEmailsError] = useState('');
+
+  async function toggleTrialEmails(next) {
+    setEmailsSaving(true);
+    setEmailsError('');
+    const previous = emailsEnabled;
+    setEmailsEnabled(next); // optimistic
+    try {
+      await api.patch('/settings/settings', { trial_emails_enabled: next });
+    } catch (err) {
+      console.error('[Settings] toggle trial_emails_enabled failed:', err);
+      setEmailsEnabled(previous); // rollback
+      setEmailsError(err.response?.data?.error || "Couldn't save that. Try again?");
+    } finally {
+      setEmailsSaving(false);
+    }
+  }
+
+  async function openCustomerPortal() {
+    if (portalLoading) return;
+    setPortalLoading(true);
+    setPortalError('');
+    try {
+      const { data } = await api.post('/subscription/portal');
+      if (!data?.url) throw new Error('Portal URL missing');
+      window.location.href = data.url;
+    } catch (err) {
+      console.error('[Settings] portal open failed:', err);
+      setPortalError(err.response?.data?.error || 'Could not open the portal. Try again?');
+      setPortalLoading(false);
+    }
+  }
+
+  // Don't render anything while we don't know the state yet — the subtle
+  // indicator in My profile covers the "I know nothing" case silently.
+  if (loading && !isActive && !isTrialing && !isExpired && !isInternal) return null;
+
+  return (
+    <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+      <h2 className="font-semibold text-bark mb-3">Plan</h2>
+
+      {isInternal && (
+        <p className="text-sm text-cocoa">
+          <span className="inline-block bg-plum-light text-plum font-semibold text-xs px-2 py-0.5 rounded mr-2">
+            Internal
+          </span>
+          Unlimited access. No billing applies to this household.
+        </p>
+      )}
+
+      {!isInternal && isTrialing && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm text-cocoa">
+              <strong className="text-plum font-semibold">Free trial</strong>
+              {daysRemaining != null && (
+                <span> · {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left</span>
+              )}
+              {trialEndsAt && (
+                <span className="text-warm-grey">
+                  {' '}(ends {new Intl.DateTimeFormat('en-GB', {
+                    day: 'numeric', month: 'long', timeZone: 'Europe/London',
+                  }).format(new Date(trialEndsAt))})
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-warm-grey mt-1">
+              Subscribe any time to avoid interruption.
+            </p>
+          </div>
+          <Link
+            to="/subscribe"
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+          >
+            Subscribe
+          </Link>
+        </div>
+      )}
+
+      {/* Trial reminder email preference — only surfaced while trialing
+          (irrelevant for active / expired / internal). Admin-only edit
+          to match the rest of this endpoint; non-admins see the state
+          but can't toggle it. */}
+      {!isInternal && isTrialing && (
+        <div className="mt-4 pt-4 border-t border-cream-border">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-cocoa">Trial reminder emails</p>
+              <p className="text-xs text-warm-grey mt-0.5">
+                Gentle nudges at 10, 5 and 2 days left. The welcome and trial-ended emails always send.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailsEnabled}
+              disabled={!isAdmin || emailsSaving}
+              onClick={() => toggleTrialEmails(!emailsEnabled)}
+              title={!isAdmin ? 'Only household admins can change this' : ''}
+              className={
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed ' +
+                (emailsEnabled ? 'bg-plum' : 'bg-light-grey')
+              }
+            >
+              <span className="sr-only">Toggle trial reminder emails</span>
+              <span
+                className={
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ' +
+                  (emailsEnabled ? 'translate-x-6' : 'translate-x-1')
+                }
+              />
+            </button>
+          </div>
+          {emailsError && <p className="text-xs text-coral mt-2">{emailsError}</p>}
+        </div>
+      )}
+
+      {!isInternal && isActive && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm text-cocoa">
+              <strong className="text-sage font-semibold">Active</strong>
+              {plan && (
+                <span className="text-charcoal">
+                  {' '}· {plan === 'annual' ? 'Annual plan (£49/year)' : 'Monthly plan (£4.99/month)'}
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-warm-grey mt-1">
+              Update card, switch plans, or cancel anytime from the Stripe portal.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openCustomerPortal}
+            disabled={portalLoading}
+            className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {portalLoading ? 'Opening…' : 'Manage subscription'}
+          </button>
+        </div>
+      )}
+
+      {!isInternal && isExpired && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm text-cocoa">
+              <strong className="text-coral font-semibold">Subscription ended</strong>
+            </p>
+            <p className="text-xs text-warm-grey mt-1">
+              Your data's still here. Subscribe to unlock everything again.
+            </p>
+          </div>
+          <Link
+            to="/subscribe"
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+          >
+            Subscribe
+          </Link>
+        </div>
+      )}
+
+      {portalError && (
+        <p className="text-sm text-coral mt-3">{portalError}</p>
+      )}
+    </div>
+  );
+}
 
 export default function Settings() {
   const { household, user, isAdmin, login, logout, token } = useAuth();
@@ -32,6 +228,7 @@ export default function Settings() {
   const [deleteOpen, setDeleteOpen]         = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleteTypedConfirm, setDeleteTypedConfirm] = useState(''); // must equal "DELETE"
   const [deleting, setDeleting]             = useState(false);
   const [deleteError, setDeleteError]       = useState('');
 
@@ -433,13 +630,19 @@ export default function Settings() {
       setDeleteError('Enter your password to confirm.');
       return;
     }
+    if (deleteTypedConfirm !== 'DELETE') {
+      setDeleteError('Type DELETE (in capitals) to confirm.');
+      return;
+    }
     if (!deleteConfirmed) {
       setDeleteError('Please confirm you understand this cannot be undone.');
       return;
     }
     setDeleting(true);
     try {
-      await api.delete('/auth/account', { data: { password: deletePassword } });
+      // Backend requires BOTH the password and the literal string
+      // "DELETE" — matches the two-factor feel of a destructive action.
+      await api.delete('/auth/account', { data: { password: deletePassword, confirmation: 'DELETE' } });
       // Clear the auth context without calling the server's /auth/logout
       // endpoint — the refresh token we'd post there was just deleted with
       // the rest of our data, so attempting it would 404.
@@ -695,7 +898,13 @@ export default function Settings() {
         const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
         return (
           <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
-            <h2 className="font-semibold text-bark mb-3">My profile</h2>
+            <div className="flex items-start justify-between mb-3">
+              <h2 className="font-semibold text-bark">My profile</h2>
+              {/* Subtle trial indicator — renders nothing unless the household
+                  is trialing. Safe to leave always-mounted; the component
+                  guards its own visibility. */}
+              <TrialIndicatorSubtle />
+            </div>
             <div className="flex items-center gap-4">
               {(me?.avatar_url || user?.avatar_url) ? (
                 <img src={me?.avatar_url || user?.avatar_url} alt={user?.name} className="w-12 h-12 rounded-full object-cover" />
@@ -721,6 +930,9 @@ export default function Settings() {
           </div>
         );
       })()}
+
+      {/* Plan / subscription */}
+      <PlanSection />
 
       {/* Connect WhatsApp */}
       <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
@@ -1253,6 +1465,7 @@ export default function Settings() {
             setDeleteOpen(true);
             setDeletePassword('');
             setDeleteConfirmed(false);
+            setDeleteTypedConfirm('');
             setDeleteError('');
           }}
           className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-error hover:bg-error/90 text-white font-semibold text-sm transition-colors"
@@ -1320,6 +1533,25 @@ export default function Settings() {
                 />
               </div>
 
+              {/* Typed-DELETE confirmation — matches the spec's two-step
+                  destructive-action pattern (Phase 8 / GDPR). Input is
+                  case-sensitive; the backend also enforces this. */}
+              <div>
+                <label className="block text-xs font-semibold text-bark mb-1.5">
+                  Type <span className="font-mono bg-cream px-1.5 py-0.5 rounded">DELETE</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteTypedConfirm}
+                  onChange={(e) => setDeleteTypedConfirm(e.target.value)}
+                  autoComplete="off"
+                  spellCheck="false"
+                  disabled={deleting}
+                  placeholder="DELETE"
+                  className="w-full border border-cream-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-error/30 focus:border-error transition-all text-bark font-mono tracking-widest"
+                />
+              </div>
+
               <label className="flex items-start gap-3 text-sm text-bark cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -1344,7 +1576,12 @@ export default function Settings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={deleting || !deletePassword || !deleteConfirmed}
+                  disabled={
+                    deleting ||
+                    !deletePassword ||
+                    deleteTypedConfirm !== 'DELETE' ||
+                    !deleteConfirmed
+                  }
                   className="flex-1 py-3 rounded-xl bg-error hover:bg-error/90 disabled:bg-error/40 text-white font-semibold text-sm transition-colors"
                 >
                   {deleting ? 'Deleting…' : 'Delete account'}

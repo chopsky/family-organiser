@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Housemait</title>
+<style>
+  :root {
+    --plum: #6B3FA0;
+    --coral: #E8724A;
+    --charcoal: #2D2A33;
+    --warm-grey: #6B6774;
+    --light-grey: #E8E5EC;
+    --cream: #FBF8F3;
+    --white: #FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "DM Sans", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--charcoal);
+    background: var(--cream);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .container { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+  header { border-bottom: 1px solid var(--light-grey); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-family: "Lora", Georgia, serif; font-size: 36px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.02em; color: var(--charcoal); }
+  h2 { font-family: "Lora", Georgia, serif; font-size: 22px; font-weight: 600; margin: 40px 0 12px; letter-spacing: -0.01em; color: var(--plum); }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; color: var(--charcoal); }
+  p, li { color: var(--charcoal); }
+  ul, ol { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--plum); }
+  .meta { color: var(--warm-grey); font-size: 14px; margin: 0; }
+  .callout { background: var(--white); border: 1px solid var(--light-grey); border-radius: 12px; padding: 16px 20px; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--light-grey); vertical-align: top; }
+  th { background: var(--white); font-weight: 600; color: var(--charcoal); }
+  code { background: var(--white); border: 1px solid var(--light-grey); border-radius: 4px; padding: 1px 6px; font-size: 14px; }
+  footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--light-grey); color: var(--warm-grey); font-size: 14px; }
+  @media (max-width: 600px) {
+    .container { padding: 32px 20px 72px; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 19px; }
+    table { font-size: 13.5px; }
+    th, td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Privacy Policy</h1>
+  <p class="meta"><strong>Last updated:</strong> 15 April 2026</p>
+  <p class="meta"><strong>Effective date:</strong> 15 April 2026</p>
+</header>
+
+<p>This Privacy Policy explains how <strong>Housemait</strong> (“we”, “us”, or “our”) collects, uses, and shares personal data when you use the Housemait mobile and web application (the “Service”). We are committed to protecting your family’s privacy and handling personal data transparently.</p>
+
+<div class="callout">
+<strong>In short:</strong> Housemait helps households coordinate shopping, tasks, meals, calendars, and documents. We only collect the data we need to run the Service. We never sell your data or share it for advertising. We use reputable third-party services to deliver the Service — they process data strictly on our behalf.
+</div>
+
+<h2>1. Who we are</h2>
+<p>Housemait is operated by <strong>[Your Legal Entity or Your Name, Sole Trader]</strong>, based in the United Kingdom. For the purposes of the UK General Data Protection Regulation (UK GDPR) and the EU GDPR, we are the <strong>data controller</strong> for personal data you provide to us.</p>
+<p>Contact for privacy enquiries: <a href="mailto:privacy@housemait.com">privacy@housemait.com</a></p>
+
+<h2>2. What data we collect</h2>
+
+<h3>2.1 Account &amp; profile data</h3>
+<ul>
+  <li>Name and email address</li>
+  <li>Password (stored only as a hashed value using bcrypt — we never see or store your password in plain text)</li>
+  <li>Apple ID or Google account identifier, if you choose to sign in with Apple or Google</li>
+  <li>Profile photo or avatar (optional)</li>
+  <li>Birthday, family role (e.g. “Mum”, “Son”), colour theme, and allergies (optional profile fields)</li>
+  <li>Approximate location (latitude/longitude) and timezone, if you choose to enable location-based features such as weather</li>
+</ul>
+
+<h3>2.2 Household data you create</h3>
+<ul>
+  <li>Household name and members (including any dependents you add)</li>
+  <li>Shopping lists, tasks, to-do items and their completion status</li>
+  <li>Calendar events (including those synced from Google Calendar, Apple Calendar/iCloud, or Microsoft 365 if you choose to connect them)</li>
+  <li>Meal plans and recipes (including recipes you import by URL)</li>
+  <li>Documents you upload (e.g. school letters, appointment slips)</li>
+  <li>Notes and household preferences</li>
+  <li>School and term dates you select for your children</li>
+</ul>
+
+<h3>2.3 Communications data</h3>
+<ul>
+  <li>WhatsApp phone number, if you link your WhatsApp account to the bot</li>
+  <li>Messages you send to the Housemait WhatsApp bot (text, voice notes, and photos of receipts)</li>
+  <li>Voice notes are transcribed for processing; receipt photos are analysed to extract shopping items</li>
+  <li>Transactional emails you receive from us (e.g. verification, password reset, weekly digest)</li>
+</ul>
+
+<h3>2.4 Technical data</h3>
+<ul>
+  <li>Authentication tokens (JWT access token, refresh token) stored on your device</li>
+  <li>Push notification tokens (if you enable notifications on iOS)</li>
+  <li>Approximate IP address and user-agent strings, logged transiently for security and abuse prevention</li>
+  <li>Server and application logs (errors, request traces) for operating and debugging the Service</li>
+</ul>
+
+<h3>2.5 Data we do <em>not</em> collect</h3>
+<ul>
+  <li>We do <strong>not</strong> use advertising identifiers or tracking SDKs.</li>
+  <li>We do <strong>not</strong> collect precise location in the background. Location is requested only when you ask for weather or set a location-based reminder.</li>
+  <li>We do <strong>not</strong> sell personal data. We do <strong>not</strong> share data with advertisers or data brokers.</li>
+</ul>
+
+<h2>3. How we use your data (and why)</h2>
+
+<table>
+  <thead>
+    <tr><th>Purpose</th><th>Legal basis (UK/EU GDPR)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Provide the core Service — account management, lists, tasks, calendar, meals, reminders</td><td>Performance of contract (Art. 6(1)(b))</td></tr>
+    <tr><td>Send transactional emails (verification, password reset, digest, reminders)</td><td>Performance of contract (Art. 6(1)(b))</td></tr>
+    <tr><td>Send push notifications you have opted into</td><td>Consent (Art. 6(1)(a)) — revocable in Settings</td></tr>
+    <tr><td>Process WhatsApp messages, voice notes, and receipt photos you send to the bot</td><td>Performance of contract (Art. 6(1)(b))</td></tr>
+    <tr><td>Process data through AI providers to classify messages, extract tasks/shopping items, parse receipts, and answer questions</td><td>Performance of contract (Art. 6(1)(b))</td></tr>
+    <tr><td>Keep the Service secure — rate limiting, abuse prevention, fraud detection</td><td>Legitimate interests (Art. 6(1)(f)) — running a secure service</td></tr>
+    <tr><td>Diagnose errors and improve the Service</td><td>Legitimate interests (Art. 6(1)(f))</td></tr>
+    <tr><td>Comply with legal obligations (e.g. respond to lawful requests, tax and accounting records)</td><td>Legal obligation (Art. 6(1)(c))</td></tr>
+  </tbody>
+</table>
+
+<h2>4. How AI is used</h2>
+<p>Housemait uses large-language-model AI providers to deliver several features — for example, classifying your WhatsApp messages into tasks or shopping items, answering chat questions, extracting items from receipt photos, and importing recipes from URLs. When these features are used, the relevant message text, photo, or document you submit is sent to our AI providers (see section 5).</p>
+<p>We do <strong>not</strong> use your household’s personal data to train any third-party AI model. Our AI providers contractually commit not to train on data submitted via their API (see their enterprise/API terms).</p>
+<p>AI is not infallible. AI-generated responses may occasionally be inaccurate. You should verify important information before acting on it.</p>
+
+<h2>5. Third-party processors</h2>
+<p>We use the following service providers to operate the Service. They process personal data on our behalf under written agreements (Data Processing Agreements) and are bound to keep your data confidential:</p>
+
+<table>
+  <thead>
+    <tr><th>Provider</th><th>Role</th><th>Where</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Supabase</td><td>Primary database, file storage, and authentication infrastructure</td><td>EU / US</td></tr>
+    <tr><td>Vercel</td><td>Hosting for the web application</td><td>US / EU</td></tr>
+    <tr><td>Railway</td><td>Hosting for the backend API server</td><td>US</td></tr>
+    <tr><td>Amazon Web Services (S3)</td><td>Object storage for uploaded documents and media</td><td>EU / US</td></tr>
+    <tr><td>Google (Gemini)</td><td>Primary AI model for message classification and chat</td><td>US</td></tr>
+    <tr><td>Anthropic (Claude)</td><td>Fallback AI model</td><td>US</td></tr>
+    <tr><td>OpenAI (GPT-4o)</td><td>Secondary fallback AI model</td><td>US</td></tr>
+    <tr><td>Twilio</td><td>WhatsApp message delivery and receiving</td><td>US / EU</td></tr>
+    <tr><td>Postmark</td><td>Transactional email delivery</td><td>US / EU</td></tr>
+    <tr><td>Apple Push Notification service</td><td>Delivering iOS push notifications</td><td>Global</td></tr>
+    <tr><td>Apple Sign in with Apple</td><td>Optional authentication provider</td><td>Global</td></tr>
+    <tr><td>Google Sign-In &amp; Google Calendar</td><td>Optional authentication and calendar sync</td><td>Global</td></tr>
+    <tr><td>Microsoft Graph (Microsoft 365)</td><td>Optional calendar sync</td><td>Global</td></tr>
+    <tr><td>Open-Meteo / equivalent weather API</td><td>Weather data (requires only coarse lat/lon)</td><td>EU</td></tr>
+  </tbody>
+</table>
+
+<h2>6. International data transfers</h2>
+<p>Several of our processors (notably AI providers, Twilio, Vercel and Railway) are based in the United States. Where personal data is transferred outside the UK or European Economic Area, we rely on appropriate safeguards such as:</p>
+<ul>
+  <li>Standard Contractual Clauses approved by the UK Information Commissioner’s Office and European Commission;</li>
+  <li>UK Addendum to the EU Standard Contractual Clauses;</li>
+  <li>EU-US Data Privacy Framework and UK Extension where the provider is self-certified.</li>
+</ul>
+
+<h2>7. Children’s data</h2>
+<p>Housemait is designed for families. Adults (aged 16 or over in the UK, or the age of digital consent in your jurisdiction) set up and manage the household account. An account holder (parent or legal guardian) may add minor children as <strong>dependents</strong> so they appear on the shared calendar, list assignments, and school term imports.</p>
+<p>Dependents do not have their own login and cannot directly interact with the Service. Information about a dependent (name, birthday, allergies, etc.) is provided by the account holder and is the account holder’s responsibility. If you are a parent or guardian and you wish to review, change, or remove any information about a child dependent in a Housemait household, please contact us at <a href="mailto:privacy@housemait.com">privacy@housemait.com</a>.</p>
+<p>We do not knowingly create independent login accounts for children under 16. If we learn that a child under 16 has created an independent account without parental consent, we will delete it.</p>
+
+<h2>8. Data retention</h2>
+<ul>
+  <li><strong>Account data:</strong> retained while your account is active, plus up to 30 days after deletion for backup rollover.</li>
+  <li><strong>Household data</strong> (lists, tasks, calendar, meal plans, documents): deleted with the household, or within 30 days after all members have left.</li>
+  <li><strong>WhatsApp message logs:</strong> retained for up to 90 days for abuse prevention and debugging, then purged.</li>
+  <li><strong>Application logs:</strong> retained for up to 30 days.</li>
+  <li><strong>Authentication tokens:</strong> refresh tokens expire 7 days after last use; access tokens expire 1 hour after issue.</li>
+  <li><strong>Financial / tax records (if any):</strong> retained as required by law (typically 6 years in the UK).</li>
+</ul>
+
+<h2>9. Your rights</h2>
+<p>Under the UK GDPR and EU GDPR you have the following rights:</p>
+<ul>
+  <li><strong>Access</strong> — obtain a copy of the personal data we hold about you.</li>
+  <li><strong>Rectification</strong> — ask us to correct inaccurate data.</li>
+  <li><strong>Erasure</strong> (“right to be forgotten”) — ask us to delete your data. Most data can be deleted in-app by deleting your account; contact us for anything else.</li>
+  <li><strong>Restriction</strong> of processing in certain circumstances.</li>
+  <li><strong>Objection</strong> to processing based on legitimate interests.</li>
+  <li><strong>Data portability</strong> — receive your data in a structured, machine-readable format.</li>
+  <li><strong>Withdraw consent</strong> at any time where consent is the legal basis (e.g. disabling push notifications in Settings).</li>
+  <li><strong>Lodge a complaint</strong> with a supervisory authority — in the UK, the <a href="https://ico.org.uk" target="_blank" rel="noopener">Information Commissioner’s Office (ICO)</a>.</li>
+</ul>
+<p>To exercise any of these rights, email <a href="mailto:privacy@housemait.com">privacy@housemait.com</a>. We will respond within 30 days.</p>
+
+<h2>10. Security</h2>
+<ul>
+  <li>All traffic between your device and our servers is encrypted using HTTPS/TLS.</li>
+  <li>Passwords are hashed using bcrypt before storage.</li>
+  <li>Sessions use short-lived access tokens (1 hour) and single-use rotating refresh tokens (7 days).</li>
+  <li>Database access is secured with row-level security policies scoped to your household.</li>
+  <li>We follow the principle of least privilege for internal access and regularly review our third-party processors.</li>
+</ul>
+<p>No system is perfectly secure. If you believe your account has been compromised, please contact us immediately at <a href="mailto:privacy@housemait.com">privacy@housemait.com</a>.</p>
+
+<h2>11. Cookies &amp; similar technologies</h2>
+<p>The Housemait web app uses <code>localStorage</code> on your device to store your authentication token and user preferences. We do not use advertising or analytics cookies. The marketing website may use minimal first-party technical cookies necessary for the site to function.</p>
+
+<h2>12. Changes to this policy</h2>
+<p>We may update this Privacy Policy from time to time. If we make material changes, we will notify you by email or in-app before the change takes effect. The “Last updated” date at the top of this page will always reflect the most recent version.</p>
+
+<h2>13. Contact</h2>
+<p>Questions, requests, or complaints can be sent to:</p>
+<p>
+  <strong>Housemait — Privacy</strong><br>
+  Email: <a href="mailto:privacy@housemait.com">privacy@housemait.com</a><br>
+  Address: [Your postal address, required for UK GDPR]
+</p>
+
+<footer>
+  © 2026 Housemait. This policy is provided in plain English as a summary of how we handle your data.
+</footer>
+
+</div>
+</body>
+</html>

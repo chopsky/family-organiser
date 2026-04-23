@@ -5,6 +5,7 @@ import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
+import TrialEndedOverlay from './TrialEndedOverlay';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
@@ -253,6 +254,12 @@ export default function Layout({ children }) {
       </nav>
 
       <Suspense fallback={null}><ChatWidget /></Suspense>
+
+      {/* Trial-ended overlay — only renders for expired households who
+          haven't dismissed it this session. Scoped to Layout so it
+          never appears on the Subscribe / Login / Signup routes (which
+          don't use Layout). */}
+      <TrialEndedOverlay />
     </div>
   );
 }

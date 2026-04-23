@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconPlus } from '../components/Icons';
+import { useCanWrite } from '../context/SubscriptionContext';
+import SubscribePrompt from '../components/SubscribePrompt';
 
 /* ─── Constants ─── */
 
@@ -434,6 +436,7 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
 export default function Tasks() {
   const { user } = useAuth();
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const canWrite = useCanWrite();
 
   // Data state
   const [tasks, setTasks] = useState([]);
@@ -731,19 +734,23 @@ export default function Tasks() {
           >
             {showAll ? 'Due today' : 'All tasks'}
           </button>
-          <button
-            onClick={() => openAddForm()}
-            className="flex items-center gap-1 text-white text-sm font-semibold px-4 transition-colors"
-            style={{
-              background: 'var(--plum, #6B3FA0)',
-              height: 40,
-              borderRadius: 12,
-            }}
-          >
-            <IconPlus className="h-4 w-4" /> Add task
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => openAddForm()}
+              className="flex items-center gap-1 text-white text-sm font-semibold px-4 transition-colors"
+              style={{
+                background: 'var(--plum, #6B3FA0)',
+                height: 40,
+                borderRadius: 12,
+              }}
+            >
+              <IconPlus className="h-4 w-4" /> Add task
+            </button>
+          )}
         </div>
       </div>
+
+      {!canWrite && <SubscribePrompt message="Subscribe to add or edit tasks" className="mb-4" />}
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 

@@ -3,8 +3,11 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconCamera, IconReceipt, IconSearch, IconCheck, IconClipboard } from '../components/Icons';
+import { useCanWrite } from '../context/SubscriptionContext';
+import SubscribePrompt from '../components/SubscribePrompt';
 
 export default function Receipt() {
+  const canWrite = useCanWrite();
   const [file, setFile]         = useState(null);
   const [preview, setPreview]   = useState('');
   const [uploading, setUploading] = useState(false);
@@ -80,7 +83,9 @@ export default function Receipt() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {!result ? (
+      {!canWrite ? (
+        <SubscribePrompt size="lg" message="Subscribe to scan receipts and auto-check shopping items" />
+      ) : !result ? (
         <>
           {/* Drop zone */}
           <div

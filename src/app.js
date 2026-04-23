@@ -29,6 +29,15 @@ app.options(/.*/, cors(corsOptions)); // explicitly handle preflight for all rou
 // Security headers (after CORS so helmet doesn't block preflight)
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
+// ── Stripe webhook — MUST be mounted before express.json() ──────────
+// Stripe signs the exact request body, so we can't let the global JSON
+// parser touch it first (re-serialising changes the bytes → signature
+// mismatch). The webhook router attaches its own express.raw() parser
+// scoped just to its own routes. Mounting this early also places it
+// BEFORE the /api rate limiter added below, which is correct — Stripe
+// can burst retries and must never be throttled.
+app.use('/api/webhooks', require('./routes/stripe-webhook'));
+
 // Body parsing — 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false })); // Twilio sends webhooks as URL-encoded form data
@@ -60,6 +69,24 @@ app.get('/health', (req, res) => {
 
 // Inbound webhooks (no auth — must be before authenticated routes)
 app.use('/api/inbound-email', require('./routes/inbound-email'));
+
+// Subscription endpoints — mounted BEFORE the gate so that expired users
+// can still reach /status (to drive the frontend's subscribe modal) and,
+// in later phases, /checkout and /portal. Defence-in-depth: the gate's
+// own path exclusion list also covers /subscription.
+app.use('/api/subscription', require('./routes/subscription'));
+
+// Unsubscribe endpoint — no bearer auth (the URL's signed JWT is the
+// credential). Mounted BEFORE the gate so expired users whose inbox
+// still has a trial nudge email can click the link and reach it.
+app.use('/api/unsubscribe', require('./routes/unsubscribe'));
+
+// Trial / subscription gate. Returns 402 for households whose trial has
+// expired or whose subscription has lapsed. Excludes /auth, /subscription,
+// /admin, /inbound-email, /webhooks via an internal allowlist — see
+// middleware/subscriptionStatus.js for the full decision table.
+const { requireActiveSubscription } = require('./middleware/subscriptionStatus');
+app.use('/api', requireActiveSubscription);
 
 // API routes
 app.use('/api/auth',     require('./routes/auth'));

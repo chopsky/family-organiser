@@ -128,6 +128,32 @@ api.interceptors.response.use(
       }
     }
 
+    // ── Handle 402: subscription required ──
+    // The backend returns 402 only for mutations from households with an
+    // expired trial or cancelled subscription (see
+    // src/middleware/subscriptionStatus.js). Reads pass through even when
+    // expired, so any 402 here means "user tried to write without a valid
+    // entitlement".
+    //
+    // We dispatch a custom event rather than calling window.location
+    // directly — SubscriptionContext listens for it and performs a proper
+    // SPA navigation + refresh of its state. Keeping the logic out of the
+    // interceptor avoids a circular import on SubscriptionContext (which
+    // imports this file).
+    //
+    // The /subscription/* URL check prevents loops if /checkout or
+    // /portal ever returns 402 (they shouldn't — they're gate-excluded —
+    // but belt-and-braces).
+    if (err.response?.status === 402) {
+      const isSubscriptionRoute = originalRequest.url?.includes('/subscription/');
+      if (!isSubscriptionRoute) {
+        window.dispatchEvent(new CustomEvent('subscription:required', {
+          detail: err.response.data, // { status, trial_ended_at }
+        }));
+      }
+      return Promise.reject(err);
+    }
+
     // Retry up to 3 times on rate limit with exponential backoff
     const retryCount = err.config._retryCount || 0;
     if (err.response?.status === 429 && retryCount < 3) {

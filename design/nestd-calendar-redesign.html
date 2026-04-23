@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Nestd — Calendar</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--plum:#6B3FA0;--plum-dark:#5A3488;--plum-light:#F3EDFC;--plum-mid:#8B6DB5;--coral:#E8724A;--coral-light:#FDF0EB;--sage:#7DAE82;--sage-light:#EDF5EE;--cream:#FBF8F3;--charcoal:#2D2A33;--warm-grey:#6B6774;--light-grey:#E8E5EC;--white:#FFFFFF;--shadow-sm:0 2px 8px rgba(107,63,160,0.06);--shadow-md:0 4px 16px rgba(107,63,160,0.08);--shadow-lg:0 8px 24px rgba(107,63,160,0.12);--radius-sm:8px;--radius-md:12px;--radius-lg:16px;--grant:#E8724A;--sarah:#6B3FA0;--lily:#7DAE82;--oliver:#E0A458;--everyone:#8B6DB5;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:#F0EBF5;color:var(--charcoal);-webkit-font-smoothing:antialiased;}
+.view-toggle{display:flex;justify-content:center;gap:8px;padding:24px 24px 16px;}
+.view-toggle button{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:8px 20px;border-radius:20px;border:1.5px solid var(--plum);cursor:pointer;transition:all .2s;}
+.view-toggle button.active{background:var(--plum);color:white;}
+.view-toggle button:not(.active){background:white;color:var(--plum);}
+.desktop-frame{max-width:1120px;margin:0 auto 40px;background:var(--cream);border-radius:16px;box-shadow:var(--shadow-md);overflow:hidden;display:flex;min-height:860px;}
+.sidebar{width:240px;background:var(--white);border-right:1px solid var(--light-grey);display:flex;flex-direction:column;flex-shrink:0;}
+.sidebar-logo{padding:24px 20px 8px;display:flex;align-items:center;gap:10px;}
+.logo-icon{width:36px;height:36px;background:var(--plum);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.wordmark{font-family:'Lora',serif;font-weight:700;font-size:22px;color:var(--plum);}
+.household-pill{margin:8px 16px 16px;padding:8px 12px;background:var(--plum-light);border-radius:var(--radius-sm);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--plum);}
+.mini-av{width:22px;height:22px;border-radius:50%;border:2px solid var(--white);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;margin-left:-6px;}.mini-av:first-child{margin-left:0;}
+.sidebar-nav{flex:1;padding:0 12px;display:flex;flex-direction:column;gap:2px;}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;font-size:14px;font-weight:500;color:var(--warm-grey);position:relative;}
+.nav-item:hover{background:var(--cream);color:var(--charcoal);}.nav-item.active{background:var(--plum-light);color:var(--plum);}
+.nav-item svg{width:20px;height:20px;flex-shrink:0;}
+.nav-badge{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--coral);color:white;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.sidebar-footer{padding:16px;border-top:1px solid var(--light-grey);display:flex;align-items:center;gap:10px;}
+.main-content{flex:1;padding:24px 28px;overflow-y:auto;}
+
+.cal-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.cal-title{font-family:'Lora',serif;font-size:26px;font-weight:600;display:flex;align-items:center;gap:10px;flex:1;}
+.cal-toolbar-right{display:flex;align-items:center;gap:8px;}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--light-grey);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--charcoal);transition:all .15s;position:relative;}
+.icon-btn:hover{border-color:var(--plum);color:var(--plum);background:var(--plum-light);}
+.icon-btn.active-filter{border-color:var(--plum);background:var(--plum-light);color:var(--plum);}
+.search-popup{position:absolute;top:42px;right:0;width:300px;background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--light-grey);box-shadow:var(--shadow-lg);z-index:30;padding:12px;display:none;}
+.search-popup.show{display:block;}
+.search-popup input{width:100%;height:42px;border:2px solid var(--coral);border-radius:var(--radius-md);padding:0 14px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--white);outline:none;color:var(--charcoal);}
+.search-popup input::placeholder{color:var(--warm-grey);}
+.view-select{height:36px;border:1.5px solid var(--light-grey);border-radius:10px;padding:0 30px 0 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:var(--white);color:var(--charcoal);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B6774' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:border-color .15s;}
+.view-select:hover{border-color:var(--plum);}
+.view-select:focus{border-color:var(--plum);}
+.add-ev-btn{padding:8px 16px;border-radius:var(--radius-md);border:none;background:var(--plum);color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s;}.add-ev-btn:hover{background:var(--plum-dark);}
+
+.cal-nav-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.cal-period{font-family:'Lora',serif;font-size:18px;font-weight:600;}
+.cal-nav{display:flex;align-items:center;gap:6px;}
+.nav-btn{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--light-grey);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--charcoal);transition:all .15s;}.nav-btn:hover{border-color:var(--plum);color:var(--plum);background:var(--plum-light);}
+.today-btn{padding:6px 16px;border-radius:20px;border:1.5px solid var(--plum);background:transparent;color:var(--plum);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}.today-btn:hover{background:var(--plum);color:white;}
+
+.settings-popup{position:absolute;top:42px;right:0;width:320px;background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--light-grey);box-shadow:var(--shadow-lg);z-index:30;padding:20px;display:none;}
+.settings-popup.show{display:block;}
+.sp-title{font-family:'Lora',serif;font-size:15px;font-weight:600;margin-bottom:12px;}
+.sp-section{margin-bottom:16px;}
+.sp-label{font-size:11px;font-weight:600;color:var(--warm-grey);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+.sp-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.sp-chip{display:flex;align-items:center;gap:5px;padding:5px 12px 5px 5px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;transition:all .12s;border:1.5px solid var(--light-grey);background:var(--white);color:var(--charcoal);}
+.sp-chip.on{color:white;border-color:transparent;}
+.sp-chip .sc-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;}
+.sp-chip .sc-dot{width:12px;height:12px;border-radius:4px;flex-shrink:0;}
+.type-chip.on{background:var(--plum);color:white;border-color:var(--plum);}
+.sp-divider{height:1px;background:var(--light-grey);margin:16px 0;}
+.sp-connect{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--light-grey);cursor:pointer;transition:all .12s;font-size:12px;font-weight:500;}.sp-connect:hover{border-color:var(--plum);background:var(--plum-light);}
+.sp-connect .sc-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sp-connect .sc-info{flex:1;}.sp-connect .sc-name{font-weight:600;font-size:12px;}.sp-connect .sc-status{font-size:10px;color:var(--warm-grey);}
+.connect-list{display:flex;flex-direction:column;gap:6px;}
+
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0;border:1px solid var(--light-grey);border-radius:var(--radius-lg);overflow:hidden;background:var(--white);}
+.mdh{padding:10px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--warm-grey);text-transform:uppercase;letter-spacing:.04em;background:var(--cream);border-bottom:1px solid var(--light-grey);}
+.mc{min-height:90px;padding:5px;border-right:1px solid var(--light-grey);border-bottom:1px solid var(--light-grey);background:var(--white);cursor:pointer;transition:background .1s;}.mc:nth-child(7n){border-right:none;}.mc:hover{background:var(--cream);}.mc.other{background:#F8F6F2;}.mc.other .cd{color:var(--light-grey);}.mc.today{background:var(--plum-light);}
+.cd{font-size:12px;font-weight:600;color:var(--charcoal);margin-bottom:3px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;}
+.mc.today .cd{background:var(--plum);color:white;border-radius:50%;}
+.cev{font-size:9px;font-weight:600;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white;}
+.cev-more{font-size:9px;color:var(--plum);font-weight:600;padding:1px 5px;cursor:pointer;}
+
+.week-grid{display:grid;grid-template-columns:48px repeat(7,minmax(0,1fr));border:1px solid var(--light-grey);border-radius:var(--radius-lg);overflow:hidden;background:var(--white);}
+.wc{background:var(--cream);border-bottom:1px solid var(--light-grey);border-right:1px solid var(--light-grey);}
+.wdh{padding:8px 4px;text-align:center;background:var(--cream);border-bottom:1px solid var(--light-grey);border-right:1px solid var(--light-grey);}.wdh:last-child{border-right:none;}
+.wdn{font-size:10px;font-weight:600;color:var(--warm-grey);text-transform:uppercase;}.wdd{font-size:15px;font-weight:700;margin-top:1px;}
+.wdh.today .wdd{background:var(--plum);color:white;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;}
+.wtl{padding:2px 5px;text-align:right;font-size:10px;font-weight:500;color:var(--warm-grey);border-right:1px solid var(--light-grey);border-bottom:1px solid var(--light-grey);height:52px;line-height:52px;}
+.wtc{border-right:1px solid var(--light-grey);border-bottom:1px solid var(--light-grey);height:52px;position:relative;cursor:pointer;transition:background .1s;}.wtc:nth-child(8n){border-right:none;}.wtc:hover{background:var(--cream);}
+.wev{position:absolute;left:2px;right:2px;border-radius:5px;padding:3px 6px;font-size:10px;font-weight:600;color:white;overflow:hidden;z-index:2;cursor:pointer;line-height:1.3;}.wev:hover{opacity:.85;}
+.wev .evt{font-size:8px;font-weight:500;opacity:.75;margin-top:1px;}
+
+.day-view{background:var(--white);border:1px solid var(--light-grey);border-radius:var(--radius-lg);overflow:hidden;}
+.day-header{padding:16px 20px;background:var(--cream);border-bottom:1px solid var(--light-grey);display:flex;align-items:center;justify-content:space-between;}
+.day-date{font-family:'Lora',serif;font-size:18px;font-weight:600;}
+.day-count{font-size:12px;color:var(--warm-grey);}
+.day-timeline{padding:0 20px;}
+.dt-hour{position:relative;height:56px;border-bottom:1px solid var(--light-grey);}
+.dt-label{position:absolute;left:0;top:-7px;font-size:10px;font-weight:500;color:var(--warm-grey);width:42px;}
+.dt-content{margin-left:52px;position:relative;height:100%;}
+.dt-ev{position:absolute;left:0;right:0;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;color:white;z-index:2;cursor:pointer;display:flex;align-items:center;gap:10px;}.dt-ev:hover{opacity:.9;}
+.dt-ev-info{flex:1;}.dt-ev-time{font-size:11px;font-weight:500;opacity:.8;margin-top:2px;}
+.dt-ev-av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;border:2px solid rgba(255,255,255,.3);flex-shrink:0;}
+.dt-ev-loc{font-size:10px;opacity:.75;margin-top:2px;display:flex;align-items:center;gap:4px;}
+
+.today-panel{margin-top:20px;}
+.today-title{font-family:'Lora',serif;font-size:17px;font-weight:600;margin-bottom:12px;}
+.today-list{display:flex;flex-direction:column;gap:8px;}
+.ti{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--white);border-radius:0 var(--radius-md) var(--radius-md) 0;border-left:4px solid;cursor:pointer;transition:box-shadow .15s;}.ti:hover{box-shadow:var(--shadow-sm);}
+.ti-info{flex:1;}.ti-name{font-size:14px;font-weight:600;}.ti-meta{font-size:12px;color:var(--warm-grey);}
+.ti-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;flex-shrink:0;}
+.ti-type{font-size:9px;font-weight:600;padding:2px 8px;border-radius:6px;flex-shrink:0;}
+
+.mobile-frame-wrapper{display:flex;justify-content:center;padding:0 24px 40px;}
+.mobile-frame{width:375px;min-height:812px;background:var(--cream);border-radius:40px;box-shadow:var(--shadow-md);overflow:hidden;position:relative;border:8px solid #2D2A33;display:flex;flex-direction:column;}
+.mobile-status{height:44px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;}
+.mobile-content{flex:1;padding:0 16px 100px;overflow-y:auto;}
+.m-cal-toolbar{display:flex;align-items:center;gap:8px;padding:8px 0 10px;}
+.m-cal-title{font-family:'Lora',serif;font-size:20px;font-weight:600;flex:1;}
+.m-icon-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--light-grey);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--charcoal);transition:all .15s;position:relative;}
+.m-icon-btn:hover{border-color:var(--plum);color:var(--plum);}
+.m-add-btn{width:32px;height:32px;border-radius:8px;border:none;background:var(--plum);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.m-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.m-period{font-family:'Lora',serif;font-size:15px;font-weight:600;}
+.m-nbtn{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--light-grey);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.m-view-toggle{display:flex;border-radius:8px;overflow:hidden;border:1.5px solid var(--light-grey);margin-bottom:12px;}
+.m-cvb{flex:1;padding:6px 0;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;border:none;cursor:pointer;background:var(--white);color:var(--warm-grey);text-align:center;transition:all .12s;}.m-cvb.active{background:var(--plum);color:white;}
+.m-mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin-bottom:14px;}
+.mch{text-align:center;font-size:10px;font-weight:600;color:var(--warm-grey);padding:4px 0;text-transform:uppercase;}
+.mcd{text-align:center;font-size:12px;font-weight:500;padding:6px 0;cursor:pointer;border-radius:50%;transition:background .1s;}.mcd:hover{background:var(--plum-light);}.mcd.today{background:var(--plum);color:white;font-weight:700;}.mcd.other{color:var(--light-grey);}
+.mcd.has-ev{position:relative;}.mcd.has-ev::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--coral);}
+.m-day-title{font-family:'Lora',serif;font-size:15px;font-weight:600;margin-bottom:10px;}
+.m-ev{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--white);border-radius:0 var(--radius-md) var(--radius-md) 0;margin-bottom:8px;border-left:4px solid;}
+.m-ev-info{flex:1;}.m-ev-name{font-size:13px;font-weight:600;}.m-ev-time{font-size:11px;color:var(--warm-grey);}
+.m-ev-av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;flex-shrink:0;}
+.m-ev-type{font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;flex-shrink:0;}
+
+.m-settings-popup{position:absolute;top:36px;right:0;width:280px;background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--light-grey);box-shadow:var(--shadow-lg);z-index:30;padding:16px;display:none;}
+.m-settings-popup.show{display:block;}
+
+.tab-bar{position:absolute;bottom:0;left:0;right:0;height:auto;padding:10px 0;padding-bottom:env(safe-area-inset-bottom,10px);background:rgba(255,255,255,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--light-grey);display:flex;align-items:flex-start;justify-content:space-around;}
+.tab-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;position:relative;}.tab-item svg{width:22px;height:22px;color:var(--warm-grey);}.tab-item span{font-size:10px;font-weight:600;color:var(--warm-grey);}.tab-item.active svg{color:var(--plum);}.tab-item.active span{color:var(--plum);}
+.tab-dot{position:absolute;top:-2px;right:-4px;width:7px;height:7px;border-radius:50%;background:var(--coral);border:1.5px solid white;}
+.hidden{display:none!important;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}.ti,.m-ev{animation:fadeIn .2s ease-out both;}.ti:nth-child(2),.m-ev:nth-child(2){animation-delay:.04s;}.ti:nth-child(3),.m-ev:nth-child(3){animation-delay:.08s;}.ti:nth-child(4),.m-ev:nth-child(4){animation-delay:.12s;}
+</style>
+</head>
+<body>
+<div class="view-toggle"><button id="btn-desktop" class="active" onclick="showView('desktop')">Desktop</button><button id="btn-mobile" onclick="showView('mobile')">Mobile</button></div>
+
+<div id="desktop-view" class="desktop-frame">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M12 3L3 10.5V20a1 1 0 001 1h5v-6a1 1 0 011-1h4a1 1 0 011 1v6h5a1 1 0 001-1V10.5L12 3z" fill="white"/></svg></div><span class="wordmark">Nestd</span></div>
+    <div class="household-pill"><div style="display:flex"><div class="mini-av" style="background:var(--grant)">G</div><div class="mini-av" style="background:var(--sarah)">S</div><div class="mini-av" style="background:var(--lily)">L</div><div class="mini-av" style="background:var(--oliver)">O</div></div>The Parkers</div>
+    <nav class="sidebar-nav">
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V10.5z"/></svg>Home</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>Shopping</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Tasks</div>
+      <div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar<span class="nav-badge">3</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Meals</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Receipt</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Family</div>
+    </nav>
+    <div class="sidebar-footer"><div style="width:32px;height:32px;border-radius:50%;background:var(--grant);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;">G</div><div style="flex:1"><div style="font-size:13px;font-weight:600;">Grant</div><div style="font-size:11px;color:var(--warm-grey);">Admin</div></div></div>
+  </aside>
+
+  <main class="main-content">
+    <div class="cal-toolbar">
+      <div class="cal-title"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--plum)" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</div>
+      <div class="cal-toolbar-right">
+        <div style="position:relative;">
+          <button class="icon-btn" id="search-btn" onclick="toggleSearch(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+          <div class="search-popup" id="search-popup"><input type="text" placeholder="Search events, tasks..." id="search-field"></div>
+        </div>
+        <select class="view-select" id="view-select" onchange="switchCalView(this.value)">
+          <option value="month" selected>Month</option>
+          <option value="week">Week</option>
+          <option value="day">Day</option>
+        </select>
+        <button class="add-ev-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button>
+        <div style="position:relative;">
+          <button class="icon-btn" id="settings-btn" onclick="toggleSettings(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.26.46.4.98.42 1.51"/></svg></button>
+          <div class="settings-popup" id="settings-popup">
+            <div class="sp-title">Calendar filters</div>
+            <div class="sp-section">
+              <div class="sp-label">Family members</div>
+              <div class="sp-chips">
+                <div class="sp-chip on" style="background:var(--grant);" onclick="toggleSpChip(this,'var(--grant)')"><div class="sc-av" style="background:var(--grant);">G</div>Grant</div>
+                <div class="sp-chip on" style="background:var(--sarah);" onclick="toggleSpChip(this,'var(--sarah)')"><div class="sc-av" style="background:var(--sarah);">S</div>Sarah</div>
+                <div class="sp-chip on" style="background:var(--lily);" onclick="toggleSpChip(this,'var(--lily)')"><div class="sc-av" style="background:var(--lily);">L</div>Lily</div>
+                <div class="sp-chip on" style="background:var(--oliver);" onclick="toggleSpChip(this,'var(--oliver)')"><div class="sc-av" style="background:var(--oliver);">O</div>Oliver</div>
+              </div>
+            </div>
+            <div class="sp-section">
+              <div class="sp-label">Calendar type</div>
+              <div class="sp-chips">
+                <div class="sp-chip type-chip on" onclick="toggleTypeChip(this)"><div class="sc-dot" style="background:var(--plum);"></div>Events</div>
+                <div class="sp-chip type-chip on" onclick="toggleTypeChip(this)"><div class="sc-dot" style="background:var(--coral);"></div>Tasks</div>
+                <div class="sp-chip type-chip on" onclick="toggleTypeChip(this)"><div class="sc-dot" style="background:#D4537E;"></div>Birthdays</div>
+                <div class="sp-chip type-chip on" onclick="toggleTypeChip(this)"><div class="sc-dot" style="background:var(--sage);"></div>Holidays</div>
+                <div class="sp-chip type-chip on" onclick="toggleTypeChip(this)"><div class="sc-dot" style="background:var(--oliver);"></div>School</div>
+              </div>
+            </div>
+            <div class="sp-divider"></div>
+            <div class="sp-label">Connected calendars</div>
+            <div class="connect-list">
+              <div class="sp-connect">
+                <div class="sc-icon" style="background:#E8F0FE;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="#4285F4" stroke-width="1.5"/><path d="M3 10h18" stroke="#4285F4" stroke-width="1.5"/><circle cx="8" cy="15" r="1.5" fill="#EA4335"/><circle cx="12" cy="15" r="1.5" fill="#34A853"/><circle cx="16" cy="15" r="1.5" fill="#FBBC04"/></svg></div>
+                <div class="sc-info"><div class="sc-name">Google Calendar</div><div class="sc-status" style="color:var(--sage);">Connected</div></div>
+              </div>
+              <div class="sp-connect">
+                <div class="sc-icon" style="background:#E6F1FB;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="#0078D4" stroke-width="1.5"/><path d="M3 10h18" stroke="#0078D4" stroke-width="1.5"/></svg></div>
+                <div class="sc-info"><div class="sc-name">Outlook Calendar</div><div class="sc-status">Connect</div></div>
+              </div>
+              <div class="sp-connect">
+                <div class="sc-icon" style="background:#F1EFE8;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="#555" stroke-width="1.5"/><path d="M3 10h18" stroke="#555" stroke-width="1.5"/></svg></div>
+                <div class="sc-info"><div class="sc-name">Apple Calendar</div><div class="sc-status">Connect</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cal-nav-row">
+      <div class="cal-period" id="cal-period">March 2026</div>
+      <div class="cal-nav">
+        <button class="nav-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="today-btn">Today</button>
+        <button class="nav-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+    </div>
+
+    <!-- MONTH VIEW -->
+    <div id="v-month" class="month-grid">
+      <div class="mdh">Mon</div><div class="mdh">Tue</div><div class="mdh">Wed</div><div class="mdh">Thu</div><div class="mdh">Fri</div><div class="mdh">Sat</div><div class="mdh">Sun</div>
+      <div class="mc other"><div class="cd">23</div></div><div class="mc other"><div class="cd">24</div></div><div class="mc other"><div class="cd">25</div></div><div class="mc other"><div class="cd">26</div></div><div class="mc other"><div class="cd">27</div></div><div class="mc other"><div class="cd">28</div></div><div class="mc"><div class="cd">1</div></div>
+      <div class="mc"><div class="cd">2</div></div><div class="mc"><div class="cd">3</div><div class="cev" style="background:var(--sarah)">Book club</div></div><div class="mc"><div class="cd">4</div></div><div class="mc"><div class="cd">5</div><div class="cev" style="background:var(--lily)">Ballet</div></div><div class="mc"><div class="cd">6</div></div><div class="mc"><div class="cd">7</div><div class="cev" style="background:var(--grant)">Dentist</div></div><div class="mc"><div class="cd">8</div></div>
+      <div class="mc"><div class="cd">9</div></div><div class="mc"><div class="cd">10</div><div class="cev" style="background:var(--oliver)">Football</div></div><div class="mc"><div class="cd">11</div></div><div class="mc"><div class="cd">12</div><div class="cev" style="background:var(--lily)">Ballet</div></div><div class="mc"><div class="cd">13</div></div><div class="mc"><div class="cd">14</div><div class="cev" style="background:var(--sarah)">Parents eve</div></div><div class="mc"><div class="cd">15</div></div>
+      <div class="mc"><div class="cd">16</div></div><div class="mc"><div class="cd">17</div><div class="cev" style="background:var(--grant)">Plumber</div><div class="cev" style="background:var(--oliver)">Piano</div></div><div class="mc"><div class="cd">18</div><div class="cev" style="background:var(--lily)">Swim</div></div><div class="mc"><div class="cd">19</div><div class="cev" style="background:var(--lily)">Ballet</div></div><div class="mc"><div class="cd">20</div></div><div class="mc"><div class="cd">21</div></div><div class="mc"><div class="cd">22</div></div>
+      <div class="mc today"><div class="cd">23</div><div class="cev" style="background:var(--lily)">School drop</div><div class="cev" style="background:var(--sarah)">Swimming</div><div class="cev-more">+2 more</div></div><div class="mc"><div class="cd">24</div><div class="cev" style="background:var(--oliver)">Piano</div></div><div class="mc"><div class="cd">25</div><div class="cev" style="background:var(--sarah)">GP appt</div></div><div class="mc"><div class="cd">26</div><div class="cev" style="background:var(--lily)">Ballet</div></div><div class="mc"><div class="cd">27</div><div class="cev" style="background:var(--grant)">Team dinner</div></div><div class="mc"><div class="cd">28</div><div class="cev" style="background:var(--oliver)">Football</div></div><div class="mc"><div class="cd">29</div><div class="cev" style="background:var(--sarah)">Roast</div></div>
+      <div class="mc"><div class="cd">30</div></div><div class="mc"><div class="cd">31</div><div class="cev" style="background:var(--oliver)">Football</div></div><div class="mc other"><div class="cd">1</div></div><div class="mc other"><div class="cd">2</div></div><div class="mc other"><div class="cd">3</div></div><div class="mc other"><div class="cd">4</div></div><div class="mc other"><div class="cd">5</div></div>
+    </div>
+
+    <!-- WEEK VIEW -->
+    <div id="v-week" class="week-grid hidden">
+      <div class="wc"></div><div class="wdh today"><div class="wdn">Mon</div><div class="wdd">23</div></div><div class="wdh"><div class="wdn">Tue</div><div class="wdd">24</div></div><div class="wdh"><div class="wdn">Wed</div><div class="wdd">25</div></div><div class="wdh"><div class="wdn">Thu</div><div class="wdd">26</div></div><div class="wdh"><div class="wdn">Fri</div><div class="wdd">27</div></div><div class="wdh"><div class="wdn">Sat</div><div class="wdd">28</div></div><div class="wdh"><div class="wdn">Sun</div><div class="wdd">29</div></div>
+      <div class="wtl">8 AM</div><div class="wtc"><div class="wev" style="background:var(--lily);top:6px;height:36px;">School drop<div class="evt">8:15-8:45</div></div></div><div class="wtc"><div class="wev" style="background:var(--lily);top:6px;height:36px;">School drop<div class="evt">8:15-8:45</div></div></div><div class="wtc"><div class="wev" style="background:var(--lily);top:6px;height:36px;">School drop<div class="evt">8:15-8:45</div></div></div><div class="wtc"><div class="wev" style="background:var(--lily);top:6px;height:36px;">School drop<div class="evt">8:15-8:45</div></div></div><div class="wtc"><div class="wev" style="background:var(--lily);top:6px;height:36px;">School drop<div class="evt">8:15-8:45</div></div></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">9 AM</div><div class="wtc"><div class="wev" style="background:var(--grant);top:2px;height:90px;">Bridal week<div class="evt">9:00-11:00</div></div></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--sarah);top:2px;height:44px;">GP appt<div class="evt">9:00-9:45</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--oliver);top:2px;height:90px;">Football<div class="evt">9:00-11:00</div></div></div><div class="wtc"></div>
+      <div class="wtl">10 AM</div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">11 AM</div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--grant);top:2px;height:44px;">Dentist<div class="evt">11:00-11:45</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">12 PM</div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--sarah);top:20px;height:70px;">Sunday roast<div class="evt">12:30-14:00</div></div></div>
+      <div class="wtl">1 PM</div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">2 PM</div><div class="wtc"><div class="wev" style="background:var(--grant);top:2px;height:44px;">Mrs Cohen<div class="evt">14:00-15:00</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--lily);top:2px;height:90px;">Party<div class="evt">14:00-16:00</div></div></div><div class="wtc"></div>
+      <div class="wtl">3 PM</div><div class="wtc"><div class="wev" style="background:var(--lily);top:20px;height:46px;">Swim class<div class="evt">15:30-16:15</div></div></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--lily);top:20px;height:46px;">Swim class<div class="evt">15:30-16:15</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">4 PM</div><div class="wtc"><div class="wev" style="background:var(--sarah);top:20px;height:44px;">Swimming<div class="evt">16:30-17:15</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">5 PM</div><div class="wtc"><div class="wev" style="background:var(--oliver);top:2px;height:40px;">Piano<div class="evt">17:00-17:45</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--oliver);top:2px;height:40px;">Piano<div class="evt">17:00-17:45</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">6 PM</div><div class="wtc"><div class="wev" style="background:var(--everyone);top:20px;height:40px;">Family dinner<div class="evt">18:30</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--grant);top:2px;height:100px;">Team dinner<div class="evt">18:00-21:00</div></div></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">7 PM</div><div class="wtc"></div><div class="wtc"><div class="wev" style="background:var(--sarah);top:2px;height:90px;">Book club<div class="evt">19:00-21:00</div></div></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+      <div class="wtl">8 PM</div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div><div class="wtc"></div>
+    </div>
+
+    <!-- DAY VIEW -->
+    <div id="v-day" class="day-view hidden">
+      <div class="day-header"><div class="day-date">Monday 23 March 2026</div><div class="day-count">7 events</div></div>
+      <div class="day-timeline">
+        <div class="dt-hour"><div class="dt-label">8 AM</div><div class="dt-content"><div class="dt-ev" style="background:var(--lily);top:6px;height:36px;"><div class="dt-ev-info"><div>School drop-off</div><div class="dt-ev-time">8:15 &ndash; 8:45</div></div><div class="dt-ev-av" style="background:var(--lily);">L</div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">9 AM</div><div class="dt-content"><div class="dt-ev" style="background:var(--grant);top:2px;height:100px;"><div class="dt-ev-info"><div>Bridal week London</div><div class="dt-ev-time">9:00 &ndash; 11:00</div><div class="dt-ev-loc"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Truman Brewery, Brick Lane</div></div><div class="dt-ev-av" style="background:var(--grant);">G</div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">10 AM</div><div class="dt-content"></div></div>
+        <div class="dt-hour"><div class="dt-label">11 AM</div><div class="dt-content"></div></div>
+        <div class="dt-hour"><div class="dt-label">12 PM</div><div class="dt-content"></div></div>
+        <div class="dt-hour"><div class="dt-label">1 PM</div><div class="dt-content"></div></div>
+        <div class="dt-hour"><div class="dt-label">2 PM</div><div class="dt-content"><div class="dt-ev" style="background:var(--grant);top:2px;height:48px;"><div class="dt-ev-info"><div>Phone call &ndash; Mrs Cohen</div><div class="dt-ev-time">14:00 &ndash; 15:00</div></div><div class="dt-ev-av" style="background:var(--grant);">G</div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">3 PM</div><div class="dt-content"><div class="dt-ev" style="background:var(--lily);top:22px;height:44px;"><div class="dt-ev-info"><div>Lily &ndash; swim class</div><div class="dt-ev-time">15:30 &ndash; 16:15</div></div><div class="dt-ev-av" style="background:var(--lily);">L</div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">4 PM</div><div class="dt-content"><div class="dt-ev" style="background:var(--sarah);top:22px;height:44px;"><div class="dt-ev-info"><div>Sophie &ndash; swimming</div><div class="dt-ev-time">16:30 &ndash; 17:15</div></div><div class="dt-ev-av" style="background:var(--sarah);">S</div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">5 PM</div><div class="dt-content"><div class="dt-ev" style="background:var(--oliver);top:2px;height:40px;"><div class="dt-ev-info"><div>Oliver &ndash; piano lesson</div><div class="dt-ev-time">17:00 &ndash; 17:45</div></div><div class="dt-ev-av" style="background:var(--oliver);">O</div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">6 PM</div><div class="dt-content"><div class="dt-ev" style="background:var(--everyone);top:22px;height:40px;"><div class="dt-ev-info"><div>Family dinner</div><div class="dt-ev-time">18:30</div></div></div></div></div>
+        <div class="dt-hour"><div class="dt-label">7 PM</div><div class="dt-content"></div></div>
+        <div class="dt-hour"><div class="dt-label">8 PM</div><div class="dt-content"></div></div>
+      </div>
+    </div>
+
+    <!-- Today's events -->
+    <div class="today-panel" id="today-panel">
+      <div class="today-title">Today&rsquo;s events</div>
+      <div class="today-list">
+        <div class="ti" style="border-left-color:var(--lily);"><div class="ti-info"><div class="ti-name">School drop-off</div><div class="ti-meta">8:15 AM &middot; Lily</div></div><div class="ti-type" style="background:var(--sage-light);color:#3B6D11;">School</div><div class="ti-av" style="background:var(--lily);">L</div></div>
+        <div class="ti" style="border-left-color:var(--grant);"><div class="ti-info"><div class="ti-name">Bridal week London</div><div class="ti-meta">9:00 AM &middot; Grant</div></div><div class="ti-type" style="background:var(--plum-light);color:var(--plum);">Event</div><div class="ti-av" style="background:var(--grant);">G</div></div>
+        <div class="ti" style="border-left-color:var(--grant);"><div class="ti-info"><div class="ti-name">Mrs Cohen call</div><div class="ti-meta">2:00 PM &middot; Grant</div></div><div class="ti-type" style="background:var(--coral-light);color:#993C1D;">Task</div><div class="ti-av" style="background:var(--grant);">G</div></div>
+        <div class="ti" style="border-left-color:var(--sarah);"><div class="ti-info"><div class="ti-name">Sophie &ndash; swimming</div><div class="ti-meta">4:30 PM &middot; Sarah</div></div><div class="ti-type" style="background:var(--plum-light);color:var(--plum);">Event</div><div class="ti-av" style="background:var(--sarah);">S</div></div>
+        <div class="ti" style="border-left-color:var(--oliver);"><div class="ti-info"><div class="ti-name">Oliver &ndash; piano</div><div class="ti-meta">5:00 PM &middot; Oliver</div></div><div class="ti-type" style="background:var(--sage-light);color:#3B6D11;">School</div><div class="ti-av" style="background:var(--oliver);">O</div></div>
+        <div class="ti" style="border-left-color:var(--everyone);"><div class="ti-info"><div class="ti-name">Family dinner</div><div class="ti-meta">6:30 PM &middot; Everyone</div></div><div class="ti-type" style="background:var(--plum-light);color:var(--plum);">Event</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ========== MOBILE ========== -->
+<div id="mobile-view" class="mobile-frame-wrapper hidden">
+  <div class="mobile-frame">
+    <div class="mobile-status">9:41</div>
+    <div class="mobile-content">
+      <div class="m-cal-toolbar">
+        <span class="m-cal-title">Calendar</span>
+        <button class="m-icon-btn" onclick="toggleSearch(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+        <select class="view-select" style="height:32px;font-size:11px;padding:0 26px 0 10px;border-radius:8px;" onchange="switchMobileCalViewSelect(this.value)">
+          <option value="month" selected>Month</option>
+          <option value="week">Week</option>
+          <option value="day">Day</option>
+        </select>
+        <button class="m-add-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <div style="position:relative;"><button class="m-icon-btn" onclick="toggleMobileSettings(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.26.46.4.98.42 1.51"/></svg></button>
+          <div class="m-settings-popup" id="m-settings-popup">
+            <div class="sp-title" style="font-size:14px;">Filters</div>
+            <div class="sp-section"><div class="sp-label">Members</div><div class="sp-chips"><div class="sp-chip on" style="background:var(--grant);font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-av" style="background:var(--grant);width:16px;height:16px;font-size:7px;">G</div>Grant</div><div class="sp-chip on" style="background:var(--sarah);font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-av" style="background:var(--sarah);width:16px;height:16px;font-size:7px;">S</div>Sarah</div><div class="sp-chip on" style="background:var(--lily);font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-av" style="background:var(--lily);width:16px;height:16px;font-size:7px;">L</div>Lily</div><div class="sp-chip on" style="background:var(--oliver);font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-av" style="background:var(--oliver);width:16px;height:16px;font-size:7px;">O</div>Oliver</div></div></div>
+            <div class="sp-section"><div class="sp-label">Type</div><div class="sp-chips"><div class="sp-chip type-chip on" style="font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-dot" style="background:var(--plum);width:10px;height:10px;"></div>Events</div><div class="sp-chip type-chip on" style="font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-dot" style="background:var(--coral);width:10px;height:10px;"></div>Tasks</div><div class="sp-chip type-chip on" style="font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-dot" style="background:#D4537E;width:10px;height:10px;"></div>Birthdays</div><div class="sp-chip type-chip on" style="font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-dot" style="background:var(--sage);width:10px;height:10px;"></div>Holidays</div><div class="sp-chip type-chip on" style="font-size:10px;padding:3px 8px 3px 3px;"><div class="sc-dot" style="background:var(--oliver);width:10px;height:10px;"></div>School</div></div></div>
+          </div>
+        </div>
+        <button class="m-add-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      </div>
+      <div class="m-nav"><button class="m-nbtn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><span class="m-period">March 2026</span><button class="m-nbtn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button></div>
+      <div class="m-mini-cal">
+        <div class="mch">M</div><div class="mch">T</div><div class="mch">W</div><div class="mch">T</div><div class="mch">F</div><div class="mch">S</div><div class="mch">S</div>
+        <div class="mcd other">23</div><div class="mcd other">24</div><div class="mcd other">25</div><div class="mcd other">26</div><div class="mcd other">27</div><div class="mcd other">28</div><div class="mcd">1</div>
+        <div class="mcd">2</div><div class="mcd has-ev">3</div><div class="mcd">4</div><div class="mcd has-ev">5</div><div class="mcd">6</div><div class="mcd has-ev">7</div><div class="mcd">8</div>
+        <div class="mcd">9</div><div class="mcd has-ev">10</div><div class="mcd">11</div><div class="mcd has-ev">12</div><div class="mcd">13</div><div class="mcd has-ev">14</div><div class="mcd">15</div>
+        <div class="mcd">16</div><div class="mcd has-ev">17</div><div class="mcd has-ev">18</div><div class="mcd has-ev">19</div><div class="mcd">20</div><div class="mcd">21</div><div class="mcd">22</div>
+        <div class="mcd today has-ev">23</div><div class="mcd has-ev">24</div><div class="mcd has-ev">25</div><div class="mcd has-ev">26</div><div class="mcd has-ev">27</div><div class="mcd has-ev">28</div><div class="mcd has-ev">29</div>
+        <div class="mcd">30</div><div class="mcd has-ev">31</div><div class="mcd other">1</div><div class="mcd other">2</div><div class="mcd other">3</div><div class="mcd other">4</div><div class="mcd other">5</div>
+      </div>
+      <div class="m-day-title">Today, 23 March</div>
+      <div class="m-ev" style="border-left-color:var(--lily);"><div class="m-ev-info"><div class="m-ev-name">School drop-off</div><div class="m-ev-time">8:15 AM</div></div><div class="m-ev-type" style="background:var(--sage-light);color:#3B6D11;">School</div><div class="m-ev-av" style="background:var(--lily);">L</div></div>
+      <div class="m-ev" style="border-left-color:var(--grant);"><div class="m-ev-info"><div class="m-ev-name">Bridal week London</div><div class="m-ev-time">9:00 AM</div></div><div class="m-ev-type" style="background:var(--plum-light);color:var(--plum);">Event</div><div class="m-ev-av" style="background:var(--grant);">G</div></div>
+      <div class="m-ev" style="border-left-color:var(--grant);"><div class="m-ev-info"><div class="m-ev-name">Mrs Cohen call</div><div class="m-ev-time">2:00 PM</div></div><div class="m-ev-type" style="background:var(--coral-light);color:#993C1D;">Task</div><div class="m-ev-av" style="background:var(--grant);">G</div></div>
+      <div class="m-ev" style="border-left-color:var(--sarah);"><div class="m-ev-info"><div class="m-ev-name">Sophie &ndash; swimming</div><div class="m-ev-time">4:30 PM</div></div><div class="m-ev-type" style="background:var(--plum-light);color:var(--plum);">Event</div><div class="m-ev-av" style="background:var(--sarah);">S</div></div>
+      <div class="m-ev" style="border-left-color:var(--oliver);"><div class="m-ev-info"><div class="m-ev-name">Oliver &ndash; piano</div><div class="m-ev-time">5:00 PM</div></div><div class="m-ev-type" style="background:var(--sage-light);color:#3B6D11;">School</div><div class="m-ev-av" style="background:var(--oliver);">O</div></div>
+      <div class="m-ev" style="border-left-color:var(--everyone);"><div class="m-ev-info"><div class="m-ev-name">Family dinner</div><div class="m-ev-time">6:30 PM</div></div><div class="m-ev-type" style="background:var(--plum-light);color:var(--plum);">Event</div></div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V10.5z"/></svg><span>Home</span></div>
+      <div class="tab-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg><span>Shopping</span></div>
+      <div class="tab-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span>Tasks</span></div>
+      <div class="tab-item active"><svg viewBox="0 0 24 24" fill="var(--plum)" stroke="none"><rect x="3" y="4" width="18" height="18" rx="2"/><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="10" width="18" height="12" opacity=".7"/></svg><span>Calendar</span><div class="tab-dot"></div></div>
+      <div class="tab-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Family</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showView(v){document.getElementById('desktop-view').classList.toggle('hidden',v!=='desktop');document.getElementById('mobile-view').classList.toggle('hidden',v!=='mobile');document.getElementById('btn-desktop').classList.toggle('active',v==='desktop');document.getElementById('btn-mobile').classList.toggle('active',v==='mobile');}
+
+function switchCalView(view){document.getElementById('v-month').classList.toggle('hidden',view!=='month');document.getElementById('v-week').classList.toggle('hidden',view!=='week');document.getElementById('v-day').classList.toggle('hidden',view!=='day');var p=document.getElementById('cal-period');if(view==='month')p.textContent='March 2026';else if(view==='week')p.textContent='23 \u2013 29 March 2026';else p.textContent='Monday 23 March 2026';document.getElementById('today-panel').classList.toggle('hidden',view==='day');}
+
+function switchMobileCalView(view,btn){btn.parentElement.querySelectorAll('.m-cvb').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
+function switchMobileCalViewSelect(view){}
+
+function toggleSearch(e){e.stopPropagation();closeAllPopups();var p=document.getElementById('search-popup');p.classList.toggle('show');if(p.classList.contains('show'))document.getElementById('search-field').focus();}
+function toggleSettings(e){e.stopPropagation();closeAllPopups();var p=document.getElementById('settings-popup');p.classList.toggle('show');document.getElementById('settings-btn').classList.toggle('active-filter',p.classList.contains('show'));}
+function toggleMobileSettings(e){e.stopPropagation();closeAllPopups();document.getElementById('m-settings-popup').classList.toggle('show');}
+function closeAllPopups(){document.getElementById('settings-popup').classList.remove('show');document.getElementById('settings-btn').classList.remove('active-filter');document.getElementById('m-settings-popup').classList.remove('show');document.getElementById('search-popup').classList.remove('show');}
+document.addEventListener('click',closeAllPopups);
+document.querySelectorAll('.settings-popup,.m-settings-popup,.search-popup').forEach(function(p){p.addEventListener('click',function(e){e.stopPropagation();});});
+
+function toggleSpChip(el,col){el.classList.toggle('on');if(el.classList.contains('on')){el.style.background=col;el.style.color='white';el.style.borderColor='transparent';}else{el.style.background='var(--white)';el.style.color='var(--charcoal)';el.style.borderColor='var(--light-grey)';}}
+function toggleTypeChip(el){el.classList.toggle('on');}
+</script>
+</body>
+</html>

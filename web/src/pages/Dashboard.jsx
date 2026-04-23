@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
+import TrialIndicatorCard from '../components/TrialIndicator';
+import { WriteGate } from '../components/SubscribePrompt';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -326,8 +328,17 @@ export default function Dashboard() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* AI chat input */}
-      <DashboardAiInput />
+      {/* Trial reminder card — only renders when the household is trialing
+          and has ≤10 days remaining. Silently no-ops otherwise (active,
+          expired, internal testers, or the first 20 days of the trial). */}
+      <TrialIndicatorCard />
+
+      {/* AI chat input — replaced with a subscribe prompt for expired
+          households so typing into a broken input doesn't turn into a
+          jarring 402 → redirect moment. */}
+      <WriteGate size="lg" message="Subscribe to create events, tasks, and more with AI">
+        <DashboardAiInput />
+      </WriteGate>
 
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

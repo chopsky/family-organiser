@@ -6,6 +6,7 @@ const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
 const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
+const { runTrialEmailCheck } = require('./trial-emails');
 const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
@@ -478,6 +479,21 @@ function startScheduler() {
   cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
 
+  // ── Trial lifecycle emails: daily at 09:00 Europe/London ───────────────────
+  // Days 20/25/28 (nudges) + day 30 (trial_expired). Welcome email is
+  // fired inline from /api/auth/create-household, not here.
+  cron.schedule('0 9 * * *', () => runTrialEmailCheck(), { timezone: 'Europe/London' });
+  console.log('✓ Trial lifecycle emails scheduled (09:00 Europe/London daily)');
+
+  // NOTE: the 12-month inactive-household retention cleanup + orphan
+  // cleanup are both handled by runRetentionCleanup() above (04:00 UTC).
+  // See src/jobs/retention.js. The 11-month pre-deletion warning email
+  // is not yet built — when needed, add a new src/jobs/retention-warning.js
+  // that runs daily at 09:00 Europe/London, finds households between 11
+  // and 12 months of inactive_since, and sends a "your data will be
+  // deleted in 30 days" email (dedupe via sent_emails with
+  // email_type = 'retention_warning').
+
   // ── Weekly digest: Sunday evenings ──────────────────────────────────────────
   const digestDay  = process.env.WEEKLY_DIGEST_DAY  ?? '0';   // 0 = Sunday
   const digestHour = parseInt((process.env.DAILY_REMINDER_HOUR || '20:00').split(':')[0], 10);
@@ -493,6 +509,7 @@ function startScheduler() {
     triggerDailyReminders: (householdId) => sendDailyReminders(householdId),
     triggerOverdueNudges:  (householdId) => sendOverdueNudges(householdId),
     triggerWeeklyDigest:   (householdId) => sendWeeklyDigest(householdId),
+    triggerTrialEmails:    () => runTrialEmailCheck(),
   };
 }
 

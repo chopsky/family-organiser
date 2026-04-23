@@ -6,6 +6,7 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const email = require('../services/email');
 const publicHolidays = require('../services/publicHolidays');
 const cache = require('../services/cache');
+const stripeService = require('../services/stripe');
 const { validatePassword } = require('../utils/password-strength');
 
 const router = Router();
@@ -258,6 +259,29 @@ router.post('/create-household', requireAuth, async (req, res) => {
     // Seed public holidays in the background (don't block response)
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id)
       .catch((err) => console.error('Failed to seed public holidays:', err));
+
+    // Send the welcome email — fire-and-forget. Dedupes via
+    // sent_emails.(household_id, email_type) so if the user somehow
+    // triggers this twice (double-click, rollback + retry) only one
+    // welcome lands. Household creation = day 1 of the trial by
+    // definition (trial_started_at defaults to NOW() in the schema).
+    (async () => {
+      try {
+        const firstName = (user.name || '').trim().split(/\s+/)[0];
+        const claimed = await db.markEmailSentIfNew(household.id, 'welcome');
+        if (!claimed) return;
+        await email.sendWelcomeEmail({
+          to: user.email,
+          firstName,
+          trialEndsAt: household.trial_ends_at,
+          householdId: household.id,
+        });
+      } catch (err) {
+        // Never block household creation on an email blip. Log
+        // loudly so we notice if this starts failing systematically.
+        console.error('[welcome-email] failed to send for household', household.id, err.message);
+      }
+    })();
 
     const response = await authResponse(user, req);
     return res.status(201).json(response);
@@ -550,9 +574,19 @@ router.get('/export', requireAuth, async (req, res) => {
 //     support. (Stops us accidentally orphaning the whole platform.)
 //   - Wrong password returns 401 without revealing which half failed.
 router.delete('/account', requireAuth, async (req, res) => {
-  const { password } = req.body;
+  const { password, confirmation } = req.body;
   if (!password) {
     return res.status(400).json({ error: 'Password is required to delete your account.' });
+  }
+  // Phase 8 / spec §9: belt-and-braces typed-word confirmation on top of
+  // the password re-entry. The frontend can still show its own modal
+  // affordance, but the backend also insists on the literal word
+  // "DELETE" so a hijacked session or a replay of a stolen auth token
+  // can't quietly wipe an account without the explicit string.
+  if (confirmation !== 'DELETE') {
+    return res.status(400).json({
+      error: 'Type DELETE (in capitals) to confirm account deletion.',
+    });
   }
 
   try {
@@ -570,44 +604,102 @@ router.delete('/account', requireAuth, async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash || '');
     if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
 
-    // Sole member → nuke the household (cascade-deletes everything).
+    // Load the household row once so we can both (a) decide the deletion
+    // mode and (b) snapshot Stripe state for the audit log before the
+    // row is gone.
+    let household = null;
+    let members = [];
+    let otherMembers = [];
     if (user.household_id) {
-      const members = await db.getHouseholdMembers(user.household_id);
-      const otherMembers = members.filter((m) => m.id !== user.id);
+      household = await db.getHouseholdById(user.household_id);
+      members = await db.getHouseholdMembers(user.household_id);
+      otherMembers = members.filter((m) => m.id !== user.id);
+    }
+    const willDeleteHousehold = !!household && otherMembers.length === 0;
+    const deletionMode = willDeleteHousehold ? 'household_deleted' : 'user_only';
 
-      if (otherMembers.length === 0) {
-        // Defensive pre-cleanup: a historical schema quirk left
-        // event_reminders.household_id without ON DELETE CASCADE, so
-        // Postgres blocks the household delete when any event reminders
-        // exist for it. The migration at
-        // supabase/migration-event-reminders-cascade-fix.sql fixes the FK
-        // for new installs, but we clean them up explicitly here too so
-        // deletion works even on databases that haven't applied the
-        // migration yet. Safe to run unconditionally — if the FK is
-        // already CASCADE, this just removes the rows slightly earlier.
-        try {
-          const { supabaseAdmin } = require('../db/client');
-          await supabaseAdmin.from('event_reminders').delete().eq('household_id', user.household_id);
-        } catch (cleanupErr) {
-          console.warn('[delete-account] event_reminders pre-clean failed:', cleanupErr.message || cleanupErr);
-          // Don't fail the whole deletion on the pre-clean — the cascade
-          // might still work if the FK has already been fixed.
+    // ── Stripe: cancel the subscription BEFORE we nuke the row ──
+    // Only relevant when the whole household is going away. When it's
+    // user_only the household (and its Stripe customer) survives, so we
+    // leave the subscription alone. Failure to cancel is non-fatal —
+    // the deletion proceeds and we record stripe_cancelled=false in
+    // the audit row so support can remediate if needed.
+    let stripeCancelled = false;
+    if (willDeleteHousehold && household?.stripe_subscription_id) {
+      try {
+        const stripe = stripeService.getStripe();
+        await stripe.subscriptions.cancel(household.stripe_subscription_id);
+        stripeCancelled = true;
+      } catch (err) {
+        // Common 404 here means the subscription was already cancelled
+        // in the Stripe dashboard — treat as success.
+        if (err?.code === 'resource_missing') {
+          stripeCancelled = true;
+        } else {
+          console.error(
+            '[delete-account] Stripe subscription cancel failed for household',
+            household.id,
+            '— proceeding with deletion:',
+            err.message
+          );
         }
+      }
+    }
 
-        await db.deleteHouseholdCascade(user.household_id);
-        return res.json({ mode: 'household_deleted' });
+    // ── Audit log: write BEFORE the deletion so the row survives ──
+    // Intentionally best-effort. If the audit write fails we log loudly
+    // but don't block the deletion — GDPR's right-to-erasure beats our
+    // internal logging. Support can cross-reference Railway logs if the
+    // audit row is missing.
+    try {
+      const { supabaseAdmin } = require('../db/client');
+      await supabaseAdmin.from('deletion_audit_log').insert({
+        user_id: user.id,
+        user_email: user.email || null,
+        household_id: household?.id || null,
+        household_name: household?.name || null,
+        deletion_mode: deletionMode,
+        stripe_customer_id:     household?.stripe_customer_id || null,
+        stripe_subscription_id: household?.stripe_subscription_id || null,
+        stripe_cancelled:       stripeCancelled,
+        ip_address: req.ip || null,
+        user_agent: req.headers['user-agent'] || null,
+      });
+    } catch (err) {
+      console.error('[delete-account] audit log insert failed — continuing with deletion:', err.message);
+    }
+
+    // ── Actual deletion ──
+    if (willDeleteHousehold) {
+      // Defensive pre-cleanup: a historical schema quirk left
+      // event_reminders.household_id without ON DELETE CASCADE, so
+      // Postgres blocks the household delete when any event reminders
+      // exist for it. The migration at
+      // supabase/migration-event-reminders-cascade-fix.sql fixes the FK
+      // for new installs, but we clean them up explicitly here too so
+      // deletion works even on databases that haven't applied the
+      // migration yet. Safe to run unconditionally — if the FK is
+      // already CASCADE, this just removes the rows slightly earlier.
+      try {
+        const { supabaseAdmin } = require('../db/client');
+        await supabaseAdmin.from('event_reminders').delete().eq('household_id', user.household_id);
+      } catch (cleanupErr) {
+        console.warn('[delete-account] event_reminders pre-clean failed:', cleanupErr.message || cleanupErr);
       }
 
-      // Only admin with other members → promote the oldest non-admin to
-      // admin so the household stays operable after we remove this user.
-      if (user.role === 'admin') {
-        const otherAdmins = otherMembers.filter((m) => m.role === 'admin');
-        if (otherAdmins.length === 0) {
-          const nextAdmin = [...otherMembers].sort(
-            (a, b) => new Date(a.created_at) - new Date(b.created_at)
-          )[0];
-          await db.updateUser(nextAdmin.id, { role: 'admin' });
-        }
+      await db.deleteHouseholdCascade(user.household_id);
+      return res.json({ mode: 'household_deleted', stripe_cancelled: stripeCancelled });
+    }
+
+    // Only admin with other members → promote the oldest non-admin to
+    // admin so the household stays operable after we remove this user.
+    if (user.household_id && user.role === 'admin') {
+      const otherAdmins = otherMembers.filter((m) => m.role === 'admin');
+      if (otherAdmins.length === 0) {
+        const nextAdmin = [...otherMembers].sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        )[0];
+        await db.updateUser(nextAdmin.id, { role: 'admin' });
       }
     }
 

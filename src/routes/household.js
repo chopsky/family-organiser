@@ -52,13 +52,17 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * Body: { name?: string, reminder_time?: string, timezone?: string }
  */
 router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, reminder_time, timezone, allergies } = req.body;
+  const { name, reminder_time, timezone, allergies, trial_emails_enabled } = req.body;
   const updates = {};
 
   if (name !== undefined) updates.name = name.trim();
   if (reminder_time !== undefined) updates.reminder_time = reminder_time;
   if (timezone !== undefined) updates.timezone = timezone;
   if (allergies !== undefined) updates.allergies = allergies;
+  // trial_emails_enabled — admin-only (matches the rest of this endpoint).
+  // The unsubscribe route flips this to false via a signed token; this
+  // endpoint lets admins flip it either way from Settings.
+  if (trial_emails_enabled !== undefined) updates.trial_emails_enabled = !!trial_emails_enabled;
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update' });
@@ -441,6 +445,87 @@ router.delete('/invites/:inviteId', requireAuth, requireHousehold, requireAdmin,
     return res.json({ message: 'Invite cancelled.' });
   } catch (err) {
     console.error('DELETE /api/household/invites error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/household/usage-summary
+ *
+ * Returns COUNT(*) of the user-generated data we want to show in the
+ * "trial ending soon" reminder card on day 26–30:
+ *   "You've got X shopping lists, X meals saved, X tasks…"
+ *
+ * The spec asks for "a single SQL query with COUNTs". Supabase's REST
+ * API doesn't support cross-table aggregates in one call — each count
+ * is its own HTTP round trip. We fire them in parallel via Promise.all
+ * so wall-clock latency is one query's worth, not N. If this ever
+ * becomes a bottleneck (unlikely — these are indexed scans over small
+ * per-household tables) swap to a plpgsql function + supabase.rpc().
+ *
+ * Cached 5 minutes — the user doesn't need real-time numbers on a
+ * marketing banner, and the endpoint fires on every nav back to
+ * Dashboard when trial is in warning window.
+ */
+router.get('/usage-summary', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const cacheKey = `usage:${req.householdId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    async function countRows(table, extraFilter) {
+      let q = supabaseAdmin
+        .from(table)
+        .select('*', { count: 'exact', head: true })
+        .eq('household_id', req.householdId);
+      if (extraFilter) q = extraFilter(q);
+      const { count, error } = await q;
+      if (error) {
+        // Log and return 0 rather than failing the whole summary — a
+        // missing-table error on one dimension shouldn't break the card.
+        console.warn(`[usage-summary] count(${table}) failed:`, error.message);
+        return 0;
+      }
+      return count ?? 0;
+    }
+
+    const [
+      shoppingItemCount,
+      shoppingListCount,
+      taskCount,
+      calendarEventCount,
+      mealPlanCount,
+      recipeCount,
+      documentCount,
+      memberCount,
+    ] = await Promise.all([
+      countRows('shopping_items'),
+      countRows('shopping_lists'),
+      countRows('tasks'),
+      // calendar_events is the only table using soft-delete — exclude
+      // tombstoned rows so the count matches what the user actually sees.
+      countRows('calendar_events', (q) => q.is('deleted_at', null)),
+      countRows('meal_plan'),
+      countRows('recipes'),
+      countRows('documents'),
+      countRows('users'),
+    ]);
+
+    const payload = {
+      shopping_item_count: shoppingItemCount,
+      shopping_list_count: shoppingListCount,
+      task_count: taskCount,
+      calendar_event_count: calendarEventCount,
+      meal_plan_count: mealPlanCount,
+      recipe_count: recipeCount,
+      document_count: documentCount,
+      member_count: memberCount,
+    };
+
+    cache.set(cacheKey, payload, 300); // 5 min TTL
+    return res.json(payload);
+  } catch (err) {
+    console.error('GET /api/household/usage-summary error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

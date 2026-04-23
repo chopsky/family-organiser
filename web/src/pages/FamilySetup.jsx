@@ -4,6 +4,8 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconUsers, IconHome, IconMail } from '../components/Icons';
+import { useCanWrite } from '../context/SubscriptionContext';
+import SubscribePrompt from '../components/SubscribePrompt';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const YEAR_GROUPS = ['Nursery', 'Reception', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12', 'Year 13'];
@@ -53,6 +55,7 @@ const AVATAR_COLOURS = {
 
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
+  const canWrite = useCanWrite();
 
   const [name, setName]               = useState(household?.name ?? '');
   const [reminderTime, setReminderTime] = useState(
@@ -855,6 +858,7 @@ export default function FamilySetup() {
       </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
+      {!canWrite && <SubscribePrompt message="Subscribe to invite family members and edit profiles" />}
 
       {/* Household card */}
       <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">

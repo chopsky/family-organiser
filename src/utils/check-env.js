@@ -17,6 +17,13 @@ const RECOMMENDED = [
   { key: 'POSTMARK_FROM_EMAIL', hint: 'From address for outbound email' },
   { key: 'WEB_URL', hint: 'Frontend URL for CORS and email links' },
   { key: 'API_URL', hint: 'Backend URL for OAuth callbacks and calendar feeds' },
+  // Stripe — Phase 3. Recommended (not REQUIRED) so the app still boots
+  // without them during local dev / in tests. Checkout and webhook routes
+  // will surface their own errors if called while unset.
+  { key: 'STRIPE_SECRET_KEY', hint: 'Stripe API secret (test or live) — needed for checkout + portal' },
+  { key: 'STRIPE_WEBHOOK_SECRET', hint: 'Stripe webhook signing secret — needed to verify /api/webhooks/stripe' },
+  { key: 'STRIPE_PRICE_MONTHLY', hint: 'Stripe Price ID for the £4.99/month plan' },
+  { key: 'STRIPE_PRICE_ANNUAL', hint: 'Stripe Price ID for the £49/year plan' },
 ];
 
 const OPTIONAL = [
@@ -33,6 +40,7 @@ const OPTIONAL = [
   { key: 'TWILIO_MESSAGING_SERVICE_SID', hint: 'WhatsApp messaging service' },
   { key: 'TWILIO_WHATSAPP_NUMBER', hint: 'WhatsApp sender number' },
   { key: 'FRONTEND_URL', hint: 'OAuth redirect URL (falls back to WEB_URL)' },
+  { key: 'STRIPE_PUBLISHABLE_KEY', hint: 'Stripe publishable key — only needed if the frontend ever calls Stripe.js directly' },
 ];
 
 function checkEnv() {

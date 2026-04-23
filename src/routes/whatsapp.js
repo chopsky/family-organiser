@@ -53,6 +53,45 @@ router.post('/webhook', async (req, res) => {
       return;
     }
 
+    // Subscription gate for the bot. The web app's subscription middleware
+    // only runs on /api/* routes — WhatsApp comes in via Twilio's webhook
+    // at /whatsapp/webhook and bypasses it entirely. Re-check here so
+    // expired households don't keep getting AI replies (which cost
+    // Anthropic credits we aren't recouping).
+    //
+    // Internal accounts and any non-expired state (active, trialing,
+    // even null in the unlikely case of a missing row) fall through. Only
+    // subscription_status === 'expired' | 'cancelled' triggers the
+    // canned reply.
+    try {
+      const householdRow = await db.getHouseholdById(user.household_id);
+      const expired = householdRow
+        && !householdRow.is_internal
+        && (householdRow.subscription_status === 'expired'
+          || householdRow.subscription_status === 'cancelled');
+      if (expired) {
+        await whatsapp.sendMessage(
+          phone,
+          "Your Housemait trial has ended. Subscribe at housemait.com to keep using me!"
+        );
+        db.logWhatsAppMessage({
+          householdId: user.household_id,
+          userId: user.id,
+          direction: 'inbound',
+          messageType: numMedia > 0 ? 'media' : 'text',
+          intent: 'subscription_required',
+          processingMs: 0,
+          body: Body || '[media]',
+          response: 'subscription required',
+        });
+        return;
+      }
+    } catch (err) {
+      // Fail-open: a DB blip in the subscription check shouldn't silently
+      // block paying customers from messaging the bot. Log and proceed.
+      console.warn('[whatsapp] subscription check failed (failing open):', err.message);
+    }
+
     // Refresh the user's 24h customer-service window. Fire-and-forget — the
     // webhook has already returned 200 above, and a DB hiccup here must not
     // block the reply. Once this write lands, broadcast.js can send free-form

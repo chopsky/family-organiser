@@ -3557,6 +3557,247 @@ async function upsertNotificationPreferences(userId, prefs) {
   return data;
 }
 
+// ─── Stripe / subscription ───────────────────────────────────────────────────
+
+/**
+ * Update the subscription fields on a household. Allowed fields are
+ * whitelisted here so a buggy or malicious caller can't reach outside
+ * billing state (e.g. set `role` or `email`). All five writable
+ * subscription columns defined in migration-subscription-trial.sql are
+ * accepted — trial_started_at / trial_ends_at are deliberately excluded
+ * (only the signup flow or admin tools should touch those).
+ */
+async function updateHouseholdSubscription(householdId, fields, db = supabase) {
+  const ALLOWED = new Set([
+    'subscription_status',
+    'stripe_customer_id',
+    'stripe_subscription_id',
+    'subscription_plan',
+    'subscription_current_period_end',
+    // Phase 8 — retention clock. Set on trial-expiry / subscription-cancel;
+    // cleared (to null) on resubscription. The cleanup cron (not yet
+    // built) queries this column.
+    'inactive_since',
+  ]);
+  const clean = {};
+  for (const [k, v] of Object.entries(fields || {})) {
+    if (ALLOWED.has(k)) clean[k] = v;
+  }
+  if (Object.keys(clean).length === 0) return null;
+  const { data, error } = await db
+    .from('households')
+    .update(clean)
+    .eq('id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function findHouseholdByStripeCustomerId(customerId, db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .select()
+    .eq('stripe_customer_id', customerId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function findHouseholdByStripeSubscriptionId(subscriptionId, db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .select()
+    .eq('stripe_subscription_id', subscriptionId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+// ─── Trial email cron helpers (Phase 7) ──────────────────────────────────
+
+/**
+ * Record that an email of the given type has been sent to a household.
+ * Returns true if the INSERT succeeded (first time we've sent this),
+ * false if it conflicted (already sent — caller should skip the send).
+ *
+ * The unique (household_id, email_type) constraint on sent_emails
+ * makes this a race-safe idempotency gate — two concurrent scheduler
+ * runs attempting the same send can't both INSERT, so they can't both
+ * proceed.
+ */
+async function markEmailSentIfNew(householdId, emailType, db = supabase) {
+  const { error } = await db
+    .from('sent_emails')
+    .insert({ household_id: householdId, email_type: emailType });
+  if (error) {
+    if (error.code === '23505') return false; // unique_violation — already sent
+    throw error;
+  }
+  return true;
+}
+
+/**
+ * Find all households whose trial is at the given integer day-count.
+ * "Day N of a 30-day trial" means NOW() is in the 24-hour window
+ * starting at `trial_started_at + (N-1) days`. Boundaries are half-open
+ * so [day 20, day 21) covers exactly one calendar day's worth of
+ * households — matches once-per-day cron semantics.
+ *
+ * Filters:
+ *   • subscription_status = 'trialing' (day 20/25/28 only fire while
+ *     the trial is still running; if the user subscribed mid-trial
+ *     they're 'active' and we skip them)
+ *   • is_internal = false (internal accounts never get nudges)
+ *
+ * Returns household rows joined with the primary contact email (the
+ * household's creator / admin user).
+ */
+async function findHouseholdsAtTrialDay(dayNumber, db = supabase) {
+  // 1-indexed day: day 1 = first 24h of trial. For day N, the window is
+  // trial_started_at + (N-1 days, N days).
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - dayNumber * 86_400_000).toISOString();
+  const windowEnd   = new Date(now.getTime() - (dayNumber - 1) * 86_400_000).toISOString();
+
+  const { data, error } = await db
+    .from('households')
+    .select('id, name, trial_started_at, trial_ends_at, subscription_status, trial_emails_enabled, is_internal')
+    .eq('subscription_status', 'trialing')
+    .eq('is_internal', false)
+    .gte('trial_started_at', windowStart)
+    .lt('trial_started_at', windowEnd);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Find households whose trial has just expired. Used by the day-30
+ * expired email. Unlike the nudges, this one fires AFTER the trial
+ * ends — we look for households whose trial_ends_at crossed into the
+ * past within the last 24 hours.
+ *
+ * Covers both statuses:
+ *   • 'expired' — the subscription gate has already flipped them
+ *   • 'trialing' — trial_ends_at is past but no mutation has touched
+ *     the gate yet, so status hasn't been flipped. We still email them.
+ *
+ * Excludes 'active' (they subscribed) and 'cancelled' (they had a
+ * subscription that was later cancelled — different email).
+ */
+async function findHouseholdsWithExpiredTrial(db = supabase) {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 86_400_000).toISOString();
+  const windowEnd   = now.toISOString();
+
+  const { data, error } = await db
+    .from('households')
+    .select('id, name, trial_started_at, trial_ends_at, subscription_status, is_internal')
+    .in('subscription_status', ['expired', 'trialing'])
+    .eq('is_internal', false)
+    .gte('trial_ends_at', windowStart)
+    .lt('trial_ends_at', windowEnd);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Get the admin user's email for a household — the default recipient
+ * for subscription lifecycle emails. Prefers the first admin (typically
+ * the household creator) and falls back to any account member with an
+ * email set. Returns null if the household has no reachable members
+ * (dependents-only household, or admins with no email column).
+ */
+async function getHouseholdPrimaryContact(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('users')
+    .select('id, name, email, role, member_type, created_at')
+    .eq('household_id', householdId)
+    .eq('member_type', 'account')
+    .not('email', 'is', null)
+    .order('role', { ascending: false })      // 'admin' > 'member' alphabetically
+    .order('created_at', { ascending: true }); // oldest admin first
+  if (error) throw error;
+  return (data || []).find((u) => !!u.email) || null;
+}
+
+/**
+ * Fetch the usage counts the nudge emails personalise on. Parallel
+ * count-head queries — identical pattern to the usage-summary
+ * endpoint on /api/household/usage-summary.
+ */
+async function getHouseholdUsageCounts(householdId, db = supabase) {
+  async function count(table, filter) {
+    let q = db.from(table).select('*', { count: 'exact', head: true }).eq('household_id', householdId);
+    if (filter) q = filter(q);
+    const { count: c, error } = await q;
+    if (error) {
+      console.warn(`[usage-counts] ${table} failed:`, error.message);
+      return 0;
+    }
+    return c ?? 0;
+  }
+  const [
+    shopping_item_count, task_count, calendar_event_count,
+    meal_plan_count, member_count,
+  ] = await Promise.all([
+    count('shopping_items'),
+    count('tasks'),
+    count('calendar_events', (q) => q.is('deleted_at', null)),
+    count('meal_plan'),
+    count('users'),
+  ]);
+  return { shopping_item_count, task_count, calendar_event_count, meal_plan_count, member_count };
+}
+
+/**
+ * Flip trial_emails_enabled. Used by the unsubscribe route (set to false)
+ * and the Settings toggle (either direction).
+ */
+async function setTrialEmailsEnabled(householdId, enabled, db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .update({ trial_emails_enabled: !!enabled })
+    .eq('id', householdId)
+    .select('id, trial_emails_enabled')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Idempotency gate for Stripe webhooks. Attempts to insert the event_id;
+ * returns true if this is a new event we should process, false if we've
+ * already handled it.
+ *
+ * The unique PRIMARY KEY on event_id gives us atomic dedup — two parallel
+ * deliveries of the same event_id race on INSERT and exactly one wins.
+ */
+async function recordStripeEventIfNew(eventId, eventType, db = supabase) {
+  const { error } = await db
+    .from('processed_stripe_events')
+    .insert({ event_id: eventId, event_type: eventType });
+  if (error) {
+    // 23505 = unique_violation — this event has already been processed.
+    if (error.code === '23505') return false;
+    throw error;
+  }
+  return true;
+}
+
+/**
+ * Remove a processed-event marker so Stripe's retry can reprocess it.
+ * Used when an event handler fails AFTER the idempotency row was written:
+ * without this, the failed event would be permanently stuck.
+ */
+async function deleteProcessedStripeEvent(eventId, db = supabase) {
+  const { error } = await db
+    .from('processed_stripe_events')
+    .delete()
+    .eq('event_id', eventId);
+  if (error) throw error;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -3564,6 +3805,19 @@ module.exports = {
   getHouseholdByCode,
   getHouseholdById,
   updateHouseholdSettings,
+  // Subscription / Stripe
+  updateHouseholdSubscription,
+  findHouseholdByStripeCustomerId,
+  findHouseholdByStripeSubscriptionId,
+  recordStripeEventIfNew,
+  deleteProcessedStripeEvent,
+  // Trial lifecycle emails
+  markEmailSentIfNew,
+  findHouseholdsAtTrialDay,
+  findHouseholdsWithExpiredTrial,
+  getHouseholdPrimaryContact,
+  getHouseholdUsageCounts,
+  setTrialEmailsEnabled,
   createUser,
   getHouseholdMembers,
   findUserByName,

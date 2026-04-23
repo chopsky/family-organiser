@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Housemait — iOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-page: #ECE7DD;
+    --bg-app: #FAF7F2;
+    --bg-app-soft: #F3EEE5;
+    --ink: #1A1620;
+    --ink-2: #4A4453;
+    --ink-3: #8A8493;
+    --line: rgba(26,22,32,0.07);
+    --line-strong: rgba(26,22,32,0.12);
+    --brand: #6C3DD9;
+    --brand-soft: #EFE9FB;
+    --brand-deep: #4A22A8;
+    --warm: #E8B4A0;
+    --warm-soft: #FBEFE8;
+    --green: #6BA368;
+    --green-soft: #E5F0E2;
+    --amber: #D89B3A;
+    --amber-soft: #FBF1DE;
+    --pink: #D8788A;
+    --pink-soft: #FBE6EA;
+    --blue: #5B8DE0;
+    --blue-soft: #E2ECFA;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-page);
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  * { box-sizing: border-box; }
+  /* hide scrollbars on inner phone screen */
+  .ios-scroll::-webkit-scrollbar { display: none; }
+  .ios-scroll { scrollbar-width: none; }
+
+  /* Tweaks panel */
+  .tweaks-panel {
+    position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+    background: #fff; border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+    padding: 18px; width: 280px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    display: none;
+  }
+  .tweaks-panel.on { display: block; }
+  .tweaks-panel h3 {
+    margin: 0 0 14px; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: #1A1620;
+  }
+  .tweaks-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .tweaks-row label { font-weight: 500; color: #4A4453; font-size: 12px; }
+  .tweaks-row .seg {
+    display: flex; gap: 4px; background: #F3EEE5; border-radius: 10px; padding: 3px;
+  }
+  .tweaks-row .seg button {
+    flex: 1; border: 0; background: transparent; padding: 6px 4px; border-radius: 7px;
+    font-size: 12px; cursor: pointer; color: #4A4453; font-family: inherit;
+  }
+  .tweaks-row .seg button.on { background: #fff; color: #1A1620; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+
+  .accents { display: flex; gap: 8px; }
+  .accents button {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .accents button.on { border-color: #1A1620; }
+</style>
+</head>
+<body>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="lib/ios-frame.jsx"></script>
+<script type="text/babel" src="src/icons.jsx"></script>
+<script type="text/babel" src="src/data.jsx"></script>
+<script type="text/babel" src="src/ui.jsx"></script>
+<script type="text/babel" src="src/screens-home.jsx"></script>
+<script type="text/babel" src="src/screens-other.jsx"></script>
+<script type="text/babel" src="src/screens-more.jsx"></script>
+<script type="text/babel" src="src/screens-settings.jsx"></script>
+<script type="text/babel" src="src/sheets.jsx"></script>
+<script type="text/babel" src="src/app.jsx"></script>
+
+<div id="root"></div>
+
+<div class="tweaks-panel" id="tweaks">
+  <h3>Tweaks</h3>
+  <div class="tweaks-row">
+    <label>Home variation</label>
+    <div class="seg" data-seg="home">
+      <button data-val="dashboard">A · Dashboard</button>
+      <button data-val="ai">B · AI-first</button>
+    </div>
+  </div>
+  <div class="tweaks-row">
+    <label>Theme</label>
+    <div class="seg" data-seg="theme">
+      <button data-val="light">Light</button>
+      <button data-val="dark">Dark</button>
+    </div>
+  </div>
+  <div class="tweaks-row">
+    <label>Accent</label>
+    <div class="accents" id="accents"></div>
+  </div>
+  <div class="tweaks-row">
+    <label>Density</label>
+    <div class="seg" data-seg="density">
+      <button data-val="airy">Airy</button>
+      <button data-val="compact">Compact</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Tweaks state + persistence ────────────────────────────────
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "home": "dashboard",
+    "theme": "dark",
+    "accent": "#6C3DD9",
+    "density": "airy"
+  }/*EDITMODE-END*/;
+
+  const STORE_KEY = 'housemait-ios-tweaks';
+  let tweaks = { ...TWEAK_DEFAULTS, ...(JSON.parse(localStorage.getItem(STORE_KEY) || '{}')) };
+
+  const ACCENTS = [
+    { name: 'purple', value: '#6C3DD9' },
+    { name: 'plum',   value: '#A23DD9' },
+    { name: 'forest', value: '#3D7A4F' },
+    { name: 'rust',   value: '#C25A2E' },
+    { name: 'ink',    value: '#1A1620' },
+  ];
+
+  function applyTweaks() {
+    document.documentElement.style.setProperty('--brand', tweaks.accent);
+    window.__tweaks = tweaks;
+    window.dispatchEvent(new CustomEvent('tweaks-change', { detail: tweaks }));
+    // sync UI
+    document.querySelectorAll('.tweaks-panel .seg').forEach(seg => {
+      const k = seg.getAttribute('data-seg');
+      seg.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('on', b.getAttribute('data-val') === tweaks[k]);
+      });
+    });
+    document.querySelectorAll('#accents button').forEach(b => {
+      b.classList.toggle('on', b.getAttribute('data-val') === tweaks.accent);
+    });
+  }
+
+  function setTweak(k, v) {
+    tweaks = { ...tweaks, [k]: v };
+    localStorage.setItem(STORE_KEY, JSON.stringify(tweaks));
+    applyTweaks();
+    try {
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [k]: v } }, '*');
+    } catch (e) {}
+  }
+
+  // build accent swatches
+  const accents = document.getElementById('accents');
+  ACCENTS.forEach(a => {
+    const b = document.createElement('button');
+    b.style.background = a.value;
+    b.setAttribute('data-val', a.value);
+    b.onclick = () => setTweak('accent', a.value);
+    accents.appendChild(b);
+  });
+
+  // wire segmented controls
+  document.querySelectorAll('.tweaks-panel .seg').forEach(seg => {
+    const k = seg.getAttribute('data-seg');
+    seg.querySelectorAll('button').forEach(b => {
+      b.onclick = () => setTweak(k, b.getAttribute('data-val'));
+    });
+  });
+
+  // edit mode protocol
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === '__activate_edit_mode') {
+      document.getElementById('tweaks').classList.add('on');
+    } else if (e.data && e.data.type === '__deactivate_edit_mode') {
+      document.getElementById('tweaks').classList.remove('on');
+    }
+  });
+  window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+  applyTweaks();
+</script>
+
+</body>
+</html>

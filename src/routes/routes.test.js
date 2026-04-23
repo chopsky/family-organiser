@@ -609,14 +609,14 @@ describe('POST /api/auth/login', () => {
 describe('GET /api/auth/verify-email', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('redirects to login with verified=true for valid token', async () => {
+  test('redirects to /verified for valid token', async () => {
     db.getEmailVerificationToken.mockResolvedValue({ id: 'evt-1', user_id: 'u-1' });
     db.markEmailVerificationTokenUsed.mockResolvedValue();
     db.updateUser.mockResolvedValue();
 
     const res = await request(app).get('/api/auth/verify-email?token=valid-token');
     expect(res.status).toBe(302);
-    expect(res.headers.location).toContain('verified=true');
+    expect(res.headers.location).toContain('/verified');
   });
 
   test('redirects with error for invalid token', async () => {
@@ -869,11 +869,24 @@ describe('DELETE /api/auth/account', () => {
     expect(res.status).toBe(400);
   });
 
+  test('returns 400 when typed-DELETE confirmation is missing', async () => {
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/DELETE/);
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+  });
+
+  test('returns 400 when confirmation is the wrong string (case-sensitive)', async () => {
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'delete' });
+    expect(res.status).toBe(400);
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+  });
+
   test('returns 401 when the password is wrong', async () => {
     db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$stored' });
     bcrypt.compare.mockResolvedValueOnce(false);
 
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'nope' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'nope', confirmation: 'DELETE' });
     expect(res.status).toBe(401);
     expect(db.deleteUserAdmin).not.toHaveBeenCalled();
     expect(db.deleteHouseholdCascade).not.toHaveBeenCalled();
@@ -882,17 +895,18 @@ describe('DELETE /api/auth/account', () => {
   test('returns 403 for platform admins (they can\'t self-delete)', async () => {
     db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x', is_platform_admin: true });
 
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'DELETE' });
     expect(res.status).toBe(403);
     expect(db.deleteUserAdmin).not.toHaveBeenCalled();
   });
 
   test('deletes the whole household when the user is the sole member', async () => {
     db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x' });
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD); // loaded for audit snapshot
     db.getHouseholdMembers.mockResolvedValue([USER]); // just them
     db.deleteHouseholdCascade.mockResolvedValue();
 
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'DELETE' });
     expect(res.status).toBe(200);
     expect(res.body.mode).toBe('household_deleted');
     expect(db.deleteHouseholdCascade).toHaveBeenCalledWith(HOUSEHOLD.id);
@@ -908,7 +922,7 @@ describe('DELETE /api/auth/account', () => {
     ]);
     db.deleteUserAdmin.mockResolvedValue();
 
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'DELETE' });
     expect(res.status).toBe(200);
     expect(res.body.mode).toBe('user_only');
     expect(db.deleteUserAdmin).toHaveBeenCalledWith(USER.id);
@@ -929,7 +943,7 @@ describe('DELETE /api/auth/account', () => {
     db.updateUser.mockResolvedValue();
     db.deleteUserAdmin.mockResolvedValue();
 
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'DELETE' });
     expect(res.status).toBe(200);
     expect(res.body.mode).toBe('user_only');
     expect(db.updateUser).toHaveBeenCalledWith('u-older', { role: 'admin' });
@@ -947,14 +961,14 @@ describe('DELETE /api/auth/account', () => {
     ]);
     db.deleteUserAdmin.mockResolvedValue();
 
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'DELETE' });
     expect(res.status).toBe(200);
     expect(db.updateUser).not.toHaveBeenCalled();
     expect(db.deleteUserAdmin).toHaveBeenCalledWith(USER.id);
   });
 
   test('returns 401 without a bearer token', async () => {
-    const res = await request(app).delete('/api/auth/account').send({ password: 'pw' });
+    const res = await request(app).delete('/api/auth/account').send({ password: 'pw', confirmation: 'DELETE' });
     expect(res.status).toBe(401);
   });
 });

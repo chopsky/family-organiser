@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SubscriptionProvider } from './context/SubscriptionContext';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import Layout from './components/Layout';
@@ -28,6 +29,9 @@ const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
 const Privacy         = lazy(() => import('./pages/Privacy'));
 const Terms           = lazy(() => import('./pages/Terms'));
+const Subscribe       = lazy(() => import('./pages/Subscribe'));
+const SubscribeSuccess = lazy(() => import('./pages/SubscribeSuccess'));
+const SubscribeCancel  = lazy(() => import('./pages/SubscribeCancel'));
 
 // Admin pages — only downloaded if user is a platform admin
 const AdminDashboard       = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -109,6 +113,13 @@ function AppRoutes() {
         <Route path="/documents" element={<RequireAuth><Layout><Documents /></Layout></RequireAuth>} />
         <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+        {/* Subscribe flow — Subscribe page is reachable by anyone logged in
+            (including expired users, so they can reactivate). Success and
+            Cancel pages are hit by Stripe redirects so they need to work
+            without any route guards beyond auth. */}
+        <Route path="/subscribe" element={<RequireAuthOnly><Subscribe /></RequireAuthOnly>} />
+        <Route path="/subscription/success" element={<RequireAuthOnly><SubscribeSuccess /></RequireAuthOnly>} />
+        <Route path="/subscription/cancel" element={<RequireAuthOnly><SubscribeCancel /></RequireAuthOnly>} />
         {/* Admin routes */}
         <Route path="/admin" element={<RequirePlatformAdmin><AdminLayout><AdminDashboard /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/users" element={<RequirePlatformAdmin><AdminLayout><AdminUsers /></AdminLayout></RequirePlatformAdmin>} />
@@ -129,7 +140,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        {/* SubscriptionProvider lives inside AuthProvider so it can call
+            useAuth() to gate its fetch on token + household. Keeping it
+            separate from AuthContext matches the server-side split
+            (routes/auth vs routes/subscription) and keeps AuthContext
+            lean for the parts of the app that don't care about billing. */}
+        <SubscriptionProvider>
+          <AppRoutes />
+        </SubscriptionProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -3,6 +3,8 @@ import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings } from '../components/Icons';
+import { useCanWrite } from '../context/SubscriptionContext';
+import SubscribePrompt from '../components/SubscribePrompt';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -279,6 +281,7 @@ function MapPinIcon({ className = 'w-2.5 h-2.5' }) {
 // ── Component ───────────────────────────────────────────────
 
 export default function Calendar() {
+  const canWrite = useCanWrite();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -963,6 +966,7 @@ export default function Calendar() {
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
+      {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
 
       {syncHealth.length > 0 && (
         <div className="rounded-2xl border border-coral/40 bg-coral/10 p-4 text-sm flex gap-3 items-start">
@@ -1077,16 +1081,19 @@ export default function Calendar() {
             <option value="day">Day</option>
           </select>
 
-          {/* Add event button */}
-          <button
-            onClick={() => openAddForm(selectedDate)}
-            className="h-9 px-3 md:px-4 rounded-xl bg-plum hover:bg-plum-dark text-white text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span className="hidden md:inline">Add</span>
-          </button>
+          {/* Add event button — hidden for expired households; inline
+              SubscribePrompt appears below the toolbar instead. */}
+          {canWrite && (
+            <button
+              onClick={() => openAddForm(selectedDate)}
+              className="h-9 px-3 md:px-4 rounded-xl bg-plum hover:bg-plum-dark text-white text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span className="hidden md:inline">Add</span>
+            </button>
+          )}
 
           {/* Settings cog */}
           <div ref={settingsRef} className="relative">

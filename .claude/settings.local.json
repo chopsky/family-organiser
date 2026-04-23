@@ -17,7 +17,31 @@
       "Bash(echo '@import \"\"tailwindcss\"\";')",
       "Bash(timeout 8 npm run dev)",
       "Bash(npm run:*)",
-      "WebFetch(domain:docs.anthropic.com)"
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(git stash *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(npx jest *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(npx vite *)",
+      "Bash(npx eslint *)",
+      "Bash(cp /tmp/authContext-head.jsx web/src/context/AuthContext.jsx.bak)",
+      "Bash(mv src/context/AuthContext.jsx src/context/AuthContext.jsx.new)",
+      "Bash(cp src/context/AuthContext.jsx.bak src/context/AuthContext.jsx)",
+      "Read(//Users/grantshapiro/Downloads/**)",
+      "Bash(category)",
+      "Bash(xargs -n1 basename)",
+      "Bash(node -c src/services/email.js)",
+      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && grep \"export default function\" {}')",
+      "Bash(rm -f /tmp/commit-msg.txt)",
+      "Read(//private/tmp/**)",
+      "Bash(python3 -c \"import sys,json;p=json.load\\(sys.stdin\\);print\\('test:',p.get\\('scripts',{}\\).get\\('test'\\)\\);print\\('jest:',p.get\\('jest'\\)\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('JWT_SECRET set:', !!process.env.JWT_SECRET\\)\")",
+      "Bash(node -e \"try{console.log\\('stripe version:', require\\('stripe/package.json'\\).version\\)}catch\\(e\\){console.log\\('NOT INSTALLED'\\)}\")",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"try{console.log\\('postmark version:', require\\('postmark/package.json'\\).version\\)}catch\\(e\\){console.log\\('NOT INSTALLED'\\)}\")"
     ]
   }
 }
