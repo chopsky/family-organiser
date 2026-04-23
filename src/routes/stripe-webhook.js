@@ -94,12 +94,28 @@ router.post('/stripe', async (req, res) => {
 // ─── Event handlers ─────────────────────────────────────────────────
 
 /**
- * Resolve a Stripe object back to our household_id. Tries the cheapest
- * lookups first (metadata, client_reference_id) before falling back to
- * DB lookups by stripe_customer_id or stripe_subscription_id.
+ * Resolve a Stripe object back to our household_id.
  *
- * Returns null if no match — caller should log and ack (returning 500
- * would make Stripe retry forever for an orphan event).
+ * Lookup order (cheapest first):
+ *   1. Event-object metadata (set by createCheckoutSession on both the
+ *      session and its subscription.metadata).
+ *   2. client_reference_id (Checkout session field).
+ *   3. Local DB lookup by stripe_customer_id.
+ *   4. Local DB lookup by stripe_subscription_id.
+ *   5. Remote fetch: retrieve the subscription from Stripe and read its
+ *      metadata.household_id.
+ *
+ * Step 5 matters because Stripe sends webhooks in an order that isn't
+ * intuitive: the FIRST invoice.paid often arrives BEFORE
+ * checkout.session.completed on a fresh subscription. When it does, the
+ * household's stripe_customer_id / stripe_subscription_id columns
+ * aren't yet populated, so steps 3 and 4 both miss. Step 5 fetches the
+ * subscription directly from Stripe (which carries the household_id we
+ * set in subscription_data.metadata at checkout) and resolves cleanly.
+ *
+ * Returns null only when ALL five paths fail — genuinely orphan events
+ * (e.g. test fires with fake IDs) log + 200 ack (returning 500 would
+ * cause Stripe to retry forever).
  */
 async function resolveHouseholdId({ metadata, clientReferenceId, customerId, subscriptionId }) {
   if (metadata?.household_id) return metadata.household_id;
@@ -111,6 +127,20 @@ async function resolveHouseholdId({ metadata, clientReferenceId, customerId, sub
   if (subscriptionId) {
     const row = await db.findHouseholdByStripeSubscriptionId(subscriptionId);
     if (row) return row.id;
+
+    // Last-ditch: fetch the subscription from Stripe. Covers the
+    // first-invoice-before-checkout-completion race. Swallow fetch
+    // errors — this is a best-effort resolution, not a hard dependency.
+    try {
+      const stripe = stripeService.getStripe();
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
+      if (sub?.metadata?.household_id) return sub.metadata.household_id;
+    } catch (err) {
+      console.warn(
+        `[stripe webhook] subscription-fetch resolution failed for ${subscriptionId}:`,
+        err.message || err
+      );
+    }
   }
   return null;
 }
