@@ -71,8 +71,14 @@ router.post('/stripe', async (req, res) => {
   // ── Process the event ───────────────────────────────────────────
   // Return 200 quickly on success; roll back the dedupe row on failure
   // so Stripe's next retry re-runs the handler.
+  //
+  // Info log on every accepted event. Low-volume traffic (a few events
+  // per subscription transition per household per month) so the noise
+  // cost is tiny, and having a clear "yes, this landed and succeeded"
+  // line makes post-hoc debugging much easier than silent 200s.
   try {
     await handleEvent(event);
+    console.log(`[stripe webhook] processed ${event.type} (${event.id})`);
     return res.status(200).json({ received: true });
   } catch (err) {
     console.error(`[stripe webhook] handler for ${event.type} (${event.id}) failed:`, err);

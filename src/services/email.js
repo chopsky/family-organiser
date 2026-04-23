@@ -318,7 +318,13 @@ function buildListUnsubscribeHeaders(householdId) {
 // Transactional. Always sends on household creation (ignores the
 // trial_emails_enabled flag — the spec carves out welcome + expiry as
 // transactional).
-async function sendWelcomeEmail({ to, firstName, trialEndsAt, householdId }) {
+async function sendWelcomeEmail({ to, firstName, trialEndsAt }) {
+  // The welcome email is transactional — the template doesn't render
+  // an unsubscribe link, so we don't compute one. Earlier revisions
+  // computed unsubscribeUrl() "for consistency" which created an
+  // accidental hard dependency on UNSUBSCRIBE_TOKEN_SECRET — a missing
+  // env var there would take out the welcome email even though it
+  // never displays the link. Keep the model lean.
   return sendTemplate({
     to,
     templateAlias: TEMPLATE_ALIASES.welcome,
@@ -327,10 +333,6 @@ async function sendWelcomeEmail({ to, firstName, trialEndsAt, householdId }) {
       first_name: firstName || 'there',
       trial_end_date: formatTrialEndDate(trialEndsAt),
       app_url: BASE_URL,
-      // unsubscribe_url is unused in the welcome template but passed for
-      // consistency so test households can include it if you ever want
-      // the welcome email to carry the footer too.
-      unsubscribe_url: householdId ? unsubscribeUrl(householdId) : '',
     },
   });
 }
