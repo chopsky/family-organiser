@@ -381,7 +381,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               top for a branded print-out. */}
           <div className="print-only text-center" style={{ marginBottom: '24px' }}>
             <img
-              src="/housemait-logo2.png"
+              src="/housemait-logo.svg"
               alt="Housemait"
               style={{ height: '36px', display: 'inline-block', marginBottom: '12px' }}
             />
