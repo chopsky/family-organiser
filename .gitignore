@@ -1,6 +1,10 @@
 node_modules/
 .env
 .env.*
+# But the web frontend's .env.production carries the public Railway API URL
+# that needs to be baked into every iOS build — not a secret, every dev needs
+# the same value. See web/.env.production for the rationale.
+!web/.env.production
 *.log
 web/dist/
 web/node_modules/
