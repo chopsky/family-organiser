@@ -318,8 +318,9 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
 
   return (
     <>
-      {/* Week navigation */}
-      <div className="flex items-center justify-between bg-linen rounded-2xl  border border-cream-border px-4 py-3">
+      {/* Week navigation — hidden on print (the print-only heading below
+          replaces it with a clean "Weekly Meal Plan · Week of X" title). */}
+      <div className="flex items-center justify-between bg-linen rounded-2xl  border border-cream-border px-4 py-3 no-print">
         <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-oat text-cocoa transition-colors">
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
@@ -338,8 +339,49 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
         </button>
       </div>
 
+      {/* Print styles — scoped to @media print so they don't touch the
+          normal UI. visibility-based hiding keeps layout stable and
+          avoids cascading `display:none` up through Layout/Main parents.
+          @page sets landscape as the browser's default orientation for
+          this print — user can still change it in the dialog if they
+          really want portrait. */}
+      <style>{`
+        @media print {
+          @page { size: landscape; margin: 10mm; }
+          body * { visibility: hidden; }
+          .meal-plan-printable,
+          .meal-plan-printable * { visibility: visible; }
+          .meal-plan-printable {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+          }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          /* Stronger borders and white background on the grid so it
+             renders clearly on paper (removes the cream background fill). */
+          .meal-plan-printable table,
+          .meal-plan-printable th,
+          .meal-plan-printable td { border-color: #666 !important; background: #fff !important; }
+          .meal-plan-printable .bg-linen { background: #fff !important; }
+        }
+        .print-only { display: none; }
+      `}</style>
+
       {loading ? <Spinner /> : (
-        <>
+        <div className="meal-plan-printable">
+          {/* Print-only heading — replaces the on-screen nav at print time
+              so the printed sheet shows which week it covers. */}
+          <div className="print-only mb-6 text-center">
+            <h1 style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
+              Weekly Meal Plan
+            </h1>
+            <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>
+              Week of {formatWeekLabel(weekStart)}
+            </p>
+          </div>
+
           {/* Weekly grid */}
           <div className="bg-linen rounded-2xl  border border-cream-border overflow-hidden">
             <div className="overflow-x-auto">
@@ -390,7 +432,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                                 ))}
                                 <button
                                   onClick={() => { setPickerCell({ date: toDateStr(date), category }); setEditingMeal(null); }}
-                                  className={`w-full rounded-lg border border-dashed border-cream-border text-cocoa/40 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center ${cellMeals.length > 0 ? 'h-6' : 'h-10'}`}
+                                  className={`no-print w-full rounded-lg border border-dashed border-cream-border text-cocoa/40 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center ${cellMeals.length > 0 ? 'h-6' : 'h-10'}`}
                                 >
                                   <span className={`leading-none ${cellMeals.length > 0 ? 'text-sm' : 'text-lg'}`}>+</span>
                                 </button>
@@ -406,22 +448,34 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-3">
+          {/* Action buttons — left group stays on the left, Print sits
+              to the right via justify-between. Wraps cleanly on narrow
+              screens (Print drops onto its own line). All hidden from
+              the printed sheet via no-print. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 no-print">
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={onSwitchToRecipes}
+                className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
+              >
+                <span>📚</span> Recipe Box
+              </button>
+              <button
+                onClick={addWeekToShoppingList}
+                className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
+              >
+                <span>🛒</span> Add to Shopping List
+              </button>
+            </div>
             <button
-              onClick={onSwitchToRecipes}
+              onClick={() => window.print()}
               className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
+              title="Opens the browser's print dialog in landscape orientation"
             >
-              <span>📚</span> Recipe Box
-            </button>
-            <button
-              onClick={addWeekToShoppingList}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
-            >
-              <span>🛒</span> Add to Shopping List
+              <span>🖨️</span> Print meal plan
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {/* Meal detail popup */}
