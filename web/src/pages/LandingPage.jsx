@@ -573,7 +573,7 @@ export default function LandingPage() {
             <div>
               <div className="eyebrow-sec">Everything in one place</div>
               <h2 className="sec" style={{ margin: 0 }}>
-                One quiet home for <em>every loose&nbsp;end.</em>
+                Your home <em>intelligently&nbsp;organised</em> with AI.
               </h2>
             </div>
             <p style={{ maxWidth: 360, color: 'var(--ink-soft)', margin: 0 }}>
