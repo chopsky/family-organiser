@@ -712,7 +712,7 @@ export default function LandingPage() {
               <div style={{ position: 'relative' }}>
                 <div className="wa-phone">
                   <div className="wa-head">
-                    <div className="wa-avatar">hm</div>
+                    <img className="wa-avatar" src="/housemait-iOS-icon.png" alt="housemait" />
                     <div>
                       <div className="wa-name">housemait</div>
                       <div className="wa-status">Family Bot · online</div>
@@ -890,8 +890,8 @@ export default function LandingPage() {
             <div className="bg1" />
             <div className="bg2" />
             <div style={{ position: 'relative', zIndex: 1 }}>
-              <h2>Give your family<br />a <em>quieter</em> week.</h2>
-              <p>Set Housemait up in under 5 minutes. Most families feel lighter by Sunday.</p>
+              <h2>Try Housemait <em>free</em><br />for 30&nbsp;days.</h2>
+              <p>Set Housemait up in under 5 minutes. Your calmer family life starts here.</p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <a href={SIGNUP_URL} className="btn btn-primary">Start 30-day free trial</a>
               </div>
