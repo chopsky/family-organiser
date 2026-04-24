@@ -483,8 +483,8 @@ export default function LandingPage() {
             </span>
             <h1 className="display">
               The quiet hum<br />
-              of a <em>family</em> that<br />
-              actually runs&nbsp;on&nbsp;time.
+              of <em>family life</em><br />
+              made easier&nbsp;with&nbsp;AI.
             </h1>
             <p className="lede">
               Housemait is the AI that holds your family's calendar, shopping, tasks and meals in one place — and answers on WhatsApp — so the mental load stops landing on one person.
