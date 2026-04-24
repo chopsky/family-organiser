@@ -60,8 +60,8 @@ export default function Signup() {
     <div className="min-h-screen bg-oat flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-3xl font-semibold text-bark">Create your account</h1>
+          <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
+          <h1 className="text-bark" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 42, lineHeight: 1.1, letterSpacing: '-0.015em' }}>Your calmer family life<br /><em style={{ fontStyle: 'italic', color: '#6B2FB8' }}>starts here.</em></h1>
           {inviteToken && (
             <p className="text-primary mt-2 font-medium">You've been invited to join a household!</p>
           )}
