@@ -18,6 +18,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
+import { isIos } from '../lib/platform';
 
 // ── localStorage helpers (mirror AuthContext's Safari-safe wrappers) ──
 function safeGetItem(key) {
@@ -211,6 +212,15 @@ function FinalPushContent({ daysRemaining, trialEndsAt }) {
 }
 
 function SubscribeButton({ variant = 'plum' }) {
+  // iOS: render a plain-text note instead of a Subscribe button (App
+  // Store rules — no external payment entry points in the app).
+  if (isIos()) {
+    return (
+      <p className="text-xs text-warm-grey italic">
+        Subscribe on <span className="text-charcoal font-medium">housemait.com</span>
+      </p>
+    );
+  }
   const bg = variant === 'coral'
     ? 'bg-coral hover:bg-coral/90'
     : 'bg-plum hover:bg-plum-pressed';

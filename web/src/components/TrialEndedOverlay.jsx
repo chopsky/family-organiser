@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
+import { isIos } from '../lib/platform';
 
 const DISMISSED_KEY = 'trial-ended-overlay-dismissed';
 
@@ -93,23 +94,34 @@ export default function TrialEndedOverlay() {
         <UsageSummary usage={usage} />
 
         <p className="text-cocoa text-base mt-5">
-          Your data is safe — subscribe anytime to pick up right where
-          you left off.
+          {isIos()
+            ? 'Your data is safe — subscribe on housemait.com to pick up right where you left off.'
+            : 'Your data is safe — subscribe anytime to pick up right where you left off.'}
         </p>
 
         <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
-          <a
-            href="/subscribe"
-            className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-          >
-            Subscribe
-          </a>
+          {/* iOS renders only the "Just browsing" dismiss — the Subscribe
+              button linked to an external payment flow which breaks App
+              Store rules. The URL is mentioned in the copy above as
+              plain text so users know where to go. */}
+          {!isIos() && (
+            <a
+              href="/subscribe"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            >
+              Subscribe
+            </a>
+          )}
           <button
             type="button"
             onClick={handleDismiss}
-            className="text-sm font-medium text-warm-grey hover:text-charcoal transition-colors px-2 py-1"
+            className={
+              isIos()
+                ? 'mx-auto text-sm font-semibold text-plum hover:text-plum-pressed transition-colors px-4 py-2 rounded-xl border border-plum/20 hover:bg-plum-light'
+                : 'text-sm font-medium text-warm-grey hover:text-charcoal transition-colors px-2 py-1'
+            }
           >
-            Just browsing
+            {isIos() ? 'Got it' : 'Just browsing'}
           </button>
         </div>
       </div>

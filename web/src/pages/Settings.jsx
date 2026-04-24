@@ -8,6 +8,7 @@ import Spinner from '../components/Spinner';
 import { IconSettings, IconUser, IconCalendar } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
+import { isIos } from '../lib/platform';
 
 const avatarColors = {
   red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
@@ -96,15 +97,21 @@ function PlanSection() {
               )}
             </p>
             <p className="text-xs text-warm-grey mt-1">
-              Subscribe any time to avoid interruption.
+              {isIos()
+                ? 'Subscribe on housemait.com to avoid interruption.'
+                : 'Subscribe any time to avoid interruption.'}
             </p>
           </div>
-          <Link
-            to="/subscribe"
-            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-          >
-            Subscribe
-          </Link>
+          {/* iOS can't offer an in-app subscribe path (App Store rules) —
+              hide the CTA. The URL is surfaced as text above. */}
+          {!isIos() && (
+            <Link
+              to="/subscribe"
+              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            >
+              Subscribe
+            </Link>
+          )}
         </div>
       )}
 
@@ -120,17 +127,25 @@ function PlanSection() {
               )}
             </p>
             <p className="text-xs text-warm-grey mt-1">
-              Update card, switch plans, or cancel anytime from the Stripe portal.
+              {isIos()
+                ? 'To change your plan or cancel, sign in at housemait.com.'
+                : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCustomerPortal}
-            disabled={portalLoading}
-            className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {portalLoading ? 'Opening…' : 'Manage subscription'}
-          </button>
+          {/* iOS can't link to the Stripe Customer Portal — that's an
+              external payment management page and falls under Apple's
+              Anti-Steering rule. Users manage their subscription by
+              signing in to the web app on any browser. */}
+          {!isIos() && (
+            <button
+              type="button"
+              onClick={openCustomerPortal}
+              disabled={portalLoading}
+              className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {portalLoading ? 'Opening…' : 'Manage subscription'}
+            </button>
+          )}
         </div>
       )}
 
@@ -141,15 +156,19 @@ function PlanSection() {
               <strong className="text-coral font-semibold">Subscription ended</strong>
             </p>
             <p className="text-xs text-warm-grey mt-1">
-              Your data's still here. Subscribe to unlock everything again.
+              {isIos()
+                ? "Your data's still here. Subscribe on housemait.com to unlock everything again."
+                : "Your data's still here. Subscribe to unlock everything again."}
             </p>
           </div>
-          <Link
-            to="/subscribe"
-            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-          >
-            Subscribe
-          </Link>
+          {!isIos() && (
+            <Link
+              to="/subscribe"
+              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            >
+              Subscribe
+            </Link>
+          )}
         </div>
       )}
 
