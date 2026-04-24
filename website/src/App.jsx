@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-const SIGNUP_URL = 'https://family-organiser-seven.vercel.app/signup'
-const SIGNIN_URL = 'https://family-organiser-seven.vercel.app/login'
+const SIGNUP_URL = 'https://housemait.com/signup'
+const SIGNIN_URL = 'https://housemait.com/login'
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
@@ -73,10 +73,362 @@ const ArrowRight = () => (
   </svg>
 )
 
+const CalendarMock = () => (
+  <div className="shot-wrap">
+    <div className="mock">
+      <div className="mock-head">
+        <div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 700 }}>Thursday</div>
+          <h4 style={{ marginTop: 2 }}>16 April · Today</h4>
+        </div>
+        <a className="mock-link">Week →</a>
+      </div>
+      <ul className="mock-list cal-list">
+        <li>
+          <span className="cal-time">08:30</span>
+          <span className="cal-bar" style={{ background: 'var(--purple)' }} />
+          <div style={{ flex: 1 }}>
+            <div className="cal-title">School run · Ben</div>
+            <div className="cal-meta">Mum · 25 min</div>
+          </div>
+          <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
+        </li>
+        <li>
+          <span className="cal-time">10:00</span>
+          <span className="cal-bar" style={{ background: 'var(--coral)' }} />
+          <div style={{ flex: 1 }}>
+            <div className="cal-title">Vet · Luna's check-up</div>
+            <div className="cal-meta">Dad · 45 min</div>
+          </div>
+          <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
+        </li>
+        <li>
+          <span className="cal-time">15:45</span>
+          <span className="cal-bar" style={{ background: 'var(--sage)' }} />
+          <div style={{ flex: 1 }}>
+            <div className="cal-title">Swimming · Sofia</div>
+            <div className="cal-meta">Mum · 1 hr</div>
+          </div>
+          <span className="avt" style={{ background: 'var(--sage)' }}>S</span>
+        </li>
+        <li>
+          <span className="cal-time">18:30</span>
+          <span className="cal-bar" style={{ background: 'var(--butter)' }} />
+          <div style={{ flex: 1 }}>
+            <div className="cal-title">Family dinner</div>
+            <div className="cal-meta">Everyone · 1 hr</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+)
+
+const TasksMock = () => (
+  <div className="shot-wrap coral">
+    <div className="mock">
+      <div className="mock-head">
+        <h4>This week's tasks</h4>
+        <a className="mock-link">All →</a>
+      </div>
+      <ul className="mock-list">
+        <li>
+          <span className="task-cb done">✓</span>
+          <div style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>Book MOT for the Volvo</div>
+          <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
+        </li>
+        <li>
+          <span className="task-cb" />
+          <div style={{ flex: 1 }}>
+            <div>Take bins out</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>Tonight · recurring Thu</div>
+          </div>
+          <span className="avt" style={{ background: 'var(--sage)' }}>B</span>
+        </li>
+        <li>
+          <span className="task-cb" />
+          <div style={{ flex: 1 }}>
+            <div>Pick up prescription</div>
+            <div style={{ fontSize: 12, color: 'var(--coral)', marginTop: 2, fontWeight: 600 }}>Overdue · due Tue</div>
+          </div>
+          <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
+        </li>
+        <li>
+          <span className="task-cb" />
+          <div style={{ flex: 1 }}>
+            <div>Reply to Mrs Walker</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>From forwarded school email</div>
+          </div>
+          <span className="avt" style={{ background: 'var(--butter)' }}>M</span>
+        </li>
+        <li>
+          <span className="task-cb" />
+          <div style={{ flex: 1 }}>Book piano lessons for term 3</div>
+          <span className="avt" style={{ background: 'var(--sky)' }}>S</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+)
+
+const MealsMock = () => (
+  <div className="shot-wrap butter">
+    <div className="mock">
+      <div className="mock-head">
+        <h4>This week's meal plan</h4>
+        <a className="mock-link">Edit →</a>
+      </div>
+      <ul className="mock-list">
+        <li><span className="day-badge sage">MON</span><span className="meal">Spaghetti Bolognese</span><span className="emoji">🍝</span></li>
+        <li><span className="day-badge sage">TUE</span><span className="meal">Shepherd's Pie</span><span className="emoji">🥧</span></li>
+        <li><span className="day-badge sage">WED</span><span className="meal">Chicken Stir-fry</span><span className="emoji">🍳</span></li>
+        <li><span className="day-badge sage">THU</span><span className="meal">Fish &amp; Chips</span><span className="emoji">🐟</span></li>
+        <li><span className="day-badge coral">FRI</span><span className="meal">Pizza Night</span><span className="emoji">🍕</span></li>
+        <li><span className="day-badge sage">SAT</span><span className="meal">Roast Chicken</span><span className="emoji">🍗</span></li>
+        <li><span className="day-badge sage">SUN</span><span className="meal">Sunday Roast</span><span className="emoji">🥩</span></li>
+      </ul>
+      <button type="button" className="mock-cta">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 12h6M9 17h4" /></svg>
+        Add all ingredients to shopping list
+      </button>
+    </div>
+  </div>
+)
+
+const ShoppingMock = () => (
+  <div className="shot-wrap green">
+    <div className="mock">
+      <div className="mock-head">
+        <h4>🛒 Groceries</h4>
+        <span className="mock-chip">7 items</span>
+      </div>
+      <div className="shop-aisle">Meat &amp; Seafood</div>
+      <div className="shop-item">
+        <span className="shop-cb" />
+        <span className="shop-emoji">🥩</span>
+        <span style={{ flex: 1 }}>Beef sausages</span>
+        <span className="shop-qty">2</span>
+      </div>
+      <div className="shop-item">
+        <span className="shop-cb" />
+        <span className="shop-emoji">🍗</span>
+        <span style={{ flex: 1 }}>Chicken frankfurters</span>
+      </div>
+      <div className="shop-aisle">Produce</div>
+      <div className="shop-item">
+        <span className="shop-cb done">✓</span>
+        <span className="shop-emoji">🥭</span>
+        <span style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>Mango</span>
+      </div>
+      <div className="shop-item">
+        <span className="shop-cb" />
+        <span className="shop-emoji">🍐</span>
+        <span style={{ flex: 1 }}>Pears</span>
+        <span className="shop-qty">6 pcs</span>
+      </div>
+      <div className="shop-item">
+        <span className="shop-cb" />
+        <span className="shop-emoji">🥒</span>
+        <span style={{ flex: 1 }}>Cucumbers</span>
+      </div>
+      <div className="shop-aisle">Dairy &amp; Eggs</div>
+      <div className="shop-item">
+        <span className="shop-cb" />
+        <span className="shop-emoji">🥚</span>
+        <span style={{ flex: 1 }}>Eggs</span>
+        <span className="shop-qty">2 pack</span>
+      </div>
+      <div className="shop-item">
+        <span className="shop-cb" />
+        <span className="shop-emoji">🥛</span>
+        <span style={{ flex: 1 }}>Milk</span>
+      </div>
+    </div>
+  </div>
+)
+
+const SchoolTermsMock = () => (
+  <div className="shot-wrap coral">
+    <div className="mock">
+      <div className="mock-head">
+        <h4>🏫 School details</h4>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 20 }}>
+        <div className="mock-field">
+          <span className="label">School</span>
+          <span className="value">Queen Elizabeth's School</span>
+        </div>
+        <div className="mock-field">
+          <span className="label">Year</span>
+          <span className="value">Year 4</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--coral)' }}>
+          <span>📅</span> Term dates imported
+        </div>
+        <span className="mock-chip synced">✓ Synced</span>
+      </div>
+      <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '4px 16px 8px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', margin: '14px 0 4px' }}>2025–2026</div>
+        <div className="term-row">
+          <span className="term-pill autumn">Autumn</span>
+          <div style={{ flex: 1 }}>
+            <div className="term-dates">3 Sept – 19 Dec</div>
+            <div className="term-half">Half term: 27 Oct – 31 Oct</div>
+          </div>
+        </div>
+        <div className="term-row">
+          <span className="term-pill spring">Spring</span>
+          <div style={{ flex: 1 }}>
+            <div className="term-dates">5 Jan – 10 Apr</div>
+            <div className="term-half">Half term: 16 Feb – 20 Feb</div>
+          </div>
+        </div>
+        <div className="term-row">
+          <span className="term-pill summer">Summer</span>
+          <div style={{ flex: 1 }}>
+            <div className="term-dates">4 May – 22 Jul</div>
+            <div className="term-half">Half term: 25 May – 29 May</div>
+          </div>
+        </div>
+      </div>
+      <div className="mock-warning">⚠️ <span><strong>3 INSET days</strong> added to your calendar</span></div>
+    </div>
+  </div>
+)
+
+const SHOWCASE = [
+  {
+    id: 'cal',
+    eyebrow: <div className="eyebrow-sec">Shared Calendar</div>,
+    title: (<>Every date, <em>every&nbsp;body</em>, on one&nbsp;page.</>),
+    desc: "See the whole month for the whole family. Filter by person, add shared events in one tap, and get a heads up when two people are double-booked.",
+    bullets: ['Colour-coded per family member', 'Syncs with Google, Apple, Outlook', 'Forward a school email — it becomes an event', '"What\'s on today" widget for the fridge tablet'],
+    mock: <CalendarMock />,
+  },
+  {
+    id: 'tasks',
+    eyebrow: <div className="eyebrow-sec">Tasks</div>,
+    title: (<>The mental load, <em>finally</em> split fairly.</>),
+    desc: "Columns per family member, so nothing lives in one person's head. Recurring chores repeat themselves. Overdue items nudge gently, not naggingly.",
+    bullets: ['Assign by name, not by guilt', 'Recurring tasks (bins, vet, MOT)', 'Kid-safe view for younger family members', 'Weekly digest: who did what'],
+    mock: <TasksMock />,
+  },
+  {
+    id: 'meals',
+    eyebrow: <div className="eyebrow-sec">Meal Plan</div>,
+    title: (<>Sunday planning, <em>finally&nbsp;fun.</em></>),
+    desc: "Drag recipes onto the week. Housemait builds the shopping list from the ingredients and remembers what your family keeps coming back to.",
+    bullets: ['Breakfast, lunch, dinner + snacks', 'One-tap: ingredients to shopping list', 'Recipe box remembers the family favourites', 'Drag & drop meals across the week'],
+    mock: <MealsMock />,
+  },
+  {
+    id: 'shop',
+    eyebrow: <div className="eyebrow-sec">Shopping</div>,
+    title: (<>A list that <em>sorts</em> itself.</>),
+    desc: "Items auto-group into sensible categories — produce, dairy, meat — so the list reads in the order you shop. Snap a receipt and Housemait automatically checks off everything you've bought.",
+    bullets: ['Create as many lists as your family needs', 'Smart categories keep items grouped sensibly', 'Receipt scanning in 2 seconds', '"Previously purchased" memory'],
+    mock: <ShoppingMock />,
+  },
+  {
+    id: 'terms',
+    eyebrow: <div className="eyebrow-sec">School Term Dates</div>,
+    title: (<>UK school term dates, <em>imported in one&nbsp;click.</em></>),
+    desc: "Select your child's school and Housemait automatically imports all term dates, half terms, and INSET days straight into your family calendar.",
+    bullets: ['Search any school in England, Scotland, Wales & NI', 'Term dates, half terms & INSET days imported automatically', 'Syncs with your family calendar so nothing clashes', 'Supports multiple children at different schools'],
+    mock: <SchoolTermsMock />,
+  },
+]
+
+function Showcase() {
+  const [active, setActive] = useState(0)
+  const trigRefs = useRef([])
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) setActive(Number(e.target.dataset.idx))
+        })
+      },
+      { rootMargin: '-50% 0px -50% 0px', threshold: 0 }
+    )
+    trigRefs.current.forEach(el => el && obs.observe(el))
+    return () => obs.disconnect()
+  }, [])
+
+  const Panel = ({ it }) => (
+    <>
+      {it.eyebrow}
+      <h3>{it.title}</h3>
+      <p>{it.desc}</p>
+      <ul className="bullets">
+        {it.bullets.map(b => (<li key={b}><span className="check">✓</span> {b}</li>))}
+      </ul>
+      {it.ctaLabel && (
+        <a href={it.ctaHref === 'SIGNUP' ? SIGNUP_URL : it.ctaHref} className="btn btn-primary" style={{ marginTop: 28 }}>{it.ctaLabel}</a>
+      )}
+    </>
+  )
+
+  return (
+    <section className="section-white sec-block showcase" id="how">
+      <div className="showcase-pin">
+        <div className="showcase-stage">
+          <div className="wrap showcase-grid">
+            <div className="showcase-left">
+              {SHOWCASE.map((it, i) => (
+                <div key={it.id} className={`showcase-panel col-text${active === i ? ' on' : ''}`}>
+                  <Panel it={it} />
+                </div>
+              ))}
+            </div>
+            <div className="showcase-right">
+              {SHOWCASE.map((it, i) => (
+                <div key={it.id} className={`showcase-mock${active === i ? ' on' : ''}`}>
+                  {it.mock}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="showcase-trigs" aria-hidden="true">
+          {SHOWCASE.map((_, i) => (
+            <div
+              key={i}
+              ref={el => (trigRefs.current[i] = el)}
+              data-idx={i}
+              className="showcase-trig"
+              style={{ top: `${i * 80}vh` }}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="wrap showcase-mobile">
+        {SHOWCASE.map(it => (
+          <div key={it.id} className="showcase-mitem">
+            <div className="col-text"><Panel it={it} /></div>
+            <div className="showcase-mitem-mock">{it.mock}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function App() {
   const [billing, setBilling] = useState('monthly')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showFab, setShowFab] = useState(false)
   const price = PRICING[billing]
+
+  useEffect(() => {
+    const onScroll = () => setShowFab(window.scrollY > 1500)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <>
@@ -403,243 +755,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* CALENDAR */}
-      <section className="section-cream sec-block" id="how">
-        <div className="wrap">
-          <div className="bigrow">
-            <div className="col-text">
-              <div className="eyebrow-sec">Shared Calendar</div>
-              <h3>Every date, <em>every&nbsp;body</em>, on one&nbsp;page.</h3>
-              <p>See the whole month for the whole family. Filter by person, add shared events in one tap, and get a heads up when two people are double-booked.</p>
-              <ul className="bullets">
-                <li><span className="check">✓</span> Colour-coded per family member</li>
-                <li><span className="check">✓</span> Syncs with Google, Apple, Outlook</li>
-                <li><span className="check">✓</span> Forward a school email — it becomes an event</li>
-                <li><span className="check">✓</span> "What's on today" widget for the fridge tablet</li>
-              </ul>
-            </div>
-            <div className="shot-wrap">
-              <div className="mock">
-                <div className="mock-head">
-                  <div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 700 }}>Thursday</div>
-                    <h4 style={{ marginTop: 2 }}>16 April · Today</h4>
-                  </div>
-                  <a className="mock-link">Week →</a>
-                </div>
-                <ul className="mock-list cal-list">
-                  <li>
-                    <span className="cal-time">08:30</span>
-                    <span className="cal-bar" style={{ background: 'var(--purple)' }} />
-                    <div style={{ flex: 1 }}>
-                      <div className="cal-title">School run · Ben</div>
-                      <div className="cal-meta">Mum · 25 min</div>
-                    </div>
-                    <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
-                  </li>
-                  <li>
-                    <span className="cal-time">10:00</span>
-                    <span className="cal-bar" style={{ background: 'var(--coral)' }} />
-                    <div style={{ flex: 1 }}>
-                      <div className="cal-title">Vet · Luna's check-up</div>
-                      <div className="cal-meta">Dad · 45 min</div>
-                    </div>
-                    <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
-                  </li>
-                  <li>
-                    <span className="cal-time">15:45</span>
-                    <span className="cal-bar" style={{ background: 'var(--sage)' }} />
-                    <div style={{ flex: 1 }}>
-                      <div className="cal-title">Swimming · Sofia</div>
-                      <div className="cal-meta">Mum · 1 hr</div>
-                    </div>
-                    <span className="avt" style={{ background: 'var(--sage)' }}>S</span>
-                  </li>
-                  <li>
-                    <span className="cal-time">18:30</span>
-                    <span className="cal-bar" style={{ background: 'var(--butter)' }} />
-                    <div style={{ flex: 1 }}>
-                      <div className="cal-title">Family dinner</div>
-                      <div className="cal-meta">Everyone · 1 hr</div>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* TASKS */}
-      <section className="section-white sec-block">
-        <div className="wrap">
-          <div className="bigrow flip">
-            <div className="shot-wrap coral">
-              <div className="mock">
-                <div className="mock-head">
-                  <h4>This week's tasks</h4>
-                  <a className="mock-link">All →</a>
-                </div>
-                <ul className="mock-list">
-                  <li>
-                    <span className="task-cb done">✓</span>
-                    <div style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>Book MOT for the Volvo</div>
-                    <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
-                  </li>
-                  <li>
-                    <span className="task-cb" />
-                    <div style={{ flex: 1 }}>
-                      <div>Take bins out</div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>Tonight · recurring Thu</div>
-                    </div>
-                    <span className="avt" style={{ background: 'var(--sage)' }}>B</span>
-                  </li>
-                  <li>
-                    <span className="task-cb" />
-                    <div style={{ flex: 1 }}>
-                      <div>Pick up prescription</div>
-                      <div style={{ fontSize: 12, color: 'var(--coral)', marginTop: 2, fontWeight: 600 }}>Overdue · due Tue</div>
-                    </div>
-                    <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
-                  </li>
-                  <li>
-                    <span className="task-cb" />
-                    <div style={{ flex: 1 }}>
-                      <div>Reply to Mrs Walker</div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>From forwarded school email</div>
-                    </div>
-                    <span className="avt" style={{ background: 'var(--butter)' }}>M</span>
-                  </li>
-                  <li>
-                    <span className="task-cb" />
-                    <div style={{ flex: 1 }}>Book piano lessons for term 3</div>
-                    <span className="avt" style={{ background: 'var(--sky)' }}>S</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div className="col-text">
-              <div className="eyebrow-sec">Tasks</div>
-              <h3>The mental load, <em>finally</em> split fairly.</h3>
-              <p>Columns per family member, so nothing lives in one person's head. Recurring chores repeat themselves. Overdue items nudge gently, not naggingly.</p>
-              <ul className="bullets">
-                <li><span className="check">✓</span> Assign by name, not by guilt</li>
-                <li><span className="check">✓</span> Recurring tasks (bins, vet, MOT)</li>
-                <li><span className="check">✓</span> Kid-safe view for younger family members</li>
-                <li><span className="check">✓</span> Weekly digest: who did what</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* MEALS */}
-      <section className="section-cream sec-block">
-        <div className="wrap">
-          <div className="bigrow">
-            <div className="col-text">
-              <div className="eyebrow-sec">Meal Plan</div>
-              <h3>Sunday planning, <em>finally&nbsp;fun.</em></h3>
-              <p>Drag recipes onto the week. Housemait builds the shopping list from the ingredients and remembers what your family keeps coming back to.</p>
-              <ul className="bullets">
-                <li><span className="check">✓</span> Breakfast, lunch, dinner + snacks</li>
-                <li><span className="check">✓</span> One-tap: ingredients to shopping list</li>
-                <li><span className="check">✓</span> Recipe box remembers the family favourites</li>
-                <li><span className="check">✓</span> Drag &amp; drop meals across the week</li>
-              </ul>
-            </div>
-            <div className="shot-wrap butter">
-              <div className="mock">
-                <div className="mock-head">
-                  <h4>This week's meal plan</h4>
-                  <a className="mock-link">Edit →</a>
-                </div>
-                <ul className="mock-list">
-                  <li><span className="day-badge sage">MON</span><span className="meal">Spaghetti Bolognese</span><span className="emoji">🍝</span></li>
-                  <li><span className="day-badge sage">TUE</span><span className="meal">Shepherd's Pie</span><span className="emoji">🥧</span></li>
-                  <li><span className="day-badge sage">WED</span><span className="meal">Chicken Stir-fry</span><span className="emoji">🍳</span></li>
-                  <li><span className="day-badge sage">THU</span><span className="meal">Fish &amp; Chips</span><span className="emoji">🐟</span></li>
-                  <li><span className="day-badge coral">FRI</span><span className="meal">Pizza Night</span><span className="emoji">🍕</span></li>
-                  <li><span className="day-badge sage">SAT</span><span className="meal">Roast Chicken</span><span className="emoji">🍗</span></li>
-                  <li><span className="day-badge sage">SUN</span><span className="meal">Sunday Roast</span><span className="emoji">🥩</span></li>
-                </ul>
-                <button type="button" className="mock-cta">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 12h6M9 17h4" /></svg>
-                  Add all ingredients to shopping list
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SHOPPING */}
-      <section className="section-white sec-block">
-        <div className="wrap">
-          <div className="bigrow flip">
-            <div className="shot-wrap green">
-              <div className="mock">
-                <div className="mock-head">
-                  <h4>🛒 Groceries</h4>
-                  <span className="mock-chip">7 items</span>
-                </div>
-                <div className="shop-aisle">Meat &amp; Seafood</div>
-                <div className="shop-item">
-                  <span className="shop-cb" />
-                  <span className="shop-emoji">🥩</span>
-                  <span style={{ flex: 1 }}>Beef sausages</span>
-                  <span className="shop-qty">2</span>
-                </div>
-                <div className="shop-item">
-                  <span className="shop-cb" />
-                  <span className="shop-emoji">🍗</span>
-                  <span style={{ flex: 1 }}>Chicken frankfurters</span>
-                </div>
-                <div className="shop-aisle">Produce</div>
-                <div className="shop-item">
-                  <span className="shop-cb done">✓</span>
-                  <span className="shop-emoji">🥭</span>
-                  <span style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>Mango</span>
-                </div>
-                <div className="shop-item">
-                  <span className="shop-cb" />
-                  <span className="shop-emoji">🍐</span>
-                  <span style={{ flex: 1 }}>Pears</span>
-                  <span className="shop-qty">6 pcs</span>
-                </div>
-                <div className="shop-item">
-                  <span className="shop-cb" />
-                  <span className="shop-emoji">🥒</span>
-                  <span style={{ flex: 1 }}>Cucumbers</span>
-                </div>
-                <div className="shop-aisle">Dairy &amp; Eggs</div>
-                <div className="shop-item">
-                  <span className="shop-cb" />
-                  <span className="shop-emoji">🥚</span>
-                  <span style={{ flex: 1 }}>Eggs</span>
-                  <span className="shop-qty">2 pack</span>
-                </div>
-                <div className="shop-item">
-                  <span className="shop-cb" />
-                  <span className="shop-emoji">🥛</span>
-                  <span style={{ flex: 1 }}>Milk</span>
-                </div>
-              </div>
-            </div>
-            <div className="col-text">
-              <div className="eyebrow-sec">Shopping</div>
-              <h3>A list that <em>sorts</em> itself.</h3>
-              <p>Items auto-group into sensible categories — produce, dairy, meat — so the list reads in the order you shop. Snap a receipt and Housemait automatically checks off everything you've bought.</p>
-              <ul className="bullets">
-                <li><span className="check">✓</span> Create as many lists as your family needs</li>
-                <li><span className="check">✓</span> Smart categories keep items grouped sensibly</li>
-                <li><span className="check">✓</span> Receipt scanning in 2 seconds</li>
-                <li><span className="check">✓</span> "Previously purchased" memory</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Showcase />
 
       {/* TESTIMONIALS */}
       <section id="stories" className="section-cream sec-block">
@@ -688,73 +804,6 @@ export default function App() {
         </div>
       </section>
 
-      {/* SCHOOL TERMS */}
-      <section className="section-white sec-block">
-        <div className="wrap">
-          <div className="bigrow">
-            <div className="col-text">
-              <div className="eyebrow-sec" style={{ color: 'var(--coral)' }}>School Term Dates</div>
-              <h3>UK school term dates, <em>imported in one&nbsp;click.</em></h3>
-              <p>No more hunting through council websites or school newsletters. Select your child's school and Housemait automatically imports all term dates, half terms, and INSET days straight into your family calendar.</p>
-              <ul className="bullets">
-                <li><span className="check">✓</span> Search any school in England, Scotland, Wales &amp; NI</li>
-                <li><span className="check">✓</span> Term dates, half terms &amp; INSET days imported automatically</li>
-                <li><span className="check">✓</span> Syncs with your family calendar so nothing clashes</li>
-                <li><span className="check">✓</span> Supports multiple children at different schools</li>
-              </ul>
-              <a href={SIGNUP_URL} className="btn btn-primary" style={{ marginTop: 28 }}>Import your school's dates</a>
-            </div>
-            <div className="shot-wrap coral">
-              <div className="mock">
-                <div className="mock-head">
-                  <h4>🏫 School details</h4>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 20 }}>
-                  <div className="mock-field">
-                    <span className="label">School</span>
-                    <span className="value">Queen Elizabeth's School</span>
-                  </div>
-                  <div className="mock-field">
-                    <span className="label">Year</span>
-                    <span className="value">Year 4</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--coral)' }}>
-                    <span>📅</span> Term dates imported
-                  </div>
-                  <span className="mock-chip synced">✓ Synced</span>
-                </div>
-                <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '4px 16px 8px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', margin: '14px 0 4px' }}>2025–2026</div>
-                  <div className="term-row">
-                    <span className="term-pill autumn">Autumn</span>
-                    <div style={{ flex: 1 }}>
-                      <div className="term-dates">3 Sept – 19 Dec</div>
-                      <div className="term-half">Half term: 27 Oct – 31 Oct</div>
-                    </div>
-                  </div>
-                  <div className="term-row">
-                    <span className="term-pill spring">Spring</span>
-                    <div style={{ flex: 1 }}>
-                      <div className="term-dates">5 Jan – 10 Apr</div>
-                      <div className="term-half">Half term: 16 Feb – 20 Feb</div>
-                    </div>
-                  </div>
-                  <div className="term-row">
-                    <span className="term-pill summer">Summer</span>
-                    <div style={{ flex: 1 }}>
-                      <div className="term-dates">4 May – 22 Jul</div>
-                      <div className="term-half">Half term: 25 May – 29 May</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="mock-warning">⚠️ <span><strong>3 INSET days</strong> added to your calendar</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* PRICING */}
       <section id="pricing" className="section-white sec-block">
@@ -889,6 +938,10 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      <a href={SIGNUP_URL} className={`fab-cta${showFab ? ' show' : ''}`}>
+        Get Started <ArrowRight />
+      </a>
     </>
   )
 }

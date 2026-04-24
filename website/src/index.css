@@ -211,9 +211,9 @@ h2.sec em { font-style: italic; color: var(--purple); }
 .bigrow { display: grid; grid-template-columns: 1fr 1.2fr; gap: 72px; align-items: center; }
 .bigrow.flip { grid-template-columns: 1.2fr 1fr; }
 .bigrow.flip .col-text { order: 2; }
-.bigrow h3 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 44px; line-height: 1.08; margin: 6px 0 18px; letter-spacing: -.01em; }
-.bigrow h3 em { font-style: italic; color: var(--purple); }
-.bigrow p { color: var(--ink-soft); font-size: 17px; max-width: 460px; }
+.bigrow h3, .showcase-panel h3, .showcase-mitem h3 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 44px; line-height: 1.08; margin: 6px 0 18px; letter-spacing: -.01em; }
+.bigrow h3 em, .showcase-panel h3 em, .showcase-mitem h3 em { font-style: italic; color: var(--purple); }
+.bigrow p, .showcase-panel p, .showcase-mitem p { color: var(--ink-soft); font-size: 17px; max-width: 460px; }
 
 .bullets { margin: 24px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
 .bullets li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; }
@@ -531,6 +531,55 @@ footer.site .bottom { display: flex; justify-content: space-between; font-size: 
 
 @media (max-width: 540px) {
   .feat-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Mobile floating CTA ─── */
+.fab-cta {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translate(-50%, 20px);
+  z-index: 50;
+  background: var(--purple);
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 30px -8px rgba(74, 29, 130, .55), 0 4px 12px rgba(27, 20, 36, .15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
+}
+.fab-cta.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+
+@media (max-width: 959px) {
+  .fab-cta { display: inline-flex; }
+}
+
+/* ─── Scrollytelling showcase (pinned) ─── */
+section.showcase { padding: 0; }
+.showcase-pin { position: relative; height: 500vh; }
+.showcase-stage { position: sticky; top: 0; height: 100vh; display: flex; align-items: center; }
+.showcase-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 80px; align-items: center; width: 100%; }
+.showcase-left, .showcase-right { position: relative; min-height: 560px; }
+.showcase-panel, .showcase-mock { position: absolute; inset: 0; opacity: 0; transform: translateY(16px); transition: opacity .45s ease, transform .45s ease; pointer-events: none; display: flex; flex-direction: column; justify-content: center; }
+.showcase-panel.on, .showcase-mock.on { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.showcase-mock { justify-content: center; align-items: stretch; }
+.showcase-mock .shot-wrap { width: 100%; }
+.showcase-trigs { position: absolute; inset: 0; pointer-events: none; }
+.showcase-trig { position: absolute; left: 0; right: 0; height: 80vh; pointer-events: none; }
+.showcase-mobile { display: none; }
+
+@media (max-width: 959px) {
+  .showcase-pin { display: none; }
+  .showcase-mobile { display: block; padding-top: 40px; padding-bottom: 40px; }
+  .showcase-mitem { margin-bottom: 80px; }
+  .showcase-mitem:last-child { margin-bottom: 0; }
+  .showcase-mitem-mock { margin-top: 28px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
