@@ -370,10 +370,21 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       `}</style>
 
       {loading ? <Spinner /> : (
-        <div className="meal-plan-printable">
+        // space-y-5 restores the vertical gap between the grid and the
+        // action buttons. The outer container's space-y-5 applies only
+        // to its DIRECT children; wrapping the grid + buttons in this
+        // div moved them a level deeper, so the spacing has to be
+        // reapplied here.
+        <div className="meal-plan-printable space-y-5">
           {/* Print-only heading — replaces the on-screen nav at print time
-              so the printed sheet shows which week it covers. */}
-          <div className="print-only mb-6 text-center">
+              so the printed sheet shows which week it covers. Logo at the
+              top for a branded print-out. */}
+          <div className="print-only text-center" style={{ marginBottom: '24px' }}>
+            <img
+              src="/housemait-logo2.png"
+              alt="Housemait"
+              style={{ height: '36px', display: 'inline-block', marginBottom: '12px' }}
+            />
             <h1 style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
               Weekly Meal Plan
             </h1>
