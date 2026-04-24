@@ -24,11 +24,11 @@ const QUICK_CHIPS = [
 const FAQS = [
   {
     q: 'How does the free trial work?',
-    a: "You get full access to every Housemait feature for 30 days — no credit card required to start. We'll only ask for payment details at the end of the trial if you want to continue. If you do nothing, your account simply pauses.",
+    a: "You get full access to every Housemait feature for 30 days, no credit card required to start. We'll only ask for payment details at the end of the trial if you want to continue. If you do nothing, your account simply pauses.",
   },
   {
     q: 'How much does Housemait cost after the trial?',
-    a: 'Housemait is £4.99/month or £49/year (which works out to about £4.08/month — roughly 2 months free). Both plans include everything — there are no feature gates. You can switch between plans or cancel anytime.',
+    a: 'Housemait is £4.99/month or £49/year (which works out to about £4.08/month, roughly 2 months free). Both plans include everything. There are no feature gates. You can switch between plans or cancel anytime.',
   },
   {
     q: 'How does the WhatsApp bot work?',
@@ -36,7 +36,7 @@ const FAQS = [
   },
   {
     q: 'Can I share documents and photos with my household?',
-    a: "Yes. Housemait has a secure Documents section where you can upload school letters, appointment slips, receipts, family photos and more. Everyone in the household has access — no more digging through email attachments.",
+    a: "Yes. Housemait has a secure Documents section where you can upload school letters, appointment slips, receipts, family photos and more. Everyone in the household has access, so no more digging through email attachments.",
   },
   {
     q: 'Can I use Housemait without WhatsApp?',
@@ -44,7 +44,7 @@ const FAQS = [
   },
   {
     q: 'How many people can be in a household?',
-    a: "There's no limit. Invite as many family members as you need — parents, grandparents, older kids, au pairs, anyone who helps run the household. One subscription covers everyone.",
+    a: "There's no limit. Invite as many family members as you need: parents, grandparents, older kids, au pairs, anyone who helps run the household. One subscription covers everyone.",
   },
   {
     q: 'Is my family data safe?',
@@ -54,7 +54,7 @@ const FAQS = [
 
 const PRICING = {
   monthly: { amount: '£4.99', per: '/month', billed: 'Billed monthly after your 30-day trial' },
-  annual: { amount: '£49.90', per: '/year', billed: 'Billed annually — 2 months free' },
+  annual: { amount: '£49.90', per: '/year', billed: 'Billed annually. 2 months free' },
 }
 
 const PLAN_FEATURES = [
@@ -305,7 +305,7 @@ const SHOWCASE = [
     eyebrow: <div className="eyebrow-sec">Shared Calendar</div>,
     title: (<>Every date, <em>every&nbsp;body</em>, on one&nbsp;page.</>),
     desc: "See the whole month for the whole family. Filter by person, add shared events in one tap, and get a heads up when two people are double-booked.",
-    bullets: ['Colour-coded per family member', 'Syncs with Google, Apple, Outlook', 'Forward a school email — it becomes an event', '"What\'s on today" widget for the fridge tablet'],
+    bullets: ['Colour-coded per family member', 'Syncs with Google, Apple, Outlook', 'Forward a school email and it becomes an event', '"What\'s on today" widget for the fridge tablet'],
     mock: <CalendarMock />,
   },
   {
@@ -328,7 +328,7 @@ const SHOWCASE = [
     id: 'shop',
     eyebrow: <div className="eyebrow-sec">Shopping</div>,
     title: (<>A list that <em>sorts</em> itself.</>),
-    desc: "Items auto-group into sensible categories — produce, dairy, meat — so the list reads in the order you shop. Snap a receipt and Housemait automatically checks off everything you've bought.",
+    desc: "Items auto-group into sensible categories like produce, dairy and meat, so the list reads in the order you shop. Snap a receipt and Housemait automatically checks off everything you've bought.",
     bullets: ['Create as many lists as your family needs', 'Smart categories keep items grouped sensibly', 'Receipt scanning in 2 seconds', '"Previously purchased" memory'],
     mock: <ShoppingMock />,
   },
@@ -487,7 +487,7 @@ export default function LandingPage() {
               made easy&nbsp;with&nbsp;AI.
             </h1>
             <p className="lede">
-              Housemait is the AI that holds your family's calendar, shopping, tasks and meals in one place — and answers on WhatsApp — so the mental load stops landing on one person.
+              Housemait is the AI that holds your family's calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
             </p>
             <div className="hero-cta">
               <a href={SIGNUP_URL} className="btn btn-primary">
@@ -577,7 +577,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p style={{ maxWidth: 360, color: 'var(--ink-soft)', margin: 0 }}>
-              From Sunday meal plans to Friday dentist reminders — Housemait keeps the whole house in sync.
+              From Sunday meal plans to Friday dentist reminders, Housemait keeps the whole house in sync.
             </p>
           </div>
           <div className="feat-grid">
@@ -629,7 +629,7 @@ export default function LandingPage() {
           <div className="ai-demo">
             <div className="ai-input">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
-              <div className="txt">"Finn has a dentist on Thursday at 4, and we're out of milk — and let's plan three easy dinners this week"</div>
+              <div className="txt">"Finn has a dentist on Thursday at 4, we're out of milk, and let's plan three easy dinners this week"</div>
               <div className="send">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z" /></svg>
               </div>
@@ -641,7 +641,7 @@ export default function LandingPage() {
                   <span className="pill" style={{ background: 'var(--purple-soft)', color: 'var(--purple-deep)' }}>Calendar</span>
                   Thu 30 April
                 </div>
-                <div className="title">Finn — Dentist</div>
+                <div className="title">Finn · Dentist</div>
                 <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>4:00 PM · 45 min<br />📍 Bellingham Dental, Bristol</div>
                 <div style={{ marginTop: 8, paddingTop: 12, borderTop: '1px solid rgba(27,20,36,.06)', fontSize: 13, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--purple)' }} />
@@ -674,9 +674,9 @@ export default function LandingPage() {
                 </div>
                 <div className="title">3 dinners planned</div>
                 <ul>
-                  <li>🍝 Tue — One-pot pasta</li>
-                  <li>🌮 Wed — Sheet-pan fajitas</li>
-                  <li>🍛 Thu — Quick butter chicken</li>
+                  <li>🍝 Tue · One-pot pasta</li>
+                  <li>🌮 Wed · Sheet-pan fajitas</li>
+                  <li>🍛 Thu · Quick butter chicken</li>
                 </ul>
               </div>
             </div>
@@ -706,7 +706,7 @@ export default function LandingPage() {
                   <li><span className="check">✓</span> Add items to your shopping list by just texting</li>
                   <li><span className="check">✓</span> Create and assign tasks to family members</li>
                   <li><span className="check">✓</span> Plan meals and get recipe suggestions</li>
-                  <li><span className="check">✓</span> Send voice notes — we'll transcribe them into actions</li>
+                  <li><span className="check">✓</span> Send voice notes and we'll transcribe them into actions</li>
                 </ul>
               </div>
               <div style={{ position: 'relative' }}>
