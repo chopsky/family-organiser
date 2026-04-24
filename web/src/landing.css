@@ -33,7 +33,7 @@
 }
 
 .lp-v2 img { max-width: 100%; display: block; }
-.lp-v2 a { color: inherit; text-decoration: none; }
+.lp-v2 a { text-decoration: none; }
 
 .wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
 .serif { font-family: 'Instrument Serif', serif; font-weight: 400; letter-spacing: -.01em; }
