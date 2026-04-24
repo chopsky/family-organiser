@@ -10,9 +10,10 @@ export default function Welcome({ user, household, next }) {
   return (
     <div className="text-center">
       <img
-        src="/housemait-logomark.png"
+        src="/housemait-logo.svg"
         alt="Housemait"
-        className="h-20 w-20 mx-auto mb-8 rounded-2xl shadow-sm"
+        className="mx-auto mb-8"
+        style={{ width: '60.67px', height: '48px', display: 'block' }}
       />
       <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
         {household?.name ? household.name : 'Your Household'}
