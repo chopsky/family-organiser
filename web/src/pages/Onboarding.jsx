@@ -121,11 +121,11 @@ export default function Onboarding() {
       </div>
 
       {/* `safe-top` adds the iOS safe-area-inset-top (notch / Dynamic
-          Island padding) on top of pt-12 so content doesn't collide with
-          the status bar on notched devices. No-op on devices without a
-          notch (safe-area-inset-top = 0 there) so web and older iPhones
-          stay unaffected. */}
-      <main className="safe-top flex-1 flex items-start justify-center px-5 pt-12 pb-8 md:pt-20 md:pb-16">
+          Island padding). Combined with pt-20 that gives ~80px below
+          the notch on iPhone 17 — enough breathing room above the
+          kicker text. No-op on devices without a notch so web and
+          older iPhones stay consistent with the previous layout. */}
+      <main className="safe-top flex-1 flex items-start justify-center px-5 pt-20 pb-12 md:pt-20 md:pb-16">
         <div className="w-full max-w-xl">
           <ErrorBanner message={error} onDismiss={() => setError('')} />
           <Suspense fallback={<StepSkeleton />}>
@@ -148,9 +148,10 @@ export default function Onboarding() {
       </main>
 
       {/* Footer nav — back + step counter. "Next" / "Skip" buttons live
-          inside each step so they can control their own wording. */}
-      <footer className="border-t border-light-grey bg-white/60 backdrop-blur-sm">
-        <div className="max-w-xl mx-auto px-5 py-4 flex items-center justify-between text-sm">
+          inside each step so they can control their own wording.
+          `safe-bottom` keeps it clear of the iPhone home indicator. */}
+      <footer className="border-t border-light-grey bg-white/60 backdrop-blur-sm safe-bottom">
+        <div className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between text-sm">
           {!isFirst ? (
             <button
               type="button"

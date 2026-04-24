@@ -10,7 +10,7 @@ export default function Welcome({ user, household, next }) {
   return (
     <div className="text-center">
       <img
-        src="/housemait-logo.svg"
+        src="/housemait-logomark.png"
         alt="Housemait"
         className="mx-auto mb-8"
         style={{ width: '60.67px', height: '48px', display: 'block' }}
