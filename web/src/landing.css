@@ -546,7 +546,7 @@ footer.site .bottom { display: flex; justify-content: space-between; font-size: 
   pointer-events: none;
   transition: opacity .25s ease, transform .25s ease;
 }
-.fab-cta.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.fab-cta.show { opacity: .9; transform: translate(-50%, 0); pointer-events: auto; }
 
 @media (max-width: 959px) {
   .fab-cta { display: inline-flex; }
