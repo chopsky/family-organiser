@@ -58,9 +58,10 @@ export default function Privacy() {
 
           <Section title="1. Who we are">
             <p>
-              Housemait is operated by <strong>[Your Legal Entity or Your Name, Sole Trader]</strong>, based
-              in the United Kingdom. For the purposes of the UK General Data Protection Regulation (UK GDPR)
-              and the EU GDPR, we are the <strong>data controller</strong> for personal data you provide to us.
+              Housemait is operated by <strong>Grant Shapiro</strong> (sole trader), based at
+              124 City Road, London, EC1V 2NX, United Kingdom. For the purposes of the UK General Data
+              Protection Regulation (UK GDPR) and the EU GDPR, we are the <strong>data controller</strong>
+              for personal data you provide to us.
             </p>
             <p>
               Contact for privacy enquiries:{' '}
@@ -325,7 +326,7 @@ export default function Privacy() {
             <p>
               <strong>Housemait — Privacy</strong><br />
               Email: <a href="mailto:privacy@housemait.com" className="text-plum hover:underline">privacy@housemait.com</a><br />
-              Address: [Your postal address, required for UK GDPR]
+              Address: Grant Shapiro, 124 City Road, London, EC1V 2NX, United Kingdom
             </p>
           </Section>
         </div>
