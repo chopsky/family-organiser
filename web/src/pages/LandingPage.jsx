@@ -560,7 +560,7 @@ export default function LandingPage() {
             </div>
             <div className="sticker s3">
               <div className="ic">✦</div>
-              <div style={{ fontSize: 12.5 }}>Receipt scanned in 2s</div>
+              <div>Grocery receipt scanned<br /><span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>6 items marked as bought</span></div>
             </div>
           </div>
         </div>
