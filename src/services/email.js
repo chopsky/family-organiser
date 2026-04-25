@@ -59,12 +59,14 @@ function button(text, url) {
   return `<a href="${url}" style="display:inline-block;background:${BRAND.plum};color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;font-size:16px;margin:16px 0;">${text}</a>`;
 }
 
-async function sendEmail(to, subject, html) {
+async function sendEmail(to, subject, html, options = {}) {
   if (!client) {
     console.warn('Postmark not configured — skipping email to', to);
     return;
   }
-  await client.sendEmail({ From: FROM, To: to, Subject: subject, HtmlBody: html });
+  const payload = { From: FROM, To: to, Subject: subject, HtmlBody: html };
+  if (options.replyTo) payload.ReplyTo = options.replyTo;
+  await client.sendEmail(payload);
 }
 
 async function sendVerificationEmail(to, name, token) {

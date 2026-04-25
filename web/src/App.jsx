@@ -29,6 +29,7 @@ const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
 const Privacy         = lazy(() => import('./pages/Privacy'));
 const Terms           = lazy(() => import('./pages/Terms'));
+const Support         = lazy(() => import('./pages/Support'));
 const Subscribe       = lazy(() => import('./pages/Subscribe'));
 const SubscribeSuccess = lazy(() => import('./pages/SubscribeSuccess'));
 const SubscribeCancel  = lazy(() => import('./pages/SubscribeCancel'));
@@ -103,6 +104,7 @@ function AppRoutes() {
         <Route path="/verified" element={<Verified />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/support" element={<Support />} />
         <Route path="/setup" element={<RequireAuthOnly><SetupHousehold /></RequireAuthOnly>} />
         {/* Onboarding wizard — requires auth + a household, but deliberately
             NOT a completed onboarding (that's what it sets). Renders without

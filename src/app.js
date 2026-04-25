@@ -60,6 +60,14 @@ if (process.env.NODE_ENV !== 'test') {
     message: { error: 'Too many join attempts. Please try again in an hour.' },
   });
   app.use('/api/auth', authLimiter);
+
+  // Stricter limiter for the public contact form (anti-spam)
+  const contactLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5,
+    message: { error: 'Too many contact attempts. Please try again later.' },
+  });
+  app.use('/api/contact', contactLimiter);
 }
 
 // Health check
@@ -80,6 +88,9 @@ app.use('/api/subscription', require('./routes/subscription'));
 // credential). Mounted BEFORE the gate so expired users whose inbox
 // still has a trial nudge email can click the link and reach it.
 app.use('/api/unsubscribe', require('./routes/unsubscribe'));
+
+// Contact form endpoint — public, no auth required.
+app.use('/api/contact', require('./routes/contact'));
 
 // Trial / subscription gate. Returns 402 for households whose trial has
 // expired or whose subscription has lapsed. Excludes /auth, /subscription,

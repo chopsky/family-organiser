@@ -922,7 +922,7 @@ export default function LandingPage() {
               <ul>
                 <li><a href="https://housemait.com/privacy">Privacy Policy</a></li>
                 <li><a href="https://housemait.com/terms">Terms of Service</a></li>
-                <li><a href="mailto:hello@housemait.com">Contact</a></li>
+                <li><a href="/support">Contact</a></li>
               </ul>
             </div>
             <div>
