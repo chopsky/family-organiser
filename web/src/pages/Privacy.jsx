@@ -326,7 +326,7 @@ export default function Privacy() {
             <p>
               <strong>Housemait — Privacy</strong><br />
               Email: <a href="mailto:privacy@housemait.com" className="text-plum hover:underline">privacy@housemait.com</a><br />
-              Address: Grant Shapiro, 124 City Road, London, EC1V 2NX, United Kingdom
+              Address: Housemait, 124 City Road, London, EC1V 2NX, United Kingdom
             </p>
           </Section>
         </div>
