@@ -85,7 +85,11 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <LandingPage />)} />
+        {/* On iOS / native: a fresh install almost always means a brand-new
+            user, so /signup is the more useful default. Returning users can
+            tap the "Already have an account? Log in" link on Signup. On
+            web the LandingPage handles its own login/signup CTAs. */}
+        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/signup" replace /> : <LandingPage />)} />
         <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
         {/* /signup must be unreachable while a session is live — otherwise a
             logged-in user creating a "new" account carries their token into
