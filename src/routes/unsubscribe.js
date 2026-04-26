@@ -31,7 +31,7 @@ const router = Router();
 function confirmationPage({ success, householdName }) {
   const inner = success
     ? `
-        <h1 style="color:#2D2A33;margin:0 0 12px;font-size:22px;font-family:Lora,Georgia,serif;font-weight:600;letter-spacing:-0.02em;">You've unsubscribed</h1>
+        <h1 style="color:#2D2A33;margin:0 0 12px;font-size:22px;font-family:'Instrument Serif',Lora,Georgia,serif;font-weight:600;letter-spacing:-0.02em;">You've unsubscribed</h1>
         <p style="color:#374151;line-height:1.6;font-size:16px;margin:0 0 8px;">
           We won't send ${householdName ? `<strong>${householdName}</strong>` : 'your household'} any more trial reminder emails.
         </p>
@@ -42,7 +42,7 @@ function confirmationPage({ success, householdName }) {
         </p>
         <a href="${process.env.WEB_URL || 'https://www.housemait.com'}" style="display:inline-block;background:#6B3FA0;color:#fff;text-decoration:none;padding:12px 28px;border-radius:12px;font-weight:600;font-size:14px;">Back to Housemait</a>`
     : `
-        <h1 style="color:#2D2A33;margin:0 0 12px;font-size:22px;font-family:Lora,Georgia,serif;font-weight:600;letter-spacing:-0.02em;">Link expired or invalid</h1>
+        <h1 style="color:#2D2A33;margin:0 0 12px;font-size:22px;font-family:'Instrument Serif',Lora,Georgia,serif;font-weight:600;letter-spacing:-0.02em;">Link expired or invalid</h1>
         <p style="color:#374151;line-height:1.6;font-size:16px;margin:0 0 20px;">
           This unsubscribe link doesn't look right. It may have expired
           (links are valid for 90 days), or been copied incorrectly.

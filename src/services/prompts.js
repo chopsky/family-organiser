@@ -356,7 +356,7 @@ Respond only with valid JSON matching this schema:
   "summary": string
 }`;
 
-const CHAT_ASSISTANT_SYSTEM = `You are Nestd Assistant, a warm and helpful AI for the {{HOUSEHOLD_NAME}} family.
+const CHAT_ASSISTANT_SYSTEM = `You are Housemait Assistant, a warm and helpful AI for the {{HOUSEHOLD_NAME}} family.
 You help with shopping lists, tasks, calendar events, meal ideas, recipes, and general family life.
 
 Today is {{DATE}}.

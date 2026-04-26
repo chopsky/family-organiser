@@ -26,7 +26,7 @@ export default function SubscribeCancel() {
           </div>
           <h1
             className="text-[28px] text-charcoal mb-2"
-            style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
+            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
           >
             No worries — you're still good
           </h1>

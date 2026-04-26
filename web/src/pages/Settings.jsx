@@ -122,7 +122,7 @@ function PlanSection() {
               <strong className="text-emerald font-semibold">Active</strong>
               {plan && (
                 <span className="text-charcoal">
-                  {' '}· {plan === 'annual' ? 'Annual plan (£49/year)' : 'Monthly plan (£4.99/month)'}
+                  {' '}· {plan === 'annual' ? 'Annual plan (£49.90/year)' : 'Monthly plan (£4.99/month)'}
                 </span>
               )}
             </p>

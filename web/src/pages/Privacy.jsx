@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 /**
  * Privacy Policy page.
  * Content mirrors /web/public/privacy.html, re-styled to match the landing-page
- * design system (DM Sans, plum headings, cream background, tailwind tokens).
+ * design system (Inter body, Instrument Serif headings, plum accents, cream background, tailwind tokens).
  */
 export default function Privacy() {
   useEffect(() => {
@@ -38,8 +38,8 @@ export default function Privacy() {
           <h1 className="text-3xl md:text-5xl font-bold text-charcoal mb-3 leading-tight">
             Privacy Policy
           </h1>
-          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Last updated:</strong> 15 April 2026</p>
-          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Effective date:</strong> 15 April 2026</p>
+          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Last updated:</strong> 25 April 2026</p>
+          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Effective date:</strong> 25 April 2026</p>
         </header>
 
         <div className="space-y-6 text-base leading-relaxed">
@@ -238,14 +238,45 @@ export default function Privacy() {
             </p>
           </Section>
 
-          <Section title="8. Data retention">
+          <Section title="8. How long we keep your data">
+            <p>
+              We keep your household's data while your account is active. When your free trial
+              ends or your subscription is cancelled, we keep your data for{' '}
+              <strong>12 months</strong> from the date you became inactive. During this window:
+            </p>
             <ul className="list-disc pl-6 space-y-1.5">
-              <li><strong>Account data:</strong> retained while your account is active, plus up to 30 days after deletion for backup rollover.</li>
-              <li><strong>Household data</strong> (lists, tasks, calendar, meal plans, documents): deleted with the household, or within 30 days after all members have left.</li>
-              <li><strong>WhatsApp message logs:</strong> retained for up to 90 days for abuse prevention and debugging, then purged.</li>
-              <li><strong>Application logs:</strong> retained for up to 30 days.</li>
+              <li>You can resubscribe at any time and everything picks up exactly where you left off — lists, calendars, meals, tasks, family profiles, all of it.</li>
+              <li>You can still log in to view your data in read-only mode.</li>
+              <li>You can export your data to a JSON file from <strong>Settings → Your data → Export my data</strong> at any time.</li>
+              <li>You can permanently delete your account and data from <strong>Settings → Delete account</strong> at any time.</li>
+            </ul>
+            <p>
+              After 12 months of inactivity, we permanently delete the household and all data
+              associated with it. We'll email you <strong>30 days before deletion</strong> (at
+              the 11-month mark) with a clear warning and a chance to resubscribe or export.
+            </p>
+            <p>Some records are kept longer where UK law requires us to:</p>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li>
+                <strong>Transaction records</strong> (payments, refunds, invoices) — kept for{' '}
+                <strong>7 years</strong> after the relevant tax year, per HMRC requirements.
+                These are held by our payment processor (Stripe) and in our own financial
+                records; they do not contain household content.
+              </li>
+              <li>
+                <strong>Deletion audit log</strong> — we keep a minimal record of account
+                deletions (user ID, email, deletion date, IP address, whether a Stripe
+                subscription was cancelled) for <strong>6 years</strong>. This supports
+                fraud-prevention and lets us respond to disputes such as “my account was deleted
+                without my consent”, as permitted under UK GDPR Article 17(3).
+              </li>
+            </ul>
+            <p>Other operational data is retained on shorter cycles:</p>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li><strong>Account data after deletion:</strong> up to 30 days for backup rollover, after which the deletion propagates through all backups.</li>
+              <li><strong>WhatsApp message logs:</strong> up to 90 days for abuse prevention and debugging, then purged.</li>
+              <li><strong>Application logs:</strong> up to 30 days.</li>
               <li><strong>Authentication tokens:</strong> refresh tokens expire 7 days after last use; access tokens expire 1 hour after issue.</li>
-              <li><strong>Financial / tax records (if any):</strong> retained as required by law (typically 6 years in the UK).</li>
             </ul>
           </Section>
 
@@ -279,7 +310,8 @@ export default function Privacy() {
                 <strong>Lodge a complaint</strong> with a supervisory authority — in the UK, the{' '}
                 <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" className="text-plum hover:underline">
                   Information Commissioner's Office (ICO)
-                </a>.
+                </a>{' '}
+                or by calling <strong>0303 123 1113</strong>.
               </li>
             </ul>
             <p>
@@ -289,7 +321,28 @@ export default function Privacy() {
             </p>
           </Section>
 
-          <Section title="10. Security">
+          <Section title="10. Email communications">
+            <p>We send two kinds of email:</p>
+            <ol className="list-decimal pl-6 space-y-1.5">
+              <li>
+                <strong>Transactional emails</strong> — account-related and always sent:
+                verification, password resets, household invites, welcome email, trial-ended
+                notice, subscription receipts, and the 30-day pre-deletion warning. You cannot
+                opt out of these while you have an active account.
+              </li>
+              <li>
+                <strong>Trial reminder emails</strong> — sent at days 20, 25 and 28 of your
+                30-day free trial. You can opt out in two ways:
+                <ul className="list-disc pl-6 space-y-1.5 mt-1.5">
+                  <li>Click the unsubscribe link in the email footer.</li>
+                  <li>Toggle off <strong>Settings → Plan → “Trial reminder emails”</strong>.</li>
+                </ul>
+              </li>
+            </ol>
+            <p>We never sell or share your email address with third parties.</p>
+          </Section>
+
+          <Section title="11. Security">
             <ul className="list-disc pl-6 space-y-1.5">
               <li>All traffic between your device and our servers is encrypted using HTTPS/TLS.</li>
               <li>Passwords are hashed using bcrypt before storage.</li>
@@ -304,7 +357,7 @@ export default function Privacy() {
             </p>
           </Section>
 
-          <Section title="11. Cookies & similar technologies">
+          <Section title="12. Cookies & similar technologies">
             <p>
               The Housemait web app uses <code className="bg-white border border-light-grey rounded px-1.5 py-0.5 text-sm">localStorage</code>{' '}
               on your device to store your authentication token and user preferences. We do not use
@@ -313,7 +366,7 @@ export default function Privacy() {
             </p>
           </Section>
 
-          <Section title="12. Changes to this policy">
+          <Section title="13. Changes to this policy">
             <p>
               We may update this Privacy Policy from time to time. If we make material changes, we will
               notify you by email or in-app before the change takes effect. The “Last updated” date at
@@ -321,7 +374,7 @@ export default function Privacy() {
             </p>
           </Section>
 
-          <Section title="13. Contact">
+          <Section title="14. Contact">
             <p>Questions, requests, or complaints can be sent to:</p>
             <p>
               <strong>Housemait — Privacy</strong><br />

@@ -1,13 +1,13 @@
-# Nestd — Family Organiser
+# Housemait — Family Organiser
 
 ## Project overview
 
-Nestd is a family organiser app targeting modern UK families. It helps households coordinate calendars, grocery lists, meal plans, tasks, and more. The app is built with React and deployed on Vercel.
+Housemait is a family organiser app targeting modern UK families. It helps households coordinate calendars, grocery lists, meal plans, tasks, and more. The app is built with React and deployed on Vercel.
 
 ## Design system
 
-Full brand guidelines: `/design/nestd-brand-guidelines.docx`
-Target interface mockup: `/design/nestd-interface-redesign.html`
+Full brand guidelines: `/design/housemait-brand-guidelines.docx`
+Target interface mockup: `/design/housemait-interface-redesign.html`
 
 Always reference these files when making UI changes. The HTML mockup is the source of truth for layout, spacing, and component patterns.
 
@@ -45,20 +45,24 @@ Warm but not twee. Organised but not rigid. Modern but not cold. The UI should f
 
 ### Typography
 
-| Role      | Font family | Weight        | Size range  | Usage                                |
-| --------- | ----------- | ------------- | ----------- | ------------------------------------ |
-| Display   | Lora        | 600–700       | 24–40px     | Page headings, feature titles        |
-| Section   | Lora        | 500–600       | 17–24px     | Card titles, section headers         |
-| Body      | DM Sans     | 400           | 15–16px     | Body text, descriptions              |
-| UI Label  | DM Sans     | 500–600       | 13–14px     | Nav items, buttons, form labels      |
-| Caption   | DM Sans     | 500           | 11–12px     | Timestamps, meta text, tab labels    |
+The brand uses **Instrument Serif** for display/headings and **Inter** for body and UI. The in-app surfaces (`web/`) ship a system font stack as the default body face for native feel, with Instrument Serif + Inter loaded from Google Fonts for headings and for parity with the marketing landing page (`website/`), which uses Inter as its body face throughout.
 
-Import from Google Fonts:
-```
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&display=swap');
+| Role      | Font family       | Weight     | Size range            | Usage                                  |
+| --------- | ----------------- | ---------- | --------------------- | -------------------------------------- |
+| Display   | Instrument Serif  | 400        | clamp(40px – 68px)    | Hero headlines, large feature titles   |
+| Section   | Instrument Serif  | 400        | 24–44px               | Page headings, card-section titles     |
+| Body      | Inter (or system) | 400        | 15–16px               | Body text, descriptions                |
+| UI Label  | Inter             | 500–600    | 13–14px               | Nav items, buttons, form labels        |
+| Caption   | Inter             | 500        | 11–12px               | Timestamps, meta text, tab labels      |
+
+Loaded in `web/index.html` and `website/index.html`:
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 ```
 
-Headings use Lora with -0.02em letter-spacing. Body uses DM Sans at 1.6 line-height. Never use more than two weights per typeface in a single view.
+Display headings use Instrument Serif with negative letter-spacing (around `-.01em` to `-.02em`) and tight line-height (~1.05). Body uses Inter (or the system stack in-app) at ~1.6 line-height. Never use more than two weights per typeface in a single view.
 
 ### Spacing
 
@@ -124,15 +128,15 @@ Use warm-toned shadows, never cool grey.
 | Ghost     | transparent  | none                | `--plum`    | Tertiary / inline    |
 | Danger    | `--coral`    | none                | white       | Destructive only     |
 
-All buttons: 48px height, 12px radius, DM Sans 600 14px.
+All buttons: 48px height, 12px radius, Inter 600 14px.
 
 #### Cards
 
-White background, 16px radius, `--shadow-sm`. Hover: `--shadow-md`. Card header: Lora 600 17px title + right-aligned action link in `--plum` 12px 600.
+White background, 16px radius, `--shadow-sm`. Hover: `--shadow-md`. Card header: Instrument Serif 400 24px title + right-aligned action link in `--plum` Inter 12px 600.
 
 #### Form inputs
 
-`--light-grey` border (1.5px), 10px radius, 48px height, `--cream` background. Focus: `--plum` border (2px) with subtle plum glow ring. Labels above in DM Sans 500 13px `--charcoal`.
+`--light-grey` border (1.5px), 10px radius, 48px height, `--cream` background. Focus: `--plum` border (2px) with subtle plum glow ring. Labels above in Inter 500 13px `--charcoal`.
 
 #### Avatars
 
@@ -140,7 +144,7 @@ Vibrant background colour per family member (Plum, Coral, Sage, Amber `#E0A458`,
 
 #### Quick actions
 
-Pill-shaped (24px radius), white background, 1.5px `--light-grey` border, 13px DM Sans 600. Hover: border changes to `--plum`, text changes to `--plum`. Each has a small coloured stroke icon on the left.
+Pill-shaped (24px radius), white background, 1.5px `--light-grey` border, 13px Inter 600. Hover: border changes to `--plum`, text changes to `--plum`. Each has a small coloured stroke icon on the left.
 
 ### Icons
 

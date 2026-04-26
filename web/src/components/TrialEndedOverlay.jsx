@@ -86,7 +86,7 @@ export default function TrialEndedOverlay() {
         <h2
           id="trial-ended-heading"
           className="text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
-          style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
+          style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
         >
           Your free trial has ended
         </h2>

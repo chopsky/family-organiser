@@ -151,7 +151,7 @@ export function TrialIndicatorCard() {
 function WarningContent({ daysRemaining }) {
   return (
     <>
-      <h3 className="text-[17px] font-semibold text-charcoal" style={{ fontFamily: 'Lora, serif', letterSpacing: '-0.02em' }}>
+      <h3 className="text-[17px] font-semibold text-charcoal" style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.02em' }}>
         Your free trial ends in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
       </h3>
       <p className="text-sm text-warm-grey mt-1">
@@ -190,7 +190,7 @@ function FinalPushContent({ daysRemaining, trialEndsAt }) {
 
   return (
     <>
-      <h3 className="text-[17px] font-semibold text-charcoal" style={{ fontFamily: 'Lora, serif', letterSpacing: '-0.02em' }}>
+      <h3 className="text-[17px] font-semibold text-charcoal" style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.02em' }}>
         {daysRemaining === 1
           ? 'Your trial ends tomorrow'
           : `Your trial ends in ${daysRemaining} days`}

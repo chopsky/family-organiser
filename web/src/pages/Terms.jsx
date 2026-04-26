@@ -46,8 +46,8 @@ export default function Terms() {
           <h1 className="text-3xl md:text-5xl font-bold text-charcoal mb-3 leading-tight">
             Terms of Service
           </h1>
-          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Last updated:</strong> 20 April 2026</p>
-          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Effective date:</strong> 20 April 2026</p>
+          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Last updated:</strong> 25 April 2026</p>
+          <p className="text-sm text-warm-grey m-0"><strong className="font-semibold">Effective date:</strong> 25 April 2026</p>
         </header>
 
         <div className="space-y-6 text-base leading-relaxed">
@@ -157,10 +157,50 @@ export default function Terms() {
 
           <Section title="7. Pricing, billing, and refunds">
             <p>
-              Housemait is currently provided free of charge. If we introduce paid plans in the
-              future, we'll update these Terms and give you clear notice before anything you're
-              already using becomes a paid feature. Existing data will never be held hostage
-              behind a new paywall.
+              New accounts get a <strong>30-day free trial</strong> with full access to every
+              feature. No card details are required to start the trial. Towards the end of the
+              trial we'll prompt you to choose a paid plan if you want to keep using the Service.
+            </p>
+            <p>
+              Current plans (UK pricing, VAT included where applicable):
+            </p>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li><strong>Monthly</strong> — £4.99 / month, billed monthly.</li>
+              <li><strong>Annual</strong> — £49.90 / year, billed annually (works out at roughly £4.16 / month — about 2 months free vs. monthly billing).</li>
+            </ul>
+            <p>
+              Both plans include the same features — there are no feature gates between tiers. You
+              can view the current pricing at any time on the{' '}
+              <strong>Settings → Plan</strong> screen or on our website. Payments are processed by{' '}
+              <strong>Stripe</strong>; we don't see or store your card details.
+            </p>
+            <p>
+              Subscriptions <strong>renew automatically</strong> at the end of each billing period
+              using your saved payment method. You can cancel at any time from{' '}
+              <strong>Settings → Plan → Manage subscription</strong> (which opens the Stripe
+              Customer Portal). When you cancel, you keep access until the end of the period
+              you've already paid for, and no further charges will be taken.
+            </p>
+            <p>
+              Because the iOS App Store does not currently allow in-app purchases for Housemait
+              subscriptions, iOS users complete and manage their subscription on the{' '}
+              <a href="https://housemait.com" target="_blank" rel="noopener noreferrer" className="text-plum hover:underline">housemait.com</a>{' '}
+              web app. The same account works across web and iOS.
+            </p>
+            <p>
+              <strong>Refunds.</strong> Subscription fees are generally non-refundable for partial
+              periods — when you cancel you keep access for the time you've paid for, but we
+              don't pro-rata earlier in the cycle. Your statutory rights as a UK consumer
+              (including the 14-day right to cancel a new subscription under the Consumer
+              Contracts Regulations 2013, where it applies) are not affected. To request a
+              refund or raise a billing issue, email{' '}
+              <a href="mailto:hello@housemait.com" className="text-plum hover:underline">hello@housemait.com</a>.
+            </p>
+            <p>
+              <strong>Pricing changes.</strong> If we change the price of an existing plan, we'll
+              give you at least <strong>30 days' email notice</strong> before the new price applies
+              to your next renewal. You can cancel before the change takes effect if you don't
+              want to continue at the new price.
             </p>
           </Section>
 
@@ -183,25 +223,66 @@ export default function Terms() {
             </p>
           </Section>
 
-          <Section title="10. Ending your account">
+          <Section title="10. Data retention">
             <p>
-              You can delete your account at any time from{' '}
-              <strong>Settings → Delete account</strong>. If you're the only member of your
-              household, everything in it will also be deleted; if other members are still
-              present, their access continues.
+              If you cancel your subscription or your free trial ends without subscribing, we'll
+              keep your household's data for <strong>12 months</strong> so you can pick up where
+              you left off if you resubscribe. During that window you can still log in to view
+              your data in read-only mode and export it at any time.
             </p>
             <p>
-              You can also export a full machine-readable copy of your data before deleting,
-              from <strong>Settings → Your data → Export my data</strong>.
+              After 12 months of inactivity, we permanently delete your household and everything
+              in it. We'll email you <strong>30 days before deletion</strong> with a clear warning
+              and your options (resubscribe or export).
             </p>
             <p>
-              We may suspend or terminate your account if you materially breach these Terms, if
-              we're required to by law, or if your account is inactive for an extended period
-              (we'll warn you by email first).
+              You can delete your account and data at any time from{' '}
+              <strong>Settings → Delete account</strong>. See the{' '}
+              <Link to="/privacy" className="text-plum hover:underline">Privacy Policy</Link>{' '}
+              for the full retention schedule and your rights under UK data protection law.
             </p>
           </Section>
 
-          <Section title="11. Disclaimers">
+          <Section title="11. Account deletion">
+            <p>
+              You can permanently delete your Housemait account at any time from{' '}
+              <strong>Settings → Delete account</strong>.
+            </p>
+            <p>When you delete your account:</p>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li>
+                If you are the <strong>only member</strong> of your household, the entire
+                household is deleted — shopping lists, calendars, meals, tasks, family profiles,
+                documents, chat history — all of it.
+              </li>
+              <li>
+                If <strong>other members remain</strong>, only your user record is removed. Your
+                name is blanked from shared items but the items themselves stay with the
+                household. If you were the only admin, another member is automatically promoted.
+              </li>
+              <li>
+                Any <strong>active Stripe subscription</strong> is cancelled immediately as part
+                of the deletion. No further charges will be taken.
+              </li>
+              <li>
+                A <strong>minimal audit record</strong> is kept (user ID, email, deletion date,
+                IP address, Stripe status) for 6 years to support fraud prevention and dispute
+                resolution, as permitted by UK GDPR Article 17(3).
+              </li>
+            </ul>
+            <p>
+              Deletion is <strong>permanent and cannot be undone</strong>. If you want a copy of
+              your data before deleting, use{' '}
+              <strong>Settings → Your data → Export my data</strong> first.
+            </p>
+            <p>
+              We may also suspend or terminate your account if you materially breach these Terms,
+              if we're required to by law, or if your account is inactive beyond the retention
+              window described in Section 10.
+            </p>
+          </Section>
+
+          <Section title="12. Disclaimers">
             <p>
               Housemait is a <strong>personal organiser tool</strong> — not medical, legal,
               financial, or emergency advice. The AI features (classifier, receipt matcher, chat
@@ -217,7 +298,7 @@ export default function Terms() {
             </p>
           </Section>
 
-          <Section title="12. Limitation of liability">
+          <Section title="13. Limitation of liability">
             <p>
               To the maximum extent permitted by law, our total liability to you in connection
               with the Service, whether in contract, tort, or otherwise, is limited to the
@@ -236,7 +317,7 @@ export default function Terms() {
             </p>
           </Section>
 
-          <Section title="13. Indemnity">
+          <Section title="14. Indemnity">
             <p>
               You agree to indemnify and hold us harmless against any claim, loss, or damage
               arising from (a) your breach of these Terms, (b) content you upload to the Service,
@@ -245,7 +326,7 @@ export default function Terms() {
             </p>
           </Section>
 
-          <Section title="14. Governing law and disputes">
+          <Section title="15. Governing law and disputes">
             <p>
               These Terms are governed by the law of <strong>England and Wales</strong>. Any
               dispute arising out of or in connection with these Terms or the Service falls under
@@ -260,7 +341,7 @@ export default function Terms() {
             </p>
           </Section>
 
-          <Section title="15. Changes to these Terms">
+          <Section title="16. Changes to these Terms">
             <p>
               We may update these Terms from time to time. If we make material changes we'll
               notify you in-app or by email at least <strong>14 days</strong> before the changes
@@ -269,7 +350,7 @@ export default function Terms() {
             </p>
           </Section>
 
-          <Section title="16. Contact">
+          <Section title="17. Contact">
             <p>
               For questions about these Terms, email{' '}
               <a href="mailto:hello@housemait.com" className="text-plum hover:underline">hello@housemait.com</a>.

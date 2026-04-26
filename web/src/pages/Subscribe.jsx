@@ -39,11 +39,11 @@ const PLANS = {
   },
   annual: {
     label: 'Annual',
-    priceDisplay: '£49',
+    priceDisplay: '£49.90',
     periodDisplay: 'per year',
-    tagline: "That's just £4.08 a month.",
+    tagline: "That's just £4.16 a month.",
     badge: 'Best value',
-    savings: 'Save £10.88 · 2 months free',
+    savings: 'Save £9.98 · 2 months free',
   },
 };
 
@@ -105,7 +105,7 @@ export default function Subscribe() {
         <div className="text-center mb-10">
           <h1
             className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600 }}
+            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600 }}
           >
             {copy.headline}
           </h1>
@@ -211,7 +211,7 @@ function PricingCard({ plan, highlighted, currentPlan, submitting, disabled, onS
 
       <h2
         className="text-[22px] text-charcoal mb-1"
-        style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
+        style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
       >
         {p.label}
       </h2>
@@ -219,7 +219,7 @@ function PricingCard({ plan, highlighted, currentPlan, submitting, disabled, onS
 
       <div className="mb-5">
         <div className="flex items-baseline gap-2">
-          <span className="text-[36px] font-semibold text-charcoal leading-none" style={{ fontFamily: 'Lora, Georgia, serif' }}>
+          <span className="text-[36px] font-semibold text-charcoal leading-none" style={{ fontFamily: '"Instrument Serif", Georgia, serif' }}>
             {p.priceDisplay}
           </span>
           <span className="text-sm text-warm-grey">{p.periodDisplay}</span>
@@ -295,7 +295,7 @@ function IosSubscribeInfo({ navigate }) {
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(107,63,160,0.06)] border border-cream-border p-7 md:p-8">
           <h1
             className="text-[26px] text-charcoal mb-3"
-            style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
+            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
           >
             Manage your subscription on the web
           </h1>

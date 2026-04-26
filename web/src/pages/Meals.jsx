@@ -385,7 +385,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               alt="Housemait"
               style={{ height: '36px', display: 'inline-block', marginBottom: '12px' }}
             />
-            <h1 style={{ fontFamily: 'Lora, Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
+            <h1 style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
               Weekly Meal Plan
             </h1>
             <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>
