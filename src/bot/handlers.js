@@ -439,10 +439,100 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
 }
 
 /** Extract a YYYY-MM-DD hint from target.context if one's obvious. */
-function extractDateFromContext(context /*, household */) {
+/**
+ * Parse a free-text date hint from the classifier's target.context field
+ * into a YYYY-MM-DD string suitable for findEventsByFuzzyTitle's dateHint.
+ *
+ * The classifier prompt invites natural-language dates ("28 April",
+ * "Tuesday", "tomorrow") so this needs to handle more than ISO. Anything
+ * unrecognised returns null and the lookup falls back to "all upcoming",
+ * which is fine — the LLM just provides a hint, not a hard filter.
+ *
+ * Year resolution: a date with no year defaults to the next future
+ * occurrence (this year if it hasn't passed in the household's timezone,
+ * else next year).
+ */
+function extractDateFromContext(context, household) {
   if (!context) return null;
-  const m = String(context).match(/\b(\d{4}-\d{2}-\d{2})\b/);
-  return m ? m[1] : null;
+  const raw = String(context).trim();
+
+  // 1. ISO YYYY-MM-DD anywhere in the string
+  const iso = raw.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (iso) return iso[1];
+
+  const tz = household?.timezone || 'Europe/London';
+  const todayInTz = ymdInTimezone(new Date(), tz);
+  const lower = raw.toLowerCase();
+
+  // 2. "today" / "tomorrow" / "yesterday"
+  if (/\btoday\b/.test(lower))    return todayInTz;
+  if (/\btomorrow\b/.test(lower)) return shiftYmd(todayInTz, 1);
+  if (/\byesterday\b/.test(lower)) return shiftYmd(todayInTz, -1);
+
+  const months = {
+    jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+    apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7,
+    aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10,
+    nov: 11, november: 11, dec: 12, december: 12,
+  };
+
+  // 3. "28 April" / "28th April" / "28 Apr 2026"
+  const dmy = lower.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\b(?:\s+(\d{4}))?/);
+  if (dmy) {
+    const day = parseInt(dmy[1], 10);
+    const month = months[dmy[2]];
+    const year = dmy[3] ? parseInt(dmy[3], 10) : resolveYearForDayMonth(day, month, todayInTz);
+    return formatYmd(year, month, day);
+  }
+
+  // 4. "April 28" / "Apr 28th" / "April 28 2026"
+  const mdy = lower.match(/\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:[,]?\s+(\d{4}))?/);
+  if (mdy) {
+    const month = months[mdy[1]];
+    const day = parseInt(mdy[2], 10);
+    const year = mdy[3] ? parseInt(mdy[3], 10) : resolveYearForDayMonth(day, month, todayInTz);
+    return formatYmd(year, month, day);
+  }
+
+  // 5. "next monday" / "monday" / "this friday" — next occurrence of weekday
+  const weekdays = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+  const wd = lower.match(/\b(?:next\s+|this\s+|on\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (wd) {
+    const target = weekdays[wd[1]];
+    const todayDow = new Date(`${todayInTz}T12:00:00Z`).getUTCDay();
+    let delta = (target - todayDow + 7) % 7;
+    if (delta === 0) delta = 7; // "monday" said on a Monday → next Monday
+    return shiftYmd(todayInTz, delta);
+  }
+
+  return null;
+}
+
+function ymdInTimezone(date, tz) {
+  // en-CA gives YYYY-MM-DD format
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(date);
+}
+
+function formatYmd(year, month, day) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function shiftYmd(ymd, deltaDays) {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
+function resolveYearForDayMonth(day, month, todayYmd) {
+  const [yStr, mStr, dStr] = todayYmd.split('-');
+  const todayY = parseInt(yStr, 10);
+  const todayM = parseInt(mStr, 10);
+  const todayD = parseInt(dStr, 10);
+  // If the date with this year has already passed, use next year.
+  if (month < todayM || (month === todayM && day < todayD)) return todayY + 1;
+  return todayY;
 }
 
 /** Translate the AI's `updates` object into a calendar_events row patch. */
