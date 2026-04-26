@@ -387,6 +387,11 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
     if (isEvent) {
       if (isDelete) {
         await db.softDeleteCalendarEvent(hit.id, household.id);
+        // Push delete to connected calendars (Apple/Google/MS). Without this,
+        // the next pull from the provider re-creates the event from their
+        // unchanged copy, undoing the user's WhatsApp delete.
+        calendarSync.pushEventToConnections(household.id, { id: hit.id }, 'delete')
+          .catch((err) => console.error('[handlers] delete_event sync push failed:', err.message));
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
         return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance — reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
       }
@@ -395,6 +400,11 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: "Got it, but I didn't see any field to change. Tell me what to update (time, date, location…).", actions };
       }
       const updated = await db.updateCalendarEvent(hit.id, household.id, eventUpdates);
+      // Push update to connected calendars (Apple/Google/MS). Without this,
+      // the next pull from the provider overwrites our update with their
+      // unchanged copy, reverting the user's WhatsApp edit.
+      calendarSync.pushEventToConnections(household.id, updated, 'update')
+        .catch((err) => console.error('[handlers] update_event sync push failed:', err.message));
       broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}`);
       push.sendToHousehold(household.id, user.id, {
         title: 'Event updated',
@@ -552,17 +562,36 @@ function buildEventUpdates(updates, existing, household, user) {
     }
   }
 
-  // Date/time changes: we rebuild start_time/end_time from the existing ones,
-  // overriding only the parts the user mentioned.
+  // Date/time changes. Three flavours:
+  //   updates.date       — shift the whole event to a new day (single-day intent)
+  //   updates.start_date — change only the start day (multi-day events)
+  //   updates.end_date   — change only the end day (multi-day events)
+  // Plus updates.start_time / end_time for the time-of-day part.
+  //
+  // Each side (start vs end) is rebuilt independently from the existing
+  // value + whichever fields the user mentioned. This avoids the previous
+  // bug where any date change collapsed start_time and end_time onto the
+  // same day, wiping multi-day spans.
   const tz = user?.timezone || household?.timezone || 'Europe/London';
-  const hasDate = !!updates.date;
-  const hasStart = !!updates.start_time;
-  const hasEnd   = !!updates.end_time;
+  const hasDate      = !!updates.date;
+  const hasStartDate = !!updates.start_date;
+  const hasEndDate   = !!updates.end_date;
+  const hasStart     = !!updates.start_time;
+  const hasEnd       = !!updates.end_time;
 
-  if (hasDate || hasStart || hasEnd) {
+  if (hasDate || hasStartDate || hasEndDate || hasStart || hasEnd) {
     const existingStart = new Date(existing.start_time);
     const existingEnd   = existing.end_time ? new Date(existing.end_time) : null;
-    const existingDate  = isNaN(existingStart.getTime()) ? null : existingStart.toISOString().slice(0, 10);
+    // All-day events are stored as YYYY-MM-DDT00:00:00Z and ...T23:59:59Z in
+    // UTC. Timezone-converting the end (e.g. to BST) bumps the date by one
+    // by the 23:59 minute, so for all-day events extract the date portion
+    // from the raw ISO string instead.
+    const existingStartDate = existing.all_day
+      ? String(existing.start_time).slice(0, 10)
+      : (isNaN(existingStart.getTime()) ? null : ymdInTimezone(existingStart, tz));
+    const existingEndDate = existing.all_day && existing.end_time
+      ? String(existing.end_time).slice(0, 10)
+      : (existingEnd && !isNaN(existingEnd.getTime()) ? ymdInTimezone(existingEnd, tz) : existingStartDate);
     const existingStartHHMM = isNaN(existingStart.getTime())
       ? '09:00'
       : existingStart.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
@@ -570,16 +599,20 @@ function buildEventUpdates(updates, existing, household, user) {
       ? existingEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz })
       : existingStartHHMM;
 
-    const nextDate = updates.date || existingDate;
-    const nextStart = updates.start_time || existingStartHHMM;
-    const nextEnd   = updates.end_time   || existingEndHHMM;
+    // updates.date acts as a global override for both sides (legacy
+    // "move X to Tuesday" behaviour). start_date / end_date only override
+    // their respective side.
+    const nextStartDate = updates.start_date || updates.date || existingStartDate;
+    const nextEndDate   = updates.end_date   || updates.date || existingEndDate;
+    const nextStart     = updates.start_time || existingStartHHMM;
+    const nextEnd       = updates.end_time   || existingEndHHMM;
 
     if (existing.all_day) {
-      patch.start_time = `${nextDate}T00:00:00Z`;
-      patch.end_time   = `${nextDate}T23:59:59Z`;
+      patch.start_time = `${nextStartDate}T00:00:00Z`;
+      patch.end_time   = `${nextEndDate}T23:59:59Z`;
     } else {
-      patch.start_time = localToUTC(nextDate, nextStart, tz);
-      patch.end_time   = localToUTC(nextDate, nextEnd, tz);
+      patch.start_time = localToUTC(nextStartDate, nextStart, tz);
+      patch.end_time   = localToUTC(nextEndDate,   nextEnd,   tz);
     }
   }
 

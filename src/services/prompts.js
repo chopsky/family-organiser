@@ -196,7 +196,9 @@ UPDATE & DELETE field population (only when you DO pick an update_*/delete_* int
   • target.context: any disambiguating detail from their message — a date, time, day, location, or modifier (e.g. "Tuesday", "at 2pm", "the later one"). Null if none provided.
   • target.assigned_to_name: exact member name if the user specified who the item belongs to (e.g. "Lynn's haircut" → "Lynn"). Null otherwise.
 - For update_* intents, populate "updates" with ONLY the fields the user explicitly wants to change. Leave all other fields null. Do not guess or fill in missing fields.
-- When the user says "move X to Tuesday", set updates.date to the resolved YYYY-MM-DD for Tuesday; leave start_time/end_time null unless they also said a time.
+- When the user says "move X to Tuesday" (single-day event), set updates.date to the resolved YYYY-MM-DD for Tuesday; leave start_time/end_time null unless they also said a time. updates.date shifts the WHOLE event to that day.
+- When the user says "change the start date to X" (multi-day event), set updates.start_date to the resolved YYYY-MM-DD; leave updates.end_date and updates.date null. This changes ONLY the start day, preserving the end day.
+- When the user says "change the end date to X" (multi-day event), set updates.end_date; leave updates.start_date and updates.date null.
 - When the user says "change X to 3pm", set updates.start_time to "15:00"; leave date null.
 - When the user says "reassign X to Lynn", set updates.assigned_to_names to ["Lynn"].
 - response_message should be short and NOT confirm the change yet — the handler will decide whether to act or ask for disambiguation and will send its own confirmation. Leave response_message as an empty string "" for update_*/delete_* intents.
@@ -278,6 +280,8 @@ Respond only with valid JSON matching this schema:
   "updates": {
     "title": string | null,
     "date": "YYYY-MM-DD" | null,
+    "start_date": "YYYY-MM-DD" | null,
+    "end_date": "YYYY-MM-DD" | null,
     "start_time": "HH:MM" | null,
     "end_time": "HH:MM" | null,
     "all_day": boolean | null,
