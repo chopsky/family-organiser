@@ -3246,6 +3246,41 @@ async function markReminderSent(reminderId, db = supabase) {
 }
 
 /**
+ * Atomically claim an event reminder for sending.
+ *
+ * Flips sent: false → true in a single UPDATE conditioned on the row
+ * still being unsent. Returns true if this caller won the claim,
+ * false if another process beat us to it. Use this *before* dispatching
+ * the WhatsApp message so concurrent cron runs (multiple API replicas,
+ * deploy overlaps) can't send the same reminder twice.
+ */
+async function claimEventReminder(reminderId, db = supabase) {
+  const { data, error } = await db
+    .from('event_reminders')
+    .update({ sent: true })
+    .eq('id', reminderId)
+    .eq('sent', false)
+    .select('id');
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
+/**
+ * Atomically claim a task notification for sending.
+ * Same pattern as claimEventReminder but for tasks.notification_sent_at.
+ */
+async function claimTaskNotification(taskId, sentAt, db = supabase) {
+  const { data, error } = await db
+    .from('tasks')
+    .update({ notification_sent_at: sentAt })
+    .eq('id', taskId)
+    .is('notification_sent_at', null)
+    .select('id');
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
+/**
  * Get assignees for a specific event.
  */
 async function getEventAssignees(eventId, db = supabase) {
@@ -4038,6 +4073,8 @@ module.exports = {
   saveEventAssignees,
   getPendingReminders,
   markReminderSent,
+  claimEventReminder,
+  claimTaskNotification,
   getEventAssignees,
   getEventAssigneesBatch,
   // Scheduler locks

@@ -268,6 +268,15 @@ async function runTaskNotificationCheck() {
       const diffMs = Math.abs(nowInTZ.getTime() - fireLocal.getTime());
       if (diffMs > 60000) continue; // Not yet or already past
 
+      // Atomic claim BEFORE we dispatch. Stamping notification_sent_at now
+      // (conditional on it still being null) is a race-free claim — only
+      // one parallel cron run wins, the loser skips. Trade-off: a transient
+      // send error after this point won't be retried, but that's better
+      // than the previous behaviour of double-sending under multiple
+      // API replicas / deploy overlaps.
+      const claimed = await db.claimTaskNotification(task.id, now.toISOString());
+      if (!claimed) continue;
+
       // Send notification
       const members = await db.getHouseholdMembers(task.household_id);
       const recipients = task.assigned_to
@@ -287,12 +296,6 @@ async function runTaskNotificationCheck() {
           }
         }
       }
-
-      // Mark as sent
-      await supabase
-        .from('tasks')
-        .update({ notification_sent_at: now.toISOString() })
-        .eq('id', task.id);
 
       console.log(`[scheduler] Sent task notification for "${task.title}" (${task.id})`);
     }

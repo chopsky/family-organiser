@@ -46,10 +46,19 @@ async function processEventReminders() {
 
     for (const reminder of pendingReminders) {
       try {
+        // Atomic claim BEFORE we do any send work. If a parallel cron run
+        // (multiple API replicas, deploy overlap) grabs the same row first,
+        // claimEventReminder returns false and we skip silently.
+        // Trade-off: a transient send error after this point won't be
+        // retried — better than the previous behaviour of double-sending
+        // every reminder when two replicas were alive.
+        const claimed = await db.claimEventReminder(reminder.id);
+        if (!claimed) continue;
+
         const event = reminder.calendar_events;
         if (!event) {
-          // Event was deleted; mark reminder as sent to avoid re-processing
-          await db.markReminderSent(reminder.id);
+          // Event deleted between SELECT and claim; row is already marked
+          // sent by the claim above, so just move on.
           continue;
         }
 
@@ -78,10 +87,7 @@ async function processEventReminders() {
           );
         }
 
-        if (recipients.length === 0) {
-          await db.markReminderSent(reminder.id);
-          continue;
-        }
+        if (recipients.length === 0) continue;
 
         const formattedTime = formatEventTime(event.start_time, timezone);
         const message = `🔔 *Reminder:* ${event.title}\nStarts in ${reminder.reminder_offset} (${formattedTime})`;
@@ -97,7 +103,6 @@ async function processEventReminders() {
           }
         }
 
-        await db.markReminderSent(reminder.id);
         console.log(
           `[event-reminders] Sent reminder for "${event.title}" to ${recipients.length} recipient(s)`
         );
@@ -106,7 +111,9 @@ async function processEventReminders() {
           `[event-reminders] Error processing reminder ${reminder.id}:`,
           err.message
         );
-        // Don't mark as sent on error — will retry next cycle
+        // Errors before the claim succeed → row stays unsent, retried next
+        // cycle. Errors after the claim → row is already marked sent, no
+        // retry. Acceptable trade-off versus duplicate sends.
       }
     }
   } catch (err) {
