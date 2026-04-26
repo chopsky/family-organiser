@@ -78,6 +78,76 @@ function isUndoRequest(text) {
   return /^(undo|revert|scrap that|scrap it|nevermind|never mind|forget it|cancel that|oops|nope scrap that|wait no|undo that|take that back)$/i.test(t);
 }
 
+// ─── Pending disambiguation store (in-memory, per user, 5-minute TTL) ─────────
+//
+// When handleModifyIntent finds multiple candidates it sends a "which one?"
+// prompt. We stash the candidate list + the original intent here so the
+// user's follow-up ("1", "the second one", or a candidate title) can be
+// resolved without going through the LLM — which has no concept of "this
+// is option N from the list I just showed".
+//
+// In-memory matches the recentAdds precedent above. 5-minute TTL is well
+// inside any plausible reply window; if the user doesn't answer in 5 mins
+// they'll just need to restate the change.
+const pendingDisambiguations = new Map(); // userId → { intent, candidates, updates, householdId, timestamp }
+const DISAMBIGUATION_WINDOW_MS = 5 * 60 * 1000;
+
+function rememberDisambiguation(userId, entry) {
+  if (!userId || !entry?.candidates?.length) return;
+  pendingDisambiguations.set(userId, { ...entry, timestamp: Date.now() });
+}
+
+function popPendingDisambiguation(userId) {
+  const entry = pendingDisambiguations.get(userId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) {
+    pendingDisambiguations.delete(userId);
+    return null;
+  }
+  pendingDisambiguations.delete(userId);
+  return entry;
+}
+
+/**
+ * Given a user message and a pending disambiguation entry, resolve which
+ * candidate the user picked. Returns the candidate object, or null if the
+ * message can't be confidently mapped.
+ *
+ * Accepts: "1" / "1." / "#1" / "the first" / "first one" / a substring of
+ * a candidate's distinguishing detail (e.g. "april" or "21 jul").
+ */
+function resolveDisambiguationChoice(text, entry) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  if (!t) return null;
+
+  // Numeric: "1", "1.", "#1", "option 1"
+  const numMatch = t.match(/^(?:#|option\s+|number\s+)?(\d+)\.?$/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    if (n >= 1 && n <= entry.candidates.length) return entry.candidates[n - 1];
+    return null;
+  }
+
+  // Ordinal words for the first 5 (matches the disambiguation prompt's slice(0,5))
+  const ordinals = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5 };
+  const ordinalMatch = t.match(/^(?:the\s+)?(first|second|third|fourth|fifth)(?:\s+one)?$/);
+  if (ordinalMatch) {
+    const n = ordinals[ordinalMatch[1]];
+    if (n <= entry.candidates.length) return entry.candidates[n - 1];
+    return null;
+  }
+
+  // Substring match against the formatted candidate line (title + date/qty/etc).
+  // Only match if exactly one candidate's formatted string contains the text —
+  // ambiguous substrings fall through and re-trigger the disambiguation prompt.
+  const matches = entry.candidates.filter((c) => {
+    const formatted = formatCandidate(entry.kind, c).toLowerCase();
+    return formatted.includes(t);
+  });
+  if (matches.length === 1) return matches[0];
+  return null;
+}
+
 async function runUndo(user, household) {
   const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
   const entry = popRecentAdd(user.id);
@@ -272,11 +342,19 @@ async function handleModifyIntent(result, user, household) {
     };
   }
 
-  // 3. Multiple matches — disambiguate
+  // 3. Multiple matches — disambiguate. Stash the candidates + intent so the
+  // user's number reply can be resolved without going back through the LLM.
   if (candidates.length > 1) {
     const lines = candidates.slice(0, 5).map((c, i) => `${i + 1}. ${formatCandidate(kind, c)}`);
     const more = candidates.length > 5 ? `\n  … and ${candidates.length - 5} more` : '';
     const verb = isDelete ? (kind === 'shopping' ? 'remove' : 'cancel') : 'change';
+    rememberDisambiguation(user.id, {
+      intent: result.intent,
+      kind,
+      candidates: candidates.slice(0, 5),
+      updates,
+      householdId: household.id,
+    });
     return {
       response: `I found a few matches — which one do you want to ${verb}?\n\n${lines.join('\n')}${more}\n\nReply with the number or a more specific detail.`,
       actions,
@@ -284,7 +362,27 @@ async function handleModifyIntent(result, user, household) {
   }
 
   // 4. One match — act
-  const hit = candidates[0];
+  return await executeModifyAction({
+    intent: result.intent,
+    kind,
+    hit: candidates[0],
+    updates,
+    user,
+    household,
+    actions,
+  });
+}
+
+/**
+ * Execute the chosen modify action against a single candidate row.
+ * Used by both the single-match path in handleModifyIntent and the
+ * disambiguation-reply path in handleTextMessage.
+ */
+async function executeModifyAction({ intent, kind, hit, updates, user, household, actions }) {
+  const isDelete = intent.startsWith('delete_');
+  const isEvent = kind === 'event';
+  const isTask = kind === 'task';
+
   try {
     if (isEvent) {
       if (isDelete) {
@@ -335,7 +433,7 @@ async function handleModifyIntent(result, user, household) {
     broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} updated: ${updated.item}`);
     return { response: `✏️ Updated "${updated.item}".`, actions };
   } catch (err) {
-    console.error(`[handlers] ${result.intent} failed:`, err.message);
+    console.error(`[handlers] ${intent} failed:`, err.message);
     return { response: `⚠️ I found it but couldn't save the change: ${err.message}`, actions };
   }
 }
@@ -521,6 +619,36 @@ async function handleTextMessage(text, user, household) {
   if (isUndoRequest(text)) {
     console.log('[handlers] Pre-classified as undo for:', text.slice(0, 50));
     return await runUndo(user, household);
+  }
+
+  // Pending disambiguation reply — if we just asked "which one?", a number /
+  // ordinal / specific-detail answer should be resolved deterministically
+  // here, NOT sent through the LLM (which has no concept of "this is option N
+  // from the list I just showed" and would re-trigger the same disambiguation).
+  const pendingDisamb = popPendingDisambiguation(user.id);
+  if (pendingDisamb) {
+    if (pendingDisamb.householdId !== household.id) {
+      // Stale entry from a household switch — drop and fall through.
+      console.log('[handlers] Dropping disambiguation entry (household mismatch)');
+    } else {
+      const chosen = resolveDisambiguationChoice(text, pendingDisamb);
+      if (chosen) {
+        console.log(`[handlers] Resolved disambiguation: "${text.slice(0, 30)}" → ${pendingDisamb.kind} ${chosen.id}`);
+        return await executeModifyAction({
+          intent: pendingDisamb.intent,
+          kind: pendingDisamb.kind,
+          hit: chosen,
+          updates: pendingDisamb.updates,
+          user,
+          household,
+          actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] },
+        });
+      }
+      // Couldn't map to a candidate — drop the entry (we've already popped
+      // it) and let the message classify normally. Better to lose the
+      // disambiguation context than have a stale "1" trigger an old action
+      // minutes later when the user's intent has moved on.
+    }
   }
 
   // Trivial messages — greetings, thanks, emoji-only — get canned replies.
