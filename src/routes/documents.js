@@ -19,7 +19,7 @@ const upload = multer({
 });
 
 // Storage limits
-const MAX_STORAGE_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB per household
+const MAX_STORAGE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB per household
 const MAX_FILES = 500;
 
 // ─── Folders ──────────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
     const usage = await db.getHouseholdStorageUsage(req.householdId);
     if (usage.totalBytes + req.file.size > MAX_STORAGE_BYTES) {
       return res.status(413).json({
-        error: 'Storage limit reached (10 GB per household)',
+        error: 'Storage limit reached (5 GB per household)',
         usage: { ...usage, limitBytes: MAX_STORAGE_BYTES },
       });
     }
