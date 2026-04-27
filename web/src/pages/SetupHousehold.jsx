@@ -8,8 +8,19 @@ export default function SetupHousehold() {
   const [name, setName]       = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
-  const { login }             = useAuth();
+  const { login, logout }     = useAuth();
   const navigate              = useNavigate();
+
+  // Escape hatch — without this users with a half-finished signup are
+  // stuck: visiting housemait.com bounces them right back here via
+  // RequireAuth's needsHousehold redirect. Logging out clears the token
+  // so the landing page renders normally. Hard redirect (vs navigate)
+  // avoids a render race where the / route evaluates to Navigate('/dashboard')
+  // before the new token=null state has propagated.
+  function handleSignOut() {
+    logout();
+    window.location.href = '/';
+  }
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -32,13 +43,23 @@ export default function SetupHousehold() {
   }
 
   return (
-    <div className="min-h-screen bg-oat flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
-          <h1 className="text-2xl font-semibold text-bark">Welcome to Housemait!</h1>
-          <p className="text-cocoa mt-2">Create your household to get started.</p>
-        </div>
+    <div className="min-h-screen bg-oat flex flex-col px-4">
+      <div className="w-full flex justify-end pt-5">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="text-sm text-cocoa hover:text-bark transition-colors"
+        >
+          Sign out
+        </button>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
+            <h1 className="text-2xl font-semibold text-bark">Welcome to Housemait!</h1>
+            <p className="text-cocoa mt-2">Create your household to get started.</p>
+          </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
           <h2 className="text-lg font-semibold text-bark mb-4">Create a household</h2>
@@ -67,9 +88,10 @@ export default function SetupHousehold() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-cocoa mt-6">
-          Once created, you can invite family members from Settings.
-        </p>
+          <p className="text-center text-xs text-cocoa mt-6">
+            Once created, you can invite family members from Settings.
+          </p>
+        </div>
       </div>
     </div>
   );

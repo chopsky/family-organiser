@@ -23,8 +23,19 @@ const Notifications    = lazy(() => import('./onboarding/Notifications'));
 const Done             = lazy(() => import('./onboarding/Done'));
 
 export default function Onboarding() {
-  const { user, household, updateUser } = useAuth();
+  const { user, household, updateUser, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Escape hatch — without this users with a half-finished signup are
+  // stuck: visiting housemait.com bounces them right back here via
+  // RequireAuth's needsOnboarding redirect. Logging out clears the token
+  // so the landing page renders normally. Hard redirect (vs navigate)
+  // avoids a render race where the / route evaluates to Navigate('/dashboard')
+  // before the new token=null state has propagated.
+  function handleSignOut() {
+    logout();
+    window.location.href = '/';
+  }
   const [stepIdx, setStepIdx] = useState(0);
   const [error, setError] = useState('');
   const [finishing, setFinishing] = useState(false);
@@ -147,9 +158,9 @@ export default function Onboarding() {
         </div>
       </main>
 
-      {/* Footer nav — back + step counter. "Next" / "Skip" buttons live
-          inside each step so they can control their own wording.
-          `safe-bottom` keeps it clear of the iPhone home indicator. */}
+      {/* Footer nav — back + step counter + sign-out. "Next" / "Skip"
+          buttons live inside each step so they can control their own
+          wording. `safe-bottom` keeps it clear of the iPhone home indicator. */}
       <footer className="border-t border-light-grey bg-white/60 backdrop-blur-sm safe-bottom">
         <div className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between text-sm">
           {!isFirst ? (
@@ -166,6 +177,13 @@ export default function Onboarding() {
           <span className="text-xs text-cocoa">
             Step {stepIdx + 1} of {steps.length}
           </span>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="text-xs text-cocoa hover:text-bark transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </footer>
     </div>
