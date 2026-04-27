@@ -2769,29 +2769,24 @@ async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
 }
 
 async function getAiUsageTimeline({ days = 30 } = {}, db = supabase) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  // PostgREST defaults to a 1000-row cap. With ascending order that returns
-  // the OLDEST 1000 rows in the window and silently drops the most recent
-  // ones — which previously made the admin dashboard chart cut off ~6 days
-  // before "now" once daily volume crossed the threshold. Bump the cap well
-  // past any plausible volume; current rate is ~200/day, so 50_000 covers
-  // ~8 months. If we ever approach that, swap this for an SQL aggregate
-  // (count(*) GROUP BY date, provider) via supabase.rpc().
-  const { data, error } = await db
-    .from('ai_usage_log')
-    .select('provider, created_at')
-    .gte('created_at', since)
-    .order('created_at', { ascending: true })
-    .limit(50000);
+  // Aggregate via SQL RPC (see supabase/migration-ai-usage-timeline-rpc.sql).
+  // The previous .select() approach silently truncated past 1000 rows due to
+  // PostgREST's project-level max-rows cap, regardless of any client-side
+  // .limit(). The RPC returns ~30 days × 3 providers = ~90 pre-aggregated
+  // rows, comfortably under any cap.
+  const { data, error } = await db.rpc('get_ai_usage_timeline', { days_param: days });
   if (error) throw error;
 
-  // Group by date
+  // Reshape SQL output [{day, provider, call_count}] into the chart's
+  // existing shape [{date, total, gemini, claude, 'gpt-4o'}]. PostgREST
+  // returns bigint as a string, so coerce with Number() before adding.
   const timeline = {};
   for (const row of data || []) {
-    const date = row.created_at.split('T')[0];
+    const date = row.day; // 'YYYY-MM-DD' from the postgres date type
     if (!timeline[date]) timeline[date] = { date, total: 0, gemini: 0, claude: 0, 'gpt-4o': 0 };
-    timeline[date].total++;
-    timeline[date][row.provider] = (timeline[date][row.provider] || 0) + 1;
+    const count = Number(row.call_count);
+    timeline[date].total += count;
+    timeline[date][row.provider] = (timeline[date][row.provider] || 0) + count;
   }
   return Object.values(timeline);
 }
