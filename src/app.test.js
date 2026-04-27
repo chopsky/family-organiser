@@ -21,7 +21,6 @@ describe('isAllowedOrigin', () => {
   });
 
   function load() {
-    // eslint-disable-next-line global-require
     return require('./cors-origins').isAllowedOrigin;
   }
 

@@ -792,7 +792,6 @@ async function handleTextMessage(text, user, household) {
   const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
   if (weatherPattern.test(text)) {
     console.log('[handlers] Pre-classified as weather for:', text.slice(0, 50));
-    const result = { intent: 'weather', response_message: '' };
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     try {
       let lat, lon, tz, locationLabel;

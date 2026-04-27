@@ -16,7 +16,7 @@ const whatsapp = require('../services/whatsapp');
  * @param {object[]} members
  * @returns {string}
  */
-function buildWeeklyDigestMessage(user, householdName, completedTasks, completedShopping, outstandingTasks, upcomingTasks, members) {
+function buildWeeklyDigestMessage(user, householdName, completedTasks, completedShopping, outstandingTasks, upcomingTasks, _members) {
   const today = new Date().toISOString().split('T')[0];
   const lines = [`📊 *Weekly roundup for ${householdName}*\n`];
 

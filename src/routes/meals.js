@@ -202,7 +202,7 @@ Return ONLY valid JSON:
     try {
       const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
       parsed = JSON.parse(cleaned);
-    } catch (parseErr) {
+    } catch {
       console.error('Could not parse AI suggestions:', text?.substring(0, 200));
       return res.status(500).json({ error: 'Could not parse AI suggestions' });
     }

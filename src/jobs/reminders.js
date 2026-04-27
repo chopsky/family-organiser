@@ -1,6 +1,6 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
-const { getWeatherReport, getCoordsFromTimezone } = require('../services/weather');
+const { getCoordsFromTimezone } = require('../services/weather');
 
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 

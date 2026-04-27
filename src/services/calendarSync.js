@@ -324,7 +324,7 @@ async function processChange(connection, subscription, change, stats = null) {
             duplicateEvent = await db.findCalendarEventByTitleAndTime(
               connection.household_id, eventData.title, eventData.start_time,
             );
-          } catch (e) {
+          } catch {
             // Non-fatal — proceed with create
           }
         }

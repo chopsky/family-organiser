@@ -632,7 +632,7 @@ router.get('/connections', async (req, res) => {
   try {
     const connections = await db.getCalendarConnections(req.user.id);
     // Strip tokens from response
-    const safe = connections.map(({ access_token, refresh_token, ...c }) => c);
+    const safe = connections.map(({ access_token: _access, refresh_token: _refresh, ...c }) => c);
     return res.json({ connections: safe });
   } catch (err) {
     console.error('GET /api/calendar/connections error:', err);

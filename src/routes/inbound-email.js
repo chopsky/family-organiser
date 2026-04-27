@@ -30,23 +30,6 @@ function parseTokenFromAddress(toAddress) {
 }
 
 /**
- * Helper: convert local date+time to UTC ISO string
- */
-function localToUTC(dateStr, timeStr, tz) {
-  try {
-    const dt = new Date(`${dateStr}T${timeStr}:00`);
-    // Use Intl to get offset for the timezone
-    const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: tz, timeZoneName: 'shortOffset' });
-    const parts = formatter.formatToParts(dt);
-    const offsetPart = parts.find(p => p.type === 'timeZoneName');
-    // Simple fallback: assume UK timezone
-    return dt.toISOString();
-  } catch {
-    return `${dateStr}T${timeStr}:00Z`;
-  }
-}
-
-/**
  * POST /api/inbound-email/webhook
  * Postmark inbound webhook handler.
  * No auth middleware — this is a webhook.

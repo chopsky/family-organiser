@@ -114,9 +114,6 @@ router.post('/register', async (req, res) => {
       }
 
       await db.markInviteAccepted(invite.id);
-      const updatedUser = Object.keys(profileUpdates).length > 0
-        ? await db.updateUser(user.id, {}) // re-fetch isn't needed, merge locally
-        : user;
       const response = await authResponse({ ...user, ...profileUpdates }, req);
       return res.status(201).json(response);
     }

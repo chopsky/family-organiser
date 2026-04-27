@@ -255,11 +255,7 @@ async function runTaskNotificationCheck() {
       const offsetMinutes = NOTIFICATION_OFFSETS[task.notification] ?? 0;
 
       // Build the due datetime in UTC by parsing due_date + due_time in the household TZ
-      const dueStr = `${task.due_date}T${task.due_time}`;
-      // Convert to a Date using the household timezone
-      const dueInTZ = new Date(new Date(dueStr).toLocaleString('en-US', { timeZone: tz }));
-      // Actually, we need the fire time in UTC for comparison
-      // Use a simpler approach: get current time in household TZ and compare
+      // Get current time in household TZ and compare against fire time.
       const nowInTZ = new Date(now.toLocaleString('en-US', { timeZone: tz }));
       const dueLocal = new Date(`${task.due_date}T${task.due_time}`);
       const fireLocal = new Date(dueLocal.getTime() - offsetMinutes * 60000);

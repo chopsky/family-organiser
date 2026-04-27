@@ -111,7 +111,7 @@ async function sendPasswordResetEmail(to, name, token) {
  * @param {object} data - { completedTasks, completedShopping, outstandingTasks, upcomingTasks, members }
  */
 async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
-  const { completedTasks, completedShopping, outstandingTasks, upcomingTasks, members } = data;
+  const { completedTasks, completedShopping, outstandingTasks, upcomingTasks } = data;
 
   // ── Completed section ─────────────────────────────────────────────────────
   const byPerson = {};
@@ -421,7 +421,7 @@ async function sendTrialDay28Email({ to, firstName, trialEndsAt, householdId, us
 // Transactional. Always sends — the spec carves this out as "account-
 // related, not promotional". Users who opted out of nudges still need
 // to know their trial ended.
-async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId }) {
+async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId: _householdId }) {
   return sendTemplate({
     to,
     templateAlias: TEMPLATE_ALIASES.trialExpired,

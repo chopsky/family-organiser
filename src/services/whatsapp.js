@@ -34,14 +34,6 @@ function isConfigured() {
 }
 
 /**
- * Build the "from" params for a Twilio message.
- * Uses direct WhatsApp number (works for replies within 24hr window).
- */
-function getFromParams() {
-  return { from: formatPhone(process.env.TWILIO_WHATSAPP_NUMBER) };
-}
-
-/**
  * Format a phone number for WhatsApp via Twilio.
  * Ensures the "whatsapp:" prefix is present.
  */

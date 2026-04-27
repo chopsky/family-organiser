@@ -9,7 +9,7 @@ async function getDAVClient() {
 }
 
 const { randomUUID } = require('crypto');
-const { RRule, rrulestr } = require('rrule');
+const { rrulestr } = require('rrule');
 
 const CALDAV_SERVER_URL = 'https://caldav.icloud.com';
 
@@ -140,7 +140,7 @@ function parseVEvent(icalData) {
       // Use the second (refined) offset for the final conversion
       const utcDate = new Date(Date.UTC(year, month, day, hour, min, sec) - offset2);
       return utcDate.toISOString().replace('.000Z', 'Z');
-    } catch (e) {
+    } catch {
       // If timezone conversion fails, fall back to treating as UTC
       return `${value.substring(0, 4)}-${value.substring(4, 6)}-${value.substring(6, 8)}T${value.substring(9, 11)}:${value.substring(11, 13)}:${value.substring(13, 15)}Z`;
     }
@@ -263,10 +263,6 @@ function expandRecurrence(eventData, externalEventId) {
     const rawDt = eventData._rawDtstart;
     const tzid = eventData._startTzid;
 
-    // Parse the original local start time components
-    let startHour = 0, startMin = 0, startSec = 0;
-    let durationMs;
-
     if (eventData.all_day || rawDt.length === 8) {
       // All-day event — expand with raw date, no timezone conversion needed
       const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`);
@@ -285,15 +281,10 @@ function expandRecurrence(eventData, externalEventId) {
       }));
     }
 
-    // Timed event — parse local time from raw DTSTART
-    startHour = parseInt(rawDt.substring(9, 11));
-    startMin = parseInt(rawDt.substring(11, 13));
-    startSec = parseInt(rawDt.substring(13, 15));
-
-    // Calculate duration from the already-converted UTC times
+    // Timed event — calculate duration from the already-converted UTC times
     const startMs = new Date(eventData.start_time).getTime();
     const endMs = new Date(eventData.end_time).getTime();
-    durationMs = endMs - startMs;
+    const durationMs = endMs - startMs;
 
     if (tzid && !rawDt.endsWith('Z')) {
       // ── DST-aware expansion ──

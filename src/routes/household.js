@@ -271,7 +271,6 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
 router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res) => {
   try {
     // Try to remove files from storage (best effort — may not exist or may have different ext)
-    const prefix = `${req.householdId}/${req.user.id}`;
     const userDb = supabaseAdmin;
     const { data: files } = await userDb.storage.from('avatars').list(req.householdId, {
       prefix: req.user.id,
@@ -281,7 +280,7 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
     }
 
     // Clear in DB
-    const updated = await db.updateUser(req.user.id, { avatar_url: null });
+    await db.updateUser(req.user.id, { avatar_url: null });
     cache.invalidate(`members:${req.householdId}`);
     return res.json({ avatar_url: null });
   } catch (err) {
@@ -473,7 +472,7 @@ router.get('/usage-summary', requireAuth, requireHousehold, async (req, res) => 
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    async function countRows(table, extraFilter) {
+    const countRows = async (table, extraFilter) => {
       let q = supabaseAdmin
         .from(table)
         .select('*', { count: 'exact', head: true })
@@ -487,7 +486,7 @@ router.get('/usage-summary', requireAuth, requireHousehold, async (req, res) => 
         return 0;
       }
       return count ?? 0;
-    }
+    };
 
     const [
       shoppingItemCount,

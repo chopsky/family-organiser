@@ -642,7 +642,7 @@ Do NOT wrap in markdown code fences.`,
     try {
       const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
       dates = JSON.parse(cleaned);
-    } catch (parseErr) {
+    } catch {
       console.error('[import-website] AI response could not be parsed:', text.substring(0, 500));
       return res.status(500).json({ error: 'Could not extract structured term dates from the website. The page may not contain parseable date information. Try adding dates manually.' });
     }

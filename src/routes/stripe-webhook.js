@@ -175,7 +175,6 @@ async function handleEvent(event) {
       // Acknowledged but ignored. Stripe sends many event types we don't
       // subscribe to — logging at info level is enough.
       console.log(`[stripe webhook] ignoring unhandled event type: ${event.type}`);
-      return;
   }
 }
 

@@ -30,7 +30,7 @@ function requireAuth(req, res, next) {
     req.user = { id: payload.userId, name: payload.name, role: payload.role, isPlatformAdmin: payload.isPlatformAdmin || false };
     req.householdId = payload.householdId;
     return next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

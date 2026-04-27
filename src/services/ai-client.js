@@ -220,7 +220,6 @@ function logAiUsage({ householdId, userId, provider, model, feature, latencyMs, 
 }
 
 async function callWithFailover(opts) {
-  const start = Date.now();
   const { feature, householdId, userId } = opts;
   let attempt = 0;
 

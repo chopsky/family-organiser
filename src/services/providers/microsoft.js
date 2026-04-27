@@ -305,7 +305,7 @@ async function refreshToken(connection) {
  * @param {string} callbackUrl - (unused, uses default API_URL-based callback)
  * @returns {object} The created subscription
  */
-async function registerWebhook(connection, callbackUrl) {
+async function registerWebhook(connection, _callbackUrl) {
   const client = getClient(connection.access_token);
 
   const expirationDateTime = new Date();

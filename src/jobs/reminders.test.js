@@ -5,7 +5,6 @@ jest.mock('../db/client', () => ({ supabase: { from: jest.fn() } }));
 const { buildDailyReminderMessage } = require('./reminders');
 
 const TODAY = new Date().toISOString().split('T')[0];
-const YESTERDAY = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 const TWO_DAYS_AGO = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
 
 const SARAH = { id: 'u1', name: 'Sarah' };

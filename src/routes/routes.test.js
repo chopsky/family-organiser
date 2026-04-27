@@ -478,8 +478,6 @@ describe('DELETE /api/household/members/:userId', () => {
 // ─── POST /api/auth/register ──────────────────────────────────────────────
 
 describe('POST /api/auth/register', () => {
-  const bcrypt = require('bcrypt');
-
   beforeEach(() => jest.clearAllMocks());
 
   test('registers new user and returns verification message', async () => {
