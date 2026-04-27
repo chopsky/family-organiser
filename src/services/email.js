@@ -103,6 +103,30 @@ async function sendPasswordResetEmail(to, name, token) {
 }
 
 /**
+ * Send an internal admin/operator alert email — for things like "Gemini
+ * stopped being called", "scheduler lock failed", etc. Plain styling, goes
+ * to ADMIN_ALERT_EMAIL (env var) or falls back to SUPPORT_EMAIL. If neither
+ * is set or Postmark isn't configured, sendEmail logs and no-ops; the alert
+ * job should treat that as best-effort.
+ *
+ * @param {string} subject — short imperative subject line
+ * @param {string} body    — plain text or simple HTML; rendered inline in
+ *                            the email shell. No outbound CTAs.
+ */
+async function sendAdminAlert(subject, body) {
+  const to = process.env.ADMIN_ALERT_EMAIL || process.env.SUPPORT_EMAIL;
+  if (!to) {
+    console.warn('[admin-alert] No ADMIN_ALERT_EMAIL or SUPPORT_EMAIL configured — skipping:', subject);
+    return;
+  }
+  const html = emailTemplate(subject, `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:15px;">${body}</p>
+    <p style="color:${BRAND.inkLight};font-size:12px;margin-top:24px;">This is an automated operator alert. You're receiving it because your address is in <code>ADMIN_ALERT_EMAIL</code> or <code>SUPPORT_EMAIL</code>.</p>
+  `);
+  await sendEmail(to, `[Housemait alert] ${subject}`, html);
+}
+
+/**
  * Build and send the weekly digest email.
  *
  * @param {string} to - Recipient email
@@ -441,6 +465,7 @@ module.exports = {
   sendInviteEmail,
   sendPasswordResetEmail,
   sendWeeklyDigestEmail,
+  sendAdminAlert,
   // Phase 7 — subscription lifecycle
   sendWelcomeEmail,
   sendTrialDay20Email,

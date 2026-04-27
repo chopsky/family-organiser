@@ -7,6 +7,7 @@ const { sendOverdueNudges } = require('./overdue-nudge');
 const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
+const { checkAiHealth } = require('./ai-health');
 const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
@@ -483,6 +484,14 @@ function startScheduler() {
   // fired inline from /api/auth/create-household, not here.
   cron.schedule('0 9 * * *', () => runTrialEmailCheck(), { timezone: 'Europe/London' });
   console.log('✓ Trial lifecycle emails scheduled (09:00 Europe/London daily)');
+
+  // ── AI provider health check: every hour at :05 ────────────────────────────
+  // Detects "Gemini went dark" failure modes (key unset, quota exhausted,
+  // model name change) and emails the operator at most once per day per
+  // condition. See src/jobs/ai-health.js for the diagnostic logic.
+  // Runs at :05 to avoid clashing with the top-of-hour minute crons.
+  cron.schedule('5 * * * *', () => checkAiHealth());
+  console.log('✓ AI provider health check scheduled (hourly at :05)');
 
   // NOTE: the 12-month inactive-household retention cleanup + orphan
   // cleanup are both handled by runRetentionCleanup() above (04:00 UTC).

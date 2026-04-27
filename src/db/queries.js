@@ -2770,11 +2770,19 @@ async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
 
 async function getAiUsageTimeline({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  // PostgREST defaults to a 1000-row cap. With ascending order that returns
+  // the OLDEST 1000 rows in the window and silently drops the most recent
+  // ones — which previously made the admin dashboard chart cut off ~6 days
+  // before "now" once daily volume crossed the threshold. Bump the cap well
+  // past any plausible volume; current rate is ~200/day, so 50_000 covers
+  // ~8 months. If we ever approach that, swap this for an SQL aggregate
+  // (count(*) GROUP BY date, provider) via supabase.rpc().
   const { data, error } = await db
     .from('ai_usage_log')
     .select('provider, created_at')
     .gte('created_at', since)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(50000);
   if (error) throw error;
 
   // Group by date
