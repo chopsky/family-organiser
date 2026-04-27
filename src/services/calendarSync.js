@@ -37,7 +37,35 @@ async function pushEventToConnections(householdId, event, action) {
       try {
         await refreshTokenIfNeeded(connection);
         const provider = getProvider(connection.provider);
-        const result = await provider.pushEvent(connection, event, action);
+
+        // For update/delete, the providers look up event.sync_mappings to
+        // find the external event id + etag they need to address. The event
+        // row passed in (from db.updateCalendarEvent) doesn't carry that,
+        // so load it here and attach. Without this, every update/delete
+        // push throws "No sync mapping found" and the change never reaches
+        // the external calendar — letting the next poll revert our edit.
+        let eventForPush = event;
+        if (action === 'update' || action === 'delete') {
+          const mapping = await db.getSyncMapping(event.id, connection.id);
+          if (!mapping) {
+            // No mapping exists — the event was never synced to this
+            // connection in the first place (e.g. created before the user
+            // connected the calendar). Nothing to update or delete on
+            // their side; skip silently.
+            return;
+          }
+          eventForPush = {
+            ...event,
+            sync_mappings: [{
+              provider: connection.provider,
+              connection_id: connection.id,
+              external_event_id: mapping.external_event_id,
+              etag: mapping.external_etag,
+            }],
+          };
+        }
+
+        const result = await provider.pushEvent(connection, eventForPush, action);
 
         if (action === 'create' && result?.externalEventId) {
           await db.createSyncMapping(event.id, connection.id, result.externalEventId, result.etag);
