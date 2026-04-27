@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
+import { formatBytes } from '../../lib/formatBytes';
 
 const PAGE_SIZE = 20;
 
@@ -73,6 +74,7 @@ export default function AdminHouseholds() {
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Name</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Storage</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Join Code</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Timezone</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Created</th>
@@ -94,6 +96,9 @@ export default function AdminHouseholds() {
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <SubscriptionBadge household={h} />
                     </td>
+                    <td className="px-4 py-3 text-warm-grey text-xs hidden lg:table-cell whitespace-nowrap">
+                      {(h.documents_count ?? 0)} files · {formatBytes(h.documents_bytes ?? 0)}
+                    </td>
                     <td className="px-4 py-3 text-warm-grey font-mono text-xs hidden md:table-cell">{h.join_code}</td>
                     <td className="px-4 py-3 text-warm-grey text-xs hidden md:table-cell">{h.timezone || '—'}</td>
                     <td className="px-4 py-3 text-warm-grey hidden lg:table-cell">
@@ -102,7 +107,7 @@ export default function AdminHouseholds() {
                   </tr>
                 ))}
                 {households.length === 0 && (
-                  <tr><td colSpan="6" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
+                  <tr><td colSpan="7" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
                 )}
               </tbody>
             </table>

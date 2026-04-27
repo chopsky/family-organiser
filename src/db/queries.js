@@ -2545,6 +2545,24 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}, db =
     for (const h of data) {
       h.member_count = countMap[h.id] || 0;
     }
+
+    // Attach document counts + total bytes (single bulk fetch — same pattern as members)
+    const { data: docs } = await db
+      .from('documents')
+      .select('household_id, file_size')
+      .in('household_id', householdIds);
+
+    const docStats = {};
+    for (const d of docs || []) {
+      const stat = docStats[d.household_id] || { count: 0, bytes: 0 };
+      stat.count++;
+      stat.bytes += d.file_size || 0;
+      docStats[d.household_id] = stat;
+    }
+    for (const h of data) {
+      h.documents_count = docStats[h.id]?.count || 0;
+      h.documents_bytes = docStats[h.id]?.bytes || 0;
+    }
   }
 
   return { households: data, total: count };
@@ -2558,13 +2576,21 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     .single();
   if (error) throw error;
 
-  const { data: members } = await db
-    .from('users')
-    .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at')
-    .eq('household_id', householdId)
-    .order('created_at');
+  const [{ data: members }, storage] = await Promise.all([
+    db
+      .from('users')
+      .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at')
+      .eq('household_id', householdId)
+      .order('created_at'),
+    getHouseholdStorageUsage(householdId).catch(() => ({ totalBytes: 0, fileCount: 0 })),
+  ]);
 
-  return { ...household, members: members || [] };
+  return {
+    ...household,
+    members: members || [],
+    documents_count: storage.fileCount,
+    documents_bytes: storage.totalBytes,
+  };
 }
 
 async function getPlatformStats(db = supabase) {

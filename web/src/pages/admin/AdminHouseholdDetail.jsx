@@ -4,6 +4,10 @@ import api from '../../lib/api';
 import { IconArrowLeft } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
+import { formatBytes } from '../../lib/formatBytes';
+
+const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB — mirrors src/routes/documents.js
+const FILE_QUOTA_COUNT = 500;
 
 function formatDate(value) {
   if (!value) return '—';
@@ -151,6 +155,15 @@ export default function AdminHouseholdDetail() {
         </div>
       </div>
 
+      {/* Storage */}
+      <div className="mt-6">
+        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Storage</h3>
+        <StorageCard
+          bytes={household.documents_bytes ?? 0}
+          fileCount={household.documents_count ?? 0}
+        />
+      </div>
+
       {/* Members */}
       <div className="mt-6">
         <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Members</h3>
@@ -206,6 +219,59 @@ function Detail({ label, value, mono }) {
     <div>
       <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider">{label}</p>
       <p className={`text-sm text-charcoal mt-0.5 ${mono ? 'font-mono' : ''}`}>{value || '—'}</p>
+    </div>
+  );
+}
+
+function StorageCard({ bytes, fileCount }) {
+  const bytesPct = Math.min(100, (bytes / STORAGE_QUOTA_BYTES) * 100);
+  const filesPct = Math.min(100, (fileCount / FILE_QUOTA_COUNT) * 100);
+  const overQuota = bytes > STORAGE_QUOTA_BYTES || fileCount > FILE_QUOTA_COUNT;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+      <div className="flex items-baseline gap-3 flex-wrap">
+        <span className="font-display text-2xl font-bold text-charcoal">{fileCount} {fileCount === 1 ? 'file' : 'files'}</span>
+        <span className="text-warm-grey">·</span>
+        <span className="font-display text-2xl font-bold text-charcoal">{formatBytes(bytes)}</span>
+        {overQuota && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-coral-light text-coral text-xs font-semibold">
+            Over quota
+          </span>
+        )}
+      </div>
+
+      <div className="mt-5 space-y-4">
+        <QuotaBar
+          label="Storage"
+          used={formatBytes(bytes)}
+          limit={formatBytes(STORAGE_QUOTA_BYTES)}
+          pct={bytesPct}
+        />
+        <QuotaBar
+          label="Files"
+          used={`${fileCount}`}
+          limit={`${FILE_QUOTA_COUNT}`}
+          pct={filesPct}
+        />
+      </div>
+    </div>
+  );
+}
+
+function QuotaBar({ label, used, limit, pct }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1.5">
+        <span className="font-semibold text-warm-grey uppercase tracking-wider">{label}</span>
+        <span className="text-charcoal">{used} <span className="text-warm-grey">of {limit}</span></span>
+      </div>
+      <div className="h-2 bg-cream rounded-full overflow-hidden">
+        <div
+          className="h-full bg-plum rounded-full transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
