@@ -226,10 +226,37 @@ async function downloadMedia(mediaUrl) {
 /**
  * Send a WhatsApp verification code to a phone number.
  *
+ * First-time WhatsApp connect happens BEFORE the user has ever messaged
+ * the bot, so the 24-hour customer-service window isn't open and
+ * sendMessage's freeform path will be rejected by Twilio with code 63016.
+ * To deliver the code outside that window we need a pre-approved Content
+ * Template (Authentication category) — the SID lives in
+ * TWILIO_TEMPLATE_VERIFICATION_CODE.
+ *
+ * Behaviour:
+ *   • If TWILIO_TEMPLATE_VERIFICATION_CODE is set to a valid Content SID,
+ *     send via sendTemplate (works regardless of the messaging window).
+ *   • Otherwise fall back to the freeform path. Logs a warning so the
+ *     misconfiguration is visible. The fallback only succeeds if the
+ *     user has messaged the bot in the last 24h — useful for re-verify
+ *     flows but useless for first-time connects.
+ *
  * @param {string} phone - Phone number to verify
  * @param {string} code  - 6-digit verification code
  */
 async function sendVerificationCode(phone, code) {
+  const templateSid = process.env.TWILIO_TEMPLATE_VERIFICATION_CODE;
+  const isValidSid = typeof templateSid === 'string' && /^HX[a-f0-9]{32}$/i.test(templateSid);
+
+  if (isValidSid) {
+    return sendTemplate(phone, templateSid, { 1: code });
+  }
+
+  console.warn(
+    '[WhatsApp] TWILIO_TEMPLATE_VERIFICATION_CODE not set — falling back to freeform send. ' +
+    'First-time WhatsApp connects will fail with Twilio 63016 until an Authentication-category ' +
+    'Content Template is approved and its SID is configured.'
+  );
   return sendMessage(phone, `Your Housemait verification code is: ${code}\n\nThis code expires in 10 minutes.`);
 }
 
