@@ -3,6 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconArrowLeft } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import SubscriptionBadge from '../../components/SubscriptionBadge';
+
+function formatDate(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleString();
+}
 
 const avatarColors = {
   red: 'bg-red', 'burnt-orange': 'bg-burnt-orange', amber: 'bg-amber', gold: 'bg-gold',
@@ -16,6 +22,7 @@ export default function AdminHouseholdDetail() {
   const { id } = useParams();
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const loadHousehold = useCallback(async () => {
     try {
@@ -29,6 +36,38 @@ export default function AdminHouseholdDetail() {
   }, [id]);
 
   useEffect(() => { loadHousehold(); }, [loadHousehold]);
+
+  async function patchSubscription(updates) {
+    setSaving(true);
+    try {
+      const { data } = await api.patch(`/admin/households/${id}/subscription`, updates);
+      setHousehold((prev) => ({ ...prev, ...data }));
+    } catch (err) {
+      console.error('Failed to update subscription:', err);
+      alert('Failed to update subscription. See console for details.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleInternal() {
+    if (!household) return;
+    const next = !household.is_internal;
+    const verb = next ? 'mark as internal (free unlimited access)' : 'remove internal flag';
+    if (!confirm(`Are you sure you want to ${verb}?`)) return;
+    await patchSubscription({ is_internal: next });
+  }
+
+  async function handleExtendTrial() {
+    if (!household) return;
+    // Extend from whichever is later — current trial end or now
+    const base = household.trial_ends_at && new Date(household.trial_ends_at) > new Date()
+      ? new Date(household.trial_ends_at)
+      : new Date();
+    const newEnd = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (!confirm(`Extend trial by 30 days (until ${new Date(newEnd).toLocaleDateString()})?`)) return;
+    await patchSubscription({ trial_ends_at: newEnd });
+  }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
   if (!household) return <p className="text-warm-grey py-10 text-center">Household not found</p>;
@@ -48,6 +87,67 @@ export default function AdminHouseholdDetail() {
           <Detail label="Members" value={household.members?.length ?? 0} />
           <Detail label="Timezone" value={household.timezone} />
           <Detail label="Created" value={household.created_at ? new Date(household.created_at).toLocaleDateString() : '—'} />
+        </div>
+      </div>
+
+      {/* Subscription */}
+      <div className="mt-6">
+        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Subscription</h3>
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+          <div className="flex items-center gap-3 flex-wrap">
+            <SubscriptionBadge household={household} />
+            {household.subscription_plan && !household.is_internal && (
+              <span className="text-sm text-warm-grey capitalize">{household.subscription_plan}</span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-light-grey">
+            <Detail label="Trial Started" value={formatDate(household.trial_started_at)} />
+            <Detail label="Trial Ends" value={formatDate(household.trial_ends_at)} />
+            <Detail label="Period Ends" value={formatDate(household.subscription_current_period_end)} />
+            <Detail
+              label="Stripe Customer"
+              value={household.stripe_customer_id ? `${household.stripe_customer_id.slice(0, 18)}…` : '—'}
+              mono
+            />
+            <Detail
+              label="Stripe Subscription"
+              value={household.stripe_subscription_id ? `${household.stripe_subscription_id.slice(0, 18)}…` : '—'}
+              mono
+            />
+            <Detail label="Internal" value={household.is_internal ? 'Yes' : 'No'} />
+          </div>
+
+          <div className="mt-5 pt-5 border-t border-light-grey flex flex-wrap gap-3">
+            <button
+              onClick={handleToggleInternal}
+              disabled={saving}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
+                household.is_internal
+                  ? 'bg-cream text-charcoal border border-light-grey hover:bg-light-grey'
+                  : 'bg-plum text-white hover:bg-plum-dark'
+              }`}
+            >
+              {household.is_internal ? 'Remove Internal Flag' : 'Mark as Internal (Free)'}
+            </button>
+            <button
+              onClick={handleExtendTrial}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-plum text-plum hover:bg-plum-light transition-colors disabled:opacity-50"
+            >
+              Extend Trial 30 Days
+            </button>
+            {household.stripe_customer_id && (
+              <a
+                href={`https://dashboard.stripe.com/customers/${household.stripe_customer_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl text-sm font-semibold border border-light-grey text-charcoal hover:bg-cream transition-colors"
+              >
+                Open in Stripe ↗
+              </a>
+            )}
+          </div>
         </div>
       </div>
 

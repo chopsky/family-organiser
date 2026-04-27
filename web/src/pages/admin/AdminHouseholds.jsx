@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import SubscriptionBadge from '../../components/SubscriptionBadge';
 
 const PAGE_SIZE = 20;
 
@@ -71,7 +72,8 @@ export default function AdminHouseholds() {
                 <tr className="border-b border-light-grey text-left">
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Name</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Join Code</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Join Code</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Timezone</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Created</th>
                 </tr>
@@ -89,7 +91,10 @@ export default function AdminHouseholds() {
                         {h.member_count ?? 0}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-warm-grey font-mono text-xs hidden sm:table-cell">{h.join_code}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <SubscriptionBadge household={h} />
+                    </td>
+                    <td className="px-4 py-3 text-warm-grey font-mono text-xs hidden md:table-cell">{h.join_code}</td>
                     <td className="px-4 py-3 text-warm-grey text-xs hidden md:table-cell">{h.timezone || '—'}</td>
                     <td className="px-4 py-3 text-warm-grey hidden lg:table-cell">
                       {h.created_at ? new Date(h.created_at).toLocaleDateString() : '—'}
@@ -97,7 +102,7 @@ export default function AdminHouseholds() {
                   </tr>
                 ))}
                 {households.length === 0 && (
-                  <tr><td colSpan="5" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
+                  <tr><td colSpan="6" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
                 )}
               </tbody>
             </table>

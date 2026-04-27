@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconUsers, IconHome, IconTrendingUp } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import SubscriptionBadge from '../../components/SubscriptionBadge';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -39,6 +40,14 @@ export default function AdminDashboard() {
     { label: 'New Households (7d)', value: stats?.newHouseholdsThisWeek ?? 0, icon: IconTrendingUp, color: 'text-plum bg-plum-light' },
   ];
 
+  const subs = stats?.subscriptions || {};
+  const subscriptionCards = [
+    { label: 'Trialing', value: subs.trialing ?? 0, valueClass: 'text-plum' },
+    { label: 'Active', value: subs.active ?? 0, valueClass: 'text-sage' },
+    { label: 'Expired / Cancelled', value: (subs.expired ?? 0) + (subs.cancelled ?? 0), valueClass: 'text-coral' },
+    { label: 'Internal', value: subs.internal ?? 0, valueClass: 'text-charcoal' },
+  ];
+
   return (
     <div>
       <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Platform Overview</h1>
@@ -55,6 +64,19 @@ export default function AdminDashboard() {
             <p className="text-xs text-warm-grey font-medium mt-0.5">{label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Subscription Stats */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Subscriptions</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {subscriptionCards.map(({ label, value, valueClass }) => (
+            <div key={label} className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+              <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Recent Users */}
@@ -106,6 +128,7 @@ export default function AdminDashboard() {
               <tr className="border-b border-light-grey text-left">
                 <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Name</th>
                 <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
+                <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
                 <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Created</th>
               </tr>
             </thead>
@@ -122,13 +145,16 @@ export default function AdminDashboard() {
                       {h.member_count ?? 0}
                     </span>
                   </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <SubscriptionBadge household={h} />
+                  </td>
                   <td className="px-4 py-3 text-warm-grey hidden md:table-cell">
                     {h.created_at ? new Date(h.created_at).toLocaleDateString() : '—'}
                   </td>
                 </tr>
               ))}
               {recentHouseholds.length === 0 && (
-                <tr><td colSpan="3" className="px-4 py-6 text-center text-warm-grey">No households yet</td></tr>
+                <tr><td colSpan="4" className="px-4 py-6 text-center text-warm-grey">No households yet</td></tr>
               )}
             </tbody>
           </table>

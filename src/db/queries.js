@@ -2517,7 +2517,7 @@ async function getUserByIdAdmin(userId, db = supabase) {
 async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}, db = supabase) {
   let query = db
     .from('households')
-    .select('id, name, join_code, timezone, reminder_time, created_at', { count: 'exact' });
+    .select('id, name, join_code, timezone, reminder_time, created_at, subscription_status, subscription_plan, trial_ends_at, is_internal, subscription_current_period_end, stripe_customer_id', { count: 'exact' });
 
   if (search) {
     query = query.ilike('name', `%${search}%`);
@@ -2571,11 +2571,12 @@ async function getPlatformStats(db = supabase) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult] = await Promise.all([
+  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats] = await Promise.all([
     db.from('users').select('id', { count: 'exact', head: true }),
     db.from('households').select('id', { count: 'exact', head: true }),
     db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
     db.from('households').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+    getSubscriptionStats(db),
   ]);
 
   return {
@@ -2583,7 +2584,61 @@ async function getPlatformStats(db = supabase) {
     totalHouseholds: householdsResult.count || 0,
     newUsersThisWeek: newUsersResult.count || 0,
     newHouseholdsThisWeek: newHouseholdsResult.count || 0,
+    subscriptions: subStats,
   };
+}
+
+/**
+ * Counts of households grouped by subscription_status, plus internal count.
+ * Internal households are mutually exclusive in the UI but counted separately
+ * here so admins can see both views.
+ */
+async function getSubscriptionStats(db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .select('subscription_status, is_internal');
+  if (error) throw error;
+
+  const stats = {
+    trialing: 0,
+    active: 0,
+    expired: 0,
+    cancelled: 0,
+    internal: 0,
+  };
+  for (const h of data || []) {
+    if (h.is_internal) stats.internal++;
+    if (h.subscription_status && stats[h.subscription_status] !== undefined) {
+      stats[h.subscription_status]++;
+    }
+  }
+  return stats;
+}
+
+/**
+ * Whitelisted subscription update for admin dashboard. Only `is_internal` and
+ * `trial_ends_at` are accepted — everything else (Stripe IDs, status,
+ * customer IDs) must flow through Stripe webhooks to stay consistent.
+ */
+async function updateHouseholdSubscriptionAdmin(householdId, updates, db = supabase) {
+  const allowed = {};
+  if (typeof updates.is_internal === 'boolean') allowed.is_internal = updates.is_internal;
+  if (typeof updates.trial_ends_at === 'string') allowed.trial_ends_at = updates.trial_ends_at;
+
+  if (Object.keys(allowed).length === 0) {
+    const err = new Error('No valid subscription fields provided');
+    err.code = 'NO_FIELDS';
+    throw err;
+  }
+
+  const { data, error } = await db
+    .from('households')
+    .update(allowed)
+    .eq('id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function disableUser(userId, db = supabase) {
@@ -4045,6 +4100,8 @@ module.exports = {
   getAllHouseholdsAdmin,
   getHouseholdDetailAdmin,
   getPlatformStats,
+  getSubscriptionStats,
+  updateHouseholdSubscriptionAdmin,
   disableUser,
   enableUser,
   deleteUserAdmin,

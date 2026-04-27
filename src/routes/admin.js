@@ -163,6 +163,37 @@ router.get('/households/:id', async (req, res) => {
   }
 });
 
+// ─── PATCH /api/admin/households/:id/subscription ──────────────────────────
+
+router.patch('/households/:id/subscription', async (req, res) => {
+  const { is_internal, trial_ends_at } = req.body || {};
+
+  // Reject anything outside the whitelist
+  const extraKeys = Object.keys(req.body || {}).filter(
+    (k) => k !== 'is_internal' && k !== 'trial_ends_at'
+  );
+  if (extraKeys.length > 0) {
+    return res.status(400).json({ error: `Unsupported fields: ${extraKeys.join(', ')}` });
+  }
+
+  try {
+    const household = await db.updateHouseholdSubscriptionAdmin(req.params.id, {
+      is_internal,
+      trial_ends_at,
+    });
+    return res.json(household);
+  } catch (err) {
+    if (err.code === 'NO_FIELDS') {
+      return res.status(400).json({ error: 'No valid subscription fields provided' });
+    }
+    if (err.code === 'PGRST116') {
+      return res.status(404).json({ error: 'Household not found' });
+    }
+    console.error('PATCH /api/admin/households/:id/subscription error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/ai-usage ─────────────────────────────────────────────────
 
 router.get('/ai-usage', async (req, res) => {
