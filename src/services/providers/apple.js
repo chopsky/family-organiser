@@ -34,7 +34,23 @@ function formatDate(dateString, allDay) {
  */
 function buildVEvent(event, uid) {
   const dtstart = formatDate(event.start_time, event.all_day);
-  const dtend = formatDate(event.end_time, event.all_day);
+  // RFC 5545: for all-day events, DTEND is *exclusive* — it must be the
+  // day AFTER the last day of the event. Our internal end_time stores the
+  // last day at 23:59:59, so for the iCal payload we have to add a day.
+  // Without this, parseVEvent's compliant subtract-one-day logic on the
+  // round-trip pull writes end_time back as one day BEFORE start_time,
+  // corrupting every all-day event we sync to Apple.
+  let dtend;
+  if (event.all_day) {
+    const d = new Date(event.end_time);
+    d.setUTCDate(d.getUTCDate() + 1);
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    dtend = `${yyyy}${mm}${dd}`;
+  } else {
+    dtend = formatDate(event.end_time, false);
+  }
   const valueParam = event.all_day ? ';VALUE=DATE' : '';
 
   const lines = [
@@ -182,13 +198,22 @@ function parseVEvent(icalData) {
 
   // iCalendar all-day events use an exclusive end date (DTEND is the day AFTER the event).
   // Subtract one day so the app doesn't show the event bleeding into the next day.
+  // Defensive: if DTEND was actually inclusive (a non-compliant source — including
+  // our own historical pushes before the buildVEvent fix), subtracting would land
+  // BEFORE start_time. In that case the source clearly wasn't using exclusive end —
+  // fall back to treating DTEND as the same day as start (single-day event). Keeps
+  // the pull idempotent for legacy Apple-stored events that still have the old
+  // non-compliant DTEND. Multi-day non-compliant events are still off by one and
+  // need to be re-pushed; they'll self-heal next time the user touches them.
   if (allDay && dtend && dtend.length === 8) {
     const d = new Date(endTime + 'T00:00:00Z');
     d.setUTCDate(d.getUTCDate() - 1);
     const y = d.getUTCFullYear();
     const m = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(d.getUTCDate()).padStart(2, '0');
-    endTime = `${y}-${m}-${dd}`;
+    const subtracted = `${y}-${m}-${dd}`;
+    const startDay = parseICalDate(dtstart, startTzid).slice(0, 10);
+    endTime = subtracted < startDay ? startDay : subtracted;
   }
 
   return {
