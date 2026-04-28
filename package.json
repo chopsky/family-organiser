@@ -48,7 +48,7 @@
     "stripe": "^22.0.2",
     "tsdav": "^2.1.8",
     "twilio": "^5.13.1",
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "eslint": "^9.39.4",
