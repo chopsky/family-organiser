@@ -328,7 +328,11 @@ export default function Calendar() {
   const [formRecurrence, setFormRecurrence] = useState('');
   const [formEndDate, setFormEndDate] = useState(toDateStr(today));
   const [formAssignees, setFormAssignees] = useState([]);
-  const [formReminders, setFormReminders] = useState([{ time: '5', unit: 'minutes' }]);
+  // Default to no reminder. The "+ Add notification" button lets users
+  // opt in explicitly. Pre-checking a 5-min default surprised users who
+  // never asked for one (and silently saved an actual reminder row if
+  // they edited the event without touching the field).
+  const [formReminders, setFormReminders] = useState([]);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -668,7 +672,7 @@ export default function Calendar() {
     setFormAssignee('');
     setFormAssignees([]);
     setFormRecurrence('');
-    setFormReminders([{ time: '5', unit: 'minutes' }]);
+    setFormReminders([]);
     setShowMoreOptions(false);
   }
 
@@ -707,7 +711,7 @@ export default function Calendar() {
       setFormAssignees([]);
     }
     setFormRecurrence(ev.recurrence || '');
-    setFormReminders(ev.reminders && Array.isArray(ev.reminders) ? ev.reminders : [{ time: '5', unit: 'minutes' }]);
+    setFormReminders(ev.reminders && Array.isArray(ev.reminders) ? ev.reminders : []);
     setShowMoreOptions(false);
     setShowForm(true);
   }

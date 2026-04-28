@@ -183,6 +183,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             if (created && assigneeNames.length > 0) {
               await db.saveEventAssignees(created.id, req.householdId, assigneeNames, members);
             }
+            // Reminders only when the user explicitly asked. The classifier
+            // prompt leaves ev.reminders null otherwise. See bot/handlers.js
+            // for the matching WhatsApp-side wiring.
+            if (created && Array.isArray(ev.reminders) && ev.reminders.length > 0) {
+              try {
+                await db.saveEventReminders(created.id, req.householdId, ev.reminders, created.start_time);
+              } catch (err) {
+                console.error('[classify] saveEventReminders failed:', err.message);
+              }
+            }
             // Mirror to connected external calendars (Apple/Google/Microsoft).
             // Fire-and-forget: errors are logged inside pushEventToConnections
             // but must not break the AI classify response.

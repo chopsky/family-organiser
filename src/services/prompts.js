@@ -169,6 +169,18 @@ DATE-REQUIRED FOR CALENDAR EVENTS:
   to ask: "Sure — when is the {title}? (Tell me a date.)"
 - "Today" or context like "this morning/afternoon/evening/tonight" counts as
   a date — use today's date.
+- REMINDERS for a create_event: leave calendar_event.reminders as null
+  UNLESS the user explicitly asked for one (e.g. "remind me 30 mins before",
+  "with a 1 hour alert", "remind me an hour before", "5 min reminder").
+  Default behaviour is NO reminder. When the user does ask:
+    • Parse the offset to {time: number, unit: "minutes"|"hours"|"days"}.
+    • "remind me 30 mins before" → [{"time": 30, "unit": "minutes"}]
+    • "with a 1 hour reminder" → [{"time": 1, "unit": "hours"}]
+    • "remind me a day before" → [{"time": 1, "unit": "days"}]
+    • Multiple reminders are allowed: "remind me 1 day and 1 hour before"
+      → [{"time": 1, "unit": "days"}, {"time": 1, "unit": "hours"}]
+  If the user asks to add a reminder TO AN EXISTING event, that's an
+  update_event intent — populate updates.reminders with the same shape.
 
 UPDATE & DELETE (events, tasks, shopping) — BE CONSERVATIVE:
 - Only use update_* or delete_* intents when the user's message contains an
@@ -270,6 +282,7 @@ Respond only with valid JSON matching this schema:
     "assigned_to_names": string[] | null,
     "location": string | null,
     "description": string | null,
+    "reminders": [{"time": number, "unit": "minutes" | "hours" | "days"}] | null,
     "force": boolean
   } | null,
   "target": {
@@ -291,6 +304,7 @@ Respond only with valid JSON matching this schema:
     "due_date": "YYYY-MM-DD" | null,
     "priority": "low" | "medium" | "high" | null,
     "recurrence": "daily" | "weekly" | "biweekly" | "monthly" | "yearly" | null,
+    "reminders": [{"time": number, "unit": "minutes" | "hours" | "days"}] | null,
     "quantity": string | null,
     "item": string | null
   } | null,

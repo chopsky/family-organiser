@@ -396,10 +396,24 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance — reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
       }
       const eventUpdates = buildEventUpdates(updates, hit, household, user);
-      if (Object.keys(eventUpdates).length === 0) {
+      // Reminders are stored in a separate table (event_reminders), so they
+      // aren't part of the column patch. Treat updates.reminders as a full
+      // replacement set: a non-null array (even []) replaces existing
+      // reminders. null means "leave reminders alone".
+      const hasReminderUpdate = Array.isArray(updates?.reminders);
+      if (Object.keys(eventUpdates).length === 0 && !hasReminderUpdate) {
         return { response: "Got it, but I didn't see any field to change. Tell me what to update (time, date, location…).", actions };
       }
-      const updated = await db.updateCalendarEvent(hit.id, household.id, eventUpdates);
+      const updated = Object.keys(eventUpdates).length > 0
+        ? await db.updateCalendarEvent(hit.id, household.id, eventUpdates)
+        : hit;
+      if (hasReminderUpdate) {
+        try {
+          await db.saveEventReminders(hit.id, household.id, updates.reminders, updated.start_time);
+        } catch (err) {
+          console.error('[handlers] saveEventReminders failed for update:', err.message);
+        }
+      }
       // Push update to connected calendars (Apple/Google/MS). Without this,
       // the next pull from the provider overwrites our update with their
       // unchanged copy, reverting the user's WhatsApp edit.
@@ -700,6 +714,20 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
 
     if (created && assigneeNames.length > 0) {
       await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
+    }
+
+    // Reminders are off by default — only created when the LLM populates
+    // ev.reminders in response to an explicit user ask ("remind me 30 mins
+    // before"). The classifier prompt at services/prompts.js spells out the
+    // shape: [{time: number, unit: "minutes"|"hours"|"days"}]. saveEventReminders
+    // turns each into an event_reminders row via reminderOffsetToMs.
+    if (created && Array.isArray(ev.reminders) && ev.reminders.length > 0) {
+      try {
+        await db.saveEventReminders(created.id, household.id, ev.reminders, created.start_time);
+      } catch (err) {
+        // Don't fail the event create over a reminder save error — log and move on.
+        console.error('[handlers] saveEventReminders failed for new event:', err.message);
+      }
     }
 
     // Mirror to any connected external calendars (Apple/Google/Microsoft).
