@@ -96,14 +96,16 @@ function PlanSection() {
                 </span>
               )}
             </p>
-            <p className="text-xs text-warm-grey mt-1">
-              {isIos()
-                ? 'Subscribe on housemait.com to avoid interruption.'
-                : 'Subscribe any time to avoid interruption.'}
-            </p>
+            {/* On iOS, no subscribe steering text — App Review rejected
+                "Subscribe on housemait.com" as anti-steering. iOS users
+                see only the entitlement status; they're expected to find
+                the website themselves if they want to subscribe. */}
+            {!isIos() && (
+              <p className="text-xs text-warm-grey mt-1">
+                Subscribe any time to avoid interruption.
+              </p>
+            )}
           </div>
-          {/* iOS can't offer an in-app subscribe path (App Store rules) —
-              hide the CTA. The URL is surfaced as text above. */}
           {!isIos() && (
             <Link
               to="/subscribe"
@@ -120,22 +122,22 @@ function PlanSection() {
           <div>
             <p className="text-sm text-cocoa">
               <strong className="text-emerald font-semibold">Active</strong>
-              {plan && (
+              {/* On iOS, show only the entitlement status — no plan name,
+                  no price, no Stripe portal link. App Review rejected the
+                  "Annual plan (£49.90/year)" string + "housemait.com"
+                  steering as Guideline 3.1.1 violations. */}
+              {!isIos() && plan && (
                 <span className="text-charcoal">
                   {' '}· {plan === 'annual' ? 'Annual plan (£49.90/year)' : 'Monthly plan (£4.99/month)'}
                 </span>
               )}
             </p>
-            <p className="text-xs text-warm-grey mt-1">
-              {isIos()
-                ? 'To change your plan or cancel, sign in at housemait.com.'
-                : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
-            </p>
+            {!isIos() && (
+              <p className="text-xs text-warm-grey mt-1">
+                Update card, switch plans, or cancel anytime from the Stripe portal.
+              </p>
+            )}
           </div>
-          {/* iOS can't link to the Stripe Customer Portal — that's an
-              external payment management page and falls under Apple's
-              Anti-Steering rule. Users manage their subscription by
-              signing in to the web app on any browser. */}
           {!isIos() && (
             <button
               type="button"
@@ -157,7 +159,7 @@ function PlanSection() {
             </p>
             <p className="text-xs text-warm-grey mt-1">
               {isIos()
-                ? "Your data's still here. Subscribe on housemait.com to unlock everything again."
+                ? "Your data's still here."
                 : "Your data's still here. Subscribe to unlock everything again."}
             </p>
           </div>

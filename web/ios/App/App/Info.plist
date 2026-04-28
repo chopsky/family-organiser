@@ -6,6 +6,12 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Housemait uses the camera so you can scan receipts and snap photos of school letters, appointment slips and other documents to add to your household.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Housemait needs access to your photo library so you can attach existing photos to documents and shopping items.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Housemait uses the microphone so you can record voice notes that get transcribed into tasks, shopping items and calendar events.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
