@@ -471,6 +471,12 @@ router.post('/events', async (req, res) => {
       }
     })();
 
+    // cal-month is the only one the frontend actually reads (see
+    // Calendar.jsx fetchMonth). cal-events / cal-tasks are kept for
+    // legacy endpoints that may still be hit by other clients. Without
+    // cal-month invalidation here, create/update/delete appeared to
+    // silently no-op until the 60-second server cache TTL expired.
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
@@ -529,6 +535,12 @@ router.patch('/events/:id', async (req, res) => {
     // Push update to connected external calendars (fire-and-forget)
     calendarSync.pushEventToConnections(req.householdId, event, 'update').catch(() => {});
 
+    // cal-month is the only one the frontend actually reads (see
+    // Calendar.jsx fetchMonth). cal-events / cal-tasks are kept for
+    // legacy endpoints that may still be hit by other clients. Without
+    // cal-month invalidation here, create/update/delete appeared to
+    // silently no-op until the 60-second server cache TTL expired.
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
@@ -550,6 +562,12 @@ router.delete('/events/:id', async (req, res) => {
     // Clean up assignees before soft-deleting
     await db.saveEventAssignees(req.params.id, req.householdId, [], []).catch(() => {});
     await db.deleteCalendarEvent(req.params.id, req.householdId);
+    // cal-month is the only one the frontend actually reads (see
+    // Calendar.jsx fetchMonth). cal-events / cal-tasks are kept for
+    // legacy endpoints that may still be hit by other clients. Without
+    // cal-month invalidation here, create/update/delete appeared to
+    // silently no-op until the 60-second server cache TTL expired.
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);

@@ -798,14 +798,25 @@ export default function Calendar() {
 
   async function deleteEvent(id) {
     if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    // Optimistic: yank from local state + close the modal immediately so the
+    // user sees instant feedback. The reconciling load() runs in the
+    // background and is mostly a safety net (a parallel update from another
+    // device, or an event we know about that the API doesn't, etc.).
+    setEvents(prev => prev.filter(e => e.id !== id));
+    setShowForm(false);
+    resetForm();
+    invalidateMonthCache();
     try {
       await api.delete(`/calendar/events/${id}`);
-      setShowForm(false);
-      resetForm();
-      invalidateMonthCache();
-      await load();
+      // Background refresh — don't await. If it adds the event back because
+      // delete actually failed, the catch block below has already shown an
+      // error and triggered the rollback path.
+      load().catch(() => {});
     } catch {
       setError('Could not delete event.');
+      // Rollback: re-fetch so the optimistic removal is undone if the
+      // server still has the event.
+      await load();
     }
   }
 
