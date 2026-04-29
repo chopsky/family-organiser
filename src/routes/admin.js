@@ -228,18 +228,6 @@ router.get('/whatsapp-stats', async (req, res) => {
   }
 });
 
-// ─── GET /api/admin/calendar-sync ───────────────────────────────────────────
-
-router.get('/calendar-sync', async (req, res) => {
-  try {
-    const connections = await db.getCalendarSyncHealth();
-    return res.json({ connections });
-  } catch (err) {
-    console.error('GET /api/admin/calendar-sync error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // ─── GET /api/admin/analytics ───────────────────────────────────────────────
 
 router.get('/analytics', async (req, res) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -228,23 +228,10 @@ export default function Settings() {
   const [feedUrl, setFeedUrl] = useState('');
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedCopied, setFeedCopied] = useState(false);
-  // Tracks whether a feed token already exists, even before the user clicks
-  // "Generate" / "Copy". Used for the mutual-exclusivity warning so we can
-  // detect "feed + two-way sync both active" without auto-creating a token
-  // just by visiting Settings.
-  const [feedExists, setFeedExists] = useState(false);
-
-  // Disconnect-with-cleanup modal state. The modal replaces the old
-  // window.confirm call so we can offer "remove events from external
-  // calendar" as the default — without that, orphan events are left
-  // behind and (combined with a feed subscription) cause duplicates.
-  const [disconnectTarget, setDisconnectTarget] = useState(null); // provider name or null
-  const [disconnectInProgress, setDisconnectInProgress] = useState(false);
-  const [disconnectResult, setDisconnectResult] = useState(null); // {provider, cleanup, ...} or null
 
   // External (inbound) calendar feeds — Cozi/FamilyWall-style read-only
   // subscriptions to the user's Apple/Google/Outlook calendar via iCal URL.
-  // Replaces the inbound side of the old two-way sync.
+  // Replaces the old two-way sync entirely.
   const [externalFeeds, setExternalFeeds] = useState([]);
   const [loadingExternalFeeds, setLoadingExternalFeeds] = useState(false);
   const [showAddFeed, setShowAddFeed] = useState(false);
@@ -258,15 +245,6 @@ export default function Settings() {
   const [receiptCopied, setReceiptCopied] = useState(false);
   const [regeneratingReceipt, setRegeneratingReceipt] = useState(false);
 
-  // Calendar connections state
-  const [calConnections, setCalConnections] = useState([]);
-  const [loadingConnections, setLoadingConnections] = useState(false);
-  const [appleEmail, setAppleEmail] = useState('');
-  const [applePassword, setApplePassword] = useState('');
-  const [connectingApple, setConnectingApple] = useState(false);
-  const [showAppleForm, setShowAppleForm] = useState(false);
-  const [appleError, setAppleError] = useState('');
-
   // Edit profile state
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState('');
@@ -277,14 +255,6 @@ export default function Settings() {
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-
-  // Calendar subscription selection state
-  const [selectingProvider, setSelectingProvider] = useState(null);
-  const [availableCalendars, setAvailableCalendars] = useState([]);
-  const [calendarSelections, setCalendarSelections] = useState({});
-  const [loadingCalendars, setLoadingCalendars] = useState(false);
-  const [savingSubscriptions, setSavingSubscriptions] = useState(false);
-  const [existingSubscriptions, setExistingSubscriptions] = useState([]);
 
   function loadMembers() {
     return api.get('/household')
@@ -417,39 +387,14 @@ export default function Settings() {
       .then(({ data }) => {
         if (data?.exists) {
           setFeedUrl(data.feedUrl);
-          setFeedExists(true);
         }
       })
       .catch(() => {});
   }, []);
 
-  function loadConnections() {
-    setLoadingConnections(true);
-    api.get('/calendar/connections')
-      .then(({ data }) => setCalConnections(data.connections ?? []))
-      .catch(() => {})
-      .finally(() => setLoadingConnections(false));
-  }
-
-  useEffect(() => { loadConnections(); }, []);
-
-  // Handle OAuth callback redirects (e.g. ?connected=google)
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    const connected = searchParams.get('connected');
-    const connError = searchParams.get('error');
-    if (connected) {
-      setSuccess(`${connected.charAt(0).toUpperCase() + connected.slice(1)} Calendar connected!`);
-      loadConnections();
-      searchParams.delete('connected');
-      setSearchParams(searchParams, { replace: true });
-    }
-    if (connError) {
-      setError(`Failed to connect calendar. Please try again.`);
-      searchParams.delete('error');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, []);
+  // (Two-way sync removed — the loadConnections + OAuth callback handler
+  // for ?connected=<provider> are no longer needed. Inbound subscriptions
+  // are managed via the read-only feed flow further down in this file.)
 
   async function handleSendWhatsappCode(e) {
     e.preventDefault();
@@ -676,26 +621,11 @@ export default function Settings() {
   }
 
   async function handleGetFeedUrl() {
-    // Mutual-exclusivity guard: a read-only feed alongside a two-way sync
-    // means every event lands in the user's external calendar twice (once
-    // as a synced native event, once as a feed entry). Warn before
-    // creating the feed.
-    if (calConnections.length > 0) {
-      const providerNames = calConnections.map(c => c.provider.charAt(0).toUpperCase() + c.provider.slice(1)).join(', ');
-      const proceed = window.confirm(
-        `You already have ${providerNames} two-way sync turned on. ` +
-        `Adding the read-only feed on top will create DUPLICATE events in your external calendar — ` +
-        `one from the sync and one from the feed.\n\n` +
-        `Generate the feed anyway?`
-      );
-      if (!proceed) return;
-    }
     setError('');
     setLoadingFeed(true);
     try {
       const { data } = await api.get('/calendar/feed-token');
       setFeedUrl(data.feedUrl);
-      setFeedExists(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not get calendar feed URL.');
     } finally {
@@ -711,7 +641,6 @@ export default function Settings() {
     try {
       const { data } = await api.post('/calendar/feed-token');
       setFeedUrl(data.feedUrl);
-      setFeedExists(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not regenerate feed URL.');
     } finally {
@@ -731,7 +660,6 @@ export default function Settings() {
     try {
       await api.delete('/calendar/feed-token');
       setFeedUrl('');
-      setFeedExists(false);
       setSuccess('Calendar feed disabled.');
     } catch (err) {
       setError(err.response?.data?.error || 'Could not disable calendar feed.');
@@ -865,184 +793,6 @@ export default function Settings() {
     }
   }
 
-  /**
-   * Prompt before adding a two-way sync when a read-only feed already
-   * exists. Returns true to proceed, false to cancel. Shared by all three
-   * provider connect handlers so the warning is consistent.
-   */
-  function confirmConnectDespiteFeed() {
-    if (!feedExists) return true;
-    return window.confirm(
-      `You already have the read-only calendar feed turned on. ` +
-      `Adding two-way sync on top will create DUPLICATE events in your external calendar — ` +
-      `one from the sync and one from the feed.\n\n` +
-      `Connect anyway?`
-    );
-  }
-
-  async function handleConnectGoogle() {
-    if (!confirmConnectDespiteFeed()) return;
-    try {
-      const { data } = await api.get('/calendar/connect/google');
-      window.location.href = data.url;
-    } catch (err) {
-      setError('Could not start Google Calendar connection.');
-    }
-  }
-
-  async function handleConnectMicrosoft() {
-    if (!confirmConnectDespiteFeed()) return;
-    try {
-      const { data } = await api.get('/calendar/connect/microsoft');
-      window.location.href = data.url;
-    } catch (err) {
-      setError('Could not start Microsoft Calendar connection.');
-    }
-  }
-
-  async function handleConnectApple(e) {
-    e.preventDefault();
-    if (!appleEmail.trim() || !applePassword.trim()) {
-      setAppleError('Email and app-specific password are required.');
-      return;
-    }
-    if (!confirmConnectDespiteFeed()) return;
-    setConnectingApple(true);
-    setAppleError('');
-    try {
-      await api.post('/calendar/connect/apple', {
-        email: appleEmail.trim(),
-        appPassword: applePassword.trim(),
-      }, { timeout: 30000 });
-      setSuccess('Apple Calendar connected!');
-      setShowAppleForm(false);
-      setAppleEmail('');
-      setApplePassword('');
-      setAppleError('');
-      loadConnections();
-    } catch (err) {
-      const msg = err.code === 'ECONNABORTED'
-        ? 'Connection timed out. Please try again.'
-        : err.response?.data?.error || 'Could not connect Apple Calendar.';
-      setAppleError(msg);
-    } finally {
-      setConnectingApple(false);
-    }
-  }
-
-  async function openCalendarSelection(provider) {
-    setSelectingProvider(provider);
-    setLoadingCalendars(true);
-    try {
-      const [calsRes, subsRes] = await Promise.allSettled([
-        api.get(`/calendar/connections/${provider}/calendars`),
-        api.get(`/calendar/connections/${provider}/subscriptions`),
-      ]);
-      if (calsRes.status === 'rejected') throw calsRes.reason;
-      const cals = calsRes.value.data.calendars ?? [];
-      const subs = subsRes.status === 'fulfilled' ? (subsRes.value.data.subscriptions ?? []) : [];
-      setAvailableCalendars(cals);
-      setExistingSubscriptions(subs);
-
-      const hasExistingSubs = subs.length > 0;
-      const selections = {};
-      for (const cal of cals) {
-        const existing = subs.find((s) => s.external_calendar_id === cal.id);
-        selections[cal.id] = {
-          enabled: existing ? existing.sync_enabled : !hasExistingSubs,
-          category: existing ? existing.category : cal.suggestedCategory || 'general',
-          visibility: existing ? existing.visibility : 'family',
-        };
-      }
-      setCalendarSelections(selections);
-    } catch (err) {
-      const msg = err.response?.status === 404
-        ? 'Calendar not connected. Please reconnect first.'
-        : err.message?.includes('timed out')
-          ? 'Connection to Apple timed out. Please try again.'
-          : 'Could not load calendars. Please try again.';
-      setError(msg);
-      setSelectingProvider(null);
-    } finally {
-      setLoadingCalendars(false);
-    }
-  }
-
-  async function saveCalendarSubscriptions() {
-    setSavingSubscriptions(true);
-    try {
-      const calendars = availableCalendars
-        .filter((cal) => calendarSelections[cal.id]?.enabled)
-        .map((cal) => ({
-          external_calendar_id: cal.id,
-          display_name: cal.displayName,
-          category: cal.suggestedCategory || 'general',
-          visibility: calendarSelections[cal.id].visibility,
-        }));
-      const { data } = await api.post(`/calendar/connections/${selectingProvider}/subscriptions`, { calendars });
-      const newCount = (data.newImports || 0);
-      const removedCount = (data.removed || 0);
-      let msg = 'Calendar selections saved.';
-      if (newCount > 0) msg += ` Importing ${newCount} calendar${newCount > 1 ? 's' : ''} — this may take a few minutes.`;
-      if (removedCount > 0) msg += ` Removed ${removedCount} calendar${removedCount > 1 ? 's' : ''}.`;
-      setSuccess(msg);
-      setSelectingProvider(null);
-    } catch {
-      setError('Could not save calendar selections.');
-    } finally {
-      setSavingSubscriptions(false);
-    }
-  }
-
-  /**
-   * Open the disconnect modal. The modal lets the user pick whether
-   * Housemait should also remove the events it previously pushed into
-   * their external calendar — without that, those events become orphans
-   * that survive the disconnect, which combined with a feed subscription
-   * causes the duplicate-events problem the Smerins household hit.
-   */
-  function handleDisconnect(provider) {
-    setDisconnectTarget(provider);
-    setDisconnectResult(null);
-  }
-
-  /**
-   * Run the disconnect.
-   *   cleanup=true  → also delete events from the external calendar
-   *   cleanup=false → just disconnect, leave external events alone
-   * Either way the connection itself is torn down server-side.
-   */
-  async function performDisconnect(cleanup) {
-    const provider = disconnectTarget;
-    if (!provider) return;
-    setDisconnectInProgress(true);
-    try {
-      const url = `/calendar/connections/${provider}${cleanup ? '?cleanup=1' : ''}`;
-      const { data } = await api.delete(url);
-      // Optimistically remove from the connections list.
-      setCalConnections(prev => prev.filter(c => c.provider !== provider));
-      // Show summary in the modal so the user sees per-event counts. Note:
-      // we track the user's *intent* (cleanupRequested) separately from the
-      // server's cleanup *result* (data.cleanup) — they collide on the
-      // field name otherwise.
-      setDisconnectResult({ provider, cleanupRequested: cleanup, ...data });
-      // Re-fetch in the background to confirm server state.
-      loadConnections().catch(() => {});
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not disconnect calendar. Please try again.');
-      setDisconnectTarget(null);
-      // Re-fetch to show actual state if optimistic update went stale.
-      await loadConnections();
-    } finally {
-      setDisconnectInProgress(false);
-    }
-  }
-
-  function closeDisconnectModal() {
-    setDisconnectTarget(null);
-    setDisconnectInProgress(false);
-    setDisconnectResult(null);
-  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -1203,29 +953,6 @@ export default function Settings() {
           Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
         </p>
 
-        {/* Mutual-exclusivity warning: feed + two-way sync both active will
-            create duplicate events in the user's external calendar. We
-            don't block the combination (some users may want it for niche
-            reasons), but we warn loudly with one-click resolution. */}
-        {feedExists && calConnections.length > 0 && (
-          <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-bark">
-            <p className="font-semibold text-coral mb-1">Duplicate events warning</p>
-            <p className="text-cocoa mb-2">
-              You have both the read-only feed and two-way sync turned on.
-              Every event will appear twice in your external calendar — pick one to fix it.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleRemoveFeed}
-                disabled={loadingFeed}
-                className="text-xs font-medium px-3 py-1.5 rounded-2xl bg-white border border-cream-border hover:border-primary hover:text-primary transition-colors"
-              >
-                Keep two-way sync, remove feed
-              </button>
-              <span className="text-xs text-cocoa self-center">or use the Disconnect buttons below to keep the feed.</span>
-            </div>
-          </div>
-        )}
 
         {feedUrl ? (
           <div className="space-y-3">
@@ -1375,275 +1102,8 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Two-Way Sync Connections */}
-        <div className="mt-5 pt-5 border-t border-cream-border">
-          <p className="text-sm font-medium text-bark mb-3">Two-way sync</p>
-          <p className="text-xs text-cocoa mb-3">
-            Connect your external calendar for automatic two-way sync. Changes in either app will be reflected in the other.
-          </p>
-
-          <div className="space-y-2">
-            {/* Google */}
-            {calConnections.find(c => c.provider === 'google') ? (
-              <div className="bg-success/10 rounded-2xl px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-success flex items-center gap-2">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                    Google Calendar connected
-                  </span>
-                  <div className="flex gap-2">
-                    <button onClick={() => openCalendarSelection('google')} className="text-xs text-primary hover:text-primary-pressed">Manage calendars</button>
-                    <button onClick={() => handleDisconnect('google')} className="text-xs text-error hover:text-error">Disconnect</button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <button onClick={handleConnectGoogle} className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-2xl px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors">
-                <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                Connect Google Calendar
-              </button>
-            )}
-
-            {/* Microsoft */}
-            {calConnections.find(c => c.provider === 'microsoft') ? (
-              <div className="bg-success/10 rounded-2xl px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-success flex items-center gap-2">
-                    <svg className="w-4 h-4" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-                    Microsoft Calendar connected
-                  </span>
-                  <div className="flex gap-2">
-                    <button onClick={() => openCalendarSelection('microsoft')} className="text-xs text-primary hover:text-primary-pressed">Manage calendars</button>
-                    <button onClick={() => handleDisconnect('microsoft')} className="text-xs text-error hover:text-error">Disconnect</button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <button onClick={handleConnectMicrosoft} className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-2xl px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors">
-                <svg className="w-4 h-4" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-                Connect Microsoft / Outlook
-              </button>
-            )}
-
-            {/* Apple */}
-            {calConnections.find(c => c.provider === 'apple') ? (
-              <div className="bg-success/10 rounded-2xl px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-success flex items-center gap-2">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                    Apple Calendar connected
-                  </span>
-                  <div className="flex gap-2">
-                    <button onClick={() => openCalendarSelection('apple')} className="text-xs text-primary hover:text-primary-pressed">Manage calendars</button>
-                    <button onClick={() => handleDisconnect('apple')} className="text-xs text-error hover:text-error">Disconnect</button>
-                  </div>
-                </div>
-              </div>
-            ) : showAppleForm ? (
-              <form onSubmit={handleConnectApple} className="border border-cream-border rounded-2xl p-3 space-y-2">
-                <p className="text-xs text-cocoa">
-                  Use an app-specific password from <a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">appleid.apple.com</a> &rarr; Sign-In and Security &rarr; App-Specific Passwords.
-                </p>
-                {appleError && (
-                  <p className="text-xs text-error bg-error/10 rounded-xl px-3 py-2">{appleError}</p>
-                )}
-                <input
-                  type="email"
-                  placeholder="Apple ID email"
-                  value={appleEmail}
-                  onChange={(e) => setAppleEmail(e.target.value)}
-                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <input
-                  type="password"
-                  placeholder="App-specific password"
-                  value={applePassword}
-                  onChange={(e) => setApplePassword(e.target.value)}
-                  className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <div className="flex gap-2">
-                  <button type="submit" disabled={connectingApple} className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-medium px-4 py-2 rounded-2xl text-sm transition-colors">
-                    {connectingApple ? 'Connecting…' : 'Connect'}
-                  </button>
-                  <button type="button" onClick={() => setShowAppleForm(false)} className="text-sm text-cocoa hover:text-bark">Cancel</button>
-                </div>
-              </form>
-            ) : (
-              <button onClick={() => setShowAppleForm(true)} className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-2xl px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                Connect Apple Calendar
-              </button>
-            )}
-          </div>
-
-          {/* Calendar Selection Panel */}
-          {selectingProvider && (
-            <div className="mt-4 border border-cream-border rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-bark">
-                  Select calendars to sync ({selectingProvider.charAt(0).toUpperCase() + selectingProvider.slice(1)})
-                </h3>
-                <button onClick={() => setSelectingProvider(null)} className="text-xs text-cocoa hover:text-bark">Close</button>
-              </div>
-
-              {loadingCalendars ? (
-                <Spinner />
-              ) : availableCalendars.length === 0 ? (
-                <p className="text-xs text-cocoa">No calendars found.</p>
-              ) : (
-                <div className="space-y-2">
-                  {availableCalendars.map((cal) => {
-                    const sel = calendarSelections[cal.id] || {};
-                    return (
-                      <div key={cal.id} className={`rounded-xl border border-cream-border p-3 ${sel.enabled ? 'bg-linen' : 'bg-oat opacity-60'}`}>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={sel.enabled ?? true}
-                            onChange={(e) => setCalendarSelections((prev) => ({
-                              ...prev,
-                              [cal.id]: { ...prev[cal.id], enabled: e.target.checked },
-                            }))}
-                            className="w-4 h-4 rounded accent-primary"
-                          />
-                          <span className="text-sm font-medium text-bark flex-1">{cal.displayName}</span>
-                        </div>
-                        {sel.enabled && (
-                          <div className="flex items-center gap-3 mt-2 ml-7">
-                            {cal.suggestedCategory && cal.suggestedCategory !== 'general' && (
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                cal.suggestedCategory === 'birthday'
-                                  ? 'bg-purple-100 text-purple-700'
-                                  : 'bg-red-100 text-red-700'
-                              }`}>
-                                {cal.suggestedCategory === 'birthday' ? 'Birthdays' : 'Public Holidays'}
-                              </span>
-                            )}
-                            <select
-                              value={sel.visibility || 'family'}
-                              onChange={(e) => setCalendarSelections((prev) => ({
-                                ...prev,
-                                [cal.id]: { ...prev[cal.id], visibility: e.target.value },
-                              }))}
-                              className="text-xs border border-cream-border rounded-xl px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                            >
-                              <option value="family">Visible to family</option>
-                              <option value="personal">Only me</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {!loadingCalendars && availableCalendars.length > 0 && (
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setSelectingProvider(null)} className="text-sm text-cocoa hover:text-bark px-3 py-1.5">Cancel</button>
-                  <button
-                    onClick={saveCalendarSubscriptions}
-                    disabled={savingSubscriptions}
-                    className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
-                  >
-                    {savingSubscriptions ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Disconnect Calendar Modal — replaces window.confirm so we can
-          offer the cleanup option (delete events from external calendar
-          on the way out). Without cleanup, every event Housemait pushed
-          becomes a permanent orphan in the user's external calendar. */}
-      {disconnectTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => !disconnectInProgress && closeDisconnectModal()}
-        >
-          <div className="absolute inset-0 bg-black/50" />
-          <div
-            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {disconnectResult ? (
-              <>
-                <h2 className="text-lg font-semibold text-bark mb-3">
-                  {disconnectResult.provider.charAt(0).toUpperCase() + disconnectResult.provider.slice(1)} Calendar disconnected
-                </h2>
-                {disconnectResult.cleanupRequested && disconnectResult.cleanup ? (
-                  <div className="text-sm text-cocoa space-y-2 mb-4">
-                    <p>
-                      Removed <strong className="text-bark">{disconnectResult.cleanup.succeeded}</strong> event{disconnectResult.cleanup.succeeded === 1 ? '' : 's'} from your external calendar.
-                    </p>
-                    {disconnectResult.cleanup.failed > 0 && (
-                      <p className="text-error">
-                        {disconnectResult.cleanup.failed} event{disconnectResult.cleanup.failed === 1 ? '' : 's'} could not be removed automatically. You may need to delete them manually from your external calendar.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-cocoa mb-4">
-                    Events Housemait previously pushed to your external calendar have been left in place. You can delete them manually if you want to.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={closeDisconnectModal}
-                  className="w-full py-3 rounded-xl bg-primary hover:bg-primary-pressed text-white font-semibold text-sm transition-colors"
-                >
-                  Done
-                </button>
-              </>
-            ) : (
-              <>
-                <h2 className="text-lg font-semibold text-bark mb-3">
-                  Disconnect {disconnectTarget.charAt(0).toUpperCase() + disconnectTarget.slice(1)} Calendar?
-                </h2>
-                <p className="text-sm text-cocoa mb-4">
-                  We&rsquo;ll stop syncing new events to your external calendar. The events Housemait already pushed are still there — pick whether to remove them too.
-                </p>
-                {disconnectInProgress && (
-                  <div className="text-sm text-cocoa bg-cream/60 border border-cream-border rounded-xl p-3 mb-4">
-                    Working… This can take a moment if you have a lot of events.
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => performDisconnect(true)}
-                    disabled={disconnectInProgress}
-                    className="w-full text-left rounded-xl border border-primary bg-primary/5 hover:bg-primary/10 px-4 py-3 transition-colors disabled:opacity-50"
-                  >
-                    <div className="text-sm font-semibold text-primary">Disconnect and remove events from my calendar</div>
-                    <div className="text-xs text-cocoa mt-0.5">Recommended. Avoids orphaned duplicates if you also use the read-only feed.</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => performDisconnect(false)}
-                    disabled={disconnectInProgress}
-                    className="w-full text-left rounded-xl border border-cream-border hover:border-bark px-4 py-3 transition-colors disabled:opacity-50"
-                  >
-                    <div className="text-sm font-semibold text-bark">Disconnect but keep events</div>
-                    <div className="text-xs text-cocoa mt-0.5">Events stay in your external calendar — you&rsquo;ll need to delete them yourself if you don&rsquo;t want them.</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeDisconnectModal}
-                    disabled={disconnectInProgress}
-                    className="w-full py-2.5 rounded-xl text-sm text-cocoa hover:text-bark transition-colors disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Email Forwarding */}
       <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">

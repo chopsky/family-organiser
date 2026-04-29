@@ -4,7 +4,6 @@ const { classify } = require('../services/ai');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
-const calendarSync = require('../services/calendarSync');
 
 const router = Router();
 
@@ -192,12 +191,6 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
               } catch (err) {
                 console.error('[classify] saveEventReminders failed:', err.message);
               }
-            }
-            // Mirror to connected external calendars (Apple/Google/Microsoft).
-            // Fire-and-forget: errors are logged inside pushEventToConnections
-            // but must not break the AI classify response.
-            if (created) {
-              calendarSync.pushEventToConnections(req.householdId, created, 'create').catch(() => {});
             }
           })());
         }

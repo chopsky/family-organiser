@@ -8,7 +8,6 @@ const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
-const calendarSync = require('../services/calendarSync');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
@@ -190,29 +189,6 @@ async function runEveningSchoolPrepCheck() {
     }
   } catch (err) {
     console.error('[scheduler] Evening school prep check failed:', err.message);
-  }
-}
-
-/**
- * Poll Apple CalDAV connections for changes.
- * Apple doesn't support webhooks, so we poll every 15 minutes.
- */
-async function runAppleCalendarPoll() {
-  try {
-    const households = await db.getAllHouseholds();
-    for (const household of households) {
-      const connections = await db.getConnectionsByHousehold(household.id);
-      const appleConnections = connections.filter((c) => c.provider === 'apple' && c.sync_enabled);
-      for (const connection of appleConnections) {
-        try {
-          await calendarSync.pullChangesFromProvider(connection);
-        } catch (err) {
-          console.error(`[scheduler] Apple poll failed for connection ${connection.id}:`, err.message);
-        }
-      }
-    }
-  } catch (err) {
-    console.error('[scheduler] Apple calendar poll failed:', err.message);
   }
 }
 
@@ -456,10 +432,6 @@ function startScheduler() {
   // ── Evening school prep reminders: check every minute (fires at 19:00) ─────
   cron.schedule('* * * * *', () => runEveningSchoolPrepCheck());
   console.log('✓ Evening school prep reminder started (19:00 per household timezone)');
-
-  // ── Apple CalDAV polling: every 15 minutes ─────────────────────────────────
-  cron.schedule('*/15 * * * *', () => runAppleCalendarPoll());
-  console.log('✓ Apple Calendar polling started (every 15 minutes)');
 
   // ── Scheduler lock cleanup: daily at 03:00 UTC ─────────────────────────────
   cron.schedule('0 3 * * *', () => db.cleanupSchedulerLocks());

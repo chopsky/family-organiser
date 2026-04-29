@@ -1558,20 +1558,6 @@ async function getCalendarEventById(eventId, householdId, db = supabase) {
   return data || null;
 }
 
-async function findCalendarEventByTitleAndTime(householdId, title, startTime, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_events')
-    .select('id')
-    .eq('household_id', householdId)
-    .eq('title', title)
-    .eq('start_time', startTime)
-    .is('deleted_at', null)
-    .limit(1)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
-}
-
 async function getTasksByDateRange(householdId, startDate, endDate, db = supabase) {
   const { data, error } = await db
     .from('tasks')
@@ -2019,112 +2005,6 @@ async function getAllEventsForFeed(householdId, db = supabase) {
 
 // ─── Calendar Connections (two-way sync) ─────────────────────────────────────
 
-async function getCalendarConnections(userId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_connections')
-    .select()
-    .eq('user_id', userId);
-  if (error) throw error;
-  return data;
-}
-
-async function upsertCalendarConnection(userId, householdId, provider, connectionData, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_connections')
-    .upsert({
-      user_id: userId,
-      household_id: householdId,
-      provider,
-      ...connectionData,
-    }, { onConflict: 'user_id,provider' })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function deleteCalendarConnection(userId, provider, db = supabase) {
-  // Schema has ON DELETE CASCADE on subscriptions and sync_mappings,
-  // so deleting the connection row cascades automatically.
-  const { data, error } = await db
-    .from('calendar_connections')
-    .delete()
-    .eq('user_id', userId)
-    .eq('provider', provider)
-    .select();
-
-  console.log(`[deleteCalendarConnection] user=${userId} provider=${provider} deleted=${data?.length || 0} rows`);
-  if (error) {
-    console.error('[deleteCalendarConnection] Error:', error);
-    throw error;
-  }
-  if (!data || data.length === 0) {
-    console.warn('[deleteCalendarConnection] No rows matched — connection may not exist for this user');
-  }
-}
-
-async function getConnectionsByHousehold(householdId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_connections')
-    .select()
-    .eq('household_id', householdId)
-    .eq('sync_enabled', true);
-  if (error) throw error;
-  return data;
-}
-
-async function createSyncMapping(eventId, connectionId, externalEventId, etag, db = supabase) {
-  // Conflict key aligns with the unique constraint added in
-  // migration-sync-mapping-unique-fix.sql. Keying on
-  // (connection_id, external_event_id) means each Apple UID owns its own
-  // mapping row instead of overwriting a previous UID's row, which is
-  // what caused the original "re-link every poll" ping-pong.
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .upsert({
-      event_id: eventId,
-      connection_id: connectionId,
-      external_event_id: externalEventId,
-      external_etag: etag || null,
-      last_synced_at: new Date().toISOString(),
-    }, { onConflict: 'connection_id,external_event_id' })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function getSyncMapping(eventId, connectionId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .select()
-    .eq('event_id', eventId)
-    .eq('connection_id', connectionId)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
-}
-
-async function getSyncMappingByExternalId(connectionId, externalEventId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .select()
-    .eq('connection_id', connectionId)
-    .eq('external_event_id', externalEventId)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
-}
-
-async function getSyncMappingsByConnection(connectionId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .select()
-    .eq('connection_id', connectionId);
-  if (error) throw error;
-  return data || [];
-}
-
 /**
  * Return only sync_mappings whose underlying calendar_event originated
  * IN Housemait — i.e. events the user created via app/bot/WhatsApp that
@@ -2141,35 +2021,12 @@ async function getSyncMappingsByConnection(connectionId, db = supabase) {
  * data: 8869 mappings total, only 6 outbound — the other 8863 reference
  * events Housemait should never touch.)
  */
-async function getOutboundSyncMappingsByConnection(connectionId, db = supabase) {
-  // PostgREST inner-join filter: pull mappings joined with their event,
-  // requiring subscription_id IS NULL (outbound) and deleted_at IS NULL
-  // (active). The `!inner` modifier turns the embed into an INNER JOIN
-  // so the filter actually narrows the rows.
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .select('*, calendar_events!inner(id, subscription_id, deleted_at)')
-    .eq('connection_id', connectionId)
-    .is('calendar_events.subscription_id', null)
-    .is('calendar_events.deleted_at', null);
-  if (error) throw error;
-  // Strip the embedded join so callers see plain mapping rows.
-  return (data || []).map(({ calendar_events: _e, ...mapping }) => mapping);
-}
 
 /**
  * Remove every sync mapping an event has for a given connection. Called
  * when we push a local delete to the provider — the event itself is
  * being removed, so all of its remote tracking should go too.
  */
-async function deleteSyncMappingsForEvent(eventId, connectionId, db = supabase) {
-  const { error } = await db
-    .from('calendar_sync_mappings')
-    .delete()
-    .eq('event_id', eventId)
-    .eq('connection_id', connectionId);
-  if (error) throw error;
-}
 
 /**
  * Remove a single mapping identified by the external UID. Called when an
@@ -2179,14 +2036,6 @@ async function deleteSyncMappingsForEvent(eventId, connectionId, db = supabase) 
  * calendar mirrors) stay intact. Caller is responsible for soft-deleting
  * the event separately if no mappings remain.
  */
-async function deleteSyncMappingByExternalId(connectionId, externalEventId, db = supabase) {
-  const { error } = await db
-    .from('calendar_sync_mappings')
-    .delete()
-    .eq('connection_id', connectionId)
-    .eq('external_event_id', externalEventId);
-  if (error) throw error;
-}
 
 /**
  * Count how many mappings reference this event, across every connection.
@@ -2195,234 +2044,9 @@ async function deleteSyncMappingByExternalId(connectionId, externalEventId, db =
  * If any remain, we leave the event alone — another sync could have it
  * mirrored.
  */
-async function countSyncMappingsForEvent(eventId, db = supabase) {
-  const { count, error } = await db
-    .from('calendar_sync_mappings')
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId);
-  if (error) throw error;
-  return count || 0;
-}
 
-// Backwards-compat alias: original callers passed (eventId, connectionId)
-// and expected "nuke all mappings for this event+connection". Preserve
-// that meaning so existing call sites don't silently change behaviour.
-const deleteSyncMapping = deleteSyncMappingsForEvent;
-
-// ─── Calendar Subscriptions ──────────────────────────────────────────────────
-
-async function getSubscriptionsByConnection(connectionId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_subscriptions')
-    .select()
-    .eq('connection_id', connectionId)
-    .order('display_name');
-  // Table may not exist until migration is run
-  if (error && error.code === '42P01') return [];
-  if (error) throw error;
-  return data;
-}
-
-async function getEnabledSubscriptionsByConnection(connectionId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_subscriptions')
-    .select()
-    .eq('connection_id', connectionId)
-    .eq('sync_enabled', true)
-    .order('display_name');
-  if (error) throw error;
-  return data;
-}
-
-async function upsertSubscription(connectionId, subData, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_subscriptions')
-    .upsert({
-      connection_id: connectionId,
-      external_calendar_id: subData.external_calendar_id,
-      display_name: subData.display_name,
-      category: subData.category || 'general',
-      visibility: subData.visibility || 'family',
-      sync_enabled: subData.sync_enabled !== false,
-    }, { onConflict: 'connection_id,external_calendar_id' })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function getSubscriptionById(subscriptionId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_subscriptions')
-    .select()
-    .eq('id', subscriptionId)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
-}
-
-async function updateSubscription(subscriptionId, updates, db = supabase) {
-  const allowed = {};
-  if (updates.category !== undefined) allowed.category = updates.category;
-  if (updates.visibility !== undefined) allowed.visibility = updates.visibility;
-  if (updates.sync_enabled !== undefined) allowed.sync_enabled = updates.sync_enabled;
-  if (updates.last_synced_at !== undefined) allowed.last_synced_at = updates.last_synced_at;
-  if (updates.sync_token !== undefined) allowed.sync_token = updates.sync_token;
-  const { data, error } = await db
-    .from('calendar_subscriptions')
-    .update(allowed)
-    .eq('id', subscriptionId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-// ── Sync health tracking ───────────────────────────────────────────────
-//
-// Auto-disable threshold: after this many consecutive failures, flip
-// sync_enabled = false so we stop hammering the provider. At a 15-min
-// Apple poll cadence, 12 failures ≈ 3 hours of retries.
-const MAX_CONSECUTIVE_SYNC_FAILURES = 12;
-
-/**
- * Mark a successful sync attempt on a subscription.
- * Clears any prior error and resets the failure counter.
- */
-async function recordSyncSuccess(subscriptionId, db = supabase) {
-  const now = new Date().toISOString();
-  const { error } = await db
-    .from('calendar_subscriptions')
-    .update({
-      last_synced_at: now,
-      last_attempted_at: now,
-      last_sync_error: null,
-      consecutive_failures: 0,
-    })
-    .eq('id', subscriptionId);
-  if (error) throw error;
-}
-
-/**
- * Mark a failed sync attempt. Increments the failure counter, records the
- * error message and attempt timestamp, and auto-disables the subscription
- * once it has failed MAX_CONSECUTIVE_SYNC_FAILURES times in a row.
- *
- * Returns { consecutive_failures, auto_disabled } for logging.
- */
-async function recordSyncFailure(subscriptionId, errorMessage, db = supabase) {
-  // Read current counter (the DB doesn't support atomic increment in the
-  // PostgREST query builder cleanly; a read-then-write is fine here — sync
-  // attempts for a given subscription are serialized by the scheduler).
-  const { data: current, error: readErr } = await db
-    .from('calendar_subscriptions')
-    .select('consecutive_failures')
-    .eq('id', subscriptionId)
-    .single();
-  if (readErr && readErr.code !== 'PGRST116') throw readErr;
-
-  const nextCount = (current?.consecutive_failures || 0) + 1;
-  const autoDisable = nextCount >= MAX_CONSECUTIVE_SYNC_FAILURES;
-
-  const updates = {
-    last_attempted_at: new Date().toISOString(),
-    last_sync_error: String(errorMessage || 'Unknown error').slice(0, 1000),
-    consecutive_failures: nextCount,
-  };
-  if (autoDisable) updates.sync_enabled = false;
-
-  const { error: writeErr } = await db
-    .from('calendar_subscriptions')
-    .update(updates)
-    .eq('id', subscriptionId);
-  if (writeErr) throw writeErr;
-
-  return { consecutive_failures: nextCount, auto_disabled: autoDisable };
-}
-
-/**
- * Return any subscriptions in a failing state for the given household.
- * Used by the UI to show a "sync broken" banner on the calendar page.
- */
-async function getFailingSubscriptionsByHousehold(householdId, db = supabase) {
-  // Join via calendar_connections — there's no direct household_id on subs.
-  const { data, error } = await db
-    .from('calendar_subscriptions')
-    .select(`
-      id, display_name, last_synced_at, last_attempted_at,
-      last_sync_error, consecutive_failures, sync_enabled,
-      calendar_connections!inner (
-        id, provider, caldav_username, household_id
-      )
-    `)
-    .eq('calendar_connections.household_id', householdId)
-    .not('last_sync_error', 'is', null);
-  if (error) throw error;
-  return (data || []).map((sub) => ({
-    id: sub.id,
-    display_name: sub.display_name,
-    last_synced_at: sub.last_synced_at,
-    last_attempted_at: sub.last_attempted_at,
-    last_sync_error: sub.last_sync_error,
-    consecutive_failures: sub.consecutive_failures,
-    sync_enabled: sub.sync_enabled,
-    provider: sub.calendar_connections?.provider,
-    account: sub.calendar_connections?.caldav_username,
-  }));
-}
-
-async function deleteSubscription(subscriptionId, db = supabase) {
-  // Delete synced events first
-  await db
-    .from('calendar_events')
-    .delete()
-    .eq('subscription_id', subscriptionId);
-  // Then delete the subscription (cascade deletes sync mappings)
-  const { error } = await db
-    .from('calendar_subscriptions')
-    .delete()
-    .eq('id', subscriptionId);
-  if (error) throw error;
-}
-
-async function getConnectionByUserAndProvider(userId, provider, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_connections')
-    .select()
-    .eq('user_id', userId)
-    .eq('provider', provider)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
-}
-
-async function getSyncMappingsBySubscription(subscriptionId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .select()
-    .eq('subscription_id', subscriptionId);
-  if (error) throw error;
-  return data;
-}
-
-async function createSyncMappingWithSubscription(eventId, connectionId, subscriptionId, externalEventId, etag, db = supabase) {
-  // See createSyncMapping for why the conflict key is
-  // (connection_id, external_event_id) and not (event_id, connection_id).
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .upsert({
-      event_id: eventId,
-      connection_id: connectionId,
-      subscription_id: subscriptionId,
-      external_event_id: externalEventId,
-      external_etag: etag || null,
-      last_synced_at: new Date().toISOString(),
-    }, { onConflict: 'connection_id,external_event_id' })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
+// (Two-way sync helpers removed — see src/services/externalFeed.js for the
+// current read-only inbound flow.)
 
 async function createCalendarEventFromSync(householdId, eventData, sourceUserId, subscriptionId, category, visibility, db = supabase) {
   // Ensure timestamps are valid for timestamptz columns (bare dates need time appended)
@@ -2454,44 +2078,6 @@ async function createCalendarEventFromSync(householdId, eventData, sourceUserId,
 }
 
 // ─── Batch Calendar Sync ────────────────────────────────────────────────────
-
-async function getSyncMappingsByExternalIds(connectionId, externalIds, db = supabase) {
-  if (!externalIds || externalIds.length === 0) return [];
-  // Supabase .in() has a limit of ~1000, so chunk if needed
-  const CHUNK = 500;
-  const results = [];
-  for (let i = 0; i < externalIds.length; i += CHUNK) {
-    const chunk = externalIds.slice(i, i + CHUNK);
-    const { data, error } = await db
-      .from('calendar_sync_mappings')
-      .select('external_event_id')
-      .eq('connection_id', connectionId)
-      .in('external_event_id', chunk);
-    if (error) throw error;
-    results.push(...(data || []));
-  }
-  return results;
-}
-
-async function batchCreateCalendarEvents(eventRows, db = supabase) {
-  if (!eventRows || eventRows.length === 0) return [];
-  const { data, error } = await db
-    .from('calendar_events')
-    .insert(eventRows)
-    .select();
-  if (error) throw error;
-  return data;
-}
-
-async function batchCreateSyncMappings(mappingRows, db = supabase) {
-  if (!mappingRows || mappingRows.length === 0) return [];
-  const { data, error } = await db
-    .from('calendar_sync_mappings')
-    .upsert(mappingRows, { onConflict: 'event_id,connection_id' })
-    .select();
-  if (error) throw error;
-  return data;
-}
 
 // ─── Meal Plan ──────────────────────────────────────────────────────────────
 
@@ -3162,45 +2748,6 @@ async function getWhatsAppTimeline({ days = 30 } = {}, db = supabase) {
 }
 
 // ─── Phase 2 Admin: Calendar Sync Health ────────────────────────────────────
-
-async function getCalendarSyncHealth(db = supabase) {
-  const { data: connections, error } = await db
-    .from('calendar_connections')
-    .select('id, user_id, household_id, provider, sync_enabled, token_expires_at, created_at');
-  if (error) throw error;
-
-  // Get user names
-  const userIds = [...new Set((connections || []).map((c) => c.user_id))];
-  const userMap = {};
-  if (userIds.length > 0) {
-    const { data: users } = await db.from('users').select('id, name, email').in('id', userIds);
-    for (const u of users || []) userMap[u.id] = u;
-  }
-
-  // Get sync mapping stats per connection
-  const result = [];
-  for (const conn of connections || []) {
-    const { data: mappings } = await db
-      .from('calendar_sync_mappings')
-      .select('last_synced_at')
-      .eq('connection_id', conn.id);
-
-    const syncedEvents = mappings?.length || 0;
-    const lastSynced = mappings?.length > 0
-      ? mappings.reduce((max, m) => (m.last_synced_at > max ? m.last_synced_at : max), '')
-      : null;
-
-    result.push({
-      ...conn,
-      user_name: userMap[conn.user_id]?.name || 'Unknown',
-      user_email: userMap[conn.user_id]?.email || '',
-      synced_events: syncedEvents,
-      last_synced_at: lastSynced,
-    });
-  }
-
-  return result;
-}
 
 // ─── Phase 2 Admin: Analytics ───────────────────────────────────────────────
 
@@ -4272,7 +3819,6 @@ module.exports = {
   // Calendar
   getCalendarEvents,
   getCalendarEventById,
-  findCalendarEventByTitleAndTime,
   getTasksByDateRange,
   createCalendarEvent,
   findSimilarEvent,
@@ -4300,37 +3846,6 @@ module.exports = {
   batchUpsertExternalFeedEvents,
   batchSoftDeleteCalendarEvents,
   getAllEventsForFeed,
-  // Calendar connections (two-way sync)
-  getCalendarConnections,
-  upsertCalendarConnection,
-  deleteCalendarConnection,
-  getConnectionsByHousehold,
-  createSyncMapping,
-  getSyncMapping,
-  getSyncMappingByExternalId,
-  getSyncMappingsByConnection,
-  getOutboundSyncMappingsByConnection,
-  deleteSyncMapping,
-  deleteSyncMappingsForEvent,
-  deleteSyncMappingByExternalId,
-  countSyncMappingsForEvent,
-  // Calendar subscriptions
-  getSubscriptionsByConnection,
-  getEnabledSubscriptionsByConnection,
-  recordSyncSuccess,
-  recordSyncFailure,
-  getFailingSubscriptionsByHousehold,
-  MAX_CONSECUTIVE_SYNC_FAILURES,
-  upsertSubscription,
-  getSubscriptionById,
-  updateSubscription,
-  deleteSubscription,
-  getConnectionByUserAndProvider,
-  getSyncMappingsBySubscription,
-  getSyncMappingsByExternalIds,
-  batchCreateCalendarEvents,
-  batchCreateSyncMappings,
-  createSyncMappingWithSubscription,
   createCalendarEventFromSync,
   // Dependents
   createDependent,
@@ -4407,7 +3922,6 @@ module.exports = {
   getRecentWhatsAppTurns,
   getWhatsAppStats,
   getWhatsAppTimeline,
-  getCalendarSyncHealth,
   getAnalytics,
   getAiUsageTopHouseholds,
   getAiUsageTopUsers,

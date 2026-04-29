@@ -358,40 +358,7 @@ describe('POST /api/calendar/events', () => {
   });
 });
 
-// ─── GET /api/calendar/sync-health ───────────────────────────────────────────
-
-describe('GET /api/calendar/sync-health', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('returns empty list when all subs are healthy', async () => {
-    db.getFailingSubscriptionsByHousehold.mockResolvedValue([]);
-    const res = await request(app).get('/api/calendar/sync-health').set(AUTH);
-    expect(res.status).toBe(200);
-    expect(res.body.failing).toEqual([]);
-  });
-
-  test('returns failing subscription details for the UI banner', async () => {
-    db.getFailingSubscriptionsByHousehold.mockResolvedValue([{
-      id: 'sub-1',
-      display_name: 'Work',
-      last_synced_at: '2026-04-12T20:52:55.688Z',
-      last_attempted_at: '2026-04-16T16:00:00.000Z',
-      last_sync_error: 'Unauthorized',
-      consecutive_failures: 47,
-      sync_enabled: false,
-      provider: 'apple',
-      account: 'grant12321@aol.com',
-    }]);
-    const res = await request(app).get('/api/calendar/sync-health').set(AUTH);
-    expect(res.status).toBe(200);
-    expect(res.body.failing).toHaveLength(1);
-    expect(res.body.failing[0]).toMatchObject({
-      provider: 'apple',
-      display_name: 'Work',
-      sync_enabled: false,
-    });
-  });
-});
+// (sync-health route removed alongside two-way calendar sync.)
 
 // ─── GET /api/digest ──────────────────────────────────────────────────────────
 

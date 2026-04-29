@@ -2,7 +2,6 @@ const { Router } = require('express');
 const multer = require('multer');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
-const calendarSync = require('../services/calendarSync');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
@@ -327,10 +326,6 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             location: act.location || null,
             description: act.description || null,
           }, req.user.id);
-          // Mirror to connected external calendars. Fire-and-forget.
-          if (createdActEvent) {
-            calendarSync.pushEventToConnections(req.householdId, createdActEvent, 'create').catch(() => {});
-          }
           executedActions.push({ type: 'create_event', title: act.title });
 
         } else if (act.action === 'add_shopping' && act.items?.length) {
@@ -501,11 +496,6 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
             location: ev.location || null,
             description: ev.description || null,
           }, req.user.id);
-          // Mirror to connected external calendars. Fire-and-forget.
-          if (createdEvRow) {
-            calendarSync.pushEventToConnections(req.householdId, createdEvRow, 'create').catch(() => {});
-          }
-
           created.push(ev.title);
         } catch (err) {
           console.error(`Failed to create event "${ev.title}" from image:`, err.message);

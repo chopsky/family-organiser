@@ -13,7 +13,6 @@ const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geo
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
-const calendarSync = require('../services/calendarSync');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -387,11 +386,6 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
     if (isEvent) {
       if (isDelete) {
         await db.softDeleteCalendarEvent(hit.id, household.id);
-        // Push delete to connected calendars (Apple/Google/MS). Without this,
-        // the next pull from the provider re-creates the event from their
-        // unchanged copy, undoing the user's WhatsApp delete.
-        calendarSync.pushEventToConnections(household.id, { id: hit.id }, 'delete')
-          .catch((err) => console.error('[handlers] delete_event sync push failed:', err.message));
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
         return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance — reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
       }
@@ -414,11 +408,6 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
           console.error('[handlers] saveEventReminders failed for update:', err.message);
         }
       }
-      // Push update to connected calendars (Apple/Google/MS). Without this,
-      // the next pull from the provider overwrites our update with their
-      // unchanged copy, reverting the user's WhatsApp edit.
-      calendarSync.pushEventToConnections(household.id, updated, 'update')
-        .catch((err) => console.error('[handlers] update_event sync push failed:', err.message));
       broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}`);
       push.sendToHousehold(household.id, user.id, {
         title: 'Event updated',
@@ -728,17 +717,6 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
         // Don't fail the event create over a reminder save error — log and move on.
         console.error('[handlers] saveEventReminders failed for new event:', err.message);
       }
-    }
-
-    // Mirror to any connected external calendars (Apple/Google/Microsoft).
-    // Fire-and-forget — if a provider push fails, it's logged inside
-    // pushEventToConnections but doesn't block the user's confirmation
-    // message. Matches the existing HTTP-route behaviour in
-    // src/routes/calendar.js so events added via the WhatsApp bot / AI
-    // chat / inbound email end up in the same external calendars as
-    // events added via the app form.
-    if (created) {
-      calendarSync.pushEventToConnections(household.id, created, 'create').catch(() => {});
     }
 
     // Update actions so the caller's confirmation/broadcast picks up the event.
@@ -1069,10 +1047,6 @@ async function handleTextMessage(text, user, household) {
       if (created && assigneeNames.length > 0) {
         await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
       }
-      // Mirror to connected external calendars (see main handler for notes).
-      if (created) {
-        calendarSync.pushEventToConnections(household.id, created, 'create').catch(() => {});
-      }
     } catch (err) {
       console.error('School event creation failed:', err.message);
       return { response: `⚠️ I understood the event but couldn't save it: ${err.message}`, actions };
@@ -1394,10 +1368,6 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
 
         if (createdEvent && assigneeNames.length > 0) {
           await db.saveEventAssignees(createdEvent.id, household.id, assigneeNames, members);
-        }
-        // Mirror to connected external calendars (see main handler for notes).
-        if (createdEvent) {
-          calendarSync.pushEventToConnections(household.id, createdEvent, 'create').catch(() => {});
         }
 
         created.push(ev.title);
