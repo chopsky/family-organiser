@@ -295,24 +295,6 @@ export default function Calendar() {
   const [schoolData, setSchoolData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [syncHealth, setSyncHealth] = useState([]); // failing subscriptions, if any
-
-  // Poll sync health so a silently-broken calendar sync becomes visible.
-  useEffect(() => {
-    let cancelled = false;
-    async function checkSyncHealth() {
-      try {
-        const { data } = await api.get('/calendar/sync-health');
-        if (!cancelled) setSyncHealth(data?.failing || []);
-      } catch {
-        // Non-critical — don't disrupt the calendar if the health check fails.
-      }
-    }
-    checkSyncHealth();
-    const interval = setInterval(checkSyncHealth, 5 * 60 * 1000); // every 5 min
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
-
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -1003,31 +985,6 @@ export default function Calendar() {
     <div className="max-w-5xl mx-auto space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
-
-      {syncHealth.length > 0 && (
-        <div className="rounded-2xl border border-coral/40 bg-coral/10 p-4 text-sm flex gap-3 items-start">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8724A" strokeWidth="2" className="flex-shrink-0 mt-0.5">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-coral">Calendar sync is failing</p>
-            <ul className="mt-1 space-y-0.5 text-charcoal">
-              {syncHealth.map((sub) => (
-                <li key={sub.id} className="text-xs">
-                  <span className="font-medium">{sub.provider === 'apple' ? 'Apple' : sub.provider} — {sub.display_name}</span>
-                  {sub.sync_enabled === false && <span className="text-coral"> (auto-disabled)</span>}
-                  {sub.last_synced_at && (
-                    <span className="text-warm-grey"> · last worked {new Date(sub.last_synced_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-warm-grey">Reconnect in Settings → Calendar connections to restore sync.</p>
-          </div>
-        </div>
-      )}
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5 flex-wrap">
