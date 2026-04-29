@@ -472,7 +472,11 @@ export default function Calendar() {
               const jsDay = d.getDay();
               const ourDay = (jsDay + 6) % 7;
               if (ourDay === act.day_of_week) {
-                const dateStr = d.toISOString().split('T')[0];
+                // Use local-date components, NOT toISOString — during BST,
+                // a `Date` for "Mon 4 May 00:00 local" is "Sun 3 May 23:00 UTC",
+                // so toISOString().split('T')[0] would return Sunday's date and
+                // the activity would render on the wrong day.
+                const dateStr = toDateStr(d);
                 schoolEvents.push({
                   id: `act-${act.id}-${dateStr}`,
                   title: `${child.name} — ${act.activity}`,
