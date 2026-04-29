@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:ios": "VITE_API_URL=https://family-organiser-production-b631.up.railway.app vite build && npx cap sync ios",
+    "build:ios:staging": "VITE_API_URL=${STAGING_API_URL:-https://family-organiser-staging.up.railway.app} vite build && npx cap sync ios",
     "open:ios": "npx cap open ios",
     "lint": "eslint .",
     "preview": "vite preview"
