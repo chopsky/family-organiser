@@ -41,7 +41,14 @@ function parseMonth(month) {
   if (!year || !mon || mon < 1 || mon > 12) return null;
   const startDate = `${year}-${String(mon).padStart(2, '0')}-01`;
   const lastDay = new Date(year, mon, 0).getDate();
-  const endDate = `${year}-${String(mon).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  // End of the last day, inclusive — without the time, PostgREST casts
+  // the date string to a timestamp at midnight, which silently excludes
+  // any event with a non-midnight start_time on the last day of the
+  // month. (Latent bug discovered when an inbound-feed event at 13:30
+  // on April 30 didn't render in the April view.)
+  // getTasksByDateRange splits on 'T' so the date-only contract is
+  // preserved for that caller.
+  const endDate = `${year}-${String(mon).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59.999Z`;
   return { startDate, endDate };
 }
 
