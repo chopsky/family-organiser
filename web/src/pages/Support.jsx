@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 export default function Support() {
   const { user } = useAuth();
@@ -15,6 +16,7 @@ export default function Support() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [sent, setSent]       = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   // Pre-fill name & email if the user is logged in.
   useEffect(() => {
@@ -42,6 +44,7 @@ export default function Support() {
         subject: subject.trim(),
         message: message.trim(),
         website, // honeypot, sent through to satisfy the API contract
+        turnstile_token: turnstileToken,
       });
       setSent(true);
     } catch (err) {
@@ -171,6 +174,7 @@ export default function Support() {
                   className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-y"
                 />
               </div>
+              <TurnstileWidget onChange={setTurnstileToken} />
               <button
                 type="submit"
                 disabled={loading}

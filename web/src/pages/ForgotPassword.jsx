@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 export default function ForgotPassword() {
   const [email, setEmail]     = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent]       = useState(false);
   const [error, setError]     = useState('');
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -15,7 +17,10 @@ export default function ForgotPassword() {
     if (!email.trim()) { setError('Please enter your email.'); return; }
     setLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email: email.trim() });
+      await api.post('/auth/forgot-password', {
+        email: email.trim(),
+        turnstile_token: turnstileToken,
+      });
       setSent(true);
     } catch {
       setSent(true); // Always show success to prevent email enumeration
@@ -52,6 +57,7 @@ export default function ForgotPassword() {
                 className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 autoComplete="email"
               />
+              <TurnstileWidget onChange={setTurnstileToken} />
               <button
                 type="submit"
                 disabled={loading}

@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const email = require('../services/email');
+const { requireTurnstile } = require('../middleware/turnstile');
 
 const router = Router();
 
@@ -35,7 +36,7 @@ function isLikelyEmail(value) {
  * accepted (returned 200) so spammers don't get a signal that they were
  * filtered, but the email is never sent.
  */
-router.post('/', async (req, res) => {
+router.post('/', requireTurnstile, async (req, res) => {
   const { name, email: senderEmail, subject, message, website } = req.body || {};
 
   // Honeypot: pretend success, drop on the floor.

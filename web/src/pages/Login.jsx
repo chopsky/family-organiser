@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 export default function Login() {
   const [email, setEmail]         = useState('');
@@ -11,6 +12,7 @@ export default function Login() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [resendState, setResendState] = useState('idle'); // idle | sending | sent
+  const [turnstileToken, setTurnstileToken] = useState(null);
   const { login }                 = useAuth();
   const navigate                  = useNavigate();
   const [searchParams]            = useSearchParams();
@@ -32,6 +34,7 @@ export default function Login() {
       const { data } = await api.post('/auth/login', {
         email: email.trim(),
         password,
+        turnstile_token: turnstileToken,
       });
       login(data);
       navigate(postLoginRoute(data));
@@ -141,6 +144,7 @@ export default function Login() {
                 <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
               </div>
             </div>
+            <TurnstileWidget onChange={setTurnstileToken} />
             <button
               type="submit"
               disabled={loading}

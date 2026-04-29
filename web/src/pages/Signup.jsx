@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 export default function Signup() {
   const [email, setEmail]       = useState('');
@@ -11,6 +12,7 @@ export default function Signup() {
   const [name, setName]         = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
+  const [turnstileToken, setTurnstileToken] = useState(null);
   const { login }               = useAuth();
   const navigate                = useNavigate();
   const [searchParams]          = useSearchParams();
@@ -34,6 +36,7 @@ export default function Signup() {
         password,
         name: name.trim(),
         inviteToken: inviteToken || undefined,
+        turnstile_token: turnstileToken,
       });
 
       if (data.token) {
@@ -117,6 +120,7 @@ export default function Signup() {
                 autoComplete="new-password"
               />
             </div>
+            <TurnstileWidget onChange={setTurnstileToken} />
             <button
               type="submit"
               disabled={loading}

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../db/queries');
 const { signToken, requireAuth } = require('../middleware/auth');
+const { requireTurnstile } = require('../middleware/turnstile');
 const email = require('../services/email');
 const publicHolidays = require('../services/publicHolidays');
 const cache = require('../services/cache');
@@ -64,7 +65,7 @@ async function authResponse(user, req = null) {
 
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 
-router.post('/register', async (req, res) => {
+router.post('/register', requireTurnstile, async (req, res) => {
   const { email: userEmail, password, name, inviteToken } = req.body;
 
   if (!userEmail?.trim() || !password || !name?.trim()) {
@@ -144,7 +145,7 @@ router.post('/register', async (req, res) => {
 
 // ─── POST /api/auth/login ───────────────────────────────────────────────────
 
-router.post('/login', async (req, res) => {
+router.post('/login', requireTurnstile, async (req, res) => {
   const { email: userEmail, password } = req.body;
 
   if (!userEmail?.trim() || !password) {
@@ -290,7 +291,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
 
 // ─── POST /api/auth/forgot-password ─────────────────────────────────────────
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', requireTurnstile, async (req, res) => {
   const { email: userEmail } = req.body;
 
   // Always return 200 to prevent email enumeration
