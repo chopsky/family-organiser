@@ -1,5 +1,6 @@
 const axios = require('axios');
 const db = require('../db/queries');
+const cache = require('./cache');
 const { parseVEvent, expandRecurrence } = require('./providers/apple');
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -231,6 +232,16 @@ async function refreshFeed(feed) {
   }
 
   await db.recordExternalFeedSuccess(feed.id);
+
+  // Invalidate the month-of-events cache so the calendar view picks up
+  // newly-pulled events on the next read. Without this, the local API's
+  // in-memory cache happily serves the pre-feed-pull view for up to its
+  // TTL — meaning users hit Refresh, the count goes up, but the calendar
+  // still looks empty until restart. Mirrors the pattern used by the
+  // calendar mutation routes (create/update/delete event).
+  cache.invalidatePattern(`cal-month:${feed.household_id}:`);
+  cache.invalidatePattern(`cal-events:${feed.household_id}:`);
+
   return stats;
 }
 

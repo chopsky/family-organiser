@@ -1654,6 +1654,7 @@ async function findSimilarEvent(householdId, title, startTime, db = supabase) {
     .from('calendar_events')
     .select('id, title, start_time, created_by, assigned_to_name, all_day')
     .eq('household_id', householdId)
+    .is('deleted_at', null) // soft-deleted events shouldn't block recreation
     .ilike('title', title.trim()) // case-insensitive exact match (no wildcards)
     .gte('start_time', rangeStart)
     .lte('start_time', rangeEnd)
