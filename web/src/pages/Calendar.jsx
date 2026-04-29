@@ -448,11 +448,28 @@ export default function Calendar() {
       const schools = Array.isArray(rawSchools) ? rawSchools : [];
       if (freshSchoolData) setSchoolData(schools);
 
+      // Scope all school-derived events (term dates AND weekly activities) to
+      // the exact months we fetched events for, so leak-through cells (days
+      // from prev/next month shown in the grid when the 1st falls mid-week)
+      // stay consistent with the rest of the displayed events. Without this,
+      // school events appear in cells where regular events are hidden, which
+      // looks like a broken grid.
+      const sortedMonths = [...monthsToFetch].sort();
+      const [firstY, firstM] = sortedMonths[0].split('-').map(Number);
+      const [lastY, lastM] = sortedMonths[sortedMonths.length - 1].split('-').map(Number);
+      const rangeStartStr = `${firstY}-${String(firstM).padStart(2, '0')}-01`;
+      const lastDayOfLastM = new Date(lastY, lastM, 0).getDate();
+      const rangeEndStr = `${lastY}-${String(lastM).padStart(2, '0')}-${String(lastDayOfLastM).padStart(2, '0')}`;
+
       // Build school events
       const schoolEvents = [];
       for (const school of schools) {
         for (const td of (school.term_dates || [])) {
           if (!td.date) continue;
+          // Skip term dates whose whole range falls outside the displayed
+          // months (lexicographic compare works because dates are YYYY-MM-DD).
+          const tdEnd = td.end_date || td.date;
+          if (tdEnd < rangeStartStr || td.date > rangeEndStr) continue;
           schoolEvents.push({
             id: `td-${td.id}`,
             title: `${school.school_name} — ${td.label || (td.event_type || 'school event').replace(/_/g, ' ')}`,
@@ -464,15 +481,6 @@ export default function Calendar() {
             _school: true,
           });
         }
-        // Scope activity expansion to the exact months we fetched events for,
-        // so leak-through cells (days from prev/next month shown in the grid
-        // when the 1st falls mid-week) don't get activity events when we're
-        // not also showing regular events for those same days. Otherwise the
-        // grid looks inconsistent — e.g. "Mason — Art" appears on Mon 27 Apr
-        // when viewing May, but no other May-view events render there.
-        const sortedMonths = [...monthsToFetch].sort();
-        const [firstY, firstM] = sortedMonths[0].split('-').map(Number);
-        const [lastY, lastM] = sortedMonths[sortedMonths.length - 1].split('-').map(Number);
         for (const child of (school.children || [])) {
           for (const act of (child.activities || [])) {
             const start = new Date(firstY, firstM - 1, 1);
