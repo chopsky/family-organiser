@@ -1311,8 +1311,9 @@ export default function Settings() {
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
               <p className="text-xs text-cocoa">
-                Apple: Calendar &rarr; right-click your calendar &rarr; Share &rarr; Public Calendar &rarr; copy URL.<br />
-                Google: Settings &rarr; Settings for my calendars &rarr; Integrate calendar &rarr; Secret address in iCal format.
+                <span className="font-medium">Apple:</span> sign in at <a href="https://www.icloud.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">iCloud.com</a> &rarr; Calendar &rarr; click the share icon next to your calendar &rarr; tick &ldquo;Public Calendar&rdquo; &rarr; copy URL.<br />
+                <span className="font-medium">Google:</span> <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> &rarr; Settings for my calendars &rarr; pick a calendar &rarr; Integrate calendar &rarr; copy &ldquo;Secret address in iCal format&rdquo;.<br />
+                <span className="font-medium">Outlook:</span> <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> &rarr; Settings &rarr; Shared calendars &rarr; Publish a calendar &rarr; pick &ldquo;Can view all details&rdquo; &rarr; copy ICS URL.
               </p>
               <div className="flex gap-2">
                 <button
