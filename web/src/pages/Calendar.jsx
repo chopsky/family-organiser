@@ -464,10 +464,19 @@ export default function Calendar() {
             _school: true,
           });
         }
+        // Scope activity expansion to the exact months we fetched events for,
+        // so leak-through cells (days from prev/next month shown in the grid
+        // when the 1st falls mid-week) don't get activity events when we're
+        // not also showing regular events for those same days. Otherwise the
+        // grid looks inconsistent — e.g. "Mason — Art" appears on Mon 27 Apr
+        // when viewing May, but no other May-view events render there.
+        const sortedMonths = [...monthsToFetch].sort();
+        const [firstY, firstM] = sortedMonths[0].split('-').map(Number);
+        const [lastY, lastM] = sortedMonths[sortedMonths.length - 1].split('-').map(Number);
         for (const child of (school.children || [])) {
           for (const act of (child.activities || [])) {
-            const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-            const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 2, 0);
+            const start = new Date(firstY, firstM - 1, 1);
+            const end = new Date(lastY, lastM, 0); // day=0 → last day of (lastM)
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
               const jsDay = d.getDay();
               const ourDay = (jsDay + 6) % 7;
