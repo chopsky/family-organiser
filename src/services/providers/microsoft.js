@@ -321,6 +321,49 @@ async function registerWebhook(connection, _callbackUrl) {
   return subscription;
 }
 
+/**
+ * Bulk-delete events from Outlook during a connection cleanup.
+ *
+ * Iterates the user's sync mappings and issues a Graph DELETE for each.
+ * 404 from Graph means the event is already gone — counted as a success
+ * because the end state is what the user wanted. Other errors count as
+ * failures so the UI can warn about orphaned events.
+ */
+async function deleteEventsBatch(connection, syncMappings) {
+  const result = { succeeded: 0, failed: 0, errors: [] };
+  if (!syncMappings || syncMappings.length === 0) return result;
+
+  let client;
+  try {
+    client = getClient(connection.access_token);
+  } catch (err) {
+    return {
+      succeeded: 0,
+      failed: syncMappings.length,
+      errors: [{ code: 'CONNECTION_FAILED', message: err.message || String(err) }],
+    };
+  }
+
+  for (const mapping of syncMappings) {
+    const externalId = mapping.external_event_id;
+    try {
+      await client.api(`/me/events/${externalId}`).delete();
+      result.succeeded++;
+    } catch (err) {
+      const status = err?.statusCode || err?.code || err?.response?.status;
+      if (status === 404) {
+        result.succeeded++;
+      } else {
+        result.failed++;
+        result.errors.push({ uid: externalId, message: err.message || String(err) });
+        console.warn(`[microsoft cleanup] Failed to delete ${externalId}:`, err.message || err);
+      }
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   getAuthUrl,
   handleCallback,
@@ -330,4 +373,5 @@ module.exports = {
   pullAllEvents,
   refreshToken,
   registerWebhook,
+  deleteEventsBatch,
 };

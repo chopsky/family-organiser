@@ -228,6 +228,30 @@ export default function Settings() {
   const [feedUrl, setFeedUrl] = useState('');
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedCopied, setFeedCopied] = useState(false);
+  // Tracks whether a feed token already exists, even before the user clicks
+  // "Generate" / "Copy". Used for the mutual-exclusivity warning so we can
+  // detect "feed + two-way sync both active" without auto-creating a token
+  // just by visiting Settings.
+  const [feedExists, setFeedExists] = useState(false);
+
+  // Disconnect-with-cleanup modal state. The modal replaces the old
+  // window.confirm call so we can offer "remove events from external
+  // calendar" as the default — without that, orphan events are left
+  // behind and (combined with a feed subscription) cause duplicates.
+  const [disconnectTarget, setDisconnectTarget] = useState(null); // provider name or null
+  const [disconnectInProgress, setDisconnectInProgress] = useState(false);
+  const [disconnectResult, setDisconnectResult] = useState(null); // {provider, cleanup, ...} or null
+
+  // External (inbound) calendar feeds — Cozi/FamilyWall-style read-only
+  // subscriptions to the user's Apple/Google/Outlook calendar via iCal URL.
+  // Replaces the inbound side of the old two-way sync.
+  const [externalFeeds, setExternalFeeds] = useState([]);
+  const [loadingExternalFeeds, setLoadingExternalFeeds] = useState(false);
+  const [showAddFeed, setShowAddFeed] = useState(false);
+  const [newFeedUrl, setNewFeedUrl] = useState('');
+  const [newFeedName, setNewFeedName] = useState('');
+  const [addingFeed, setAddingFeed] = useState(false);
+  const [feedActionId, setFeedActionId] = useState(null); // id of feed currently being refreshed/removed
 
   // Receipt email forwarding state
   const [receiptEmail, setReceiptEmail] = useState('');
@@ -383,6 +407,22 @@ export default function Settings() {
   }
 
   // Load calendar connections
+  // Fetch existing feed token on mount without creating one. We need this
+  // for the mutual-exclusivity warning: if both feed and connections are
+  // active, surface a banner so the user can pick one. Calling the regular
+  // /feed-token endpoint would auto-create the token, so we use the
+  // dedicated /status endpoint that returns null when none exists.
+  useEffect(() => {
+    api.get('/calendar/feed-token/status')
+      .then(({ data }) => {
+        if (data?.exists) {
+          setFeedUrl(data.feedUrl);
+          setFeedExists(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   function loadConnections() {
     setLoadingConnections(true);
     api.get('/calendar/connections')
@@ -636,11 +676,26 @@ export default function Settings() {
   }
 
   async function handleGetFeedUrl() {
+    // Mutual-exclusivity guard: a read-only feed alongside a two-way sync
+    // means every event lands in the user's external calendar twice (once
+    // as a synced native event, once as a feed entry). Warn before
+    // creating the feed.
+    if (calConnections.length > 0) {
+      const providerNames = calConnections.map(c => c.provider.charAt(0).toUpperCase() + c.provider.slice(1)).join(', ');
+      const proceed = window.confirm(
+        `You already have ${providerNames} two-way sync turned on. ` +
+        `Adding the read-only feed on top will create DUPLICATE events in your external calendar — ` +
+        `one from the sync and one from the feed.\n\n` +
+        `Generate the feed anyway?`
+      );
+      if (!proceed) return;
+    }
     setError('');
     setLoadingFeed(true);
     try {
       const { data } = await api.get('/calendar/feed-token');
       setFeedUrl(data.feedUrl);
+      setFeedExists(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not get calendar feed URL.');
     } finally {
@@ -656,8 +711,30 @@ export default function Settings() {
     try {
       const { data } = await api.post('/calendar/feed-token');
       setFeedUrl(data.feedUrl);
+      setFeedExists(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not regenerate feed URL.');
+    } finally {
+      setLoadingFeed(false);
+    }
+  }
+
+  /**
+   * Revoke the feed token. Used both by the "Disable feed" button under
+   * the feed URL (added when a two-way sync is also active) and by the
+   * mutual-exclusivity banner's "remove feed" action.
+   */
+  async function handleRemoveFeed() {
+    if (!window.confirm('Disable the read-only calendar feed? Anyone subscribed to the feed URL will stop receiving updates.')) return;
+    setError('');
+    setLoadingFeed(true);
+    try {
+      await api.delete('/calendar/feed-token');
+      setFeedUrl('');
+      setFeedExists(false);
+      setSuccess('Calendar feed disabled.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not disable calendar feed.');
     } finally {
       setLoadingFeed(false);
     }
@@ -668,6 +745,87 @@ export default function Settings() {
       setFeedCopied(true);
       setTimeout(() => setFeedCopied(false), 2000);
     });
+  }
+
+  // ── External feed subscriptions (read-only inbound) ────────────────────────
+  async function loadExternalFeeds() {
+    setLoadingExternalFeeds(true);
+    try {
+      const { data } = await api.get('/calendar/external-feeds');
+      setExternalFeeds(data?.feeds || []);
+    } catch {
+      // Non-fatal: leave the list empty
+    } finally {
+      setLoadingExternalFeeds(false);
+    }
+  }
+  useEffect(() => { loadExternalFeeds(); }, []);
+
+  async function handleAddExternalFeed(e) {
+    e.preventDefault();
+    if (!newFeedUrl.trim() || !newFeedName.trim()) {
+      setError('URL and name are required.');
+      return;
+    }
+    setAddingFeed(true);
+    setError('');
+    try {
+      const { data } = await api.post('/calendar/external-feeds', {
+        feed_url: newFeedUrl.trim(),
+        display_name: newFeedName.trim(),
+      });
+      setExternalFeeds(prev => [...prev, data.feed]);
+      const stats = data.refresh;
+      const summary = stats
+        ? `Subscribed — pulled ${stats.fetched} event${stats.fetched === 1 ? '' : 's'}.`
+        : 'Subscribed.';
+      setSuccess(summary);
+      setNewFeedUrl('');
+      setNewFeedName('');
+      setShowAddFeed(false);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not add calendar feed.');
+    } finally {
+      setAddingFeed(false);
+    }
+  }
+
+  async function handleRefreshExternalFeed(id) {
+    setFeedActionId(id);
+    setError('');
+    try {
+      const { data } = await api.post(`/calendar/external-feeds/${id}/refresh`);
+      const stats = data?.refresh || {};
+      setSuccess(
+        `Refreshed: ${stats.created || 0} new, ${stats.updated || 0} updated, ${stats.deleted || 0} removed.`
+      );
+      // Update last_synced_at locally so the UI reflects the new state without a re-fetch.
+      setExternalFeeds(prev => prev.map(f => f.id === id
+        ? { ...f, last_synced_at: new Date().toISOString(), last_error: null, consecutive_failures: 0 }
+        : f
+      ));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not refresh feed.');
+      // Re-load to pick up the failure counter the server bumped.
+      loadExternalFeeds();
+    } finally {
+      setFeedActionId(null);
+    }
+  }
+
+  async function handleRemoveExternalFeed(id) {
+    if (!window.confirm('Remove this calendar subscription? Its events will disappear from Housemait. You can re-add the URL anytime.')) return;
+    setFeedActionId(id);
+    setError('');
+    try {
+      await api.delete(`/calendar/external-feeds/${id}`);
+      setExternalFeeds(prev => prev.filter(f => f.id !== id));
+      setSuccess('Calendar subscription removed.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove feed.');
+    } finally {
+      setFeedActionId(null);
+    }
   }
 
   // Build receipt email address from household token — fetch fresh if not in context
@@ -707,7 +865,23 @@ export default function Settings() {
     }
   }
 
+  /**
+   * Prompt before adding a two-way sync when a read-only feed already
+   * exists. Returns true to proceed, false to cancel. Shared by all three
+   * provider connect handlers so the warning is consistent.
+   */
+  function confirmConnectDespiteFeed() {
+    if (!feedExists) return true;
+    return window.confirm(
+      `You already have the read-only calendar feed turned on. ` +
+      `Adding two-way sync on top will create DUPLICATE events in your external calendar — ` +
+      `one from the sync and one from the feed.\n\n` +
+      `Connect anyway?`
+    );
+  }
+
   async function handleConnectGoogle() {
+    if (!confirmConnectDespiteFeed()) return;
     try {
       const { data } = await api.get('/calendar/connect/google');
       window.location.href = data.url;
@@ -717,6 +891,7 @@ export default function Settings() {
   }
 
   async function handleConnectMicrosoft() {
+    if (!confirmConnectDespiteFeed()) return;
     try {
       const { data } = await api.get('/calendar/connect/microsoft');
       window.location.href = data.url;
@@ -731,6 +906,7 @@ export default function Settings() {
       setAppleError('Email and app-specific password are required.');
       return;
     }
+    if (!confirmConnectDespiteFeed()) return;
     setConnectingApple(true);
     setAppleError('');
     try {
@@ -818,20 +994,54 @@ export default function Settings() {
     }
   }
 
-  async function handleDisconnect(provider) {
-    if (!window.confirm(`Disconnect ${provider.charAt(0).toUpperCase() + provider.slice(1)} Calendar? All synced events from this calendar will be removed.`)) return;
+  /**
+   * Open the disconnect modal. The modal lets the user pick whether
+   * Housemait should also remove the events it previously pushed into
+   * their external calendar — without that, those events become orphans
+   * that survive the disconnect, which combined with a feed subscription
+   * causes the duplicate-events problem the Smerins household hit.
+   */
+  function handleDisconnect(provider) {
+    setDisconnectTarget(provider);
+    setDisconnectResult(null);
+  }
+
+  /**
+   * Run the disconnect.
+   *   cleanup=true  → also delete events from the external calendar
+   *   cleanup=false → just disconnect, leave external events alone
+   * Either way the connection itself is torn down server-side.
+   */
+  async function performDisconnect(cleanup) {
+    const provider = disconnectTarget;
+    if (!provider) return;
+    setDisconnectInProgress(true);
     try {
-      await api.delete(`/calendar/connections/${provider}`);
-      // Optimistically update, then verify from the server
+      const url = `/calendar/connections/${provider}${cleanup ? '?cleanup=1' : ''}`;
+      const { data } = await api.delete(url);
+      // Optimistically remove from the connections list.
       setCalConnections(prev => prev.filter(c => c.provider !== provider));
-      setSuccess(`${provider.charAt(0).toUpperCase() + provider.slice(1)} Calendar disconnected.`);
-      // Re-fetch to confirm it's actually gone
-      await loadConnections();
+      // Show summary in the modal so the user sees per-event counts. Note:
+      // we track the user's *intent* (cleanupRequested) separately from the
+      // server's cleanup *result* (data.cleanup) — they collide on the
+      // field name otherwise.
+      setDisconnectResult({ provider, cleanupRequested: cleanup, ...data });
+      // Re-fetch in the background to confirm server state.
+      loadConnections().catch(() => {});
     } catch (err) {
-      setError('Could not disconnect calendar. Please try again.');
-      // Re-fetch to show actual state
+      setError(err.response?.data?.error || 'Could not disconnect calendar. Please try again.');
+      setDisconnectTarget(null);
+      // Re-fetch to show actual state if optimistic update went stale.
       await loadConnections();
+    } finally {
+      setDisconnectInProgress(false);
     }
+  }
+
+  function closeDisconnectModal() {
+    setDisconnectTarget(null);
+    setDisconnectInProgress(false);
+    setDisconnectResult(null);
   }
 
   return (
@@ -993,6 +1203,30 @@ export default function Settings() {
           Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
         </p>
 
+        {/* Mutual-exclusivity warning: feed + two-way sync both active will
+            create duplicate events in the user's external calendar. We
+            don't block the combination (some users may want it for niche
+            reasons), but we warn loudly with one-click resolution. */}
+        {feedExists && calConnections.length > 0 && (
+          <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-bark">
+            <p className="font-semibold text-coral mb-1">Duplicate events warning</p>
+            <p className="text-cocoa mb-2">
+              You have both the read-only feed and two-way sync turned on.
+              Every event will appear twice in your external calendar — pick one to fix it.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleRemoveFeed}
+                disabled={loadingFeed}
+                className="text-xs font-medium px-3 py-1.5 rounded-2xl bg-white border border-cream-border hover:border-primary hover:text-primary transition-colors"
+              >
+                Keep two-way sync, remove feed
+              </button>
+              <span className="text-xs text-cocoa self-center">or use the Disconnect buttons below to keep the feed.</span>
+            </div>
+          </div>
+        )}
+
         {feedUrl ? (
           <div className="space-y-3">
             <div className="flex gap-2">
@@ -1016,13 +1250,22 @@ export default function Settings() {
               <p><span className="font-medium">Google Calendar:</span> Settings &rarr; Add calendar &rarr; From URL &rarr; paste URL</p>
               <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web &rarr; paste URL</p>
             </div>
-            <button
-              onClick={handleRegenerateFeed}
-              disabled={loadingFeed}
-              className="text-xs text-cocoa hover:text-error transition-colors"
-            >
-              {loadingFeed ? 'Regenerating…' : 'Regenerate URL'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleRegenerateFeed}
+                disabled={loadingFeed}
+                className="text-xs text-cocoa hover:text-error transition-colors"
+              >
+                {loadingFeed ? 'Regenerating…' : 'Regenerate URL'}
+              </button>
+              <button
+                onClick={handleRemoveFeed}
+                disabled={loadingFeed}
+                className="text-xs text-cocoa hover:text-error transition-colors"
+              >
+                Disable feed
+              </button>
+            </div>
           </div>
         ) : (
           <button
@@ -1033,6 +1276,103 @@ export default function Settings() {
             {loadingFeed ? 'Generating…' : 'Generate Calendar Feed'}
           </button>
         )}
+
+        {/* External feed subscriptions (read-only inbound) */}
+        <div className="mt-5 pt-5 border-t border-cream-border">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-bark">Subscribed calendars</p>
+            {!showAddFeed && (
+              <button
+                onClick={() => setShowAddFeed(true)}
+                className="text-xs text-primary hover:text-primary-pressed font-medium"
+              >
+                + Add calendar
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-cocoa mb-3">
+            Show events from another calendar (Apple, Google, Outlook, school, sports) inside Housemait. Read-only — edits happen in the source calendar.
+          </p>
+
+          {showAddFeed && (
+            <form onSubmit={handleAddExternalFeed} className="border border-cream-border rounded-2xl p-3 space-y-2 mb-3">
+              <input
+                type="text"
+                placeholder="Calendar name (e.g. Work, School, Sasha's iCloud)"
+                value={newFeedName}
+                onChange={(e) => setNewFeedName(e.target.value)}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <input
+                type="url"
+                placeholder="https://… or webcal://… (iCal feed URL)"
+                value={newFeedUrl}
+                onChange={(e) => setNewFeedUrl(e.target.value)}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <p className="text-xs text-cocoa">
+                Apple: Calendar &rarr; right-click your calendar &rarr; Share &rarr; Public Calendar &rarr; copy URL.<br />
+                Google: Settings &rarr; Settings for my calendars &rarr; Integrate calendar &rarr; Secret address in iCal format.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={addingFeed}
+                  className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-medium px-4 py-2 rounded-2xl text-sm transition-colors"
+                >
+                  {addingFeed ? 'Adding…' : 'Subscribe'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddFeed(false); setNewFeedUrl(''); setNewFeedName(''); }}
+                  className="text-sm text-cocoa hover:text-bark px-3"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!showAddFeed && externalFeeds.length === 0 && !loadingExternalFeeds && (
+            <p className="text-xs text-cocoa italic">No calendars subscribed yet.</p>
+          )}
+
+          {externalFeeds.length > 0 && (
+            <ul className="space-y-2">
+              {externalFeeds.map((feed) => (
+                <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-bark truncate">{feed.display_name}</p>
+                      <p className="text-xs text-cocoa truncate">
+                        {feed.last_synced_at
+                          ? `Last refreshed ${new Date(feed.last_synced_at).toLocaleString()}`
+                          : 'Never refreshed'}
+                        {feed.last_error && ' · last error: ' + feed.last_error}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleRefreshExternalFeed(feed.id)}
+                        disabled={feedActionId === feed.id}
+                        className="text-xs text-primary hover:text-primary-pressed disabled:opacity-50"
+                      >
+                        {feedActionId === feed.id ? '…' : 'Refresh'}
+                      </button>
+                      <button
+                        onClick={() => handleRemoveExternalFeed(feed.id)}
+                        disabled={feedActionId === feed.id}
+                        className="text-xs text-error hover:text-error/80 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Two-Way Sync Connections */}
         <div className="mt-5 pt-5 border-t border-cream-border">
@@ -1213,6 +1553,96 @@ export default function Settings() {
           )}
         </div>
       </div>
+
+      {/* Disconnect Calendar Modal — replaces window.confirm so we can
+          offer the cleanup option (delete events from external calendar
+          on the way out). Without cleanup, every event Housemait pushed
+          becomes a permanent orphan in the user's external calendar. */}
+      {disconnectTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => !disconnectInProgress && closeDisconnectModal()}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {disconnectResult ? (
+              <>
+                <h2 className="text-lg font-semibold text-bark mb-3">
+                  {disconnectResult.provider.charAt(0).toUpperCase() + disconnectResult.provider.slice(1)} Calendar disconnected
+                </h2>
+                {disconnectResult.cleanupRequested && disconnectResult.cleanup ? (
+                  <div className="text-sm text-cocoa space-y-2 mb-4">
+                    <p>
+                      Removed <strong className="text-bark">{disconnectResult.cleanup.succeeded}</strong> event{disconnectResult.cleanup.succeeded === 1 ? '' : 's'} from your external calendar.
+                    </p>
+                    {disconnectResult.cleanup.failed > 0 && (
+                      <p className="text-error">
+                        {disconnectResult.cleanup.failed} event{disconnectResult.cleanup.failed === 1 ? '' : 's'} could not be removed automatically. You may need to delete them manually from your external calendar.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-cocoa mb-4">
+                    Events Housemait previously pushed to your external calendar have been left in place. You can delete them manually if you want to.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={closeDisconnectModal}
+                  className="w-full py-3 rounded-xl bg-primary hover:bg-primary-pressed text-white font-semibold text-sm transition-colors"
+                >
+                  Done
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold text-bark mb-3">
+                  Disconnect {disconnectTarget.charAt(0).toUpperCase() + disconnectTarget.slice(1)} Calendar?
+                </h2>
+                <p className="text-sm text-cocoa mb-4">
+                  We&rsquo;ll stop syncing new events to your external calendar. The events Housemait already pushed are still there — pick whether to remove them too.
+                </p>
+                {disconnectInProgress && (
+                  <div className="text-sm text-cocoa bg-cream/60 border border-cream-border rounded-xl p-3 mb-4">
+                    Working… This can take a moment if you have a lot of events.
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => performDisconnect(true)}
+                    disabled={disconnectInProgress}
+                    className="w-full text-left rounded-xl border border-primary bg-primary/5 hover:bg-primary/10 px-4 py-3 transition-colors disabled:opacity-50"
+                  >
+                    <div className="text-sm font-semibold text-primary">Disconnect and remove events from my calendar</div>
+                    <div className="text-xs text-cocoa mt-0.5">Recommended. Avoids orphaned duplicates if you also use the read-only feed.</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => performDisconnect(false)}
+                    disabled={disconnectInProgress}
+                    className="w-full text-left rounded-xl border border-cream-border hover:border-bark px-4 py-3 transition-colors disabled:opacity-50"
+                  >
+                    <div className="text-sm font-semibold text-bark">Disconnect but keep events</div>
+                    <div className="text-xs text-cocoa mt-0.5">Events stay in your external calendar — you&rsquo;ll need to delete them yourself if you don&rsquo;t want them.</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeDisconnectModal}
+                    disabled={disconnectInProgress}
+                    className="w-full py-2.5 rounded-xl text-sm text-cocoa hover:text-bark transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Email Forwarding */}
       <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">

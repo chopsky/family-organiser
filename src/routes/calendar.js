@@ -18,6 +18,7 @@ const calendarSync = require('../services/calendarSync');
 const googleProvider = require('../services/providers/google');
 const microsoftProvider = require('../services/providers/microsoft');
 const appleProvider = require('../services/providers/apple');
+const externalFeed = require('../services/externalFeed');
 const publicHolidays = require('../services/publicHolidays');
 
 const router = Router();
@@ -623,6 +624,28 @@ router.get('/feed-token', async (req, res) => {
 });
 
 /**
+ * GET /api/calendar/feed-token/status
+ * Check whether a feed token already exists for the current user, without
+ * creating one. The Settings page calls this on mount so it can surface a
+ * mutual-exclusivity warning when a feed and a two-way sync are both
+ * active — without auto-creating a feed token just by visiting the page.
+ */
+router.get('/feed-token/status', async (req, res) => {
+  try {
+    const token = await db.getFeedTokenIfExists(req.user.id, req.householdId);
+    if (!token) return res.json({ exists: false, feedUrl: null });
+    const baseUrl = process.env.API_URL || 'http://localhost:3000';
+    return res.json({
+      exists: true,
+      feedUrl: `${baseUrl}/api/calendar/feed/${token.token}.ics`,
+    });
+  } catch (err) {
+    console.error('GET /api/calendar/feed-token/status error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/calendar/feed-token
  * Regenerate the feed token for the current user.
  */
@@ -634,6 +657,22 @@ router.post('/feed-token', async (req, res) => {
     return res.json({ token: token.token, feedUrl });
   } catch (err) {
     console.error('POST /api/calendar/feed-token error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/calendar/feed-token
+ * Revoke the user's feed token. Used when switching from feed to two-way
+ * sync, or from the mutual-exclusivity warning. Idempotent — succeeds
+ * even if no token exists.
+ */
+router.delete('/feed-token', async (req, res) => {
+  try {
+    await db.deleteFeedToken(req.user.id, req.householdId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/calendar/feed-token error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -761,19 +800,73 @@ router.post('/connect/apple', async (req, res) => {
  * DELETE /api/calendar/connections/:provider
  * Disconnect a calendar provider.
  *
- * All the hard work is delegated to the disconnect_calendar_connection
+ * Query params:
+ *   cleanup=1  Before tearing down the connection, also delete the events
+ *              we previously pushed into the user's external calendar.
+ *              Without this, the events stay behind as orphans in the
+ *              external calendar — and if the user also has the read-only
+ *              ICS feed subscribed, every event will appear twice (once
+ *              as orphan, once as feed entry). The Smerins household ran
+ *              into exactly this; cleanup is now the default in the UI.
+ *
+ * The structural teardown (events soft-delete, sync_mappings, subs,
+ * connection row) is delegated to the `disconnect_calendar_connection`
  * Postgres function (supabase/migration-disconnect-function.sql). That
  * function runs with statement_timeout = '5min' so the cascade can't be
- * killed mid-flight by the default ~8s timeout — previously we were
- * chasing timeout errors across three different cascade points and each
- * fix exposed another one. One atomic server-side operation is simpler
- * and more reliable.
+ * killed mid-flight by the default ~8s timeout. The external-side cleanup
+ * happens BEFORE the RPC because the RPC deletes the sync_mappings rows
+ * that tell us which external events to remove.
+ *
+ * External-side cleanup is best-effort: we never block the disconnect on
+ * provider errors. The user has explicitly asked to disconnect, so worst
+ * case we leave some orphans rather than refuse the action. The response
+ * includes per-event success/failure counts so the UI can surface a
+ * follow-up message.
  */
 router.delete('/connections/:provider', async (req, res) => {
   const { provider } = req.params;
+  const wantsCleanup = req.query.cleanup === '1' || req.query.cleanup === 'true';
   if (!['google', 'microsoft', 'apple'].includes(provider)) {
     return res.status(400).json({ error: 'Invalid provider.' });
   }
+
+  // ── External-side cleanup (optional, best-effort) ────────────────────────
+  // CRITICAL: only pass OUTBOUND mappings (events that originated in
+  // Housemait and were pushed to the external provider) to deleteEventsBatch.
+  // Including inbound mirrors here would tell the external provider to
+  // delete the user's own native events — turning a "tidy up after yourself"
+  // action into "wipe their calendar". See getOutboundSyncMappingsByConnection
+  // for the full reasoning.
+  let cleanupResult = null;
+  if (wantsCleanup) {
+    try {
+      const connection = await db.getConnectionByUserAndProvider(req.user.id, provider);
+      if (connection) {
+        const mappings = await db.getOutboundSyncMappingsByConnection(connection.id);
+        if (mappings.length === 0) {
+          cleanupResult = { succeeded: 0, failed: 0, errors: [] };
+        } else {
+          const providerModule = { google: googleProvider, microsoft: microsoftProvider, apple: appleProvider }[provider];
+          cleanupResult = await providerModule.deleteEventsBatch(connection, mappings);
+          console.log(
+            `[disconnect cleanup] ${provider} user=${req.user.id}: succeeded=${cleanupResult.succeeded}, failed=${cleanupResult.failed} (of ${mappings.length} outbound mappings)`
+          );
+        }
+      } else {
+        cleanupResult = { succeeded: 0, failed: 0, errors: [{ message: 'Connection not found' }] };
+      }
+    } catch (err) {
+      // A failure here must NOT block the disconnect — log and proceed.
+      console.error('[disconnect cleanup] Unexpected error (continuing with teardown):', err);
+      cleanupResult = {
+        succeeded: 0,
+        failed: 0,
+        errors: [{ message: err.message || String(err) }],
+      };
+    }
+  }
+
+  // ── Structural teardown (always runs) ────────────────────────────────────
   try {
     const { supabaseAdmin } = require('../db/client');
 
@@ -790,7 +883,7 @@ router.delete('/connections/:provider', async (req, res) => {
     const subs     = row.subscriptions_deleted ?? 0;
 
     console.log(
-      `[disconnect] ${provider} for user=${req.user.id}: connections=${removed}, events=${events}, mappings=${mappings}, subs=${subs}`
+      `[disconnect] ${provider} for user=${req.user.id}: connections=${removed}, events=${events}, mappings=${mappings}, subs=${subs}, cleanup=${wantsCleanup}`
     );
     return res.json({
       success: true,
@@ -798,6 +891,7 @@ router.delete('/connections/:provider', async (req, res) => {
       events_deleted: events,
       mappings_deleted: mappings,
       subscriptions_deleted: subs,
+      cleanup: cleanupResult,
     });
   } catch (err) {
     console.error('DELETE /api/calendar/connections error:', err);
@@ -986,6 +1080,129 @@ router.delete('/subscriptions/:id', async (req, res) => {
   } catch (err) {
     console.error('DELETE /subscriptions error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── External calendar feeds (read-only inbound subscriptions) ──────────────
+
+/**
+ * GET /api/calendar/external-feeds
+ * List all external feeds visible to the current household. Per-user
+ * ownership is tracked but events are household-visible, so the list
+ * shows everyone's feeds with the owner's user_id attached so the UI
+ * can render attribution.
+ */
+router.get('/external-feeds', async (req, res) => {
+  try {
+    const feeds = await db.getExternalFeedsByHousehold(req.householdId);
+    return res.json({ feeds });
+  } catch (err) {
+    console.error('GET /api/calendar/external-feeds error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/calendar/external-feeds
+ * Add a new feed and immediately do an initial pull so the user sees
+ * events appear within seconds rather than waiting for the cron.
+ *
+ * Body: { feed_url, display_name, color? }
+ *
+ * Returns: { feed, refresh: stats } on success.
+ *   - 409 if the URL is already subscribed in this household.
+ *   - 502 if the initial pull fails (the feed row is still created;
+ *     the user can hit "Refresh" once the source comes back).
+ */
+router.post('/external-feeds', async (req, res) => {
+  const { feed_url, display_name, color } = req.body || {};
+  if (!feed_url || !display_name) {
+    return res.status(400).json({ error: 'feed_url and display_name are required.' });
+  }
+  const normalisedUrl = externalFeed.normaliseFeedUrl(feed_url);
+  if (!/^https?:\/\//i.test(normalisedUrl)) {
+    return res.status(400).json({ error: 'Feed URL must start with https://, http://, or webcal://.' });
+  }
+
+  let feed;
+  try {
+    feed = await db.createExternalFeed({
+      user_id: req.user.id,
+      household_id: req.householdId,
+      feed_url: normalisedUrl,
+      display_name: display_name.trim().slice(0, 200),
+      color: color || 'sky',
+    });
+  } catch (err) {
+    // Unique violation on (household_id, feed_url) — friendlier message.
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'Someone in your household has already subscribed to this URL.' });
+    }
+    console.error('POST /api/calendar/external-feeds error:', err);
+    return res.status(500).json({ error: err.message || 'Could not add feed.' });
+  }
+
+  // Initial pull. If it fails, we still return the feed so the user can
+  // see it in their list and retry later — they shouldn't lose the URL
+  // they pasted just because the source is temporarily down.
+  let refresh = null;
+  let refreshError = null;
+  try {
+    refresh = await externalFeed.refreshFeed(feed);
+  } catch (err) {
+    refreshError = err.message || String(err);
+  }
+
+  if (refreshError) {
+    return res.status(502).json({ feed, refresh: null, error: refreshError });
+  }
+  return res.json({ feed, refresh });
+});
+
+/**
+ * POST /api/calendar/external-feeds/:id/refresh
+ * Manually pull the feed now. Useful while we don't have a cron, and
+ * stays useful after the cron exists for "I just added an event in
+ * Apple Calendar, give it to me now" moments.
+ */
+router.post('/external-feeds/:id/refresh', async (req, res) => {
+  const feed = await db.getExternalFeedById(req.params.id);
+  if (!feed || feed.household_id !== req.householdId) {
+    return res.status(404).json({ error: 'Feed not found.' });
+  }
+  try {
+    const refresh = await externalFeed.refreshFeed(feed);
+    return res.json({ refresh });
+  } catch (err) {
+    // Surface Postgres' detail/hint/code in the response so dup-key-style
+    // errors are diagnosable without trawling through the API logs.
+    console.error(`POST /api/calendar/external-feeds/${feed.id}/refresh error:`, err);
+    return res.status(502).json({
+      error: err.message || 'Refresh failed.',
+      detail: err.details || err.detail || null,
+      hint: err.hint || null,
+      code: err.code || null,
+    });
+  }
+});
+
+/**
+ * DELETE /api/calendar/external-feeds/:id
+ * Remove a feed. Events created by this feed are hard-deleted via the
+ * ON DELETE CASCADE on calendar_events.external_feed_id — they re-appear
+ * if the user re-subscribes.
+ */
+router.delete('/external-feeds/:id', async (req, res) => {
+  const feed = await db.getExternalFeedById(req.params.id);
+  if (!feed || feed.household_id !== req.householdId) {
+    return res.status(404).json({ error: 'Feed not found.' });
+  }
+  try {
+    await db.deleteExternalFeed(feed.id, req.householdId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(`DELETE /api/calendar/external-feeds/${feed.id} error:`, err);
+    return res.status(500).json({ error: err.message || 'Could not remove feed.' });
   }
 });
 

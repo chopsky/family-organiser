@@ -829,6 +829,65 @@ async function pullAllEvents(connection, calendarUrl) {
   return events;
 }
 
+/**
+ * Bulk-delete events from Apple/CalDAV during a connection cleanup.
+ *
+ * Called from the disconnect-with-cleanup flow. Connects once, fetches
+ * the target calendar once, then issues a DELETE per sync mapping.
+ *
+ * 404 from the server means the event is already gone — counted as a
+ * success because the end state is what the user wanted. Other errors
+ * count as failures and are reported back so the UI can warn the user
+ * that some orphans may remain.
+ *
+ * Returns: { succeeded: number, failed: number, errors: [{uid, message}] }
+ */
+async function deleteEventsBatch(connection, syncMappings) {
+  const result = { succeeded: 0, failed: 0, errors: [] };
+  if (!syncMappings || syncMappings.length === 0) return result;
+
+  let client;
+  let calendar;
+  try {
+    client = await connect(connection);
+    const calendars = await client.fetchCalendars();
+    calendar = findCalendar(calendars, connection);
+    if (!calendar) throw new Error('No calendar found on Apple account');
+  } catch (err) {
+    return {
+      succeeded: 0,
+      failed: syncMappings.length,
+      errors: [{ code: 'CONNECTION_FAILED', message: err.message || String(err) }],
+    };
+  }
+
+  for (const mapping of syncMappings) {
+    const uid = mapping.external_event_id;
+    const calendarObjectUrl = `${calendar.url}${uid}.ics`;
+    try {
+      await client.deleteCalendarObject({
+        calendarObject: {
+          url: calendarObjectUrl,
+          etag: mapping.external_etag || undefined,
+        },
+      });
+      result.succeeded++;
+    } catch (err) {
+      const status = err?.response?.status || err?.status;
+      if (status === 404) {
+        // Already gone on the server — desired state achieved.
+        result.succeeded++;
+      } else {
+        result.failed++;
+        result.errors.push({ uid, message: err.message || String(err) });
+        console.warn(`[apple cleanup] Failed to delete ${uid}:`, err.message || err);
+      }
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   connect,
   pushEvent,
@@ -838,4 +897,12 @@ module.exports = {
   buildVEvent,
   listCalendars,
   pullAllEvents,
+  deleteEventsBatch,
+  // Re-exported so the new external-feed service can reuse the same
+  // RFC 5545 / TZID-aware parser and recurrence expander rather than
+  // re-implementing them. When two-way sync is removed, these belong
+  // in a shared utility file — leaving them here for the vertical
+  // slice to keep churn contained.
+  parseVEvent,
+  expandRecurrence,
 };

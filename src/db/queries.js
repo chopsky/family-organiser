@@ -1774,6 +1774,214 @@ async function getFeedTokenData(token, db = supabase) {
   return data || null;
 }
 
+// ─── External calendar feeds (read-only inbound subscriptions) ──────────────
+//
+// Replaces the inbound side of the old two-way sync. Each row in
+// external_calendar_feeds points at an iCal URL the user pasted; events
+// pulled from that URL live in calendar_events with external_feed_id set
+// and a non-null external_uid. The pull/dedup logic lives in
+// services/externalFeed.js — these helpers are thin DB wrappers.
+
+async function getExternalFeedsByHousehold(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function getExternalFeedById(feedId, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('id', feedId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function createExternalFeed(feed, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .insert(feed)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteExternalFeed(feedId, householdId, db = supabase) {
+  // Scoped by household_id so a user can't delete a feed they don't
+  // belong to even if they guess the id.
+  const { error } = await db
+    .from('external_calendar_feeds')
+    .delete()
+    .eq('id', feedId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function recordExternalFeedSuccess(feedId, db = supabase) {
+  const { error } = await db
+    .from('external_calendar_feeds')
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_error: null,
+      consecutive_failures: 0,
+    })
+    .eq('id', feedId);
+  if (error) throw error;
+}
+
+async function recordExternalFeedFailure(feedId, message, db = supabase) {
+  // Increment via a read-modify-write since Supabase doesn't expose
+  // atomic SQL operators here. Acceptable race for a once-per-hour cron.
+  const { data: existing } = await db
+    .from('external_calendar_feeds')
+    .select('consecutive_failures')
+    .eq('id', feedId)
+    .single();
+  const failures = (existing?.consecutive_failures || 0) + 1;
+  const { error } = await db
+    .from('external_calendar_feeds')
+    .update({
+      last_error: (message || '').slice(0, 1000),
+      consecutive_failures: failures,
+    })
+    .eq('id', feedId);
+  if (error) throw error;
+}
+
+async function getExternalFeedEvents(feedId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_events')
+    .select('id, external_uid, start_time, end_time')
+    .eq('external_feed_id', feedId)
+    .is('deleted_at', null);
+  if (error) throw error;
+  return data || [];
+}
+
+async function createExternalFeedEvent(row, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_events')
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Idempotent upsert of a feed-sourced event keyed by
+ * (external_feed_id, external_uid). Use this from the refresh path
+ * instead of insert/update — it removes the race between "is this UID
+ * already in DB?" and the actual write, and quietly handles edge cases
+ * the diff-then-write approach can't:
+ *   - same UID appearing multiple times in one pull (EXCEPTION events,
+ *     duplicate VEVENTs in the source feed)
+ *   - rows that were soft-deleted by a previous 7-day guard pass and
+ *     are now coming back (the upsert resurrects them via deleted_at)
+ *   - rows the SELECT-then-decide flow missed because the SELECT
+ *     filtered deleted_at while the unique index does not
+ *
+ * The row is expected to include `external_feed_id` and `external_uid`;
+ * we explicitly set `deleted_at: null` so a previously soft-deleted row
+ * comes back to life on conflict.
+ */
+async function upsertExternalFeedEvent(row, db = supabase) {
+  const payload = { ...row, deleted_at: null };
+  const { data, error } = await db
+    .from('calendar_events')
+    .upsert(payload, { onConflict: 'external_feed_id,external_uid' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Batched upsert — sends N rows in a single HTTP round-trip rather
+ * than N round-trips. With recurring series expanded across an 18-month
+ * window, an Apple iCloud Family calendar can easily produce 5–20k
+ * event rows; one round-trip per row makes a refresh take minutes
+ * instead of seconds. This is the path the refresh loop should use.
+ *
+ * Caller is responsible for chunking if the row set is large enough to
+ * exceed Supabase's request payload cap (~10MB). 500 rows per chunk is
+ * a comfortable default for typical event payloads.
+ */
+async function batchUpsertExternalFeedEvents(rows, db = supabase) {
+  if (!rows || rows.length === 0) return [];
+  const payload = rows.map((r) => ({ ...r, deleted_at: null }));
+  const { data, error } = await db
+    .from('calendar_events')
+    .upsert(payload, { onConflict: 'external_feed_id,external_uid' })
+    .select('id, external_uid');
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Batched soft-delete by id — used by the refresh's 7-day-guard pass
+ * to remove events that disappeared from the feed. Same N+1
+ * motivation as batchUpsert.
+ */
+async function batchSoftDeleteCalendarEvents(eventIds, householdId, db = supabase) {
+  if (!eventIds || eventIds.length === 0) return;
+  const { error } = await db
+    .from('calendar_events')
+    .update({ deleted_at: new Date().toISOString() })
+    .in('id', eventIds)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function updateExternalFeedEvent(eventId, householdId, fields, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_events')
+    .update(fields)
+    .eq('id', eventId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Look up the feed token for a user without creating one.
+ * Used by the Settings page to detect whether a feed is already enabled
+ * (so we can show a mutual-exclusivity warning when a two-way sync is
+ * also active). Returns the row or null — never inserts.
+ */
+async function getFeedTokenIfExists(userId, householdId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_feed_tokens')
+    .select()
+    .eq('user_id', userId)
+    .eq('household_id', householdId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+/**
+ * Revoke the user's feed token. Used by the Settings page when the user
+ * switches from feed → two-way sync, or chooses "remove feed" from the
+ * mutual-exclusivity warning.
+ */
+async function deleteFeedToken(userId, householdId, db = supabase) {
+  const { error } = await db
+    .from('calendar_feed_tokens')
+    .delete()
+    .eq('user_id', userId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
 async function getAllEventsForFeed(householdId, db = supabase) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -1781,11 +1989,19 @@ async function getAllEventsForFeed(householdId, db = supabase) {
   oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
   const [{ data: events }, { data: tasks }] = await Promise.all([
+    // Exclude events that came in via an inbound external feed. Without
+    // this filter, a user who subscribes to (a) an external calendar IN
+    // Housemait via the inbound iCal feed feature AND (b) the Housemait
+    // outbound feed in their external calendar app sees every external
+    // event TWICE in their external calendar — once as the native
+    // original, once re-broadcast through Housemait. Outbound should
+    // only ever ship events that originated in Housemait.
     db
       .from('calendar_events')
       .select()
       .eq('household_id', householdId)
       .is('deleted_at', null)
+      .is('external_feed_id', null)
       .gte('start_time', thirtyDaysAgo.toISOString())
       .lte('start_time', oneYearAhead.toISOString())
       .order('start_time'),
@@ -1906,6 +2122,38 @@ async function getSyncMappingsByConnection(connectionId, db = supabase) {
     .eq('connection_id', connectionId);
   if (error) throw error;
   return data || [];
+}
+
+/**
+ * Return only sync_mappings whose underlying calendar_event originated
+ * IN Housemait — i.e. events the user created via app/bot/WhatsApp that
+ * Housemait pushed outward. These are the only mappings that should be
+ * passed to deleteEventsBatch on disconnect: they identify the orphan
+ * events the user wants removed from their external calendar.
+ *
+ * Mappings that point at INBOUND-mirrored events (subscription_id NOT
+ * NULL) MUST be excluded — those represent the user's own native events
+ * in Apple/Google/Outlook, which they obviously don't want Housemait to
+ * delete on disconnect. Without this filter, a user with N events in
+ * their external calendar plus 6 events Housemait pushed would lose ALL
+ * N+6 to a "Disconnect and remove events" click. (Confirmed via Grant's
+ * data: 8869 mappings total, only 6 outbound — the other 8863 reference
+ * events Housemait should never touch.)
+ */
+async function getOutboundSyncMappingsByConnection(connectionId, db = supabase) {
+  // PostgREST inner-join filter: pull mappings joined with their event,
+  // requiring subscription_id IS NULL (outbound) and deleted_at IS NULL
+  // (active). The `!inner` modifier turns the embed into an INNER JOIN
+  // so the filter actually narrows the rows.
+  const { data, error } = await db
+    .from('calendar_sync_mappings')
+    .select('*, calendar_events!inner(id, subscription_id, deleted_at)')
+    .eq('connection_id', connectionId)
+    .is('calendar_events.subscription_id', null)
+    .is('calendar_events.deleted_at', null);
+  if (error) throw error;
+  // Strip the embedded join so callers see plain mapping rows.
+  return (data || []).map(({ calendar_events: _e, ...mapping }) => mapping);
 }
 
 /**
@@ -4036,6 +4284,20 @@ module.exports = {
   getOrCreateFeedToken,
   regenerateFeedToken,
   getFeedTokenData,
+  getFeedTokenIfExists,
+  deleteFeedToken,
+  getExternalFeedsByHousehold,
+  getExternalFeedById,
+  createExternalFeed,
+  deleteExternalFeed,
+  recordExternalFeedSuccess,
+  recordExternalFeedFailure,
+  getExternalFeedEvents,
+  createExternalFeedEvent,
+  updateExternalFeedEvent,
+  upsertExternalFeedEvent,
+  batchUpsertExternalFeedEvents,
+  batchSoftDeleteCalendarEvents,
   getAllEventsForFeed,
   // Calendar connections (two-way sync)
   getCalendarConnections,
@@ -4046,6 +4308,7 @@ module.exports = {
   getSyncMapping,
   getSyncMappingByExternalId,
   getSyncMappingsByConnection,
+  getOutboundSyncMappingsByConnection,
   deleteSyncMapping,
   deleteSyncMappingsForEvent,
   deleteSyncMappingByExternalId,
