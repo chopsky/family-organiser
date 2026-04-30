@@ -275,10 +275,17 @@ export default function Documents() {
           <IconUpload className="h-4 w-4" />
           {uploading ? 'Uploading...' : 'Upload File'}
         </button>
+        {/*
+          The `accept` list MUST stay in sync with the server-side allowlist
+          in src/utils/fileValidation.js. The browser uses this to filter
+          the picker — it's UX, not security; the server rejects anything
+          off-list regardless. If you add a type here, add it there too.
+        */}
         <input
           ref={fileInputRef}
           type="file"
           className="hidden"
+          accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.heic,.docx,.xlsx,.pptx,.doc,.xls,.ppt"
           onChange={handleUpload}
         />
       </div>
@@ -760,7 +767,18 @@ function FilePreviewModal({ doc, url, onClose, onDownload }) {
           {isImage ? (
             <img src={url} alt={doc.name} className="max-w-full max-h-[70vh] rounded-lg object-contain" />
           ) : isPdf ? (
-            <iframe src={url} className="w-full h-[70vh] rounded-lg border border-light-grey" title={doc.name} />
+            // Defense-in-depth: sandbox the iframe so even a malicious PDF
+            // (e.g. one carrying embedded JavaScript via OpenAction) can't
+            // exfiltrate, navigate the parent, submit forms, or pop dialogs.
+            // `allow-popups` lets the user click links inside the PDF that
+            // open in a new tab — common UX, low risk. We deliberately do
+            // NOT include allow-scripts or allow-same-origin.
+            <iframe
+              src={url}
+              sandbox="allow-popups"
+              className="w-full h-[70vh] rounded-lg border border-light-grey"
+              title={doc.name}
+            />
           ) : (
             <div className="text-center py-12">
               <IconFileText className="h-16 w-16 mx-auto text-light-grey mb-4" />

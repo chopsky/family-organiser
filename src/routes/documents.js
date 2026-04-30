@@ -9,10 +9,13 @@ const path = require('path');
 const db = require('../db/queries');
 const r2 = require('../services/r2');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
+const { validateUpload } = require('../utils/fileValidation');
 
 const router = Router();
 
-// 25 MB file size limit — any file type accepted
+// 25 MB file size limit. File-type allowlist + magic-byte sniffing happens
+// in src/utils/fileValidation.js after multer parses the body — see the
+// upload handler below.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
@@ -213,6 +216,19 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
       });
     }
 
+    // Validate file type via extension allowlist + magic-byte sniff. Reject
+    // executables, scripts, HTML/SVG (XSS risk), unknown formats, and any
+    // file whose bytes don't match what its extension claims (e.g. an .exe
+    // renamed to .pdf, or a client lying about Content-Type).
+    let validated;
+    try {
+      validated = validateUpload(req.file.buffer, req.file.originalname);
+    } catch (validationErr) {
+      return res.status(validationErr.statusCode || 415).json({
+        error: validationErr.message,
+      });
+    }
+
     // If uploading to a folder, verify access
     const folderId = req.body.folder_id || null;
     if (folderId) {
@@ -230,15 +246,17 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
       : `file${ext}`;
     const storageKey = `${req.householdId}/${folderId || 'root'}/${crypto.randomUUID()}-${safeFilename}`;
 
-    // Upload to R2
-    await r2.uploadFile(storageKey, req.file.buffer, req.file.mimetype);
+    // Upload to R2 with the SERVER-DERIVED MIME type, not the client's
+    // claim. validateUpload() canonicalises this from the magic bytes.
+    await r2.uploadFile(storageKey, req.file.buffer, validated.mime);
 
-    // Record in database
+    // Record in database with the validated MIME, again ignoring any
+    // client-supplied Content-Type.
     const doc = await db.createDocument(req.householdId, {
       name: req.file.originalname || safeFilename,
       file_path: storageKey,
       file_size: req.file.size,
-      mime_type: req.file.mimetype,
+      mime_type: validated.mime,
       uploaded_by: req.user.id,
       folder_id: folderId,
     });
