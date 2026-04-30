@@ -3371,6 +3371,61 @@ async function getDocumentsByFolderIds(folderIds) {
 }
 
 /**
+ * Append one row to the document audit log.
+ *
+ * Called from the route that issues signed download URLs — every time a
+ * user actively requests a document, we record who, what, when, and from
+ * where. Failures are swallowed by the caller (logging shouldn't block
+ * the actual download), but we still throw on real DB errors so they
+ * surface in Railway.
+ */
+async function logDocumentAccess({ documentId, householdId, userId, action = 'download', ip = null, userAgent = null }) {
+  const { error } = await supabase
+    .from('document_access_log')
+    .insert({
+      document_id:  documentId,
+      household_id: householdId,
+      user_id:      userId,
+      action,
+      ip,
+      user_agent:   userAgent,
+    });
+  if (error) throw error;
+}
+
+/**
+ * Per-document access history. Newest rows first. Joined to users so the
+ * caller doesn't need a follow-up query for each row.
+ */
+async function getDocumentAccessLog(documentId, householdId, limit = 50) {
+  const { data, error } = await supabase
+    .from('document_access_log')
+    .select('id, action, ip, user_agent, created_at, user:users(id, name, email)')
+    .eq('document_id', documentId)
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Recent document activity across the whole household. Powers the
+ * "Who's been opening what?" admin view. Joined to documents and users
+ * so the UI can show file names and member names without N+1 lookups.
+ */
+async function getRecentDocumentActivity(householdId, limit = 50) {
+  const { data, error } = await supabase
+    .from('document_access_log')
+    .select('id, action, ip, user_agent, created_at, document:documents(id, name), user:users(id, name, email)')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
  * Get all descendant folder IDs (including the given folder) using iterative BFS.
  */
 async function getDescendantFolderIds(folderId) {
@@ -3957,6 +4012,9 @@ module.exports = {
   deleteDocument,
   getDocumentsByFolderIds,
   getDescendantFolderIds,
+  logDocumentAccess,
+  getDocumentAccessLog,
+  getRecentDocumentActivity,
   getHouseholdStorageUsage,
   // Device tokens & notification preferences
   registerDeviceToken,

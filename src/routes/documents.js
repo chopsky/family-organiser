@@ -161,6 +161,25 @@ router.get('/usage', requireAuth, requireHousehold, async (req, res) => {
 });
 
 /**
+ * GET /api/documents/activity
+ * Recent document download activity across the household. Admin-only —
+ * non-admins could use this to fingerprint other members' private-folder
+ * access patterns. Powers the "Recent activity" surface in Settings.
+ */
+router.get('/activity', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+    const log = await db.getRecentDocumentActivity(req.householdId);
+    return res.json(log);
+  } catch (err) {
+    console.error('GET /api/documents/activity error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/documents?folder_id=<uuid>
  * List documents in a folder (root if no folder_id).
  */
@@ -279,6 +298,11 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
 /**
  * GET /api/documents/:id/url
  * Get a signed download URL (valid for 1 hour).
+ *
+ * This endpoint also writes one row to document_access_log so households
+ * can see who's been opening which file. Logging failures are swallowed
+ * so the user's download path is never blocked by an audit-log issue —
+ * we'd rather lose one log row than fail the user's request.
  */
 router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
   try {
@@ -291,12 +315,62 @@ router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
     }
 
     const url = await r2.getSignedDownloadUrl(doc.file_path, 3600);
+
+    // Log the access. Best-effort — wrap in its own try so a logging
+    // failure doesn't bubble up. req.ip respects X-Forwarded-For via the
+    // trusted-proxy config in app.js; req.get('user-agent') is plain.
+    try {
+      await db.logDocumentAccess({
+        documentId:  doc.id,
+        householdId: req.householdId,
+        userId:      req.user.id,
+        action:      'download',
+        ip:          req.ip || null,
+        userAgent:   req.get('user-agent') || null,
+      });
+    } catch (logErr) {
+      console.warn('[documents] access-log insert failed:', logErr.message);
+    }
+
     return res.json({ url, expiresIn: 3600 });
   } catch (err) {
     console.error('GET /api/documents/:id/url error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/**
+ * GET /api/documents/:id/access-log
+ * Per-document access history. Visible to:
+ *   - the document's uploader, AND
+ *   - household admins.
+ * Anyone else gets 403 — the privacy story for private folders is that
+ * non-owners shouldn't even know the file exists, let alone who's been
+ * looking at it.
+ */
+router.get('/:id/access-log', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const doc = await db.getDocumentById(req.params.id, req.householdId);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    // Visibility gate
+    if (doc.folder?.visibility === 'private' && doc.folder.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const isAdmin    = req.user.role === 'admin';
+    const isUploader = doc.uploaded_by === req.user.id;
+    if (!isAdmin && !isUploader) {
+      return res.status(403).json({ error: 'Only the uploader or a household admin can view access history' });
+    }
+
+    const log = await db.getDocumentAccessLog(req.params.id, req.householdId);
+    return res.json(log);
+  } catch (err) {
+    console.error('GET /api/documents/:id/access-log error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 /**
  * PATCH /api/documents/:id
