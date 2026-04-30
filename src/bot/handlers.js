@@ -9,7 +9,7 @@
 const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
-const { getWeatherReport, getCoordsFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
+const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -794,43 +794,36 @@ async function handleTextMessage(text, user, household) {
   // resolve short follow-ups like "no, in sea point" or "what about tomorrow?".
   const history = await db.getRecentWhatsAppTurns(user.id, { limit: 10, windowMinutes: 30 }).catch(() => []);
 
-  // Pre-classify: detect weather intent before AI call to avoid misclassification
+  // Pre-classify: detect weather intent before AI call to avoid misclassification.
+  //
+  // We only honour weather queries when the user explicitly names a location
+  // ("weather in Cape Town", "what's the weather like in Brighton tomorrow").
+  // The previous fallback-to-stored-location path was removed: Housemait
+  // doesn't ship location services, so the only "location" we have for a
+  // user is their household timezone — too coarse to be useful, and
+  // misleading for anyone away from home or in a non-UK household whose
+  // timezone has been left at the default.
   const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
   if (weatherPattern.test(text)) {
     console.log('[handlers] Pre-classified as weather for:', text.slice(0, 50));
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     try {
-      let lat, lon, tz, locationLabel;
-
-      // Check if the user asked about a specific location (e.g. "weather in Cape Town")
       const locationName = extractLocationFromMessage(text);
-      if (locationName) {
-        const geo = await geocodeLocation(locationName);
-        if (geo) {
-          lat = geo.lat;
-          lon = geo.lon;
-          tz = geo.timezone || 'auto';
-          locationLabel = `${geo.name}, ${geo.country}`;
-        }
+      if (!locationName) {
+        return {
+          response: "I can't tell where you are — Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
+          actions,
+        };
       }
-
-      // Fallback to user's profile location
-      if (!lat || !lon) {
-        const fullUser = household.members.find(m => m.id === user.id);
-        lat = fullUser?.latitude;
-        lon = fullUser?.longitude;
-        tz = fullUser?.timezone || household.timezone || 'Europe/London';
-        if (!lat || !lon) {
-          const tzCoords = getCoordsFromTimezone(tz);
-          if (tzCoords) [lat, lon] = tzCoords;
-        }
+      const geo = await geocodeLocation(locationName);
+      if (!geo) {
+        return {
+          response: `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_. 🗺️`,
+          actions,
+        };
       }
-
-      if (!lat || !lon) {
-        return { response: "I couldn't determine your location. Try asking 'weather in Cape Town' or open the Housemait app to sync your timezone. 📍", actions };
-      }
-      const report = await getWeatherReport(lat, lon, tz, { userMessage: text });
-      const prefix = locationLabel ? `📍 *${locationLabel}*\n\n` : '';
+      const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: text });
+      const prefix = `📍 *${geo.name}, ${geo.country}*\n\n`;
       return { response: prefix + report, actions };
     } catch (err) {
       console.error('[handlers] Weather fetch failed:', err.message);
@@ -890,40 +883,26 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || "I couldn't find that event. Try checking the calendar in the app.", actions };
   }
 
-  // Handle weather request
+  // Handle weather request — explicit-location only (see the pre-classifier
+  // block above for the rationale).
   if (result.intent === 'weather') {
     try {
-      let lat, lon, tz, locationLabel;
-
-      // Check if the user asked about a specific location
       const locationName = extractLocationFromMessage(text);
-      if (locationName) {
-        const geo = await geocodeLocation(locationName);
-        if (geo) {
-          lat = geo.lat;
-          lon = geo.lon;
-          tz = geo.timezone || 'auto';
-          locationLabel = `${geo.name}, ${geo.country}`;
-        }
+      if (!locationName) {
+        return {
+          response: "I can't tell where you are — Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
+          actions,
+        };
       }
-
-      // Fallback to user's profile location
-      if (!lat || !lon) {
-        const fullUser = household.members.find(m => m.id === user.id);
-        lat = fullUser?.latitude;
-        lon = fullUser?.longitude;
-        tz = fullUser?.timezone || household.timezone || 'Europe/London';
-        if (!lat || !lon) {
-          const tzCoords = getCoordsFromTimezone(tz);
-          if (tzCoords) [lat, lon] = tzCoords;
-        }
+      const geo = await geocodeLocation(locationName);
+      if (!geo) {
+        return {
+          response: `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_. 🗺️`,
+          actions,
+        };
       }
-
-      if (!lat || !lon) {
-        return { response: "I couldn't determine your location. Try asking 'weather in Cape Town' or open the Housemait app to sync your timezone. 📍", actions };
-      }
-      const report = await getWeatherReport(lat, lon, tz, { userMessage: text });
-      const prefix = locationLabel ? `📍 *${locationLabel}*\n\n` : '';
+      const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: text });
+      const prefix = `📍 *${geo.name}, ${geo.country}*\n\n`;
       return { response: prefix + report, actions };
     } catch (err) {
       console.error('[handlers] Weather fetch failed (post-classify):', err.message);
