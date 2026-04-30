@@ -20,6 +20,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
+import { isIos } from '../lib/platform';
 
 const AUTO_REDIRECT_MS = 3000;
 
@@ -54,6 +55,15 @@ export default function SubscribeSuccess() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // App Store guideline 3.1.1: this page is a Stripe-return URL and
+  // mentions "subscription" / "Stripe" — neither should ever be visible
+  // to an iOS reviewer. The /subscribe redirect on iOS already prevents
+  // the user from getting here organically, but a manually-typed deep
+  // link could still hit this route. Bounce to /dashboard.
+  useEffect(() => {
+    if (isIos()) navigate('/dashboard', { replace: true });
+  }, [navigate]);
+
   // Auto-redirect countdown
   useEffect(() => {
     const interval = setInterval(() => {
@@ -68,6 +78,11 @@ export default function SubscribeSuccess() {
     }, 1000);
     return () => clearInterval(interval);
   }, [navigate]);
+
+  // Don't even render the success UI on iOS — the redirect above will
+  // navigate away on next tick, but flashing the subscription confirmation
+  // for that tick is undesirable.
+  if (isIos()) return null;
 
   return (
     <div className="min-h-screen bg-cream flex items-center justify-center px-4">

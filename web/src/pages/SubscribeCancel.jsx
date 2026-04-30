@@ -10,9 +10,23 @@
  * back to /subscribe for a retry and /dashboard for a bail-out.
  */
 
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { isIos } from '../lib/platform';
 
 export default function SubscribeCancel() {
+  const navigate = useNavigate();
+
+  // App Store guideline 3.1.1: this page mentions "trial" + "subscribing"
+  // and links back to /subscribe — none of which should ever be visible
+  // to an iOS reviewer. Bounce to /dashboard on iOS even if a deep link
+  // brought us here.
+  useEffect(() => {
+    if (isIos()) navigate('/dashboard', { replace: true });
+  }, [navigate]);
+
+  if (isIos()) return null;
+
   return (
     <div className="min-h-screen bg-cream flex items-center justify-center px-4">
       <div className="w-full max-w-md">

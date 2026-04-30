@@ -64,6 +64,11 @@ export default function TrialEndedOverlay() {
   if (location.pathname.startsWith('/subscription') || location.pathname === '/subscribe') {
     return null;
   }
+  // App Store guideline 3.1.1: never surface a "trial has ended" prompt
+  // on iOS. The SubscriptionContext already forces isExpired=false on
+  // iOS so this guard is defence-in-depth — explicitly block here in
+  // case any future change to the context regresses that.
+  if (isIos()) return null;
   if (!isExpired || dismissed) return null;
 
   function handleDismiss() {
