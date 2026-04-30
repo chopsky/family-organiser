@@ -59,9 +59,26 @@ export default function TurnstileWidget({ onChange, theme = 'light' }) {
         widgetIdRef.current = window.turnstile.render(ref.current, {
           sitekey: SITE_KEY,
           theme,
+          // 'refresh-expired: auto' tells Cloudflare to silently issue a new
+          // challenge when the previous token expires (default TTL: 5 min).
+          // Without this, a user who lingers on the login page (typing
+          // slowly, reading, switching apps on iOS so the WebView suspends)
+          // submits with an expired token, Cloudflare rejects it as
+          // "invalid token", our middleware returns 403, and the user sees
+          // a generic auth failure they can't recover from. App Review
+          // hits this constantly.
+          'refresh-expired': 'auto',
           callback: (token) => onChange?.(token),
-          'error-callback': () => onChange?.(null),
+          'error-callback': () => {
+            onChange?.(null);
+            // Force a fresh challenge so the user's next submission isn't
+            // doomed to fail with the same stale state.
+            try { window.turnstile.reset(widgetIdRef.current); } catch { /* widget already gone */ }
+          },
           'expired-callback': () => onChange?.(null),
+          // Note: with refresh-expired:auto, expired-callback fires THEN
+          // Turnstile auto-resets, so we just clear the parent's token.
+          // The new challenge produces a fresh token via `callback`.
         });
       })
       .catch((err) => {
