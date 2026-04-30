@@ -19,7 +19,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
 
     // Fetch household first so we can use its timezone for date calculations
     const household = await db.getHouseholdById(req.householdId);
-    const tz = household?.timezone || 'Africa/Johannesburg';
+    const tz = household?.timezone || 'Europe/London';
 
     // Today's date in YYYY-MM-DD format, in the household's timezone
     const now = new Date();

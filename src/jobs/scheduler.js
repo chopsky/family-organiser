@@ -15,7 +15,7 @@ const { isSchoolInSession } = require('../utils/school-terms');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
- * Falls back to 'Africa/Johannesburg' if the timezone is invalid.
+ * Falls back to 'Europe/London' if the timezone is invalid.
  */
 function currentHHMMInTZ(timezone) {
   try {
@@ -31,7 +31,7 @@ function currentHHMMInTZ(timezone) {
     // Invalid timezone string — fall back
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Africa/Johannesburg',
+      timeZone: 'Europe/London',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
@@ -49,7 +49,7 @@ async function runDailyReminderCheck() {
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
-      const tz = household.timezone || 'Africa/Johannesburg';
+      const tz = household.timezone || 'Europe/London';
       const nowInTZ = currentHHMMInTZ(tz);
       const householdDefault = (household.reminder_time || '08:00:00').substring(0, 5);
       const members = await db.getHouseholdMembers(household.id);
@@ -82,7 +82,7 @@ async function runOverdueNudgeCheck() {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       // Nudge at 14:00 in the household's timezone
-      const tz = household.timezone || 'Africa/Johannesburg';
+      const tz = household.timezone || 'Europe/London';
       const nowInTZ = currentHHMMInTZ(tz);
       if (nowInTZ === '14:00') {
         const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];

@@ -1,6 +1,5 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
-const { getCoordsFromTimezone } = require('../services/weather');
 
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 
@@ -11,20 +10,15 @@ const { getCoordsFromTimezone } = require('../services/weather');
  * @param {object[]} myTasks   - Tasks assigned to this user (overdue + today)
  * @param {object[]} allTasks  - Tasks assigned to everyone (overdue + today)
  * @param {number} shoppingCount - Number of incomplete shopping items
+ * @param {object[]} schoolActivities - School activities for today
  * @returns {string}
  */
-function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, weatherBrief, schoolActivities) {
+function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, schoolActivities) {
   const today = new Date().toISOString().split('T')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   const lines = [`${greeting}, ${user.name}! Here's what's on for today:\n`];
-
-  // Weather brief (if available)
-  if (weatherBrief) {
-    lines.push(weatherBrief);
-    lines.push('');
-  }
 
   // School activities for today
   if (schoolActivities && schoolActivities.length > 0) {
@@ -91,13 +85,6 @@ async function sendDailyReminders(householdId, singleMember) {
   const shoppingItems = await db.getShoppingList(householdId);
   const shoppingCount = shoppingItems.length;
 
-  // Pre-fetch the household timezone so the per-member weather lookup can
-  // fall back to it when a user has no timezone of their own. Without this
-  // we silently default to 'Europe/London' for everyone, which produces
-  // wrong weather for households outside the UK.
-  const household = await db.getHouseholdById(householdId);
-  const householdTz = household?.timezone || null;
-
   // All tasks due today or overdue, assigned to everyone (null)
   const { data: everyoneTasks } = await require('../db/client').supabaseAdmin
     .from('tasks')
@@ -124,44 +111,6 @@ async function sendDailyReminders(householdId, singleMember) {
       .eq('completed', false)
       .eq('assigned_to', member.id)
       .lte('due_date', today);
-
-    // Fetch brief weather — use GPS coords or fall back to timezone-based
-    // coords. Order of preference for the timezone:
-    //   1. user's own setting
-    //   2. household timezone (more accurate than a hardcoded default)
-    //   3. 'Europe/London' as the absolute last-ditch fallback
-    let weatherBrief = null;
-    const tz = member.timezone || householdTz || 'Europe/London';
-    let wLat = member.latitude;
-    let wLon = member.longitude;
-    // Use != null so a longitude of exactly 0 (Greenwich meridian) doesn't
-    // get rejected as falsy. Same for an equatorial latitude.
-    if (wLat == null || wLon == null) {
-      const tzCoords = getCoordsFromTimezone(tz);
-      if (tzCoords) [wLat, wLon] = tzCoords;
-    }
-    if (wLat != null && wLon != null) {
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${wLat}&longitude=${wLon}&current=temperature_2m,apparent_temperature,weather_code&timezone=${encodeURIComponent(tz)}`;
-        const weatherRes = await fetch(url);
-        if (weatherRes.ok) {
-          const wd = await weatherRes.json();
-          const c = wd.current;
-          const codes = { 0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌦️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'❄️',95:'⛈️',96:'⛈️',99:'⛈️' };
-          const icon = codes[c.weather_code] || '🌡️';
-          weatherBrief = `${icon} *Weather:* ${Math.round(c.temperature_2m)}°C (feels like ${Math.round(c.apparent_temperature)}°C)`;
-        } else {
-          // Non-2xx from Open-Meteo. Was previously silent — log so we can
-          // diagnose. Don't include the URL itself (would log the user's
-          // approximate coords in plain text); just the status + tz.
-          console.warn(`[reminders] weather skipped for ${member.name} (tz=${tz}): Open-Meteo returned HTTP ${weatherRes.status}`);
-        }
-      } catch (err) {
-        console.warn(`[reminders] weather skipped for ${member.name} (tz=${tz}): ${err.message || err}`);
-      }
-    } else {
-      console.warn(`[reminders] weather skipped for ${member.name}: no GPS coords on user record and timezone "${tz}" is not in the TIMEZONE_COORDS fallback map`);
-    }
 
     // Get today's school activities for children in this household
     // Only include if today is during term time (not holidays, half term, INSET, or bank holiday)
@@ -193,7 +142,6 @@ async function sendDailyReminders(householdId, singleMember) {
       myTasks || [],
       everyoneTasks || [],
       shoppingCount,
-      weatherBrief,
       schoolActivities
     );
 
