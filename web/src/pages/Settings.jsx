@@ -40,6 +40,15 @@ function PlanSection() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
 
+  // App Store guideline 3.1.1: don't surface ANY plan / subscription /
+  // pricing / entitlement state on iOS. Even the "Internal" badge or a
+  // bare "Active" string has been called out by reviewers as "accessing
+  // paid content". Hide the section entirely; iOS users manage billing
+  // on web (or not at all). See SubscriptionContext for the matching
+  // backend short-circuit.
+  // Hook calls must come first (rules-of-hooks), so we early-return here.
+  if (isIos()) return null;
+
   // NB: there's no "trial reminder emails" toggle here. PECR covers us
   // as long as the email-footer unsubscribe link works, and the footer
   // link already flips trial_emails_enabled=false via /api/unsubscribe.

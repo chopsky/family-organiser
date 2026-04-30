@@ -18,7 +18,7 @@
  * the right tool for that — we nudge them there via a text link).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -53,14 +53,18 @@ export default function Subscribe() {
   const [submitting, setSubmitting] = useState(null); // 'monthly' | 'annual' | null
   const [error, setError] = useState('');
 
-  // iOS: Apple Review Guideline 3.1.1 bars selling digital subscriptions
-  // without using Apple's IAP, and the Anti-Steering rule bars linking to
-  // an external payment page. We therefore render a plain info screen on
-  // iOS — no pricing, no buttons pointing at Stripe, just a note pointing
-  // users at the web app (plain text, not a link).
-  if (isIos()) {
-    return <IosSubscribeInfo navigate={navigate} />;
-  }
+  // iOS: redirect away from this page entirely. Apple Review Guideline
+  // 3.1.1 + Anti-Steering means we can't show pricing, can't link to web
+  // checkout, and can't even mention "manage your subscription on
+  // housemait.com" — App Review rejected previous iterations that
+  // attempted to do exactly that. The cleanest move is "this page does
+  // not exist on iOS" — we send users back to /dashboard so deep links
+  // and stale 402-redirects (in case any slip through the
+  // SubscriptionContext guard) don't dead-end.
+  useEffect(() => {
+    if (isIos()) navigate('/dashboard', { replace: true });
+  }, [navigate]);
+  if (isIos()) return null;
 
   async function handleSubscribe(plan) {
     if (submitting) return;
@@ -268,54 +272,3 @@ function PricingCard({ plan, highlighted, currentPlan, submitting, disabled, onS
   );
 }
 
-/**
- * iOS-only rendering of the Subscribe route. Intentionally contains no
- * pricing, no buttons pointing at external payment pages, and no tappable
- * links to housemait.com — all three would trigger App Store review
- * rejection under Guideline 3.1.1 and the Anti-Steering rule.
- *
- * The URL is surfaced as plain text so a user who decides to subscribe
- * knows where to go (they can type it manually into Safari). The Back
- * button uses React Router navigation only — stays inside the app.
- */
-function IosSubscribeInfo({ navigate }) {
-  return (
-    <div className="min-h-screen bg-cream py-10 px-4">
-      <div className="max-w-lg mx-auto">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-warm-grey hover:text-charcoal transition-colors mb-6 flex items-center gap-1"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back
-        </button>
-
-        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(107,63,160,0.06)] border border-cream-border p-7 md:p-8">
-          <h1
-            className="text-[26px] text-charcoal mb-3"
-            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
-          >
-            Manage your subscription on the web
-          </h1>
-          <p className="text-cocoa text-base leading-relaxed mb-4">
-            Housemait subscriptions are managed on our website rather than in the app.
-          </p>
-          <p className="text-cocoa text-base leading-relaxed mb-6">
-            Open a web browser on any device and go to <strong className="text-charcoal">housemait.com</strong> to start, change, or cancel your subscription. Your account and household data stay in sync — sign in with the same email and you'll pick up right where you left off here.
-          </p>
-
-          <div className="bg-oat rounded-xl px-4 py-3 mb-2">
-            <p className="text-sm text-charcoal font-medium mb-1">What you can still do here</p>
-            <ul className="text-sm text-cocoa space-y-1 list-disc list-inside">
-              <li>Use every feature during your free trial</li>
-              <li>View your current plan status in Settings</li>
-              <li>Access your household's lists, calendar, meals and more</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}

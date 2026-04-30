@@ -56,6 +56,11 @@ function formatTrialEndDate(iso) {
  */
 export function TrialIndicatorSubtle({ className = '' }) {
   const { isTrialing, daysRemaining } = useSubscription();
+  // App Store guideline 3.1.1: no trial/plan UI on iOS. The context
+  // already short-circuits to isInternal=true on iOS so isTrialing
+  // would naturally be false, but a defensive check here prevents
+  // accidental regressions if the context behaviour ever changes.
+  if (isIos()) return null;
   if (!isTrialing || daysRemaining == null) return null;
 
   const label = daysRemaining === 1
@@ -95,6 +100,13 @@ export function TrialIndicatorCard() {
       setDismissed(false);
     }
   }, [dismissedKey]);
+
+  // App Store guideline 3.1.1: no trial/plan UI on iOS. The context
+  // short-circuits isTrialing to false on iOS so the inWarningWindow
+  // check below would already return null, but the explicit guard here
+  // is defence-in-depth. Comes after the hook calls so we don't
+  // violate rules-of-hooks.
+  if (isIos()) return null;
 
   // Only show for the last 10 days of the trial. Days 1–20 of the trial
   // (11+ remaining) use the subtle text in Settings only per the spec.

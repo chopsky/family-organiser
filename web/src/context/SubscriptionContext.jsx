@@ -20,6 +20,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from './AuthContext';
+import { isIos } from '../lib/platform';
 
 const SubscriptionContext = createContext(null);
 
@@ -51,6 +52,24 @@ export function SubscriptionProvider({ children }) {
       setLoading(false);
       setError(null);
       loadedHouseholdRef.current = null;
+      return;
+    }
+
+    // On iOS we deliberately don't surface ANY subscription state to the
+    // UI — see App Store guideline 3.1.1. Treating iOS as always-internal
+    // (which the rest of the app already maps to "full access, no
+    // billing surface") collapses every "trial / active / expired"
+    // branch to a single non-rendered no-op. Skip the fetch entirely so
+    // the iOS app makes one fewer round-trip on launch.
+    if (isIos()) {
+      setStatus(null);
+      setDaysRemaining(null);
+      setTrialEndsAt(null);
+      setPlan(null);
+      setIsInternal(true);
+      setLoading(false);
+      setError(null);
+      loadedHouseholdRef.current = household.id;
       return;
     }
 
@@ -89,6 +108,11 @@ export function SubscriptionProvider({ children }) {
   // to itself.
   useEffect(() => {
     function onSubscriptionRequired() {
+      // Never bounce iOS users to /subscribe — there is no in-app
+      // payment path (Apple guideline 3.1.1) and we mustn't link to
+      // external billing. The 402 will surface as a generic error
+      // toast wherever the mutation was attempted; that's fine.
+      if (isIos()) return;
       if (location.pathname === '/subscribe' || location.pathname.startsWith('/subscription/')) return;
       // Refresh silently so the subscribe page has fresh data when it loads.
       fetchStatus();

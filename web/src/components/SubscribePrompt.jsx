@@ -24,6 +24,7 @@
 
 import { Link } from 'react-router-dom';
 import { useCanWrite } from '../context/SubscriptionContext';
+import { isIos } from '../lib/platform';
 
 /**
  * Inline prompt. Renders regardless of subscription state — the caller
@@ -42,6 +43,13 @@ export default function SubscribePrompt({
   ctaLabel = 'Subscribe',
   className = '',
 }) {
+  // App Store guideline 3.1.1: never surface a "Subscribe" CTA on iOS.
+  // Defence-in-depth — the SubscriptionContext already forces
+  // canWrite=true on iOS so callers' `{!canWrite && <SubscribePrompt/>}`
+  // patterns won't render this, but any caller that renders us
+  // unconditionally would still get blocked here.
+  if (isIos()) return null;
+
   const { padding, text, button } = SIZES[size] || SIZES.md;
 
   return (
