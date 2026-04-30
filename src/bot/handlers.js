@@ -77,6 +77,43 @@ function isUndoRequest(text) {
   return /^(undo|revert|scrap that|scrap it|nevermind|never mind|forget it|cancel that|oops|nope scrap that|wait no|undo that|take that back)$/i.test(t);
 }
 
+/**
+ * Recognise simple slash commands like "/shopping". These are documented
+ * shortcuts shown in the daily reminder ("Reply /shopping to see it…")
+ * and must NEVER reach the AI — letting the LLM "interpret" something
+ * as terse and ambiguous as "/shopping" got us a real-world bug where
+ * it fabricated a complete_task action against an unrelated task.
+ *
+ * Returns the canonical command name, or null if `text` isn't a slash
+ * command we know about.
+ */
+const SLASH_COMMANDS = {
+  shopping: 'shopping',
+  list:     'shopping',
+  tasks:    'tasks',
+  todos:    'tasks',
+  todo:     'tasks',
+  mytasks:  'mytasks',
+  'my-tasks': 'mytasks',
+  help:     'help',
+};
+function matchSlashCommand(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (!t.startsWith('/')) return null;
+  // Take the first whitespace-separated token, drop the slash. Ignore
+  // anything after — "/shopping please" still resolves cleanly.
+  const cmd = t.slice(1).split(/\s+/)[0];
+  return SLASH_COMMANDS[cmd] || null;
+}
+
+const SLASH_HELP_TEXT =
+  '*Quick commands:*\n' +
+  '• `/shopping` — show the shopping list\n' +
+  '• `/tasks` — show today\'s + overdue tasks\n' +
+  '• `/mytasks` — show only tasks assigned to you\n' +
+  '• `/help` — this message\n\n' +
+  'You can also chat to me normally — _"add milk to the list"_, _"weather in Brighton tomorrow"_, _"what\'s on this Saturday?"_.';
+
 // ─── Pending disambiguation store (in-memory, per user, 5-minute TTL) ─────────
 //
 // When handleModifyIntent finds multiple candidates it sends a "which one?"
@@ -788,6 +825,27 @@ async function handleTextMessage(text, user, household) {
       response: trivial.response,
       actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] },
     };
+  }
+
+  // Slash commands — deterministic, never sent to the AI. See SLASH_COMMANDS
+  // above for the list. These exist primarily because the daily reminder
+  // tells users to reply "/shopping" to see the list — letting the AI
+  // "interpret" that resulted in a real bug where it fabricated a task
+  // completion against an unrelated task.
+  const slashCmd = matchSlashCommand(text);
+  if (slashCmd) {
+    console.log('[handlers] Slash command matched:', slashCmd);
+    const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+    switch (slashCmd) {
+      case 'shopping':
+        return { response: await handleList(user, household), actions };
+      case 'tasks':
+        return { response: await handleTasks(user, household), actions };
+      case 'mytasks':
+        return { response: await handleMyTasks(user, household), actions };
+      case 'help':
+        return { response: SLASH_HELP_TEXT, actions };
+    }
   }
 
   // Fetch recent WhatsApp conversation turns (last ~30 min) so the AI can
