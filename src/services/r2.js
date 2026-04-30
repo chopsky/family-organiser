@@ -92,11 +92,19 @@ async function deleteFiles(keys) {
 
 /**
  * Generate a signed URL for downloading a file.
+ *
+ * Default TTL is 5 minutes — short enough that a stolen URL has limited
+ * value if a user's device is compromised, long enough that "click
+ * preview, get distracted, come back" still works. The frontend always
+ * fetches a fresh URL on every preview/download request, so there's no
+ * UX cost to the shorter window. Callers can override for special cases
+ * (e.g. background fetches, server-to-server jobs).
+ *
  * @param {string} key - Storage path
- * @param {number} expiresIn - Seconds until URL expires (default 3600 = 1 hour)
+ * @param {number} expiresIn - Seconds until URL expires (default 300 = 5 min)
  * @returns {Promise<string>} Signed URL
  */
-async function getSignedDownloadUrl(key, expiresIn = 3600) {
+async function getSignedDownloadUrl(key, expiresIn = 300) {
   ensureClient();
   return getSignedUrl(client, new GetObjectCommand({
     Bucket: BUCKET,

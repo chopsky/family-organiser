@@ -9,7 +9,7 @@ const path = require('path');
 const db = require('../db/queries');
 const r2 = require('../services/r2');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
-const { validateUpload } = require('../utils/fileValidation');
+const { validateUpload, normaliseFilename } = require('../utils/fileValidation');
 
 const router = Router();
 
@@ -190,11 +190,13 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     // Attach a signed preview URL for image documents so the frontend can
     // render thumbnails. Signing is cheap (HMAC only — no network), and the
     // browser lazy-loads the actual image bytes only when the card scrolls
-    // into view. URLs are valid for 1 hour which is plenty for a session.
+    // into view. We use the default 5-min TTL (see r2.js); the frontend
+    // re-fetches the list (and gets fresh URLs) every time the user opens
+    // the Documents page, so a 5-min window is plenty for one session.
     const withPreviews = await Promise.all(docs.map(async (doc) => {
       if (doc.mime_type?.startsWith('image/')) {
         try {
-          const preview_url = await r2.getSignedDownloadUrl(doc.file_path, 3600);
+          const preview_url = await r2.getSignedDownloadUrl(doc.file_path);
           return { ...doc, preview_url };
         } catch {
           return doc;
@@ -258,21 +260,28 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
       }
     }
 
-    // Build storage key
-    const ext = path.extname(req.file.originalname || '').toLowerCase();
-    const safeFilename = req.file.originalname
-      ? req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')
-      : `file${ext}`;
+    // Filename hygiene happens in two passes:
+    //   1. normaliseFilename() — Unicode NFKC + strip BiDi / zero-width /
+    //      control characters. This is the DISPLAY name we show users
+    //      and store in the DB. See utils/fileValidation.js for the
+    //      attack-surface rationale.
+    //   2. ASCII-only sanitisation for the storage-key path — we still
+    //      want R2 keys to be plain `[a-zA-Z0-9._-]` to dodge any
+    //      S3-compatibility quirk with non-ASCII keys.
+    const displayName = normaliseFilename(req.file.originalname) || `file.${validated.ext}`;
+    const ext = path.extname(displayName).toLowerCase();
+    const safeFilename = displayName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storageKey = `${req.householdId}/${folderId || 'root'}/${crypto.randomUUID()}-${safeFilename}`;
 
     // Upload to R2 with the SERVER-DERIVED MIME type, not the client's
     // claim. validateUpload() canonicalises this from the magic bytes.
     await r2.uploadFile(storageKey, req.file.buffer, validated.mime);
 
-    // Record in database with the validated MIME, again ignoring any
-    // client-supplied Content-Type.
+    // Record in database with the normalised display name + validated
+    // MIME. We never store the raw originalname — see normaliseFilename
+    // for what gets stripped.
     const doc = await db.createDocument(req.householdId, {
-      name: req.file.originalname || safeFilename,
+      name: displayName,
       file_path: storageKey,
       file_size: req.file.size,
       mime_type: validated.mime,
@@ -314,7 +323,10 @@ router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const url = await r2.getSignedDownloadUrl(doc.file_path, 3600);
+    // Use the default 5-min TTL — see r2.js for rationale. The frontend
+    // fetches a fresh URL on every preview/download click, so the user
+    // never holds onto a stale URL anyway.
+    const url = await r2.getSignedDownloadUrl(doc.file_path);
 
     // Log the access. Best-effort — wrap in its own try so a logging
     // failure doesn't bubble up. req.ip respects X-Forwarded-For via the
@@ -332,7 +344,7 @@ router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
       console.warn('[documents] access-log insert failed:', logErr.message);
     }
 
-    return res.json({ url, expiresIn: 3600 });
+    return res.json({ url, expiresIn: 300 });
   } catch (err) {
     console.error('GET /api/documents/:id/url error:', err);
     return res.status(500).json({ error: 'Internal server error' });

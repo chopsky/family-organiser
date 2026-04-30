@@ -8,7 +8,7 @@
  *   - Plain-text heuristic for .txt / .csv (rejects binaries with text ext)
  */
 
-const { validateUpload, ACCEPT_ATTRIBUTE, ALLOWED } = require('./fileValidation');
+const { validateUpload, normaliseFilename, ACCEPT_ATTRIBUTE, ALLOWED } = require('./fileValidation');
 
 // Helper: build a buffer that starts with the given magic bytes,
 // padded with zeros to a reasonable length so the validator sees enough.
@@ -159,5 +159,84 @@ describe('validateUpload()', () => {
         expect(exts).toContain(`.${key}`);
       }
     });
+  });
+});
+
+describe('normaliseFilename()', () => {
+  test('passes through an ordinary filename', () => {
+    expect(normaliseFilename('Family photo.jpg')).toBe('Family photo.jpg');
+  });
+
+  test('strips right-to-left override (the classic exe-disguise trick)', () => {
+    // "evil" + RLO + "fdp.exe"  →  renders as "evilexe.pdf" in many UIs.
+    // The visible suffix the user sees doesn't match the actual extension.
+    const rlo = '‮';
+    const evil = `evil${rlo}fdp.exe`;
+    const result = normaliseFilename(evil);
+    expect(result).toBe('evilfdp.exe'); // RLO removed, real extension exposed
+    expect(result).not.toContain(rlo);
+  });
+
+  test('strips zero-width spaces and joiners', () => {
+    const zwsp = '​';
+    const zwj  = '‍';
+    const sneaky = `passport${zwsp}.pdf${zwj}`;
+    expect(normaliseFilename(sneaky)).toBe('passport.pdf');
+  });
+
+  test('strips BOM / zero-width no-break space', () => {
+    expect(normaliseFilename('﻿receipt.pdf')).toBe('receipt.pdf');
+  });
+
+  test('strips NUL and other C0 control characters (incl. tab)', () => {
+    expect(normaliseFilename('clean\x00name.pdf')).toBe('cleanname.pdf');
+    // Tab is in the C0 range and is removed entirely. A filename with a
+    // raw tab is non-standard anyway — a clean strip produces a valid
+    // name without any "tab→space" gymnastics.
+    expect(normaliseFilename('tab\x09sep.csv')).toBe('tabsep.csv');
+    expect(normaliseFilename('bell\x07name.pdf')).toBe('bellname.pdf');
+  });
+
+  test('NFKC normalises fullwidth lookalikes to ASCII', () => {
+    // Fullwidth Latin "PDF" (U+FF30 U+FF24 U+FF26) → "PDF"
+    expect(normaliseFilename('report.ＰＤＦ')).toBe('report.PDF');
+  });
+
+  test('collapses consecutive dots — defeats evil.pdf.exe chains', () => {
+    expect(normaliseFilename('evil.pdf...exe')).toBe('evil.pdf.exe');
+    // (The validator then rejects the .exe extension separately.)
+  });
+
+  test('strips leading dots so files are not Unix-hidden', () => {
+    expect(normaliseFilename('.htaccess')).toBe('htaccess');
+    expect(normaliseFilename('....stealth.pdf')).toBe('stealth.pdf');
+  });
+
+  test('collapses runs of whitespace and trims ends', () => {
+    expect(normaliseFilename('  spaced   out  .pdf')).toBe('spaced out .pdf');
+  });
+
+  test('caps length at 200 chars, preserving the extension', () => {
+    const longBase = 'a'.repeat(300);
+    const result = normaliseFilename(`${longBase}.pdf`);
+    expect(result.length).toBe(200);
+    expect(result.endsWith('.pdf')).toBe(true);
+  });
+
+  test('caps length at 200 chars without an extension', () => {
+    const long = 'b'.repeat(300);
+    expect(normaliseFilename(long).length).toBe(200);
+  });
+
+  test('returns empty string for empty / nullish input', () => {
+    expect(normaliseFilename('')).toBe('');
+    expect(normaliseFilename(null)).toBe('');
+    expect(normaliseFilename(undefined)).toBe('');
+  });
+
+  test('does not mangle legitimate accented characters', () => {
+    // Accented Latin should survive — these are not lookalike abuse.
+    expect(normaliseFilename('café-menu.pdf')).toBe('café-menu.pdf');
+    expect(normaliseFilename('résumé.docx')).toBe('résumé.docx');
   });
 });
