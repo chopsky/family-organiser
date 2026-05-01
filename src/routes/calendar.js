@@ -194,6 +194,37 @@ router.get('/tasks', async (req, res) => {
 });
 
 /**
+ * GET /api/calendar/search
+ * Substring search across events + tasks for the household, with NO
+ * date filter. Powers the calendar page's search dropdown — the prior
+ * client-side filter only saw events in the currently-loaded ~3-month
+ * window, which made it useless for finding anything older or further
+ * out than that.
+ *
+ * Query params:
+ *   q     — required, ≥2 chars (single letters waste DB time on giant
+ *           result sets; the frontend doesn't fire below 2 chars either)
+ *   limit — optional, default 50, capped at 100 by the query helper
+ *
+ * Returns: { events: Event[], tasks: Task[] } sorted most-recent-first.
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.json({ events: [], tasks: [] });
+    }
+    const parsedLimit = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : 50;
+    const results = await db.searchCalendar(req.householdId, q, { limit });
+    return res.json(results);
+  } catch (err) {
+    console.error('GET /api/calendar/search error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/calendar/month
  * Combined endpoint — returns events + tasks for a month in a single request.
  * Query params: month (e.g. "2026-03"), category? (optional)

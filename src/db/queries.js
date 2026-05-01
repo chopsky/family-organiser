@@ -1611,6 +1611,67 @@ async function getTasksByDateRange(householdId, startDate, endDate, db = supabas
   return data;
 }
 
+/**
+ * Substring search across calendar_events + tasks for a household.
+ *
+ * Powers the calendar page's search bar without a date filter — so
+ * searching "wedding" finds an event two years out, not just events
+ * in the currently-rendered month. Replaces the prior client-side
+ * filter, which was bounded by whatever ±1-month window had been
+ * loaded into memory.
+ *
+ * Match semantics:
+ *   • Events: title / description / location ILIKE %q% (case-insensitive
+ *     substring match, mirrors the previous client-side String.includes).
+ *   • Tasks: title ILIKE %q% (the tasks table has no description column,
+ *     so the prior client-side check on t.description was always falsy).
+ *   • deleted_at IS NULL on events; tasks have no soft-delete.
+ *   • Both completed and incomplete tasks are returned — search history
+ *     is useful ("when did we book the photographer?") even for things
+ *     that have already happened.
+ *
+ * Returns up to `limit` of each type, ordered most-recent-first so the
+ * dropdown surfaces stuff close to today before stuff from years ago.
+ * Capped at 100 per type as a safety bound.
+ */
+async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supabase) {
+  const trimmed = (query || '').trim();
+  if (!trimmed) return { events: [], tasks: [] };
+
+  const cap = Math.min(Math.max(1, limit), 100);
+  // ILIKE pattern: surround in % so it matches the term anywhere in
+  // the field. PostgREST passes the raw value through to Postgres so
+  // % and _ act as wildcards — fine for our use case (a stray %
+  // someone typed just over-matches; not a security concern).
+  const pattern = `%${trimmed}%`;
+
+  const [eventsRes, tasksRes] = await Promise.all([
+    db
+      .from('calendar_events')
+      .select('id, title, description, location, start_time, end_time, all_day, color, assigned_to_name, category')
+      .eq('household_id', householdId)
+      .is('deleted_at', null)
+      .or(`title.ilike.${pattern},description.ilike.${pattern},location.ilike.${pattern}`)
+      .order('start_time', { ascending: false })
+      .limit(cap),
+    db
+      .from('tasks')
+      .select('id, title, due_date, completed, assigned_to_name')
+      .eq('household_id', householdId)
+      .ilike('title', pattern)
+      .order('due_date', { ascending: false })
+      .limit(cap),
+  ]);
+
+  if (eventsRes.error) throw eventsRes.error;
+  if (tasksRes.error) throw tasksRes.error;
+
+  return {
+    events: eventsRes.data || [],
+    tasks: tasksRes.data || [],
+  };
+}
+
 async function createCalendarEvent(householdId, eventData, createdByUserId, db = supabase) {
   const { data, error } = await db
     .from('calendar_events')
@@ -3916,6 +3977,7 @@ module.exports = {
   getCalendarEvents,
   getCalendarEventById,
   getTasksByDateRange,
+  searchCalendar,
   createCalendarEvent,
   findSimilarEvent,
   updateCalendarEvent,

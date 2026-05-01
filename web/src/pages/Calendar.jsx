@@ -909,26 +909,66 @@ export default function Calendar() {
   const currentTimeTop = (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
 
   // ── Search results ─────────────────────────────────────
+  //
+  // Search hits the backend (GET /api/calendar/search) with the full
+  // typed query — no date filter, so it covers every event + task in
+  // the household, not just the ~3-month window that's been loaded
+  // into memory. Debounced 300 ms so each keystroke doesn't fire a
+  // request, and only sends once the query is at least 2 chars.
 
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase().trim();
-    const matches = [];
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
-    for (const ev of events) {
-      if (ev.title?.toLowerCase().includes(q) || ev.description?.toLowerCase().includes(q) || ev.location?.toLowerCase().includes(q)) {
-        matches.push({ type: 'event', item: ev, date: ev.start_time?.split('T')[0], title: ev.title });
-      }
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
     }
-    for (const t of tasks) {
-      if (t.title?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)) {
-        matches.push({ type: 'task', item: t, date: t.due_date, title: t.title });
-      }
-    }
 
-    matches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    return matches.slice(0, 20);
-  }, [searchQuery, events, tasks]);
+    setSearchLoading(true);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get('/calendar/search', { params: { q } });
+        if (cancelled) return;
+        const matches = [];
+        for (const ev of res.data?.events || []) {
+          matches.push({
+            type: 'event',
+            item: ev,
+            date: ev.start_time?.split('T')[0],
+            title: ev.title,
+          });
+        }
+        for (const t of res.data?.tasks || []) {
+          matches.push({
+            type: 'task',
+            item: t,
+            date: t.due_date,
+            title: t.title,
+          });
+        }
+        // Sort newest-first: results from years out or years past
+        // both sit below stuff close to "now" in the dropdown.
+        // (Replaces the prior ascending sort, which pushed old
+        // events to the top of a tight 20-row cap and effectively
+        // hid recent matches.)
+        matches.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        setSearchResults(matches.slice(0, 50));
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   function jumpToSearchResult(result) {
     const dateStr = result.date;
@@ -1034,7 +1074,11 @@ export default function Calendar() {
                 />
                 {searchQuery.trim() && (
                   <div className="mt-2 max-h-64 overflow-y-auto">
-                    {searchResults.length === 0 ? (
+                    {searchQuery.trim().length < 2 ? (
+                      <p className="text-sm text-warm-grey p-3 text-center">Type at least 2 characters…</p>
+                    ) : searchLoading && searchResults.length === 0 ? (
+                      <p className="text-sm text-warm-grey p-3 text-center">Searching…</p>
+                    ) : searchResults.length === 0 ? (
                       <p className="text-sm text-warm-grey p-3 text-center">No results found</p>
                     ) : (
                       searchResults.map((result, i) => {
