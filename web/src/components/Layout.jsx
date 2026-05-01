@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 const ChatWidget = lazy(() => import('./ChatWidget'));
@@ -236,6 +236,9 @@ export default function Layout({ children }) {
               <IconShield className="h-5 w-5" />
             </Link>
           )}
+          <Link to="/help" className="text-warm-grey hover:text-charcoal transition-colors" title="Help & support">
+            <IconHelp className="h-5 w-5" />
+          </Link>
           <Link to="/settings" className="text-warm-grey hover:text-charcoal transition-colors" title="Settings">
             <IconSettings className="h-5 w-5" />
           </Link>
