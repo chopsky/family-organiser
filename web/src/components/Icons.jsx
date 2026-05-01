@@ -167,15 +167,20 @@ export function IconX(p) {
   return <Icon {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>;
 }
 
-// Question-mark inside a circle — universal "help / support / FAQ"
-// affordance. Used in the desktop sidebar footer next to the settings
-// cog so users always have a one-click path into the Help centre.
+// Lifebuoy — friendly, on-brand "help is here if you need it" icon.
+// Used in the desktop sidebar footer next to the settings cog so users
+// always have a one-click path into the Help centre. Geometry matches
+// Lucide's life-buoy (outer ring + inner ring + four diagonal "rope"
+// segments at NE/NW/SE/SW).
 export function IconHelp(p) {
   return (
     <Icon {...p}>
       <circle cx="12" cy="12" r="10" />
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
+      <circle cx="12" cy="12" r="4" />
+      <line x1="4.93" y1="4.93" x2="9.17" y2="9.17" />
+      <line x1="14.83" y1="9.17" x2="19.07" y2="4.93" />
+      <line x1="14.83" y1="14.83" x2="19.07" y2="19.07" />
+      <line x1="9.17" y1="14.83" x2="4.93" y2="19.07" />
     </Icon>
   );
 }
