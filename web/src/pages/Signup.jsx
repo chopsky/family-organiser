@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -13,6 +13,7 @@ export default function Signup() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef            = useRef(null);
   const { login }               = useAuth();
   const navigate                = useNavigate();
   const [searchParams]          = useSearchParams();
@@ -49,6 +50,13 @@ export default function Signup() {
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong.');
+      // Turnstile tokens are single-use. The backend already consumed
+      // ours validating this submission — even though the request
+      // ultimately failed (weak password, email taken, etc), the token
+      // is dead and re-submitting with it would trip "Bot verification
+      // failed". Clear and reset so the next submit gets a fresh one.
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -120,7 +128,7 @@ export default function Signup() {
                 autoComplete="new-password"
               />
             </div>
-            <TurnstileWidget onChange={setTurnstileToken} />
+            <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
             <button
               type="submit"
               disabled={loading}

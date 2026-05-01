@@ -16,7 +16,7 @@
  * fail-opens in this case, so forms keep working.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__turnstileOnLoad';
@@ -39,9 +39,35 @@ function loadScript() {
   return scriptLoading;
 }
 
-export default function TurnstileWidget({ onChange, theme = 'light' }) {
-  const ref = useRef(null);
+/**
+ * forwardRef so parent forms can imperatively call `reset()` on a failed
+ * submission. Turnstile tokens are SINGLE-USE — once the backend has
+ * validated one (even before deciding the request itself was bad), that
+ * token is dead. Parents that don't reset after an error will trip the
+ * "Bot verification failed" message on the next submit, even though the
+ * widget visually still shows "Success!" (it only auto-resets on its
+ * own 5-min expiry, not on submission).
+ *
+ * Usage:
+ *   const turnstileRef = useRef(null);
+ *   <TurnstileWidget ref={turnstileRef} onChange={setToken} />
+ *   // After any backend error:
+ *   turnstileRef.current?.reset();
+ */
+const TurnstileWidget = forwardRef(function TurnstileWidget(
+  { onChange, theme = 'light' },
+  ref,
+) {
+  const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    reset() {
+      if (widgetIdRef.current && window.turnstile) {
+        try { window.turnstile.reset(widgetIdRef.current); } catch { /* widget gone */ }
+      }
+    },
+  }), []);
 
   useEffect(() => {
     // No site key configured → bypass. Server-side middleware also fail-opens.
@@ -55,8 +81,8 @@ export default function TurnstileWidget({ onChange, theme = 'light' }) {
 
     loadScript()
       .then(() => {
-        if (cancelled || !ref.current || !window.turnstile) return;
-        widgetIdRef.current = window.turnstile.render(ref.current, {
+        if (cancelled || !containerRef.current || !window.turnstile) return;
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: SITE_KEY,
           theme,
           // 'refresh-expired: auto' tells Cloudflare to silently issue a new
@@ -103,5 +129,7 @@ export default function TurnstileWidget({ onChange, theme = 'light' }) {
 
   if (!SITE_KEY) return null;
 
-  return <div ref={ref} className="turnstile-container my-3" />;
-}
+  return <div ref={containerRef} className="turnstile-container my-3" />;
+});
+
+export default TurnstileWidget;

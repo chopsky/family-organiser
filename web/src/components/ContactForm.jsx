@@ -16,7 +16,7 @@
  *              section card; Support.jsx does not).
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from './ErrorBanner';
@@ -34,6 +34,7 @@ export default function ContactForm({ compact = false }) {
   const [error, setError]     = useState('');
   const [sent, setSent]       = useState(false);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
 
   // Pre-fill name & email if the user is logged in. Deliberately one-shot
   // (no name/email in deps) so it never overrides what the user typed.
@@ -65,6 +66,10 @@ export default function ContactForm({ compact = false }) {
       setSent(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+      // Turnstile tokens are single-use. Reset so the next submit
+      // gets a fresh challenge, not a 'Bot verification failed'.
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -176,7 +181,7 @@ export default function ContactForm({ compact = false }) {
             className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-y"
           />
         </div>
-        <TurnstileWidget onChange={setTurnstileToken} />
+        <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
         <button
           type="submit"
           disabled={loading}

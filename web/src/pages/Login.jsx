@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -13,6 +13,7 @@ export default function Login() {
   const [error, setError]         = useState('');
   const [resendState, setResendState] = useState('idle'); // idle | sending | sent
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef              = useRef(null);
   const { login }                 = useAuth();
   const navigate                  = useNavigate();
   const [searchParams]            = useSearchParams();
@@ -40,6 +41,12 @@ export default function Login() {
       navigate(postLoginRoute(data));
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong.');
+      // Turnstile tokens are single-use — the backend already consumed
+      // ours validating this submission. Re-submitting with the same
+      // token would trip "Bot verification failed" on the second try.
+      // Clear and reset so the next submit gets a fresh challenge.
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -144,7 +151,7 @@ export default function Login() {
                 <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
               </div>
             </div>
-            <TurnstileWidget onChange={setTurnstileToken} />
+            <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
             <button
               type="submit"
               disabled={loading}
