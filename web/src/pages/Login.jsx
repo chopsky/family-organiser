@@ -80,8 +80,8 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-oat flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
+      <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
           <h1 className="text-bark" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 42, lineHeight: 1.1, letterSpacing: '-0.015em' }}>Welcome <em style={{ fontStyle: 'italic', color: '#6B2FB8' }}>back.</em></h1>

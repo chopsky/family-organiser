@@ -13,8 +13,8 @@ import ContactForm from '../components/ContactForm';
 
 export default function Support() {
   return (
-    <div className="min-h-screen bg-oat flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
+      <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
           <h1

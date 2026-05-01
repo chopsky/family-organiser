@@ -12,8 +12,8 @@ export default function Verified() {
   const continueLabel = token ? 'Continue to dashboard' : 'Log in';
 
   return (
-    <div className="min-h-screen bg-oat flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
+      <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-3xl font-semibold text-bark">Email verified!</h1>

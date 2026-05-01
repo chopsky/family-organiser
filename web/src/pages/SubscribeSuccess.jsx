@@ -85,8 +85,8 @@ export default function SubscribeSuccess() {
   if (isIos()) return null;
 
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-cream px-4 py-8 md:py-12 flex flex-col items-center">
+      <div className="my-auto w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-[0_4px_16px_rgba(107,63,160,0.08)] border border-cream-border p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-sage-light flex items-center justify-center mx-auto mb-5">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4A7D50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

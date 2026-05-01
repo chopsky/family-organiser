@@ -32,8 +32,8 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-oat flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8 max-w-md text-center">
+      <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
+        <div className="my-auto bg-white rounded-2xl shadow-sm border border-cream-border p-8 max-w-md text-center">
           <p className="text-error mb-4">Invalid reset link.</p>
           <Link to="/forgot-password" className="text-primary font-medium hover:underline">Request a new one</Link>
         </div>
@@ -42,8 +42,8 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-oat flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
+      <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
         </div>
