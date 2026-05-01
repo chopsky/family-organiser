@@ -58,7 +58,22 @@ async function authResponse(user, req = null) {
   return {
     token,
     refreshToken,
-    user: { id: user.id, name: user.name, role: user.role, color_theme: user.color_theme || 'sage', avatar_url: user.avatar_url || null, isPlatformAdmin: user.is_platform_admin || false, onboarded_at: user.onboarded_at || null },
+    // created_at + whatsapp_linked are surfaced for the trial-week
+    // activation experience (web/src/components/WelcomeChecklist.jsx) —
+    // the checklist needs to know whether to render at all (within
+    // 7 days of signup) and whether to tick "Connect WhatsApp"
+    // automatically. Both are cheap reads, both already on the row.
+    user: {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      color_theme: user.color_theme || 'sage',
+      avatar_url: user.avatar_url || null,
+      isPlatformAdmin: user.is_platform_admin || false,
+      onboarded_at: user.onboarded_at || null,
+      created_at: user.created_at || null,
+      whatsapp_linked: !!user.whatsapp_linked,
+    },
     household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time } : null,
   };
 }

@@ -6,6 +6,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
+import WelcomeChecklist from '../components/WelcomeChecklist';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -333,6 +334,15 @@ export default function Dashboard() {
           expired, internal testers, or the first 20 days of the trial). */}
       <TrialIndicatorCard />
 
+      {/* Welcome activation checklist — only renders during the user's
+          first 7 days. Shows three quick-start tasks (connect WhatsApp,
+          add an event, invite family) that auto-tick as the user does
+          them. Self-hides on completion or explicit dismissal. */}
+      <WelcomeChecklist
+        hasContent={(todayEvents?.length || 0) + (outstanding?.length || 0) > 0}
+        memberCount={members?.length || 1}
+      />
+
       {/* AI chat input — replaced with a subscribe prompt for expired
           households so typing into a broken input doesn't turn into a
           jarring 402 → redirect moment. */}
@@ -413,7 +423,13 @@ export default function Dashboard() {
             <Link to="/shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
           </div>
           {shoppingItems.length === 0 ? (
-            <p className="text-sm text-cocoa py-4 text-center">Shopping list is empty</p>
+            <div className="py-6 text-center">
+              <p className="text-sm text-bark font-medium">Shopping list is empty</p>
+              <p className="text-xs text-cocoa mt-1.5 leading-relaxed">
+                Tap <Link to="/shopping" className="text-primary font-medium hover:underline">Open list →</Link> to
+                add items, or message <span className="italic">"add milk and eggs to the list"</span> to the WhatsApp bot.
+              </p>
+            </div>
           ) : (
             <>
               <div className="flex flex-col" style={{ gap: 6 }}>

@@ -1141,9 +1141,17 @@ export default function Tasks() {
 
           {/* Empty state */}
           {!loading && columnData.every((col) => col.incomplete.length === 0 && col.completed.length === 0) && (
-            <p className="text-center py-10" style={{ color: 'var(--warm-grey, #6B6774)', fontSize: 15 }}>
-              {showAll ? 'No tasks yet. Add one to get started!' : 'Nothing due today!'}
-            </p>
+            <div className="text-center py-10 max-w-md mx-auto px-4">
+              <p className="text-[15px] font-medium text-charcoal">
+                {showAll ? 'No tasks yet' : 'Nothing due today'}
+              </p>
+              <p className="text-[13px] text-warm-grey mt-2 leading-relaxed">
+                {showAll
+                  ? <>Tap <span className="font-semibold text-plum">+</span> to add one, or message <span className="italic">"remind Sarah to book the dentist on Tuesday"</span> to the WhatsApp bot.</>
+                  : <>You're all caught up. Switch to <span className="font-medium">All tasks</span> to see what's coming up.</>
+                }
+              </p>
+            </div>
           )}
         </>
       )}

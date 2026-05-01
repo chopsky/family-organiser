@@ -471,8 +471,15 @@ export default function Shopping() {
 
           {/* Empty state */}
           {incompleteItems.length === 0 && !loading && (
-            <div className="text-center py-12 text-cocoa text-sm">
-              No items on this list yet. Add something above!
+            <div className="text-center py-12 max-w-md mx-auto px-4">
+              <p className="text-[15px] font-medium text-charcoal">
+                No items on this list yet
+              </p>
+              <p className="text-[13px] text-cocoa mt-2 leading-relaxed">
+                Add something using the input above, or message{' '}
+                <span className="italic">"add bread, milk and bananas to the list"</span>{' '}
+                to the WhatsApp bot — items get sorted by aisle automatically.
+              </p>
             </div>
           )}
 

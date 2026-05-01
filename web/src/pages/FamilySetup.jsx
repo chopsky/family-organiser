@@ -961,30 +961,51 @@ export default function FamilySetup() {
           <div className="mt-4 pt-4 border-t border-cream-border">
             <p className="text-xs font-medium text-cocoa uppercase tracking-wider mb-2">Pending invites</p>
             <ul className="space-y-1">
-              {pendingInvites.map((inv) => (
-                <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-xl px-3 py-2">
-                  <span>{inv.name || inv.email}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-cocoa">
-                      {inv.name ? inv.email : ''} · expires {new Date(inv.expires_at).toLocaleDateString()}
-                    </span>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await api.delete(`/household/invites/${inv.id}`);
-                          setPendingInvites(prev => prev.filter(i => i.id !== inv.id));
-                        } catch {
-                          setError('Failed to cancel invite.');
-                        }
-                      }}
-                      className="text-xs text-error hover:text-error/80 transition-colors"
-                      title="Cancel invite"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </li>
-              ))}
+              {pendingInvites.map((inv) => {
+                // Build a wa.me deep-link with a friendly preset message
+                // so the inviter can pass the invite into a WhatsApp
+                // chat without typing the link manually. wa.me opens
+                // the recipient's WhatsApp share-sheet on tap; the
+                // user picks who to send to.
+                const inviteUrl = `${window.location.origin}/signup?invite=${inv.token}`;
+                const inviteeName = (inv.name || '').trim();
+                const greeting = inviteeName ? `Hi ${inviteeName.split(' ')[0]}` : 'Hey';
+                const waText = `${greeting} — I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}`;
+                const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+                return (
+                  <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-xl px-3 py-2">
+                    <span>{inv.name || inv.email}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-cocoa">
+                        {inv.name ? inv.email : ''} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                      </span>
+                      <a
+                        href={waUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-success hover:text-success/80 transition-colors"
+                        title="Share invite link via WhatsApp"
+                      >
+                        Share via WhatsApp
+                      </a>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.delete(`/household/invites/${inv.id}`);
+                            setPendingInvites(prev => prev.filter(i => i.id !== inv.id));
+                          } catch {
+                            setError('Failed to cancel invite.');
+                          }
+                        }}
+                        className="text-xs text-error hover:text-error/80 transition-colors"
+                        title="Cancel invite"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
