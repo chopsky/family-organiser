@@ -1083,7 +1083,7 @@ export default function Calendar() {
                     ) : (
                       searchResults.map((result, i) => {
                         const dateLabel = result.date
-                          ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+                          ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
                           : 'No date';
                         return (
                           <button
