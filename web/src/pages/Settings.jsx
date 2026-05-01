@@ -1313,6 +1313,23 @@ export default function Settings() {
         )}
       </section>
 
+      {/* Help & support — small entry point above the danger zone so users
+          who land in Settings looking for "how do I…?" find a nudge to the
+          /help page (FAQ + contact form) rather than reading on. */}
+      <section className="mt-2 rounded-2xl p-5 border border-cream-border bg-white">
+        <h2 className="text-base font-semibold text-bark mb-1">Help &amp; support</h2>
+        <p className="text-sm text-cocoa">
+          Quick answers to common questions, plus a way to reach us if
+          you're stuck.
+        </p>
+        <Link
+          to="/help"
+          className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl border border-cream-border text-bark hover:bg-cream font-semibold text-sm transition-colors"
+        >
+          Visit the help centre
+        </Link>
+      </section>
+
       {/* Danger zone — delete account. Placed last so it's below the
           mostly-safe Log out affordance and visually separated. */}
       <section

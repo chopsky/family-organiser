@@ -30,6 +30,7 @@ const Documents       = lazy(() => import('./pages/Documents'));
 const Privacy         = lazy(() => import('./pages/Privacy'));
 const Terms           = lazy(() => import('./pages/Terms'));
 const Support         = lazy(() => import('./pages/Support'));
+const Help            = lazy(() => import('./pages/Help'));
 const Subscribe       = lazy(() => import('./pages/Subscribe'));
 const SubscribeSuccess = lazy(() => import('./pages/SubscribeSuccess'));
 const SubscribeCancel  = lazy(() => import('./pages/SubscribeCancel'));
@@ -119,6 +120,7 @@ function AppRoutes() {
         <Route path="/documents" element={<RequireAuth><Layout><Documents /></Layout></RequireAuth>} />
         <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+        <Route path="/help" element={<RequireAuth><Layout><Help /></Layout></RequireAuth>} />
         {/* Subscribe flow — Subscribe page is reachable by anyone logged in
             (including expired users, so they can reactivate). Success and
             Cancel pages are hit by Stripe redirects so they need to work

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 const ChatWidget = lazy(() => import('./ChatWidget'));
@@ -19,19 +19,77 @@ const mainNav = [
   { to: '/family',     label: 'Family',    Icon: IconUsers     },
 ];
 
+// Mobile bottom-tab order from the iOS design handoff: Home · Calendar ·
+// Tasks · Shopping · More. Meal Plan, Receipt, Documents, Family and
+// Settings live behind the More sheet (see `MoreSheet` below) — that's
+// the design's deliberate pattern: keep the bottom bar to four
+// destinations the user touches every day, plus a curated "More" set.
 const mobileNav = [
-  { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
-  { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
-  { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
-  { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
-  { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
+  { to: '/dashboard',  label: 'Home',      Icon: IconHome     },
+  { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar },
+  { to: '/tasks',      label: 'Tasks',     Icon: IconCheck    },
+  { to: '/shopping',   label: 'Shopping',  Icon: IconCart     },
 ];
 
+// Routes considered "behind the More button" for active-tab styling.
+// (The bottom-sheet redesign exposes these as feature tiles + an account
+// list, but from a navigation-state perspective they all live under More.)
 const moreNav = [
-  { to: '/family',     label: 'Family Setup',     Icon: IconUsers    },
-  { to: '/documents',  label: 'Documents',        Icon: IconFileText },
-  { to: '/receipt',    label: 'Receipt Scanner',   Icon: IconCamera   },
-  { to: '/settings',   label: 'Settings',          Icon: IconSettings  },
+  { to: '/meals' },
+  { to: '/family' },
+  { to: '/documents' },
+  { to: '/receipt' },
+  { to: '/settings' },
+  { to: '/help' },
+];
+
+// 2×2 feature tiles that head the More sheet. Colours are taken from the
+// Housemait iOS design handoff (warm amber / brand plum / sky blue / dusty
+// rose) — they're tile-only accents, not part of the global token set, so
+// they're inlined rather than promoted to Tailwind utilities.
+const moreTiles = [
+  {
+    to: '/meals',
+    label: 'Meal Plan',
+    sub: 'Weekly dinners & recipes',
+    Icon: IconUtensils,
+    bg: '#FBF1DE',
+    fg: '#D89B3A',
+  },
+  {
+    to: '/receipt',
+    label: 'Receipts',
+    sub: 'Scan & auto-match',
+    Icon: IconCamera,
+    bg: '#EFE9FB',
+    fg: '#6B3FA0',
+  },
+  {
+    to: '/documents',
+    label: 'Documents',
+    sub: 'Household paperwork',
+    Icon: IconFileText,
+    bg: '#E2ECFA',
+    fg: '#5B8DE0',
+  },
+  {
+    to: '/family',
+    label: 'Family',
+    sub: 'Members & settings',
+    Icon: IconUsers,
+    bg: '#FBE6EA',
+    fg: '#D8788A',
+  },
+];
+
+// Account section rows. Notifications, Connected apps and Privacy &
+// data are intentionally omitted — they're all reachable from inside
+// Settings, and surfacing them as separate rows promised destinations
+// we don't yet deep-link cleanly. Help & support links to /help, which
+// hosts the FAQ + contact form (logged-out users have /support).
+const moreAccountRows = [
+  { to: '/settings', label: 'Settings', bold: true },
+  { to: '/help',     label: 'Help & support' },
 ];
 
 const avatarColors = {
@@ -64,24 +122,26 @@ export default function Layout({ children }) {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const [members, setMembers] = useState([]);
-  const moreRef = useRef(null);
 
   // Register for push notifications on iOS
   usePushNotifications(user);
 
-  // Close "More" popover on navigation
+  // Close "More" sheet on navigation
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);
 
-  // Close "More" popover on outside click
+  // Esc-to-close + body-scroll-lock while the More sheet is open. The
+  // sheet itself eats taps via stopPropagation; the backdrop click is
+  // wired in the JSX below.
   useEffect(() => {
     if (!moreOpen) return;
-    function handleClick(e) {
-      if (moreRef.current && !moreRef.current.contains(e.target)) {
-        setMoreOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    function onKey(e) { if (e.key === 'Escape') setMoreOpen(false); }
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [moreOpen]);
 
   // Sync user profile and members on mount and route changes
@@ -205,53 +265,63 @@ export default function Layout({ children }) {
         </div>
       </main>
 
-      {/* ── Mobile Bottom Tab Bar ── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-light-grey flex items-start justify-around pt-2.5 safe-bottom" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+      {/* ── Mobile Bottom Tab Bar ──────────────────────────────────
+          Five tabs from the iOS design handoff: Home · Calendar · Tasks
+          · Shopping · More. The background is a vertical cream gradient
+          (opaque at the bottom, fading to transparent at the top) plus
+          a saturated backdrop-blur — so page content visibly fades
+          *under* the bar instead of slamming into a hard top border.
+          The cream rgba values match Tailwind token `--color-cream`
+          (#FBF8F3 → rgb 251,248,243).
+
+          A `pointer-events-none` spacer over the gradient's top stripe
+          would be overkill: the buttons themselves are the only
+          interactive surfaces and they sit comfortably below the fade. */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-start justify-around pt-2 safe-bottom"
+        style={{
+          background: 'linear-gradient(to top, rgba(251,248,243,0.95) 60%, rgba(251,248,243,0.6) 80%, rgba(251,248,243,0))',
+          backdropFilter: 'blur(14px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+        }}
+      >
         {mobileNav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 ${
+              `flex-1 max-w-[80px] flex flex-col items-center gap-[3px] py-1 ${
                 isActive ? 'text-plum' : 'text-warm-grey'
               }`
             }
           >
-            <Icon className="h-[22px] w-[22px]" />
-            <span className="text-[10px] font-semibold">{label}</span>
+            <Icon className="h-[26px] w-[26px]" />
+            <span className="text-[11px] font-semibold tracking-[0.01em]">{label}</span>
           </NavLink>
         ))}
 
-        {/* More button + popover */}
-        <div ref={moreRef} className="relative flex flex-col items-center gap-1">
-          <button
-            onClick={() => setMoreOpen(v => !v)}
-            className={`flex flex-col items-center gap-1 ${isMoreActive || moreOpen ? 'text-plum' : 'text-warm-grey'}`}
-          >
-            <IconMore className="h-[22px] w-[22px]" />
-            <span className="text-[10px] font-semibold">More</span>
-          </button>
-
-          {moreOpen && (
-            <div className="absolute bottom-full mb-2 right-0 bg-white rounded-2xl shadow-lg border border-light-grey py-2 min-w-[180px] z-50">
-              {moreNav.map(({ to, label, Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-                      isActive ? 'text-plum bg-plum-light' : 'text-charcoal hover:bg-cream'
-                    }`
-                  }
-                >
-                  <Icon className="h-5 w-5" />
-                  {label}
-                </NavLink>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* More tab — opens the redesigned bottom sheet. The sheet itself
+            is rendered outside the <nav> so it can take the full viewport
+            instead of being clipped by the tab bar. The button matches
+            the layout/sizing of the NavLinks above so the row stays
+            visually balanced. */}
+        <button
+          onClick={() => setMoreOpen(v => !v)}
+          aria-expanded={moreOpen}
+          aria-haspopup="dialog"
+          className={`flex-1 max-w-[80px] flex flex-col items-center gap-[3px] py-1 ${isMoreActive || moreOpen ? 'text-plum' : 'text-warm-grey'}`}
+        >
+          <IconMore className="h-[26px] w-[26px]" />
+          <span className="text-[11px] font-semibold tracking-[0.01em]">More</span>
+        </button>
       </nav>
+
+      {/* ── More bottom sheet ──────────────────────────────────────
+          A native-feeling iOS-style sheet: backdrop fades in over 250ms;
+          panel slides up with `cubic-bezier(0.32, 0.72, 0, 1)` over 320ms.
+          Designed mobile-first — it auto-hides on ≥768px where the
+          desktop sidebar already exposes everything in this menu. */}
+      {moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
 
       <Suspense fallback={null}><ChatWidget /></Suspense>
 
@@ -260,6 +330,153 @@ export default function Layout({ children }) {
           never appears on the Subscribe / Login / Signup routes (which
           don't use Layout). */}
       <TrialEndedOverlay />
+    </div>
+  );
+}
+
+/**
+ * MoreSheet — iOS-style bottom sheet exposed from the 5th tab on mobile.
+ *
+ * Anatomy (top → bottom):
+ *   • Drag handle (5×40 pill)
+ *   • Header row: "More" title + circular X close button
+ *   • 2×2 grid of feature tiles (Meal Plan / Receipts / Documents / Family)
+ *   • "Account" caption
+ *   • Grouped list (Settings / Notifications / Connected apps /
+ *     Privacy & data / Help & support)
+ *
+ * Layout in the source tree maps to the Housemait iOS design handoff
+ * (`design_handoff_housemait_ios/README.md` § "More sheet"). Tile accent
+ * colours are inlined because they're tile-only and not reused elsewhere
+ * — promoting them to Tailwind utilities would just add noise.
+ *
+ * Animation: a `mounted` flag flips on the next frame so the slide-up
+ * transition runs from `translateY(100%)` → `translateY(0)`. Reduced
+ * motion is honoured via `motion-reduce:` Tailwind variants on the
+ * panel transition.
+ *
+ * Dismissal: clicking the backdrop, the X button, or pressing Esc
+ * (Esc is wired in Layout) all flip `moreOpen=false` in the parent.
+ * NavLink clicks on rows inherit the same close behaviour because the
+ * parent already closes the sheet on `location.pathname` change.
+ */
+function MoreSheet({ onClose }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="More"
+      className="md:hidden fixed inset-0 z-[60] flex items-end"
+      style={{
+        background: mounted ? 'rgba(45,42,51,0.45)' : 'rgba(45,42,51,0)',
+        transition: 'background 250ms ease',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full bg-cream flex flex-col motion-reduce:transition-none"
+        style={{
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          maxHeight: '88vh',
+          transform: mounted ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
+          paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 24px)',
+          boxShadow: '0 -10px 30px rgba(0,0,0,0.12)',
+        }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-2.5 pb-1">
+          <div className="h-[5px] w-10 rounded-full bg-light-grey" />
+        </div>
+
+        {/* Header row */}
+        <div className="flex items-center justify-between px-5 pt-1 pb-3">
+          <h2
+            className="text-[19px] font-bold text-charcoal m-0"
+          >
+            More
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="w-[30px] h-[30px] rounded-full bg-white border border-light-grey flex items-center justify-center text-warm-grey hover:text-charcoal active:scale-95 transition-transform"
+          >
+            <IconX className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Scrollable body — only flexes when content overflows the
+            88vh cap (rare on a phone, common on a small landscape view). */}
+        <div className="flex-1 overflow-y-auto">
+          {/* 2×2 feature tiles */}
+          <div className="grid grid-cols-2 gap-3 px-5 pt-1 pb-5">
+            {moreTiles.map(({ to, label, sub, Icon, bg, fg }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className="bg-white rounded-2xl border border-light-grey p-4 flex flex-col gap-3.5 items-start text-left active:scale-[0.98] transition-transform"
+                style={{ minHeight: 130 }}
+              >
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: bg, color: fg }}
+                >
+                  <Icon className="h-[22px] w-[22px]" />
+                </div>
+                <div>
+                  <div className="text-[14px] font-bold text-charcoal leading-tight">
+                    {label}
+                  </div>
+                  <div className="text-[11px] text-warm-grey mt-0.5">
+                    {sub}
+                  </div>
+                </div>
+              </NavLink>
+            ))}
+          </div>
+
+          {/* Account section */}
+          <div className="px-5 pb-2">
+            <div className="text-[11px] font-bold tracking-[0.1em] uppercase text-warm-grey px-1 pb-2">
+              Account
+            </div>
+            <div className="bg-white rounded-2xl border border-light-grey overflow-hidden">
+              {moreAccountRows.map((row, i, arr) => {
+                const isLast = i === arr.length - 1;
+                const rowClasses = `flex items-center px-4 py-3.5 ${isLast ? '' : 'border-b border-light-grey'}`;
+                const labelClasses = `flex-1 text-[14px] text-charcoal ${row.bold ? 'font-semibold' : 'font-normal'}`;
+                const Chevron = (
+                  <IconChevronRight className="h-3.5 w-3.5 text-warm-grey/60 ml-2" />
+                );
+
+                if (row.href) {
+                  return (
+                    <a key={row.label} href={row.href} className={rowClasses}>
+                      <span className={labelClasses}>{row.label}</span>
+                      {Chevron}
+                    </a>
+                  );
+                }
+                return (
+                  <NavLink key={row.label} to={row.to} className={rowClasses}>
+                    <span className={labelClasses}>{row.label}</span>
+                    {Chevron}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -98,6 +98,16 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
+
+  /* FAQ accordion uses a custom chevron; suppress the browser default
+     disclosure triangle on <summary> elements globally so we don't have
+     to repeat these resets per-component. */
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
 }
 
 /* ── Landing page scoped styles ── */
