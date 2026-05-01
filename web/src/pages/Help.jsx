@@ -8,28 +8,33 @@
  *
  * Structure:
  *   1. Hero ("How can we help?")
- *   2. FAQ — 4 grouped sections with deep-link-friendly ids
- *      • #getting-started        Getting started + WhatsApp bot
- *      • #calendar-documents     Calendar + documents
- *      • #billing                Subscriptions + billing  ← iOS-hidden
+ *   2. FAQ — 3 grouped sections with deep-link-friendly ids
+ *      • #getting-started          Getting started + WhatsApp bot
+ *      • #calendar-documents       Calendar + documents
  *      • #account-troubleshooting  Account, data + troubleshooting
  *   3. "Still need help?" — embedded ContactForm
  *   4. Footer — direct email, brand links, app version
  *
- * iOS gating: the Subscriptions section is wrapped in {!isIos() && (…)}
- * so the iOS bundle never references billing copy. App Store guideline
- * 3.1.1 — defence in depth even though SubscriptionContext also short-
- * circuits there.
+ * App Store guideline 3.1.1 — there is *no* subscription, billing,
+ * pricing, payment, or Stripe content on this page in any form, on
+ * any platform. Earlier drafts gated a Subscriptions FAQ behind
+ * isIos() at runtime, but the strings + the openStripePortal handler
+ * still lived in the JS bundle that ships with the iOS app via
+ * Capacitor. Removing the section entirely means the iOS bundle
+ * contains zero subscription content reachable from /help — strongest
+ * possible signal to App Review.
  *
- * Copy is intentionally short and links to authoritative sources where
- * possible (Settings, Stripe portal, Privacy page) rather than restating
+ * Web users with billing questions still find them in Settings →
+ * Plan (which has its own iOS gate and the canonical Stripe portal
+ * flow). The /help page deliberately does NOT duplicate that path.
+ *
+ * Copy is intentionally short and links to authoritative sources
+ * where possible (Settings, Privacy page) rather than restating
  * numbers — keeps the page honest as features evolve.
  */
 
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../lib/api';
-import { isIos } from '../lib/platform';
 import FaqAccordion from '../components/FaqAccordion';
 import ContactForm from '../components/ContactForm';
 
@@ -39,18 +44,6 @@ export default function Help() {
     document.title = 'Help & support · Housemait';
     if (!window.location.hash) window.scrollTo(0, 0);
   }, []);
-
-  async function openStripePortal() {
-    try {
-      const { data } = await api.post('/subscription/portal');
-      if (data?.url) window.location.href = data.url;
-    } catch (err) {
-      // Non-fatal — user can also hit Settings → Plan, which has the
-      // same button with proper error UI. Surfacing a toast here would
-      // duplicate that machinery.
-      console.error('Stripe portal open failed', err);
-    }
-  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -227,57 +220,7 @@ export default function Help() {
         </FaqAccordion>
       </FaqSection>
 
-      {/* ── 3. Subscriptions & billing ─ iOS-hidden ────────────── */}
-      {!isIos() && (
-        <FaqSection id="billing" title="Subscriptions & billing">
-          <FaqAccordion
-            id="billing-trial-length"
-            question="How long is the free trial?"
-          >
-            <p>
-              30 days, no card required to start. We'll only ask for
-              payment details if you want to keep using Housemait at the
-              end of the trial.
-            </p>
-          </FaqAccordion>
-
-          <FaqAccordion
-            id="billing-trial-end"
-            question="What happens when the trial ends?"
-          >
-            <p>
-              Your account stays read-only — you can still log in and see
-              everything you've built — but you won't be able to add new
-              items or use the WhatsApp bot until you subscribe. Your
-              data stays exactly where it is.
-            </p>
-          </FaqAccordion>
-
-          <FaqAccordion
-            id="billing-manage"
-            question="How do I update my card or cancel?"
-          >
-            <p>
-              Manage your subscription, payment method, and cancellation
-              through the Stripe customer portal. You can also reach this
-              from{' '}
-              <Link to="/settings" className="text-plum hover:underline">
-                Settings → Plan
-              </Link>
-              .
-            </p>
-            <button
-              type="button"
-              onClick={openStripePortal}
-              className="inline-flex items-center mt-2 px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Manage subscription
-            </button>
-          </FaqAccordion>
-        </FaqSection>
-      )}
-
-      {/* ── 4. Account, data & troubleshooting ─────────────────── */}
+      {/* ── 3. Account, data & troubleshooting ─────────────────── */}
       <FaqSection id="account-troubleshooting" title="Account, data & troubleshooting">
         <FaqAccordion
           id="account-export-delete"
