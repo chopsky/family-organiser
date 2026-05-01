@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -355,17 +355,83 @@ export default function Layout({ children }) {
  * motion is honoured via `motion-reduce:` Tailwind variants on the
  * panel transition.
  *
- * Dismissal: clicking the backdrop, the X button, or pressing Esc
- * (Esc is wired in Layout) all flip `moreOpen=false` in the parent.
- * NavLink clicks on rows inherit the same close behaviour because the
- * parent already closes the sheet on `location.pathname` change.
+ * Dismissal:
+ *   • Tap the X button
+ *   • Tap the backdrop above the sheet
+ *   • Press Esc (wired one level up in Layout)
+ *   • Tap any nav link inside the sheet (parent's pathname effect)
+ *   • Drag the handle / header bar downward past ~100 px or with a
+ *     downward flick — the iOS-native gesture users expect when they
+ *     see a drag handle pill at the top.
+ *
+ * The drag listener is scoped to the handle + header strip so touches
+ * inside the FAQ tile grid (below) remain tappable. `touchAction: 'none'`
+ * on the drag region tells the browser this surface doesn't scroll, so
+ * we can `setDragOffset` without fighting native scroll behaviour.
+ *
+ * dragRef holds gesture state that doesn't need to drive re-renders
+ * (start coords, timestamps). `dragOffset` lives in state because the
+ * panel transform reads it on render.
  */
 function MoreSheet({ onClose }) {
   const [mounted, setMounted] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  // `isDragging` lives in state because the panel's `transition` prop
+  // depends on it (none while dragging, spring-easing otherwise) and
+  // reading mutable values off a ref during render violates React's
+  // ref-stability contract. Drag start/end each cause exactly one
+  // additional render — negligible. Frame-by-frame finger tracking
+  // happens via `dragOffset` (also state) inside onDragMove.
+  const [isDragging, setIsDragging] = useState(false);
+  // Stable per-gesture state we don't want to render on (start coords
+  // and timestamp). Mutated synchronously inside the touch handlers.
+  const dragRef = useRef({ startY: 0, startTime: 0 });
+
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
+
+  function onDragStart(e) {
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    dragRef.current = { startY: touch.clientY, startTime: Date.now() };
+    setIsDragging(true);
+  }
+
+  function onDragMove(e) {
+    if (!isDragging) return;
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    const dy = touch.clientY - dragRef.current.startY;
+    // Downward drags only — clamp upward delta to 0 so the sheet stays
+    // glued to translateY(0) at rest. Some sheet libraries allow a small
+    // overscroll above the resting position; we deliberately don't.
+    setDragOffset(Math.max(0, dy));
+  }
+
+  function onDragEnd() {
+    if (!isDragging) return;
+    const elapsed = Date.now() - dragRef.current.startTime;
+    const distance = dragOffset;
+    // velocity in px/ms — anything > ~0.6 reads as a deliberate flick
+    // even if the absolute distance is small. Tuned by feel against
+    // Apple's bottom-sheet gesture in Maps.
+    const velocity = elapsed > 0 ? distance / elapsed : 0;
+
+    setIsDragging(false);
+
+    if (distance > 100 || velocity > 0.6) {
+      // Dismiss. Don't reset dragOffset — the sheet is about to unmount
+      // anyway, and resetting would cause a brief reverse animation
+      // before the parent's `moreOpen=false` removes us from the tree.
+      onClose();
+    } else {
+      // Snap back. The transition kicks in (isDragging just flipped to
+      // false) so the panel springs back to translateY(0).
+      setDragOffset(0);
+    }
+  }
 
   return (
     <div
@@ -386,19 +452,34 @@ function MoreSheet({ onClose }) {
           borderTopLeftRadius: 28,
           borderTopRightRadius: 28,
           maxHeight: '88vh',
-          transform: mounted ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
+          transform: mounted
+            ? `translateY(${dragOffset}px)`
+            : 'translateY(100%)',
+          transition: isDragging
+            ? 'none'
+            : 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
           paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 24px)',
           boxShadow: '0 -10px 30px rgba(0,0,0,0.12)',
         }}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-2.5 pb-1">
-          <div className="h-[5px] w-10 rounded-full bg-light-grey" />
-        </div>
+        {/* Drag handle + header — touch listeners scoped here so touches
+            inside the FAQ tile grid below stay tappable. touchAction:none
+            tells the browser not to interpret this region as scrollable
+            content, which would otherwise fight our setDragOffset. */}
+        <div
+          onTouchStart={onDragStart}
+          onTouchMove={onDragMove}
+          onTouchEnd={onDragEnd}
+          onTouchCancel={onDragEnd}
+          style={{ touchAction: 'none' }}
+        >
+          {/* Drag handle pill */}
+          <div className="flex justify-center pt-2.5 pb-1">
+            <div className="h-[5px] w-10 rounded-full bg-light-grey" />
+          </div>
 
-        {/* Header row */}
-        <div className="flex items-center justify-between px-5 pt-1 pb-3">
+          {/* Header row */}
+          <div className="flex items-center justify-between px-5 pt-1 pb-3">
           <h2
             className="text-[19px] font-bold text-charcoal m-0"
           >
@@ -412,6 +493,7 @@ function MoreSheet({ onClose }) {
           >
             <IconX className="h-4 w-4" />
           </button>
+          </div>
         </div>
 
         {/* Scrollable body — only flexes when content overflows the
