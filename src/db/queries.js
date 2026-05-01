@@ -1282,6 +1282,46 @@ async function deleteShoppingItem(itemId, householdId, db = supabase) {
   if (error) throw error;
 }
 
+/**
+ * Delete *prior* completed shopping items with the same name in the same
+ * (household, list), keeping the row identified by `keepItemId`.
+ *
+ * Called from the PATCH /shopping/:id route when an item is freshly
+ * checked off. The intent: "Previously purchased" should show one entry
+ * per item, dated to the most recent purchase — not three rows of "milk".
+ *
+ * Match semantics:
+ *   • Same household + same list (Tesco list and Sainsbury's list are
+ *     deliberately separate scopes).
+ *   • `completed = true` only — never touches open/active items.
+ *   • Case-insensitive exact-string match on `item`. Postgres ILIKE
+ *     without wildcards is a literal case-folded equality. Whitespace
+ *     differences in stored values aren't normalised — addItem already
+ *     trims on insert (src/routes/shopping.js), so this matters only
+ *     for legacy rows. The follow-up backfill migration handles those.
+ *
+ * Returns the count of rows deleted. Errors are surfaced to the caller
+ * (the route logs and continues — purge failure shouldn't block the
+ * primary check-off flow).
+ */
+async function purgePriorPurchases(keepItemId, listId, householdId, itemName, db = supabase) {
+  const trimmed = (itemName || '').trim();
+  if (!trimmed || !listId || !householdId || !keepItemId) return 0;
+
+  const { data, error } = await db
+    .from('shopping_items')
+    .delete()
+    .eq('household_id', householdId)
+    .eq('list_id', listId)
+    .eq('completed', true)
+    .neq('id', keepItemId)
+    .ilike('item', trimmed)
+    .select('id');
+
+  if (error) throw error;
+  return data?.length || 0;
+}
+
 // ─── Fuzzy find + generic update helpers (used by WhatsApp edit/delete intents) ──
 
 /**
@@ -3865,6 +3905,7 @@ module.exports = {
   uncompleteTask,
   uncompleteShoppingItem,
   deleteShoppingItem,
+  purgePriorPurchases,
   deleteTask,
   findTasksByFuzzyTitle,
   findShoppingItemsByFuzzyName,

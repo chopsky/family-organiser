@@ -19,8 +19,23 @@ export const AISLE_CONFIG = {
   'Other':                { bg: '#FBF8F3', stroke: '#6B6774', emoji: '📦', pillBg: '#FBF8F3', pillText: '#6B6774' },
 };
 
-// Item name to emoji lookup — more specific patterns first, then generic
+// Item name to emoji lookup — first regex that matches wins. Items
+// further down are matched only if everything above failed, so this
+// list is ordered specific → general.
+//
+// HIGH-SPECIFICITY OVERRIDES BLOCK
+// Multi-word compounds whose constituent words also have patterns
+// further down (e.g. "peanut butter" contains "butter"). They MUST be
+// listed first or they'd be intercepted by the generic match. If you
+// add a new mapping somewhere mid-file and notice it never wins, the
+// answer is almost always "a shorter pattern earlier in the array
+// catches a substring of your input" — surface the new mapping here.
 const ITEM_EMOJI_MAP = [
+  [/peanut butter|nutella/i, '🥜'],
+  [/peanut/i, '🥜'],
+  [/butternut squash/i, '🥬'],
+  [/baked beans/i, '🥫'],
+  [/olive oil/i, '🫒'],
   // Fruits
   [/apple/i, '🍎'], [/banana/i, '🍌'], [/mango/i, '🥭'], [/orange/i, '🍊'],
   [/lemon/i, '🍋'], [/lime/i, '🍋'], [/grape/i, '🍇'], [/pear/i, '🍐'],
@@ -39,14 +54,21 @@ const ITEM_EMOJI_MAP = [
   [/aubergine|eggplant/i, '🍆'], [/chilli|chili/i, '🌶️'],
   [/pepper|capsicum/i, '🌶️'], [/lettuce|salad leaves/i, '🥬'],
   [/spinach|kale/i, '🥬'], [/cabbage/i, '🥬'], [/celery/i, '🥬'],
-  [/asparagus/i, '🥬'], [/pea/i, '🫛'], [/bean|lentil/i, '🫘'],
+  // /\bpeas?\b/ deliberately avoids matching substrings like "peanut",
+  // "peach", "pear" — those have their own (or are caught by earlier)
+  // patterns. Without the \b, "smooth peanut butter" gets the pea-pod
+  // emoji because /pea/ hits before the /peanut butter/ pattern below.
+  [/asparagus/i, '🥬'], [/\bpeas?\b/i, '🫛'], [/bean|lentil/i, '🫘'],
   [/ginger/i, '🫚'], [/beetroot|beet/i, '🥬'],
   [/turnip|swede|parsnip/i, '🥕'], [/leek|spring onion/i, '🧅'],
   [/coriander|parsley|basil|mint|herb|dill|rosemary|thyme/i, '🌿'],
   [/cauliflower/i, '🥦'],
   // Meat and Seafood
   [/chicken/i, '🍗'], [/beef|mince/i, '🥩'], [/steak/i, '🥩'],
-  [/sausage/i, '🌭'], [/bacon/i, '🥓'], [/ham/i, '🥓'],
+  // /\bham\b/ stops "ham" matching "s-ham-poo" (which previously gave
+  // shampoo a bacon emoji). Real ham still resolves to 🥓 here before
+  // the Personal Care section runs.
+  [/sausage/i, '🌭'], [/bacon/i, '🥓'], [/\bham\b/i, '🥓'],
   [/pork/i, '🥩'], [/lamb/i, '🥩'], [/turkey/i, '🦃'], [/duck/i, '🦆'],
   [/salmon/i, '🐟'], [/tuna/i, '🐟'], [/cod/i, '🐟'],
   [/prawn|shrimp/i, '🦐'], [/crab/i, '🦀'], [/lobster/i, '🦞'],
@@ -66,14 +88,28 @@ const ITEM_EMOJI_MAP = [
   // Pantry and Grains
   [/rice/i, '🍚'], [/pasta|spaghetti|penne|fusilli|macaroni|lasagne|noodle/i, '🍝'],
   [/cereal|oat|granola|muesli/i, '🥣'], [/honey/i, '🍯'],
-  [/flour/i, '🌾'], [/sugar/i, '🌾'], [/oil|olive oil/i, '🫒'],
+  // /\boils?\b/ keeps "oil" / "olive oil" / "vegetable oil" mapping to
+  // an olive while refusing to match "t-oil-et" — without the \b
+  // boundary, "toilet paper" picked up the olive emoji before reaching
+  // the /toilet paper/ pattern in the Household section.
+  [/flour/i, '🌾'], [/sugar/i, '🌾'], [/\boils?\b/i, '🫒'],
   [/sauce|ketchup|mustard|mayo/i, '🫙'], [/vinegar/i, '🫙'],
-  [/jam|marmalade/i, '🫙'], [/peanut butter|nutella/i, '🥜'],
-  [/nut|almond|walnut|cashew|pistachio/i, '🥜'],
+  [/jam|marmalade/i, '🫙'],
+  // /\bnuts?\b/ avoids matching substrings — "doughnut", "coconut" all
+  // contain "nut" but should hit their own patterns instead. The
+  // named-nut alternatives stay greedy because "almond milk" etc.
+  // should still match. Peanut and peanut butter are handled in the
+  // top-of-file override block.
+  [/\bnuts?\b|almond|walnut|cashew|pistachio/i, '🥜'],
   [/chocolate/i, '🍫'], [/candy|sweet/i, '🍬'],
   [/crisp|chip/i, '🍟'], [/popcorn/i, '🍿'],
   [/salt|seasoning|spice|cumin|paprika|cinnamon|turmeric/i, '🧂'],
-  [/stock|bouillon|broth/i, '🫙'], [/tin|can|baked beans/i, '🥫'],
+  // /\btins?\b|\bcans?\b/ keeps "tin", "tins", "can", "cans" matching
+  // (and "tin foil", "tin opener", "baked beans") while refusing
+  // "candle" / "canister" / "tinsel". Word boundaries are crucial here
+  // because both "tin" and "can" are common substrings of unrelated
+  // shopping-adjacent words.
+  [/stock|bouillon|broth/i, '🫙'], [/\btins?\b|\bcans?\b|baked beans/i, '🥫'],
   [/bolognese/i, '🍝'], [/soy sauce/i, '🫙'],
   // Frozen
   [/frozen/i, '🧊'], [/pizza/i, '🍕'], [/nugget/i, '🍗'],

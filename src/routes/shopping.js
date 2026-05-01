@@ -178,8 +178,31 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       throw error;
     }
 
-    // WhatsApp broadcast on fresh check-off only.
+    // Fresh check-off side-effects: dedupe prior purchases of the same
+    // item, then broadcast to other household members on WhatsApp.
+    // We only run these on a real state transition (open → completed) —
+    // not on idempotent PATCHes or on un-checks.
     if (completed === true && wasCompleted === false) {
+      // Dedupe: clear older completed rows for the same item in this
+      // list. The user expects "Previously purchased" to show one row
+      // per item, dated to the most recent buy. Without this, every
+      // re-purchase of "milk" stacks another row on top.
+      try {
+        const purged = await db.purgePriorPurchases(
+          data.id,
+          data.list_id,
+          req.householdId,
+          data.item,
+        );
+        if (purged > 0) {
+          console.log(`[shopping] purged ${purged} prior "${data.item}" purchase${purged === 1 ? '' : 's'} for list ${data.list_id}`);
+        }
+      } catch (err) {
+        // Non-fatal — the user's check-off itself succeeded; only the
+        // history dedupe failed. Log and carry on.
+        console.error('[shopping] purgePriorPurchases failed:', err.message);
+      }
+
       try {
         const members = await db.getHouseholdMembers(req.householdId);
         broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} checked off: ${data.item}`);
