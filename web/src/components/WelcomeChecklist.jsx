@@ -37,7 +37,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const DISMISSED_KEY = 'housemait-welcome-dismissed';
+// Per-user dismissal key — each user gets their own slot. Without the
+// user.id suffix, dismissing the card on one account would suppress it
+// for every subsequent fresh signup in the same browser (e.g. test
+// accounts during dev), which we accidentally shipped first time round.
+const DISMISSED_KEY_PREFIX = 'housemait-welcome-dismissed:';
 const ACTIVATION_WINDOW_DAYS = 7;
 
 function safeLocalGet(key) {
@@ -49,7 +53,14 @@ function safeLocalSet(key, val) {
 
 export default function WelcomeChecklist({ hasContent, memberCount }) {
   const { user } = useAuth();
-  const [dismissed, setDismissed] = useState(() => safeLocalGet(DISMISSED_KEY) === 'true');
+  // Compute the dismissal key once we know which user is logged in. If
+  // user.id isn't available yet (rare race during AuthContext hydration),
+  // we fall back to a placeholder key — the card simply won't render
+  // (the withinWindow check below also fails without user.created_at).
+  const dismissedKey = user?.id
+    ? `${DISMISSED_KEY_PREFIX}${user.id}`
+    : `${DISMISSED_KEY_PREFIX}__pending__`;
+  const [dismissed, setDismissed] = useState(() => safeLocalGet(dismissedKey) === 'true');
 
   // Within-window guard: only render for accounts created in the last
   // ACTIVATION_WINDOW_DAYS days. created_at is exposed by authResponse()
@@ -96,14 +107,22 @@ export default function WelcomeChecklist({ hasContent, memberCount }) {
       // Persist dismissal once the user reaches all-done so we don't
       // re-show the card if a state flips back briefly (e.g. an item
       // gets deleted — unlikely, but defensive).
-      safeLocalSet(DISMISSED_KEY, 'true');
+      safeLocalSet(dismissedKey, 'true');
     }
-  }, [allDone]);
+  }, [allDone, dismissedKey]);
+
+  // Re-read the dismissed flag if the dismissal key changes (e.g. user
+  // logs out + back in as a different account in the same browser).
+  // Without this, the State for `dismissed` would stick at whatever
+  // it was on first mount.
+  useEffect(() => {
+    setDismissed(safeLocalGet(dismissedKey) === 'true');
+  }, [dismissedKey]);
 
   if (dismissed || allDone || !withinWindow) return null;
 
   function handleDismiss() {
-    safeLocalSet(DISMISSED_KEY, 'true');
+    safeLocalSet(dismissedKey, 'true');
     setDismissed(true);
   }
 
