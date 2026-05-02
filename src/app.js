@@ -53,13 +53,36 @@ if (process.env.NODE_ENV !== 'test') {
   });
   app.use('/api', limiter);
 
-  // Stricter limiter for auth endpoint (prevent brute-force on join codes)
-  const authLimiter = rateLimit({
+  // Stricter limiter for SENSITIVE auth endpoints — register, login, the
+  // password-reset trio, and resend-verification. These are the real
+  // brute-force / credential-stuffing surfaces, and Turnstile already
+  // gates most of them; this is a backstop for distributed attempts that
+  // somehow get past the bot challenge.
+  //
+  // We deliberately do NOT cover /api/auth as a whole. Silent endpoints
+  // (refresh, me, sessions, logout, mark-onboarded) get called passively
+  // — every tab-focus fires /refresh, every page load fires /me — so a
+  // single user across a long browsing session can rack up dozens of
+  // /api/auth calls without ever doing anything attack-worthy. Mixing
+  // those in with the strict budget caused legitimate users to see
+  // "Too many join attempts" mid-session. The global 300/min limiter
+  // above still covers them as a sanity backstop.
+  //
+  // 50/hour/IP — generous enough that families on shared WiFi don't
+  // collide, password-managers retrying don't trip, dev/QA testing has
+  // headroom; tight enough that no realistic brute-force fits.
+  const sensitiveAuthLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20,
-    message: { error: 'Too many join attempts. Please try again in an hour.' },
+    max: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many authentication attempts. Please try again in an hour.' },
   });
-  app.use('/api/auth', authLimiter);
+  app.use('/api/auth/register', sensitiveAuthLimiter);
+  app.use('/api/auth/login', sensitiveAuthLimiter);
+  app.use('/api/auth/forgot-password', sensitiveAuthLimiter);
+  app.use('/api/auth/reset-password', sensitiveAuthLimiter);
+  app.use('/api/auth/resend-verification', sensitiveAuthLimiter);
 
   // Stricter limiter for the public contact form (anti-spam)
   const contactLimiter = rateLimit({
