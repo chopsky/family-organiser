@@ -6,7 +6,6 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
-import WelcomeChecklist from '../components/WelcomeChecklist';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -333,15 +332,6 @@ export default function Dashboard() {
           and has ≤10 days remaining. Silently no-ops otherwise (active,
           expired, internal testers, or the first 20 days of the trial). */}
       <TrialIndicatorCard />
-
-      {/* Welcome activation checklist — only renders during the user's
-          first 7 days. Shows three quick-start tasks (connect WhatsApp,
-          add an event, invite family) that auto-tick as the user does
-          them. Self-hides on completion or explicit dismissal. */}
-      <WelcomeChecklist
-        hasContent={(todayEvents?.length || 0) + (outstanding?.length || 0) > 0}
-        memberCount={members?.length || 1}
-      />
 
       {/* AI chat input — replaced with a subscribe prompt for expired
           households so typing into a broken input doesn't turn into a
