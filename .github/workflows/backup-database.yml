@@ -1,0 +1,67 @@
+name: backup-database
+
+# Off-site Postgres backup → Cloudflare R2.
+#
+# Runs daily at 03:00 UTC (~04:00 BST in summer, 03:00 in winter — both
+# well outside any meaningful Housemait usage window). Failed runs send
+# the standard GitHub Actions failure notification email to repo admins.
+#
+# Setup steps + secret list documented in docs/disaster-recovery.md.
+# Implementation in scripts/backup/dump-and-upload.sh.
+#
+# Security note: this workflow is invoked only by `schedule` (trusted)
+# and `workflow_dispatch` (admin-only). No untrusted PR/issue/comment
+# input ever reaches a `run:` step — every secret enters via env vars,
+# never inline-interpolated into shell commands.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: backup-database
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install pg_dump 16
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release; echo "$VERSION_CODENAME")-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          pg_dump --version
+
+      - name: Verify tooling
+        run: |
+          gpg --version | head -1
+          gzip --version | head -1
+          aws --version
+
+      - name: Run backup
+        env:
+          BACKUP_DB_URL:         ${{ secrets.BACKUP_DB_URL }}
+          BACKUP_GPG_PUBLIC_KEY: ${{ secrets.BACKUP_GPG_PUBLIC_KEY }}
+          BACKUP_GPG_RECIPIENT:  ${{ secrets.BACKUP_GPG_RECIPIENT }}
+          R2_ACCOUNT_ID:         ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID:      ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY:  ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME:        ${{ secrets.R2_BACKUP_BUCKET_NAME }}
+        run: |
+          chmod +x scripts/backup/dump-and-upload.sh
+          ./scripts/backup/dump-and-upload.sh
