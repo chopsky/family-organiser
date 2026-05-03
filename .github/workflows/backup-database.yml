@@ -34,7 +34,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install pg_dump 16
+      # MAINTENANCE TOUCH-POINT: keep postgresql-client-NN in sync with the
+      # major version Supabase is running. pg_dump can dump a server at the
+      # same major version or older, but NOT a newer one — first run failed
+      # with "server version mismatch" because pg_dump 16 saw a PG 17.6
+      # server. When Supabase upgrades to PG 18+ in future, bump this line.
+      - name: Install pg_dump 17
         run: |
           set -euo pipefail
           sudo install -d /usr/share/postgresql-common/pgdg
@@ -44,7 +49,7 @@ jobs:
             https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release; echo "$VERSION_CODENAME")-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
           pg_dump --version
 
       - name: Verify tooling
