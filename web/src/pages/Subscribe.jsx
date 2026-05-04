@@ -33,17 +33,17 @@ import { isIos } from '../lib/platform';
 const PLANS = {
   monthly: {
     label: 'Monthly',
-    priceDisplay: '£4.99',
+    priceDisplay: '£5.99',
     periodDisplay: 'per month',
     tagline: 'Pay as you go, cancel anytime.',
   },
   annual: {
     label: 'Annual',
-    priceDisplay: '£49.90',
+    priceDisplay: '£59.90',
     periodDisplay: 'per year',
-    tagline: "That's just £4.16 a month.",
+    tagline: "That's just £4.99 a month.",
     badge: 'Best value',
-    savings: 'Save £9.98 · 2 months free',
+    savings: 'Save £11.98 · 2 months free',
   },
 };
 

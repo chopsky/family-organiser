@@ -133,11 +133,11 @@ function PlanSection() {
               <strong className="text-emerald font-semibold">Active</strong>
               {/* On iOS, show only the entitlement status — no plan name,
                   no price, no Stripe portal link. App Review rejected the
-                  "Annual plan (£49.90/year)" string + "housemait.com"
+                  "Annual plan (£59.90/year)" string + "housemait.com"
                   steering as Guideline 3.1.1 violations. */}
               {!isIos() && plan && (
                 <span className="text-charcoal">
-                  {' '}· {plan === 'annual' ? 'Annual plan (£49.90/year)' : 'Monthly plan (£4.99/month)'}
+                  {' '}· {plan === 'annual' ? 'Annual plan (£59.90/year)' : 'Monthly plan (£5.99/month)'}
                 </span>
               )}
             </p>

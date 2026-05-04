@@ -27,7 +27,7 @@ const FAQS = [
   },
   {
     q: 'How much does Housemait cost after the trial?',
-    a: 'Housemait is £4.99/month or £49.90/year (which works out to about £4.16/month — roughly 2 months free). Both plans include everything — there are no feature gates. You can switch between plans or cancel anytime.',
+    a: 'Housemait is £5.99/month or £59.90/year (which works out to about £4.99/month — roughly 2 months free). Both plans include everything — there are no feature gates. You can switch between plans or cancel anytime.',
   },
   {
     q: 'How does the WhatsApp bot work?',
@@ -52,8 +52,8 @@ const FAQS = [
 ]
 
 const PRICING = {
-  monthly: { amount: '£4.99', per: '/month', billed: 'Billed monthly after your 30-day trial' },
-  annual: { amount: '£49.90', per: '/year', billed: 'Billed annually — 2 months free' },
+  monthly: { amount: '£5.99', per: '/month', billed: 'Billed monthly after your 30-day trial' },
+  annual: { amount: '£59.90', per: '/year', billed: 'Billed annually — 2 months free' },
 }
 
 const PLAN_FEATURES = [
