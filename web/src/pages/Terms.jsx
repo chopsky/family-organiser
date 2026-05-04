@@ -166,7 +166,7 @@ export default function Terms() {
             </p>
             <ul className="list-disc pl-6 space-y-1.5">
               <li><strong>Monthly</strong> — £5.99 / month, billed monthly.</li>
-              <li><strong>Annual</strong> — £59.90 / year, billed annually (works out at roughly £4.99 / month — about 2 months free vs. monthly billing).</li>
+              <li><strong>Annual</strong> — £59.99 / year, billed annually (works out at roughly £5 / month — about 2 months free vs. monthly billing).</li>
             </ul>
             <p>
               Both plans include the same features — there are no feature gates between tiers. You

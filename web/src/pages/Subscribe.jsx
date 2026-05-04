@@ -39,11 +39,11 @@ const PLANS = {
   },
   annual: {
     label: 'Annual',
-    priceDisplay: '£59.90',
+    priceDisplay: '£59.99',
     periodDisplay: 'per year',
-    tagline: "That's just £4.99 a month.",
+    tagline: "That's just £5 a month.",
     badge: 'Best value',
-    savings: 'Save £11.98 · 2 months free',
+    savings: 'Save £11.89 · 2 months free',
   },
 };
 
