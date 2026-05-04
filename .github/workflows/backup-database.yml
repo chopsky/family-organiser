@@ -50,7 +50,14 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends postgresql-client-17
-          pg_dump --version
+          # postgresql-common's pg_dump wrapper picks the LOWEST installed
+          # major version by default (Debian convention — the assumption
+          # being "lowest = compatible with the widest range of servers").
+          # Ubuntu 24.04's default postgresql-client-16 is preinstalled on
+          # the runner, so without this PATH prepend, `pg_dump` resolves
+          # to v16.13 and the dump fails against Supabase's PG 17.6 server.
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Verify tooling
         run: |
