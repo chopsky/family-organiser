@@ -134,7 +134,7 @@ The full specification is in `claude-code-instructions.md`. Save that file in yo
 > Please do the following:
 >
 > 1. Build a subscribe page (e.g. `web/src/pages/Subscribe.jsx`) that:
->    - Shows two pricing cards: Monthly (£4.99/month) and Annual (£49/year)
+>    - Shows two pricing cards: Monthly (£5.99/month) and Annual (£59.99/year)
 >    - Highlights Annual as "Best value" with the savings clearly shown ("Save £10.88" or "2 months free")
 >    - Pre-selects the Annual option
 >    - Each "Subscribe" button calls `POST /api/subscription/checkout` with the selected plan and redirects to the returned Stripe URL

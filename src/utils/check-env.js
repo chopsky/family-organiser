@@ -22,8 +22,8 @@ const RECOMMENDED = [
   // will surface their own errors if called while unset.
   { key: 'STRIPE_SECRET_KEY', hint: 'Stripe API secret (test or live) — needed for checkout + portal' },
   { key: 'STRIPE_WEBHOOK_SECRET', hint: 'Stripe webhook signing secret — needed to verify /api/webhooks/stripe' },
-  { key: 'STRIPE_PRICE_MONTHLY', hint: 'Stripe Price ID for the £4.99/month plan' },
-  { key: 'STRIPE_PRICE_ANNUAL', hint: 'Stripe Price ID for the £49/year plan' },
+  { key: 'STRIPE_PRICE_MONTHLY', hint: 'Stripe Price ID for the £5.99/month plan' },
+  { key: 'STRIPE_PRICE_ANNUAL', hint: 'Stripe Price ID for the £59.99/year plan' },
 ];
 
 const OPTIONAL = [

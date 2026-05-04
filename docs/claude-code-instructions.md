@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement a 30-day free trial system for Housemait. Every new user gets full access to all features for 30 days from signup. No credit card is required at signup. After 30 days, the user is prompted to subscribe (£4.99/month or £49/year) to continue using the app.
+Implement a 30-day free trial system for Housemait. Every new user gets full access to all features for 30 days from signup. No credit card is required at signup. After 30 days, the user is prompted to subscribe (£5.99/month or £59.99/year) to continue using the app.
 
 There is no "Pro" tier or separate plan name — users simply have either an active trial, an active subscription, or an expired/inactive state.
 
@@ -100,7 +100,7 @@ Install Stripe: `npm install stripe`
 Use Stripe in test mode during development. You'll need:
 - STRIPE_SECRET_KEY (env var)
 - STRIPE_WEBHOOK_SECRET (env var)
-- Two Price IDs — one for monthly (£4.99) and one for annual (£49/year)
+- Two Price IDs — one for monthly (£5.99) and one for annual (£59.99/year)
 
 Create these products/prices in the Stripe dashboard or via the API.
 
@@ -190,8 +190,8 @@ Display a subtle, non-intrusive indicator in the app:
 ### Subscribe page / modal
 
 Show two pricing cards:
-- Monthly: £4.99/month
-- Annual: £49/year (save £10.88 — or "2 months free")
+- Monthly: £5.99/month
+- Annual: £59.99/year (save £11.89 — or "2 months free")
 
 Highlight annual as "Most popular" or "Best value". Each card has a "Subscribe" button that calls POST /api/subscription/checkout with the selected plan, then redirects to the Stripe Checkout URL.
 
@@ -271,8 +271,8 @@ Example: `trial_ends_at` stored as `2026-05-21T00:00:00Z` should display as "21 
   - STRIPE_SECRET_KEY
   - STRIPE_PUBLISHABLE_KEY
   - STRIPE_WEBHOOK_SECRET
-  - STRIPE_PRICE_MONTHLY (Price ID for £4.99/month)
-  - STRIPE_PRICE_ANNUAL (Price ID for £49/year)
+  - STRIPE_PRICE_MONTHLY (Price ID for £5.99/month)
+  - STRIPE_PRICE_ANNUAL (Price ID for £59.99/year)
   - SENDGRID_API_KEY
   - UNSUBSCRIBE_TOKEN_SECRET (for signing one-click unsubscribe links)
 
@@ -326,7 +326,7 @@ The backend 402 middleware already blocks API writes, so even if someone bypasse
 
 Create a reusable component (e.g., `<SubscribePrompt />`) that can be dropped into any interactive element. When triggered, it shows a small inline message or mini-modal:
 - "Subscribe to unlock this feature"
-- "Monthly: £4.99/mo · Annual: £49/year (save £10.88)"
+- "Monthly: £5.99/mo · Annual: £59.99/year (save £11.89)"
 - CTA button → Stripe checkout
 
 This keeps the subscribe option ever-present without being aggressive.

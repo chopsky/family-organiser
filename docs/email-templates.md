@@ -236,7 +236,7 @@ it looks like you've been busy:
   • {{tasks_completed}} tasks completed
 
 Your trial ends on {{trial_end_date}}. To keep going, subscribe at
-{{subscribe_url}} — £4.99/month or £49.90/year (saves £10).
+{{subscribe_url}} — £5.99/month or £59.99/year (saves £11.89).
 
 Not feeling it yet? No worries. Just let it expire — we'll keep your
 data for 30 days in case you change your mind.
@@ -340,7 +340,7 @@ Stop these check-ins: {{unsubscribe_url}}
                       <tr>
                         <td style="padding:14px 16px;">
                           <p style="margin:0;font-size:13px;color:#6B6774;">Monthly</p>
-                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£4.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /mo</span></p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£5.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /mo</span></p>
                         </td>
                       </tr>
                     </table>
@@ -350,7 +350,7 @@ Stop these check-ins: {{unsubscribe_url}}
                       <tr>
                         <td style="padding:14px 16px;">
                           <p style="margin:0;font-size:13px;color:#6B3FA0;font-weight:600;">Annual · Best value</p>
-                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£49.90<span style="font-size:13px;color:#6B6774;font-weight:400;"> /yr</span></p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£59.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /yr</span></p>
                         </td>
                       </tr>
                     </table>
@@ -420,8 +420,8 @@ just {{days_remaining}} days from now.
 
 Subscribe to keep using the app uninterrupted: {{subscribe_url}}
 
-  • £4.99 / month
-  • £49.90 / year (saves you £10)
+  • £5.99 / month
+  • £59.99 / year (saves you £11.89)
 
 If you decide not to subscribe, your account will be paused and your
 data preserved for 30 days. You can come back any time and pick up
@@ -477,7 +477,7 @@ Stop these reminders: {{unsubscribe_url}}
                       <tr>
                         <td style="padding:14px 16px;">
                           <p style="margin:0;font-size:13px;color:#6B6774;">Monthly</p>
-                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£4.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /mo</span></p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£5.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /mo</span></p>
                         </td>
                       </tr>
                     </table>
@@ -487,7 +487,7 @@ Stop these reminders: {{unsubscribe_url}}
                       <tr>
                         <td style="padding:14px 16px;">
                           <p style="margin:0;font-size:13px;color:#6B3FA0;font-weight:600;">Annual · Saves £10</p>
-                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£49.90<span style="font-size:13px;color:#6B6774;font-weight:400;"> /yr</span></p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£59.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /yr</span></p>
                         </td>
                       </tr>
                     </table>
@@ -555,8 +555,8 @@ Last reminder — your trial ends on {{trial_end_date}}.
 
 Subscribe now to avoid interruption: {{subscribe_url}}
 
-  • £4.99 / month
-  • £49.90 / year (saves £10 vs monthly)
+  • £5.99 / month
+  • £59.99 / year (saves £11.89 vs monthly)
 
 One subscription covers your whole household — every family member
 gets full access.
@@ -620,7 +620,7 @@ Stop these reminders: {{unsubscribe_url}}
                       <tr>
                         <td style="padding:14px 16px;">
                           <p style="margin:0;font-size:13px;color:#6B6774;">Monthly</p>
-                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£4.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /mo</span></p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£5.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /mo</span></p>
                         </td>
                       </tr>
                     </table>
@@ -630,7 +630,7 @@ Stop these reminders: {{unsubscribe_url}}
                       <tr>
                         <td style="padding:14px 16px;">
                           <p style="margin:0;font-size:13px;color:#6B3FA0;font-weight:600;">Annual · Saves £10</p>
-                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£49.90<span style="font-size:13px;color:#6B6774;font-weight:400;"> /yr</span></p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:600;color:#2D2A33;">£59.99<span style="font-size:13px;color:#6B6774;font-weight:400;"> /yr</span></p>
                         </td>
                       </tr>
                     </table>

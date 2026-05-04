@@ -135,13 +135,12 @@ function DashboardAiInput() {
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
           </button>
-          <button
-            type="button"
-            className="p-2 text-warm-grey hover:text-primary rounded-lg hover:bg-plum-light/50 transition-colors"
-            title="Voice input (coming soon)"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
-          </button>
+          {/* Mic button removed — was a non-functional "Voice input (coming
+              soon)" placeholder that App Review flagged as a broken UI
+              control under Guideline 2.1(a). Voice input today happens
+              via the WhatsApp bot's voice-note transcription path; once
+              we ship in-app speech-to-text, restore the button alongside
+              an actual onClick + Web Speech API integration. */}
           <button
             type="submit"
             className="p-2 text-white bg-plum hover:bg-plum/90 rounded-xl transition-colors"
