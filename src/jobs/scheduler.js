@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const ical = require('node-ical');
 const db = require('../db/queries');
+const externalFeed = require('../services/externalFeed');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
@@ -278,6 +279,74 @@ async function runTaskNotificationCheck() {
 }
 
 /**
+ * Refresh every user-subscribed external iCal feed (the per-household
+ * "Subscribed calendars" — Apple/Google/Outlook/sports calendars users
+ * paste into Calendar settings).
+ *
+ * Distinct from syncAllIcalFeeds() below, which is the SCHOOL-only iCal
+ * sync. This one covers the user-managed external_calendar_feeds table.
+ *
+ * The feature shipped without a scheduled refresher — feeds got their
+ * last_synced_at stamp from the manual subscribe-time fetch and then
+ * went stale forever, until a user noticed and complained. This is the
+ * fix.
+ *
+ * Each feed's individual error handling lives in
+ * externalFeed.refreshFeed (records the failure to the row). All we do
+ * here is iterate, swallow per-feed errors so one bad feed doesn't
+ * abort the rest of the batch, and log a summary line for ops.
+ */
+async function refreshAllExternalFeeds() {
+  console.log('[scheduler] Starting external feed refresh');
+  let succeeded = 0;
+  let failed = 0;
+  let totalCreated = 0;
+  let totalUpdated = 0;
+  let totalDeleted = 0;
+
+  try {
+    const feeds = await db.getAllActiveExternalFeeds();
+    if (feeds.length === 0) {
+      console.log('[scheduler] No external feeds to refresh');
+      return;
+    }
+    console.log(`[scheduler] Refreshing ${feeds.length} external feed(s)`);
+
+    for (const feed of feeds) {
+      try {
+        const stats = await externalFeed.refreshFeed(feed);
+        succeeded += 1;
+        totalCreated += stats.created || 0;
+        totalUpdated += stats.updated || 0;
+        totalDeleted += stats.deleted || 0;
+        console.log(
+          `[scheduler] Feed ${feed.id} (${feed.display_name}): ` +
+            `${stats.created} new, ${stats.updated} updated, ${stats.deleted} deleted`,
+        );
+      } catch (err) {
+        // refreshFeed itself called recordExternalFeedFailure before
+        // re-throwing — the row's consecutive_failures + last_error
+        // are already updated. Just log here and continue with the
+        // next feed; one bad URL must not stop the rest.
+        failed += 1;
+        console.error(
+          `[scheduler] Feed ${feed.id} (${feed.display_name}) failed:`,
+          err.message,
+        );
+      }
+    }
+
+    console.log(
+      `[scheduler] External feed refresh complete: ` +
+        `${succeeded}/${feeds.length} succeeded, ${failed} failed, ` +
+        `${totalCreated} new / ${totalUpdated} updated / ${totalDeleted} deleted`,
+    );
+  } catch (err) {
+    console.error('[scheduler] External feed refresh batch error:', err);
+  }
+}
+
+/**
  * Daily iCal sync — re-fetch and replace all ical_import dates for every
  * school that has an ical_url configured.
  */
@@ -447,6 +516,17 @@ function startScheduler() {
   cron.schedule('0 6 * * *', () => syncAllIcalFeeds());
   console.log('✓ Daily iCal sync scheduled (06:00 UTC)');
 
+  // ── External feed refresh: every 6 hours at :15 ─────────────────────────────
+  // Refreshes user-subscribed iCal feeds (Apple/Google/Outlook/sports
+  // calendars from the Calendar settings page). 6h gives users a max
+  // ~6h delay between adding an event in their source calendar and seeing
+  // it in Housemait — generous enough to be polite to upstream hosts
+  // (Apple iCloud feeds are notoriously slow + heavy), tight enough that
+  // "I added it yesterday and it's still not here" stops being a thing.
+  // Runs at :15 to dodge the top-of-hour reminder ticks.
+  cron.schedule('15 */6 * * *', () => refreshAllExternalFeeds());
+  console.log('✓ External feed refresh scheduled (every 6h at :15)');
+
   // ── Yearly public holiday refresh: Dec 1 at midnight ───────────────────────
   cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
@@ -493,4 +573,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };
+module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };

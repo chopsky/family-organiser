@@ -1880,6 +1880,33 @@ async function getExternalFeedsByHousehold(householdId, db = supabase) {
   return data || [];
 }
 
+/**
+ * All feeds across all households that should be refreshed by the
+ * scheduler. Filters out:
+ *   - Feeds with sync_enabled=false (user-paused)
+ *   - Feeds with consecutive_failures >= MAX_FAILURES (auto-skipped
+ *     after a streak of errors, so a permanently-broken URL doesn't
+ *     hammer the failing host every cron tick — the user will need to
+ *     edit-or-delete the feed for it to come back, or we can reset the
+ *     counter by hand).
+ *
+ * Ordered with newest-stale-data first (last_synced_at ASC, NULLS first
+ * for never-synced rows) so a brand new feed gets attention on the very
+ * next cron tick, and a fresh-ish feed waits its turn.
+ */
+const EXTERNAL_FEED_MAX_FAILURES = 10;
+
+async function getAllActiveExternalFeeds(db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('sync_enabled', true)
+    .lt('consecutive_failures', EXTERNAL_FEED_MAX_FAILURES)
+    .order('last_synced_at', { ascending: true, nullsFirst: true });
+  if (error) throw error;
+  return data || [];
+}
+
 async function getExternalFeedById(feedId, db = supabase) {
   const { data, error } = await db
     .from('external_calendar_feeds')
@@ -3992,6 +4019,7 @@ module.exports = {
   getFeedTokenIfExists,
   deleteFeedToken,
   getExternalFeedsByHousehold,
+  getAllActiveExternalFeeds,
   getExternalFeedById,
   createExternalFeed,
   deleteExternalFeed,
