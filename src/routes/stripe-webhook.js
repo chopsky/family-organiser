@@ -37,7 +37,8 @@ const router = express.Router();
 // keep handling every other route normally.
 router.use(express.raw({ type: 'application/json', limit: '2mb' }));
 
-router.post('/stripe', async (req, res) => {
+// Mounted at /api/webhooks/stripe in app.js, so the route inside is '/'.
+router.post('/', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   if (!sig) {
     return res.status(400).json({ error: 'Missing Stripe-Signature header' });

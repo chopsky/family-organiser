@@ -3693,6 +3693,13 @@ async function updateHouseholdSubscription(householdId, fields, db = supabase) {
     // cleared (to null) on resubscription. The cleanup cron (not yet
     // built) queries this column.
     'inactive_since',
+    // IAP / RevenueCat (Phase 1 of the iOS IAP rebuild). 'stripe' on every
+    // pre-IAP household; flips to 'apple' the first time we see a
+    // RevenueCat webhook for that household. The app_user_id is what
+    // RevenueCat echoes in every webhook payload — gives us O(1) lookup
+    // when the app_user_id ≠ household_id (alias merges, etc).
+    'subscription_provider',
+    'revenuecat_app_user_id',
   ]);
   const clean = {};
   for (const [k, v] of Object.entries(fields || {})) {
@@ -3764,6 +3771,12 @@ async function markEmailSentIfNew(householdId, emailType, db = supabase) {
  *     the trial is still running; if the user subscribed mid-trial
  *     they're 'active' and we skip them)
  *   • is_internal = false (internal accounts never get nudges)
+ *   • subscription_provider != 'apple' (Apple subscribers get Apple's
+ *     own renewal/expiry emails, and our nudge emails point at the
+ *     web subscribe page which has different pricing — sending both
+ *     creates conflicting messages. By design, an Apple subscriber
+ *     would never be 'trialing' anyway, but the filter is defensive
+ *     against any future state where the two could co-exist).
  *
  * Returns household rows joined with the primary contact email (the
  * household's creator / admin user).
@@ -3777,9 +3790,10 @@ async function findHouseholdsAtTrialDay(dayNumber, db = supabase) {
 
   const { data, error } = await db
     .from('households')
-    .select('id, name, trial_started_at, trial_ends_at, subscription_status, trial_emails_enabled, is_internal')
+    .select('id, name, trial_started_at, trial_ends_at, subscription_status, trial_emails_enabled, is_internal, subscription_provider')
     .eq('subscription_status', 'trialing')
     .eq('is_internal', false)
+    .neq('subscription_provider', 'apple')
     .gte('trial_started_at', windowStart)
     .lt('trial_started_at', windowEnd);
   if (error) throw error;
@@ -3807,9 +3821,14 @@ async function findHouseholdsWithExpiredTrial(db = supabase) {
 
   const { data, error } = await db
     .from('households')
-    .select('id, name, trial_started_at, trial_ends_at, subscription_status, is_internal')
+    .select('id, name, trial_started_at, trial_ends_at, subscription_status, is_internal, subscription_provider')
     .in('subscription_status', ['expired', 'trialing'])
     .eq('is_internal', false)
+    // Apple subscribers get Apple's expiry / billing-issue emails directly;
+    // our day-30 email would point them at housemait.com/subscribe with web
+    // pricing and a different cancel flow. Defensive against impossible
+    // states like provider='apple' + status='trialing' (see findHouseholdsAtTrialDay).
+    .neq('subscription_provider', 'apple')
     .gte('trial_ends_at', windowStart)
     .lt('trial_ends_at', windowEnd);
   if (error) throw error;
@@ -3913,6 +3932,58 @@ async function deleteProcessedStripeEvent(eventId, db = supabase) {
   if (error) throw error;
 }
 
+// ─── RevenueCat / IAP webhook helpers ────────────────────────────────────
+
+/**
+ * Idempotency gate for RevenueCat webhooks. Mirrors recordStripeEventIfNew.
+ * RevenueCat retries non-2xx events for 72h with exponential backoff, so
+ * dedup is essential. The unique PRIMARY KEY on event_id gives us atomic
+ * dedup — two parallel deliveries race on INSERT and exactly one wins.
+ */
+async function recordRevenuecatEventIfNew(eventId, eventType, appUserId, db = supabase) {
+  const { error } = await db
+    .from('processed_revenuecat_events')
+    .insert({ event_id: eventId, event_type: eventType, app_user_id: appUserId });
+  if (error) {
+    if (error.code === '23505') return false; // already processed
+    throw error;
+  }
+  return true;
+}
+
+/**
+ * Remove a processed-event marker so RevenueCat's retry can reprocess it.
+ * Used when an event handler fails AFTER the idempotency row was written.
+ */
+async function deleteProcessedRevenuecatEvent(eventId, db = supabase) {
+  const { error } = await db
+    .from('processed_revenuecat_events')
+    .delete()
+    .eq('event_id', eventId);
+  if (error) throw error;
+}
+
+/**
+ * Find a household by its RevenueCat app_user_id. Used by the webhook
+ * handler when app_user_id isn't a valid household UUID — happens when:
+ *   • RevenueCat anonymous IDs ($RCAnonymousID:...) were issued before
+ *     the app called Purchases.logIn(householdId).
+ *   • A SUBSCRIBER_ALIAS event remapped one user_id to another.
+ *
+ * In the happy path (logIn called early on app launch) app_user_id IS
+ * the household id, so we try getHouseholdById first and fall back here.
+ */
+async function findHouseholdByRevenuecatAppUserId(appUserId, db = supabase) {
+  if (!appUserId) return null;
+  const { data, error } = await db
+    .from('households')
+    .select()
+    .eq('revenuecat_app_user_id', appUserId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -3926,6 +3997,10 @@ module.exports = {
   findHouseholdByStripeSubscriptionId,
   recordStripeEventIfNew,
   deleteProcessedStripeEvent,
+  // RevenueCat / iOS IAP
+  recordRevenuecatEventIfNew,
+  deleteProcessedRevenuecatEvent,
+  findHouseholdByRevenuecatAppUserId,
   // Trial lifecycle emails
   markEmailSentIfNew,
   findHouseholdsAtTrialDay,

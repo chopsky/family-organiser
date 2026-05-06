@@ -36,7 +36,12 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 // scoped just to its own routes. Mounting this early also places it
 // BEFORE the /api rate limiter added below, which is correct — Stripe
 // can burst retries and must never be throttled.
-app.use('/api/webhooks', require('./routes/stripe-webhook'));
+//
+// Mounted at /api/webhooks/stripe (not /api/webhooks) so the raw-body
+// parser applies ONLY to Stripe traffic. Other webhook routes mounted
+// later (e.g. /api/webhooks/revenuecat) need normal JSON parsing and
+// would break if the raw parser intercepted them.
+app.use('/api/webhooks/stripe', require('./routes/stripe-webhook'));
 
 // Body parsing — 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
 app.use(express.json({ limit: '10mb' }));
@@ -100,6 +105,13 @@ app.get('/health', (req, res) => {
 
 // Inbound webhooks (no auth — must be before authenticated routes)
 app.use('/api/inbound-email', require('./routes/inbound-email'));
+
+// RevenueCat webhook (Bearer-token auth, JSON body — safe to mount after
+// the global JSON parser because RevenueCat doesn't sign body bytes).
+// Must be reachable without an authenticated user session, so mount
+// before the subscriptionStatus gate (handled by routing, not middleware
+// here — webhooks live under /api/webhooks which is gate-excluded).
+app.use('/api/webhooks/revenuecat', require('./routes/revenuecat-webhook'));
 
 // Subscription endpoints — mounted BEFORE the gate so that expired users
 // can still reach /status (to drive the frontend's subscribe modal) and,

@@ -24,6 +24,7 @@ function resolveWebUrl() {
  *     "trial_ends_at": "2026-05-21T00:00:00Z" | null,
  *     "days_remaining": 27 | null,          // null unless status === 'trialing'
  *     "subscription_plan": "monthly" | "annual" | null,
+ *     "subscription_provider": "stripe" | "apple",  // which billing platform
  *     "is_internal": false                  // tester/beta accounts — frontend treats as unlimited
  *   }
  */
@@ -54,6 +55,9 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
       trial_ends_at: trialEndsAt,
       days_remaining: daysRemaining,
       subscription_plan: household.subscription_plan || null,
+      // Default to 'stripe' if the column is somehow null (legacy rows
+      // pre-Phase-1a were backfilled, but defensive fallback).
+      subscription_provider: household.subscription_provider || 'stripe',
       is_internal: household.is_internal === true,
     });
   } catch (err) {

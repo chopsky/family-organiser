@@ -36,7 +36,7 @@ const avatarColors = {
  *   • loading   → subtle loading state (no spinner — this card is ambient)
  */
 function PlanSection() {
-  const { isActive, isTrialing, isExpired, isInternal, plan, daysRemaining, trialEndsAt, loading } = useSubscription();
+  const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
 
@@ -57,8 +57,31 @@ function PlanSection() {
   // If you ever want to re-add it, the PATCH /api/settings/settings
   // endpoint still accepts trial_emails_enabled — just wire a UI back.
 
+  // Manage-subscription button routing depends on which platform the
+  // household is billed through:
+  //   • Apple   → deep-link to iOS's subscription management screen.
+  //               itms-apps://apps.apple.com/account/subscriptions opens
+  //               the Settings → Apple ID → Subscriptions panel directly
+  //               in the App Store app on iOS. Same URL works inside the
+  //               Capacitor WebView (window.location triggers the
+  //               external scheme handler).
+  //   • Stripe  → open the Stripe customer portal (current default).
+  //
+  // We don't need to handle "isIos() && provider==='stripe'" specially —
+  // a household billed through Stripe but accessed via iOS still has a
+  // valid Stripe portal URL; we just open it. (App Review concerns about
+  // anti-steering apply to the Subscribe flow, not to managing an
+  // existing subscription.)
   async function openCustomerPortal() {
     if (portalLoading) return;
+
+    if (provider === 'apple') {
+      // Universal deep link — works inside Capacitor WebView and Safari.
+      // No API round-trip needed; iOS handles the URL natively.
+      window.location.href = 'itms-apps://apps.apple.com/account/subscriptions';
+      return;
+    }
+
     setPortalLoading(true);
     setPortalError('');
     try {
@@ -143,7 +166,9 @@ function PlanSection() {
             </p>
             {!isIos() && (
               <p className="text-xs text-warm-grey mt-1">
-                Update card, switch plans, or cancel anytime from the Stripe portal.
+                {provider === 'apple'
+                  ? 'Update card, switch plans, or cancel anytime in your Apple ID subscriptions.'
+                  : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
               </p>
             )}
           </div>

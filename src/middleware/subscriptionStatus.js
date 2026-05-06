@@ -50,7 +50,7 @@ const EXCLUDED_PATH_PREFIXES = [
   '/subscription',   // /status, and later /checkout + /portal — expired users need these
   '/admin',          // platform staff tools — not gated by customer subscription state
   '/inbound-email',  // Postmark/SendGrid webhook — no user auth at all
-  '/webhooks',       // future Stripe webhook — secured by signature, not bearer token
+  '/webhooks',       // Stripe (HMAC-signed) + RevenueCat (Bearer-token) webhooks — secured at handler level, not by user auth
   '/unsubscribe',    // one-click email-footer links — mailgun-style clients POST with no bearer token
 ];
 

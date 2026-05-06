@@ -32,6 +32,7 @@ export function SubscriptionProvider({ children }) {
   const [daysRemaining, setDaysRemaining] = useState(null); // number | null
   const [trialEndsAt, setTrialEndsAt] = useState(null);     // ISO string | null
   const [plan, setPlan] = useState(null);                   // 'monthly' | 'annual' | null
+  const [provider, setProvider] = useState(null);           // 'stripe' | 'apple' | null
   const [isInternal, setIsInternal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -48,6 +49,7 @@ export function SubscriptionProvider({ children }) {
       setDaysRemaining(null);
       setTrialEndsAt(null);
       setPlan(null);
+      setProvider(null);
       setIsInternal(false);
       setLoading(false);
       setError(null);
@@ -66,6 +68,7 @@ export function SubscriptionProvider({ children }) {
       setDaysRemaining(null);
       setTrialEndsAt(null);
       setPlan(null);
+      setProvider(null);
       setIsInternal(true);
       setLoading(false);
       setError(null);
@@ -81,6 +84,7 @@ export function SubscriptionProvider({ children }) {
       setDaysRemaining(data.days_remaining ?? null);
       setTrialEndsAt(data.trial_ends_at || null);
       setPlan(data.subscription_plan || null);
+      setProvider(data.subscription_provider || null);
       setIsInternal(data.is_internal === true);
       loadedHouseholdRef.current = household.id;
     } catch (err) {
@@ -159,6 +163,7 @@ export function SubscriptionProvider({ children }) {
       daysRemaining: isInternal ? null : daysRemaining,
       trialEndsAt,
       plan,
+      provider, // 'stripe' | 'apple' | null — drives Manage-button routing
       isInternal,
       isActive,
       isTrialing,
@@ -180,7 +185,7 @@ export function useSubscription() {
     // shape so the UI just hides trial indicators rather than crashing.
     return {
       status: null, rawStatus: null, daysRemaining: null, trialEndsAt: null,
-      plan: null, isInternal: false, isActive: false, isTrialing: false,
+      plan: null, provider: null, isInternal: false, isActive: false, isTrialing: false,
       isExpired: false, loading: false, error: null, refresh: () => {},
     };
   }
