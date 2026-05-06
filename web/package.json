@@ -18,6 +18,7 @@
     "@capacitor/ios": "^8.3.0",
     "@capacitor/keyboard": "^8.0.3",
     "@capacitor/push-notifications": "^8.0.3",
+    "@revenuecat/purchases-capacitor": "^13.0.1",
     "axios": "^1.13.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

@@ -8,7 +8,6 @@ import Spinner from '../components/Spinner';
 import { IconSettings, IconUser, IconCalendar } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
-import { isIos } from '../lib/platform';
 
 const avatarColors = {
   red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
@@ -40,14 +39,12 @@ function PlanSection() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
 
-  // App Store guideline 3.1.1: don't surface ANY plan / subscription /
-  // pricing / entitlement state on iOS. Even the "Internal" badge or a
-  // bare "Active" string has been called out by reviewers as "accessing
-  // paid content". Hide the section entirely; iOS users manage billing
-  // on web (or not at all). See SubscriptionContext for the matching
-  // backend short-circuit.
-  // Hook calls must come first (rules-of-hooks), so we early-return here.
-  if (isIos()) return null;
+  // Phase 3 (IAP rebuild): the iOS-hide hack is gone. iOS users now see
+  // their real subscription state and a working Manage button. The
+  // Manage button routes by `provider` (see openCustomerPortal) — Apple
+  // subscribers deep-link to their Apple ID subscriptions; Stripe
+  // subscribers (e.g. someone who subscribed on web and later opened
+  // the iOS app) hit the Stripe portal as before.
 
   // NB: there's no "trial reminder emails" toggle here. PECR covers us
   // as long as the email-footer unsubscribe link works, and the footer
@@ -128,24 +125,16 @@ function PlanSection() {
                 </span>
               )}
             </p>
-            {/* On iOS, no subscribe steering text — App Review rejected
-                "Subscribe on housemait.com" as anti-steering. iOS users
-                see only the entitlement status; they're expected to find
-                the website themselves if they want to subscribe. */}
-            {!isIos() && (
-              <p className="text-xs text-warm-grey mt-1">
-                Subscribe any time to avoid interruption.
-              </p>
-            )}
+            <p className="text-xs text-warm-grey mt-1">
+              Subscribe any time to avoid interruption.
+            </p>
           </div>
-          {!isIos() && (
-            <Link
-              to="/subscribe"
-              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Subscribe
-            </Link>
-          )}
+          <Link
+            to="/subscribe"
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+          >
+            Subscribe
+          </Link>
         </div>
       )}
 
@@ -154,34 +143,26 @@ function PlanSection() {
           <div>
             <p className="text-sm text-cocoa">
               <strong className="text-emerald font-semibold">Active</strong>
-              {/* On iOS, show only the entitlement status — no plan name,
-                  no price, no Stripe portal link. App Review rejected the
-                  "Annual plan (£59.99/year)" string + "housemait.com"
-                  steering as Guideline 3.1.1 violations. */}
-              {!isIos() && plan && (
+              {plan && (
                 <span className="text-charcoal">
-                  {' '}· {plan === 'annual' ? 'Annual plan (£59.99/year)' : 'Monthly plan (£5.99/month)'}
+                  {' '}· {plan === 'annual' ? 'Annual plan' : 'Monthly plan'}
                 </span>
               )}
             </p>
-            {!isIos() && (
-              <p className="text-xs text-warm-grey mt-1">
-                {provider === 'apple'
-                  ? 'Update card, switch plans, or cancel anytime in your Apple ID subscriptions.'
-                  : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
-              </p>
-            )}
+            <p className="text-xs text-warm-grey mt-1">
+              {provider === 'apple'
+                ? 'Update card, switch plans, or cancel anytime in your Apple ID subscriptions.'
+                : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
+            </p>
           </div>
-          {!isIos() && (
-            <button
-              type="button"
-              onClick={openCustomerPortal}
-              disabled={portalLoading}
-              className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {portalLoading ? 'Opening…' : 'Manage subscription'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={openCustomerPortal}
+            disabled={portalLoading}
+            className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {portalLoading ? 'Opening…' : 'Manage subscription'}
+          </button>
         </div>
       )}
 
@@ -192,19 +173,15 @@ function PlanSection() {
               <strong className="text-coral font-semibold">Subscription ended</strong>
             </p>
             <p className="text-xs text-warm-grey mt-1">
-              {isIos()
-                ? "Your data's still here."
-                : "Your data's still here. Subscribe to unlock everything again."}
+              Your data's still here. Subscribe to unlock everything again.
             </p>
           </div>
-          {!isIos() && (
-            <Link
-              to="/subscribe"
-              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Subscribe
-            </Link>
-          )}
+          <Link
+            to="/subscribe"
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+          >
+            Subscribe
+          </Link>
         </div>
       )}
 

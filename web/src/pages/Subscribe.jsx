@@ -18,12 +18,13 @@
  * the right tool for that — we nudge them there via a text link).
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useSubscription } from '../context/SubscriptionContext';
 import ErrorBanner from '../components/ErrorBanner';
 import { isIos } from '../lib/platform';
+import IosSubscribe from './IosSubscribe';
 
 // Pricing constants — hard-coded in the UI layer because Stripe is the
 // source of truth on the backend, but users see these numbers BEFORE we
@@ -53,18 +54,10 @@ export default function Subscribe() {
   const [submitting, setSubmitting] = useState(null); // 'monthly' | 'annual' | null
   const [error, setError] = useState('');
 
-  // iOS: redirect away from this page entirely. Apple Review Guideline
-  // 3.1.1 + Anti-Steering means we can't show pricing, can't link to web
-  // checkout, and can't even mention "manage your subscription on
-  // housemait.com" — App Review rejected previous iterations that
-  // attempted to do exactly that. The cleanest move is "this page does
-  // not exist on iOS" — we send users back to /dashboard so deep links
-  // and stale 402-redirects (in case any slip through the
-  // SubscriptionContext guard) don't dead-end.
-  useEffect(() => {
-    if (isIos()) navigate('/dashboard', { replace: true });
-  }, [navigate]);
-  if (isIos()) return null;
+  // Platform dispatch — iOS sees the Apple-IAP paywall, web sees the
+  // Stripe Checkout paywall below. Both are App-Review-compliant under
+  // Guideline 3.1.1: native IAP on iOS, no anti-steering on web.
+  if (isIos()) return <IosSubscribe />;
 
   async function handleSubscribe(plan) {
     if (submitting) return;

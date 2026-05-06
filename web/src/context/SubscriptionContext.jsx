@@ -20,8 +20,6 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from './AuthContext';
-import { isIos } from '../lib/platform';
-
 const SubscriptionContext = createContext(null);
 
 export function SubscriptionProvider({ children }) {
@@ -57,24 +55,13 @@ export function SubscriptionProvider({ children }) {
       return;
     }
 
-    // On iOS we deliberately don't surface ANY subscription state to the
-    // UI — see App Store guideline 3.1.1. Treating iOS as always-internal
-    // (which the rest of the app already maps to "full access, no
-    // billing surface") collapses every "trial / active / expired"
-    // branch to a single non-rendered no-op. Skip the fetch entirely so
-    // the iOS app makes one fewer round-trip on launch.
-    if (isIos()) {
-      setStatus(null);
-      setDaysRemaining(null);
-      setTrialEndsAt(null);
-      setPlan(null);
-      setProvider(null);
-      setIsInternal(true);
-      setLoading(false);
-      setError(null);
-      loadedHouseholdRef.current = household.id;
-      return;
-    }
+    // Phase 3 (IAP rebuild): the iOS-as-always-internal hack that lived
+    // here while we had no in-app payment path is gone. iOS now goes
+    // through the real /api/subscription/status flow and sees the real
+    // trial countdown / expired state, with the IosSubscribe paywall
+    // (Apple IAP) as the day-30 destination — see Subscribe.jsx and
+    // IosSubscribe.jsx. App Review 3.1.1 compliance comes from the
+    // paywall being native IAP, not from hiding subscription state.
 
     setLoading(true);
     setError(null);
@@ -112,11 +99,10 @@ export function SubscriptionProvider({ children }) {
   // to itself.
   useEffect(() => {
     function onSubscriptionRequired() {
-      // Never bounce iOS users to /subscribe — there is no in-app
-      // payment path (Apple guideline 3.1.1) and we mustn't link to
-      // external billing. The 402 will surface as a generic error
-      // toast wherever the mutation was attempted; that's fine.
-      if (isIos()) return;
+      // /subscribe dispatches by platform: web → Stripe Checkout flow,
+      // iOS → IosSubscribe (Apple IAP). Both are App-Review-compliant
+      // destinations; the old "never redirect iOS" guard from before
+      // we had IAP is gone.
       if (location.pathname === '/subscribe' || location.pathname.startsWith('/subscription/')) return;
       // Refresh silently so the subscribe page has fresh data when it loads.
       fetchStatus();

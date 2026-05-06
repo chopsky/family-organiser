@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import api from '../lib/api';
+import { logIn as revenuecatLogIn, logOut as revenuecatLogOut } from '../lib/revenuecat';
 
 const AuthContext = createContext(null);
 
@@ -54,7 +55,24 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     setHousehold(null);
+    // Clear RevenueCat's identity so the next user on this device
+    // doesn't inherit the previous user's subscription state. No-op
+    // on web; safe to ignore failures.
+    revenuecatLogOut();
   }, []);
+
+  // Keep RevenueCat's app_user_id in sync with the current household.
+  // Runs on:
+  //   • initial mount when household was restored from localStorage
+  //     (already-logged-in user reopens the app),
+  //   • every login (household state flips from null → object),
+  //   • household switch (rare today, but supported by the model).
+  // No-op on web; effective only on native iOS.
+  useEffect(() => {
+    if (household?.id) {
+      revenuecatLogIn(household.id);
+    }
+  }, [household?.id]);
 
   // ── Visibility-change idle check ────────────────────────────────
   // When the user returns to the tab after a long absence, fire any
