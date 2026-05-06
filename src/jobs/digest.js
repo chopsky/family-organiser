@@ -137,11 +137,47 @@ async function sendWeeklyDigest(householdId) {
 }
 
 /**
+ * Compute an ISO 8601 week key like "2026_w18". Used as the email_type
+ * suffix in the sent_emails dedupe row so each household gets at most
+ * one weekly digest per ISO week, regardless of cause (Railway crash
+ * + restart, manual admin trigger, second cron schedule).
+ */
+function getISOWeekKey(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // Per ISO 8601: shift to the Thursday of this week, then count weeks
+  // from the year of that Thursday.
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86_400_000) + 1) / 7);
+  return `${d.getUTCFullYear()}_w${String(weekNo).padStart(2, '0')}`;
+}
+
+/**
  * Send the weekly digest via email to all members with an email address.
+ *
+ * Two layers of dedup:
+ *   1. Per-week sent_emails row: prevents the same household from
+ *      receiving the digest twice in one ISO week, even if this
+ *      function is called more than once (cron firing twice, manual
+ *      trigger from admin tooling, etc).
+ *   2. Per-address dedup within the loop: defends against the case
+ *      where two user rows in the household share the same email
+ *      address (which shouldn't happen but has been seen in the wild
+ *      from old test data / merged households).
  *
  * @param {string} householdId
  */
 async function sendWeeklyDigestEmail(householdId) {
+  // ─── Idempotency gate ─────────────────────────────────────────────
+  const weekKey = `weekly_digest_${getISOWeekKey(new Date())}`;
+  const claimed = await db.markEmailSentIfNew(householdId, weekKey);
+  if (!claimed) {
+    console.log(
+      `[digest] ${weekKey} already sent to household ${householdId} — skipping duplicate run`
+    );
+    return;
+  }
+
   const today = new Date().toISOString().split('T')[0];
   const household = await db.getHouseholdById(householdId);
   const members = await db.getHouseholdMembers(householdId);
@@ -158,8 +194,18 @@ async function sendWeeklyDigestEmail(householdId) {
 
   const upcomingTasks = await db.getTasksDueNextWeek(householdId);
 
+  // Track addresses we've already emailed in THIS run so a household
+  // with two members sharing one email gets exactly one digest.
+  const seenEmails = new Set();
+
   for (const member of members) {
     if (!member.email) continue;
+    const normalised = member.email.toLowerCase().trim();
+    if (seenEmails.has(normalised)) {
+      console.log(`[digest] Already emailed ${normalised} in this household run — skipping ${member.name}`);
+      continue;
+    }
+    seenEmails.add(normalised);
 
     try {
       await email.sendWeeklyDigestEmail(member.email, member.name, household.name, {

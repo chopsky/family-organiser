@@ -174,29 +174,63 @@ export default function Shopping() {
     }
   }
 
+  // ── Optimistic mutation handlers ──────────────────────────────────────
+  // Each handler updates local state IMMEDIATELY so the UI doesn't
+  // flash / scroll-jump while the network round-trip happens. On
+  // failure, we revert to the snapshot taken before the change.
+  //
+  // Trade-off accepted: a network failure briefly shows the new state
+  // before reverting. Worth it — the alternative (await the API, then
+  // setState, then re-render) is what was making every check-off feel
+  // like a page reload.
+
   async function toggleItem(item) {
+    const next = !item.completed;
+    const completedAt = next ? new Date().toISOString() : null;
+    setItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, completed: next, completed_at: completedAt } : i))
+    );
     try {
-      await api.patch(`/shopping/${item.id}`, { completed: !item.completed });
-      await loadItems();
+      await api.patch(`/shopping/${item.id}`, { completed: next });
     } catch {
+      // Revert
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id ? { ...i, completed: item.completed, completed_at: item.completed_at } : i
+        )
+      );
       setError('Could not update item.');
     }
   }
 
   async function deleteItem(id) {
+    let snapshot;
+    setItems((prev) => {
+      snapshot = prev;
+      return prev.filter((i) => i.id !== id);
+    });
     try {
       await api.delete(`/shopping/${id}`);
-      await loadItems();
     } catch {
+      // Revert
+      if (snapshot) setItems(snapshot);
       setError('Could not delete item.');
     }
   }
 
   async function restoreItem(item) {
+    setItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, completed: false, completed_at: null } : i))
+    );
     try {
       await api.patch(`/shopping/${item.id}`, { completed: false });
-      await loadItems();
     } catch {
+      // Revert
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id ? { ...i, completed: item.completed, completed_at: item.completed_at } : i
+        )
+      );
       setError('Could not restore item.');
     }
   }

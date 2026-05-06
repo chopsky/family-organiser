@@ -554,6 +554,29 @@ function startScheduler() {
   // deleted in 30 days" email (dedupe via sent_emails with
   // email_type = 'retention_warning').
 
+  // ── Recurring task auto-advance: every day at 00:30 ────────────────────────
+  // For weekly/monthly/etc tasks the user never completed, advance the
+  // due_date forward to the next scheduled instance >= today. Without
+  // this, "Take the bins out (weekly)" sits at "overdue by 22 days"
+  // forever instead of resetting on the next week. Runs at 00:30 so:
+  //   • midnight has crossed every UK timezone (BST/GMT both fine),
+  //   • it's well before the morning reminder crons (07:00) so the
+  //     daily reminder for "today's tasks" sees the post-advance state.
+  cron.schedule('30 0 * * *', async () => {
+    try {
+      const advanced = await db.advanceOverdueRecurringTasks();
+      if (advanced.length > 0) {
+        console.log(`[recurring-tasks] Advanced ${advanced.length} overdue recurring task(s)`);
+        for (const t of advanced) {
+          console.log(`  • ${t.id} "${t.title}": ${t.oldDue} → ${t.newDue}`);
+        }
+      }
+    } catch (err) {
+      console.error('[recurring-tasks] Auto-advance failed:', err.message);
+    }
+  });
+  console.log('✓ Recurring-task auto-advance scheduled (daily 00:30)');
+
   // ── Weekly digest: Sunday evenings ──────────────────────────────────────────
   const digestDay  = process.env.WEEKLY_DIGEST_DAY  ?? '0';   // 0 = Sunday
   const digestHour = parseInt((process.env.DAILY_REMINDER_HOUR || '20:00').split(':')[0], 10);

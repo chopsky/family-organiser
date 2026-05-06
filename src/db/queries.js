@@ -1130,15 +1130,60 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
   return completed;
 }
 
-async function generateNextRecurrence(task, db = supabase) {
-  const due = new Date(task.due_date);
-  switch (task.recurrence) {
-    case 'daily':     due.setDate(due.getDate() + 1); break;
-    case 'weekly':    due.setDate(due.getDate() + 7); break;
-    case 'biweekly':  due.setDate(due.getDate() + 14); break;
-    case 'monthly':   due.setMonth(due.getMonth() + 1); break;
-    case 'yearly':    due.setFullYear(due.getFullYear() + 1); break;
+/**
+ * Advance a date by one recurrence period. Pure helper, returns a NEW
+ * Date object (input not mutated). Returns null for unknown recurrence
+ * strings — caller should treat as "not recurring".
+ */
+function advancePeriod(date, recurrence) {
+  const d = new Date(date);
+  switch (recurrence) {
+    case 'daily':     d.setDate(d.getDate() + 1); return d;
+    case 'weekly':    d.setDate(d.getDate() + 7); return d;
+    case 'biweekly':  d.setDate(d.getDate() + 14); return d;
+    case 'monthly':   d.setMonth(d.getMonth() + 1); return d;
+    case 'yearly':    d.setFullYear(d.getFullYear() + 1); return d;
     default: return null;
+  }
+}
+
+/**
+ * Compute the next valid due date for a recurring task — the earliest
+ * scheduled instance that's >= today. Used by both completion-time
+ * regeneration and the daily auto-advance cron.
+ *
+ * Example: a weekly task due 2026-04-01 advanced today (2026-04-23)
+ * walks Apr 8 → Apr 15 → Apr 22 → Apr 29; returns 2026-04-29 because
+ * Apr 22 < today (Apr 23) and Apr 29 is the first >=.
+ */
+function nextValidDueDate(currentDueISO, recurrence, todayISO = null) {
+  if (!currentDueISO || !recurrence) return null;
+  const todayStr = todayISO || new Date().toISOString().split('T')[0];
+  let due = new Date(currentDueISO + 'T00:00:00Z');
+  const today = new Date(todayStr + 'T00:00:00Z');
+  // Safety cap: 365 iterations covers the worst case (a daily task
+  // overdue by a year) without risking a runaway loop on bad data.
+  for (let i = 0; i < 365; i++) {
+    if (due >= today) break;
+    const next = advancePeriod(due, recurrence);
+    if (!next) return null;
+    due = next;
+  }
+  return due.toISOString().split('T')[0];
+}
+
+async function generateNextRecurrence(task, db = supabase) {
+  // Compute the next due date, advancing past any "still in the past"
+  // instances. Without this, completing a 3-week-overdue weekly task
+  // would create a NEW instance also in the past — that's the original
+  // bug that left "Take the bins out (weekly)" stuck at "overdue 22 days".
+  let due = advancePeriod(task.due_date, task.recurrence);
+  if (!due) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 365 && due < today; i++) {
+    due = advancePeriod(due, task.recurrence);
+    if (!due) return null;
   }
 
   // Delete any previous uncompleted instances of this recurring task.
@@ -1169,6 +1214,58 @@ async function generateNextRecurrence(task, db = supabase) {
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Daily auto-advance for recurring tasks the user never completed.
+ *
+ * For every incomplete recurring task whose due_date is in the past,
+ * advance the due_date in place to the next scheduled instance >=
+ * today. This prevents the "overdue by 22 days" bug where a weekly
+ * task sits accumulating overdue days because the regeneration code
+ * (generateNextRecurrence) only fires on completion.
+ *
+ * In-place update (no new task row) because:
+ *   • The user never completed it, so there's no history to preserve.
+ *   • A second row would cause confusion + stale-row cleanup.
+ *   • Matches user expectation: "by the time it's the next week, it
+ *     should reset" — same task, fresh due date.
+ *
+ * Called by scheduler.js at 00:30 local time daily, after midnight has
+ * crossed every UK timezone but before reminder crons fire (07:00).
+ *
+ * Returns the array of advanced tasks for logging / observability.
+ */
+async function advanceOverdueRecurringTasks(db = supabase) {
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data: overdueTasks, error } = await db
+    .from('tasks')
+    .select('id, household_id, title, due_date, recurrence')
+    .not('recurrence', 'is', null)
+    .eq('completed', false)
+    .lt('due_date', today);
+  if (error) throw error;
+  if (!overdueTasks || overdueTasks.length === 0) return [];
+
+  const advanced = [];
+  for (const task of overdueTasks) {
+    const newDue = nextValidDueDate(task.due_date, task.recurrence, today);
+    if (!newDue || newDue === task.due_date) continue;
+
+    const { error: updateErr } = await db
+      .from('tasks')
+      .update({ due_date: newDue })
+      .eq('id', task.id);
+    if (updateErr) {
+      // Don't abort the batch on one failure — log and continue so
+      // a single bad row doesn't block the rest of the cleanup.
+      console.error(`[advanceOverdueRecurringTasks] failed to advance ${task.id}:`, updateErr.message);
+      continue;
+    }
+    advanced.push({ id: task.id, title: task.title, oldDue: task.due_date, newDue });
+  }
+  return advanced;
 }
 
 // ─── Scheduler helpers ────────────────────────────────────────────────────────
@@ -4060,6 +4157,7 @@ module.exports = {
   completeTask,
   completeTasksByName,
   generateNextRecurrence,
+  advanceOverdueRecurringTasks,
   getCompletedThisWeek,
   getOverdueTasksForUser,
   getTasksForUser,
