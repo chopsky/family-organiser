@@ -4,60 +4,87 @@
 -- This SQL is the database-only equivalent of
 -- src/db/queries.js#advanceOverdueRecurringTasks, which now runs daily
 -- at 00:30 via cron. Use this query when you want to apply the fix
--- immediately rather than waiting for the next cron tick (e.g. right
--- after deploying the cron change so users don't see stale "overdue
--- 22 days" labels for one more night).
+-- immediately rather than waiting for the next cron tick.
 --
--- Idempotent — running twice in a row is a no-op (the second run finds
--- no tasks with due_date < today after the first run completes).
+-- Implementation: a PL/pgSQL DO block that loops over each overdue
+-- recurring task and advances its due_date one period at a time until
+-- it lands >= CURRENT_DATE. This mirrors the JS implementation rather
+-- than trying to compute the new date in a single expression — months
+-- and years aren't fixed-length, so the per-task loop is both correct
+-- and easy to reason about.
+--
+-- Idempotent: running twice in a row is a no-op (the second run finds
+-- no tasks with due_date < CURRENT_DATE after the first run completes).
 --
 -- Run in Supabase SQL editor.
 
--- Preview what will change before committing.
+-- ── Step 1: preview what will change ────────────────────────────────
+-- Read-only — shows the rows that will be touched and (per recurrence
+-- type) what the next single advance would produce. The actual UPDATE
+-- below loops until >= today, which may advance further than this
+-- preview shows for very-overdue tasks. Run the full DO block to commit.
 SELECT
   id,
   title,
   recurrence,
-  due_date AS old_due,
+  due_date AS current_due,
+  CURRENT_DATE - due_date AS days_overdue,
   CASE recurrence
-    WHEN 'daily'    THEN
-      due_date + ((CURRENT_DATE - due_date)::int) * INTERVAL '1 day'
-    WHEN 'weekly'   THEN
-      due_date + (CEIL((CURRENT_DATE - due_date)::numeric / 7) * 7)::int * INTERVAL '1 day'
-    WHEN 'biweekly' THEN
-      due_date + (CEIL((CURRENT_DATE - due_date)::numeric / 14) * 14)::int * INTERVAL '1 day'
-    WHEN 'monthly'  THEN
-      due_date + (CEIL(EXTRACT(EPOCH FROM (CURRENT_DATE - due_date)) / (30 * 86400))::int) * INTERVAL '1 month'
-    WHEN 'yearly'   THEN
-      due_date + (CEIL(EXTRACT(YEAR FROM AGE(CURRENT_DATE, due_date)))::int) * INTERVAL '1 year'
-  END AS new_due
+    WHEN 'daily'    THEN due_date + 1
+    WHEN 'weekly'   THEN due_date + 7
+    WHEN 'biweekly' THEN due_date + 14
+    WHEN 'monthly'  THEN (due_date + INTERVAL '1 month')::date
+    WHEN 'yearly'   THEN (due_date + INTERVAL '1 year')::date
+  END AS next_period
 FROM tasks
 WHERE recurrence IS NOT NULL
   AND completed = false
   AND due_date < CURRENT_DATE
-ORDER BY due_date;
+ORDER BY days_overdue DESC;
 
--- Once the preview looks right, run the UPDATE. The math mirrors
--- nextValidDueDate() in queries.js: advance by `recurrence` periods
--- enough times to land >= CURRENT_DATE.
-UPDATE tasks SET due_date =
-  CASE recurrence
-    WHEN 'daily' THEN
-      CURRENT_DATE
-    WHEN 'weekly' THEN
-      due_date + (CEIL((CURRENT_DATE - due_date)::numeric / 7) * 7)::int
-    WHEN 'biweekly' THEN
-      due_date + (CEIL((CURRENT_DATE - due_date)::numeric / 14) * 14)::int
-    WHEN 'monthly' THEN
-      due_date + (CEIL(EXTRACT(EPOCH FROM (CURRENT_DATE - due_date)) / (30 * 86400))::int) * INTERVAL '1 month'
-    WHEN 'yearly' THEN
-      due_date + (CEIL(EXTRACT(YEAR FROM AGE(CURRENT_DATE, due_date)))::int) * INTERVAL '1 year'
-  END
-WHERE recurrence IS NOT NULL
-  AND completed = false
-  AND due_date < CURRENT_DATE;
+-- ── Step 2: apply the fix ───────────────────────────────────────────
+DO $$
+DECLARE
+  t RECORD;
+  new_due DATE;
+  iterations INT;
+BEGIN
+  FOR t IN
+    SELECT id, title, due_date, recurrence
+    FROM tasks
+    WHERE recurrence IS NOT NULL
+      AND completed = false
+      AND due_date < CURRENT_DATE
+  LOOP
+    new_due := t.due_date;
+    iterations := 0;
 
--- Verify: should return zero rows.
+    -- Advance one period at a time until new_due >= today.
+    -- Cap at 1000 iterations as a safety belt against runaway loops
+    -- (would only matter for badly-formed data — even a daily task
+    -- 5 years overdue is just ~1825 advances).
+    WHILE new_due < CURRENT_DATE AND iterations < 1000 LOOP
+      iterations := iterations + 1;
+      new_due := CASE t.recurrence
+        WHEN 'daily'    THEN new_due + 1
+        WHEN 'weekly'   THEN new_due + 7
+        WHEN 'biweekly' THEN new_due + 14
+        WHEN 'monthly'  THEN (new_due + INTERVAL '1 month')::date
+        WHEN 'yearly'   THEN (new_due + INTERVAL '1 year')::date
+        ELSE NULL
+      END;
+      EXIT WHEN new_due IS NULL;
+    END LOOP;
+
+    IF new_due IS NOT NULL AND new_due > t.due_date THEN
+      UPDATE tasks SET due_date = new_due WHERE id = t.id;
+      RAISE NOTICE 'Advanced "%" (%): % → %', t.title, t.recurrence, t.due_date, new_due;
+    END IF;
+  END LOOP;
+END$$;
+
+-- ── Step 3: verify ──────────────────────────────────────────────────
+-- Should return zero rows after the DO block runs successfully.
 SELECT id, title, recurrence, due_date
 FROM tasks
 WHERE recurrence IS NOT NULL
