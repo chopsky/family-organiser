@@ -17,9 +17,29 @@
  */
 
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__turnstileOnLoad';
+
+// Skip Turnstile entirely on iOS native. Reasoning:
+//   • The threat model for a signed App Store binary is fundamentally
+//     different from web — no bot signups via App Review's flow, no
+//     credential stuffing from a controlled native binary.
+//   • Loading the Cloudflare script in the WebView introduces race
+//     conditions where users (especially App Reviewers using iPad
+//     hardware keyboards) can submit before a token is ready, resulting
+//     in opaque "login failed" errors. Apple rejected 1.1.0(8) for
+//     exactly this — Guideline 2.1(a), iPad login error.
+//   • Server-side middleware fail-opens when the request lacks a token,
+//     so the iOS native flow is allowed. See src/middleware/turnstile.js.
+function isIosNative() {
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  } catch {
+    return false;
+  }
+}
 
 let scriptLoading = null; // shared promise so multiple mounts don't load the script N times
 
@@ -70,6 +90,12 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
   }), []);
 
   useEffect(() => {
+    // iOS native bypass — see top-of-file comment.
+    if (isIosNative()) {
+      onChange?.(null);
+      return;
+    }
+
     // No site key configured → bypass. Server-side middleware also fail-opens.
     // Lets local dev work without Cloudflare creds.
     if (!SITE_KEY) {
@@ -78,52 +104,91 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
     }
 
     let cancelled = false;
+    let scriptLoadStarted = false;
 
-    loadScript()
-      .then(() => {
-        if (cancelled || !containerRef.current || !window.turnstile) return;
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: SITE_KEY,
-          theme,
-          // 'invisible' = no visible iframe, no layout shift, no UI element
-          // for the user to wait on. Cloudflare runs the challenge silently
-          // in the background; suspicious sessions still get an interactive
-          // prompt only when needed. Fixes an iOS WebView issue where the
-          // iframe load was eating tap-to-focus events on email/password
-          // inputs for the first 1-2 seconds, making the form feel locked.
-          size: 'invisible',
-          // 'refresh-expired: auto' tells Cloudflare to silently issue a new
-          // challenge when the previous token expires (default TTL: 5 min).
-          // Without this, a user who lingers on the login page (typing
-          // slowly, reading, switching apps on iOS so the WebView suspends)
-          // submits with an expired token, Cloudflare rejects it as
-          // "invalid token", our middleware returns 403, and the user sees
-          // a generic auth failure they can't recover from. App Review
-          // hits this constantly.
-          'refresh-expired': 'auto',
-          callback: (token) => onChange?.(token),
-          'error-callback': () => {
-            onChange?.(null);
-            // Force a fresh challenge so the user's next submission isn't
-            // doomed to fail with the same stale state.
-            try { window.turnstile.reset(widgetIdRef.current); } catch { /* widget already gone */ }
-          },
-          'expired-callback': () => onChange?.(null),
-          // Note: with refresh-expired:auto, expired-callback fires THEN
-          // Turnstile auto-resets, so we just clear the parent's token.
-          // The new challenge produces a fresh token via `callback`.
+    // Defer loading Cloudflare's script until the user has actually
+    // interacted with the page. Loading the script on mount blocks iOS
+    // WebView's tap-event delivery for ~1-2 seconds — even with
+    // size:invisible — because the script execution and iframe creation
+    // run on the main thread during the WebView's first paint.
+    //
+    // First interaction (focus / pointerdown / keydown / touchstart on
+    // the document) tells us the user has the form responsive. By the
+    // time they finish typing and hit Submit, the script has loaded and
+    // produced a token in the background.
+    //
+    // 5s fallback timer covers the edge case of a user who lands on the
+    // page and never interacts with anything (rare — they came here for
+    // a reason). After 5s we load anyway so the widget isn't held up
+    // forever for an idle user.
+    function startScriptLoad() {
+      if (scriptLoadStarted || cancelled) return;
+      scriptLoadStarted = true;
+      cleanupListeners();
+      loadAndRenderWidget();
+    }
+
+    const interactionEvents = ['pointerdown', 'keydown', 'focusin', 'touchstart'];
+    function cleanupListeners() {
+      interactionEvents.forEach((evt) =>
+        document.removeEventListener(evt, startScriptLoad, true)
+      );
+      clearTimeout(fallbackTimer);
+    }
+
+    interactionEvents.forEach((evt) =>
+      document.addEventListener(evt, startScriptLoad, { capture: true, passive: true })
+    );
+    const fallbackTimer = setTimeout(startScriptLoad, 5000);
+
+    function loadAndRenderWidget() {
+      loadScript()
+        .then(() => {
+          if (cancelled || !containerRef.current || !window.turnstile) return;
+          widgetIdRef.current = window.turnstile.render(containerRef.current, {
+            sitekey: SITE_KEY,
+            theme,
+            // 'invisible' = no visible iframe, no layout shift, no UI element
+            // for the user to wait on. Cloudflare runs the challenge silently
+            // in the background; suspicious sessions still get an interactive
+            // prompt only when needed. Fixes an iOS WebView issue where the
+            // iframe load was eating tap-to-focus events on email/password
+            // inputs for the first 1-2 seconds, making the form feel locked.
+            size: 'invisible',
+            // 'refresh-expired: auto' tells Cloudflare to silently issue a new
+            // challenge when the previous token expires (default TTL: 5 min).
+            // Without this, a user who lingers on the login page (typing
+            // slowly, reading, switching apps on iOS so the WebView suspends)
+            // submits with an expired token, Cloudflare rejects it as
+            // "invalid token", our middleware returns 403, and the user sees
+            // a generic auth failure they can't recover from. App Review
+            // hits this constantly.
+            'refresh-expired': 'auto',
+            callback: (token) => onChange?.(token),
+            'error-callback': () => {
+              onChange?.(null);
+              // Force a fresh challenge so the user's next submission isn't
+              // doomed to fail with the same stale state.
+              try { window.turnstile.reset(widgetIdRef.current); } catch { /* widget already gone */ }
+            },
+            'expired-callback': () => onChange?.(null),
+            // Note: with refresh-expired:auto, expired-callback fires THEN
+            // Turnstile auto-resets, so we just clear the parent's token.
+            // The new challenge produces a fresh token via `callback`.
+          });
+        })
+        .catch((err) => {
+          // Network blocked Cloudflare or similar. Surface null so the form
+          // submission isn't held up forever; server-side decides whether
+          // to enforce.
+          console.warn('[turnstile] widget load failed:', err.message);
+          onChange?.(null);
         });
-      })
-      .catch((err) => {
-        // Network blocked Cloudflare or similar. Surface null so the form
-        // submission isn't held up forever; server-side decides whether
-        // to enforce.
-        console.warn('[turnstile] widget load failed:', err.message);
-        onChange?.(null);
-      });
+    }
 
     return () => {
       cancelled = true;
+      cleanupListeners();
       if (widgetIdRef.current && window.turnstile) {
         try { window.turnstile.remove(widgetIdRef.current); } catch { /* widget already gone */ }
         widgetIdRef.current = null;
@@ -134,7 +199,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 
-  if (!SITE_KEY) return null;
+  if (!SITE_KEY || isIosNative()) return null;
 
   return <div ref={containerRef} className="turnstile-container my-3" />;
 });

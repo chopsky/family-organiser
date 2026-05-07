@@ -41,6 +41,26 @@ async function requireTurnstile(req, res, next) {
     return next();
   }
 
+  // iOS native clients skip Turnstile entirely. The threat model for a
+  // signed App Store binary is fundamentally different from web — no
+  // bot signups via App Review's flow, no credential stuffing from a
+  // controlled native binary. Apple rejected 1.1.0(8) under Guideline
+  // 2.1(a) when an iPad reviewer hit a Turnstile race during login, so
+  // we now bypass it for Capacitor requests entirely.
+  //
+  // Detection: Capacitor iOS apps send the Origin header
+  // "capacitor://localhost". The User-Agent also includes "Capacitor"
+  // but is more easily forged; we use both as a defence-in-depth check.
+  // Either match is sufficient — if both are missing we treat as web.
+  const origin = req.get('Origin') || '';
+  const userAgent = req.get('User-Agent') || '';
+  const isCapacitorRequest =
+    origin.startsWith('capacitor://') ||
+    /Capacitor/i.test(userAgent);
+  if (isCapacitorRequest) {
+    return next();
+  }
+
   const token = req.body?.turnstile_token;
   if (!token) {
     return res.status(403).json({

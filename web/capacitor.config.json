@@ -8,8 +8,8 @@
   },
   "plugins": {
     "Keyboard": {
-      "resize": "none",
-      "scrollAssist": false,
+      "resize": "native",
+      "resizeOnFullScreen": true,
       "hideFormAccessoryBar": true
     }
   }

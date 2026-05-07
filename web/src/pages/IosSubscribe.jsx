@@ -245,13 +245,16 @@ export default function IosSubscribe() {
           </button>
         </div>
 
-        {/* Footer — Apple Review requires Terms + Privacy reachable
-            from any paid screen. Both routes already exist in the app. */}
-        <div className="mt-10 text-center text-xs text-warm-grey">
-          <p className="mb-2">
-            Subscriptions auto-renew. Cancel anytime in Settings → Apple ID → Subscriptions.
-          </p>
+        {/* Footer — short reassurance text. Per-card disclosure blocks
+            above carry the full Apple-required Terms + Privacy + auto-
+            renew language; this is just the consolidated "managed by
+            Apple" line for users who scrolled past the cards.        */}
+        <div className="mt-8 text-center text-xs text-warm-grey">
           <p>
+            Payments are processed by Apple. Subscription is charged to your
+            Apple ID and managed under Settings → Apple ID → Subscriptions.
+          </p>
+          <p className="mt-2">
             <Link to="/terms" className="underline hover:text-charcoal">Terms of use</Link>
             {' · '}
             <Link to="/privacy" className="underline hover:text-charcoal">Privacy policy</Link>
@@ -301,10 +304,24 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
   // Use Apple's localised price string — never hardcode. App Review
   // checks for parity between displayed price and StoreConnect.
   const priceString = pkg?.product?.priceString || '';
-  // Period: derive from package type so the unit label below the price
-  // is consistent. RevenueCat packageType is one of MONTHLY / ANNUAL
-  // / WEEKLY etc. For our paywall we only show monthly + annual.
-  const periodDisplay = pkg?.packageType === 'ANNUAL' ? 'per year' : 'per month';
+  const isAnnual = pkg?.packageType === 'ANNUAL';
+  const periodDisplay = isAnnual ? 'per year' : 'per month';
+  // Subscription length disclosure (Apple Guideline 3.1.2(c) requires
+  // the period to be displayed explicitly, not just "/month").
+  const lengthDisclosure = isAnnual
+    ? '1 year subscription, auto-renewing'
+    : '1 month subscription, auto-renewing';
+  // Per-unit price for annual — Apple specifically calls out price-per-
+  // unit "if appropriate", and annual subscriptions where it differs from
+  // the headline price are the canonical case.
+  // Computes from the localized price (defensive: returns null if Apple's
+  // pricing object is unexpected so we never hardcode).
+  const perUnitDisplay = isAnnual ? computeAnnualPerMonth(pkg) : null;
+  // Subscription title — Apple wants the EXACT product title visible.
+  // Falls back to a sensible default if the SDK doesn't surface it.
+  const subscriptionTitle =
+    pkg?.product?.title?.replace(/\s*\(.*\)\s*$/, '').trim() ||
+    `Housemait Premium ${planLabel}`;
 
   return (
     <div
@@ -325,11 +342,11 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
         className="text-[22px] text-charcoal mb-1"
         style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
       >
-        {planLabel}
+        {subscriptionTitle}
       </h2>
       <p className="text-sm text-warm-grey mb-5">{tagline}</p>
 
-      <div className="mb-5">
+      <div className="mb-3">
         <div className="flex items-baseline gap-2">
           <span
             className="text-[36px] font-semibold text-charcoal leading-none"
@@ -339,7 +356,17 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
           </span>
           <span className="text-sm text-warm-grey">{periodDisplay}</span>
         </div>
+        {perUnitDisplay && (
+          <p className="text-xs text-warm-grey mt-1">
+            (works out to {perUnitDisplay} per month)
+          </p>
+        )}
       </div>
+
+      {/* Subscription length disclosure — Apple Guideline 3.1.2(c). */}
+      <p className="text-xs text-warm-grey mb-5">
+        {lengthDisclosure}
+      </p>
 
       <ul className="space-y-2 mb-6 text-sm text-charcoal">
         {FEATURES.map((feature) => (
@@ -369,8 +396,44 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
             ? `Subscribe — ${priceString}`
             : 'Unavailable'}
       </button>
+
+      {/* Per-card disclosure block — Apple Guideline 3.1.2(c) requires
+          the auto-renew disclaimer + Terms + Privacy links to be near
+          the purchase button, not buried in a footer.                 */}
+      <p className="text-[11px] text-warm-grey mt-3 leading-snug">
+        Auto-renews each {isAnnual ? 'year' : 'month'} until cancelled. Cancel anytime in
+        Settings → Apple ID → Subscriptions at least 24 hours before the end of
+        the current period. By subscribing you agree to the{' '}
+        <Link to="/terms" className="underline">Terms of use</Link>
+        {' '}and{' '}
+        <Link to="/privacy" className="underline">Privacy policy</Link>.
+      </p>
     </div>
   );
+}
+
+/**
+ * Compute "per month" string from an annual package's localized price.
+ * Returns null if the SDK doesn't expose a numeric price + currency we
+ * can format — never falls back to hardcoded values (App Review verifies
+ * displayed price matches StoreConnect).
+ */
+function computeAnnualPerMonth(pkg) {
+  const priceObj = pkg?.product;
+  const amount = priceObj?.price; // numeric, e.g. 59.99
+  const currencyCode = priceObj?.currencyCode; // 'USD', 'GBP'
+  if (typeof amount !== 'number' || !currencyCode) return null;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyCode,
+      // Match Apple's typical formatting: 2 fraction digits.
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount / 12);
+  } catch {
+    return null;
+  }
 }
 
 // ─── Server-sync poll ────────────────────────────────────────────
