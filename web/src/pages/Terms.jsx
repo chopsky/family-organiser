@@ -23,7 +23,14 @@ export default function Terms() {
   return (
     <div className="landing-page min-h-screen bg-cream font-sans antialiased text-charcoal">
       {/* ═══ Top bar ═══ */}
-      <nav className="sticky top-0 z-50 glass border-b border-light-grey">
+      {/* paddingTop pushes the nav content below the iOS status bar — without
+          this, the logo and Back link sit under the status bar on iPhone.
+          Apple reviewers tap the Terms link from the IAP paywall and would hit
+          this same issue. */}
+      <nav
+        className="sticky top-0 z-50 glass border-b border-light-grey"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
             <img src="/housemait-logo2.png" alt="Housemait" className="h-7" />

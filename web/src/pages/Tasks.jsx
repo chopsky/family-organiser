@@ -761,12 +761,11 @@ export default function Tasks() {
           <form
             onSubmit={handleSubmit}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto space-y-3"
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto space-y-3 p-4 sm:p-6"
             style={{
               background: '#FFFFFF',
               borderRadius: 16,
               boxShadow: 'var(--shadow-lg, 0 8px 24px rgba(107,63,160,0.10))',
-              padding: 24,
             }}
           >
             <div className="flex items-center justify-between mb-1">
@@ -841,8 +840,13 @@ export default function Tasks() {
               />
             </div>
 
+            {/* min-w-0 on each grid child is critical — without it, native iOS
+                <input type="date"> and <input type="time"> report an intrinsic
+                min-width that exceeds the grid track on narrow phones, causing
+                the right column to overflow the modal. Grid items default to
+                min-width:auto, so they refuse to shrink below content width. */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="min-w-0 overflow-hidden">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Due date</label>
                 <input
                   type="date"
@@ -856,10 +860,16 @@ export default function Tasks() {
                     padding: '0 14px',
                     fontSize: 14,
                     background: '#FFFFFF',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    display: 'block',
                   }}
                 />
               </div>
-              <div>
+              <div className="min-w-0 overflow-hidden">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Time (optional)</label>
                 <input
                   type="time"
@@ -873,10 +883,16 @@ export default function Tasks() {
                     padding: '0 14px',
                     fontSize: 14,
                     background: '#FFFFFF',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    display: 'block',
                   }}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Assign to</label>
                 <select
                   value={assignee}
@@ -895,7 +911,7 @@ export default function Tasks() {
                   {members.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Priority</label>
                 <select
                   value={priority}
@@ -916,7 +932,7 @@ export default function Tasks() {
                   <option value="low">Low</option>
                 </select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Repeats</label>
                 <select
                   value={recurrence}
@@ -934,7 +950,7 @@ export default function Tasks() {
                   {RECURRENCES.map((r) => <option key={r} value={r}>{r || 'Never'}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Notification</label>
                 <select
                   value={notification}

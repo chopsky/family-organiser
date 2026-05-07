@@ -148,13 +148,15 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: SITE_KEY,
             theme,
-            // 'invisible' = no visible iframe, no layout shift, no UI element
-            // for the user to wait on. Cloudflare runs the challenge silently
-            // in the background; suspicious sessions still get an interactive
-            // prompt only when needed. Fixes an iOS WebView issue where the
-            // iframe load was eating tap-to-focus events on email/password
-            // inputs for the first 1-2 seconds, making the form feel locked.
-            size: 'invisible',
+            // 'normal' renders Cloudflare's visible managed widget — the
+            // small "Verify you are human" checkbox card. Most users see no
+            // challenge (it just resolves automatically), but the widget is
+            // visible and gives users a clear signal that bot protection is
+            // running. We previously used 'invisible' to dodge an iOS WebView
+            // tap-handling race; that's now moot because iOS native bypasses
+            // Turnstile entirely (see isIosNative() above), so the visible
+            // widget only renders on desktop / mobile-web where it's fine.
+            size: 'normal',
             // 'refresh-expired: auto' tells Cloudflare to silently issue a new
             // challenge when the previous token expires (default TTL: 5 min).
             // Without this, a user who lingers on the login page (typing

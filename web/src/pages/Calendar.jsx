@@ -1789,7 +1789,12 @@ export default function Calendar() {
                   <div className="flex-shrink-0 pt-2.5">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   </div>
-                  <div className="flex-1 space-y-2">
+                  {/* min-w-0 on the flex-1 wrapper prevents the inner row from
+                      growing past the modal width on narrow phones — flex
+                      items default to min-width:auto, and native iOS date
+                      inputs have a wide intrinsic min-width that would
+                      otherwise force the row to overflow. */}
+                  <div className="flex-1 min-w-0 space-y-2">
                     {/* Start row */}
                     <div className="flex items-center gap-2">
                       <input
@@ -1799,14 +1804,16 @@ export default function Calendar() {
                           setFormDate(e.target.value);
                           if (formEndDate < e.target.value) setFormEndDate(e.target.value);
                         }}
-                        className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                        className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                       />
                       {!formAllDay && (
                         <input
                           type="time"
                           value={formStart}
                           onChange={e => setFormStart(e.target.value)}
-                          className="w-[110px] h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                          className="w-[110px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
                       {/* All day toggle */}
@@ -1827,14 +1834,16 @@ export default function Calendar() {
                         value={formEndDate}
                         onChange={e => setFormEndDate(e.target.value)}
                         min={formDate}
-                        className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                        className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                       />
                       {!formAllDay && (
                         <input
                           type="time"
                           value={formEnd}
                           onChange={e => setFormEnd(e.target.value)}
-                          className="w-[110px] h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                          className="w-[110px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
                       {/* Spacer to align with all-day toggle */}
@@ -2084,26 +2093,32 @@ export default function Calendar() {
                   className="w-full border-[1.5px] border-light-grey rounded-[10px] px-3 py-2 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20 resize-none"
                 />
               </div>
+              {/* min-w-0 on each grid child is critical — without it, native iOS
+                  <input type="date"> and <input type="time"> report an intrinsic
+                  min-width that exceeds the grid track on narrow phones, causing
+                  the right column to overflow the modal. Same fix as Tasks.jsx. */}
               <div className="grid grid-cols-2 gap-2">
-                <div>
+                <div className="min-w-0 overflow-hidden">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Due date</label>
                   <input
                     type="date"
                     value={taskDueDate}
                     onChange={e => setTaskDueDate(e.target.value)}
+                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
                     className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                   />
                 </div>
-                <div>
+                <div className="min-w-0 overflow-hidden">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Time (optional)</label>
                   <input
                     type="time"
                     value={taskDueTime}
                     onChange={e => setTaskDueTime(e.target.value)}
+                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
                     className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Assign to</label>
                   <select
                     value={taskAssignee}
@@ -2114,7 +2129,7 @@ export default function Calendar() {
                     {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                   </select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Repeats</label>
                   <select
                     value={taskRecurrence}
@@ -2124,7 +2139,7 @@ export default function Calendar() {
                     {RECURRENCES.map(r => <option key={r} value={r}>{r || 'Never'}</option>)}
                   </select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Notification</label>
                   <select
                     value={taskNotification}
