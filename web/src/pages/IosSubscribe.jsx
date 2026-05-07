@@ -47,6 +47,7 @@ const FEATURES = [
   'Unlimited shopping lists',
   'Shared family calendar',
   'Meal planning & recipes',
+  'Unlimited AI chat',
   'Receipt scanning',
   'WhatsApp assistant',
   'Document storage',
@@ -160,11 +161,18 @@ export default function IosSubscribe() {
   );
 
   return (
-    <div className="min-h-screen bg-cream py-10 px-4">
+    <div
+      className="min-h-screen bg-cream pb-10 px-4"
+      // env(safe-area-inset-top) pushes content below the iOS status bar +
+      // Dynamic Island. Without this, the Back button sits flush against
+      // the time/battery icons and is barely tappable. Min 24px so the
+      // top has breathing room on web (where safe-area-inset-top is 0).
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
+    >
       <div className="max-w-4xl mx-auto">
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-warm-grey hover:text-charcoal transition-colors mb-6 flex items-center gap-1"
+          className="text-sm text-warm-grey hover:text-charcoal transition-colors mb-6 flex items-center gap-1 -ml-2 px-2 py-2"
           disabled={submitting !== null}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

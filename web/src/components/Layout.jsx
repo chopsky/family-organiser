@@ -377,8 +377,19 @@ export default function Layout({ children }) {
  * panel transform reads it on render.
  */
 function MoreSheet({ onClose }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  function handleLogout() {
+    setShowLogoutConfirm(false);
+    onClose();
+    logout();
+    navigate('/');
+  }
+
   // `isDragging` lives in state because the panel's `transition` prop
   // depends on it (none while dragging, spring-easing otherwise) and
   // reading mutable values off a ref during render violates React's
@@ -535,9 +546,11 @@ function MoreSheet({ onClose }) {
               Account
             </div>
             <div className="bg-white rounded-2xl border border-light-grey overflow-hidden">
-              {moreAccountRows.map((row, i, arr) => {
-                const isLast = i === arr.length - 1;
-                const rowClasses = `flex items-center px-4 py-3.5 ${isLast ? '' : 'border-b border-light-grey'}`;
+              {moreAccountRows.map((row) => {
+                // All nav rows now have a divider below — Logout is the
+                // bottom-most row with no border-bottom, so we render the
+                // borders unconditionally on the link/anchor rows.
+                const rowClasses = 'flex items-center px-4 py-3.5 border-b border-light-grey';
                 const labelClasses = `flex-1 text-[14px] text-charcoal ${row.bold ? 'font-semibold' : 'font-normal'}`;
                 const Chevron = (
                   <IconChevronRight className="h-3.5 w-3.5 text-warm-grey/60 ml-2" />
@@ -558,10 +571,60 @@ function MoreSheet({ onClose }) {
                   </NavLink>
                 );
               })}
+
+              {/* Logout — destructive, hence coral text + no chevron.
+                  Tapped → confirmation modal renders below.            */}
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="w-full flex items-center px-4 py-3.5 text-left active:bg-cream"
+              >
+                <span className="flex-1 text-[14px] font-semibold text-coral">
+                  Log out
+                </span>
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Logout confirmation modal — sits ABOVE the bottom sheet (z-[70]
+          vs sheet's z-[60]). Click outside the dialog cancels. */}
+      {showLogoutConfirm && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center px-6"
+          style={{ background: 'rgba(45,42,51,0.55)' }}
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            className="bg-cream rounded-2xl shadow-xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-[18px] font-semibold text-charcoal mb-2">
+              Log out of Housemait?
+            </h3>
+            <p className="text-sm text-cocoa mb-5">
+              You'll need to sign back in next time you open the app.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-light-grey text-charcoal text-sm font-semibold hover:bg-light-grey/30 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-coral text-white text-sm font-semibold hover:bg-coral/90 transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

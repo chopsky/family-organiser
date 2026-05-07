@@ -231,6 +231,7 @@ function PricingCard({ plan, highlighted, currentPlan, submitting, disabled, onS
           'Unlimited shopping lists',
           'Shared family calendar',
           'Meal planning & recipes',
+          'Unlimited AI chat',
           'Receipt scanning',
           'WhatsApp assistant',
           'Document storage',

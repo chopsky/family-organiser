@@ -34,27 +34,17 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import { Purchases } from '@revenuecat/purchases-capacitor';
 
-// Lazy-load the SDK module so non-native builds don't bundle native
-// stubs they'll never call. Vite still bundles it (no top-level
-// dynamic-import elision in v8), but the import is cheap on iOS where
-// it's actually needed. The dynamic import also gives us a clean
-// failure path if the native module isn't registered for some reason
-// (e.g. cap sync didn't run before a build).
-let _purchasesPromise = null;
-async function getPurchases() {
-  if (!Capacitor.isNativePlatform()) return null;
-  if (!_purchasesPromise) {
-    _purchasesPromise = import('@revenuecat/purchases-capacitor')
-      .then((mod) => mod.Purchases)
-      .catch((err) => {
-        console.error('[revenuecat] failed to load native module:', err);
-        _purchasesPromise = null;
-        return null;
-      });
-  }
-  return _purchasesPromise;
-}
+// Diagnostic: prove the module is being loaded at all on app launch.
+console.log('[revenuecat] module loaded; isNative=', Capacitor.isNativePlatform(), 'platform=', Capacitor.getPlatform());
+
+// Static import (was previously dynamic). The SDK is only useful on
+// iOS native — on web/Android it returns a stub from registerPlugin
+// that throws "UNIMPLEMENTED" when called. We gate every call site
+// with isIapPlatform() so the stub never runs. The earlier dynamic
+// import was hanging in the Capacitor WebView for reasons unclear;
+// static imports are the documented Capacitor-plugin pattern anyway.
 
 /** Entitlement identifier matching the RevenueCat dashboard (Phase 0). */
 export const PREMIUM_ENTITLEMENT = 'premium';
@@ -79,8 +69,15 @@ let _configured = false;
  * console warning so dev builds get a clear hint).
  */
 export async function configure() {
-  if (!isIapPlatform()) return;
-  if (_configured) return;
+  console.log('[revenuecat] configure() entered');
+  if (!isIapPlatform()) {
+    console.log('[revenuecat] not iOS native, skipping');
+    return;
+  }
+  if (_configured) {
+    console.log('[revenuecat] already configured, skipping');
+    return;
+  }
 
   const apiKey = import.meta.env?.VITE_REVENUECAT_IOS_KEY;
   if (!apiKey) {
@@ -90,14 +87,13 @@ export async function configure() {
     );
     return;
   }
-
-  const Purchases = await getPurchases();
-  if (!Purchases) return;
+  console.log('[revenuecat] api key present, length=', apiKey.length);
 
   try {
+    console.log('[revenuecat] calling Purchases.configure...');
     await Purchases.configure({ apiKey });
     _configured = true;
-    console.log('[revenuecat] configured');
+    console.log('[revenuecat] configured ✓');
   } catch (err) {
     console.error('[revenuecat] configure failed:', err);
   }
@@ -114,8 +110,6 @@ export async function configure() {
  */
 export async function logIn(householdId) {
   if (!isIapPlatform() || !householdId) return;
-  const Purchases = await getPurchases();
-  if (!Purchases) return;
 
   try {
     await Purchases.logIn({ appUserID: householdId });
@@ -135,8 +129,6 @@ export async function logIn(householdId) {
  */
 export async function logOut() {
   if (!isIapPlatform()) return;
-  const Purchases = await getPurchases();
-  if (!Purchases) return;
 
   try {
     await Purchases.logOut();
@@ -159,11 +151,22 @@ export async function logOut() {
  */
 export async function getCurrentOffering() {
   if (!isIapPlatform()) return null;
-  const Purchases = await getPurchases();
-  if (!Purchases) return null;
 
   try {
+    console.log('[revenuecat] calling getOfferings...');
     const result = await Purchases.getOfferings();
+    console.log('[revenuecat] getOfferings result:', JSON.stringify({
+      hasCurrent: !!result?.current,
+      currentId: result?.current?.identifier,
+      currentPackageCount: result?.current?.availablePackages?.length || 0,
+      allOfferingIds: Object.keys(result?.all || {}),
+    }));
+    if (!result?.current) {
+      console.warn(
+        '[revenuecat] No "current" offering set. Check RevenueCat dashboard → Offerings → ' +
+        'mark one offering as "Current". All offerings: ' + Object.keys(result?.all || {}).join(', ')
+      );
+    }
     return result?.current || null;
   } catch (err) {
     console.error('[revenuecat] getOfferings failed:', err);
@@ -183,11 +186,6 @@ export async function purchasePackage(pkg) {
   if (!isIapPlatform()) {
     throw new Error('IAP not available on this platform');
   }
-  const Purchases = await getPurchases();
-  if (!Purchases) {
-    throw new Error('RevenueCat SDK not loaded');
-  }
-
   // Purchases.purchasePackage returns { customerInfo, productIdentifier, transaction }.
   return Purchases.purchasePackage({ aPackage: pkg });
 }
@@ -205,11 +203,6 @@ export async function restorePurchases() {
   if (!isIapPlatform()) {
     throw new Error('Restore not available on this platform');
   }
-  const Purchases = await getPurchases();
-  if (!Purchases) {
-    throw new Error('RevenueCat SDK not loaded');
-  }
-
   return Purchases.restorePurchases();
 }
 
@@ -221,8 +214,6 @@ export async function restorePurchases() {
  */
 export async function getCustomerInfo() {
   if (!isIapPlatform()) return null;
-  const Purchases = await getPurchases();
-  if (!Purchases) return null;
 
   try {
     const result = await Purchases.getCustomerInfo();
