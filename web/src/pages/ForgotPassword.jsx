@@ -73,6 +73,12 @@ export default function ForgotPassword() {
             <Link to="/login" className="text-primary font-medium hover:underline">Back to login</Link>
           </p>
         )}
+
+        <p className="text-center text-xs text-cocoa/70 mt-6">
+          <Link to="/terms" className="hover:text-primary hover:underline">Terms of Service</Link>
+          <span className="mx-2">·</span>
+          <Link to="/privacy" className="hover:text-primary hover:underline">Privacy Policy</Link>
+        </p>
       </div>
     </div>
   );

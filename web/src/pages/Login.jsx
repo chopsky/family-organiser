@@ -164,6 +164,12 @@ export default function Login() {
         <p className="text-center text-sm text-cocoa mt-6">
           Don't have an account? <Link to="/signup" className="text-primary font-medium hover:underline">Sign up</Link>
         </p>
+
+        <p className="text-center text-xs text-cocoa/70 mt-6">
+          <Link to="/terms" className="hover:text-primary hover:underline">Terms of Service</Link>
+          <span className="mx-2">·</span>
+          <Link to="/privacy" className="hover:text-primary hover:underline">Privacy Policy</Link>
+        </p>
       </div>
     </div>
   );
