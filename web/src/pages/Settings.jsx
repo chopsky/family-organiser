@@ -1224,14 +1224,6 @@ export default function Settings() {
         ) : null}
       </div>}
 
-      {/* Log out */}
-      <button
-        onClick={() => { logout(); navigate('/'); }}
-        className="w-full py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
-      >
-        Log out
-      </button>
-
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
@@ -1332,8 +1324,10 @@ export default function Settings() {
         </Link>
       </section>
 
-      {/* Danger zone — delete account. Placed last so it's below the
-          mostly-safe Log out affordance and visually separated. */}
+      {/* Danger zone — delete account. Sits above the Log out affordance
+          because Log out is the very last thing on the page; users
+          looking to leave the app see it without having to scroll past
+          a destructive action. */}
       <section
         className="mt-2 rounded-2xl p-5 border"
         style={{ borderColor: 'rgba(215, 99, 83, 0.25)', background: 'rgba(215, 99, 83, 0.04)' }}
@@ -1358,6 +1352,16 @@ export default function Settings() {
           Delete my account
         </button>
       </section>
+
+      {/* Log out — bottom of the page. Standard convention in most
+          settings UIs; users scrolling to the end of Settings expect to
+          find it here. */}
+      <button
+        onClick={() => { logout(); navigate('/'); }}
+        className="w-full mt-6 py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
+      >
+        Log out
+      </button>
 
       {/* Delete Account Modal */}
       {deleteOpen && (
