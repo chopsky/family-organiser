@@ -8,25 +8,22 @@
  *
  * Structure:
  *   1. Hero ("How can we help?")
- *   2. FAQ — 3 grouped sections with deep-link-friendly ids
+ *   2. FAQ — 4 grouped sections with deep-link-friendly ids
  *      • #getting-started          Getting started + WhatsApp bot
  *      • #calendar-documents       Calendar + documents
+ *      • #billing                  Subscription + billing
  *      • #account-troubleshooting  Account, data + troubleshooting
  *   3. "Still need help?" — embedded ContactForm
  *   4. Footer — direct email, brand links, app version
  *
- * App Store guideline 3.1.1 — there is *no* subscription, billing,
- * pricing, payment, or Stripe content on this page in any form, on
- * any platform. Earlier drafts gated a Subscriptions FAQ behind
- * isIos() at runtime, but the strings + the openStripePortal handler
- * still lived in the JS bundle that ships with the iOS app via
- * Capacitor. Removing the section entirely means the iOS bundle
- * contains zero subscription content reachable from /help — strongest
- * possible signal to App Review.
- *
- * Web users with billing questions still find them in Settings →
- * Plan (which has its own iOS gate and the canonical Stripe portal
- * flow). The /help page deliberately does NOT duplicate that path.
+ * App Store anti-steering (Guideline 3.1.3): the billing section is
+ * present on both web and iOS, but the Cancel and Refund answers
+ * branch on isIos() so iOS users see Apple-appropriate guidance —
+ * cancel via iOS Settings → Apple ID → Subscriptions, refund via
+ * reportaproblem.apple.com (the canonical Apple refund URL, explicitly
+ * permitted to link). The Stripe portal handler from earlier drafts is
+ * intentionally NOT included — iOS users are never directed to an
+ * external billing surface.
  *
  * Copy is intentionally short and links to authoritative sources
  * where possible (Settings, Privacy page) rather than restating
@@ -35,6 +32,7 @@
 
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { isIos } from '../lib/platform';
 import FaqAccordion from '../components/FaqAccordion';
 import ContactForm from '../components/ContactForm';
 
@@ -220,7 +218,124 @@ export default function Help() {
         </FaqAccordion>
       </FaqSection>
 
-      {/* ── 3. Account, data & troubleshooting ─────────────────── */}
+      {/* ── 3. Subscription & billing ─────────────────────────── */}
+      <FaqSection id="billing" title="Subscription & billing">
+        <FaqAccordion
+          id="billing-trial"
+          question="How long is the free trial?"
+        >
+          <p>
+            30 days from when you sign up — no card or payment details
+            required to start. We'll only ask for payment if you choose
+            to keep using Housemait at the end of the trial.
+          </p>
+        </FaqAccordion>
+
+        <FaqAccordion
+          id="billing-trial-end"
+          question="What happens when my trial ends?"
+        >
+          <p>
+            Your account stays read-only — you can still log in and see
+            everything you've built — but you can't add new items or use
+            the WhatsApp bot until you subscribe. Your data stays exactly
+            where it is.
+          </p>
+        </FaqAccordion>
+
+        <FaqAccordion
+          id="billing-pricing"
+          question="How much does Housemait Premium cost?"
+        >
+          <p>
+            £5.99 per month or £59.99 per year (the annual plan works
+            out to about £5.00 per month). Subscriptions auto-renew
+            until cancelled.
+          </p>
+        </FaqAccordion>
+
+        <FaqAccordion
+          id="billing-cancel"
+          question="How do I update my payment method or cancel?"
+        >
+          {isIos() ? (
+            <>
+              <p>
+                Subscriptions purchased through the Housemait iOS app are
+                managed by Apple. To cancel or update your payment method:
+              </p>
+              <ol className="list-decimal pl-5 space-y-1 my-2">
+                <li>Open the iOS <strong>Settings</strong> app</li>
+                <li>
+                  Tap your name at the top, then{' '}
+                  <strong>Subscriptions</strong>
+                </li>
+                <li>
+                  Find <strong>Housemait</strong> and tap to manage
+                </li>
+              </ol>
+              <p>
+                Cancellations take effect at the end of your current
+                billing period — you'll keep Premium access until then.
+              </p>
+            </>
+          ) : (
+            <p>
+              Head to{' '}
+              <Link to="/settings" className="text-plum hover:underline">
+                Settings → Plan
+              </Link>{' '}
+              and use the manage-subscription button — that opens the
+              customer portal where you can update your card, change
+              plans, or cancel. Cancellations take effect at the end of
+              your current billing period.
+            </p>
+          )}
+        </FaqAccordion>
+
+        <FaqAccordion
+          id="billing-refund"
+          question="Can I get a refund?"
+        >
+          {isIos() ? (
+            <p>
+              Refunds for App Store purchases are handled by Apple. Visit{' '}
+              <a
+                href="https://reportaproblem.apple.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-plum hover:underline"
+              >
+                reportaproblem.apple.com
+              </a>
+              {' '}and select the Housemait charge — Apple will guide you
+              through the refund request. If you have other concerns,
+              email us at{' '}
+              <a
+                href="mailto:hello@housemait.com"
+                className="text-plum hover:underline"
+              >
+                hello@housemait.com
+              </a>{' '}
+              and we'll do what we can to help.
+            </p>
+          ) : (
+            <p>
+              Drop us a line at{' '}
+              <a
+                href="mailto:hello@housemait.com"
+                className="text-plum hover:underline"
+              >
+                hello@housemait.com
+              </a>{' '}
+              with the email on your account and we'll sort it out. We're
+              reasonable about refunds within the first month.
+            </p>
+          )}
+        </FaqAccordion>
+      </FaqSection>
+
+      {/* ── 4. Account, data & troubleshooting ─────────────────── */}
       <FaqSection id="account-troubleshooting" title="Account, data & troubleshooting">
         <FaqAccordion
           id="account-export-delete"
