@@ -293,46 +293,6 @@ export default function Help() {
           )}
         </FaqAccordion>
 
-        <FaqAccordion
-          id="billing-refund"
-          question="Can I get a refund?"
-        >
-          {isIos() ? (
-            <p>
-              Refunds for App Store purchases are handled by Apple. Visit{' '}
-              <a
-                href="https://reportaproblem.apple.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-plum hover:underline"
-              >
-                reportaproblem.apple.com
-              </a>
-              {' '}and select the Housemait charge — Apple will guide you
-              through the refund request. If you have other concerns,
-              email us at{' '}
-              <a
-                href="mailto:hello@housemait.com"
-                className="text-plum hover:underline"
-              >
-                hello@housemait.com
-              </a>{' '}
-              and we'll do what we can to help.
-            </p>
-          ) : (
-            <p>
-              Drop us a line at{' '}
-              <a
-                href="mailto:hello@housemait.com"
-                className="text-plum hover:underline"
-              >
-                hello@housemait.com
-              </a>{' '}
-              with the email on your account and we'll sort it out. We're
-              reasonable about refunds within the first month.
-            </p>
-          )}
-        </FaqAccordion>
       </FaqSection>
 
       {/* ── 4. Account, data & troubleshooting ─────────────────── */}
