@@ -33,7 +33,9 @@ export default function ForgotPassword() {
     <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
       <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
+          <Link to="/" aria-label="Housemait home" className="inline-block">
+            <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
+          </Link>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
           <h2 className="text-xl font-semibold text-bark mb-2">Reset your password</h2>
