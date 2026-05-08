@@ -104,93 +104,61 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
     }
 
     let cancelled = false;
-    let scriptLoadStarted = false;
 
-    // Defer loading Cloudflare's script until the user has actually
-    // interacted with the page. Loading the script on mount blocks iOS
-    // WebView's tap-event delivery for ~1-2 seconds — even with
-    // size:invisible — because the script execution and iframe creation
-    // run on the main thread during the WebView's first paint.
-    //
-    // First interaction (focus / pointerdown / keydown / touchstart on
-    // the document) tells us the user has the form responsive. By the
-    // time they finish typing and hit Submit, the script has loaded and
-    // produced a token in the background.
-    //
-    // 5s fallback timer covers the edge case of a user who lands on the
-    // page and never interacts with anything (rare — they came here for
-    // a reason). After 5s we load anyway so the widget isn't held up
-    // forever for an idle user.
-    function startScriptLoad() {
-      if (scriptLoadStarted || cancelled) return;
-      scriptLoadStarted = true;
-      cleanupListeners();
-      loadAndRenderWidget();
-    }
-
-    const interactionEvents = ['pointerdown', 'keydown', 'focusin', 'touchstart'];
-    function cleanupListeners() {
-      interactionEvents.forEach((evt) =>
-        document.removeEventListener(evt, startScriptLoad, true)
-      );
-      clearTimeout(fallbackTimer);
-    }
-
-    interactionEvents.forEach((evt) =>
-      document.addEventListener(evt, startScriptLoad, { capture: true, passive: true })
-    );
-    const fallbackTimer = setTimeout(startScriptLoad, 5000);
-
-    function loadAndRenderWidget() {
-      loadScript()
-        .then(() => {
-          if (cancelled || !containerRef.current || !window.turnstile) return;
-          widgetIdRef.current = window.turnstile.render(containerRef.current, {
-            sitekey: SITE_KEY,
-            theme,
-            // 'normal' renders Cloudflare's visible managed widget — the
-            // small "Verify you are human" checkbox card. Most users see no
-            // challenge (it just resolves automatically), but the widget is
-            // visible and gives users a clear signal that bot protection is
-            // running. We previously used 'invisible' to dodge an iOS WebView
-            // tap-handling race; that's now moot because iOS native bypasses
-            // Turnstile entirely (see isIosNative() above), so the visible
-            // widget only renders on desktop / mobile-web where it's fine.
-            size: 'normal',
-            // 'refresh-expired: auto' tells Cloudflare to silently issue a new
-            // challenge when the previous token expires (default TTL: 5 min).
-            // Without this, a user who lingers on the login page (typing
-            // slowly, reading, switching apps on iOS so the WebView suspends)
-            // submits with an expired token, Cloudflare rejects it as
-            // "invalid token", our middleware returns 403, and the user sees
-            // a generic auth failure they can't recover from. App Review
-            // hits this constantly.
-            'refresh-expired': 'auto',
-            callback: (token) => onChange?.(token),
-            'error-callback': () => {
-              onChange?.(null);
-              // Force a fresh challenge so the user's next submission isn't
-              // doomed to fail with the same stale state.
-              try { window.turnstile.reset(widgetIdRef.current); } catch { /* widget already gone */ }
-            },
-            'expired-callback': () => onChange?.(null),
-            // Note: with refresh-expired:auto, expired-callback fires THEN
-            // Turnstile auto-resets, so we just clear the parent's token.
-            // The new challenge produces a fresh token via `callback`.
-          });
-        })
-        .catch((err) => {
-          // Network blocked Cloudflare or similar. Surface null so the form
-          // submission isn't held up forever; server-side decides whether
-          // to enforce.
-          console.warn('[turnstile] widget load failed:', err.message);
-          onChange?.(null);
+    // Load the Cloudflare script and render the widget on mount. We
+    // previously deferred this until first user interaction to avoid
+    // blocking iOS WebView's tap-event delivery during the first paint
+    // — but iOS native now bypasses Turnstile entirely (see
+    // isIosNative() above), so the widget only ever renders on web,
+    // where eager loading is fine and gives users immediate feedback
+    // that bot protection is running.
+    loadScript()
+      .then(() => {
+        if (cancelled || !containerRef.current || !window.turnstile) return;
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: SITE_KEY,
+          theme,
+          // 'normal' renders Cloudflare's visible managed widget — the
+          // small "Verify you are human" checkbox card. Most users see no
+          // challenge (it just resolves automatically), but the widget is
+          // visible and gives users a clear signal that bot protection is
+          // running. We previously used 'invisible' to dodge an iOS WebView
+          // tap-handling race; that's now moot because iOS native bypasses
+          // Turnstile entirely (see isIosNative() above), so the visible
+          // widget only renders on desktop / mobile-web where it's fine.
+          size: 'normal',
+          // 'refresh-expired: auto' tells Cloudflare to silently issue a new
+          // challenge when the previous token expires (default TTL: 5 min).
+          // Without this, a user who lingers on the login page (typing
+          // slowly, reading, switching apps on iOS so the WebView suspends)
+          // submits with an expired token, Cloudflare rejects it as
+          // "invalid token", our middleware returns 403, and the user sees
+          // a generic auth failure they can't recover from. App Review
+          // hits this constantly.
+          'refresh-expired': 'auto',
+          callback: (token) => onChange?.(token),
+          'error-callback': () => {
+            onChange?.(null);
+            // Force a fresh challenge so the user's next submission isn't
+            // doomed to fail with the same stale state.
+            try { window.turnstile.reset(widgetIdRef.current); } catch { /* widget already gone */ }
+          },
+          'expired-callback': () => onChange?.(null),
+          // Note: with refresh-expired:auto, expired-callback fires THEN
+          // Turnstile auto-resets, so we just clear the parent's token.
+          // The new challenge produces a fresh token via `callback`.
         });
-    }
+      })
+      .catch((err) => {
+        // Network blocked Cloudflare or similar. Surface null so the form
+        // submission isn't held up forever; server-side decides whether
+        // to enforce.
+        console.warn('[turnstile] widget load failed:', err.message);
+        onChange?.(null);
+      });
 
     return () => {
       cancelled = true;
-      cleanupListeners();
       if (widgetIdRef.current && window.turnstile) {
         try { window.turnstile.remove(widgetIdRef.current); } catch { /* widget already gone */ }
         widgetIdRef.current = null;
