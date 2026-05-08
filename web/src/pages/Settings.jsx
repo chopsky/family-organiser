@@ -1170,15 +1170,6 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Signed in as */}
-      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
-        <h2 className="font-semibold text-bark mb-2 flex items-center gap-2"><IconUser className="h-4 w-4" /> You</h2>
-        <p className="text-sm text-cocoa">
-          Signed in as <span className="font-medium">{user?.name}</span>
-          <span className="text-cocoa"> ({user?.role})</span>
-        </p>
-      </div>
-
       {/* Schools (admin only) */}
       {isAdmin && <SchoolsSection />}
 
@@ -1323,6 +1314,16 @@ export default function Settings() {
           Visit the help centre
         </Link>
       </section>
+
+      {/* Signed in as — sits just above the danger zone so the user has
+          a clear reminder of which account they're about to delete. */}
+      <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+        <h2 className="font-semibold text-bark mb-2 flex items-center gap-2"><IconUser className="h-4 w-4" /> You</h2>
+        <p className="text-sm text-cocoa">
+          Signed in as <span className="font-medium">{user?.name}</span>
+          <span className="text-cocoa"> ({user?.role})</span>
+        </p>
+      </div>
 
       {/* Danger zone — delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
