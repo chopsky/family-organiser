@@ -112,6 +112,11 @@ export default function FamilySetup() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSchoolId, setProfileSchoolId] = useState(null);
   const [profileYearGroup, setProfileYearGroup] = useState('');
+  // Edit-modal mirror of the add-dependent flow's `depAttendsSchool` toggle.
+  // Defaulted to true in openEditProfile if the member already has a school
+  // (so existing data isn't hidden), false otherwise. Toggling off clears the
+  // school selection so saving persists null.
+  const [profileAttendsSchool, setProfileAttendsSchool] = useState(false);
   const [editSchoolSearch, setEditSchoolSearch] = useState('');
   const [editSchoolResults, setEditSchoolResults] = useState([]);
   const [editSelectedSchoolData, setEditSelectedSchoolData] = useState(null); // full GIAS school data for new school creation
@@ -291,6 +296,7 @@ export default function FamilySetup() {
     setProfileAvatar(member.avatar_url || null);
     setProfileSchoolId(member.school_id || null);
     setProfileYearGroup(member.year_group || '');
+    setProfileAttendsSchool(Boolean(member.school_id));
     const school = householdSchools.find(s => s.id === member.school_id);
     setEditSchoolSearch(school?.school_name || '');
     setEditSchoolResults([]);
@@ -1606,49 +1612,80 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School — visible for all members (a 16-year-old with login
-                  access still attends school). The activities + term dates
-                  card below is still dependent-only because those are the
-                  bits a parent manages on a younger child's behalf. */}
-              <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📋 School</h3>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-bark mb-1">School</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={editSchoolSearch}
-                        onChange={(e) => handleEditSchoolSearch(e.target.value)}
-                        className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                        placeholder="Search by name or postcode..."
-                      />
-                      {editSchoolResults.length > 0 && (
-                        <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                          {editSchoolResults.map(s => (
-                            <li key={s.urn}>
-                              <button type="button" onClick={() => selectEditSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                <span className="font-medium text-bark">{s.name}</span>
-                                <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
+              {/* School toggle — same pattern as the add-dependent form.
+                  Hidden by default for members without a school; defaulted on
+                  if the member already has a school attached (so existing data
+                  isn't surprise-hidden). Toggling off clears the selection so
+                  the save persists null. */}
+              <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-bark">
+                  {editingMember?.member_type === 'dependent'
+                    ? 'Do they attend school?'
+                    : `Does ${profileName || 'this member'} attend school?`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !profileAttendsSchool;
+                    setProfileAttendsSchool(next);
+                    if (!next) {
+                      setProfileSchoolId(null);
+                      setProfileYearGroup('');
+                      setEditSchoolSearch('');
+                      setEditSchoolResults([]);
+                      setEditSelectedSchoolData(null);
+                    }
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${profileAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
+                >
+                  <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${profileAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* School details — only shown when the toggle above is on. The
+                  activities + term-dates card below is still dependent-only
+                  because those are the bits a parent manages on a younger
+                  child's behalf. */}
+              {profileAttendsSchool && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-bark mb-1">School</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={editSchoolSearch}
+                          onChange={(e) => handleEditSchoolSearch(e.target.value)}
+                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                          placeholder="Search by name or postcode..."
+                        />
+                        {editSchoolResults.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {editSchoolResults.map(s => (
+                              <li key={s.urn}>
+                                <button type="button" onClick={() => selectEditSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                  <span className="font-medium text-bark">{s.name}</span>
+                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      {profileSchoolId && editSchoolSearch && (
+                        <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
                       )}
                     </div>
-                    {profileSchoolId && editSchoolSearch && (
-                      <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
-                    )}
-                  </div>
-                  <div className="w-28">
-                    <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                    <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                      <option value="">Select...</option>
-                      {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <div className="w-28">
+                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
+                      <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
+                        <option value="">Select...</option>
+                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Weekly activities + term-dates view (dependents only) */}
               {editingMember?.member_type === 'dependent' && (
