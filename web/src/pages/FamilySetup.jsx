@@ -672,24 +672,26 @@ export default function FamilySetup() {
         year_group: profileYearGroup || null,
       };
 
-      // Handle school assignment for dependents
+      // Handle school assignment. The /household/profile endpoint accepts
+      // school_id for any member (it's a column on the users table, used by
+      // both full Family Members and dependents) so we always send it. This
+      // lets parents associate a teen's user account with a school the same
+      // way they'd associate a younger child as a dependent.
       let createdNewSchool = false;
-      if (editingMember?.member_type === 'dependent') {
-        if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
-          // Need to create the school in household first
-          const schoolData = editSelectedSchoolData || {};
-          const { data: created } = await api.post('/schools', {
-            school_name: schoolData.name || editSchoolSearch,
-            school_urn: schoolData.urn || profileSchoolId.replace('new:', ''),
-            school_type: schoolData.type,
-            local_authority: schoolData.local_authority,
-            postcode: schoolData.postcode,
-          });
-          payload.school_id = created.school.id;
-          createdNewSchool = !created.existing;
-        } else {
-          payload.school_id = profileSchoolId || null;
-        }
+      if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
+        // Need to create the school in household first
+        const schoolData = editSelectedSchoolData || {};
+        const { data: created } = await api.post('/schools', {
+          school_name: schoolData.name || editSchoolSearch,
+          school_urn: schoolData.urn || profileSchoolId.replace('new:', ''),
+          school_type: schoolData.type,
+          local_authority: schoolData.local_authority,
+          postcode: schoolData.postcode,
+        });
+        payload.school_id = created.school.id;
+        createdNewSchool = !created.existing;
+      } else {
+        payload.school_id = profileSchoolId || null;
       }
 
       // Check if school changed (new school linked that may need term dates)
@@ -1604,49 +1606,55 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School details (dependents only) */}
-              {editingMember?.member_type === 'dependent' && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📋 School details</h3>
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-bark mb-1">School</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={editSchoolSearch}
-                          onChange={(e) => handleEditSchoolSearch(e.target.value)}
-                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="Search by name or postcode..."
-                        />
-                        {editSchoolResults.length > 0 && (
-                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                            {editSchoolResults.map(s => (
-                              <li key={s.urn}>
-                                <button type="button" onClick={() => selectEditSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                  <span className="font-medium text-bark">{s.name}</span>
-                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode}</span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      {profileSchoolId && editSchoolSearch && (
-                        <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
+              {/* School — visible for all members (a 16-year-old with login
+                  access still attends school). The activities + term dates
+                  card below is still dependent-only because those are the
+                  bits a parent manages on a younger child's behalf. */}
+              <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📋 School</h3>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-bark mb-1">School</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={editSchoolSearch}
+                        onChange={(e) => handleEditSchoolSearch(e.target.value)}
+                        className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                        placeholder="Search by name or postcode..."
+                      />
+                      {editSchoolResults.length > 0 && (
+                        <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                          {editSchoolResults.map(s => (
+                            <li key={s.urn}>
+                              <button type="button" onClick={() => selectEditSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                <span className="font-medium text-bark">{s.name}</span>
+                                <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                      <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                        <option value="">Select...</option>
-                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
-                    </div>
+                    {profileSchoolId && editSchoolSearch && (
+                      <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
+                    )}
                   </div>
+                  <div className="w-28">
+                    <label className="block text-sm font-medium text-bark mb-1">Year group</label>
+                    <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
+                      <option value="">Select...</option>
+                      {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
 
+              {/* Weekly activities + term-dates view (dependents only) */}
+              {editingMember?.member_type === 'dependent' && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   {/* Weekly activities grid */}
-                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-3">📅 Weekly activities</h3>
+                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📅 Weekly activities</h3>
                   <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time</p>
 
                   {loadingActivities ? <Spinner /> : (
