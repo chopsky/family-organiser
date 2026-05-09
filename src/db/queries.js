@@ -839,12 +839,14 @@ async function markUserOnboarded(userId, db = supabase) {
 
 // ─── Invites ────────────────────────────────────────────────────────────────
 
-async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme }, db = supabase) {
+async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme, school_id, year_group }, db = supabase) {
   const row = { household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt };
   if (name) row.name = name;
   if (family_role) row.family_role = family_role;
   if (birthday) row.birthday = birthday;
   if (color_theme) row.color_theme = color_theme;
+  if (school_id) row.school_id = school_id;
+  if (year_group) row.year_group = year_group;
   const { data, error } = await db
     .from('invites')
     .insert(row)

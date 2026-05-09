@@ -384,7 +384,7 @@ router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, as
  * Send an email invite to join the household. Admin only.
  */
 router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { email: inviteEmail, name: inviteName, family_role, birthday, color_theme } = req.body;
+  const { email: inviteEmail, name: inviteName, family_role, birthday, color_theme, school_id, year_group } = req.body;
 
   if (!inviteEmail?.trim()) {
     return res.status(400).json({ error: 'Email is required' });
@@ -394,6 +394,16 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
     const household = await db.getHouseholdById(req.householdId);
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
+    // school_id, if supplied, must be a household_schools row owned by THIS
+    // household — never trust a UUID from the client without a check.
+    let safeSchoolId = null;
+    if (school_id) {
+      const schools = await db.getHouseholdSchools(req.householdId);
+      if (schools.find((s) => s.id === school_id)) {
+        safeSchoolId = school_id;
+      }
+    }
 
     await db.createInvite({
       householdId: req.householdId,
@@ -405,6 +415,8 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
       family_role: family_role?.trim() || null,
       birthday: birthday || null,
       color_theme: color_theme || null,
+      school_id: safeSchoolId,
+      year_group: year_group || null,
     });
 
     try {

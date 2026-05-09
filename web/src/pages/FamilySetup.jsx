@@ -85,6 +85,15 @@ export default function FamilySetup() {
   const [newColor, setNewColor] = useState('teal');
   const [newEmail, setNewEmail] = useState('');
   const [addingMember, setAddingMember] = useState(false);
+  // Invite-flow school state. Mirrors the depAttendsSchool/depSchool*
+  // pattern but kept as a separate set of state vars so the two modals
+  // can't leak into each other.
+  const [newAttendsSchool, setNewAttendsSchool] = useState(false);
+  const [newSchoolSearch, setNewSchoolSearch] = useState('');
+  const [newSchoolResults, setNewSchoolResults] = useState([]);
+  const [newSelectedSchool, setNewSelectedSchool] = useState(null);
+  const [newYearGroup, setNewYearGroup] = useState('');
+  const [searchingNewSchools, setSearchingNewSchools] = useState(false);
 
   // Add dependent state
   const [showAddDependent, setShowAddDependent] = useState(false);
@@ -821,24 +830,76 @@ export default function FamilySetup() {
     setShowAddMember(true);
   }
 
+  // Search GIAS by name/postcode for the invite modal. Same shape as
+  // handleSchoolSearch (dependent flow) but writes into the invite-specific
+  // state so the two modals don't share results.
+  async function handleNewMemberSchoolSearch(query) {
+    setNewSchoolSearch(query);
+    if (query.trim().length < 2) { setNewSchoolResults([]); return; }
+    setSearchingNewSchools(true);
+    try {
+      const { data } = await api.get(`/schools/search?q=${encodeURIComponent(query)}`);
+      setNewSchoolResults(data.schools || []);
+    } catch { setNewSchoolResults([]); }
+    finally { setSearchingNewSchools(false); }
+  }
+
+  function selectNewMemberSchool(school) {
+    setNewSelectedSchool(school);
+    setNewSchoolSearch(school.name);
+    setNewSchoolResults([]);
+  }
+
   async function handleAddMember() {
     if (!newName.trim()) { setError('Name is required.'); return; }
     if (!newEmail.trim()) { setError('Email is required to send the invite.'); return; }
     setAddingMember(true);
     setError('');
     try {
+      // If a school is selected, ensure it exists as a household_schools row
+      // before the invite is created — the invites table FK references that
+      // table. Same flow as handleAddDependent. Reuses an existing household
+      // row when the URN matches (e.g. siblings already attend).
+      let schoolId = null;
+      if (newAttendsSchool && newSelectedSchool) {
+        const existing = householdSchools.find(s => s.school_urn === newSelectedSchool.urn);
+        if (existing) {
+          schoolId = existing.id;
+        } else {
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: newSelectedSchool.name,
+            school_urn: newSelectedSchool.urn,
+            school_type: newSelectedSchool.type,
+            local_authority: newSelectedSchool.local_authority,
+            postcode: newSelectedSchool.postcode,
+          });
+          schoolId = schoolData.school.id;
+        }
+      }
+
       await api.post('/household/invite', {
         email: newEmail.trim(),
         name: newName.trim(),
         family_role: newRole.trim() || null,
         birthday: newBirthday || null,
         color_theme: newColor,
+        school_id: schoolId,
+        year_group: newAttendsSchool ? newYearGroup || null : null,
       });
       setShowAddMember(false);
+      // Reset invite-flow school state for the next time the modal opens.
+      setNewAttendsSchool(false);
+      setNewSchoolSearch('');
+      setNewSelectedSchool(null);
+      setNewYearGroup('');
+      setNewSchoolResults([]);
       setSuccess(`Invite sent to ${newEmail.trim()}`);
       setTimeout(() => setSuccess(''), 3000);
       const { data } = await api.get('/household/invites');
       setPendingInvites(data.invites ?? []);
+      // Refresh household schools — a new one may have just been created.
+      const refreshedSchools = await api.get('/schools').then(r => r.data.schools || []);
+      setHouseholdSchools(refreshedSchools);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not send invite.');
     } finally {
@@ -1359,6 +1420,77 @@ export default function FamilySetup() {
                   ))}
                 </div>
               </div>
+
+              {/* School toggle — same pattern as the add-dependent flow.
+                  Pre-fills the school + year group on the invite so the
+                  fields are already set when the invitee accepts. */}
+              <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-bark">
+                  {`Does ${newName.trim() || 'this member'} attend school?`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !newAttendsSchool;
+                    setNewAttendsSchool(next);
+                    if (!next) {
+                      setNewSchoolSearch('');
+                      setNewSchoolResults([]);
+                      setNewSelectedSchool(null);
+                      setNewYearGroup('');
+                    }
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${newAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
+                >
+                  <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${newAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {newAttendsSchool && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-bark mb-1">School</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={newSchoolSearch}
+                          onChange={(e) => handleNewMemberSchoolSearch(e.target.value)}
+                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                          placeholder="Search by name or postcode..."
+                        />
+                        {searchingNewSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
+                        {newSchoolResults.length > 0 && (
+                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {newSchoolResults.map(s => (
+                              <li key={s.urn}>
+                                <button type="button" onClick={() => selectNewMemberSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                  <span className="font-medium text-bark">{s.name}</span>
+                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      {/* Surface 'same school as Tom' hint when relevant */}
+                      {newSelectedSchool && householdSchools.find(s => s.school_urn === newSelectedSchool.urn) && (
+                        <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
+                          <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === newSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
+                          <p className="text-xs text-plum/70">Term dates already set up.</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-28">
+                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
+                      <select value={newYearGroup} onChange={(e) => setNewYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
+                        <option value="">Select...</option>
+                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-cream-border">
                 <label className="block text-sm font-medium text-bark mb-1">Email address <span className="text-error">*</span></label>

@@ -125,6 +125,8 @@ router.post('/register', requireTurnstile, async (req, res) => {
       if (invite.family_role) profileUpdates.family_role = invite.family_role;
       if (invite.birthday) profileUpdates.birthday = invite.birthday;
       if (invite.color_theme) profileUpdates.color_theme = invite.color_theme;
+      if (invite.school_id) profileUpdates.school_id = invite.school_id;
+      if (invite.year_group) profileUpdates.year_group = invite.year_group;
       if (Object.keys(profileUpdates).length > 0) {
         await db.updateUser(user.id, profileUpdates);
       }
