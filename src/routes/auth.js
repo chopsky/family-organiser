@@ -895,13 +895,19 @@ router.post('/google', async (req, res) => {
     let user = await db.getUserByEmail(googleEmail);
 
     if (!user) {
-      // Handle invite
+      // Handle invite — hold the invite reference so we can copy its pre-fill
+      // fields onto the new user after createUserWithEmail returns. Mirrors
+      // the email/password flow above (~line 122-130). Without this, family
+      // role / birthday / colour theme / school_id / year_group set by the
+      // inviter are silently dropped on SSO sign-up.
       let householdId = null;
+      let acceptedInvite = null;
       const role = 'member';
       if (inviteToken) {
         const invite = await db.getInviteByToken(inviteToken);
         if (invite) {
           householdId = invite.household_id;
+          acceptedInvite = invite;
           await db.markInviteAccepted(invite.id);
         }
       }
@@ -914,6 +920,19 @@ router.post('/google', async (req, res) => {
         emailVerified: true,
         role,
       });
+
+      if (acceptedInvite) {
+        const profileUpdates = {};
+        if (acceptedInvite.family_role) profileUpdates.family_role = acceptedInvite.family_role;
+        if (acceptedInvite.birthday) profileUpdates.birthday = acceptedInvite.birthday;
+        if (acceptedInvite.color_theme) profileUpdates.color_theme = acceptedInvite.color_theme;
+        if (acceptedInvite.school_id) profileUpdates.school_id = acceptedInvite.school_id;
+        if (acceptedInvite.year_group) profileUpdates.year_group = acceptedInvite.year_group;
+        if (Object.keys(profileUpdates).length > 0) {
+          await db.updateUser(user.id, profileUpdates);
+          user = { ...user, ...profileUpdates };
+        }
+      }
     }
 
     const response = await authResponse(user, req);
@@ -960,11 +979,15 @@ router.post('/apple', async (req, res) => {
 
     if (!user) {
       const userName = appleName || appleEmail.split('@')[0];
+      // Hold the invite reference so we can copy its pre-fill fields onto the
+      // new user. Mirrors the email/password and Google blocks above.
       let householdId = null;
+      let acceptedInvite = null;
       if (inviteToken) {
         const invite = await db.getInviteByToken(inviteToken);
         if (invite) {
           householdId = invite.household_id;
+          acceptedInvite = invite;
           await db.markInviteAccepted(invite.id);
         }
       }
@@ -977,6 +1000,19 @@ router.post('/apple', async (req, res) => {
         emailVerified: true,
         role: 'member',
       });
+
+      if (acceptedInvite) {
+        const profileUpdates = {};
+        if (acceptedInvite.family_role) profileUpdates.family_role = acceptedInvite.family_role;
+        if (acceptedInvite.birthday) profileUpdates.birthday = acceptedInvite.birthday;
+        if (acceptedInvite.color_theme) profileUpdates.color_theme = acceptedInvite.color_theme;
+        if (acceptedInvite.school_id) profileUpdates.school_id = acceptedInvite.school_id;
+        if (acceptedInvite.year_group) profileUpdates.year_group = acceptedInvite.year_group;
+        if (Object.keys(profileUpdates).length > 0) {
+          await db.updateUser(user.id, profileUpdates);
+          user = { ...user, ...profileUpdates };
+        }
+      }
     }
 
     const response = await authResponse(user, req);
