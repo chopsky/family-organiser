@@ -58,9 +58,13 @@ export default function FamilySetup() {
   const canWrite = useCanWrite();
 
   const [name, setName]               = useState(household?.name ?? '');
-  const [reminderTime, setReminderTime] = useState(
-    household?.reminder_time?.slice(0, 5) ?? '08:00'
-  );
+  // Household default reminder time. Previously editable on this page but
+  // removed from the UI now that each member sets their own time — the
+  // column is kept as the scheduler's fallback for users who haven't set a
+  // personal time. The seed value (set on signup) remains in the DB and is
+  // never re-edited from the client. Read here only to display in the
+  // per-member hint copy.
+  const householdReminderTime = household?.reminder_time?.slice(0, 5) ?? '08:00';
   const [saving, setSaving]           = useState(false);
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
@@ -777,7 +781,6 @@ export default function FamilySetup() {
     try {
       const { data } = await api.patch('/settings/settings', {
         name: name.trim(),
-        reminder_time: reminderTime + ':00',
       });
       setSuccess('Settings saved!');
       login({ token, user, household: data.household });
@@ -886,16 +889,6 @@ export default function FamilySetup() {
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-bark block mb-1">Default daily reminder time</label>
-              <input
-                type="time"
-                value={reminderTime}
-                onChange={(e) => setReminderTime(e.target.value)}
-                className="border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-              <p className="text-xs text-cocoa mt-1">Default for members who haven't set their own time.</p>
-            </div>
             <button
               type="submit"
               disabled={saving}
@@ -907,7 +900,6 @@ export default function FamilySetup() {
         ) : (
           <div className="space-y-2 text-sm text-cocoa">
             <p><span className="font-medium text-bark">Name:</span> {household?.name}</p>
-            <p><span className="font-medium text-bark">Reminder time:</span> {household?.reminder_time?.slice(0, 5)}</p>
             <p className="text-xs text-cocoa mt-2">Only admins can change household settings.</p>
           </div>
         )}
@@ -1906,7 +1898,7 @@ export default function FamilySetup() {
                     className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
                   />
                   <p className="text-xs text-cocoa mt-1">
-                    {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
+                    {profileReminderTime ? 'Your personal reminder time.' : `If empty, sent at ${householdReminderTime}.`}
                   </p>
                 </div>
               )}
