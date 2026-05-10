@@ -11,6 +11,29 @@ const isNativeIos = () => {
   catch { return false; }
 };
 
+// Detect "user dismissed the native sign-in sheet" across providers and
+// error shapes. Treat as a silent no-op rather than an error toast.
+//
+// Variants seen in the wild:
+//   - Apple ASAuthorizationError.canceled = code 1001 — surfaces as
+//     "The operation couldn't be completed.
+//      (com.apple.AuthenticationServices.AuthorizationError error 1001.)"
+//   - Google's iOS SDK: GIDSignInErrorCode.canceled = -5 — message
+//     "The user canceled the sign-in flow."
+//   - Capgo plugin's normalised codes: 'CANCELED' / 'CANCELLED'
+//   - Apple's web JS SDK: { error: 'popup_closed_by_user' }
+function isCancelError(err) {
+  if (!err) return false;
+  const code = String(err.code ?? '').toUpperCase();
+  if (code === 'CANCELED' || code === 'CANCELLED' || code === '1001' || code === '-5') return true;
+  if (err.error === 'popup_closed_by_user') return true;
+  const msg = String(err.message ?? '').toLowerCase();
+  if (msg.includes('cancel')) return true;
+  // Apple wraps the underlying NSError as "(...AuthorizationError error 1001.)"
+  if (msg.includes('authorizationerror') && msg.includes('1001')) return true;
+  return false;
+}
+
 export default function SocialButtons({ inviteToken, onSuccess, onError }) {
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [nativeSocialLoginInitialised, setNativeSocialLoginInitialised] = useState(false);
@@ -95,8 +118,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         });
         onSuccess(data);
       } catch (err) {
-        // User cancelled the native sheet — silent no-op.
-        if (err?.code === 'CANCELED' || err?.message?.includes('cancel')) return;
+        if (isCancelError(err)) return;
         console.error('[social-login] iOS Google sign-in error:', err);
         onError(err?.response?.data?.error || err?.message || 'Google sign-in failed.');
       }
@@ -154,7 +176,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         });
         onSuccess(data);
       } catch (err) {
-        if (err?.code === 'CANCELED' || err?.message?.includes('cancel')) return;
+        if (isCancelError(err)) return;
         console.error('[social-login] iOS Apple sign-in error:', err);
         onError(err?.response?.data?.error || err?.message || 'Apple sign-in failed.');
       }
@@ -189,7 +211,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
       });
       onSuccess(data);
     } catch (err) {
-      if (err.error === 'popup_closed_by_user') return;
+      if (isCancelError(err)) return;
       onError(err.response?.data?.error || 'Apple sign-in failed.');
     }
   }
