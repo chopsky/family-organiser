@@ -108,6 +108,14 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
       }
       try {
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        // Force the account chooser. Google's iOS SDK caches the last-used
+        // account by default and silently signs you back in — fine for
+        // password-manager-like flows, wrong for an explicit
+        // 'Continue with Google' button where the user expects to pick
+        // which account. logout() clears the cached credential without
+        // affecting the user's logged-in state in our app.
+        try { await SocialLogin.logout({ provider: 'google' }); }
+        catch { /* nothing cached — first sign-in, ignore */ }
         console.log('[social-login] iOS Google: calling login()...');
         const result = await SocialLogin.login({ provider: 'google', options: {} });
         console.log('[social-login] iOS Google: result keys=', Object.keys(result || {}), 'inner keys=', Object.keys(result?.result || {}));
