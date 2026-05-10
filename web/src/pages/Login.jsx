@@ -43,18 +43,7 @@ export default function Login() {
       // Surface a more useful message than "Something went wrong" when
       // axios fails before getting a response — typically CORS, network,
       // or wrong API URL.
-      let msg = err.response?.data?.error;
-      if (!msg) {
-        if (err.code === 'ERR_NETWORK') msg = 'Network error — could not reach the server.';
-        else if (err.code === 'ERR_BAD_REQUEST') msg = 'Server rejected the request (CORS or 4xx).';
-        else if (err.message) msg = `Error: ${err.message}`;
-        else msg = 'Something went wrong.';
-      }
-      // Show the baseURL inline so we can see exactly what URL the app was
-      // trying to reach without needing Web Inspector.
-      msg += ` [origin=${window.location.origin} | api=${err.config?.baseURL || '?'} | url=${err.config?.url || '?'}]`;
-      setError(msg);
-      console.error('[login] failed:', { code: err.code, status: err.response?.status, message: err.message, baseURL: err.config?.baseURL, url: err.config?.url });
+      setError(err.response?.data?.error || 'Something went wrong.');
       // Turnstile tokens are single-use — the backend already consumed
       // ours validating this submission. Re-submitting with the same
       // token would trip "Bot verification failed" on the second try.
