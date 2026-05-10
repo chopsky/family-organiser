@@ -73,13 +73,24 @@ describe('isAllowedOrigin', () => {
     expect(isAllowed('http://family-organiser-abc.vercel.app')).toBe(false); // http (not https)
   });
 
-  test('rejects production URL variants that do not exactly match WEB_URL', () => {
+  test('rejects production URL variants that do not match WEB_URL', () => {
     const isAllowed = load();
-    // Exact string comparison (not substring) so www.housmait.com.evil.com
-    // can't sneak through.
+    // Different protocol must be rejected.
     expect(isAllowed('http://www.housmait.com')).toBe(false);
-    expect(isAllowed('https://housmait.com')).toBe(false);
+    // Substring spoof must be rejected — exact hostname match (after
+    // stripping leading www.) is required.
     expect(isAllowed('https://www.housmait.com.evil.com')).toBe(false);
+  });
+
+  test('accepts www and bare-domain variants of WEB_URL', () => {
+    // WEB_URL is set to https://www.housmait.com in beforeEach — both
+    // forms of the production hostname must be allowed because the iOS
+    // app's WebView origin can be either depending on capacitor.config
+    // (server.hostname). Without this, switching between forms silently
+    // breaks the iOS app via CORS rejection.
+    const isAllowed = load();
+    expect(isAllowed('https://www.housmait.com')).toBe(true);
+    expect(isAllowed('https://housmait.com')).toBe(true);
   });
 
   test('allows all origins when WEB_URL is unset (development mode)', () => {

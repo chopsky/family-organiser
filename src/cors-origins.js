@@ -30,6 +30,20 @@ function isAllowedOrigin(origin) {
   if (!origin) return true; // same-origin / mobile / server-to-server
   if (!process.env.WEB_URL) return true; // dev: allow all
   if (origin === process.env.WEB_URL) return true;
+  // Accept www and bare-domain variants of WEB_URL automatically. iOS's
+  // WKWebView (server.hostname in capacitor.config.json) is configured to
+  // load from https://www.housemait.com — that origin must be allowed
+  // even if Railway's WEB_URL happens to be set to the bare-domain form,
+  // or vice versa. Without this, switching WEB_URL between www / bare
+  // silently breaks the iOS app via CORS rejection.
+  try {
+    const webUrl = new URL(process.env.WEB_URL);
+    const reqUrl = new URL(origin);
+    if (reqUrl.protocol === webUrl.protocol) {
+      const stripWww = (h) => h.replace(/^www\./, '');
+      if (stripWww(reqUrl.hostname) === stripWww(webUrl.hostname)) return true;
+    }
+  } catch { /* malformed URL — fall through to remaining checks */ }
   if (origin === 'capacitor://localhost') return true;
   if (origin === 'http://localhost') return true;
   return PREVIEW_PATTERNS.some((re) => re.test(origin));
