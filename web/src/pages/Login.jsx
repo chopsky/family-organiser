@@ -79,9 +79,9 @@ export default function Login() {
     return '/dashboard';
   }
 
+  // paddingTop accommodates the iOS status bar via env(safe-area-inset-top).
+  // Desktop has no safe area so it's effectively just 2rem on web.
   return (
-    {/* paddingTop accommodates the iOS status bar via env(safe-area-inset-top).
-        Desktop has no safe area so it's effectively just 2rem on web. */}
     <div
       className="min-h-screen bg-oat px-4 pb-8 md:pb-12 flex flex-col items-center"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
