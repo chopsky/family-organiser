@@ -1239,7 +1239,7 @@ export default function FamilySetup() {
       {showAddDependent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAddDependent(false)}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-bark">Add family member</h2>
               <button onClick={() => setShowAddDependent(false)} className="text-cocoa hover:text-bark p-1">
@@ -1270,7 +1270,7 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
-                <input type="date" value={depBirthday} onChange={(e) => setDepBirthday(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
+                <input type="date" value={depBirthday} onChange={(e) => setDepBirthday(e.target.value)} style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
               </div>
 
               <div>
@@ -1366,7 +1366,7 @@ export default function FamilySetup() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAddMember(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
@@ -1400,7 +1400,7 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
-                <input type="date" value={newBirthday} onChange={(e) => setNewBirthday(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
+                <input type="date" value={newBirthday} onChange={(e) => setNewBirthday(e.target.value)} style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
               </div>
 
               <div>
@@ -1628,8 +1628,13 @@ export default function FamilySetup() {
       {editingMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingMember(null)}>
           <div className="absolute inset-0 bg-black/40" />
+          {/* overflow-x-hidden clips any horizontal overflow from native iOS
+              date/time inputs that would otherwise push past the modal edge.
+              Vertical scrolling still works via overflow-y-auto. p-4 on mobile
+              (instead of flat p-6) gives narrow phones more room for the
+              native picker controls. */}
           <div
-            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
@@ -1703,12 +1708,18 @@ export default function FamilySetup() {
                 />
               </div>
 
-              <div>
+              {/* Native iOS date/time inputs have an intrinsic min-width that
+                  can exceed narrow modal widths, causing horizontal overflow.
+                  min-w-0 + overflow-hidden on the wrapper, and appearance:none
+                  + maxWidth:100% on the input itself, kill the overflow without
+                  losing the native picker (which still triggers on tap). */}
+              <div className="min-w-0 overflow-hidden">
                 <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
                 <input
                   type="date"
                   value={profileBirthday}
                   onChange={(e) => setProfileBirthday(e.target.value)}
+                  style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
                   className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
                 />
               </div>
@@ -2021,12 +2032,13 @@ export default function FamilySetup() {
               )}
 
               {editingMember?.member_type !== 'dependent' && (
-                <div>
+                <div className="min-w-0 overflow-hidden">
                   <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
                   <input
                     type="time"
                     value={profileReminderTime}
                     onChange={(e) => setProfileReminderTime(e.target.value)}
+                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
                     className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
                   />
                   <p className="text-xs text-cocoa mt-1">
