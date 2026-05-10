@@ -114,28 +114,32 @@ export default function Privacy() {
               <li>Server and application logs (errors, request traces) for operating and debugging the Service</li>
             </ul>
 
-            <SubHeading>2.5 Analytics data <em>(only with your consent)</em></SubHeading>
+            <SubHeading>2.5 Analytics data</SubHeading>
             <p>
-              On the Housemait website (housemait.com) we use{' '}
-              <strong>Google Analytics 4</strong> to understand how visitors discover and move
-              through the site so we can improve it. Google Analytics is{' '}
-              <strong>only loaded if you accept the cookie banner</strong> shown on your first
-              visit. If you decline, no analytics cookies are set and no usage data is sent to
-              Google.
+              On the Housemait website (housemait.com) we use <strong>Google Analytics 4</strong>{' '}
+              to understand how visitors discover and move through the site so we can improve
+              it. We use Google's <strong>Consent Mode v2</strong> with all consent signals
+              defaulted to "denied", which means Google Analytics behaves very differently
+              before and after you respond to the cookie banner:
             </p>
-            <p>If you accept, Google Analytics collects:</p>
+            <p><strong>Before you accept or decline</strong> the banner, and at all times if you
+              decline:</p>
             <ul className="list-disc pl-6 space-y-1.5">
-              <li>A pseudonymous client ID stored in a first-party cookie (<code>_ga</code>, <code>_ga_*</code>)</li>
-              <li>Pages you visit, the order you visit them in, and how long you stay</li>
-              <li>Approximate location (country / region only — IP addresses are anonymised by Google)</li>
-              <li>Device and browser type</li>
-              <li>The site you arrived from (referrer)</li>
+              <li>No analytics cookies are set on your device.</li>
+              <li>No persistent identifier is generated for you.</li>
+              <li>Only anonymised cookieless pings are sent to Google, containing the URL you visited, the page that referred you, a coarse country/region derived from your IP (which is then anonymised), and your device/browser type. These pings can't be tied back to you across sessions.</li>
+            </ul>
+            <p><strong>After you accept</strong> the banner:</p>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li>Google Analytics sets first-party cookies on housemait.com (<code>_ga</code>, <code>_ga_*</code>) containing a pseudonymous client ID.</li>
+              <li>We can see the path you take through the site, how long you stay on each page, and which pages convert (sign-ups, etc.) so we know which content is helping families.</li>
+              <li>IP addresses remain anonymised by Google before any data is stored.</li>
             </ul>
             <p>
-              We do <strong>not</strong> use Google Analytics inside the authenticated app
-              itself, only on the marketing website. You can withdraw consent at any time by
-              clearing site data for housemait.com in your browser, which removes the cookies
-              and reshows the banner on your next visit.
+              We do <strong>not</strong> use Google Analytics inside the authenticated Housemait
+              app itself — only on the public marketing website. You can withdraw consent at any
+              time by clearing site data for housemait.com in your browser, which removes the
+              cookies and reshows the banner on your next visit.
             </p>
 
             <SubHeading>2.6 Data we do <em>not</em> collect</SubHeading>
@@ -164,7 +168,8 @@ export default function Privacy() {
                   <Row c1="Process data through AI providers to classify messages, extract tasks/shopping items, parse receipts, and answer questions" c2="Performance of contract (Art. 6(1)(b))" />
                   <Row c1="Keep the Service secure — rate limiting, abuse prevention, fraud detection" c2="Legitimate interests (Art. 6(1)(f)) — running a secure service" />
                   <Row c1="Diagnose errors and improve the Service" c2="Legitimate interests (Art. 6(1)(f))" />
-                  <Row c1="Measure how visitors use the marketing website (via Google Analytics)" c2="Consent (Art. 6(1)(a)) — only after you accept the cookie banner; revocable at any time" />
+                  <Row c1="Aggregate, cookieless measurement of marketing-website traffic (Google Analytics Consent Mode pings — no cookies, no identifiers, anonymised IP)" c2="Legitimate interests (Art. 6(1)(f))" />
+                  <Row c1="Full marketing-website analytics with cookies (Google Analytics)" c2="Consent (Art. 6(1)(a)) — only after you accept the cookie banner; revocable at any time" />
                   <Row c1="Comply with legal obligations (e.g. respond to lawful requests, tax and accounting records)" c2="Legal obligation (Art. 6(1)(c))" />
                 </tbody>
               </table>
@@ -220,7 +225,7 @@ export default function Privacy() {
                   <Row c1="Google Sign-In & Google Calendar" c2="Optional authentication and calendar sync" c3="Global" />
                   <Row c1="Microsoft Graph (Microsoft 365)" c2="Optional calendar sync" c3="Global" />
                   <Row c1="Open-Meteo / equivalent weather API" c2="Weather data (requires only coarse lat/lon)" c3="EU" />
-                  <Row c1="Google Analytics 4" c2="Marketing-website analytics (housemait.com only; loaded only with your consent)" c3="US / EU" />
+                  <Row c1="Google Analytics 4" c2="Marketing-website analytics (housemait.com only; Consent Mode v2 — cookieless until you accept, full analytics after)" c3="US / EU" />
                 </tbody>
               </table>
             </TableWrap>

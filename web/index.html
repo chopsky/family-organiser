@@ -33,10 +33,34 @@
     <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
     <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
 
-    <!-- Google Analytics is loaded at runtime by web/src/lib/analytics.js
-         once the user accepts the cookie banner. PECR / UK GDPR require an
-         explicit opt-in before any non-essential tracker fires, so the
-         gtag <script> deliberately doesn't appear inline here. -->
+    <!-- Google Analytics with Consent Mode v2.
+         The gtag script loads on every page so Google's tag verifier (and
+         our own setup-time checks) can detect it. BEFORE config runs, we
+         set every consent signal to "denied" — this means GA only sends
+         cookieless, anonymised pings (no _ga cookies, no client ID, no
+         personal data) until the user accepts the cookie banner. The
+         pings let us see anonymous traffic shape; full GA4 events,
+         cookies, and identifiers turn on via gtag('consent', 'update')
+         called from web/src/lib/analytics.js when consent flips. This is
+         the ICO-recognised pattern for PECR/UK-GDPR-compliant analytics.
+         wait_for_update gives the JS bundle ~500ms to restore a prior
+         "accepted" choice from localStorage before the first config ping
+         fires, so returning visitors don't lose the page-view. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RY1QCM5JBG"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500
+      });
+      gtag('js', new Date());
+      gtag('config', 'G-RY1QCM5JBG', { anonymize_ip: true });
+    </script>
   </head>
   <body>
     <div id="root"></div>
