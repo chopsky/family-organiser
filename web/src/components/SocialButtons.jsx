@@ -27,10 +27,13 @@ function isCancelError(err) {
   const code = String(err.code ?? '').toUpperCase();
   if (code === 'CANCELED' || code === 'CANCELLED' || code === '1001' || code === '-5') return true;
   if (err.error === 'popup_closed_by_user') return true;
-  const msg = String(err.message ?? '').toLowerCase();
-  if (msg.includes('cancel')) return true;
   // Apple wraps the underlying NSError as "(...AuthorizationError error 1001.)"
+  const msg = String(err.message ?? '').toLowerCase();
   if (msg.includes('authorizationerror') && msg.includes('1001')) return true;
+  // Google iOS SDK uses 'the user canceled the sign-in flow.' — narrow
+  // match to avoid swallowing real errors that incidentally contain
+  // 'cancel' (e.g. 'request was cancelled mid-flight by ...').
+  if (/the user canceled/i.test(msg) || /user cancelled/i.test(msg)) return true;
   return false;
 }
 
@@ -105,21 +108,35 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
       }
       try {
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        console.log('[social-login] iOS Google: calling login()...');
         const result = await SocialLogin.login({ provider: 'google', options: {} });
+        console.log('[social-login] iOS Google: result keys=', Object.keys(result || {}), 'inner keys=', Object.keys(result?.result || {}));
         // Plugin returns { provider, result: { idToken, ...profile } } on iOS.
-        const idToken = result?.result?.idToken;
+        // Defensive: also try a couple of other shapes Capgo has used across
+        // versions, in case the documented one doesn't match what we get.
+        const idToken =
+          result?.result?.idToken ||
+          result?.idToken ||
+          result?.result?.authentication?.idToken ||
+          null;
         if (!idToken) {
+          console.warn('[social-login] iOS Google: no idToken in response. Full result:', JSON.stringify(result));
           onError('Google sign-in did not return a token. Please try again.');
           return;
         }
+        console.log('[social-login] iOS Google: got idToken, length=', idToken.length, '— POSTing to /auth/google');
         const { data } = await api.post('/auth/google', {
           idToken,
           inviteToken: inviteToken || undefined,
         });
+        console.log('[social-login] iOS Google: server accepted, calling onSuccess');
         onSuccess(data);
       } catch (err) {
-        if (isCancelError(err)) return;
-        console.error('[social-login] iOS Google sign-in error:', err);
+        if (isCancelError(err)) {
+          console.log('[social-login] iOS Google: cancelled by user');
+          return;
+        }
+        console.error('[social-login] iOS Google sign-in error:', err, 'response data:', err?.response?.data);
         onError(err?.response?.data?.error || err?.message || 'Google sign-in failed.');
       }
       return;
