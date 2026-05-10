@@ -68,7 +68,12 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
+    {/* paddingTop accommodates the iOS status bar via env(safe-area-inset-top).
+        Desktop has no safe area so it's effectively just 2rem on web. */}
+    <div
+      className="min-h-screen bg-oat px-4 pb-8 md:pb-12 flex flex-col items-center"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+    >
       <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" aria-label="Housemait home" className="inline-block">
