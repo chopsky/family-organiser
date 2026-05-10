@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import SortableHeader from '../../components/SortableHeader';
 
 const PAGE_SIZE = 20;
 
@@ -11,12 +12,14 @@ export default function AdminUsers() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: PAGE_SIZE };
+      const params = { page, limit: PAGE_SIZE, sort, sortDir };
       if (search.trim()) params.search = search.trim();
       const { data } = await api.get('/admin/users', { params });
       setUsers(data.users || []);
@@ -26,7 +29,7 @@ export default function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, sort, sortDir]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -34,6 +37,12 @@ export default function AdminUsers() {
     e.preventDefault();
     setPage(1);
     loadUsers();
+  }
+
+  function handleSort(column, direction) {
+    setPage(1);
+    setSort(column);
+    setSortDir(direction);
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -79,11 +88,11 @@ export default function AdminUsers() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-light-grey text-left">
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Name</th>
+                  <SortableHeader column="name" label="Name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Email</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Role</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Joined</th>
+                  <SortableHeader column="created_at" label="Joined" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
               <tbody>

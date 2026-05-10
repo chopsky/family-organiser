@@ -2537,7 +2537,7 @@ async function getRecentPurchases(householdId, days = 14, db = supabase) {
 
 // ─── Platform Admin ──────────────────────────────────────────────────────────
 
-async function getAllUsersAdmin({ search, page = 1, limit = 50 } = {}, db = supabase) {
+async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc' } = {}, db = supabase) {
   let query = db
     .from('users')
     .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
@@ -2546,9 +2546,13 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50 } = {}, db = supa
     query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
   }
 
+  // Whitelist sort columns to prevent injection
+  const sortColumn = sort === 'name' ? 'name' : 'created_at';
+  const ascending = sortDir === 'asc';
+
   const from = (page - 1) * limit;
   const { data, error, count } = await query
-    .order('created_at', { ascending: false })
+    .order(sortColumn, { ascending })
     .range(from, from + limit - 1);
 
   if (error) throw error;
@@ -2576,7 +2580,7 @@ async function getUserByIdAdmin(userId, db = supabase) {
   return { ...user, household };
 }
 
-async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}, db = supabase) {
+async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc', plan } = {}, db = supabase) {
   let query = db
     .from('households')
     .select('id, name, join_code, timezone, reminder_time, created_at, subscription_status, subscription_plan, trial_ends_at, is_internal, subscription_current_period_end, stripe_customer_id', { count: 'exact' });
@@ -2585,9 +2589,22 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50 } = {}, db =
     query = query.ilike('name', `%${search}%`);
   }
 
+  // Plan filter — matches what SubscriptionBadge displays. Internal takes
+  // priority over subscription_status, so non-internal filters must also
+  // exclude internal households.
+  if (plan === 'internal') {
+    query = query.eq('is_internal', true);
+  } else if (plan === 'trialing' || plan === 'active' || plan === 'expired' || plan === 'cancelled') {
+    query = query.eq('subscription_status', plan).eq('is_internal', false);
+  }
+
+  // Whitelist sort columns to prevent injection
+  const sortColumn = sort === 'name' ? 'name' : 'created_at';
+  const ascending = sortDir === 'asc';
+
   const from = (page - 1) * limit;
   const { data, error, count } = await query
-    .order('created_at', { ascending: false })
+    .order(sortColumn, { ascending })
     .range(from, from + limit - 1);
 
   if (error) throw error;

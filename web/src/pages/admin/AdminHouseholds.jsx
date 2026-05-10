@@ -4,22 +4,35 @@ import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
+import SortableHeader from '../../components/SortableHeader';
 import { formatBytes } from '../../lib/formatBytes';
 
 const PAGE_SIZE = 20;
+const PLAN_OPTIONS = [
+  { value: '', label: 'All plans' },
+  { value: 'trialing', label: 'Trialing' },
+  { value: 'active', label: 'Active' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'internal', label: 'Internal' },
+];
 
 export default function AdminHouseholds() {
   const [households, setHouseholds] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+  const [sort, setSort] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
 
   const loadHouseholds = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: PAGE_SIZE };
+      const params = { page, limit: PAGE_SIZE, sort, sortDir };
       if (search.trim()) params.search = search.trim();
+      if (planFilter) params.plan = planFilter;
       const { data } = await api.get('/admin/households', { params });
       setHouseholds(data.households || []);
       setTotal(data.total || 0);
@@ -28,7 +41,7 @@ export default function AdminHouseholds() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, planFilter, sort, sortDir]);
 
   useEffect(() => { loadHouseholds(); }, [loadHouseholds]);
 
@@ -38,6 +51,17 @@ export default function AdminHouseholds() {
     loadHouseholds();
   }
 
+  function handleSort(column, direction) {
+    setPage(1);
+    setSort(column);
+    setSortDir(direction);
+  }
+
+  function handlePlanChange(e) {
+    setPage(1);
+    setPlanFilter(e.target.value);
+  }
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
@@ -45,22 +69,33 @@ export default function AdminHouseholds() {
       <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Households</h1>
       <p className="text-warm-grey text-sm mt-1">{total} total household{total !== 1 ? 's' : ''}</p>
 
-      {/* Search */}
-      <form onSubmit={handleSearch} className="mt-4 flex gap-2">
-        <div className="relative flex-1 max-w-md">
-          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by household name..."
-            className="w-full pl-10 pr-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
-          />
-        </div>
-        <button type="submit" className="px-4 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum-dark transition-colors">
-          Search
-        </button>
-      </form>
+      {/* Search + Filter */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[280px]">
+          <div className="relative flex-1 max-w-md">
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by household name..."
+              className="w-full pl-10 pr-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
+            />
+          </div>
+          <button type="submit" className="px-4 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum-dark transition-colors">
+            Search
+          </button>
+        </form>
+        <select
+          value={planFilter}
+          onChange={handlePlanChange}
+          className="px-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm font-medium text-charcoal focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
+        >
+          {PLAN_OPTIONS.map(({ value, label }) => (
+            <option key={value || 'all'} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Table */}
       <div className="mt-4 bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
@@ -71,13 +106,13 @@ export default function AdminHouseholds() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-light-grey text-left">
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Name</th>
+                  <SortableHeader column="name" label="Name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Storage</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Join Code</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Timezone</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Created</th>
+                  <SortableHeader column="created_at" label="Created" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
               <tbody>

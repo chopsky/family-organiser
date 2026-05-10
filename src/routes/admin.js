@@ -23,11 +23,13 @@ router.get('/stats', async (req, res) => {
 
 router.get('/users', async (req, res) => {
   try {
-    const { search, page = 1, limit = 50 } = req.query;
+    const { search, page = 1, limit = 50, sort, sortDir } = req.query;
     const result = await db.getAllUsersAdmin({
       search,
       page: parseInt(page, 10),
       limit: Math.min(parseInt(limit, 10) || 50, 100),
+      sort,
+      sortDir,
     });
     return res.json(result);
   } catch (err) {
@@ -135,11 +137,14 @@ router.get('/users/:id/usage', async (req, res) => {
 
 router.get('/households', async (req, res) => {
   try {
-    const { search, page = 1, limit = 50 } = req.query;
+    const { search, page = 1, limit = 50, sort, sortDir, plan } = req.query;
     const result = await db.getAllHouseholdsAdmin({
       search,
       page: parseInt(page, 10),
       limit: Math.min(parseInt(limit, 10) || 50, 100),
+      sort,
+      sortDir,
+      plan,
     });
     return res.json(result);
   } catch (err) {
