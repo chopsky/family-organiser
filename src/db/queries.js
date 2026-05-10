@@ -3111,12 +3111,26 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
   // AI stats
   const aiByProvider = {};
   const aiByFeature = {};
+  const aiByDate = {};
   let aiTotalLatency = 0;
   let aiLatencyCount = 0;
   for (const r of aiRows) {
     aiByProvider[r.provider] = (aiByProvider[r.provider] || 0) + 1;
     aiByFeature[r.feature] = (aiByFeature[r.feature] || 0) + 1;
     if (r.latency_ms) { aiTotalLatency += r.latency_ms; aiLatencyCount++; }
+    const date = (r.created_at || '').slice(0, 10);
+    if (date) aiByDate[date] = (aiByDate[date] || 0) + 1;
+  }
+
+  // Daily AI usage — last 10 days, including zero-call days for a continuous axis
+  const dailyAi = [];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  for (let i = 9; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    dailyAi.push({ date, calls: aiByDate[date] || 0 });
   }
 
   // WhatsApp stats
@@ -3139,6 +3153,7 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
       failoverCalls: aiRows.filter((r) => r.is_failover).length,
       byProvider: aiByProvider,
       byFeature: aiByFeature,
+      daily: dailyAi,
     },
     whatsapp: {
       totalMessages: waRows.length,

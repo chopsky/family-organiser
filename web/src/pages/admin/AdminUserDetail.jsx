@@ -21,6 +21,7 @@ export default function AdminUserDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   const [usage, setUsage] = useState(null);
   const [usageLoading, setUsageLoading] = useState(true);
 
@@ -38,7 +39,7 @@ export default function AdminUserDetail() {
   useEffect(() => { loadUser(); }, [loadUser]);
 
   useEffect(() => {
-    api.get(`/admin/users/${id}/usage`)
+    api.get(`/admin/users/${id}/usage`, { params: { days: 30 } })
       .then(({ data }) => setUsage(data))
       .catch((err) => console.error('Failed to load usage:', err))
       .finally(() => setUsageLoading(false));
@@ -75,13 +76,22 @@ export default function AdminUserDetail() {
   async function handleDelete() {
     if (isSelf || actionLoading) return;
     setActionLoading(true);
+    setDeleteError(null);
     try {
       await api.delete(`/admin/users/${id}?confirm=true`);
       navigate('/admin/users');
     } catch (err) {
       console.error('Failed to delete user:', err);
+      const msg = err.response?.data?.error || err.message || 'Failed to delete user';
+      const status = err.response?.status ? `${err.response.status}: ` : '';
+      setDeleteError(`${status}${msg}`);
       setActionLoading(false);
     }
+  }
+
+  function openDeleteConfirm() {
+    setDeleteError(null);
+    setShowDeleteConfirm(true);
   }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
@@ -135,6 +145,13 @@ export default function AdminUserDetail() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 pt-6 border-t border-light-grey">
           <Detail label="Member Type" value={user.member_type} />
           <Detail label="Family Role" value={user.family_role} />
+          {user.birthday && (
+            <Detail
+              label="Birthday"
+              value={new Date(user.birthday).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              noCapitalize
+            />
+          )}
           <Detail label="WhatsApp" value={user.whatsapp_linked ? user.whatsapp_phone : 'Not linked'} />
           <Detail label="Timezone" value={user.timezone} />
           <Detail label="Joined" value={user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'} />
@@ -178,7 +195,7 @@ export default function AdminUserDetail() {
               {user.disabled_at ? <><IconCheckCircle className="h-4 w-4" /> Enable</> : <><IconBan className="h-4 w-4" /> Disable</>}
             </button>
             <button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={openDeleteConfirm}
               disabled={actionLoading}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-coral text-white text-sm font-semibold hover:bg-coral/90 transition-colors disabled:opacity-50"
             >
@@ -196,6 +213,12 @@ export default function AdminUserDetail() {
             <p className="text-sm text-warm-grey mt-2">
               Are you sure you want to permanently delete <strong>{user.name}</strong>? This cannot be undone.
             </p>
+            {deleteError && (
+              <div className="mt-3 p-3 rounded-xl bg-coral-light border border-coral/30">
+                <p className="text-xs font-semibold text-coral uppercase tracking-wider">Error</p>
+                <p className="text-sm text-coral mt-1 break-words">{deleteError}</p>
+              </div>
+            )}
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -243,6 +266,14 @@ export default function AdminUserDetail() {
                   <p className="text-[11px] text-warm-grey">Failovers</p>
                 </div>
               </div>
+
+              {usage.ai.daily?.length > 0 && (
+                <div className="mb-4 pb-4 border-b border-light-grey">
+                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Last 10 Days</p>
+                  <DailyChart data={usage.ai.daily} />
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 {Object.entries(usage.ai.byProvider || {}).map(([provider, count]) => (
                   <div key={provider} className="flex items-center justify-between text-sm">
@@ -319,11 +350,34 @@ export default function AdminUserDetail() {
   );
 }
 
-function Detail({ label, value }) {
+function DailyChart({ data }) {
+  const max = Math.max(1, ...data.map((d) => d.calls));
+  return (
+    <div className="flex items-end gap-1 h-20">
+      {data.map((d) => {
+        const heightPct = d.calls > 0 ? Math.max(8, (d.calls / max) * 100) : 0;
+        const dayLabel = new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return (
+          <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${dayLabel}: ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
+            <div className="flex-1 w-full flex items-end">
+              <div
+                className={`w-full rounded-t-sm ${d.calls > 0 ? 'bg-plum' : 'bg-light-grey'}`}
+                style={{ height: d.calls > 0 ? `${heightPct}%` : '2px' }}
+              />
+            </div>
+            <span className="text-[9px] text-warm-grey font-medium leading-tight text-center">{d.calls}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Detail({ label, value, noCapitalize }) {
   return (
     <div>
       <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider">{label}</p>
-      <p className="text-sm text-charcoal mt-0.5 capitalize">{value || '—'}</p>
+      <p className={`text-sm text-charcoal mt-0.5 ${noCapitalize ? '' : 'capitalize'}`}>{value || '—'}</p>
     </div>
   );
 }
