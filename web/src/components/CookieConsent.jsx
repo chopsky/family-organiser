@@ -12,15 +12,31 @@
  * On any auth'd in-app route the banner will still surface if no choice
  * exists — that's intentional, the legal requirement applies regardless
  * of whether the visitor is signed in.
+ *
+ * Hidden on iOS native (Capacitor) — Google Analytics is not loaded
+ * inside the iOS app bundle (the gtag <script> in index.html only fires
+ * in real browser environments), and the iOS app discloses analytics
+ * separately via the App Privacy nutrition labels in App Store Connect.
+ * The PECR/GDPR cookie-banner requirement applies to the *web* surface
+ * where actual cookies could be set; in the iOS WebView there's nothing
+ * to consent to.
  */
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { getConsent, setConsent } from '../lib/analytics';
+
+const isNative = () => {
+  try { return Capacitor.isNativePlatform(); }
+  catch { return false; }
+};
 
 export default function CookieConsent() {
   const [choice, setChoice] = useState(() => getConsent());
 
+  // Native apps don't need a cookie banner — see top-of-file comment.
+  if (isNative()) return null;
   if (choice) return null;
 
   function decide(value) {
