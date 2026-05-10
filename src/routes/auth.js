@@ -973,11 +973,26 @@ router.post('/apple', async (req, res) => {
       return res.status(401).json({ error: 'Invalid Apple token' });
     }
 
+    // Accept tokens from EITHER the web Services ID OR the iOS bundle ID.
+    // Apple Sign-In on web uses a Services ID (something like
+    // 'com.housemait.app.signin'), whereas iOS native uses the app's bundle
+    // ID directly via the com.apple.developer.applesignin entitlement —
+    // Apple signs each token with the corresponding `aud` claim. Same as
+    // the Google flow, allowing two audiences doesn't open an attack
+    // surface because the signature is still verified against Apple's
+    // public keys.
+    //
+    // APPLE_NATIVE_BUNDLE_ID defaults to 'com.housemait.app' — same value
+    // hardcoded in capacitor.config.json's appId. Override via env if you
+    // ever ship a second bundle (TestFlight-only build, dev variant, etc.).
+    const validAudiences = [];
+    if (process.env.APPLE_CLIENT_ID) validAudiences.push(process.env.APPLE_CLIENT_ID);
+    validAudiences.push(process.env.APPLE_NATIVE_BUNDLE_ID || 'com.housemait.app');
     const key = await jwksClient.getSigningKey(decoded.header.kid);
     const payload = jwt.verify(idToken, key.getPublicKey(), {
       algorithms: ['RS256'],
       issuer: 'https://appleid.apple.com',
-      audience: process.env.APPLE_CLIENT_ID,
+      audience: validAudiences,
     });
 
     const appleEmail = payload.email?.toLowerCase();

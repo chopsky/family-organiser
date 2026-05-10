@@ -41,8 +41,14 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
       (async () => {
         try {
           const { SocialLogin } = await import('@capgo/capacitor-social-login');
+          // Apple side: on iOS native, the SDK authenticates via the
+          // com.apple.developer.applesignin entitlement + bundle ID — no
+          // clientId/redirectUrl are needed (those are web-only Services ID
+          // concerns). Initialising with `apple: {}` is the documented way
+          // to enable the provider without configuring web fallbacks.
           await SocialLogin.initialize({
             google: { iOSClientId: GOOGLE_IOS_CLIENT_ID },
+            apple: {},
           });
           if (!cancelled) setNativeSocialLoginInitialised(true);
         } catch (err) {
@@ -114,6 +120,48 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
   }
 
   async function handleApple() {
+    // iOS native: use ASAuthorizationController via the Capgo plugin.
+    // The com.apple.developer.applesignin entitlement on this app's bundle
+    // ID handles the credential issuance — no Services ID, no redirect URL.
+    // Plugin returns { provider, result: { identityToken, user, email,
+    // givenName, familyName } } on iOS.
+    if (isNativeIos()) {
+      if (!nativeSocialLoginInitialised) {
+        onError('Apple sign-in is initialising. Please try again in a moment.');
+        return;
+      }
+      try {
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        const result = await SocialLogin.login({
+          provider: 'apple',
+          options: { scopes: ['email', 'fullName'] },
+        });
+        const idToken = result?.result?.identityToken;
+        if (!idToken) {
+          onError('Apple sign-in did not return a token. Please try again.');
+          return;
+        }
+        // Apple gives the user's full name ONLY on the first sign-in (and
+        // never again, even after revocation). Capture it now so we can
+        // pre-fill the user record server-side.
+        const givenName = result?.result?.givenName;
+        const familyName = result?.result?.familyName;
+        const name = [givenName, familyName].filter(Boolean).join(' ').trim() || undefined;
+        const { data } = await api.post('/auth/apple', {
+          idToken,
+          name,
+          inviteToken: inviteToken || undefined,
+        });
+        onSuccess(data);
+      } catch (err) {
+        if (err?.code === 'CANCELED' || err?.message?.includes('cancel')) return;
+        console.error('[social-login] iOS Apple sign-in error:', err);
+        onError(err?.response?.data?.error || err?.message || 'Apple sign-in failed.');
+      }
+      return;
+    }
+
+    // Web flow — Apple's JS SDK with Services ID.
     if (!APPLE_CLIENT_ID) return;
     try {
       if (!window.AppleID) {
@@ -146,8 +194,10 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
     }
   }
 
-  const showGoogle = !!GOOGLE_CLIENT_ID;
-  const showApple = !!APPLE_CLIENT_ID;
+  // Apple button shows on iOS native always (the entitlement is the gate),
+  // OR on web if APPLE_CLIENT_ID (the Services ID) is configured.
+  const showGoogle = !!GOOGLE_CLIENT_ID || isNativeIos();
+  const showApple = !!APPLE_CLIENT_ID || isNativeIos();
 
   if (!showGoogle && !showApple) return null;
 
@@ -173,7 +223,8 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         <button
           type="button"
           onClick={handleApple}
-          className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors"
+          disabled={isNativeIos() && !nativeSocialLoginInitialised}
+          className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors disabled:opacity-60 disabled:cursor-wait"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
