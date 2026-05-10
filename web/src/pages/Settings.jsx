@@ -1213,6 +1213,28 @@ export default function Settings() {
             ))}
           </div>
         ) : null}
+
+        {/* Quick smoke-test: sends a push to the current user's registered
+            devices. Useful while diagnosing iOS push delivery — bypasses
+            the usual triggers (task assignment etc.) so we can isolate
+            the APNs pipeline. */}
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const { data } = await api.post('/notifications/test');
+              setSuccess(data.sent > 0
+                ? `Test push sent to ${data.sent} device(s).`
+                : 'Sent — but no devices are registered yet.');
+              setTimeout(() => setSuccess(''), 4000);
+            } catch (err) {
+              setError(err.response?.data?.error || 'Test push failed.');
+            }
+          }}
+          className="mt-4 w-full text-sm font-medium text-plum hover:text-plum-pressed border border-plum/30 hover:border-plum rounded-xl py-2 transition-colors"
+        >
+          Send test push
+        </button>
       </div>}
 
       {/* Your data — GDPR right to portability (Article 20). Sits above

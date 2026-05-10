@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
+const push = require('../services/push');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
@@ -35,6 +36,27 @@ router.post('/register-device', requireAuth, requireHousehold, async (req, res) 
     return res.json({ ok: true });
   } catch (err) {
     console.error('POST /api/notifications/register-device error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/notifications/test
+ * Send a test push notification to the current user's registered devices.
+ * Used to verify the APNs pipeline end-to-end without depending on a real
+ * trigger (task assignment, shopping update, etc.). Authenticated users
+ * only; rate-limit applies via the global auth limiter.
+ */
+router.post('/test', requireAuth, async (req, res) => {
+  try {
+    const result = await push.sendToUser(req.user.id, {
+      title: 'Test from Housemait',
+      body: 'If you can see this, push notifications are working.',
+      category: 'family_activity',
+    });
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('POST /api/notifications/test error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
