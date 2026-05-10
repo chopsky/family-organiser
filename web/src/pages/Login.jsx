@@ -50,6 +50,9 @@ export default function Login() {
         else if (err.message) msg = `Error: ${err.message}`;
         else msg = 'Something went wrong.';
       }
+      // Show the baseURL inline so we can see exactly what URL the app was
+      // trying to reach without needing Web Inspector.
+      msg += ` [origin=${window.location.origin} | api=${err.config?.baseURL || '?'} | url=${err.config?.url || '?'}]`;
       setError(msg);
       console.error('[login] failed:', { code: err.code, status: err.response?.status, message: err.message, baseURL: err.config?.baseURL, url: err.config?.url });
       // Turnstile tokens are single-use — the backend already consumed
