@@ -46,4 +46,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // MARK: - Push Notifications (APNs)
+    //
+    // The @capacitor/push-notifications plugin observes these notification
+    // names and emits the corresponding JS events ('registration' /
+    // 'registrationError'). Without these two methods, the plugin's
+    // PushNotifications.register() call resolves successfully but no token
+    // is ever delivered — iOS receives the APNs token but has nowhere to
+    // forward it. The bare npx-cap-add-ios template omits these; they have
+    // to be added by hand once the push plugin is installed.
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
 }
