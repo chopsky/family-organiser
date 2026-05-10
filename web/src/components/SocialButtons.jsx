@@ -1,11 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
 import api from '../lib/api';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
 const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID;
+
+const isNativeIos = () => {
+  try { return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'; }
+  catch { return false; }
+};
 
 export default function SocialButtons({ inviteToken, onSuccess, onError }) {
   const [googleLoaded, setGoogleLoaded] = useState(false);
+  const [nativeSocialLoginInitialised, setNativeSocialLoginInitialised] = useState(false);
 
   const handleGoogleResponse = useCallback(async (response) => {
     try {
@@ -19,12 +27,31 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
     }
   }, [inviteToken, onSuccess, onError]);
 
-  // Load the Google Identity Services SDK in the background. We deliberately
-  // don't render Google's iframe-based button on this page — its appearance
-  // is unstable across the form's focus lifecycle (the iframe self-refreshes
-  // when other inputs gain focus, causing visible flicker). Instead, we
-  // ship a custom button below and trigger Google's One Tap popup on click.
+  // On iOS native: initialise the Capgo Social Login plugin once on mount so
+  // the Google SDK is ready by the time the user taps the button. The plugin
+  // wraps Apple's ASWebAuthenticationSession + Google's native iOS SDK, both
+  // of which are reliable inside a Capacitor WebView (unlike Google's web JS
+  // SDK, which is blocked by Google in WebViews).
+  //
+  // On web: defer to the existing JS SDK flow.
   useEffect(() => {
+    if (isNativeIos()) {
+      if (!GOOGLE_IOS_CLIENT_ID) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const { SocialLogin } = await import('@capgo/capacitor-social-login');
+          await SocialLogin.initialize({
+            google: { iOSClientId: GOOGLE_IOS_CLIENT_ID },
+          });
+          if (!cancelled) setNativeSocialLoginInitialised(true);
+        } catch (err) {
+          console.error('[social-login] iOS plugin initialise failed:', err);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
     if (!GOOGLE_CLIENT_ID) return;
     if (window.google?.accounts?.id) { setGoogleLoaded(true); return; }
 
@@ -36,11 +63,40 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
     document.head.appendChild(script);
   }, []);
 
-  // Click handler — triggers Google's One Tap popup (their personalised
-  // account-chooser surface). This gives users the same "Continue as
-  // [Name]" personalisation they used to get from the iframe button,
-  // but in a controlled modal that won't visually mutate the page.
-  function handleGoogleClick() {
+  // Click handler — branches on platform:
+  //   • iOS native: invoke the Capgo plugin which uses Google's iOS SDK
+  //     and ASWebAuthenticationSession to authenticate. Returns an idToken
+  //     in the same JWT format the server already verifies.
+  //   • Web: trigger Google's One Tap popup via the JS SDK.
+  async function handleGoogleClick() {
+    if (isNativeIos()) {
+      if (!nativeSocialLoginInitialised) {
+        onError('Google sign-in is initialising. Please try again in a moment.');
+        return;
+      }
+      try {
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        const result = await SocialLogin.login({ provider: 'google', options: {} });
+        // Plugin returns { provider, result: { idToken, ...profile } } on iOS.
+        const idToken = result?.result?.idToken;
+        if (!idToken) {
+          onError('Google sign-in did not return a token. Please try again.');
+          return;
+        }
+        const { data } = await api.post('/auth/google', {
+          idToken,
+          inviteToken: inviteToken || undefined,
+        });
+        onSuccess(data);
+      } catch (err) {
+        // User cancelled the native sheet — silent no-op.
+        if (err?.code === 'CANCELED' || err?.message?.includes('cancel')) return;
+        console.error('[social-login] iOS Google sign-in error:', err);
+        onError(err?.response?.data?.error || err?.message || 'Google sign-in failed.');
+      }
+      return;
+    }
+
     if (!googleLoaded || !window.google?.accounts?.id) {
       onError('Google Sign-In is loading. Please try again in a moment.');
       return;
@@ -101,7 +157,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         <button
           type="button"
           onClick={handleGoogleClick}
-          disabled={!googleLoaded}
+          disabled={isNativeIos() ? !nativeSocialLoginInitialised : !googleLoaded}
           className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors disabled:opacity-60 disabled:cursor-wait"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">

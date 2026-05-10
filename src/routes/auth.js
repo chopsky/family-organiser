@@ -884,9 +884,19 @@ router.post('/google', async (req, res) => {
   try {
     const { OAuth2Client } = require('google-auth-library');
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    // Accept tokens issued by EITHER the web client OR the iOS native client.
+    // Google issues different idTokens for each (different `aud` claim) — same
+    // user, same email, but the audience differs. Passing an array tells the
+    // verifier to accept any of these. The token's signature must still be
+    // valid Google-signed, so allowing two audiences doesn't open an attack
+    // surface — it just lets the same backend handle both surfaces.
+    const validAudiences = [process.env.GOOGLE_CLIENT_ID];
+    if (process.env.GOOGLE_IOS_CLIENT_ID) {
+      validAudiences.push(process.env.GOOGLE_IOS_CLIENT_ID);
+    }
     const ticket = await client.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: validAudiences,
     });
     const payload = ticket.getPayload();
     const googleEmail = payload.email.toLowerCase();

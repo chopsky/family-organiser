@@ -53,5 +53,20 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Google Sign-In: native SDK reads GIDClientID on init.
+	     The matching CFBundleURLSchemes entry below lets iOS hand the
+	     OAuth redirect back to our app after the user authenticates in
+	     ASWebAuthenticationSession. -->
+	<key>GIDClientID</key>
+	<string>1094093123603-ic536dufes9m5bjnokcrt843j6udr7el.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1094093123603-ic536dufes9m5bjnokcrt843j6udr7el</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
