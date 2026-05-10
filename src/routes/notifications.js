@@ -26,7 +26,12 @@ router.post('/register-device', requireAuth, requireHousehold, async (req, res) 
   }
 
   try {
-    await db.registerDeviceToken(req.user.id, req.household.id, token, platform);
+    // requireHousehold sets req.householdId (the string), not req.household
+    // (an object). Previous code did req.household.id which threw 'Cannot
+    // read properties of undefined', surfacing as a 500 to the client and
+    // an empty device_tokens table — the only reason push notifications
+    // didn't work for any iOS user since this endpoint was added.
+    await db.registerDeviceToken(req.user.id, req.householdId, token, platform);
     return res.json({ ok: true });
   } catch (err) {
     console.error('POST /api/notifications/register-device error:', err);
