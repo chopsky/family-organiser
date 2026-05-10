@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom'
  */
 export default function Terms() {
   useEffect(() => {
-    document.title = 'Terms of Service — Housemait'
+    document.title = 'Terms of Service | Housemait'
     window.scrollTo(0, 0)
   }, [])
 

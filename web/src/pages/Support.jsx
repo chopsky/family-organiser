@@ -8,10 +8,15 @@
  * changes, edit ContactForm.jsx — this file should rarely need touching.
  */
 
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ContactForm from '../components/ContactForm';
 
 export default function Support() {
+  useEffect(() => {
+    document.title = 'Contact | Housemait';
+  }, []);
+
   return (
     <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
       <div className="my-auto w-full max-w-md">

@@ -16,7 +16,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Housemait" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Housemait</title>
+    <title>AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait</title>
 
     <!-- Instrument Serif for editorial display moments (Dashboard greeting). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -32,6 +32,11 @@
          iOS native bypasses Turnstile so this is a no-op there. -->
     <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
     <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
+
+    <!-- Google Analytics is loaded at runtime by web/src/lib/analytics.js
+         once the user accepts the cookie banner. PECR / UK GDPR require an
+         explicit opt-in before any non-essential tracker fires, so the
+         gtag <script> deliberately doesn't appear inline here. -->
   </head>
   <body>
     <div id="root"></div>

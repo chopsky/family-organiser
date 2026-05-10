@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -21,6 +21,10 @@ export default function Login() {
   const verified = searchParams.get('verified') === 'true';
   const tokenError = searchParams.get('error');
   const needsVerification = error.toLowerCase().includes('verify your email');
+
+  useEffect(() => {
+    document.title = 'Log in | Housemait';
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();

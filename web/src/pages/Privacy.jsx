@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
  */
 export default function Privacy() {
   useEffect(() => {
-    document.title = 'Privacy Policy — Housemait'
+    document.title = 'Privacy Policy | Housemait'
     window.scrollTo(0, 0)
   }, [])
 
@@ -114,11 +114,36 @@ export default function Privacy() {
               <li>Server and application logs (errors, request traces) for operating and debugging the Service</li>
             </ul>
 
-            <SubHeading>2.5 Data we do <em>not</em> collect</SubHeading>
+            <SubHeading>2.5 Analytics data <em>(only with your consent)</em></SubHeading>
+            <p>
+              On the Housemait website (housemait.com) we use{' '}
+              <strong>Google Analytics 4</strong> to understand how visitors discover and move
+              through the site so we can improve it. Google Analytics is{' '}
+              <strong>only loaded if you accept the cookie banner</strong> shown on your first
+              visit. If you decline, no analytics cookies are set and no usage data is sent to
+              Google.
+            </p>
+            <p>If you accept, Google Analytics collects:</p>
             <ul className="list-disc pl-6 space-y-1.5">
-              <li>We do <strong>not</strong> use advertising identifiers or tracking SDKs.</li>
+              <li>A pseudonymous client ID stored in a first-party cookie (<code>_ga</code>, <code>_ga_*</code>)</li>
+              <li>Pages you visit, the order you visit them in, and how long you stay</li>
+              <li>Approximate location (country / region only — IP addresses are anonymised by Google)</li>
+              <li>Device and browser type</li>
+              <li>The site you arrived from (referrer)</li>
+            </ul>
+            <p>
+              We do <strong>not</strong> use Google Analytics inside the authenticated app
+              itself, only on the marketing website. You can withdraw consent at any time by
+              clearing site data for housemait.com in your browser, which removes the cookies
+              and reshows the banner on your next visit.
+            </p>
+
+            <SubHeading>2.6 Data we do <em>not</em> collect</SubHeading>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li>We do <strong>not</strong> use advertising identifiers or advertising/profiling SDKs.</li>
               <li>We do <strong>not</strong> collect precise location in the background. Location is requested only when you ask for weather or set a location-based reminder.</li>
               <li>We do <strong>not</strong> sell personal data. We do <strong>not</strong> share data with advertisers or data brokers.</li>
+              <li>We do <strong>not</strong> run any analytics inside the authenticated Housemait app — only on the public marketing website, and only with consent.</li>
             </ul>
           </Section>
 
@@ -139,6 +164,7 @@ export default function Privacy() {
                   <Row c1="Process data through AI providers to classify messages, extract tasks/shopping items, parse receipts, and answer questions" c2="Performance of contract (Art. 6(1)(b))" />
                   <Row c1="Keep the Service secure — rate limiting, abuse prevention, fraud detection" c2="Legitimate interests (Art. 6(1)(f)) — running a secure service" />
                   <Row c1="Diagnose errors and improve the Service" c2="Legitimate interests (Art. 6(1)(f))" />
+                  <Row c1="Measure how visitors use the marketing website (via Google Analytics)" c2="Consent (Art. 6(1)(a)) — only after you accept the cookie banner; revocable at any time" />
                   <Row c1="Comply with legal obligations (e.g. respond to lawful requests, tax and accounting records)" c2="Legal obligation (Art. 6(1)(c))" />
                 </tbody>
               </table>
@@ -194,6 +220,7 @@ export default function Privacy() {
                   <Row c1="Google Sign-In & Google Calendar" c2="Optional authentication and calendar sync" c3="Global" />
                   <Row c1="Microsoft Graph (Microsoft 365)" c2="Optional calendar sync" c3="Global" />
                   <Row c1="Open-Meteo / equivalent weather API" c2="Weather data (requires only coarse lat/lon)" c3="EU" />
+                  <Row c1="Google Analytics 4" c2="Marketing-website analytics (housemait.com only; loaded only with your consent)" c3="US / EU" />
                 </tbody>
               </table>
             </TableWrap>

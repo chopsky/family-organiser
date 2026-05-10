@@ -425,6 +425,10 @@ export default function LandingPage() {
   const price = PRICING[billing]
 
   useEffect(() => {
+    document.title = 'AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait'
+  }, [])
+
+  useEffect(() => {
     const onScroll = () => setShowFab(window.scrollY > 1500)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })

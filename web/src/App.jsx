@@ -5,6 +5,7 @@ import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
+import CookieConsent from './components/CookieConsent';
 
 // Eagerly load pages that are always needed on first paint
 import LandingPage from './pages/LandingPage';
@@ -155,6 +156,7 @@ export default function App() {
             lean for the parts of the app that don't care about billing. */}
         <SubscriptionProvider>
           <AppRoutes />
+          <CookieConsent />
         </SubscriptionProvider>
       </AuthProvider>
     </BrowserRouter>
