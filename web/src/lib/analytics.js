@@ -18,7 +18,7 @@
  */
 
 const STORAGE_KEY = 'housemait-analytics-consent';
-const GA_MEASUREMENT_ID = 'G-VQCXNK8470';
+const GA_MEASUREMENT_ID = 'G-RY1QCM5JBG';
 
 let gaLoaded = false;
 
