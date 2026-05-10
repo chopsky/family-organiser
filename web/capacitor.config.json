@@ -3,8 +3,11 @@
   "appName": "Housemait",
   "webDir": "dist",
   "ios": {
-    "scheme": "Housemait",
     "backgroundColor": "#FBF8F3"
+  },
+  "server": {
+    "iosScheme": "https",
+    "hostname": "www.housemait.com"
   },
   "plugins": {
     "Keyboard": {
