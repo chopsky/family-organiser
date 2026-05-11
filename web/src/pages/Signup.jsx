@@ -5,9 +5,6 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
-import LocaleBadge from '../components/LocaleBadge';
-import { LOCALES } from '../lib/locales';
-import { readLocaleCookie } from '../hooks/useLocale';
 
 export default function Signup() {
   const [email, setEmail]       = useState('');
@@ -24,12 +21,6 @@ export default function Signup() {
   const navigate                = useNavigate();
   const [searchParams]          = useSearchParams();
   const inviteToken             = searchParams.get('invite');
-
-  // Locale of the marketing page the visitor arrived from — drives the
-  // "Free 30-day trial, then £X/month" reassurance line below the form.
-  // Falls back to the international default if they hit /signup directly
-  // without touching a localised page first.
-  const locale = LOCALES[readLocaleCookie()] || LOCALES.default;
 
   useEffect(() => {
     document.title = 'Sign up | Housemait';
@@ -92,7 +83,6 @@ export default function Signup() {
     >
       <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
-          <LocaleBadge />
           <Link to="/" aria-label="Housemait home" className="inline-block">
             <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
           </Link>
@@ -178,10 +168,6 @@ export default function Signup() {
           </>
           )}
         </div>
-
-        <p className="text-center text-xs text-cocoa mt-4">
-          Free 30-day trial. Then <strong className="text-charcoal font-semibold">{locale.pricing.monthly}/month</strong> — cancel anytime.
-        </p>
 
         <p className="text-center text-sm text-cocoa mt-6">
           Already have an account? <Link to="/login" className="text-primary font-medium hover:underline">Log in</Link>

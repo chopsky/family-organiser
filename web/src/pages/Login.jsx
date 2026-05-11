@@ -5,7 +5,6 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
-import LocaleBadge from '../components/LocaleBadge';
 
 export default function Login() {
   const [email, setEmail]         = useState('');
@@ -101,7 +100,6 @@ export default function Login() {
     >
       <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
-          <LocaleBadge />
           <Link to="/" aria-label="Housemait home" className="inline-block">
             <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
           </Link>
