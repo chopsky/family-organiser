@@ -1,26 +1,25 @@
 /**
  * Strict regional redirect — Vercel Edge Middleware.
  *
- * Every request to a locale-pathed URL is forced to match the visitor's
- * IP-derived country. UK IP visiting /us → 307 to /uk. ZA IP visiting /
- * → 307 to /za. Unknown country → / (international default).
+ * Every "marketing-ish" request is forced to the locale page matching
+ * the visitor's IP-derived country. This explicitly includes typo /
+ * 404-style paths (`/asdfkjaskdj`, `/old-link-from-2022`, etc.) — those
+ * would otherwise fall through to the SPA rewrite and render the
+ * default-locale landing, which makes the geo enforcement leaky.
  *
- * The matcher list at the bottom controls which paths run this
- * middleware. Auth-flow pages (/login, /signup, /support, /privacy,
- * /terms) and authenticated app routes (/dashboard, /settings, …) are
- * NOT in the matcher — they remain universally reachable so a UK
- * customer can still sign in from a US-IP airport WiFi.
+ * The set of paths that bypass the redirect is enumerated below:
+ *   - SKIP_PATHS: exact-match public pages (auth flow, support, legal)
+ *   - SKIP_PREFIXES: authenticated app routes + well-known endpoints
+ *   - Matcher exclusions: static assets, API rewrites
  *
- * Search-engine crawlers bypass entirely. Without this exemption,
- * Googlebot crawling from US IPs would always be redirected to /us and
- * never index /uk, /eu, /au, /ca, /za — collapsing the hreflang setup
- * we set up in Tier 1.
+ * Search-engine crawlers also bypass entirely. Without this, Googlebot
+ * crawling from US IPs would always be redirected to /us and never
+ * index /uk, /eu, /au, /ca, /za — collapsing the hreflang setup.
  *
  * Choice of 307 (not 301): geo redirects are temporary by their
  * nature — the destination depends on where the visitor is right now,
  * not where they "should" be canonically. Using 301 would teach search
- * engines and browsers to permanently associate / with /uk, which is
- * exactly what we don't want.
+ * engines and browsers to permanently associate / with /uk.
  */
 
 // EU + EEA + Switzerland → /eu. Switzerland is included because we
@@ -32,6 +31,41 @@ const EU_OR_EEA = new Set([
   'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
   'NO', 'IS', 'LI', 'CH',
 ]);
+
+// Exact-match paths the middleware MUST NOT redirect. These render the
+// same content for every visitor regardless of country.
+const SKIP_PATHS = new Set([
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/check-email',
+  '/verified',
+  '/privacy',
+  '/terms',
+  '/support',
+]);
+
+// Prefix-match paths — anything starting with one of these is bypassed.
+// Mostly authenticated app routes that already require a JWT to render
+// anything useful, and a few well-known infra endpoints.
+const SKIP_PREFIXES = [
+  '/dashboard',
+  '/shopping',
+  '/tasks',
+  '/calendar',
+  '/meals',
+  '/receipt',
+  '/documents',
+  '/family',
+  '/settings',
+  '/subscribe',
+  '/subscription',
+  '/setup',
+  '/onboarding',
+  '/admin',
+  '/.well-known',
+];
 
 // User-agent patterns for crawlers and link-preview fetchers. Includes
 // the main search engines, the Facebook/Twitter/LinkedIn card-renderers
@@ -51,6 +85,16 @@ function pathForCountry(country) {
 }
 
 export default function middleware(request) {
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  // Skip non-locale pages — auth flow, legal, authenticated routes,
+  // well-known endpoints. These render the same for every visitor and
+  // must remain universally reachable so e.g. a UK customer logging in
+  // from a US-IP airport WiFi isn't bounced.
+  if (SKIP_PATHS.has(path)) return;
+  if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return;
+
   // Bot bypass MUST come before the geo check. Googlebot's IP geolocates
   // to the US, but we still want it to be able to crawl /uk so that
   // hreflang annotations resolve correctly when a UK searcher hits
@@ -62,10 +106,9 @@ export default function middleware(request) {
   // TCP-level source IP geolocation. It's never user-controllable —
   // a tampered cookie or header from the client can't poison this.
   const country = request.headers.get('x-vercel-ip-country') || '';
-  const url = new URL(request.url);
   const expected = pathForCountry(country);
 
-  if (url.pathname === expected) return;
+  if (path === expected) return;
 
   // Preserve query string + hash on the redirect so utm tags, ?invite=…
   // tokens, etc. follow the visitor through to their locale page.
@@ -74,9 +117,17 @@ export default function middleware(request) {
 }
 
 export const config = {
-  // Only the seven locale-pathed URLs trigger this middleware. Anything
-  // else (auth flow, dashboards, static assets) is fall-through — the
-  // middleware doesn't even run for those requests, so there's no
-  // edge-execution cost on irrelevant traffic.
-  matcher: ['/', '/uk', '/us', '/eu', '/au', '/ca', '/za'],
+  // Match almost everything — the SKIP_PATHS / SKIP_PREFIXES lists
+  // above do the heavy lifting inside the function. The matcher itself
+  // only excludes things that should never invoke the middleware at
+  // all: static assets, API rewrites, and Vercel internals.
+  //
+  // The negative-lookahead pattern means "any path that doesn't start
+  // with one of these prefixes and isn't a file with one of these
+  // extensions". File-extension exclusion is required because the SPA
+  // also serves /housemait-favicon.png, /manifest.json, etc., and we
+  // don't want to fire the edge function for those.
+  matcher: [
+    '/((?!api/|assets/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|xml|txt|json|webmanifest|js|css|map|woff|woff2|ttf|otf|html)).*)',
+  ],
 };
