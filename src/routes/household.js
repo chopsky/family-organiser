@@ -91,7 +91,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
-  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, year_group } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id } = req.body;
 
   // Determine target user — admins can edit others, members only themselves
   let targetUserId = req.user.id;
@@ -133,7 +133,6 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     updates.longitude = req.body.longitude;
   }
   if (school_id !== undefined) updates.school_id = school_id || null;
-  if (year_group !== undefined) updates.year_group = year_group || null;
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update.' });
@@ -346,7 +345,7 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
  * Add a dependent (infant, pet, etc.) to the household. Admin only.
  */
 router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, family_role, birthday, color_theme, school_id, year_group } = req.body;
+  const { name, family_role, birthday, color_theme, school_id } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Name is required.' });
@@ -359,7 +358,6 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
       birthday: birthday || null,
       color_theme: color_theme || 'sage',
       school_id: school_id || null,
-      year_group: year_group || null,
     });
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
@@ -391,7 +389,7 @@ router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, as
  * Send an email invite to join the household. Admin only.
  */
 router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { email: inviteEmail, name: inviteName, family_role, birthday, color_theme, school_id, year_group } = req.body;
+  const { email: inviteEmail, name: inviteName, family_role, birthday, color_theme, school_id } = req.body;
 
   if (!inviteEmail?.trim()) {
     return res.status(400).json({ error: 'Email is required' });
@@ -423,7 +421,6 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
       birthday: birthday || null,
       color_theme: color_theme || null,
       school_id: safeSchoolId,
-      year_group: year_group || null,
     });
 
     try {

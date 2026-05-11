@@ -104,7 +104,7 @@ async function buildSystemPrompt(householdId, householdName, userId) {
     for (const school of schools) {
       const children = members.filter(m => m.school_id === school.id);
       if (children.length > 0) {
-        const childNames = children.map(c => `${c.name} (${c.year_group || 'no year group'})`).join(', ');
+        const childNames = children.map(c => c.name).join(', ');
         schoolLines.push(`${school.school_name}: ${childNames}`);
       }
     }

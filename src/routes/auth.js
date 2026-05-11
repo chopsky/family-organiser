@@ -126,7 +126,6 @@ router.post('/register', requireTurnstile, async (req, res) => {
       if (invite.birthday) profileUpdates.birthday = invite.birthday;
       if (invite.color_theme) profileUpdates.color_theme = invite.color_theme;
       if (invite.school_id) profileUpdates.school_id = invite.school_id;
-      if (invite.year_group) profileUpdates.year_group = invite.year_group;
       if (Object.keys(profileUpdates).length > 0) {
         await db.updateUser(user.id, profileUpdates);
       }
@@ -915,8 +914,8 @@ router.post('/google', async (req, res) => {
       // Handle invite — hold the invite reference so we can copy its pre-fill
       // fields onto the new user after createUserWithEmail returns. Mirrors
       // the email/password flow above (~line 122-130). Without this, family
-      // role / birthday / colour theme / school_id / year_group set by the
-      // inviter are silently dropped on SSO sign-up.
+      // role / birthday / colour theme / school_id set by the inviter are
+      // silently dropped on SSO sign-up.
       let householdId = null;
       let acceptedInvite = null;
       const role = 'member';
@@ -944,7 +943,6 @@ router.post('/google', async (req, res) => {
         if (acceptedInvite.birthday) profileUpdates.birthday = acceptedInvite.birthday;
         if (acceptedInvite.color_theme) profileUpdates.color_theme = acceptedInvite.color_theme;
         if (acceptedInvite.school_id) profileUpdates.school_id = acceptedInvite.school_id;
-        if (acceptedInvite.year_group) profileUpdates.year_group = acceptedInvite.year_group;
         if (Object.keys(profileUpdates).length > 0) {
           await db.updateUser(user.id, profileUpdates);
           user = { ...user, ...profileUpdates };
@@ -1039,7 +1037,6 @@ router.post('/apple', async (req, res) => {
         if (acceptedInvite.birthday) profileUpdates.birthday = acceptedInvite.birthday;
         if (acceptedInvite.color_theme) profileUpdates.color_theme = acceptedInvite.color_theme;
         if (acceptedInvite.school_id) profileUpdates.school_id = acceptedInvite.school_id;
-        if (acceptedInvite.year_group) profileUpdates.year_group = acceptedInvite.year_group;
         if (Object.keys(profileUpdates).length > 0) {
           await db.updateUser(user.id, profileUpdates);
           user = { ...user, ...profileUpdates };

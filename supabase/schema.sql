@@ -30,7 +30,6 @@ create table if not exists users (
   latitude           double precision,
   longitude          double precision,
   school_id          uuid,
-  year_group         text,
   created_at         timestamp with time zone default now()
 );
 
@@ -70,7 +69,6 @@ create table if not exists school_term_dates (
   date                    date not null,
   end_date                date,
   label                   text,
-  applies_to_year_groups  text[],
   source                  text default 'manual',
   created_at              timestamp with time zone default now()
 );

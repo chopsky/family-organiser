@@ -9,7 +9,6 @@ import { isUkHousehold } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const YEAR_GROUPS = ['Nursery', 'Reception', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12', 'Year 13'];
 
 const COLOUR_OPTIONS = [
   { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
@@ -97,7 +96,6 @@ export default function FamilySetup() {
   const [newSchoolSearch, setNewSchoolSearch] = useState('');
   const [newSchoolResults, setNewSchoolResults] = useState([]);
   const [newSelectedSchool, setNewSelectedSchool] = useState(null);
-  const [newYearGroup, setNewYearGroup] = useState('');
   const [searchingNewSchools, setSearchingNewSchools] = useState(false);
 
   // Add dependent state
@@ -113,7 +111,6 @@ export default function FamilySetup() {
   const [depSchoolSearch, setDepSchoolSearch] = useState('');
   const [depSchoolResults, setDepSchoolResults] = useState([]);
   const [depSelectedSchool, setDepSelectedSchool] = useState(null);
-  const [depYearGroup, setDepYearGroup] = useState('');
   const [searchingSchools, setSearchingSchools] = useState(false);
   const [householdSchools, setHouseholdSchools] = useState([]);
   const [childActivities, setChildActivities] = useState({}); // { childId: [activities] }
@@ -129,7 +126,6 @@ export default function FamilySetup() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSchoolId, setProfileSchoolId] = useState(null);
-  const [profileYearGroup, setProfileYearGroup] = useState('');
   // Edit-modal mirror of the add-dependent flow's `depAttendsSchool` toggle.
   // Defaulted to true in openEditProfile if the member already has a school
   // (so existing data isn't hidden), false otherwise. Toggling off clears the
@@ -230,7 +226,6 @@ export default function FamilySetup() {
     setDepAttendsSchool(false);
     setDepSchoolSearch('');
     setDepSelectedSchool(null);
-    setDepYearGroup('');
     setDepSchoolResults([]);
     setShowAddDependent(true);
   }
@@ -266,7 +261,6 @@ export default function FamilySetup() {
         birthday: depBirthday || null,
         color_theme: depColor,
         school_id: schoolId,
-        year_group: depAttendsSchool ? depYearGroup || null : null,
       });
       setShowAddDependent(false);
       await loadMembers();
@@ -313,7 +307,6 @@ export default function FamilySetup() {
     setProfileReminderTime(member.reminder_time ? member.reminder_time.substring(0, 5) : '');
     setProfileAvatar(member.avatar_url || null);
     setProfileSchoolId(member.school_id || null);
-    setProfileYearGroup(member.year_group || '');
     setProfileAttendsSchool(Boolean(member.school_id));
     const school = householdSchools.find(s => s.id === member.school_id);
     setEditSchoolSearch(school?.school_name || '');
@@ -693,7 +686,6 @@ export default function FamilySetup() {
         birthday: profileBirthday || null,
         color_theme: profileColor,
         reminder_time: profileReminderTime || null,
-        year_group: profileYearGroup || null,
       };
 
       // Handle school assignment. The /household/profile endpoint accepts
@@ -889,14 +881,12 @@ export default function FamilySetup() {
         birthday: newBirthday || null,
         color_theme: newColor,
         school_id: schoolId,
-        year_group: newAttendsSchool ? newYearGroup || null : null,
       });
       setShowAddMember(false);
       // Reset invite-flow school state for the next time the modal opens.
       setNewAttendsSchool(false);
       setNewSchoolSearch('');
       setNewSelectedSchool(null);
-      setNewYearGroup('');
       setNewSchoolResults([]);
       setSuccess(`Invite sent to ${newEmail.trim()}`);
       setTimeout(() => setSuccess(''), 3000);
@@ -1118,7 +1108,7 @@ export default function FamilySetup() {
                           return school ? (
                             <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
                               <span className="w-1.5 h-1.5 rounded-full bg-sky" />
-                              {m.year_group ? `${m.year_group}, ` : ''}{school.school_name}
+                              {school.school_name}
                             </span>
                           ) : null;
                         })()}
@@ -1366,13 +1356,6 @@ export default function FamilySetup() {
                         </div>
                       )}
                     </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                      <select value={depYearGroup} onChange={(e) => setDepYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                        <option value="">Select...</option>
-                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
-                    </div>
                   </div>
                 </div>
               )}
@@ -1466,7 +1449,6 @@ export default function FamilySetup() {
                       setNewSchoolSearch('');
                       setNewSchoolResults([]);
                       setNewSelectedSchool(null);
-                      setNewYearGroup('');
                     }
                   }}
                   className={`relative w-11 h-6 rounded-full transition-colors ${newAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
@@ -1510,13 +1492,6 @@ export default function FamilySetup() {
                           <p className="text-xs text-plum/70">Term dates already set up.</p>
                         </div>
                       )}
-                    </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                      <select value={newYearGroup} onChange={(e) => setNewYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                        <option value="">Select...</option>
-                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
                     </div>
                   </div>
                 </div>
@@ -1813,7 +1788,6 @@ export default function FamilySetup() {
                     setProfileAttendsSchool(next);
                     if (!next) {
                       setProfileSchoolId(null);
-                      setProfileYearGroup('');
                       setEditSchoolSearch('');
                       setEditSchoolResults([]);
                       setEditSelectedSchoolData(null);
@@ -1859,13 +1833,6 @@ export default function FamilySetup() {
                       {profileSchoolId && editSchoolSearch && (
                         <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
                       )}
-                    </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-medium text-bark mb-1">Year group</label>
-                      <select value={profileYearGroup} onChange={(e) => setProfileYearGroup(e.target.value)} className="w-full border border-cream-border rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-sm">
-                        <option value="">Select...</option>
-                        {YEAR_GROUPS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
                     </div>
                   </div>
                 </div>

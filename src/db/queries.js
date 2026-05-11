@@ -316,7 +316,7 @@ async function deleteHouseholdNote(householdId, key, db = supabase) {
 
 // ─── Dependent helpers ───────────────────────────────────────────────────────
 
-async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, year_group }, db = supabase) {
+async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id }, db = supabase) {
   const { data, error } = await db
     .from('users')
     .insert({
@@ -326,7 +326,6 @@ async function createDependent(householdId, { name, family_role, birthday, color
       birthday: birthday || null,
       color_theme: color_theme || 'sage',
       school_id: school_id || null,
-      year_group: year_group || null,
       member_type: 'dependent',
       role: 'member',
       email_verified: false,
@@ -569,7 +568,6 @@ async function addSchoolTermDates(schoolId, dates, db = supabase) {
     date: d.date,
     end_date: d.end_date || null,
     label: d.label || null,
-    applies_to_year_groups: d.applies_to_year_groups || null,
     source: d.source || 'manual',
   }));
   const { data, error } = await db
@@ -843,14 +841,13 @@ async function markUserOnboarded(userId, db = supabase) {
 
 // ─── Invites ────────────────────────────────────────────────────────────────
 
-async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme, school_id, year_group }, db = supabase) {
+async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme, school_id }, db = supabase) {
   const row = { household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt };
   if (name) row.name = name;
   if (family_role) row.family_role = family_role;
   if (birthday) row.birthday = birthday;
   if (color_theme) row.color_theme = color_theme;
   if (school_id) row.school_id = school_id;
-  if (year_group) row.year_group = year_group;
   const { data, error } = await db
     .from('invites')
     .insert(row)
