@@ -226,15 +226,6 @@ export default function Dashboard() {
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
   const weekMeals = digest?.weekMeals ?? [];
 
-  // Group shopping by aisle category (max 4 groups for the dashboard)
-  const shoppingByAisle = {};
-  shoppingItems.forEach(item => {
-    const cat = item.aisle_category || item.category || 'Other';
-    if (!shoppingByAisle[cat]) shoppingByAisle[cat] = [];
-    shoppingByAisle[cat].push(item);
-  });
-  const shoppingGroups = Object.entries(shoppingByAisle).slice(0, 4);
-
   // This week's dinners — today + next 3 days
   const DAY_LABELS_FULL = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -421,21 +412,25 @@ export default function Dashboard() {
             </div>
           ) : (
             <>
-              <div className="flex flex-col" style={{ gap: 6 }}>
-                {shoppingGroups.map(([cat, items]) => {
-                  const badge = getCatBadge(cat);
+              {/* One item per row: [badge] [name (truncates)] [quantity, right-
+                  aligned]. Cap at 5 rows so the dashboard card stays compact —
+                  the 'N items' line at the bottom tells the user how many more
+                  there are. */}
+              <div className="flex flex-col" style={{ gap: 4 }}>
+                {shoppingItems.slice(0, 5).map((item) => {
+                  const badge = getCatBadge(item.aisle_category || item.category || 'Other');
                   return (
-                    <div key={cat} className="flex items-center" style={{ gap: 10, padding: '6px 0' }}>
+                    <div key={item.id} className="flex items-center" style={{ gap: 10, padding: '4px 0' }}>
                       <span
                         className={`shrink-0 uppercase tracking-wide ${badge.bg} ${badge.text}`}
                         style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}
                       >
                         {badge.label}
                       </span>
-                      <span className="text-sm text-bark">
-                        {items.slice(0, 3).map(i => i.item).join(', ')}
-                        {items.length > 3 && <span className="text-cocoa"> +{items.length - 3}</span>}
-                      </span>
+                      <span className="flex-1 text-sm text-bark truncate">{item.item}</span>
+                      {item.quantity && (
+                        <span className="shrink-0 text-sm text-cocoa">{item.quantity}</span>
+                      )}
                     </div>
                   );
                 })}
