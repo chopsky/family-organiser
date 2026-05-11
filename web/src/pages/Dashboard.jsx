@@ -91,6 +91,8 @@ function getMonday(d) {
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   function handleAiSubmit(e) {
     e.preventDefault();
@@ -116,16 +118,57 @@ function DashboardAiInput() {
     }, 500);
   }
 
+  // Web Speech API — supported in Safari (incl. iOS WKWebView from iOS
+  // 14.5+), Chrome, Edge. Each recognized phrase replaces the input
+  // value; users can submit normally with the send button or by
+  // pressing Enter. Tapping the mic again while recording stops it.
+  // SpeechRecognitionSupported is browser-only so we re-detect each
+  // click to avoid SSR / first-render issues.
+  function handleMicClick() {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      // Tell the user gently rather than failing silently.
+      alert('Voice input is not supported in this browser. Try Chrome or Safari.');
+      return;
+    }
+    const recognition = new SR();
+    recognition.lang = navigator.language || 'en-GB';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || '';
+      if (aiInputRef.current) {
+        aiInputRef.current.value = transcript;
+        aiInputRef.current.focus();
+      }
+    };
+    recognition.onend = () => setIsRecording(false);
+    recognition.onerror = () => setIsRecording(false);
+    recognitionRef.current = recognition;
+    setIsRecording(true);
+    recognition.start();
+  }
+
   return (
     <form onSubmit={handleAiSubmit}>
-      <div className="flex items-center bg-white rounded-2xl border border-light-grey shadow-[0_2px_8px_rgba(107,63,160,0.06)] overflow-hidden">
+      <div
+        className="flex items-center bg-white rounded-2xl overflow-hidden"
+        style={{
+          border: '1px solid rgba(26, 22, 32, 0.05)',
+          boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.05) 0px 6px 18px',
+        }}
+      >
         <input
           ref={aiInputRef}
           type="text"
-          placeholder="Ask AI to create events, tasks, recipes, scan receipts, and more..."
-          className="flex-1 px-4 py-3.5 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
+          placeholder="What can I help you with today?"
+          className="flex-1 px-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
-        <div className="flex items-center gap-1 pr-2">
+        <div className="flex items-center gap-1 pr-3">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
           <button
             type="button"
@@ -135,15 +178,27 @@ function DashboardAiInput() {
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
           </button>
-          {/* Mic button removed — was a non-functional "Voice input (coming
-              soon)" placeholder that App Review flagged as a broken UI
-              control under Guideline 2.1(a). Voice input today happens
-              via the WhatsApp bot's voice-note transcription path; once
-              we ship in-app speech-to-text, restore the button alongside
-              an actual onClick + Web Speech API integration. */}
+          {/* Voice input via the Web Speech API. Properly functional
+              (transcribes one phrase into the input) so it doesn't
+              trip App Review Guideline 2.1(a) like the old non-
+              functional placeholder did. Falls back to an explanatory
+              alert on unsupported browsers. */}
+          <button
+            type="button"
+            onClick={handleMicClick}
+            className={`p-2 rounded-lg transition-colors ${isRecording ? 'text-coral bg-coral/10' : 'text-warm-grey hover:text-primary hover:bg-plum-light/50'}`}
+            title={isRecording ? 'Stop recording' : 'Voice input'}
+            aria-pressed={isRecording}
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          </button>
           <button
             type="submit"
-            className="p-2 text-white bg-plum hover:bg-plum/90 rounded-xl transition-colors"
+            className="p-2 text-white bg-plum hover:bg-plum/90 rounded-full transition-colors"
             title="Send"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
