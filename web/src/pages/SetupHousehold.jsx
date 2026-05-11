@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
-import { detectCountryFromTimezone } from '../lib/country';
+import { detectCountryFromTimezone, detectCountryFromLocaleCookie } from '../lib/country';
+import { readLocaleCookie } from '../hooks/useLocale';
 import ErrorBanner from '../components/ErrorBanner';
 
 export default function SetupHousehold() {
@@ -30,11 +31,23 @@ export default function SetupHousehold() {
     setLoading(true);
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
-      // Best-effort auto-detect from the browser's timezone. Imperfect
-      // (Canadian timezones share 'America/' prefix with the US, India/SG
-      // map to 'OTHER', etc.) but gets the UK case right which is the
-      // overwhelming majority. User can correct in Settings → Household.
-      const country = detectCountryFromTimezone(timezone);
+      // Country detection cascade:
+      //   1. Locale cookie (housemait-locale) — set when the visitor landed
+      //      on a country-specific marketing page (/gb, /us, /za, etc.).
+      //      Driven by Vercel's edge geo-routing, so it reflects what we
+      //      actually KNOW about the visitor from their IP. Most reliable.
+      //   2. Browser timezone — fallback when no locale cookie exists
+      //      (visitor came directly to /signup, or via /eu which covers
+      //      multiple countries).
+      //
+      // Cookie wins over timezone because the marketing site IS the
+      // source of truth for what region the visitor signed up for. A
+      // Canadian on a US-locked timezone is correctly classified as CA
+      // via the cookie; a UK expat in Spain who came in via /gb is
+      // correctly classified as GB.
+      const country =
+        detectCountryFromLocaleCookie(readLocaleCookie())
+        || detectCountryFromTimezone(timezone);
       const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone, country });
       login(data);
       // Fresh signups always have onboarded_at === null here, so they

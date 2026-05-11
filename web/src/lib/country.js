@@ -29,7 +29,34 @@ export const COUNTRY_LABELS = {
 };
 
 /**
- * Best-effort country code from the browser's timezone.
+ * Country code from the marketing locale cookie set by useLocale (see
+ * web/src/hooks/useLocale.js).
+ *
+ * The locale cookie is set when a visitor lands on one of the
+ * country-specific marketing pages (/gb, /us, /za, etc.), driven by
+ * Vercel's edge geo-routing. Using this as the primary signal — over
+ * browser timezone — fixes two real cases:
+ *
+ *   • Canadians (timezone = America/Toronto) who would otherwise be
+ *     classified as US by timezone alone, now correctly land as CA.
+ *   • SA expats abroad whose timezone is wrong, but who came in via
+ *     the /za page deliberately.
+ *
+ * Returns null for the 'eu' (covers multiple countries) and 'default'
+ * (unknown) locales — caller should fall back to timezone detection
+ * in those cases.
+ */
+export function detectCountryFromLocaleCookie(localeCode) {
+  if (!localeCode) return null;
+  const map = { gb: 'GB', us: 'US', au: 'AU', za: 'ZA', ca: 'CA' };
+  return map[localeCode.toLowerCase()] || null;
+}
+
+/**
+ * Best-effort country code from the browser's timezone. Used as a
+ * fallback when no locale cookie is set (visitor signing up directly
+ * via /signup without touching a marketing page first, or visiting
+ * the /eu page which covers multiple countries).
  *
  * Caveats:
  *   • Canadian users (America/Toronto, America/Vancouver, etc.) are
