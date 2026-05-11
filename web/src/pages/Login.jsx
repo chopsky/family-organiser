@@ -13,6 +13,11 @@ export default function Login() {
   const [error, setError]         = useState('');
   const [resendState, setResendState] = useState('idle'); // idle | sending | sent
   const [turnstileToken, setTurnstileToken] = useState(null);
+  // Email form is hidden by default — Continue with Email button reveals it.
+  // Keeps the initial surface focused on the SSO options (the cleaner /
+  // less data-entry path) and removes the visual clutter of all the
+  // email/password fields stacked next to the SSO buttons.
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const turnstileRef              = useRef(null);
   const { login }                 = useAuth();
   const navigate                  = useNavigate();
@@ -129,6 +134,20 @@ export default function Login() {
 
           <SocialButtons onSuccess={handleSocialSuccess} onError={setError} />
 
+          {!showEmailForm ? (
+            <button
+              type="button"
+              onClick={() => setShowEmailForm(true)}
+              className="w-full mt-3 flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 7l9 6 9-6" />
+              </svg>
+              Continue with Email
+            </button>
+          ) : (
+          <>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-cream-border" /></div>
             <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-cocoa">or log in with email</span></div>
@@ -173,6 +192,8 @@ export default function Login() {
               {loading ? 'Logging in...' : 'Log in'}
             </button>
           </form>
+          </>
+          )}
         </div>
 
         <p className="text-center text-sm text-cocoa mt-6">
