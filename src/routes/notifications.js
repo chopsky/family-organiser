@@ -47,21 +47,18 @@ router.post('/register-device', requireAuth, requireHousehold, async (req, res) 
  * background the app and see the actual system banner (iOS suppresses
  * banners while the app is in foreground).
  *
- * Returns immediately so the UI can show "scheduled" feedback without
+ * Returns immediately so the UI can show 'scheduled' feedback without
  * blocking.
  */
 router.post('/test', requireAuth, async (req, res) => {
-  // Acknowledge immediately. The push fires 5s later (see below).
   res.json({ ok: true, scheduled: true, delaySeconds: 5 });
-
   setTimeout(async () => {
     try {
-      const result = await push.sendToUser(req.user.id, {
+      await push.sendToUser(req.user.id, {
         title: 'Test from Housemait',
         body: 'If you can see this, push notifications are working.',
         category: 'family_activity',
       });
-      console.log('[push] test push fired for user', req.user.id, '— result:', result);
     } catch (err) {
       console.error('[push] test push error:', err.message);
     }

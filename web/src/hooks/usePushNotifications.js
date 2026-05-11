@@ -19,39 +19,31 @@ export default function usePushNotifications(user) {
 
     (async () => {
       try {
-        console.log('[push] hook running for user', user.id);
         const { PushNotifications } = await import('@capacitor/push-notifications');
 
         // Check / request permission
         let perm = await PushNotifications.checkPermissions();
-        console.log('[push] initial permission:', perm.receive);
         if (perm.receive === 'prompt') {
           perm = await PushNotifications.requestPermissions();
-          console.log('[push] permission after prompt:', perm.receive);
         }
-        if (perm.receive !== 'granted') {
-          console.log('[push] permission not granted, bailing');
-          return;
-        }
+        if (perm.receive !== 'granted') return;
 
         // Listen for registration success
         const regListener = await PushNotifications.addListener('registration', async (token) => {
-          console.log('[push] got token from APNs, length:', token.value?.length);
           try {
             await api.post('/notifications/register-device', {
               token: token.value,
               platform: 'ios',
             });
-            console.log('[push] token posted to server successfully');
             registered.current = true;
           } catch (err) {
-            console.warn('[push] failed to POST token to server:', err.message, err.response?.status, err.response?.data);
+            console.warn('Failed to register device token:', err);
           }
         });
 
         // Listen for registration errors
         const errListener = await PushNotifications.addListener('registrationError', (err) => {
-          console.warn('[push] APNs registration error:', JSON.stringify(err));
+          console.warn('Push registration error:', err);
         });
 
         // Listen for incoming notifications while app is open
@@ -76,9 +68,7 @@ export default function usePushNotifications(user) {
         };
 
         // Register with APNs
-        console.log('[push] calling register()...');
         await PushNotifications.register();
-        console.log('[push] register() resolved (waiting for registration event)');
       } catch (err) {
         console.warn('Push notifications not available:', err);
       }

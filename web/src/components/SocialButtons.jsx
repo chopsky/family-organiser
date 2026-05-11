@@ -116,9 +116,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         // affecting the user's logged-in state in our app.
         try { await SocialLogin.logout({ provider: 'google' }); }
         catch { /* nothing cached — first sign-in, ignore */ }
-        console.log('[social-login] iOS Google: calling login()...');
         const result = await SocialLogin.login({ provider: 'google', options: {} });
-        console.log('[social-login] iOS Google: result keys=', Object.keys(result || {}), 'inner keys=', Object.keys(result?.result || {}));
         // Plugin returns { provider, result: { idToken, ...profile } } on iOS.
         // Defensive: also try a couple of other shapes Capgo has used across
         // versions, in case the documented one doesn't match what we get.
@@ -128,23 +126,17 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
           result?.result?.authentication?.idToken ||
           null;
         if (!idToken) {
-          console.warn('[social-login] iOS Google: no idToken in response. Full result:', JSON.stringify(result));
           onError('Google sign-in did not return a token. Please try again.');
           return;
         }
-        console.log('[social-login] iOS Google: got idToken, length=', idToken.length, '— POSTing to /auth/google');
         const { data } = await api.post('/auth/google', {
           idToken,
           inviteToken: inviteToken || undefined,
         });
-        console.log('[social-login] iOS Google: server accepted, calling onSuccess');
         onSuccess(data);
       } catch (err) {
-        if (isCancelError(err)) {
-          console.log('[social-login] iOS Google: cancelled by user');
-          return;
-        }
-        console.error('[social-login] iOS Google sign-in error:', err, 'response data:', err?.response?.data);
+        if (isCancelError(err)) return;
+        console.error('[social-login] iOS Google sign-in error:', err);
         onError(err?.response?.data?.error || err?.message || 'Google sign-in failed.');
       }
       return;
