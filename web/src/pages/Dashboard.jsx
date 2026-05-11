@@ -460,7 +460,7 @@ export default function Dashboard() {
                         {task.title}
                       </p>
                       {dueLabel && (
-                        <p className={`text-xs mt-0.5 ${dueLabel.overdue ? 'text-coral font-medium' : 'text-cocoa'}`}>
+                        <p className={`text-xs mt-0.5 ${dueLabel.overdue ? 'text-coral' : 'text-cocoa'}`}>
                           {dueLabel.text}
                         </p>
                       )}
@@ -508,7 +508,7 @@ export default function Dashboard() {
                       </span>
                       <span className="flex-1 text-sm text-bark truncate">{item.item}</span>
                       {item.quantity && (
-                        <span className="shrink-0 text-sm text-cocoa">{item.quantity}</span>
+                        <span className="shrink-0 text-cocoa" style={{ fontSize: 12 }}>{item.quantity}</span>
                       )}
                     </div>
                   );
