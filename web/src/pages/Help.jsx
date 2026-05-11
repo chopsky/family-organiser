@@ -371,11 +371,9 @@ export default function Help() {
         <h2
           className="text-charcoal m-0"
           style={{
-            fontFamily: "'Instrument Serif', serif",
-            fontWeight: 400,
-            fontSize: 28,
-            lineHeight: 1.15,
-            letterSpacing: '-0.015em',
+            fontWeight: 500,
+            fontSize: 19,
+            lineHeight: 1.3,
           }}
         >
           Still need help?
@@ -427,11 +425,9 @@ function FaqSection({ id, title, children }) {
       <h2
         className="text-charcoal mb-3"
         style={{
-          fontFamily: "'Instrument Serif', serif",
-          fontWeight: 400,
-          fontSize: 28,
-          lineHeight: 1.15,
-          letterSpacing: '-0.015em',
+          fontWeight: 500,
+          fontSize: 19,
+          lineHeight: 1.3,
         }}
       >
         {title}
