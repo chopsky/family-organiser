@@ -153,12 +153,33 @@ async function insertHolidaysForHousehold(householdId, countryCode, year, create
 }
 
 /**
+ * Resolve a household's effective country code for holiday lookup.
+ *
+ * Prefers the explicit households.country column (set on creation via
+ * detectCountryFromTimezone + can be corrected via support / SQL), and
+ * falls back to deriving from timezone if country isn't set (e.g. for
+ * legacy rows from before the country column existed).
+ *
+ * Returns null if neither yields a country we can use, in which case the
+ * caller should skip holiday seeding for that household.
+ */
+function resolveCountryCode(household) {
+  if (household?.country && household.country !== 'OTHER') return household.country;
+  return countryFromTimezone(household?.timezone);
+}
+
+/**
  * Called when a household is created. Inserts current + next year holidays.
  */
-async function seedHolidaysForNewHousehold(householdId, timezone, createdByUserId) {
-  const countryCode = countryFromTimezone(timezone);
+async function seedHolidaysForNewHousehold(householdId, timezone, createdByUserId, country) {
+  // Prefer explicit country (passed from createHousehold caller), fall back
+  // to timezone. Same priority as resolveCountryCode but inlined because
+  // we don't have a household record to pass yet at seed time.
+  const countryCode =
+    (country && country !== 'OTHER' ? country : null) ||
+    countryFromTimezone(timezone);
   if (!countryCode) {
-    console.log(`No country mapping for timezone "${timezone}" — skipping holiday seed`);
+    console.log(`No country mapping for timezone "${timezone}" / country "${country}" — skipping holiday seed`);
     return;
   }
 
@@ -177,7 +198,7 @@ async function refreshHolidaysForAllHouseholds() {
   const nextYear = new Date().getFullYear() + 1;
 
   for (const household of households) {
-    const countryCode = countryFromTimezone(household.timezone);
+    const countryCode = resolveCountryCode(household);
     if (!countryCode) continue;
     await insertHolidaysForHousehold(household.id, countryCode, nextYear, null);
   }
@@ -185,6 +206,7 @@ async function refreshHolidaysForAllHouseholds() {
 
 module.exports = {
   countryFromTimezone,
+  resolveCountryCode,
   fetchHolidays,
   insertHolidaysForHousehold,
   seedHolidaysForNewHousehold,

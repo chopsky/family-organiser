@@ -279,7 +279,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
     const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin' });
 
     // Seed public holidays in the background (don't block response)
-    publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id)
+    publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id, household.country)
       .catch((err) => console.error('Failed to seed public holidays:', err));
 
     // Send the welcome email — fire-and-forget. Dedupes via
