@@ -372,7 +372,7 @@ export default function Help() {
           className="text-charcoal m-0"
           style={{
             fontWeight: 500,
-            fontSize: 19,
+            fontSize: 20,
             lineHeight: 1.3,
           }}
         >
@@ -426,7 +426,7 @@ function FaqSection({ id, title, children }) {
         className="text-charcoal mb-3"
         style={{
           fontWeight: 500,
-          fontSize: 19,
+          fontSize: 20,
           lineHeight: 1.3,
         }}
       >
