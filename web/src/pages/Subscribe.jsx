@@ -25,28 +25,44 @@ import { useSubscription } from '../context/SubscriptionContext';
 import ErrorBanner from '../components/ErrorBanner';
 import { isIos } from '../lib/platform';
 import IosSubscribe from './IosSubscribe';
+import { LOCALES, getLocaleByPath } from '../lib/locales';
+import { readLocaleCookie } from '../hooks/useLocale';
 
-// Pricing constants — hard-coded in the UI layer because Stripe is the
-// source of truth on the backend, but users see these numbers BEFORE we
-// hit Stripe. If you ever change the price in Stripe, update here too.
-// (A future refinement would fetch these from the backend, which in turn
-// reads them from Stripe's price objects at boot.)
-const PLANS = {
-  monthly: {
-    label: 'Monthly',
-    priceDisplay: '£5.99',
-    periodDisplay: 'per month',
-    tagline: 'Pay as you go, cancel anytime.',
-  },
-  annual: {
-    label: 'Annual',
-    priceDisplay: '£59.99',
-    periodDisplay: 'per year',
-    tagline: "That's just £5 a month.",
-    badge: 'Best value',
-    savings: 'Save £11.89 · 2 months free',
-  },
-};
+// Resolve which locale (and therefore which currency) to charge in. We
+// prefer the locale cookie set during the visitor's marketing journey
+// (e.g. they hit /us, accepted a price they saw there, and now we
+// honour that on the checkout page). If they never touched a localised
+// page — direct signup, then straight to /subscribe — we fall back to
+// the international default. The backend ultimately re-validates the
+// currency against Stripe, so a tampered cookie can't smuggle prices.
+function resolveLocale() {
+  const code = readLocaleCookie();
+  if (code && LOCALES[code]) return LOCALES[code];
+  return LOCALES.default;
+}
+
+// Build the two plan cards from the active locale. We deliberately
+// rebuild on every render rather than caching at module scope so a
+// user switching between marketing pages in a session always sees
+// consistent currency.
+function buildPlans(locale) {
+  return {
+    monthly: {
+      label: 'Monthly',
+      priceDisplay: locale.pricing.monthly,
+      periodDisplay: 'per month',
+      tagline: 'Pay as you go, cancel anytime.',
+    },
+    annual: {
+      label: 'Annual',
+      priceDisplay: locale.pricing.annual,
+      periodDisplay: 'per year',
+      tagline: `That's just ${locale.pricing.monthlyEquivalent} a month.`,
+      badge: 'Best value',
+      savings: locale.pricing.savings,
+    },
+  };
+}
 
 export default function Subscribe() {
   const navigate = useNavigate();
@@ -59,12 +75,21 @@ export default function Subscribe() {
   // Guideline 3.1.1: native IAP on iOS, no anti-steering on web.
   if (isIos()) return <IosSubscribe />;
 
+  // Locale-driven pricing. resolveLocale() reads the cookie set during
+  // the marketing journey; getLocaleByPath() exists if we ever want to
+  // honour a path override (we don't today since /subscribe is not
+  // locale-pathed). currency below ('gbp', 'usd', …) is what the backend
+  // uses to pick the right Stripe Price via lookup_key.
+  const locale = resolveLocale();
+  const plans = buildPlans(locale);
+  const currency = locale.stripeCurrency;
+
   async function handleSubscribe(plan) {
     if (submitting) return;
     setSubmitting(plan);
     setError('');
     try {
-      const { data } = await api.post('/subscription/checkout', { plan });
+      const { data } = await api.post('/subscription/checkout', { plan, currency });
       if (!data?.url) {
         throw new Error('Checkout URL missing from response');
       }
@@ -116,6 +141,7 @@ export default function Subscribe() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <PricingCard
             plan="monthly"
+            plans={plans}
             highlighted={false}
             currentPlan={currentPlan}
             submitting={submitting === 'monthly'}
@@ -124,6 +150,7 @@ export default function Subscribe() {
           />
           <PricingCard
             plan="annual"
+            plans={plans}
             highlighted={true}
             currentPlan={currentPlan}
             submitting={submitting === 'annual'}
@@ -187,8 +214,8 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining, currentPlan
   };
 }
 
-function PricingCard({ plan, highlighted, currentPlan, submitting, disabled, onSubscribe }) {
-  const p = PLANS[plan];
+function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabled, onSubscribe }) {
+  const p = plans[plan];
   const isCurrentPlan = currentPlan === plan;
 
   return (

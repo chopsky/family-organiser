@@ -26,31 +26,102 @@ function getStripe() {
   return _stripe;
 }
 
-function priceIdForPlan(plan) {
-  const ids = {
-    monthly: process.env.STRIPE_PRICE_MONTHLY,
-    annual: process.env.STRIPE_PRICE_ANNUAL,
-  };
-  const id = ids[plan];
+// ────────────────────────────────────────────────────────────────────────
+// Price resolution via Stripe lookup_keys.
+//
+// Instead of storing one Price ID per (plan, currency) pair in env vars
+// (would be 12 vars: STRIPE_PRICE_MONTHLY_GBP, … _USD, … _EUR …), every
+// Price object in Stripe carries a stable `lookup_key` string we set at
+// creation time. Our convention is `${interval}_${currency}` — e.g.
+// `monthly_gbp`, `annual_usd`. At runtime we fetch all matching Prices
+// once, cache the ID↔lookup_key map in memory, and resolve from there.
+//
+// Why a cache: Stripe doesn't expose a single-Price-by-lookup-key
+// endpoint; you have to list-by-lookup-keys. Doing this on every
+// checkout request would add ~300ms of API latency per call. The cache
+// is process-local and refreshes on dyno restart, which is fine — Price
+// IDs never change once created.
+// ────────────────────────────────────────────────────────────────────────
+
+const SUPPORTED_INTERVALS = ['monthly', 'annual'];
+const SUPPORTED_CURRENCIES = ['gbp', 'usd', 'eur', 'aud', 'cad', 'zar'];
+
+function allManagedLookupKeys() {
+  const keys = [];
+  for (const interval of SUPPORTED_INTERVALS) {
+    for (const cur of SUPPORTED_CURRENCIES) {
+      keys.push(`${interval}_${cur}`);
+    }
+  }
+  return keys;
+}
+
+let _priceCache = null; // { byLookupKey: Map, byPriceId: Map }
+
+async function getPriceCache() {
+  if (_priceCache) return _priceCache;
+  const stripe = getStripe();
+  const keys = allManagedLookupKeys();
+
+  // Stripe's list endpoint accepts a `lookup_keys[]` array. We expand
+  // the linked Product so debugging in logs is friendlier ("Housemait
+  // Monthly" instead of an opaque prod_xxx ID).
+  const result = await stripe.prices.list({
+    lookup_keys: keys,
+    expand: ['data.product'],
+    limit: 100,
+  });
+
+  const byLookupKey = new Map();
+  const byPriceId = new Map();
+  for (const price of result.data) {
+    if (!price.lookup_key) continue;
+    byLookupKey.set(price.lookup_key, price.id);
+    byPriceId.set(price.id, price.lookup_key);
+  }
+
+  _priceCache = { byLookupKey, byPriceId };
+  return _priceCache;
+}
+
+/**
+ * Resolve the Stripe Price ID for a (plan, currency) pair.
+ * `currency` is one of the SUPPORTED_CURRENCIES strings (lowercase).
+ * Throws if the matching Price hasn't been created in Stripe yet.
+ */
+async function priceIdForPlan(plan, currency = 'gbp') {
+  if (!SUPPORTED_INTERVALS.includes(plan)) {
+    throw new Error(`Unknown plan "${plan}" — expected monthly or annual`);
+  }
+  const lc = (currency || 'gbp').toLowerCase();
+  if (!SUPPORTED_CURRENCIES.includes(lc)) {
+    throw new Error(`Unsupported currency "${currency}" — supported: ${SUPPORTED_CURRENCIES.join(', ')}`);
+  }
+  const lookupKey = `${plan}_${lc}`;
+  const { byLookupKey } = await getPriceCache();
+  const id = byLookupKey.get(lookupKey);
   if (!id) {
     throw new Error(
-      `No Stripe price configured for plan "${plan}" — ` +
-      `check STRIPE_PRICE_${(plan || '').toUpperCase()} env var`
+      `No Stripe Price found with lookup_key="${lookupKey}". ` +
+      `Create the Price in the Stripe Dashboard (set the lookup_key field on the Price) ` +
+      `or check that the plan/currency you passed is one we manage.`
     );
   }
   return id;
 }
 
 /**
- * Map a Stripe Price ID back to our internal plan label. Used by the
- * webhook handler when Stripe sends subscription / invoice events that
- * carry only the price.
+ * Map a Stripe Price ID back to our internal { plan, currency } pair.
+ * Used by the webhook handler when Stripe sends subscription / invoice
+ * events that carry only the price. Returns null for unknown prices.
  */
-function planFromPriceId(priceId) {
+async function planFromPriceId(priceId) {
   if (!priceId) return null;
-  if (priceId === process.env.STRIPE_PRICE_MONTHLY) return 'monthly';
-  if (priceId === process.env.STRIPE_PRICE_ANNUAL) return 'annual';
-  return null;
+  const { byPriceId } = await getPriceCache();
+  const key = byPriceId.get(priceId);
+  if (!key) return null;
+  const [plan, currency] = key.split('_');
+  return { plan, currency };
 }
 
 /**
@@ -67,9 +138,10 @@ function planFromPriceId(priceId) {
  * customer.subscription.updated) can resolve back to the household
  * without a round-trip through the customers table.
  */
-async function createCheckoutSession({ plan, householdId, customerEmail, successUrl, cancelUrl }) {
+async function createCheckoutSession({ plan, currency, householdId, customerEmail, successUrl, cancelUrl }) {
   const stripe = getStripe();
-  const priceId = priceIdForPlan(plan);
+  const cur = (currency || 'gbp').toLowerCase();
+  const priceId = await priceIdForPlan(plan, cur);
 
   return stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -79,9 +151,13 @@ async function createCheckoutSession({ plan, householdId, customerEmail, success
     allow_promotion_codes: true,
     success_url: successUrl,
     cancel_url: cancelUrl,
-    metadata: { household_id: householdId, plan },
+    // Metadata is repeated on both the session and the subscription so
+    // both webhook event types (checkout.session.completed and
+    // customer.subscription.*) can resolve back to our household + plan
+    // + currency without re-fetching the other object.
+    metadata: { household_id: householdId, plan, currency: cur },
     subscription_data: {
-      metadata: { household_id: householdId, plan },
+      metadata: { household_id: householdId, plan, currency: cur },
     },
   });
 }

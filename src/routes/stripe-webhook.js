@@ -199,11 +199,16 @@ async function handleCheckoutCompleted(session) {
   // The session only carries the subscription ID — fetch the full
   // subscription to get the price + current_period_end for our DB.
   let plan = null;
+  let currency = null;
   let periodEnd = null;
   if (subscriptionId) {
     const stripe = stripeService.getStripe();
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
-    plan = stripeService.planFromPriceId(sub.items?.data?.[0]?.price?.id);
+    const resolved = await stripeService.planFromPriceId(sub.items?.data?.[0]?.price?.id);
+    if (resolved) {
+      plan = resolved.plan;
+      currency = resolved.currency;
+    }
     if (sub.current_period_end) {
       periodEnd = new Date(sub.current_period_end * 1000).toISOString();
     }
@@ -221,6 +226,7 @@ async function handleCheckoutCompleted(session) {
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
     subscription_plan: plan,
+    subscription_currency: currency,
     subscription_current_period_end: periodEnd,
     inactive_since: null,
   });
@@ -296,8 +302,9 @@ async function handleSubscriptionUpdated(subscription) {
     update.subscription_status = 'cancelled';
   }
 
-  const plan = stripeService.planFromPriceId(subscription.items?.data?.[0]?.price?.id);
-  if (plan) update.subscription_plan = plan;
+  const resolved = await stripeService.planFromPriceId(subscription.items?.data?.[0]?.price?.id);
+  if (resolved?.plan) update.subscription_plan = resolved.plan;
+  if (resolved?.currency) update.subscription_currency = resolved.currency;
   if (subscription.current_period_end) {
     update.subscription_current_period_end =
       new Date(subscription.current_period_end * 1000).toISOString();

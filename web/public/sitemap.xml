@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Housemait marketing-site sitemap.
+
+  Each <url> is reciprocally linked to every other locale via
+  xhtml:link rel="alternate" hreflang="..."> tags — Google's preferred
+  way to signal multi-regional variants. Including the same set on
+  every entry (including self-references) is required by the spec;
+  search engines treat the absence of self-reference as a sign of an
+  incomplete hreflang annotation.
+
+  The /privacy, /terms, /support pages are not localised yet so they
+  appear once with a single hreflang="en-GB" annotation. When/if we
+  localise them we'd add the same alternate set as the landing pages.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- Default international landing page (hreflang x-default) -->
+  <url>
+    <loc>https://housemait.com/</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- United Kingdom -->
+  <url>
+    <loc>https://housemait.com/uk</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- United States -->
+  <url>
+    <loc>https://housemait.com/us</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- European Union (English-speakers) -->
+  <url>
+    <loc>https://housemait.com/eu</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Australia -->
+  <url>
+    <loc>https://housemait.com/au</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Canada -->
+  <url>
+    <loc>https://housemait.com/ca</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- South Africa -->
+  <url>
+    <loc>https://housemait.com/za</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
+    <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
+    <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
+    <xhtml:link rel="alternate" hreflang="en-CA"    href="https://housemait.com/ca" />
+    <xhtml:link rel="alternate" hreflang="en-ZA"    href="https://housemait.com/za" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Non-localised supporting pages -->
+  <url>
+    <loc>https://housemait.com/support</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://housemait.com/privacy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://housemait.com/terms</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+</urlset>

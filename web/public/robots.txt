@@ -1,5 +1,56 @@
-User-agent: facebookexternalhit
-Allow: /
+# Housemait robots policy.
+#
+# Open by default — the marketing site lives on the same host as the
+# authenticated app, but everything behind /dashboard, /settings, etc.
+# requires a JWT to render anything useful (the page is just the React
+# skeleton + a redirect to /login for unauth'd visitors), so there's
+# no SEO/privacy harm if a crawler hits those URLs. We still Disallow
+# them so the search-result page doesn't fill with empty /dashboard,
+# /settings entries that out-rank our real landing pages.
 
 User-agent: *
+Allow: /
+
+# Authenticated app routes — nothing useful for a crawler to index.
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /tasks
+Disallow: /meals
+Disallow: /shopping
+Disallow: /receipt
+Disallow: /documents
+Disallow: /family
+Disallow: /settings
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /setup
+Disallow: /subscribe
+Disallow: /subscription
+
+# Auth flow plumbing — these URLs are reached via emailed links with
+# single-use tokens; indexing the bare path would just return the React
+# shell, no real content.
+Disallow: /verified
+Disallow: /check-email
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# AI training crawlers — opt out by default. These don't drive search
+# traffic; allowing them just gives them free training data. Remove
+# the block per-bot if you want a particular one to index for AI search.
+User-agent: GPTBot
 Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+Sitemap: https://housemait.com/sitemap.xml

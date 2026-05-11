@@ -55,6 +55,10 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
       trial_ends_at: trialEndsAt,
       days_remaining: daysRemaining,
       subscription_plan: household.subscription_plan || null,
+      // Lowercase ISO-4217 code the household is billed in (gbp, usd,
+      // eur, aud, cad, zar). NULL for trialing/never-subscribed
+      // households. Drives the in-app Settings → Plan price label.
+      subscription_currency: household.subscription_currency || null,
       // Default to 'stripe' if the column is somehow null (legacy rows
       // pre-Phase-1a were backfilled, but defensive fallback).
       subscription_provider: household.subscription_provider || 'stripe',
@@ -89,6 +93,13 @@ router.post('/checkout', requireAuth, requireHousehold, async (req, res) => {
     return res.status(400).json({ error: 'plan must be "monthly" or "annual"' });
   }
 
+  // Currency is sourced from the locale cookie the frontend captured
+  // during the marketing journey (see web/src/pages/Subscribe.jsx). The
+  // Stripe service revalidates against the SUPPORTED_CURRENCIES list
+  // and throws if a tampered value is passed, so this is safe to trust
+  // here.
+  const currency = (req.body?.currency || 'gbp').toLowerCase();
+
   try {
     const user = await db.getUserById(req.user.id);
     if (!user?.email) {
@@ -100,6 +111,7 @@ router.post('/checkout', requireAuth, requireHousehold, async (req, res) => {
     const webUrl = resolveWebUrl();
     const session = await stripeService.createCheckoutSession({
       plan,
+      currency,
       householdId: req.householdId,
       customerEmail: user.email,
       successUrl: `${webUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,

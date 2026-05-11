@@ -45,11 +45,15 @@ jest.mock('../db/client', () => {
 jest.mock('../services/stripe', () => {
   // We want real planFromPriceId + idOf semantics but mocked Stripe SDK
   // calls. Only the pieces the route actually invokes need mocking.
+  //
+  // planFromPriceId is async in production (it reaches into Stripe's
+  // lookup_key cache) and returns { plan, currency } — kept consistent
+  // here so the handler's awaited destructure works identically in tests.
   return {
     constructWebhookEvent: jest.fn(),
-    planFromPriceId: (priceId) => {
-      if (priceId === TEST_PRICE_MONTHLY) return 'monthly';
-      if (priceId === TEST_PRICE_ANNUAL) return 'annual';
+    planFromPriceId: async (priceId) => {
+      if (priceId === TEST_PRICE_MONTHLY) return { plan: 'monthly', currency: 'gbp' };
+      if (priceId === TEST_PRICE_ANNUAL) return { plan: 'annual', currency: 'gbp' };
       return null;
     },
     getStripe: jest.fn(() => ({
@@ -211,6 +215,7 @@ describe('POST /api/webhooks/stripe — checkout.session.completed', () => {
       stripe_customer_id: 'cus_1',
       stripe_subscription_id: 'sub_1',
       subscription_plan: 'monthly',
+      subscription_currency: 'gbp',
       subscription_current_period_end: new Date(1_800_000_000 * 1000).toISOString(),
       // Phase 8: clear the retention clock on subscribe (covers the
       // trial-expired-then-resubscribed path).
@@ -338,6 +343,7 @@ describe('POST /api/webhooks/stripe — customer.subscription.updated', () => {
       stripe_subscription_id: 'sub_1',
       subscription_status: 'active',
       subscription_plan: 'annual',
+      subscription_currency: 'gbp',
       subscription_current_period_end: new Date(1_950_000_000 * 1000).toISOString(),
     });
   });

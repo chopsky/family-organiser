@@ -3820,6 +3820,11 @@ async function updateHouseholdSubscription(householdId, fields, db = supabase) {
     'stripe_customer_id',
     'stripe_subscription_id',
     'subscription_plan',
+    // Multi-currency Tier 1 — written by the Stripe webhook handler from
+    // the Price object's currency (lowercase ISO-4217). Drives the in-app
+    // Settings → Plan card so non-GBP subscribers see their actual
+    // currency rather than a hardcoded £ figure.
+    'subscription_currency',
     'subscription_current_period_end',
     // Phase 8 — retention clock. Set on trial-expiry / subscription-cancel;
     // cleared (to null) on resubscription. The cleanup cron (not yet

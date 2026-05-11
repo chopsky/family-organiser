@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import '../landing.css'
+import { useLocale } from '../hooks/useLocale'
+import HreflangTags from '../components/HreflangTags'
 
 const SIGNUP_URL = '/signup'
 const SIGNIN_URL = '/login'
@@ -21,52 +23,72 @@ const QUICK_CHIPS = [
   { label: 'WhatsApp', color: '#25D366' },
 ]
 
-const FAQS = [
-  {
-    q: 'How does the free trial work?',
-    a: "You get full access to every Housemait feature for 30 days, no credit card required to start. We'll only ask for payment details at the end of the trial if you want to continue. If you do nothing, your account simply pauses.",
-  },
-  {
-    q: 'How much does Housemait cost after the trial?',
-    a: 'Housemait is £5.99/month or £59.99/year (which works out to about £5/month, roughly 2 months free). Both plans include everything. There are no feature gates. You can switch between plans or cancel anytime.',
-  },
-  {
-    q: 'How does the WhatsApp bot work?',
-    a: 'Each family member messages the Housemait bot directly on WhatsApp. Just send a message to add items, assign tasks, plan meals or check the shopping list. The bot understands natural language and even voice notes.',
-  },
-  {
-    q: 'Can I share documents and photos with my household?',
-    a: "Yes. Housemait has a secure Documents section where you can upload school letters, appointment slips, receipts, family photos and more. Everyone in the household has access, so no more digging through email attachments.",
-  },
-  {
-    q: 'Can I use Housemait without WhatsApp?',
-    a: 'Absolutely. The web app has everything you need. WhatsApp is an optional add-on for families who prefer chatting over apps.',
-  },
-  {
-    q: 'How many people can be in a household?',
-    a: "There's no limit. Invite as many family members as you need: parents, grandparents, older kids, au pairs, anyone who helps run the household. One subscription covers everyone.",
-  },
-  {
-    q: 'Is my family data safe?',
-    a: "Your privacy is paramount. We're fully GDPR compliant, your data is encrypted, and we never sell or share your family's information with third parties.",
-  },
-]
-
-const PRICING = {
-  monthly: { amount: '£5.99', per: '/month', billed: 'Billed monthly after your 30-day trial' },
-  annual: { amount: '£59.99', per: '/year', billed: 'Billed annually. 2 months free' },
+/** Build the FAQ list with pricing strings interpolated from the active
+ *  locale. Most answers don't reference price/region, so they're shared
+ *  verbatim across locales; only the pricing answer varies. */
+function buildFaqs(locale) {
+  const p = locale.pricing
+  return [
+    {
+      q: 'How does the free trial work?',
+      a: "You get full access to every Housemait feature for 30 days, no credit card required to start. We'll only ask for payment details at the end of the trial if you want to continue. If you do nothing, your account simply pauses.",
+    },
+    {
+      q: 'How much does Housemait cost after the trial?',
+      a: `Housemait is ${p.monthly}/month or ${p.annual}/year (which works out to about ${p.monthlyEquivalent}/month, roughly 2 months free). Both plans include everything. There are no feature gates. You can switch between plans or cancel anytime.`,
+    },
+    {
+      q: 'How does the WhatsApp bot work?',
+      a: 'Each family member messages the Housemait bot directly on WhatsApp. Just send a message to add items, assign tasks, plan meals or check the shopping list. The bot understands natural language and even voice notes.',
+    },
+    {
+      q: 'Can I share documents and photos with my household?',
+      a: "Yes. Housemait has a secure Documents section where you can upload school letters, appointment slips, receipts, family photos and more. Everyone in the household has access, so no more digging through email attachments.",
+    },
+    {
+      q: 'Can I use Housemait without WhatsApp?',
+      a: 'Absolutely. The web app has everything you need. WhatsApp is an optional add-on for families who prefer chatting over apps.',
+    },
+    {
+      q: 'How many people can be in a household?',
+      a: "There's no limit. Invite as many family members as you need: parents, grandparents, older kids, au pairs, anyone who helps run the household. One subscription covers everyone.",
+    },
+    {
+      q: 'Is my family data safe?',
+      a: "Your privacy is paramount. We're fully GDPR compliant, your data is encrypted, and we never sell or share your family's information with third parties.",
+    },
+  ]
 }
 
-const PLAN_FEATURES = [
-  'Unlimited household members',
-  'Shared lists, tasks & calendar',
-  'AI-powered WhatsApp assistant',
-  'School term dates & INSET days',
-  'Meal planner & recipe library',
-  'Documents & photos vault',
-  'Receipt scanner',
-  'Weekly family digest',
-]
+/** Build the two pricing cards (monthly / annual) from the locale's
+ *  pricing strings. The billing-frequency labels are locale-agnostic, so
+ *  they stay hardcoded. */
+function buildPricing(locale) {
+  return {
+    monthly: { amount: locale.pricing.monthly, per: '/month', billed: 'Billed monthly after your 30-day trial' },
+    annual:  { amount: locale.pricing.annual,  per: '/year',  billed: 'Billed annually. 2 months free' },
+  }
+}
+
+/** Pricing-card feature list. The school-terms bullet is UK-only —
+ *  see locale.features.schoolTerms — so the list is built dynamically. */
+function buildPlanFeatures(locale) {
+  const features = [
+    'Unlimited household members',
+    'Shared lists, tasks & calendar',
+    'AI-powered WhatsApp assistant',
+  ]
+  if (locale.features.schoolTerms) {
+    features.push('School term dates & INSET days')
+  }
+  features.push(
+    'Meal planner & recipe library',
+    'Documents & photos vault',
+    'Receipt scanner',
+    'Weekly family digest',
+  )
+  return features
+}
 
 const ArrowRight = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -342,7 +364,7 @@ const SHOWCASE = [
   },
 ]
 
-function Showcase() {
+function Showcase({ items }) {
   const [active, setActive] = useState(0)
   const trigRefs = useRef([])
 
@@ -357,7 +379,7 @@ function Showcase() {
     )
     trigRefs.current.forEach(el => el && obs.observe(el))
     return () => obs.disconnect()
-  }, [])
+  }, [items])
 
   const Panel = ({ it }) => (
     <>
@@ -379,14 +401,14 @@ function Showcase() {
         <div className="showcase-stage">
           <div className="wrap showcase-grid">
             <div className="showcase-left">
-              {SHOWCASE.map((it, i) => (
+              {items.map((it, i) => (
                 <div key={it.id} className={`showcase-panel col-text${active === i ? ' on' : ''}`}>
                   <Panel it={it} />
                 </div>
               ))}
             </div>
             <div className="showcase-right">
-              {SHOWCASE.map((it, i) => (
+              {items.map((it, i) => (
                 <div key={it.id} className={`showcase-mock${active === i ? ' on' : ''}`}>
                   {it.mock}
                 </div>
@@ -395,7 +417,7 @@ function Showcase() {
           </div>
         </div>
         <div className="showcase-trigs" aria-hidden="true">
-          {SHOWCASE.map((_, i) => (
+          {items.map((_, i) => (
             <div
               key={i}
               ref={el => (trigRefs.current[i] = el)}
@@ -407,7 +429,7 @@ function Showcase() {
         </div>
       </div>
       <div className="wrap showcase-mobile">
-        {SHOWCASE.map(it => (
+        {items.map(it => (
           <div key={it.id} className="showcase-mitem">
             <div className="col-text"><Panel it={it} /></div>
             <div className="showcase-mitem-mock">{it.mock}</div>
@@ -419,10 +441,19 @@ function Showcase() {
 }
 
 export default function LandingPage() {
+  const locale = useLocale()
   const [billing, setBilling] = useState('monthly')
   const [menuOpen, setMenuOpen] = useState(false)
   const [showFab, setShowFab] = useState(false)
-  const price = PRICING[billing]
+  const pricing = buildPricing(locale)
+  const price = pricing[billing]
+  const faqs = buildFaqs(locale)
+  const planFeatures = buildPlanFeatures(locale)
+  // Feature scrollytelling — filter out UK-only entries (school term
+  // dates) for markets that don't support them yet.
+  const showcaseItems = locale.features.schoolTerms
+    ? SHOWCASE
+    : SHOWCASE.filter(it => it.id !== 'terms')
 
   useEffect(() => {
     document.title = 'AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait'
@@ -437,6 +468,7 @@ export default function LandingPage() {
 
   return (
     <div className="lp-v2">
+      <HreflangTags locale={locale} />
       {/* NAV */}
       <nav className="top">
         <div className="wrap inner">
@@ -760,7 +792,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <Showcase />
+      <Showcase items={showcaseItems} />
 
       {/* TESTIMONIALS */}
       <section id="stories" className="section-cream sec-block">
@@ -816,7 +848,7 @@ export default function LandingPage() {
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <div className="eyebrow-sec">Pricing</div>
             <h2 className="sec" style={{ margin: '0 auto' }}>
-              Less than a <em>takeaway</em> a month.
+              Less than <em>{locale.pricing.compareReference}</em> a month.
             </h2>
             <p className="sec-lede" style={{ margin: '14px auto 0' }}>
               30-day free trial. Cancel any time. One plan covers your whole household.
@@ -853,7 +885,7 @@ export default function LandingPage() {
               <div className="billed">{price.billed}</div>
             </div>
             <ul>
-              {PLAN_FEATURES.map(f => (
+              {planFeatures.map(f => (
                 <li key={f}><span className="check">✓</span> {f}</li>
               ))}
             </ul>
@@ -877,7 +909,7 @@ export default function LandingPage() {
             <h2 className="sec" style={{ margin: '0 auto' }}>Questions, <em>answered.</em></h2>
           </div>
           <div className="faq">
-            {FAQS.map((f, i) => (
+            {faqs.map((f, i) => (
               <details key={f.q} open={i === 0}>
                 <summary>{f.q}</summary>
                 <div className="answer">{f.a}</div>
@@ -910,7 +942,7 @@ export default function LandingPage() {
           <div className="fgrid">
             <div>
               <img src="/assets/logo.png" alt="housemait" style={{ height: 26 }} />
-              <p className="tag">Family life, organised. AI-powered household management for modern UK families.</p>
+              <p className="tag">Family life, organised. AI-powered household management for {locale.audienceTagline}.</p>
               <div className="social">
                 <a href="https://linkedin.com/company/housemait/" target="_blank" rel="noopener noreferrer" aria-label="Housemait on LinkedIn">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -951,7 +983,7 @@ export default function LandingPage() {
           </div>
           <div className="bottom">
             <span>© {new Date().getFullYear()} Housemait. All rights reserved.</span>
-            <span>Made with ❤️ for UK families</span>
+            <span>{locale.footerNote}</span>
           </div>
         </div>
       </footer>

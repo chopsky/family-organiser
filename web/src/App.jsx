@@ -93,6 +93,18 @@ function AppRoutes() {
             tap the "Already have an account? Log in" link on Signup. On
             web the LandingPage handles its own login/signup CTAs. */}
         <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/signup" replace /> : <LandingPage />)} />
+        {/* Country-specific marketing variants. Same LandingPage component;
+            it reads pricing, audience tagline, and feature flags via
+            useLocale() based on the route path. Each variant emits its
+            own hreflang + self-canonical so Google serves the right page
+            per region in search results. Auth'd users always bounce to
+            /dashboard regardless of which locale path they hit. */}
+        <Route path="/uk" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/us" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/eu" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/au" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/ca" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/za" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
         {/* /signup must be unreachable while a session is live — otherwise a
             logged-in user creating a "new" account carries their token into
