@@ -1538,16 +1538,25 @@ export default function FamilySetup() {
               </div>
             )}
 
-            <div className="space-y-3">
-              {/* Option 1: Import from LA */}
-              <div className="bg-white rounded-xl border border-cream-border p-4">
+            {/* Most-likely path: state school follows council term dates.
+                Surfaced first with a 'Recommended' badge so parents pick this
+                without thinking unless they know they need otherwise. */}
+            <div className="mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-cocoa mb-2">
+                If it's a state school
+              </p>
+              <div className="bg-white rounded-xl border-2 border-primary/30 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
-                    <p className="text-xs text-cocoa mt-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">Recommended</span>
+                    </div>
+                    <p className="text-xs text-cocoa">
+                      Most state schools follow their council&apos;s term dates.
                       {termDateSchoolLA
-                        ? `Automatically import term dates from ${termDateSchoolLA} council.`
-                        : 'Automatically look up and import term dates from the local authority.'}
+                        ? ` We will import them from ${termDateSchoolLA} council.`
+                        : ' We will look up and import them automatically.'}
                     </p>
                   </div>
                   <button
@@ -1559,8 +1568,16 @@ export default function FamilySetup() {
                   </button>
                 </div>
               </div>
+            </div>
 
-              {/* Option 2: Import from school website */}
+            {/* Fallback paths: private schools, academies, or any school that
+                doesn't follow council term dates. Grouped under a clear
+                heading so the user understands these are the alternatives. */}
+            <p className="text-xs font-semibold uppercase tracking-wide text-cocoa mb-2 mt-5">
+              If it's a private school, academy, or has its own dates
+            </p>
+            <div className="space-y-3">
+              {/* Option: Import from school website */}
               <div className="bg-white rounded-xl border border-cream-border p-4">
                 <h3 className="text-sm font-semibold text-bark">🌐 Import from school website</h3>
                 <p className="text-xs text-cocoa mt-1">Paste the URL of your school's term dates page.</p>
