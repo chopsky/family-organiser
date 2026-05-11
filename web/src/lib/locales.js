@@ -200,3 +200,34 @@ export function getLocaleByPath(pathname) {
 export function allLocales() {
   return [...LOCALE_ORDER.map((c) => LOCALES[c]), LOCALES.default];
 }
+
+/**
+ * Map a household.country code (ISO 3166-1 alpha-2 — 'GB', 'ZA' etc.)
+ * back to a marketing locale config.
+ *
+ * Used by Subscribe.jsx so that a signed-in user's PRICING is driven by
+ * the country they signed up under (household.country, set canonically
+ * at signup) rather than the locale cookie, which gets overwritten
+ * every time they visit a marketing page. Stops scenarios like: 'I
+ * signed up via /za with ZAR pricing, but logging back in via my UK IP
+ * now shows me GBP'.
+ *
+ * Returns null when there's no exact locale match — caller falls back
+ * to the cookie or the default locale. Cases where this returns null:
+ *   • country='OTHER' — visitor outside our supported markets
+ *   • country='NZ'   — no dedicated /nz marketing page (yet)
+ *   • country='IE'   — collapsed under /eu since both use EUR
+ */
+const COUNTRY_TO_LOCALE = {
+  GB: 'gb',
+  US: 'us',
+  AU: 'au',
+  CA: 'ca',
+  ZA: 'za',
+  IE: 'eu',
+};
+export function getLocaleByCountry(country) {
+  if (!country) return null;
+  const code = COUNTRY_TO_LOCALE[country.toUpperCase()];
+  return code && LOCALES[code] ? LOCALES[code] : null;
+}

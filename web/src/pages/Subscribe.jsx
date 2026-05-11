@@ -22,20 +22,31 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useAuth } from '../context/AuthContext';
 import ErrorBanner from '../components/ErrorBanner';
 import { isIos } from '../lib/platform';
 import IosSubscribe from './IosSubscribe';
-import { LOCALES, getLocaleByPath } from '../lib/locales';
+import { LOCALES, getLocaleByPath, getLocaleByCountry } from '../lib/locales';
 import { readLocaleCookie } from '../hooks/useLocale';
 
-// Resolve which locale (and therefore which currency) to charge in. We
-// prefer the locale cookie set during the visitor's marketing journey
-// (e.g. they hit /us, accepted a price they saw there, and now we
-// honour that on the checkout page). If they never touched a localised
-// page — direct signup, then straight to /subscribe — we fall back to
-// the international default. The backend ultimately re-validates the
-// currency against Stripe, so a tampered cookie can't smuggle prices.
-function resolveLocale() {
+// Resolve which locale (and therefore which currency) to charge in.
+//
+// Priority cascade:
+//   1. household.country — canonical record set at signup. A user who
+//      signed up via /za must keep seeing ZAR even when they log back
+//      in from a UK IP. Locale cookies get overwritten every time the
+//      user visits a marketing page; the household.country doesn't.
+//   2. Locale cookie — set during the visitor's marketing journey, used
+//      for unsigned-in or pre-signup visits to /subscribe.
+//   3. Default international locale — last-resort fallback.
+//
+// The backend re-validates the currency against Stripe's price lookup,
+// so a tampered cookie can't smuggle a cheaper price through.
+function resolveLocale(household) {
+  if (household?.country) {
+    const fromHousehold = getLocaleByCountry(household.country);
+    if (fromHousehold) return fromHousehold;
+  }
   const code = readLocaleCookie();
   if (code && LOCALES[code]) return LOCALES[code];
   return LOCALES.default;
@@ -67,6 +78,7 @@ function buildPlans(locale) {
 export default function Subscribe() {
   const navigate = useNavigate();
   const { isActive, isTrialing, isExpired, daysRemaining, trialEndsAt, plan: currentPlan } = useSubscription();
+  const { household } = useAuth();
   const [submitting, setSubmitting] = useState(null); // 'monthly' | 'annual' | null
   const [error, setError] = useState('');
 
@@ -80,7 +92,7 @@ export default function Subscribe() {
   // honour a path override (we don't today since /subscribe is not
   // locale-pathed). currency below ('gbp', 'usd', …) is what the backend
   // uses to pick the right Stripe Price via lookup_key.
-  const locale = resolveLocale();
+  const locale = resolveLocale(household);
   const plans = buildPlans(locale);
   const currency = locale.stripeCurrency;
 

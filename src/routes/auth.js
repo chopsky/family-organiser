@@ -74,7 +74,7 @@ async function authResponse(user, req = null) {
       created_at: user.created_at || null,
       whatsapp_linked: !!user.whatsapp_linked,
     },
-    household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time } : null,
+    household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time, country: household.country } : null,
   };
 }
 
