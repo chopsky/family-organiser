@@ -87,6 +87,28 @@ function getMonday(d) {
   return date;
 }
 
+/**
+ * Friendly relative-date label for a task's due_date.
+ * Returns { text, overdue } so the caller can red-tint overdue items.
+ * Null due_date → null (no label to render).
+ */
+function formatTaskDueLabel(dueDateStr) {
+  if (!dueDateStr) return null;
+  // Parse as a local date (YYYY-MM-DD) so timezone doesn't shift it.
+  const [y, m, d] = dueDateStr.split('T')[0].split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const due = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due - today) / 86400000);
+  if (diffDays === 0) return { text: 'Today', overdue: false };
+  if (diffDays === 1) return { text: 'Tomorrow', overdue: false };
+  if (diffDays === -1) return { text: 'Yesterday', overdue: true };
+  if (diffDays < -1) return { text: `${Math.abs(diffDays)} days overdue`, overdue: true };
+  if (diffDays < 7) return { text: due.toLocaleDateString('en-GB', { weekday: 'long' }), overdue: false };
+  return { text: due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), overdue: false };
+}
+
 // ── AI Chat Input ───────────────────────────────────────────────
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
@@ -414,25 +436,41 @@ export default function Dashboard() {
             <p className="text-sm text-cocoa py-4 text-center">All caught up!</p>
           ) : (
             <ul className="space-y-1">
-              {outstanding.slice(0, 5).map((task) => (
-                <li key={task.id} className="flex items-start gap-3 py-2">
-                  <button
-                    onClick={() => toggleTask(task)}
-                    className={`shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                      task.completed
-                        ? 'bg-sage border-sage text-white'
-                        : 'border-cream-border hover:border-primary'
-                    }`}
-                  >
-                    {task.completed && (
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              {outstanding.slice(0, 5).map((task) => {
+                const assignee = task.assigned_to_name
+                  ? members.find(m => m.name === task.assigned_to_name)
+                  : null;
+                const dueLabel = formatTaskDueLabel(task.due_date);
+                return (
+                  <li key={task.id} className="flex items-center gap-3 py-2">
+                    <button
+                      onClick={() => toggleTask(task)}
+                      className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        task.completed
+                          ? 'bg-sage border-sage text-white'
+                          : 'border-cream-border hover:border-primary'
+                      }`}
+                    >
+                      {task.completed && (
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
+                        {task.title}
+                      </p>
+                      {dueLabel && (
+                        <p className={`text-xs mt-0.5 ${dueLabel.overdue ? 'text-coral font-medium' : 'text-cocoa'}`}>
+                          {dueLabel.text}
+                        </p>
+                      )}
+                    </div>
+                    {assignee && (
+                      <div className="shrink-0">{getMemberAvatar(assignee)}</div>
                     )}
-                  </button>
-                  <span className={`text-sm ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
-                    {task.title}
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
