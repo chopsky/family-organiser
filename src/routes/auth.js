@@ -271,7 +271,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
   // uses. If the client sends something unrecognised, fall through to DB
   // default 'GB' rather than rejecting — being lenient on creation matters
   // more than rejecting an odd value (the user can fix it in Settings).
-  const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'OTHER'];
+  const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'ZA', 'OTHER'];
   const safeCountry = ALLOWED_COUNTRIES.includes(country) ? country : undefined;
 
   try {

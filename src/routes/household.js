@@ -67,7 +67,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   // Silently dropped if invalid (admin Settings dropdown enforces valid
   // values; protects against direct API calls).
   if (country !== undefined) {
-    const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'OTHER'];
+    const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'ZA', 'OTHER'];
     if (ALLOWED_COUNTRIES.includes(country)) updates.country = country;
   }
 

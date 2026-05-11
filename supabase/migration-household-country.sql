@@ -20,11 +20,12 @@
 ALTER TABLE households
   ADD COLUMN IF NOT EXISTS country text NOT NULL DEFAULT 'GB';
 
--- Drop the constraint if it exists, then add — makes the migration re-runnable.
+-- Drop the constraint if it exists, then add — makes the migration re-runnable
+-- and lets us extend the allow-list (e.g. adding ZA later) by re-running.
 ALTER TABLE households DROP CONSTRAINT IF EXISTS households_country_check;
 ALTER TABLE households
   ADD CONSTRAINT households_country_check
-  CHECK (country IN ('GB','IE','US','CA','AU','NZ','OTHER'));
+  CHECK (country IN ('GB','IE','US','CA','AU','NZ','ZA','OTHER'));
 
 -- Partial index on non-GB rows. UK is the dominant tenant for the foreseeable
 -- future; we only ever query country when filtering for non-default values

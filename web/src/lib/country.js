@@ -15,7 +15,7 @@
  * and update src/routes/auth.js + src/routes/household.js allow-lists.
  */
 
-export const SUPPORTED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'OTHER'];
+export const SUPPORTED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'ZA', 'OTHER'];
 
 export const COUNTRY_LABELS = {
   GB: 'United Kingdom',
@@ -24,6 +24,7 @@ export const COUNTRY_LABELS = {
   CA: 'Canada',
   AU: 'Australia',
   NZ: 'New Zealand',
+  ZA: 'South Africa',
   OTHER: 'Other / not listed',
 };
 
@@ -44,6 +45,11 @@ export function detectCountryFromTimezone(tz) {
   if (tz.startsWith('America/')) return 'US';
   if (tz.startsWith('Australia/')) return 'AU';
   if (tz === 'Pacific/Auckland' || tz === 'Pacific/Chatham') return 'NZ';
+  // South Africa uses a single timezone (SAST, UTC+2). 'Africa/Johannesburg'
+  // is the canonical IANA name; older systems also use 'Africa/Maseru'
+  // (Lesotho) and 'Africa/Mbabane' (Eswatini) which share the same offset
+  // and are typically reported as Africa/Johannesburg by modern browsers.
+  if (tz === 'Africa/Johannesburg') return 'ZA';
   return 'OTHER';
 }
 
