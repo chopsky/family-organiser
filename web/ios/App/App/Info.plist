@@ -10,6 +10,10 @@
 	<string>Housemait uses the camera so you can scan receipts and snap photos of school letters, appointment slips and other documents to add to your household.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Housemait needs access to your photo library so you can attach existing photos to documents and shopping items.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Housemait uses your microphone to convert speech to text when you tap the voice input button on the AI chat.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Housemait uses speech recognition to convert what you say into text in the AI chat, so you can ask questions hands-free.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
