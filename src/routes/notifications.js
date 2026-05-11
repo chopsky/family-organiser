@@ -42,23 +42,30 @@ router.post('/register-device', requireAuth, requireHousehold, async (req, res) 
 
 /**
  * POST /api/notifications/test
- * Send a test push notification to the current user's registered devices.
- * Used to verify the APNs pipeline end-to-end without depending on a real
- * trigger (task assignment, shopping update, etc.). Authenticated users
- * only; rate-limit applies via the global auth limiter.
+ * Send a test push notification to the current user's registered devices,
+ * delayed by 5 seconds so the user has time to lock their phone or
+ * background the app and see the actual system banner (iOS suppresses
+ * banners while the app is in foreground).
+ *
+ * Returns immediately so the UI can show "scheduled" feedback without
+ * blocking.
  */
 router.post('/test', requireAuth, async (req, res) => {
-  try {
-    const result = await push.sendToUser(req.user.id, {
-      title: 'Test from Housemait',
-      body: 'If you can see this, push notifications are working.',
-      category: 'family_activity',
-    });
-    return res.json({ ok: true, ...result });
-  } catch (err) {
-    console.error('POST /api/notifications/test error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
+  // Acknowledge immediately. The push fires 5s later (see below).
+  res.json({ ok: true, scheduled: true, delaySeconds: 5 });
+
+  setTimeout(async () => {
+    try {
+      const result = await push.sendToUser(req.user.id, {
+        title: 'Test from Housemait',
+        body: 'If you can see this, push notifications are working.',
+        category: 'family_activity',
+      });
+      console.log('[push] test push fired for user', req.user.id, '— result:', result);
+    } catch (err) {
+      console.error('[push] test push error:', err.message);
+    }
+  }, 5000);
 });
 
 /**
