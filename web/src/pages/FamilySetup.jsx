@@ -5,7 +5,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconUsers, IconHome, IconMail } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
-import { isUkHousehold, SUPPORTED_COUNTRIES, COUNTRY_LABELS } from '../lib/country';
+import { isUkHousehold } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -63,7 +63,6 @@ export default function FamilySetup() {
   const isUk = isUkHousehold(household);
 
   const [name, setName]               = useState(household?.name ?? '');
-  const [country, setCountry]         = useState(household?.country ?? 'GB');
   // Household default reminder time. Previously editable on this page but
   // removed from the UI now that each member sets their own time — the
   // column is kept as the scheduler's fallback for users who haven't set a
@@ -796,7 +795,6 @@ export default function FamilySetup() {
     try {
       const { data } = await api.patch('/settings/settings', {
         name: name.trim(),
-        country,
       });
       setSuccess('Settings saved!');
       login({ token, user, household: data.household });
@@ -957,19 +955,6 @@ export default function FamilySetup() {
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-bark block mb-1">Country</label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                {SUPPORTED_COUNTRIES.map((c) => (
-                  <option key={c} value={c}>{COUNTRY_LABELS[c]}</option>
-                ))}
-              </select>
-              <p className="text-xs text-cocoa mt-1">Some features (like school directory and term dates) are tailored per country.</p>
-            </div>
             <button
               type="submit"
               disabled={saving}
@@ -981,7 +966,6 @@ export default function FamilySetup() {
         ) : (
           <div className="space-y-2 text-sm text-cocoa">
             <p><span className="font-medium text-bark">Name:</span> {household?.name}</p>
-            <p><span className="font-medium text-bark">Country:</span> {COUNTRY_LABELS[household?.country] || household?.country || '—'}</p>
             <p className="text-xs text-cocoa mt-2">Only admins can change household settings.</p>
           </div>
         )}
