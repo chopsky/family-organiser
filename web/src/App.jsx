@@ -99,7 +99,13 @@ function AppRoutes() {
             own hreflang + self-canonical so Google serves the right page
             per region in search results. Auth'd users always bounce to
             /dashboard regardless of which locale path they hit. */}
-        <Route path="/uk" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/gb" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        {/* Legacy /uk URL — kept until search engines and bookmarks have
+            migrated to /gb. Bounces to /gb so old inbound links keep
+            working; vercel.json also issues a 301 at the edge for the
+            same path so non-React traffic (crawlers, social previewers)
+            gets the permanent-move signal without invoking the SPA. */}
+        <Route path="/uk" element={<Navigate to="/gb" replace />} />
         <Route path="/us" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/eu" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/au" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />

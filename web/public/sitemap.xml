@@ -20,7 +20,7 @@
   <url>
     <loc>https://housemait.com/</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
@@ -32,9 +32,9 @@
 
   <!-- United Kingdom -->
   <url>
-    <loc>https://housemait.com/uk</loc>
+    <loc>https://housemait.com/gb</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
@@ -48,7 +48,7 @@
   <url>
     <loc>https://housemait.com/us</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
@@ -62,7 +62,7 @@
   <url>
     <loc>https://housemait.com/eu</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
@@ -76,7 +76,7 @@
   <url>
     <loc>https://housemait.com/au</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
@@ -90,7 +90,7 @@
   <url>
     <loc>https://housemait.com/ca</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />
@@ -104,7 +104,7 @@
   <url>
     <loc>https://housemait.com/za</loc>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
-    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/uk" />
+    <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
     <xhtml:link rel="alternate" hreflang="en-IE"    href="https://housemait.com/eu" />
     <xhtml:link rel="alternate" hreflang="en-AU"    href="https://housemait.com/au" />

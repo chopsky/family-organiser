@@ -2,7 +2,10 @@
  * Locale configuration — single source of truth for region-specific marketing.
  *
  * Every locale entry maps to:
- *   • a unique URL path (/uk, /us, …) used by both routing and hreflang
+ *   • a unique URL path (/gb, /us, …) used by both routing and hreflang.
+ *     We use ISO 3166-1 alpha-2 country codes (gb, us, eu, au, ca, za)
+ *     because that's exactly what Vercel returns in x-vercel-ip-country,
+ *     so the middleware's path-for-country mapping stays trivial
  *   • a Stripe currency code (GBP, USD, …) — combined with the billing
  *     interval, this resolves to a Stripe Price via lookup_key, e.g.
  *     `monthly_gbp`, `annual_usd`. The matching Price objects live in
@@ -26,9 +29,9 @@
  */
 
 export const LOCALES = {
-  uk: {
-    code: 'uk',
-    path: '/uk',
+  gb: {
+    code: 'gb',
+    path: '/gb',
     hreflang: 'en-GB',
     name: 'United Kingdom',
     flag: '🇬🇧',
@@ -177,11 +180,11 @@ export const LOCALE_COOKIE = 'housemait-locale';
 
 /** Stable iteration order — matters for sitemap generation and hreflang
  *  rendering so the alt tags appear in a consistent sequence. */
-export const LOCALE_ORDER = ['uk', 'us', 'eu', 'au', 'ca', 'za'];
+export const LOCALE_ORDER = ['gb', 'us', 'eu', 'au', 'ca', 'za'];
 
 /** Resolve a locale config from a URL pathname. Anything that doesn't
  *  match a known prefix falls back to `default`. The lookup is prefix-
- *  based so deep links like `/uk/anything` still resolve to the UK
+ *  based so deep links like `/gb/anything` still resolve to the UK
  *  locale — useful if we ever add localised sub-pages. */
 export function getLocaleByPath(pathname) {
   for (const code of LOCALE_ORDER) {

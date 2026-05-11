@@ -6,7 +6,7 @@
  * set correctly. Tells search engines:
  *
  *   • <link rel="canonical" href="https://housemait.com{locale.path}">
- *   • <link rel="alternate" hreflang="en-GB"   href=".../uk">
+ *   • <link rel="alternate" hreflang="en-GB"   href=".../gb">
  *   • <link rel="alternate" hreflang="en-US"   href=".../us">
  *     …one per locale…
  *   • <link rel="alternate" hreflang="x-default" href="https://housemait.com/">
@@ -26,7 +26,7 @@ export default function HreflangTags({ locale }) {
     if (typeof document === 'undefined' || !locale) return;
 
     // Wipe previously-injected tags so we don't accumulate them on
-    // route changes (e.g. visitor goes /uk → /us, the old <link>s would
+    // route changes (e.g. visitor goes /gb → /us, the old <link>s would
     // otherwise stick around and Google would see conflicting signals).
     document.querySelectorAll(`[${MARKER_ATTR}]`).forEach((node) => node.remove());
 

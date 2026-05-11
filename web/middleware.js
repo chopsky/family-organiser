@@ -14,12 +14,12 @@
  *
  * Search-engine crawlers also bypass entirely. Without this, Googlebot
  * crawling from US IPs would always be redirected to /us and never
- * index /uk, /eu, /au, /ca, /za — collapsing the hreflang setup.
+ * index /gb, /eu, /au, /ca, /za — collapsing the hreflang setup.
  *
  * Choice of 307 (not 301): geo redirects are temporary by their
  * nature — the destination depends on where the visitor is right now,
  * not where they "should" be canonically. Using 301 would teach search
- * engines and browsers to permanently associate / with /uk.
+ * engines and browsers to permanently associate / with /gb.
  */
 
 // EU + EEA + Switzerland → /eu. Switzerland is included because we
@@ -75,7 +75,7 @@ const CRAWLER_UA = /bot|crawl|spider|slurp|ia_archiver|facebookexternalhit|twitt
 
 function pathForCountry(country) {
   const cc = (country || '').toUpperCase();
-  if (cc === 'GB') return '/uk';
+  if (cc === 'GB') return '/gb';
   if (cc === 'US') return '/us';
   if (cc === 'AU') return '/au';
   if (cc === 'CA') return '/ca';
@@ -96,7 +96,7 @@ export default function middleware(request) {
   if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return;
 
   // Bot bypass MUST come before the geo check. Googlebot's IP geolocates
-  // to the US, but we still want it to be able to crawl /uk so that
+  // to the US, but we still want it to be able to crawl /gb so that
   // hreflang annotations resolve correctly when a UK searcher hits
   // Google with a "family organiser uk" query.
   const userAgent = request.headers.get('user-agent') || '';
