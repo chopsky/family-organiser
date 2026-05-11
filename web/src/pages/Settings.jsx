@@ -1218,7 +1218,7 @@ export default function Settings() {
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
-      <section className="mt-2 rounded-2xl p-5 border border-cream-border bg-white">
+      <section className="mt-2 rounded-2xl p-5 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-base font-semibold text-bark mb-1">Your data</h2>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
@@ -1240,7 +1240,7 @@ export default function Settings() {
           Sits between "Your data" (non-destructive GDPR surface) and the
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
-      <section className="mt-2 rounded-2xl p-5 border border-cream-border bg-white">
+      <section className="mt-2 rounded-2xl p-5 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-base font-semibold text-bark mb-1">Active sessions</h2>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
@@ -1301,7 +1301,7 @@ export default function Settings() {
       {/* Help & support — small entry point above the danger zone so users
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
-      <section className="mt-2 rounded-2xl p-5 border border-cream-border bg-white">
+      <section className="mt-2 rounded-2xl p-5 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-base font-semibold text-bark mb-1">Help &amp; support</h2>
         <p className="text-sm text-cocoa">
           Quick answers to common questions, plus a way to reach us if
