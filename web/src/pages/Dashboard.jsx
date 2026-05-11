@@ -265,20 +265,6 @@ export default function Dashboard() {
     return EVENT_DOT_CYCLE[index % EVENT_DOT_CYCLE.length];
   }
 
-  // Shopping list last updated info
-  const lastUpdatedItem = shoppingItems.length > 0 ? shoppingItems.reduce((latest, item) => {
-    if (!latest) return item;
-    return (item.updated_at || item.created_at) > (latest.updated_at || latest.created_at) ? item : latest;
-  }, null) : null;
-  const lastUpdatedBy = lastUpdatedItem?.added_by_name || lastUpdatedItem?.created_by_name;
-  const lastUpdatedAt = lastUpdatedItem?.updated_at || lastUpdatedItem?.created_at;
-  const lastUpdatedAgo = lastUpdatedAt ? (() => {
-    const mins = Math.round((now - new Date(lastUpdatedAt)) / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.round(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.round(hours / 24)}d ago`;
-  })() : null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -434,14 +420,6 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
-              </div>
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-cream-border, #E8E5EC)', fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
-                <p>
-                  {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}
-                  {lastUpdatedBy && lastUpdatedAgo && (
-                    <span> · Updated by {lastUpdatedBy} {lastUpdatedAgo}</span>
-                  )}
-                </p>
               </div>
             </>
           )}
