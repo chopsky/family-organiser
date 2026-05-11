@@ -3,6 +3,7 @@ const ical = require('node-ical');
 const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
+const saTermDates = require('../services/saTermDates');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 
@@ -374,6 +375,50 @@ Only return valid JSON array, nothing else.`;
  * POST /api/schools/:schoolId/import-la-dates
  * Scrape term dates from the school's local authority website using AI.
  */
+/**
+ * POST /api/schools/:schoolId/import-sa-term-dates
+ *
+ * Import the unified South African national school term dates onto this
+ * school. From 2026 onwards SA has a single national calendar that
+ * applies to every public school across all 9 provinces, so there's no
+ * per-LA / per-province / per-school logic to negotiate — one tap copies
+ * the national dates onto the household school.
+ *
+ * Body: { years?: number[] }  defaults to [current year].
+ * Send years: [2026, 2027] to import two years at once.
+ */
+router.post('/:schoolId/import-sa-term-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find(s => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+
+    const years = Array.isArray(req.body?.years) && req.body.years.length
+      ? req.body.years.filter((y) => Number.isInteger(y) && y >= 2026 && y <= 2100)
+      : [new Date().getFullYear()];
+
+    if (!years.length) return res.status(400).json({ error: 'No valid years provided.' });
+
+    const inserted = await saTermDates.importToSchool(school.id, years);
+
+    if (inserted === 0) {
+      return res.status(404).json({
+        error: 'No South African term dates found for the requested year(s). They may not have been published yet.',
+      });
+    }
+
+    cache.invalidate(`calendar:${req.householdId}`);
+    return res.json({
+      message: `Imported ${inserted} term-date entries for ${school.school_name}.`,
+      count: inserted,
+      years,
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/import-sa-term-dates error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
     // Get the school's LA

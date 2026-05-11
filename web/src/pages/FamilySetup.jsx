@@ -56,9 +56,12 @@ const AVATAR_COLOURS = {
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
   const canWrite = useCanWrite();
-  // UK-only feature gate. School directory + term-dates are UK-specific.
-  // Non-GB households see no school UI (no toggle on add/edit forms, no
-  // 'Coming soon' card to set expectations).
+  // UK-only feature gate. School directory + term-dates are UK-specific
+  // for 1.2.0. South African schools (manual name entry + national
+  // term-date import) lands as a focused 1.3.0 release — the backend
+  // infrastructure (sa_national_term_dates table, /import-sa-term-dates
+  // endpoint, hasSchoolsFeature() helper) is already in place; just the
+  // frontend UI work remains.
   const isUk = isUkHousehold(household);
 
   const [name, setName]               = useState(household?.name ?? '');

@@ -60,3 +60,22 @@ export function detectCountryFromTimezone(tz) {
 export function isUkHousehold(household) {
   return household?.country === 'GB';
 }
+
+/**
+ * Whether a household has access to ANY schools UI (UK-style GIAS search
+ * or SA-style manual entry + national term-date import). For other
+ * countries the schools section is hidden entirely with a Coming-soon
+ * placeholder.
+ */
+export function hasSchoolsFeature(household) {
+  return household?.country === 'GB' || household?.country === 'ZA';
+}
+
+/**
+ * Whether a household uses the SA flow (manual school name, no GIAS,
+ * national term-date import option). UK households still use the GIAS-
+ * driven directory + LA-dates flow.
+ */
+export function isSouthAfricaHousehold(household) {
+  return household?.country === 'ZA';
+}
