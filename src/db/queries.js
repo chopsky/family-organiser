@@ -2770,11 +2770,29 @@ async function enableUser(userId, db = supabase) {
 }
 
 async function deleteUserAdmin(userId, db = supabase) {
-  const { error } = await db
-    .from('users')
-    .delete()
-    .eq('id', userId);
-  if (error) throw error;
+  // Delegates to the delete_user_cascade() Postgres function (see
+  // supabase/migration-user-delete-fix.sql). The function runs with
+  // SET statement_timeout = '5min' so the cascade across all the user-
+  // referencing tables (refresh_tokens, device_tokens, event_reminders,
+  // chat_messages, audit logs, etc.) doesn't hit Supabase's default
+  // ~30s timeout. Real accounts hit this even on relatively light usage.
+  //
+  // Falls back to a plain DELETE if the function isn't installed yet —
+  // covers the brief window between code deploy and migration run.
+  const { error: rpcErr } = await db.rpc('delete_user_cascade', { p_user_id: userId });
+  if (!rpcErr) return;
+
+  // 42883 = undefined_function — function isn't deployed yet.
+  if (rpcErr.code === '42883' || /function .*does not exist/i.test(rpcErr.message || '')) {
+    console.warn('[db] delete_user_cascade() not installed — falling back to direct DELETE. Run migration-user-delete-fix.sql.');
+    const { error } = await db
+      .from('users')
+      .delete()
+      .eq('id', userId);
+    if (error) throw error;
+    return;
+  }
+  throw rpcErr;
 }
 
 async function deleteHouseholdCascade(householdId, db = supabase) {
