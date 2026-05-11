@@ -236,7 +236,13 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
   // Apple button shows on iOS native always (the entitlement is the gate),
   // OR on web if APPLE_CLIENT_ID (the Services ID) is configured.
   const showGoogle = !!GOOGLE_CLIENT_ID || isNativeIos();
-  const showApple = !!APPLE_CLIENT_ID || isNativeIos();
+  // Apple Sign-In on web requires a Services ID + verified domain + signing
+  // key + 4-5 env vars working in concert. iOS native uses
+  // ASAuthorizationController via the entitlement and needs none of that.
+  // Until the web setup is fully done, only render the button on iOS where
+  // it actually works — showing a broken button on web is worse than
+  // showing nothing.
+  const showApple = isNativeIos();
 
   if (!showGoogle && !showApple) return null;
 
