@@ -257,7 +257,7 @@ router.post('/resend-verification', async (req, res) => {
 // ─── POST /api/auth/create-household ────────────────────────────────────────
 
 router.post('/create-household', requireAuth, async (req, res) => {
-  const { name, timezone } = req.body;
+  const { name, timezone, country } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Household name is required' });
@@ -267,8 +267,15 @@ router.post('/create-household', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'You already belong to a household' });
   }
 
+  // Validate country against the same allow-list the DB CHECK constraint
+  // uses. If the client sends something unrecognised, fall through to DB
+  // default 'GB' rather than rejecting — being lenient on creation matters
+  // more than rejecting an odd value (the user can fix it in Settings).
+  const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'OTHER'];
+  const safeCountry = ALLOWED_COUNTRIES.includes(country) ? country : undefined;
+
   try {
-    const household = await db.createHousehold(name.trim(), timezone);
+    const household = await db.createHousehold(name.trim(), timezone, safeCountry);
     const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin' });
 
     // Seed public holidays in the background (don't block response)

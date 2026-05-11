@@ -7,11 +7,15 @@ function generateJoinCode() {
   return crypto.randomBytes(3).toString('hex').toUpperCase(); // e.g. "A3F9B2"
 }
 
-async function createHousehold(name, timezone, db = supabase) {
+async function createHousehold(name, timezone, country, db = supabase) {
   const join_code = generateJoinCode();
   const inbound_email_token = crypto.randomBytes(6).toString('hex');
   const row = { name, join_code, inbound_email_token };
   if (timezone) row.timezone = timezone;
+  // Country is validated by the route layer (allowed values from a fixed
+  // list). Only set if provided — otherwise the DB default 'GB' applies,
+  // which is the right fallback for the dominant tenant.
+  if (country) row.country = country;
   const { data, error } = await db
     .from('households')
     .insert(row)

@@ -5,6 +5,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconUsers, IconHome, IconMail } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
+import { isUkHousehold, SUPPORTED_COUNTRIES, COUNTRY_LABELS } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -56,8 +57,13 @@ const AVATAR_COLOURS = {
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
   const canWrite = useCanWrite();
+  // UK-only feature gate. School directory + term-dates are UK-specific.
+  // Non-GB households see no school UI (no toggle on add/edit forms, no
+  // 'Coming soon' card to set expectations).
+  const isUk = isUkHousehold(household);
 
   const [name, setName]               = useState(household?.name ?? '');
+  const [country, setCountry]         = useState(household?.country ?? 'GB');
   // Household default reminder time. Previously editable on this page but
   // removed from the UI now that each member sets their own time — the
   // column is kept as the scheduler's fallback for users who haven't set a
@@ -790,6 +796,7 @@ export default function FamilySetup() {
     try {
       const { data } = await api.patch('/settings/settings', {
         name: name.trim(),
+        country,
       });
       setSuccess('Settings saved!');
       login({ token, user, household: data.household });
@@ -950,6 +957,19 @@ export default function FamilySetup() {
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium text-bark block mb-1">Country</label>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {SUPPORTED_COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{COUNTRY_LABELS[c]}</option>
+                ))}
+              </select>
+              <p className="text-xs text-cocoa mt-1">Some features (like school directory and term dates) are tailored per country.</p>
+            </div>
             <button
               type="submit"
               disabled={saving}
@@ -961,6 +981,7 @@ export default function FamilySetup() {
         ) : (
           <div className="space-y-2 text-sm text-cocoa">
             <p><span className="font-medium text-bark">Name:</span> {household?.name}</p>
+            <p><span className="font-medium text-bark">Country:</span> {COUNTRY_LABELS[household?.country] || household?.country || '—'}</p>
             <p className="text-xs text-cocoa mt-2">Only admins can change household settings.</p>
           </div>
         )}
@@ -1180,6 +1201,25 @@ export default function FamilySetup() {
         )}
       </div>
 
+      {/* Schools coming-soon placeholder — only for non-GB households.
+          Sets the expectation that the school directory + term-date
+          imports are a real feature on our roadmap, just not localised
+          to their country yet. UK households see the full school
+          experience inline on the family-member and dependent flows. */}
+      {!isUk && (
+        <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)] border border-cream-border">
+          <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
+            <span className="text-base" aria-hidden="true">🌍</span>
+            Schools
+          </h2>
+          <p className="text-sm text-cocoa">
+            School directory and term-date imports are currently UK-only.
+            Coming soon to your country — until then, the rest of Housemait
+            works the same.
+          </p>
+        </div>
+      )}
+
       {/* Allergies & Dietary Requirements */}
       <div className="bg-linen rounded-2xl p-5 shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
         <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
@@ -1291,7 +1331,9 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle */}
+              {/* School toggle — UK-only feature. Hidden entirely on
+                  non-GB households (see lib/country.js). */}
+              {isUk && (
               <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
                 <span className="text-sm font-medium text-bark">Do they attend school?</span>
                 <button
@@ -1302,9 +1344,10 @@ export default function FamilySetup() {
                   <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${depAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
                 </button>
               </div>
+              )}
 
               {/* School fields (shown when toggle is on) */}
-              {depAttendsSchool && (
+              {isUk && depAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <div className="flex gap-3">
                     <div className="flex-1">
@@ -1423,7 +1466,9 @@ export default function FamilySetup() {
 
               {/* School toggle — same pattern as the add-dependent flow.
                   Pre-fills the school + year group on the invite so the
-                  fields are already set when the invitee accepts. */}
+                  fields are already set when the invitee accepts.
+                  UK-only — see lib/country.js. */}
+              {isUk && (
               <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
                 <span className="text-sm font-medium text-bark">
                   {`Does ${newName.trim() || 'this member'} attend school?`}
@@ -1445,8 +1490,9 @@ export default function FamilySetup() {
                   <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${newAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
                 </button>
               </div>
+              )}
 
-              {newAttendsSchool && (
+              {isUk && newAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <div className="flex gap-3">
                     <div className="flex-1">
@@ -1768,7 +1814,8 @@ export default function FamilySetup() {
                   Hidden by default for members without a school; defaulted on
                   if the member already has a school attached (so existing data
                   isn't surprise-hidden). Toggling off clears the selection so
-                  the save persists null. */}
+                  the save persists null. UK-only — see lib/country.js. */}
+              {isUk && (
               <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
                 <span className="text-sm font-medium text-bark">
                   {editingMember?.member_type === 'dependent'
@@ -1793,12 +1840,13 @@ export default function FamilySetup() {
                   <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${profileAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
                 </button>
               </div>
+              )}
 
               {/* School details — only shown when the toggle above is on. The
                   activities + term-dates card below is still dependent-only
                   because those are the bits a parent manages on a younger
                   child's behalf. */}
-              {profileAttendsSchool && (
+              {isUk && profileAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <div className="flex gap-3">
                     <div className="flex-1">

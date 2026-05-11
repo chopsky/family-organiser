@@ -52,7 +52,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * Body: { name?: string, reminder_time?: string, timezone?: string }
  */
 router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, reminder_time, timezone, allergies, trial_emails_enabled } = req.body;
+  const { name, reminder_time, timezone, allergies, trial_emails_enabled, country } = req.body;
   const updates = {};
 
   if (name !== undefined) updates.name = name.trim();
@@ -63,6 +63,13 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   // The unsubscribe route flips this to false via a signed token; this
   // endpoint lets admins flip it either way from Settings.
   if (trial_emails_enabled !== undefined) updates.trial_emails_enabled = !!trial_emails_enabled;
+  // Country — validated against the same allow-list the DB CHECK uses.
+  // Silently dropped if invalid (admin Settings dropdown enforces valid
+  // values; protects against direct API calls).
+  if (country !== undefined) {
+    const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'OTHER'];
+    if (ALLOWED_COUNTRIES.includes(country)) updates.country = country;
+  }
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update' });

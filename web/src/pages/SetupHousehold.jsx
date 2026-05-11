@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import { detectCountryFromTimezone } from '../lib/country';
 import ErrorBanner from '../components/ErrorBanner';
 
 export default function SetupHousehold() {
@@ -29,7 +30,12 @@ export default function SetupHousehold() {
     setLoading(true);
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
-      const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone });
+      // Best-effort auto-detect from the browser's timezone. Imperfect
+      // (Canadian timezones share 'America/' prefix with the US, India/SG
+      // map to 'OTHER', etc.) but gets the UK case right which is the
+      // overwhelming majority. User can correct in Settings → Household.
+      const country = detectCountryFromTimezone(timezone);
+      const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone, country });
       login(data);
       // Fresh signups always have onboarded_at === null here, so they
       // flow into the wizard. Existing users with old data ever end up
