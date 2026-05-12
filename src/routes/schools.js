@@ -768,7 +768,18 @@ If you genuinely cannot find any term dates in the content, return an empty arra
 Do NOT wrap in markdown code fences.`,
       messages: [{ role: 'user', content: `${cfg.userIntro}\n\n${pageText}` }],
       timeoutMs: LONG_TIMEOUT_MS,
-      maxTokens: 4096,
+      // 8192: a full SA year planner can emit 80+ entries (terms × 2 +
+      // ~40 holidays per year × 2 years). The old 4096 cap silently
+      // truncated Gemini's response mid-array, leaving the parser with
+      // invalid JSON. 8192 leaves comfortable headroom.
+      maxTokens: 8192,
+      // responseFormat: 'json' tells the Gemini call to set
+      // responseMimeType='application/json', which forces valid JSON at
+      // the API layer. Without it, Gemini occasionally emits
+      // conversational prose around the array and the parser chokes.
+      // Claude doesn't have an equivalent knob, but it usually behaves;
+      // the lenient JSON extraction further down is its safety net.
+      responseFormat: 'json',
       useThinking: false,
       feature: 'school_website_extraction',
       householdId: req.householdId,
