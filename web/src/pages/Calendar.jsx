@@ -1458,7 +1458,7 @@ export default function Calendar() {
       {viewMode === 'week' && (
         <div
           className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col"
-          style={{ maxHeight: 'min(560px, calc(100vh - 280px))' }}
+          style={{ maxHeight: 'min(560px, calc(100dvh - 360px))' }}
         >
           {/* Headers */}
           <div className="grid" style={{ gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}>
@@ -1595,7 +1595,7 @@ export default function Calendar() {
       {viewMode === 'day' && selectedDate && (
         <div
           className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col"
-          style={{ maxHeight: 'min(600px, calc(100vh - 280px))' }}
+          style={{ maxHeight: 'min(600px, calc(100dvh - 360px))' }}
         >
           {/* Day header — date itself is already shown in the toolbar's
               navigation label above, so we keep just the event count here. */}
