@@ -1456,7 +1456,10 @@ export default function Calendar() {
 
       {/* ── Week View ───────────────────────────────────────── */}
       {viewMode === 'week' && (
-        <div className="border border-light-grey rounded-2xl overflow-hidden bg-white">
+        <div
+          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col"
+          style={{ maxHeight: 'min(560px, calc(100vh - 280px))' }}
+        >
           {/* Headers */}
           <div className="grid" style={{ gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}>
             <div className="bg-cream border-b border-light-grey border-r border-light-grey" />
@@ -1504,10 +1507,12 @@ export default function Calendar() {
             );
           })()}
 
-          {/* Time grid — on mobile we cap to a viewport-relative height so
-              the calendar doesn't push the page below the bottom tab bar.
-              On desktop the 560px ceiling wins via the min(). */}
-          <div ref={scrollContainerRef} className="overflow-y-auto" style={{ maxHeight: 'min(560px, calc(100vh - 280px))' }}>
+          {/* Time grid — takes the remaining vertical space below the
+              week headers + all-day strip. flex-1 stretches it; min-h-0
+              lets it actually shrink below its content size so the
+              overflow-y-auto kicks in. The viewport cap lives on the
+              outer card so the entire calendar fits the screen. */}
+          <div ref={scrollContainerRef} className="overflow-y-auto flex-1 min-h-0">
             <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
               {/* Hour rows */}
               {HOURS.map(hour => (
@@ -1588,7 +1593,10 @@ export default function Calendar() {
 
       {/* ── Day View ────────────────────────────────────────── */}
       {viewMode === 'day' && selectedDate && (
-        <div className="border border-light-grey rounded-2xl overflow-hidden bg-white">
+        <div
+          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col"
+          style={{ maxHeight: 'min(600px, calc(100vh - 280px))' }}
+        >
           {/* Day header — date itself is already shown in the toolbar's
               navigation label above, so we keep just the event count here. */}
           <div className="flex items-center justify-end px-5 py-3 bg-cream border-b border-light-grey">
@@ -1618,7 +1626,7 @@ export default function Calendar() {
           })()}
 
           {/* Timeline */}
-          <div ref={viewMode === 'day' ? scrollContainerRef : undefined} className="overflow-y-auto px-5" style={{ maxHeight: 'min(600px, calc(100vh - 280px))' }}>
+          <div ref={viewMode === 'day' ? scrollContainerRef : undefined} className="overflow-y-auto px-5 flex-1 min-h-0">
             <div className="relative" style={{ height: `${24 * 56}px` }}>
               {HOURS.map(hour => {
                 return (
