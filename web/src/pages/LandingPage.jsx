@@ -678,7 +678,7 @@ export default function LandingPage() {
                   Thu 30 April
                 </div>
                 <div className="title">Finn · Dentist</div>
-                <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>4:00 PM · 45 min<br />📍 Bellingham Dental, Bristol</div>
+                <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>4:00 PM · 45 min<br />📍 {locale.demo.dentistLocation}</div>
                 <div style={{ marginTop: 8, paddingTop: 12, borderTop: '1px solid rgba(27,20,36,.06)', fontSize: 13, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--purple)' }} />
                   Reminder set for 30 min before
@@ -694,12 +694,12 @@ export default function LandingPage() {
                   <li>
                     <span className="cb" />
                     <span style={{ background: 'var(--sky-soft)', padding: '2px 8px', borderRadius: 4, fontSize: 11, textTransform: 'uppercase', color: '#4a6a94' }}>Dairy</span>
-                    Milk · 2L
+                    Milk · {locale.demo.milkSize}
                   </li>
                   <li>
                     <span className="cb" />
                     <span style={{ background: 'var(--coral-soft)', padding: '2px 8px', borderRadius: 4, fontSize: 11, textTransform: 'uppercase', color: '#a84522' }}>Meat</span>
-                    Chicken · 1kg
+                    Chicken · {locale.demo.chickenSize}
                   </li>
                 </ul>
               </div>

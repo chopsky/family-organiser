@@ -48,6 +48,11 @@ export const LOCALES = {
     features: { schoolTerms: true, whatsappBot: true },
     audienceTagline: 'modern UK families',
     footerNote: 'Made with ❤️ for UK families',
+    demo: {
+      dentistLocation: 'Bellingham Dental, Bristol',
+      milkSize: '2L',
+      chickenSize: '1kg',
+    },
   },
   us: {
     code: 'us',
@@ -68,6 +73,11 @@ export const LOCALES = {
     features: { schoolTerms: false, whatsappBot: true },
     audienceTagline: 'modern families',
     footerNote: 'Made with ❤️ for modern families',
+    demo: {
+      dentistLocation: 'Cedar Park Family Dental, Austin',
+      milkSize: '1 gallon',
+      chickenSize: '2 lb',
+    },
   },
   eu: {
     code: 'eu',
@@ -88,6 +98,13 @@ export const LOCALES = {
     features: { schoolTerms: false, whatsappBot: true },
     audienceTagline: 'modern European families',
     footerNote: 'Made with ❤️ for modern families',
+    demo: {
+      // Deliberately non-specific — the /eu page serves visitors from
+      // 27+ countries, no single city would feel local to all of them.
+      dentistLocation: 'Happy Smiles Dental',
+      milkSize: '2L',
+      chickenSize: '1kg',
+    },
   },
   au: {
     code: 'au',
@@ -108,6 +125,11 @@ export const LOCALES = {
     features: { schoolTerms: false, whatsappBot: true },
     audienceTagline: 'modern Australian families',
     footerNote: 'Made with ❤️ for Australian families',
+    demo: {
+      dentistLocation: 'Newtown Family Dental, Sydney',
+      milkSize: '2L',
+      chickenSize: '1kg',
+    },
   },
   ca: {
     code: 'ca',
@@ -128,6 +150,11 @@ export const LOCALES = {
     features: { schoolTerms: false, whatsappBot: true },
     audienceTagline: 'modern Canadian families',
     footerNote: 'Made with ❤️ for Canadian families',
+    demo: {
+      dentistLocation: 'Beaches Family Dental, Toronto',
+      milkSize: '2L',
+      chickenSize: '1kg',
+    },
   },
   za: {
     code: 'za',
@@ -148,6 +175,11 @@ export const LOCALES = {
     features: { schoolTerms: false, whatsappBot: true },
     audienceTagline: 'modern South African families',
     footerNote: 'Made with ❤️ for South African families',
+    demo: {
+      dentistLocation: 'Sandton Family Dental, Johannesburg',
+      milkSize: '2L',
+      chickenSize: '1kg',
+    },
   },
   default: {
     code: 'default',
@@ -168,6 +200,13 @@ export const LOCALES = {
     features: { schoolTerms: false, whatsappBot: true },
     audienceTagline: 'modern families',
     footerNote: 'Made with ❤️ for modern families',
+    demo: {
+      // Match the EU page's neutral framing — no city, no national
+      // associations for the rest-of-world fallback audience.
+      dentistLocation: 'Happy Smiles Dental',
+      milkSize: '2L',
+      chickenSize: '1kg',
+    },
   },
 };
 
