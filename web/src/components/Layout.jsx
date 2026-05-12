@@ -212,7 +212,7 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-cream flex flex-col md:flex-row">
       {/* ── Desktop Sidebar ── */}
-      <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
+      <aside className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30">
         {/* Logo */}
         <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
           <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
