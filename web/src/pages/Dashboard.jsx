@@ -187,7 +187,7 @@ function DashboardAiInput() {
         <input
           ref={aiInputRef}
           type="text"
-          placeholder="What can I help you with today?"
+          placeholder="What can I help you with?"
           className="flex-1 px-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
         <div className="flex items-center gap-1 pr-3">
