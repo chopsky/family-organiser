@@ -1617,7 +1617,7 @@ export default function Calendar() {
                     style={{ height: '56px' }}
                     onClick={() => openAddForm(selectedDate, hour)}
                   >
-                    <div className="absolute left-0 -top-1.5 text-[10px] font-medium text-warm-grey" style={{ width: '42px' }}>
+                    <div className="absolute left-0 -top-1.5 text-[10px] font-medium text-warm-grey bg-white pr-2 z-[1]" style={{ width: '42px' }}>
                       {hour > 0 ? formatHour(hour) : ''}
                     </div>
                   </div>
