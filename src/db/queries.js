@@ -1540,10 +1540,25 @@ async function updateShoppingItem(itemId, householdId, updates, db = supabase) {
 
 // ─── Shopping Lists ──────────────────────────────────────────────────────────
 
-// Seeds every new household with this set on first access. Shared by
-// getShoppingLists (read path) and getDefaultShoppingList (write path) so
-// the two can't drift.
-const DEFAULT_SHOPPING_LISTS = ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'];
+// Per-country shopping-list presets. New households get these seeded on
+// first access so the Shopping page never opens to an empty state.
+//
+// UK gets the original supermarket set because Tesco/Sainsbury's/etc. are
+// such household-name fixtures that a UK family expects them ready to go.
+// SA mirrors that pattern with the local big-box chains. Every other
+// market falls through to a single "Default" list — Whole Foods vs Trader
+// Joe's vs Kroger (US), Coles vs Woolworths (AU), Loblaws vs Sobeys (CA)
+// etc. vary too much per family for a useful preset, and showing UK chain
+// names to a US user reads as "this app wasn't made for me".
+const DEFAULT_LISTS_BY_COUNTRY = {
+  GB: ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'],
+  ZA: ['Default', 'Pick n Pay', 'Woolworths', 'Checkers', 'Spar'],
+};
+const DEFAULT_LISTS_FALLBACK = ['Default'];
+
+function defaultShoppingListsFor(country) {
+  return DEFAULT_LISTS_BY_COUNTRY[country] || DEFAULT_LISTS_FALLBACK;
+}
 
 async function getShoppingLists(householdId, db = supabase) {
   const { data, error } = await db
@@ -1560,7 +1575,16 @@ async function getShoppingLists(householdId, db = supabase) {
   // returned without ever clearing its loading=true initial state — i.e. an
   // infinite spinner for first-time users.
   if (!data || data.length === 0) {
-    const rows = DEFAULT_SHOPPING_LISTS.map((name) => ({ household_id: householdId, name }));
+    // Look up the household's country so we can seed locale-appropriate
+    // store names. If the country isn't set (legacy household) we fall
+    // back to the international "Default" list.
+    const { data: hh } = await db
+      .from('households')
+      .select('country')
+      .eq('id', householdId)
+      .single();
+    const presets = defaultShoppingListsFor(hh?.country);
+    const rows = presets.map((name) => ({ household_id: householdId, name }));
     await db.from('shopping_lists').insert(rows);
     const { data: seeded, error: seedErr } = await db
       .from('shopping_lists')
@@ -1602,10 +1626,17 @@ async function getDefaultShoppingList(householdId, db = supabase) {
     .eq('name', 'Default')
     .single();
   if (!data) {
-    // Create all default lists for this household (DEFAULT_SHOPPING_LISTS is
-    // declared above getShoppingLists — shared so the two seeding paths
-    // can't drift out of sync).
-    const rows = DEFAULT_SHOPPING_LISTS.map(name => ({ household_id: householdId, name }));
+    // Create all default lists for this household. The preset set is
+    // locale-aware (UK gets Tesco/M&S/etc., SA gets Pick n Pay/Woolies,
+    // everywhere else gets just "Default") — see DEFAULT_LISTS_BY_COUNTRY
+    // above getShoppingLists for the rationale.
+    const { data: hh } = await db
+      .from('households')
+      .select('country')
+      .eq('id', householdId)
+      .single();
+    const presets = defaultShoppingListsFor(hh?.country);
+    const rows = presets.map(name => ({ household_id: householdId, name }));
     await db.from('shopping_lists').insert(rows);
     const result = await db
       .from('shopping_lists')
