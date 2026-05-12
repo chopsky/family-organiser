@@ -1578,11 +1578,9 @@ export default function Calendar() {
       {/* ── Day View ────────────────────────────────────────── */}
       {viewMode === 'day' && selectedDate && (
         <div className="border border-light-grey rounded-2xl overflow-hidden bg-white">
-          {/* Day header */}
-          <div className="flex items-center justify-between px-5 py-4 bg-cream border-b border-light-grey">
-            <div className="text-lg font-semibold" style={{ fontFamily: 'var(--font-display)' }}>
-              {formatLongDate(selectedDate)}
-            </div>
+          {/* Day header — date itself is already shown in the toolbar's
+              navigation label above, so we keep just the event count here. */}
+          <div className="flex items-center justify-end px-5 py-3 bg-cream border-b border-light-grey">
             <div className="text-xs text-warm-grey">
               {eventsForDate(selectedDate).length + tasksForDate(selectedDate).length} events
             </div>
