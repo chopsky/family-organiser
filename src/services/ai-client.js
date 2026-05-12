@@ -52,7 +52,7 @@ function isTransient(err) {
  * Call Gemini 3.1 Pro. Returns { text, provider }.
  * Converts Claude-style messages to Gemini format.
  */
-async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, responseFormat }) {
+async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, responseFormat, useThinking = true }) {
   const client = getGeminiClient();
   const timeout = timeoutMs || DEFAULT_TIMEOUT_MS;
 
@@ -96,6 +96,16 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
     };
     if (responseFormat === 'json') {
       config.responseMimeType = 'application/json';
+    }
+    // Gemini 2.5 Flash has thinking ON by default and the thinking
+    // budget eats into maxOutputTokens. For mechanical tasks like
+    // structured extraction or classification, callers should pass
+    // useThinking: false — otherwise the model can burn 5-7k tokens
+    // "thinking" and run out before finishing the JSON output. (Seen
+    // in the wild on the school year-planner extraction: response
+    // truncated mid-array at ~2k chars even with maxTokens=8192.)
+    if (useThinking === false) {
+      config.thinkingConfig = { thinkingBudget: 0 };
     }
 
     const response = await client.models.generateContent({
