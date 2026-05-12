@@ -1540,20 +1540,20 @@ async function updateShoppingItem(itemId, householdId, updates, db = supabase) {
 
 // ─── Shopping Lists ──────────────────────────────────────────────────────────
 
-// Per-country shopping-list presets. New households get these seeded on
-// first access so the Shopping page never opens to an empty state.
+// New households get a single "Default" list seeded on first access so
+// the Shopping page never opens to an empty state.
 //
-// UK gets the original supermarket set because Tesco/Sainsbury's/etc. are
-// such household-name fixtures that a UK family expects them ready to go.
-// SA mirrors that pattern with the local big-box chains. Every other
-// market falls through to a single "Default" list — Whole Foods vs Trader
-// Joe's vs Kroger (US), Coles vs Woolworths (AU), Loblaws vs Sobeys (CA)
-// etc. vary too much per family for a useful preset, and showing UK chain
-// names to a US user reads as "this app wasn't made for me".
-const DEFAULT_LISTS_BY_COUNTRY = {
-  GB: ['Default', 'M&S', 'Tesco', 'Waitrose', "Sainsbury's", 'Aldi'],
-  ZA: ['Default', 'Pick n Pay', 'Woolworths', 'Checkers', 'Spar'],
-};
+// Earlier versions of this code shipped per-country supermarket presets
+// (UK: Tesco/M&S/Waitrose/Sainsbury's/Aldi) on the theory that ready-to-
+// go store-specific lists would feel native. The data ran the other way:
+// across every household with shopping items, 100% only ever used the
+// "Default" list. The supermarket-named lists were dead weight on the
+// Shopping UI. So we now seed only "Default" everywhere and let users
+// create named lists themselves if they want them.
+//
+// Kept as a per-country map (rather than a flat constant) so a future
+// locale can opt back into named presets without restructuring callers.
+const DEFAULT_LISTS_BY_COUNTRY = {};
 const DEFAULT_LISTS_FALLBACK = ['Default'];
 
 function defaultShoppingListsFor(country) {
