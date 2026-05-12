@@ -1638,8 +1638,6 @@ export default function Calendar() {
                   const top = (startMin / 60) * hourH;
                   const height = Math.max(((endMin - startMin) / 60) * hourH, 20);
                   const layout = overlapLayout.get(ev.id) || { col: 0, totalCols: 1 };
-                  const widthPct = 100 / layout.totalCols;
-                  const leftPct = layout.col * widthPct;
                   const hex = getEventHex(ev);
                   const memberInfo = ev.assigned_to_name ? getMemberInfo(ev.assigned_to_name) : null;
 
@@ -1648,10 +1646,16 @@ export default function Calendar() {
                       key={ev.id}
                       className="absolute rounded-lg px-2.5 py-1.5 z-[2] cursor-pointer hover:opacity-90 flex items-start gap-2 overflow-hidden"
                       style={{
+                        // Left gutter (44px) reserves room for the time
+                        // labels on the left rail. We distribute the
+                        // *remaining* width across `totalCols` columns —
+                        // the previous formula proportionally shaved the
+                        // gutter from every column, which made the
+                        // rightmost card overflow past the hour line.
                         top: `${top}px`,
                         height: `${height}px`,
-                        left: `calc(52px + ${leftPct}%)`,
-                        width: `calc(${widthPct}% - 52px * ${widthPct / 100} - 4px)`,
+                        left: `calc(44px + ${layout.col} * (100% - 44px) / ${layout.totalCols})`,
+                        width: `calc((100% - 44px) / ${layout.totalCols} - 4px)`,
                         background: hex + '18',
                         color: hex,
                       }}
