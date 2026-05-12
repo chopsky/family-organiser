@@ -1461,7 +1461,7 @@ export default function Calendar() {
           // header + bottom nav (~320px combined), desktop just the page
           // padding + H1 (~240px). Tailwind responsive class swaps the
           // offset at the md: breakpoint.
-          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_320px)] md:max-h-[calc(100dvh_-_240px)]"
+          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_300px)] md:max-h-[calc(100dvh_-_200px)]"
         >
           {/* Headers */}
           <div className="grid" style={{ gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}>
@@ -1598,7 +1598,7 @@ export default function Calendar() {
       {viewMode === 'day' && selectedDate && (
         <div
           // See note on the week-view card above for the offset rationale.
-          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_320px)] md:max-h-[calc(100dvh_-_240px)]"
+          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_300px)] md:max-h-[calc(100dvh_-_200px)]"
         >
           {/* Day header — date itself is already shown in the toolbar's
               navigation label above, so we keep just the event count here. */}
@@ -1720,9 +1720,12 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* ── Today's Events Panel (below month/week, hidden in day, hidden on mobile month since selected day panel covers it) ── */}
-      {viewMode !== 'day' && todayEvents.length > 0 && (
-        <div className={`mt-5 ${viewMode === 'month' ? 'hidden md:block' : ''}`}>
+      {/* ── Today's Events Panel (month view only — week view shows its
+            own timed events inline, day view IS today's events). On mobile
+            month view we still hide it because the selected-day panel
+            above already lists the day's events. ── */}
+      {viewMode === 'month' && todayEvents.length > 0 && (
+        <div className="mt-5 hidden md:block">
           <h3 className="text-[17px] font-semibold mb-3" style={{ fontFamily: 'var(--font-display)' }}>Today's events</h3>
           <div className="flex flex-col gap-2">
             {todayEvents.map(item => {
