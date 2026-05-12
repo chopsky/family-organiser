@@ -717,16 +717,18 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
     // term names to recognise and which AY format to emit.
     const promptByCountry = {
       ZA: {
-        intro: `You are an expert at extracting South African school term dates from website or PDF content. South African schools run on the calendar year (January–December) with four terms: Term 1, Term 2, Term 3, Term 4. From 2026, a unified national calendar applies to every public school. Extract ALL term dates you can find — for both ${currentAY} and ${nextAY} if available.`,
+        intro: `You are an expert at extracting South African school term dates from website or PDF content. South African schools run on the calendar year (January–December) with four terms. From 2026, a unified national calendar applies to every public school. Extract ALL term dates you can find — for both ${currentAY} and ${nextAY} if available.
+
+The source may label terms as "Term 1", "Term 2" or as "FIRST TERM", "SECOND TERM", "THIRD TERM", "FOURTH TERM" — treat both labelings identically.`,
         lookFor: [
           'Dates in any common format ("3 January 2026", "03/01/2026", "2026-01-03")',
-          'Term boundaries (Term 1 start/end, Term 2 start/end, etc.)',
-          'Mid-term breaks',
-          'School-specific closures (Jewish high holidays, sports days, parent evenings, etc.)',
-          'Public holidays falling in term',
+          'Term boundaries — when "FIRST TERM" / "TERM 1" says e.g. "Wednesday 14 January - Friday 27 March", emit one term_start and one term_end',
+          'Mid-term breaks (use half_term_start with end_date)',
+          'School-specific closures: Jewish holidays (Pesach, Rosh Hashanah, Yom Kippur, Sukkot, Chanukah, etc.), sports days, parent evenings',
+          'South African public holidays falling on school days (Human Rights Day, Freedom Day, Workers Day, Youth Day, Heritage Day, Day of Reconciliation, etc.)',
         ],
         ayFormat: `"${currentAY}" or "${nextAY}"`,
-        userIntro: 'Extract all school term dates from this South African school website or year planner:',
+        userIntro: 'Extract all school term dates and closures from this South African school year planner. Emit one JSON entry per date you find — terms, breaks, holidays, and closures all go into the same array:',
       },
       GB: {
         intro: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find — for both the ${currentAY} academic year and the ${nextAY} academic year if available.`,
@@ -773,13 +775,32 @@ Do NOT wrap in markdown code fences.`,
       userId: req.user.id,
     });
 
+    // Lenient JSON extraction. Models occasionally:
+    //   • Wrap the response in ```json … ``` (handled by the original
+    //     regex) or in plain ``` (now also handled).
+    //   • Prefix prose like "Here are the term dates I found:" before
+    //     the JSON. We dig out the first `[` … last `]` substring.
+    //   • Return "I cannot find any term dates" prose — caught when
+    //     the slice still fails to parse.
     let dates;
     try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      // Step 1: strip any markdown code fences anywhere in the response.
+      let cleaned = text
+        .replace(/```(?:json)?\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
+      // Step 2: if there's prose before/after, slice to the JSON array.
+      const firstBracket = cleaned.indexOf('[');
+      const lastBracket = cleaned.lastIndexOf(']');
+      if (firstBracket !== -1 && lastBracket > firstBracket) {
+        cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+      }
       dates = JSON.parse(cleaned);
     } catch {
-      console.error('[import-website] AI response could not be parsed:', text.substring(0, 500));
-      return res.status(500).json({ error: 'Could not extract structured term dates from the website. The page may not contain parseable date information. Try adding dates manually.' });
+      console.error('[import-website] AI response could not be parsed:', text.substring(0, 1000));
+      return res.status(500).json({
+        error: 'The school dates page or PDF was downloaded, but the AI could not extract structured dates from it. This often happens with visual year-planner PDFs where dates are positioned on a calendar grid. Try a different URL, an iCal feed, or add dates manually.',
+      });
     }
 
     if (!Array.isArray(dates) || dates.length === 0) {
