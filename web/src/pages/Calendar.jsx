@@ -736,11 +736,20 @@ export default function Calendar() {
         reminders: formReminders.length > 0 ? formReminders : null,
       };
       if (formAllDay) {
+        // All-day events are stored at UTC midnight (the canonical "this
+        // day" marker), so we can ship them as naked timestamps — Postgres
+        // will interpret them as UTC, which is what we want.
         payload.start_time = `${formDate}T00:00:00`;
         payload.end_time = `${formEndDate || formDate}T23:59:59`;
       } else {
-        payload.start_time = `${formDate}T${formStart}:00`;
-        payload.end_time = `${formEndDate || formDate}T${formEnd}:00`;
+        // Timed events: the user types a *local* time ("10:00" in BST).
+        // `new Date("2026-05-12T10:00:00")` (no trailing Z) parses as local
+        // time, and `.toISOString()` converts to the correct UTC instant.
+        // Without this conversion, Postgres' timestamptz column would
+        // interpret the naked timestamp as UTC and the event would land
+        // an hour late on every BST/CEST/etc. clock.
+        payload.start_time = new Date(`${formDate}T${formStart}:00`).toISOString();
+        payload.end_time = new Date(`${formEndDate || formDate}T${formEnd}:00`).toISOString();
       }
 
       if (editingEvent) {
