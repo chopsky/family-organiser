@@ -5,7 +5,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import { IconUsers, IconHome, IconMail } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
-import { isUkHousehold } from '../lib/country';
+import { isUkHousehold, isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -56,13 +56,13 @@ const AVATAR_COLOURS = {
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
   const canWrite = useCanWrite();
-  // UK-only feature gate. School directory + term-dates are UK-specific
-  // for 1.2.0. South African schools (manual name entry + national
-  // term-date import) lands as a focused 1.3.0 release — the backend
-  // infrastructure (sa_national_term_dates table, /import-sa-term-dates
-  // endpoint, hasSchoolsFeature() helper) is already in place; just the
-  // frontend UI work remains.
+  // Country-specific school flow gates. There are now three flows:
+  //   • UK: GIAS-driven school search + LA term-date scrape (full-fat)
+  //   • SA: free-text school name + national term-date import (1.3.0+)
+  //   • Other: schools feature hidden entirely with a Coming-soon card
   const isUk = isUkHousehold(household);
+  const isSa = isSouthAfricaHousehold(household);
+  const showSchools = hasSchoolsFeature(household);
 
   const [name, setName]               = useState(household?.name ?? '');
   // Household default reminder time. Previously editable on this page but
@@ -100,6 +100,12 @@ export default function FamilySetup() {
   const [newSchoolResults, setNewSchoolResults] = useState([]);
   const [newSelectedSchool, setNewSelectedSchool] = useState(null);
   const [searchingNewSchools, setSearchingNewSchools] = useState(false);
+  // SA path for the invite-member modal: free-text school name plus an
+  // optional pointer to an already-linked household school (when the
+  // user clicks a chip to reuse a sibling's school). When existingId is
+  // set, the handler links to that row without creating a new one.
+  const [newSaSchoolName, setNewSaSchoolName] = useState('');
+  const [newSaSchoolExistingId, setNewSaSchoolExistingId] = useState(null);
 
   // Add dependent state
   const [showAddDependent, setShowAddDependent] = useState(false);
@@ -115,6 +121,10 @@ export default function FamilySetup() {
   const [depSchoolResults, setDepSchoolResults] = useState([]);
   const [depSelectedSchool, setDepSelectedSchool] = useState(null);
   const [searchingSchools, setSearchingSchools] = useState(false);
+  // SA path for the add-dependent modal — see the equivalent newSa* vars
+  // above for the same pattern.
+  const [depSaSchoolName, setDepSaSchoolName] = useState('');
+  const [depSaSchoolExistingId, setDepSaSchoolExistingId] = useState(null);
   const [householdSchools, setHouseholdSchools] = useState([]);
   const [childActivities, setChildActivities] = useState({}); // { childId: [activities] }
 
@@ -137,6 +147,15 @@ export default function FamilySetup() {
   const [editSchoolSearch, setEditSchoolSearch] = useState('');
   const [editSchoolResults, setEditSchoolResults] = useState([]);
   const [editSelectedSchoolData, setEditSelectedSchoolData] = useState(null); // full GIAS school data for new school creation
+  // SA path for the edit-profile modal. profileSaSchoolName tracks the
+  // (possibly newly-typed) name; profileSaSchoolExistingId, if set,
+  // means "reuse this household_schools row" — typically populated when
+  // the user clicks a chip to pick a sibling's school. The existing
+  // profileSchoolId already covers "this member is currently linked to
+  // school X" for both UK and SA — these two new vars handle the typing
+  // step before that link is persisted.
+  const [profileSaSchoolName, setProfileSaSchoolName] = useState('');
+  const [profileSaSchoolExistingId, setProfileSaSchoolExistingId] = useState(null);
   const [editActivities, setEditActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [addActivityDay, setAddActivityDay] = useState(0);
@@ -238,15 +257,26 @@ export default function FamilySetup() {
     setAddingDependent(true);
     setError('');
     try {
-      // If school is selected, ensure it exists in household first
+      // If school is selected, ensure it exists in household first.
+      // Two paths: UK uses the GIAS-shaped depSelectedSchool object;
+      // SA uses the free-text depSaSchoolName (+ optional existing-row
+      // pointer when the user clicked a chip for a sibling's school).
       let schoolId = null;
-      if (depAttendsSchool && depSelectedSchool) {
-        // Check if this school already exists in the household
+      if (depAttendsSchool && isSa && depSaSchoolName.trim()) {
+        if (depSaSchoolExistingId) {
+          schoolId = depSaSchoolExistingId;
+        } else {
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: depSaSchoolName.trim(),
+          });
+          schoolId = schoolData.school.id;
+        }
+      } else if (depAttendsSchool && depSelectedSchool) {
+        // UK path — match by GIAS URN.
         const existingSchool = householdSchools.find(s => s.school_urn === depSelectedSchool.urn);
         if (existingSchool) {
           schoolId = existingSchool.id;
         } else {
-          // Create new household school
           const { data: schoolData } = await api.post('/schools', {
             school_name: depSelectedSchool.name,
             school_urn: depSelectedSchool.urn,
@@ -314,6 +344,10 @@ export default function FamilySetup() {
     const school = householdSchools.find(s => s.id === member.school_id);
     setEditSchoolSearch(school?.school_name || '');
     setEditSchoolResults([]);
+    // SA path: pre-fill the typed name + the existing-school pointer.
+    // The UK GIAS-search inputs above are simply unused on SA households.
+    setProfileSaSchoolName(school?.school_name || '');
+    setProfileSaSchoolExistingId(school?.id || null);
     setShowAddActivity(false);
     setShowAddTermDate(false);
     setEditTermDates([]);
@@ -413,6 +447,37 @@ export default function FamilySetup() {
       setError(err.response?.data?.error || 'Could not import calendar.');
     } finally {
       setImportingIcal(false);
+    }
+  }
+
+  // South African national term-date import. The unified national
+  // calendar (effective 2026 onwards) applies to every public school,
+  // so there's no per-school lookup negotiation — one tap copies the
+  // canonical national dates onto this household_schools row.
+  async function handleImportSaTermDates() {
+    if (!termDateSchoolId) return;
+    setImportingLA(true); // reuse the LA-import busy flag — only one
+                          // primary import button is on screen per country
+    setImportError('');
+    try {
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-sa-term-dates`);
+      if (!data?.count) {
+        setImportError(data?.message || 'No South African term dates available for this year yet.');
+        return;
+      }
+      setSuccess(data.message || 'Term dates imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      setShowTermDateOptions(false);
+      setImportError('');
+      await loadSchools();
+      if (editingMember?.school_id === termDateSchoolId) {
+        const { data: tdData } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
+        setEditTermDates(tdData.term_dates || []);
+      }
+    } catch (err) {
+      setImportError(err.response?.data?.error || 'Could not import South African term dates. Try another option below.');
+    } finally {
+      setImportingLA(false);
     }
   }
 
@@ -696,9 +761,30 @@ export default function FamilySetup() {
       // both full Family Members and dependents) so we always send it. This
       // lets parents associate a teen's user account with a school the same
       // way they'd associate a younger child as a dependent.
+      //
+      // Three flows feed into payload.school_id:
+      //   • UK new school: profileSchoolId starts with 'new:' (GIAS-search
+      //     hasn't been linked yet) — create from editSelectedSchoolData.
+      //   • SA: branch on profileAttendsSchool + the SA name/existingId
+      //     state. Existing id wins; otherwise create-by-name.
+      //   • Existing link (either country): just use profileSchoolId.
       let createdNewSchool = false;
-      if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
-        // Need to create the school in household first
+      if (isSa && profileAttendsSchool) {
+        if (profileSaSchoolExistingId) {
+          payload.school_id = profileSaSchoolExistingId;
+        } else if (profileSaSchoolName.trim()) {
+          const { data: created } = await api.post('/schools', {
+            school_name: profileSaSchoolName.trim(),
+          });
+          payload.school_id = created.school.id;
+          createdNewSchool = !created.existing;
+        } else {
+          payload.school_id = null;
+        }
+      } else if (isSa && !profileAttendsSchool) {
+        payload.school_id = null;
+      } else if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
+        // UK: need to create the school in household first
         const schoolData = editSelectedSchoolData || {};
         const { data: created } = await api.post('/schools', {
           school_name: schoolData.name || editSchoolSearch,
@@ -858,10 +944,19 @@ export default function FamilySetup() {
     try {
       // If a school is selected, ensure it exists as a household_schools row
       // before the invite is created — the invites table FK references that
-      // table. Same flow as handleAddDependent. Reuses an existing household
-      // row when the URN matches (e.g. siblings already attend).
+      // table. Two paths mirror handleAddDependent: UK by GIAS URN, SA by
+      // free-text name (with optional existing-row pointer for siblings).
       let schoolId = null;
-      if (newAttendsSchool && newSelectedSchool) {
+      if (newAttendsSchool && isSa && newSaSchoolName.trim()) {
+        if (newSaSchoolExistingId) {
+          schoolId = newSaSchoolExistingId;
+        } else {
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: newSaSchoolName.trim(),
+          });
+          schoolId = schoolData.school.id;
+        }
+      } else if (newAttendsSchool && newSelectedSchool) {
         const existing = householdSchools.find(s => s.school_urn === newSelectedSchool.urn);
         if (existing) {
           schoolId = existing.id;
@@ -891,6 +986,8 @@ export default function FamilySetup() {
       setNewSchoolSearch('');
       setNewSelectedSchool(null);
       setNewSchoolResults([]);
+      setNewSaSchoolName('');
+      setNewSaSchoolExistingId(null);
       setSuccess(`Invite sent to ${newEmail.trim()}`);
       setTimeout(() => setSuccess(''), 3000);
       const { data } = await api.get('/household/invites');
@@ -1178,21 +1275,19 @@ export default function FamilySetup() {
         )}
       </div>
 
-      {/* Schools coming-soon placeholder — only for non-GB households.
-          Sets the expectation that the school directory + term-date
-          imports are a real feature on our roadmap, just not localised
-          to their country yet. UK households see the full school
-          experience inline on the family-member and dependent flows. */}
-      {!isUk && (
+      {/* Schools coming-soon placeholder — only for countries we don't
+          yet support (UK and SA each have their own flow inline in the
+          member modals; everywhere else sees this card). */}
+      {!showSchools && (
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
             <span className="text-base" aria-hidden="true">🌍</span>
             Schools
           </h2>
           <p className="text-sm text-cocoa">
-            School directory and term-date imports are currently UK-only.
-            Coming soon to your country — until then, the rest of Housemait
-            works the same.
+            School directory and term-date imports are currently available
+            in the UK and South Africa. Coming soon to more countries —
+            until then, the rest of Housemait works the same.
           </p>
         </div>
       )}
@@ -1308,9 +1403,12 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle — UK-only feature. Hidden entirely on
-                  non-GB households (see lib/country.js). */}
-              {isUk && (
+              {/* School toggle — only shown for countries we support. UK
+                  gets the GIAS search; SA gets a free-text name input
+                  plus chips for any existing household schools. Other
+                  countries see the Schools coming-soon card up top
+                  instead. */}
+              {showSchools && (
               <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
                 <span className="text-sm font-medium text-bark">Do they attend school?</span>
                 <button
@@ -1323,7 +1421,7 @@ export default function FamilySetup() {
               </div>
               )}
 
-              {/* School fields (shown when toggle is on) */}
+              {/* UK: GIAS school search */}
               {isUk && depAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <div className="flex gap-3">
@@ -1360,6 +1458,53 @@ export default function FamilySetup() {
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* SA: free-text school name + existing-school chips. SA
+                  doesn't have a public school directory like GIAS, so we
+                  let parents type the name and pick from their household's
+                  already-linked schools (typical case: second child at
+                  the same school as their sibling). */}
+              {isSa && depAttendsSchool && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-bark mb-1">School name</label>
+                    <input
+                      type="text"
+                      value={depSaSchoolName}
+                      onChange={(e) => {
+                        setDepSaSchoolName(e.target.value);
+                        setDepSaSchoolExistingId(null);
+                      }}
+                      className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                      placeholder="e.g. Sandown Primary"
+                    />
+                  </div>
+                  {householdSchools.length > 0 && (
+                    <div>
+                      <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {householdSchools.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setDepSaSchoolName(s.school_name);
+                              setDepSaSchoolExistingId(s.id);
+                            }}
+                            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                              depSaSchoolExistingId === s.id
+                                ? 'bg-plum-light border-plum text-plum'
+                                : 'bg-white border-cream-border text-bark hover:border-plum'
+                            }`}
+                          >
+                            {s.school_name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1437,8 +1582,8 @@ export default function FamilySetup() {
               {/* School toggle — same pattern as the add-dependent flow.
                   Pre-fills the school + year group on the invite so the
                   fields are already set when the invitee accepts.
-                  UK-only — see lib/country.js. */}
-              {isUk && (
+                  Only shown for countries with a school flow (UK + SA). */}
+              {showSchools && (
               <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
                 <span className="text-sm font-medium text-bark">
                   {`Does ${newName.trim() || 'this member'} attend school?`}
@@ -1452,6 +1597,8 @@ export default function FamilySetup() {
                       setNewSchoolSearch('');
                       setNewSchoolResults([]);
                       setNewSelectedSchool(null);
+                      setNewSaSchoolName('');
+                      setNewSaSchoolExistingId(null);
                     }
                   }}
                   className={`relative w-11 h-6 rounded-full transition-colors ${newAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
@@ -1497,6 +1644,50 @@ export default function FamilySetup() {
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* SA: free-text + existing-school chips — see Add Dependent
+                  modal above for the same pattern + rationale. */}
+              {isSa && newAttendsSchool && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-bark mb-1">School name</label>
+                    <input
+                      type="text"
+                      value={newSaSchoolName}
+                      onChange={(e) => {
+                        setNewSaSchoolName(e.target.value);
+                        setNewSaSchoolExistingId(null);
+                      }}
+                      className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                      placeholder="e.g. Sandown Primary"
+                    />
+                  </div>
+                  {householdSchools.length > 0 && (
+                    <div>
+                      <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {householdSchools.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setNewSaSchoolName(s.school_name);
+                              setNewSaSchoolExistingId(s.id);
+                            }}
+                            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                              newSaSchoolExistingId === s.id
+                                ? 'bg-plum-light border-plum text-plum'
+                                : 'bg-white border-cream-border text-bark hover:border-plum'
+                            }`}
+                          >
+                            {s.school_name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1546,45 +1737,58 @@ export default function FamilySetup() {
               </div>
             )}
 
-            {/* Most-likely path: state school follows council term dates.
-                Surfaced first with a 'Recommended' badge so parents pick this
-                without thinking unless they know they need otherwise. */}
-            <div className="mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-cocoa mb-2">
-                If it's a state school
-              </p>
-              <div className="bg-white rounded-xl border-2 border-primary/30 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">Recommended</span>
-                    </div>
-                    <p className="text-xs text-cocoa">
-                      Most state schools follow their council&apos;s term dates.
-                      {termDateSchoolLA
-                        ? ` We will import them from ${termDateSchoolLA} council.`
-                        : ' We will look up and import them automatically.'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleImportLADates}
-                    disabled={importingLA}
-                    className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
-                  >
-                    {importingLA ? 'Importing...' : 'Import'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Fallback paths: private schools, academies, or any school that
-                doesn't follow council term dates. Grouped under a clear
-                heading so the user understands these are the alternatives. */}
-            <p className="text-xs font-semibold uppercase tracking-wide text-cocoa mb-2 mt-5">
-              If it's a private school, academy, or has its own dates
-            </p>
+            {/* Four equal options, no recommended badge or section headers
+                — the user already knows which type of school their kid
+                attends, and each card's subtitle says when it applies. The
+                top card varies by country: UK gets the LA import, SA gets
+                the unified national term-date import. The three fallback
+                cards (website / iCal / manual) are identical across
+                countries — they're generic over school type. */}
             <div className="space-y-3">
+              {/* Country-specific top card — UK: LA, SA: national. */}
+              {isSa ? (
+                <div className="bg-white rounded-xl border border-cream-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-bark">🇿🇦 Import South African national term dates</h3>
+                      <p className="text-xs text-cocoa mt-1">
+                        From 2026, a unified national calendar applies to every
+                        public school across all nine provinces. One tap copies
+                        those dates onto this school.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleImportSaTermDates}
+                      disabled={importingLA}
+                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                    >
+                      {importingLA ? 'Importing...' : 'Import'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-cream-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
+                      <p className="text-xs text-cocoa mt-1">
+                        Most state schools follow their council&apos;s term dates.
+                        {termDateSchoolLA
+                          ? ` We will import them from ${termDateSchoolLA} council.`
+                          : ' We will look up and import them automatically.'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleImportLADates}
+                      disabled={importingLA}
+                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                    >
+                      {importingLA ? 'Importing...' : 'Import'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Option: Import from school website */}
               <div className="bg-white rounded-xl border border-cream-border p-4">
                 <h3 className="text-sm font-semibold text-bark">🌐 Import from school website</h3>
@@ -1776,8 +1980,8 @@ export default function FamilySetup() {
                   Hidden by default for members without a school; defaulted on
                   if the member already has a school attached (so existing data
                   isn't surprise-hidden). Toggling off clears the selection so
-                  the save persists null. UK-only — see lib/country.js. */}
-              {isUk && (
+                  the save persists null. Shown for UK + SA. */}
+              {showSchools && (
               <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
                 <span className="text-sm font-medium text-bark">
                   {editingMember?.member_type === 'dependent'
@@ -1794,6 +1998,8 @@ export default function FamilySetup() {
                       setEditSchoolSearch('');
                       setEditSchoolResults([]);
                       setEditSelectedSchoolData(null);
+                      setProfileSaSchoolName('');
+                      setProfileSaSchoolExistingId(null);
                     }
                   }}
                   className={`relative w-11 h-6 rounded-full transition-colors ${profileAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
@@ -1838,6 +2044,50 @@ export default function FamilySetup() {
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* SA: free-text + existing-school chips, same pattern as the
+                  add-dependent and invite modals. */}
+              {isSa && profileAttendsSchool && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-bark mb-1">School name</label>
+                    <input
+                      type="text"
+                      value={profileSaSchoolName}
+                      onChange={(e) => {
+                        setProfileSaSchoolName(e.target.value);
+                        setProfileSaSchoolExistingId(null);
+                      }}
+                      className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                      placeholder="e.g. Sandown Primary"
+                    />
+                  </div>
+                  {householdSchools.length > 0 && (
+                    <div>
+                      <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {householdSchools.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setProfileSaSchoolName(s.school_name);
+                              setProfileSaSchoolExistingId(s.id);
+                            }}
+                            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                              profileSaSchoolExistingId === s.id
+                                ? 'bg-plum-light border-plum text-plum'
+                                : 'bg-white border-cream-border text-bark hover:border-plum'
+                            }`}
+                          >
+                            {s.school_name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
