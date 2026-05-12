@@ -63,7 +63,7 @@ export default function Receipt() {
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
         <div
-          className="hidden md:flex"
+          className="hidden"
           style={{
             width: '42px',
             height: '42px',

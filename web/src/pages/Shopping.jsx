@@ -306,7 +306,7 @@ export default function Shopping() {
       {/* Page header */}
       <div className="flex items-center gap-3">
         <div
-          className="hidden md:flex"
+          className="hidden"
           style={{
             width: '42px',
             height: '42px',

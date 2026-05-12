@@ -1030,7 +1030,7 @@ export default function Calendar() {
       <div className="flex items-center gap-2.5 flex-wrap">
         <h1 className="flex items-center gap-2.5 flex-1 min-w-0" style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif', fontSize: '36px', fontWeight: 400, lineHeight: 1 }}>
           <div
-            className="hidden md:flex"
+            className="hidden"
             style={{
               width: '42px',
               height: '42px',

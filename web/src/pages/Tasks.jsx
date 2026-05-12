@@ -712,7 +712,7 @@ export default function Tasks() {
           }}
         >
           <div
-            className="hidden md:flex"
+            className="hidden"
             style={{
               width: '42px',
               height: '42px',
