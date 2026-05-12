@@ -321,6 +321,44 @@ export default function FamilySetup() {
     }
   }
 
+  // Remove a household_schools row (typed school) from the SA chip
+  // picker. Warns if any family members are linked to it — the backend
+  // will refuse the delete in that case (FK constraint), so we surface
+  // the problem upfront rather than show a generic 500. Refreshes both
+  // the schools list and the chip-selection state so the UI matches
+  // reality after the delete.
+  async function handleRemoveHouseholdSchool(schoolId) {
+    const school = householdSchools.find((s) => s.id === schoolId);
+    if (!school) return;
+    const linkedChildren = school.children?.map((c) => c.name).filter(Boolean) || [];
+    const confirmMsg = linkedChildren.length
+      ? `Remove ${school.school_name}? ${linkedChildren.join(', ')} ${linkedChildren.length === 1 ? 'is' : 'are'} currently linked to it and will be unlinked.`
+      : `Remove ${school.school_name}?`;
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      await api.delete(`/schools/${schoolId}`);
+      const fresh = await api.get('/schools').then((r) => r.data.schools || []);
+      setHouseholdSchools(fresh);
+      // Clear any chip-selection pointers that referenced the removed
+      // school so the modals don't try to link to a row that no longer
+      // exists.
+      if (depSaSchoolExistingId === schoolId) {
+        setDepSaSchoolExistingId(null);
+        setDepSaSchoolName('');
+      }
+      if (newSaSchoolExistingId === schoolId) {
+        setNewSaSchoolExistingId(null);
+        setNewSaSchoolName('');
+      }
+      if (profileSaSchoolExistingId === schoolId) {
+        setProfileSaSchoolExistingId(null);
+        setProfileSaSchoolName('');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || `Could not remove ${school.school_name}.`);
+    }
+  }
+
   async function handleRemoveDependent(member) {
     if (!window.confirm(`Remove ${member.name}?`)) return;
     try {
@@ -1485,23 +1523,40 @@ export default function FamilySetup() {
                     <div>
                       <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
                       <div className="flex flex-wrap gap-2">
-                        {householdSchools.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              setDepSaSchoolName(s.school_name);
-                              setDepSaSchoolExistingId(s.id);
-                            }}
-                            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-                              depSaSchoolExistingId === s.id
-                                ? 'bg-plum-light border-plum text-plum'
-                                : 'bg-white border-cream-border text-bark hover:border-plum'
-                            }`}
-                          >
-                            {s.school_name}
-                          </button>
-                        ))}
+                        {householdSchools.map((s) => {
+                          const selected = depSaSchoolExistingId === s.id;
+                          return (
+                            <div
+                              key={s.id}
+                              className={`inline-flex items-stretch rounded-lg border overflow-hidden transition-colors ${
+                                selected
+                                  ? 'bg-plum-light border-plum text-plum'
+                                  : 'bg-white border-cream-border text-bark hover:border-plum'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDepSaSchoolName(s.school_name);
+                                  setDepSaSchoolExistingId(s.id);
+                                }}
+                                className="text-xs px-2.5 py-1.5"
+                              >
+                                {s.school_name}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveHouseholdSchool(s.id)}
+                                aria-label={`Remove ${s.school_name}`}
+                                className={`px-2 text-xs border-l hover:bg-coral-light hover:text-coral ${
+                                  selected ? 'border-plum' : 'border-cream-border'
+                                }`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1668,23 +1723,40 @@ export default function FamilySetup() {
                     <div>
                       <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
                       <div className="flex flex-wrap gap-2">
-                        {householdSchools.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              setNewSaSchoolName(s.school_name);
-                              setNewSaSchoolExistingId(s.id);
-                            }}
-                            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-                              newSaSchoolExistingId === s.id
-                                ? 'bg-plum-light border-plum text-plum'
-                                : 'bg-white border-cream-border text-bark hover:border-plum'
-                            }`}
-                          >
-                            {s.school_name}
-                          </button>
-                        ))}
+                        {householdSchools.map((s) => {
+                          const selected = newSaSchoolExistingId === s.id;
+                          return (
+                            <div
+                              key={s.id}
+                              className={`inline-flex items-stretch rounded-lg border overflow-hidden transition-colors ${
+                                selected
+                                  ? 'bg-plum-light border-plum text-plum'
+                                  : 'bg-white border-cream-border text-bark hover:border-plum'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewSaSchoolName(s.school_name);
+                                  setNewSaSchoolExistingId(s.id);
+                                }}
+                                className="text-xs px-2.5 py-1.5"
+                              >
+                                {s.school_name}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveHouseholdSchool(s.id)}
+                                aria-label={`Remove ${s.school_name}`}
+                                className={`px-2 text-xs border-l hover:bg-coral-light hover:text-coral ${
+                                  selected ? 'border-plum' : 'border-cream-border'
+                                }`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -2068,23 +2140,40 @@ export default function FamilySetup() {
                     <div>
                       <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
                       <div className="flex flex-wrap gap-2">
-                        {householdSchools.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              setProfileSaSchoolName(s.school_name);
-                              setProfileSaSchoolExistingId(s.id);
-                            }}
-                            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-                              profileSaSchoolExistingId === s.id
-                                ? 'bg-plum-light border-plum text-plum'
-                                : 'bg-white border-cream-border text-bark hover:border-plum'
-                            }`}
-                          >
-                            {s.school_name}
-                          </button>
-                        ))}
+                        {householdSchools.map((s) => {
+                          const selected = profileSaSchoolExistingId === s.id;
+                          return (
+                            <div
+                              key={s.id}
+                              className={`inline-flex items-stretch rounded-lg border overflow-hidden transition-colors ${
+                                selected
+                                  ? 'bg-plum-light border-plum text-plum'
+                                  : 'bg-white border-cream-border text-bark hover:border-plum'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProfileSaSchoolName(s.school_name);
+                                  setProfileSaSchoolExistingId(s.id);
+                                }}
+                                className="text-xs px-2.5 py-1.5"
+                              >
+                                {s.school_name}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveHouseholdSchool(s.id)}
+                                aria-label={`Remove ${s.school_name}`}
+                                className={`px-2 text-xs border-l hover:bg-coral-light hover:text-coral ${
+                                  selected ? 'border-plum' : 'border-cream-border'
+                                }`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
