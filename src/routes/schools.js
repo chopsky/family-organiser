@@ -807,10 +807,19 @@ Do NOT wrap in markdown code fences.`,
         cleaned = cleaned.substring(firstBracket, lastBracket + 1);
       }
       dates = JSON.parse(cleaned);
-    } catch {
-      console.error('[import-website] AI response could not be parsed:', text.substring(0, 1000));
+    } catch (parseErr) {
+      console.error('[import-website] AI response could not be parsed:', text.substring(0, 2000));
+      // Surface the first 500 chars of what the AI actually returned so
+      // we can see the failure mode without server logs. Temporary —
+      // remove once we've stabilised this code path.
+      const preview = (text || '<empty>').substring(0, 500);
       return res.status(500).json({
-        error: 'The school dates page or PDF was downloaded, but the AI could not extract structured dates from it. This often happens with visual year-planner PDFs where dates are positioned on a calendar grid. Try a different URL, an iCal feed, or add dates manually.',
+        error: 'The school dates page or PDF was downloaded, but the AI could not extract structured dates from it. Try a different URL, an iCal feed, or add dates manually.',
+        debug: {
+          parseError: parseErr.message,
+          responseLength: (text || '').length,
+          responsePreview: preview,
+        },
       });
     }
 
