@@ -250,7 +250,15 @@ export default function Layout({ children }) {
            right. Page title/household name intentionally omitted — each
            page renders its own H1 at the top of the body so mobile gets
            the same editorial feel as desktop. */}
-      <header className="md:hidden bg-cream border-b border-light-grey z-30 sticky top-0 safe-top">
+      <header
+        className="md:hidden z-30 sticky top-0 safe-top"
+        style={{
+          borderBottom: 0,
+          background: 'linear-gradient(to bottom, rgba(251, 248, 243, 0.95) 60%, rgba(251, 248, 243, 0.6) 80%, rgba(251, 248, 243, 0))',
+          backdropFilter: 'blur(14px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+        }}
+      >
         <div className="px-4 py-3 flex items-center justify-between">
           <Link to="/dashboard" className="shrink-0 flex items-center">
             <img src="/housemait-logo2.png" alt="Housemait" className="max-w-[140px] h-auto" />
@@ -263,7 +271,7 @@ export default function Layout({ children }) {
 
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">
-        <div className="px-5 md:px-8 py-6 md:py-11 pb-28 md:pb-11 pt-8">
+        <div className="px-5 md:px-8 py-6 md:py-11 pb-28 md:pb-11 pt-7">
           {children}
         </div>
       </main>
