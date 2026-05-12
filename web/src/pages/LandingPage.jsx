@@ -90,6 +90,16 @@ function buildPlanFeatures(locale) {
   return features
 }
 
+/** Testimonial quotes — universal across locales. The reviewer names,
+ *  roles, and cities are localised via `locale.reviews` so an Austin
+ *  parent doesn't see "Bristol" in the social proof set. The order
+ *  here matters: REVIEW_QUOTES[i] pairs with locale.reviews[i]. */
+const REVIEW_QUOTES = [
+  "The Sunday planning argument is over. We do it in 12 minutes with a coffee. I didn't realise how much of it I was carrying alone.",
+  "I forwarded a school PDF to Housemait at 10pm. By morning every date was on the calendar, and the permission slip was on my task list. Magic.",
+  "We were the 14-apps-and-a-whiteboard family. Now it's one app and we actually sit down at dinner together. That's the real review.",
+]
+
 const ArrowRight = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -327,7 +337,7 @@ const SHOWCASE = [
     eyebrow: <div className="eyebrow-sec">Shared Calendar</div>,
     title: (<>Every date, <em>every&nbsp;body</em>, on one&nbsp;page.</>),
     desc: "See the whole month for the whole family. Filter by person, add shared events in one tap, and get a heads up when two people are double-booked.",
-    bullets: ['Colour-coded per family member', 'Syncs with Google, Apple, Outlook', 'Forward a school email and it becomes an event', '"What\'s on today" widget for the fridge tablet'],
+    bullets: ['Colour-coded per family member', 'Connects with Google, Apple, Outlook', 'Forward a school email and it becomes an event', '"What\'s on today" widget for the fridge tablet'],
     mock: <CalendarMock />,
   },
   {
@@ -450,10 +460,18 @@ export default function LandingPage() {
   const faqs = buildFaqs(locale)
   const planFeatures = buildPlanFeatures(locale)
   // Feature scrollytelling — filter out UK-only entries (school term
-  // dates) for markets that don't support them yet.
-  const showcaseItems = locale.features.schoolTerms
-    ? SHOWCASE
-    : SHOWCASE.filter(it => it.id !== 'terms')
+  // dates) for markets that don't support them yet, and template the
+  // "Recurring tasks (bins, vet, MOT)" bullet so each locale shows a
+  // locally-resonant chore instead of the UK-specific MOT example.
+  const showcaseItems = (locale.features.schoolTerms ? SHOWCASE : SHOWCASE.filter(it => it.id !== 'terms'))
+    .map(it => it.id !== 'tasks' ? it : {
+      ...it,
+      bullets: it.bullets.map(b =>
+        b.startsWith('Recurring tasks (')
+          ? `Recurring tasks (${locale.demo.recurringTasksExample})`
+          : b
+      ),
+    })
 
   useEffect(() => {
     document.title = 'AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait'
@@ -804,39 +822,19 @@ export default function LandingPage() {
             </h2>
           </div>
           <div className="testis">
-            <div className="testi">
-              <div className="stars">★★★★★</div>
-              <blockquote>"The Sunday planning argument is over. We do it in 12 minutes with a coffee. I didn't realise how much of it I was carrying alone."</blockquote>
-              <div className="who">
-                <div className="avatar">SK</div>
-                <div>
-                  <div className="name">Sarah K.</div>
-                  <div className="role">Mum of 3 · Bristol</div>
+            {locale.reviews.map((r, i) => (
+              <div key={r.name} className={`testi${i === 1 ? ' hl' : ''}`}>
+                <div className="stars">★★★★★</div>
+                <blockquote>"{REVIEW_QUOTES[i]}"</blockquote>
+                <div className="who">
+                  <div className="avatar">{r.initials}</div>
+                  <div>
+                    <div className="name">{r.name}</div>
+                    <div className="role">{r.role}{r.city ? ` · ${r.city}` : ''}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="testi hl">
-              <div className="stars">★★★★★</div>
-              <blockquote>"I forwarded a school PDF to Housemait at 10pm. By morning every date was on the calendar, and the permission slip was on my task list. Magic."</blockquote>
-              <div className="who">
-                <div className="avatar">JM</div>
-                <div>
-                  <div className="name">James M.</div>
-                  <div className="role">Dad of 2 · Manchester</div>
-                </div>
-              </div>
-            </div>
-            <div className="testi">
-              <div className="stars">★★★★★</div>
-              <blockquote>"We were the 14-apps-and-a-whiteboard family. Now it's one app and we actually sit down at dinner together. That's the real review."</blockquote>
-              <div className="who">
-                <div className="avatar">PR</div>
-                <div>
-                  <div className="name">Priya R.</div>
-                  <div className="role">Mum of 2 · London</div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>

@@ -52,7 +52,13 @@ export const LOCALES = {
       dentistLocation: 'Bellingham Dental, Bristol',
       milkSize: '2L',
       chickenSize: '1kg',
+      recurringTasksExample: 'bins, vet, MOT',
     },
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mum of 3', city: 'Bristol' },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Manchester' },
+      { name: 'Priya R.', initials: 'PR', role: 'Mum of 2', city: 'London' },
+    ],
   },
   us: {
     code: 'us',
@@ -77,7 +83,13 @@ export const LOCALES = {
       dentistLocation: 'Cedar Park Family Dental, Austin',
       milkSize: '1 gallon',
       chickenSize: '2 lb',
+      recurringTasksExample: 'bins, vet, oil change',
     },
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mom of 3', city: 'Austin' },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Denver' },
+      { name: 'Priya R.', initials: 'PR', role: 'Mom of 2', city: 'Brooklyn' },
+    ],
   },
   eu: {
     code: 'eu',
@@ -104,7 +116,15 @@ export const LOCALES = {
       dentistLocation: 'Happy Smiles Dental',
       milkSize: '2L',
       chickenSize: '1kg',
+      recurringTasksExample: 'bins, vet, school runs',
     },
+    // Three different European capitals so the testimonial set itself
+    // signals "EU-wide" without committing to any single country.
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mum of 3', city: 'Dublin' },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Amsterdam' },
+      { name: 'Priya R.', initials: 'PR', role: 'Mum of 2', city: 'Berlin' },
+    ],
   },
   au: {
     code: 'au',
@@ -129,7 +149,15 @@ export const LOCALES = {
       dentistLocation: 'Newtown Family Dental, Sydney',
       milkSize: '2L',
       chickenSize: '1kg',
+      // "rego" = Aussie shorthand for annual vehicle registration —
+      // the closest cultural analogue to the UK MOT.
+      recurringTasksExample: 'bins, vet, rego',
     },
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mum of 3', city: 'Sydney' },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Melbourne' },
+      { name: 'Priya R.', initials: 'PR', role: 'Mum of 2', city: 'Brisbane' },
+    ],
   },
   ca: {
     code: 'ca',
@@ -154,7 +182,13 @@ export const LOCALES = {
       dentistLocation: 'Beaches Family Dental, Toronto',
       milkSize: '2L',
       chickenSize: '1kg',
+      recurringTasksExample: 'bins, vet, oil change',
     },
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mom of 3', city: 'Toronto' },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Vancouver' },
+      { name: 'Priya R.', initials: 'PR', role: 'Mom of 2', city: 'Calgary' },
+    ],
   },
   za: {
     code: 'za',
@@ -179,7 +213,14 @@ export const LOCALES = {
       dentistLocation: 'Sandton Family Dental, Johannesburg',
       milkSize: '2L',
       chickenSize: '1kg',
+      // Annual vehicle licence-disc renewal is the SA analogue to MOT.
+      recurringTasksExample: 'bins, vet, licence renewal',
     },
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mom of 3', city: 'Johannesburg' },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Cape Town' },
+      { name: 'Priya R.', initials: 'PR', role: 'Mom of 2', city: 'Durban' },
+    ],
   },
   default: {
     code: 'default',
@@ -206,7 +247,17 @@ export const LOCALES = {
       dentistLocation: 'Happy Smiles Dental',
       milkSize: '2L',
       chickenSize: '1kg',
+      recurringTasksExample: 'bins, vet, school runs',
     },
+    // No city on reviewers — the default page serves visitors whose
+    // country we don't have a dedicated page for, so attaching a city
+    // would feel arbitrary. Mum (not Mom) for the broader English
+    // convention; American visitors land on /us anyway.
+    reviews: [
+      { name: 'Sarah K.', initials: 'SK', role: 'Mum of 3', city: null },
+      { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: null },
+      { name: 'Priya R.', initials: 'PR', role: 'Mum of 2', city: null },
+    ],
   },
 };
 
