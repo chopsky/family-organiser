@@ -1815,7 +1815,7 @@ export default function Calendar() {
                           setFormDate(e.target.value);
                           if (formEndDate < e.target.value) setFormEndDate(e.target.value);
                         }}
-                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
                         className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                       />
                       {!formAllDay && (
@@ -1823,7 +1823,7 @@ export default function Calendar() {
                           type="time"
                           value={formStart}
                           onChange={e => setFormStart(e.target.value)}
-                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
                           className="w-[110px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
@@ -1845,7 +1845,7 @@ export default function Calendar() {
                         value={formEndDate}
                         onChange={e => setFormEndDate(e.target.value)}
                         min={formDate}
-                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
                         className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                       />
                       {!formAllDay && (
@@ -1853,7 +1853,7 @@ export default function Calendar() {
                           type="time"
                           value={formEnd}
                           onChange={e => setFormEnd(e.target.value)}
-                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none' }}
+                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
                           className="w-[110px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
@@ -2115,7 +2115,7 @@ export default function Calendar() {
                     type="date"
                     value={taskDueDate}
                     onChange={e => setTaskDueDate(e.target.value)}
-                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
+                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block', lineHeight: '48px' }}
                     className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                   />
                 </div>
@@ -2125,7 +2125,7 @@ export default function Calendar() {
                     type="time"
                     value={taskDueTime}
                     onChange={e => setTaskDueTime(e.target.value)}
-                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
+                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block', lineHeight: '48px' }}
                     className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                   />
                 </div>

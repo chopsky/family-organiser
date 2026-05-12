@@ -857,6 +857,12 @@ export default function Tasks() {
                     border: '1.5px solid var(--light-grey, #E8E5EC)',
                     borderRadius: 10,
                     height: 48,
+                    // lineHeight matches height: without it, iOS WKWebView
+                    // with -webkit-appearance:none renders the date text
+                    // glued to the top of the content box instead of
+                    // baseline-centered. Setting line-height to the box
+                    // height gives us a centered single-line render.
+                    lineHeight: '48px',
                     padding: '0 14px',
                     fontSize: 14,
                     background: '#FFFFFF',
@@ -880,6 +886,7 @@ export default function Tasks() {
                     border: '1.5px solid var(--light-grey, #E8E5EC)',
                     borderRadius: 10,
                     height: 48,
+                    lineHeight: '48px', // see note on the date input above
                     padding: '0 14px',
                     fontSize: 14,
                     background: '#FFFFFF',
