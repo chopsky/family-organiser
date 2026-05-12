@@ -1504,8 +1504,10 @@ export default function Calendar() {
             );
           })()}
 
-          {/* Time grid */}
-          <div ref={scrollContainerRef} className="overflow-y-auto" style={{ maxHeight: '560px' }}>
+          {/* Time grid — on mobile we cap to a viewport-relative height so
+              the calendar doesn't push the page below the bottom tab bar.
+              On desktop the 560px ceiling wins via the min(). */}
+          <div ref={scrollContainerRef} className="overflow-y-auto" style={{ maxHeight: 'min(560px, calc(100vh - 280px))' }}>
             <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
               {/* Hour rows */}
               {HOURS.map(hour => (
@@ -1514,7 +1516,7 @@ export default function Calendar() {
                   className="absolute w-full grid border-b border-light-grey"
                   style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px`, gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}
                 >
-                  <div className="text-[10px] font-medium text-warm-grey text-right pr-1.5 -mt-1.5 border-r border-light-grey">
+                  <div className="relative text-[10px] font-medium text-warm-grey text-right pr-1.5 -mt-1.5 border-r border-light-grey bg-white z-[1]">
                     {hour > 0 ? formatHour(hour) : ''}
                   </div>
                   {weekDays.map((date, i) => (
@@ -1616,7 +1618,7 @@ export default function Calendar() {
           })()}
 
           {/* Timeline */}
-          <div ref={viewMode === 'day' ? scrollContainerRef : undefined} className="overflow-y-auto px-5" style={{ maxHeight: '600px' }}>
+          <div ref={viewMode === 'day' ? scrollContainerRef : undefined} className="overflow-y-auto px-5" style={{ maxHeight: 'min(600px, calc(100vh - 280px))' }}>
             <div className="relative" style={{ height: `${24 * 56}px` }}>
               {HOURS.map(hour => {
                 return (
