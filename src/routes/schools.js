@@ -544,51 +544,113 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
   }
 
   try {
+    // Country-aware framing. UK schools use Autumn/Spring/Summer terms on
+    // a Sept-Aug academic year; SA schools use Term 1-4 on a Jan-Dec
+    // calendar year. Without this branch the AI defaults to UK vocab and
+    // misses SA's Term 1 / Term 2 / etc., or rejects the page entirely
+    // because it doesn't "look like" a UK school calendar.
+    const household = await db.getHouseholdById(req.householdId);
+    const country = household?.country || 'GB';
+
     const now = new Date();
-    const currentAY = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
-    const nextAY = `${parseInt(currentAY.split('-')[1])}-${parseInt(currentAY.split('-')[1]) + 1}`;
+    let currentAY;
+    let nextAY;
+    if (country === 'ZA') {
+      // SA school year = calendar year. AY label is just the year number.
+      currentAY = String(now.getFullYear());
+      nextAY = String(now.getFullYear() + 1);
+    } else {
+      // UK + everyone else uses Sept-Aug AY.
+      currentAY = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+      nextAY = `${parseInt(currentAY.split('-')[1])}-${parseInt(currentAY.split('-')[1]) + 1}`;
+    }
 
-    // Fetch the webpage content
+    // Direct-PDF short-circuit. Pasting a `.pdf` URL into the website
+    // import (common for SA / private schools that publish a year-planner
+    // PDF) used to land in a dead zone: response.text() decoded the PDF's
+    // binary bytes as text, yielding gibberish that the HTML pipeline
+    // then "stripped" into more gibberish, and the PDF-discovery code
+    // below only fired when the response was actual HTML linking to PDFs.
+    // Now we detect the direct case via the URL extension *and* the
+    // Content-Type header, and route to pdfParse before any HTML logic.
+    const trimmedUrl = website_url.trim();
+    const looksLikePdfUrl = /\.pdf(\?|#|$)/i.test(trimmedUrl);
+
     let pageText;
-    let rawHtml;
-    try {
-      const response = await fetch(website_url.trim(), {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)',
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-      });
-      if (!response.ok) {
-        return res.status(400).json({ error: `Website returned HTTP ${response.status}. Check the URL and try again.` });
-      }
-      rawHtml = await response.text();
+    let rawHtml = '';
 
-      // Strip HTML but try to preserve table/list structure for better AI parsing
-      pageText = rawHtml
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-        .replace(/<\/tr>/gi, '\n')
-        .replace(/<\/li>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<\/div>/gi, '\n')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/h[1-6]>/gi, '\n')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/gi, ' ')
-        .replace(/&amp;/gi, '&')
-        .replace(/[ \t]+/g, ' ')
-        .replace(/\n\s*\n/g, '\n')
-        .trim()
-        .substring(0, 12000); // Allow more content for better context
-    } catch (fetchErr) {
-      return res.status(400).json({ error: `Could not fetch the website: ${fetchErr.message}` });
+    if (looksLikePdfUrl) {
+      try {
+        const pdfResponse = await fetch(trimmedUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)' },
+        });
+        if (!pdfResponse.ok) {
+          return res.status(400).json({ error: `PDF returned HTTP ${pdfResponse.status}. Check the URL and try again.` });
+        }
+        const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+        const pdfData = await pdfParse(pdfBuffer);
+        pageText = (pdfData.text || '').trim().substring(0, 16000);
+        if (pageText.length < 50) {
+          return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image — try a different URL or add dates manually.' });
+        }
+        console.log('[import-website] Direct PDF — extracted', pageText.length, 'chars from', trimmedUrl);
+      } catch (pdfErr) {
+        return res.status(400).json({ error: `Could not parse the PDF: ${pdfErr.message}` });
+      }
+    } else {
+      // HTML path — the original flow.
+      try {
+        const response = await fetch(trimmedUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)',
+            'Accept': 'text/html,application/xhtml+xml,application/pdf',
+          },
+        });
+        if (!response.ok) {
+          return res.status(400).json({ error: `Website returned HTTP ${response.status}. Check the URL and try again.` });
+        }
+
+        // Belt-and-braces: a server might serve a PDF without a .pdf
+        // path (e.g. a CGI endpoint). Detect by Content-Type and re-route.
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/pdf')) {
+          const pdfBuffer = Buffer.from(await response.arrayBuffer());
+          const pdfData = await pdfParse(pdfBuffer);
+          pageText = (pdfData.text || '').trim().substring(0, 16000);
+          if (pageText.length < 50) {
+            return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image — try a different URL or add dates manually.' });
+          }
+          console.log('[import-website] Content-Type PDF — extracted', pageText.length, 'chars from', trimmedUrl);
+        } else {
+          rawHtml = await response.text();
+          // Strip HTML but try to preserve table/list structure for better AI parsing
+          pageText = rawHtml
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+            .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+            .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+            .replace(/<\/tr>/gi, '\n')
+            .replace(/<\/li>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<\/div>/gi, '\n')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/h[1-6]>/gi, '\n')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n\s*\n/g, '\n')
+            .trim()
+            .substring(0, 12000);
+        }
+      } catch (fetchErr) {
+        return res.status(400).json({ error: `Could not fetch the website: ${fetchErr.message}` });
+      }
     }
 
     // If the page has little text content, look for PDF links containing term dates
-    if (pageText.length < 200 || /term.dates/i.test(rawHtml)) {
+    if (!looksLikePdfUrl && rawHtml && (pageText.length < 200 || /term.dates/i.test(rawHtml))) {
       const pdfLinks = [];
       const pdfRegex = /href=["']([^"']*\.pdf[^"']*)["']/gi;
       let pdfMatch;
@@ -649,17 +711,45 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
 
     console.log('[import-website] Extracted', pageText.length, 'chars from', website_url);
 
+    // Country-specific framing for the AI. The vocab and academic-year
+    // shape varies enough that a UK-flavoured prompt confidently misses
+    // SA dates (and vice versa). Each branch tells the AI exactly which
+    // term names to recognise and which AY format to emit.
+    const promptByCountry = {
+      ZA: {
+        intro: `You are an expert at extracting South African school term dates from website or PDF content. South African schools run on the calendar year (January–December) with four terms: Term 1, Term 2, Term 3, Term 4. From 2026, a unified national calendar applies to every public school. Extract ALL term dates you can find — for both ${currentAY} and ${nextAY} if available.`,
+        lookFor: [
+          'Dates in any common format ("3 January 2026", "03/01/2026", "2026-01-03")',
+          'Term boundaries (Term 1 start/end, Term 2 start/end, etc.)',
+          'Mid-term breaks',
+          'School-specific closures (Jewish high holidays, sports days, parent evenings, etc.)',
+          'Public holidays falling in term',
+        ],
+        ayFormat: `"${currentAY}" or "${nextAY}"`,
+        userIntro: 'Extract all school term dates from this South African school website or year planner:',
+      },
+      GB: {
+        intro: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find — for both the ${currentAY} academic year and the ${nextAY} academic year if available.`,
+        lookFor: [
+          'Dates in any UK format (e.g. "3rd September 2025", "3 Sep 2025", "03/09/2025")',
+          'Term names (Autumn, Spring, Summer)',
+          'Half term breaks',
+          'INSET/training days',
+          'Bank holidays',
+          'School-specific closures (e.g. religious holidays)',
+        ],
+        ayFormat: `"${currentAY}" or "${nextAY}"`,
+        userIntro: 'Extract all school term dates from this UK school website page content:',
+      },
+    };
+    const cfg = promptByCountry[country] || promptByCountry.GB;
+
     // Use AI to extract term dates from the page content
     const { text } = await callWithFailover({
-      system: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find — for both the ${currentAY} academic year and the ${nextAY} academic year if available.
+      system: `${cfg.intro}
 
 Look carefully for:
-- Dates in any UK format (e.g. "3rd September 2025", "3 Sep 2025", "03/09/2025")
-- Term names (Autumn, Spring, Summer)
-- Half term breaks
-- INSET/training days
-- Bank holidays
-- School-specific closures (e.g. religious holidays)
+${cfg.lookFor.map((line) => `- ${line}`).join('\n')}
 
 Return ONLY a valid JSON array with no other text:
 [
@@ -669,12 +759,12 @@ Return ONLY a valid JSON array with no other text:
 ]
 
 Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
-For half terms, use half_term_start with an end_date spanning the break.
+For half terms / mid-term breaks, use half_term_start with an end_date spanning the break.
 For school-specific closures (religious holidays etc), use bank_holiday with a descriptive label.
-Include the academic_year field (e.g. "${currentAY}" or "${nextAY}") for each entry.
+Include the academic_year field (${cfg.ayFormat}) for each entry.
 If you genuinely cannot find any term dates in the content, return an empty array [].
 Do NOT wrap in markdown code fences.`,
-      messages: [{ role: 'user', content: `Extract all school term dates from this UK school website page content:\n\n${pageText}` }],
+      messages: [{ role: 'user', content: `${cfg.userIntro}\n\n${pageText}` }],
       timeoutMs: LONG_TIMEOUT_MS,
       maxTokens: 4096,
       useThinking: false,
