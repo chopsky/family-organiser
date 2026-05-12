@@ -2180,10 +2180,12 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {/* Weekly activities + term-dates view (dependents only) */}
+              {/* Weekly activities (dependents only — parents managing a
+                  younger child's schedule). Term dates live in a sibling
+                  block below so any member with a school, dependent or
+                  not, can import / view / edit them. */}
               {editingMember?.member_type === 'dependent' && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  {/* Weekly activities grid */}
                   <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📅 Weekly activities</h3>
                   <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time</p>
 
@@ -2247,8 +2249,17 @@ export default function FamilySetup() {
                     </>
                   )}
 
-                  {/* Term dates section */}
-                  {editingMember?.school_id && (() => {
+                </div>
+              )}
+
+              {/* Term dates — shown for any member who has a school, not
+                  just dependents. Without this lift, an adult member who
+                  was added with a school would land in a dead-end where
+                  they could see the linked school but had no UI to
+                  trigger the import-term-dates modal. */}
+              {editingMember?.school_id && (
+                <div className="border border-cream-border rounded-xl p-4 space-y-3">
+                  {(() => {
                     const school = householdSchools.find(s => s.id === editingMember.school_id);
                     const grouped = groupDatesByTerm(editTermDates);
                     const academicYears = Object.keys(grouped).sort();
