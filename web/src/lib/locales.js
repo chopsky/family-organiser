@@ -59,6 +59,29 @@ export const LOCALES = {
       { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Manchester' },
       { name: 'Priya R.', initials: 'PR', role: 'Mum of 2', city: 'London' },
     ],
+    schoolTerms: {
+      planFeature: 'School term dates & INSET days',
+      titlePrefix: 'UK school term dates',
+      desc: "Select your child's school and Housemait automatically imports all term dates, half terms, and INSET days straight into your family calendar.",
+      bullets: [
+        'Search any school in England, Scotland, Wales & NI',
+        'Term dates, half terms & INSET days imported automatically',
+        'Syncs with your family calendar so nothing clashes',
+        'Supports multiple children at different schools',
+      ],
+      mock: {
+        schoolName: "Queen Elizabeth's School",
+        yearLabel: 'Year',
+        yearValue: 'Year 4',
+        academicYear: '2025–2026',
+        terms: [
+          { name: 'Autumn', pillClass: 'autumn', dates: '3 Sept – 19 Dec', breakLabel: 'Half term', breakDates: '27 Oct – 31 Oct' },
+          { name: 'Spring', pillClass: 'spring', dates: '5 Jan – 10 Apr', breakLabel: 'Half term', breakDates: '16 Feb – 20 Feb' },
+          { name: 'Summer', pillClass: 'summer', dates: '4 May – 22 Jul', breakLabel: 'Half term', breakDates: '25 May – 29 May' },
+        ],
+        warning: '⚠️ 3 INSET days added to your calendar',
+      },
+    },
   },
   us: {
     code: 'us',
@@ -206,7 +229,7 @@ export const LOCALES = {
       savings: 'Save R189 · 2 months free',
       compareReference: 'a takeaway',
     },
-    features: { schoolTerms: false, whatsappBot: true },
+    features: { schoolTerms: true, whatsappBot: true },
     audienceTagline: 'modern South African families',
     footerNote: 'Made with ❤️ for South African families',
     demo: {
@@ -221,6 +244,33 @@ export const LOCALES = {
       { name: 'James M.', initials: 'JM', role: 'Dad of 2', city: 'Cape Town' },
       { name: 'Priya R.', initials: 'PR', role: 'Mom of 2', city: 'Durban' },
     ],
+    schoolTerms: {
+      // SA schools run on a four-term calendar (Jan-Dec aligned with the
+      // calendar year), not the three-term UK academic year. No INSET
+      // concept; "school holidays" is the equivalent break.
+      planFeature: 'School term dates & holidays',
+      titlePrefix: 'South African school term dates',
+      desc: "Select your child's school and Housemait automatically imports all term dates and school holidays straight into your family calendar.",
+      bullets: [
+        'Search any school across South Africa',
+        'Term dates and school holidays imported automatically',
+        'Syncs with your family calendar so nothing clashes',
+        'Supports multiple children at different schools',
+      ],
+      mock: {
+        schoolName: 'Westville Primary School',
+        yearLabel: 'Grade',
+        yearValue: 'Grade 4',
+        academicYear: '2026',
+        terms: [
+          { name: 'Term 1', pillClass: 'autumn', dates: '14 Jan – 27 Mar', breakLabel: 'Holiday', breakDates: '28 Mar – 14 Apr' },
+          { name: 'Term 2', pillClass: 'spring', dates: '15 Apr – 26 Jun', breakLabel: 'Holiday', breakDates: '27 Jun – 20 Jul' },
+          { name: 'Term 3', pillClass: 'summer', dates: '21 Jul – 2 Oct', breakLabel: 'Holiday', breakDates: '3 Oct – 12 Oct' },
+          { name: 'Term 4', pillClass: 'winter', dates: '13 Oct – 9 Dec', breakLabel: '', breakDates: '' },
+        ],
+        warning: '🎉 12 public holidays added to your calendar',
+      },
+    },
   },
   default: {
     code: 'default',

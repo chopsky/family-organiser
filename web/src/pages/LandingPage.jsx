@@ -71,15 +71,18 @@ function buildPricing(locale) {
 }
 
 /** Pricing-card feature list. The school-terms bullet is UK-only —
- *  see locale.features.schoolTerms — so the list is built dynamically. */
+ *  see locale.schoolTerms — so the list is built dynamically. */
 function buildPlanFeatures(locale) {
   const features = [
     'Unlimited household members',
     'Shared lists, tasks & calendar',
     'AI-powered WhatsApp assistant',
   ]
-  if (locale.features.schoolTerms) {
-    features.push('School term dates & INSET days')
+  // School-terms line text comes from the active locale (UK calls them
+  // "INSET days"; SA calls them "holidays"). Locales without a
+  // schoolTerms config omit the line entirely.
+  if (locale.schoolTerms?.planFeature) {
+    features.push(locale.schoolTerms.planFeature)
   }
   features.push(
     'Meal planner & recipe library',
@@ -280,56 +283,56 @@ const ShoppingMock = () => (
   </div>
 )
 
-const SchoolTermsMock = () => (
-  <div className="shot-wrap coral">
-    <div className="mock">
-      <div className="mock-head">
-        <h4>🏫 School details</h4>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 20 }}>
-        <div className="mock-field">
-          <span className="label">School</span>
-          <span className="value">Queen Elizabeth's School</span>
+/** School-terms feature mock. The data shape is dictated by
+ *  locale.schoolTerms.mock — see /lib/locales.js for the source of truth.
+ *  Takes a `data` prop rather than reading the locale itself so the mock
+ *  stays a pure rendering component (easier to test in isolation, no
+ *  hook dependency). */
+const SchoolTermsMock = ({ data }) => {
+  if (!data) return null
+  return (
+    <div className="shot-wrap coral">
+      <div className="mock">
+        <div className="mock-head">
+          <h4>🏫 School details</h4>
         </div>
-        <div className="mock-field">
-          <span className="label">Year</span>
-          <span className="value">Year 4</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--coral)' }}>
-          <span>📅</span> Term dates imported
-        </div>
-        <span className="mock-chip synced">✓ Synced</span>
-      </div>
-      <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '4px 16px 8px' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', margin: '14px 0 4px' }}>2025–2026</div>
-        <div className="term-row">
-          <span className="term-pill autumn">Autumn</span>
-          <div style={{ flex: 1 }}>
-            <div className="term-dates">3 Sept – 19 Dec</div>
-            <div className="term-half">Half term: 27 Oct – 31 Oct</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 20 }}>
+          <div className="mock-field">
+            <span className="label">School</span>
+            <span className="value">{data.schoolName}</span>
+          </div>
+          <div className="mock-field">
+            <span className="label">{data.yearLabel}</span>
+            <span className="value">{data.yearValue}</span>
           </div>
         </div>
-        <div className="term-row">
-          <span className="term-pill spring">Spring</span>
-          <div style={{ flex: 1 }}>
-            <div className="term-dates">5 Jan – 10 Apr</div>
-            <div className="term-half">Half term: 16 Feb – 20 Feb</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--coral)' }}>
+            <span>📅</span> Term dates imported
           </div>
+          <span className="mock-chip synced">✓ Synced</span>
         </div>
-        <div className="term-row">
-          <span className="term-pill summer">Summer</span>
-          <div style={{ flex: 1 }}>
-            <div className="term-dates">4 May – 22 Jul</div>
-            <div className="term-half">Half term: 25 May – 29 May</div>
-          </div>
+        <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '4px 16px 8px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', margin: '14px 0 4px' }}>{data.academicYear}</div>
+          {data.terms.map((term) => (
+            <div className="term-row" key={term.name}>
+              <span className={`term-pill ${term.pillClass}`}>{term.name}</span>
+              <div style={{ flex: 1 }}>
+                <div className="term-dates">{term.dates}</div>
+                {term.breakDates && (
+                  <div className="term-half">{term.breakLabel}: {term.breakDates}</div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
+        {data.warning && (
+          <div className="mock-warning"><span>{data.warning}</span></div>
+        )}
       </div>
-      <div className="mock-warning">⚠️ <span><strong>3 INSET days</strong> added to your calendar</span></div>
     </div>
-  </div>
-)
+  )
+}
 
 const SHOWCASE = [
   {
@@ -364,15 +367,27 @@ const SHOWCASE = [
     bullets: ['Create as many lists as your family needs', 'Smart categories keep items grouped sensibly', 'Receipt scanning in 2 seconds', '"Previously purchased" memory'],
     mock: <ShoppingMock />,
   },
-  {
+  // The 'terms' entry is appended in the component body when the active
+  // locale has schoolTerms content configured (currently GB + ZA). Each
+  // locale brings its own title prefix, bullets, and mock data so the
+  // section advertises a country-appropriate school calendar.
+]
+
+/** Build the locale-specific school-terms showcase item from
+ *  locale.schoolTerms data, or return null if the locale doesn't have
+ *  school terms enabled. */
+function buildSchoolTermsItem(locale) {
+  const st = locale.schoolTerms
+  if (!st) return null
+  return {
     id: 'terms',
     eyebrow: <div className="eyebrow-sec">School Term Dates</div>,
-    title: (<>UK school term dates, <em>imported in one&nbsp;click.</em></>),
-    desc: "Select your child's school and Housemait automatically imports all term dates, half terms, and INSET days straight into your family calendar.",
-    bullets: ['Search any school in England, Scotland, Wales & NI', 'Term dates, half terms & INSET days imported automatically', 'Syncs with your family calendar so nothing clashes', 'Supports multiple children at different schools'],
-    mock: <SchoolTermsMock />,
-  },
-]
+    title: (<>{st.titlePrefix}, <em>imported in one&nbsp;click.</em></>),
+    desc: st.desc,
+    bullets: st.bullets,
+    mock: <SchoolTermsMock data={st.mock} />,
+  }
+}
 
 function Showcase({ items }) {
   const [active, setActive] = useState(0)
@@ -459,19 +474,20 @@ export default function LandingPage() {
   const price = pricing[billing]
   const faqs = buildFaqs(locale)
   const planFeatures = buildPlanFeatures(locale)
-  // Feature scrollytelling — filter out UK-only entries (school term
-  // dates) for markets that don't support them yet, and template the
-  // "Recurring tasks (bins, vet, MOT)" bullet so each locale shows a
-  // locally-resonant chore instead of the UK-specific MOT example.
-  const showcaseItems = (locale.features.schoolTerms ? SHOWCASE : SHOWCASE.filter(it => it.id !== 'terms'))
-    .map(it => it.id !== 'tasks' ? it : {
-      ...it,
-      bullets: it.bullets.map(b =>
-        b.startsWith('Recurring tasks (')
-          ? `Recurring tasks (${locale.demo.recurringTasksExample})`
-          : b
-      ),
-    })
+  // Feature scrollytelling — template the "Recurring tasks (bins, vet,
+  // MOT)" bullet so each locale shows a locally-resonant chore instead
+  // of the UK-specific MOT example, then append the school-terms entry
+  // when the active locale has its content configured (GB + ZA today).
+  const universalItems = SHOWCASE.map(it => it.id !== 'tasks' ? it : {
+    ...it,
+    bullets: it.bullets.map(b =>
+      b.startsWith('Recurring tasks (')
+        ? `Recurring tasks (${locale.demo.recurringTasksExample})`
+        : b
+    ),
+  })
+  const termsItem = buildSchoolTermsItem(locale)
+  const showcaseItems = termsItem ? [...universalItems, termsItem] : universalItems
 
   useEffect(() => {
     document.title = 'AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait'
