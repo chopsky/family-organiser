@@ -7,7 +7,11 @@ const { extractEmailContent, extractPdfText } = require('../services/email-parse
 const { detectAisle } = require('../utils/aisle-detect');
 const { sendInboundEmailConfirmation } = require('../services/email');
 
-const API_URL = process.env.API_URL || 'https://api.housemait.com';
+// Undo links go to the public-facing web URL (housemait.com), not the
+// Railway API URL. Vercel already proxies /api/* → Railway via the
+// rewrite rule in web/vercel.json, so the link resolves cleanly via
+// DNS regardless of whether api.housemait.com is configured.
+const PUBLIC_URL = process.env.WEB_URL || 'https://housemait.com';
 
 const router = Router();
 
@@ -325,7 +329,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
             const names = actionsTaken.task_titles.slice(0, 4).join(', ');
             lines.push(`☑ Added ${tasksCreated} task${tasksCreated === 1 ? '' : 's'}${names ? ` (${names})` : ''}.`);
           }
-          const undoUrl = `${API_URL}/api/inbound-email/undo/${undoToken}`;
+          const undoUrl = `${PUBLIC_URL}/api/inbound-email/undo/${undoToken}`;
           await sendInboundEmailConfirmation(from, lines.join('\n'), undoUrl, subject);
         } catch (err) {
           console.warn('[inbound-email] Confirmation email failed:', err.message);
