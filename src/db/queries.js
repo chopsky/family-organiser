@@ -1767,7 +1767,7 @@ async function getTasksByDateRange(householdId, startDate, endDate, db = supabas
  */
 async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supabase) {
   const trimmed = (query || '').trim();
-  if (!trimmed) return { events: [], tasks: [] };
+  if (!trimmed) return { events: [], tasks: [], schoolDates: [] };
 
   const cap = Math.min(Math.max(1, limit), 100);
   // ILIKE pattern: surround in % so it matches the term anywhere in
@@ -1776,7 +1776,11 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
   // someone typed just over-matches; not a security concern).
   const pattern = `%${trimmed}%`;
 
-  const [eventsRes, tasksRes] = await Promise.all([
+  // school_term_dates is joined to household_schools to filter by
+  // household. We embed the parent so we can return the school name
+  // alongside each match — both for context in the search UI and so
+  // clicking a result can route to the right place.
+  const [eventsRes, tasksRes, schoolDatesRes] = await Promise.all([
     db
       .from('calendar_events')
       .select('id, title, description, location, start_time, end_time, all_day, color, assigned_to_name, category')
@@ -1792,14 +1796,33 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
       .ilike('title', pattern)
       .order('due_date', { ascending: false })
       .limit(cap),
+    db
+      .from('school_term_dates')
+      .select('id, event_type, date, end_date, label, academic_year, household_schools!inner(id, household_id, school_name, colour)')
+      .eq('household_schools.household_id', householdId)
+      .ilike('label', pattern)
+      .order('date', { ascending: false })
+      .limit(cap),
   ]);
 
   if (eventsRes.error) throw eventsRes.error;
   if (tasksRes.error) throw tasksRes.error;
+  if (schoolDatesRes.error) throw schoolDatesRes.error;
 
   return {
     events: eventsRes.data || [],
     tasks: tasksRes.data || [],
+    schoolDates: (schoolDatesRes.data || []).map((row) => ({
+      id: row.id,
+      event_type: row.event_type,
+      date: row.date,
+      end_date: row.end_date,
+      label: row.label,
+      academic_year: row.academic_year,
+      school_id: row.household_schools?.id,
+      school_name: row.household_schools?.school_name,
+      colour: row.household_schools?.colour,
+    })),
   };
 }
 

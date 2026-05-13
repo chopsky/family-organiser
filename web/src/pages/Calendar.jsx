@@ -959,6 +959,19 @@ export default function Calendar() {
             title: t.title,
           });
         }
+        // School term dates live in their own table — added to the
+        // backend payload so we can surface them here. The title shown
+        // in the dropdown carries the school name so a parent searching
+        // "Pesach" sees "Pesach (Herzlia)" rather than a context-free
+        // label.
+        for (const sd of res.data?.schoolDates || []) {
+          matches.push({
+            type: 'school_date',
+            item: sd,
+            date: sd.date,
+            title: sd.school_name ? `${sd.label} (${sd.school_name})` : sd.label,
+          });
+        }
         // Sort newest-first: results from years out or years past
         // both sit below stuff close to "now" in the dropdown.
         // (Replaces the prior ascending sort, which pushed old
@@ -1094,16 +1107,24 @@ export default function Calendar() {
                         const dateLabel = result.date
                           ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
                           : 'No date';
+                        const typeLabel = result.type === 'event' ? 'Event' : result.type === 'task' ? 'Task' : 'School';
+                        // Dot colour: events get their own colour; tasks
+                        // and school-term-dates each get a category tint.
+                        const dotColor = result.type === 'event'
+                          ? getEventHex(result.item)
+                          : result.type === 'school_date'
+                            ? '#6B3FA0' // plum — matches the school chips/avatars
+                            : '#7A8694';
                         return (
                           <button
                             key={`${result.type}-${result.item.id}-${i}`}
                             onClick={() => jumpToSearchResult(result)}
                             className="w-full text-left px-3 py-2 hover:bg-cream transition-colors flex items-start gap-3 rounded-lg"
                           >
-                            <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: result.type === 'event' ? getEventHex(result.item) : '#7A8694' }} />
+                            <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: dotColor }} />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold text-charcoal truncate">{result.title}</p>
-                              <p className="text-xs text-warm-grey">{dateLabel} · {result.type === 'event' ? 'Event' : 'Task'}</p>
+                              <p className="text-xs text-warm-grey">{dateLabel} · {typeLabel}</p>
                             </div>
                           </button>
                         );
