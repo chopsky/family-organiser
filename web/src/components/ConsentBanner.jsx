@@ -32,7 +32,7 @@ const isNative = () => {
   catch { return false; }
 };
 
-export default function CookieConsent() {
+export default function ConsentBanner() {
   const [choice, setChoice] = useState(() => getConsent());
 
   // Native apps don't need a cookie banner — see top-of-file comment.

@@ -5,7 +5,10 @@ import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
-import CookieConsent from './components/CookieConsent';
+// File renamed from CookieConsent.jsx — many ad-blocker rules match on
+// the substring "CookieConsent" in URLs and `net::ERR_BLOCKED_BY_CLIENT`
+// the dev request. ConsentBanner is functionally identical.
+import ConsentBanner from './components/ConsentBanner';
 
 // Eagerly load pages that are always needed on first paint
 import LandingPage from './pages/LandingPage';
@@ -174,7 +177,7 @@ export default function App() {
             lean for the parts of the app that don't care about billing. */}
         <SubscriptionProvider>
           <AppRoutes />
-          <CookieConsent />
+          <ConsentBanner />
         </SubscriptionProvider>
       </AuthProvider>
     </BrowserRouter>
