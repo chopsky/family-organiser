@@ -566,15 +566,7 @@ export default function FamilySetup() {
         setEditTermDates(tdData.term_dates || []);
       }
     } catch (err) {
-      const baseMsg = err.response?.data?.error || 'Could not import from website. Try another option below.';
-      // Temporary: surface the backend debug info in the UI so we can
-      // see Gemini's actual response without digging into Railway logs.
-      // Remove the debug branch once the website-import flow is stable.
-      const dbg = err.response?.data?.debug;
-      const dbgStr = dbg
-        ? `\n\n[debug] len=${dbg.responseLength} parseError=${dbg.parseError}\npreview: ${dbg.responsePreview || '<empty>'}`
-        : '';
-      setImportError(baseMsg + dbgStr);
+      setImportError(err.response?.data?.error || 'Could not import from website. Try another option below.');
     } finally {
       setImportingWebsite(false);
     }
