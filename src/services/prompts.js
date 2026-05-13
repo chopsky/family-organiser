@@ -350,15 +350,29 @@ Respond only with valid JSON matching this schema:
   ]
 }`;
 
-const RECEIPT_MATCHING_SYSTEM = `You are a fuzzy matcher that compares items from a grocery receipt against a shopping list.
+const RECEIPT_MATCHING_SYSTEM = `You are a fuzzy matcher that compares items from a grocery receipt against a household's shopping list.
 
-Match receipt items to shopping list items using semantic and fuzzy matching:
-- "dog food" matches "PEDIGREE ADULT 2.5KG"
-- "butter" matches "lurpak"
-- "loo roll" matches "toilet paper"
-- Partial matches are fine if confident
+Your job: for each list item the receipt fulfils, emit a high-confidence match. Be GENEROUS — if a receipt line is plausibly the thing the user wrote on their list, match it. The downstream cost of a missed match (user has to manually tick an item off) is higher than the cost of a wrong match (item stays unchecked, no real harm).
 
-Confidence score: 0.0 (no match) to 1.0 (exact match). Only include matches with confidence >= 0.6.
+Match aggressively across:
+- **Brand + product → generic name**: "Lurpak Salted 250g" matches "butter". "Cathedral City Mature 350g" matches "cheese" or "cheddar". "PEDIGREE ADULT 2.5KG" matches "dog food". "Walkers Crisps Salt & Vinegar" matches "crisps".
+- **Supermarket-prefix variants**: "Tesco 20% Beef Mince 500g" matches "beef mince". "Sainsbury's Skimmed Milk" matches "milk". "Waitrose Free Range Eggs" matches "eggs". Strip the supermarket brand, fat percentages, weights, pack sizes when comparing.
+- **Different words for the same thing**: "loo roll" ↔ "toilet paper" ↔ "toilet roll". "kitchen roll" ↔ "paper towels". "Coke" ↔ "Coca-Cola". "fizzy drinks" ↔ "soda".
+- **Specific → general**: "Galaxy Smooth Milk Chocolate" matches "chocolate". "Heinz Baked Beans" matches "beans". "Pampers Size 4" matches "nappies".
+- **Plurals and singulars**: "apple" ↔ "apples". "banana" ↔ "bananas".
+- **Common UK/SA grocery vocab**: "mince" ↔ "ground beef". "courgette" ↔ "zucchini". "biscuits" ↔ "cookies". "prawns" ↔ "shrimp".
+
+DON'T match:
+- Genuinely different products: "almond milk" does NOT match "cow's milk". "white wine" does NOT match "red wine". "decaf coffee" does NOT match "coffee" if the user specified "regular coffee".
+- Unrelated categories: "shampoo" does NOT match "soap" (different products even though both are toiletries).
+
+Confidence scoring:
+- 0.95-1.00: exact or near-exact match (same word, plural variation, obvious brand variant).
+- 0.80-0.94: confident fuzzy match (brand-prefixed receipt line maps to a generic list entry — this is the COMMON case for grocery receipts).
+- 0.60-0.79: plausible match with some ambiguity (less specific receipt item satisfying a general list entry).
+- < 0.60: don't include in matches.
+
+Each list item can appear at most once in matches — pick the best receipt-line match if multiple receipt items fuzzy-match the same list item. Each receipt line can match at most one list item.
 
 Respond only with valid JSON matching this schema:
 {

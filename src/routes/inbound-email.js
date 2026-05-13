@@ -193,33 +193,17 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
             if (m.list_item_name) actionsTaken.checked_off_names.push(m.list_item_name);
           }
 
-          // Receipt items that didn't match anything on the active list.
-          // Add them as already-completed so they live in Previously
-          // purchased (useful for "buy again" suggestions) without
-          // appearing on the next shopping run.
-          const matchedNames = new Set(
-            (matchResult.matches || [])
-              .filter((m) => m.confidence >= 0.7)
-              .map((m) => m.receipt_item_normalised || m.list_item_name?.toLowerCase())
-          );
-          const unmatchedItems = uniqueItems.filter((u) => !matchedNames.has(u.normalised_name));
-          if (unmatchedItems.length) {
-            const defaultList = await db.getDefaultShoppingList(householdId);
-            const enrichedItems = unmatchedItems.map((item) => ({
-              item: item.normalised_name || item.item,
-              quantity: item.quantity ? String(item.quantity) : null,
-              list_id: defaultList?.id,
-              aisle_category: detectAisle(item.normalised_name || item.item) || 'Other',
-              source: 'email_forward',
-              completed: true,
-            }));
-            const inserted = await db.addShoppingItems(householdId, enrichedItems, null);
-            itemsAdded = inserted?.length || enrichedItems.length;
-            for (const row of inserted || []) {
-              actionsTaken.added_items.push(row.id);
-              if (row.item) actionsTaken.added_item_names.push(row.item);
-            }
-          }
+          // Receipt items that didn't match anything on the active list
+          // are deliberately discarded — NOT added to "Previously
+          // purchased" as we used to do. The previous behaviour created
+          // duplicate clutter when the matcher missed a fuzzy variant
+          // (e.g. "Tesco 20% beef mince" vs the list's "beef mince" —
+          // the matcher should have caught it, but on miss it'd add the
+          // verbose receipt-line as a new row, polluting the household's
+          // history with brand/weight-specific noise.) A receipt is
+          // a record of what was bought; if the matcher can't tie
+          // something to an existing list row, the user can manually
+          // add it later if it matters.
         } catch (err) {
           console.warn('[inbound-email] Shopping items failed:', err.message);
         }
