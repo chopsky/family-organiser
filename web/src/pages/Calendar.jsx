@@ -1482,7 +1482,7 @@ export default function Calendar() {
           // header + bottom nav (~320px combined), desktop just the page
           // padding + H1 (~240px). Tailwind responsive class swaps the
           // offset at the md: breakpoint.
-          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_380px)] md:max-h-[calc(100dvh_-_200px)]"
+          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_280px)] md:max-h-[calc(100dvh_-_200px)]"
         >
           {/* Headers */}
           <div className="grid" style={{ gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}>
@@ -1619,7 +1619,7 @@ export default function Calendar() {
       {viewMode === 'day' && selectedDate && (
         <div
           // See note on the week-view card above for the offset rationale.
-          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_380px)] md:max-h-[calc(100dvh_-_200px)]"
+          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_280px)] md:max-h-[calc(100dvh_-_200px)]"
         >
           {/* Day header — date itself is already shown in the toolbar's
               navigation label above, so we keep just the event count here. */}
