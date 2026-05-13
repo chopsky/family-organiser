@@ -377,9 +377,11 @@ router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, as
     await db.deleteDependent(req.params.id, req.householdId);
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
+    cache.invalidate(`schools:${req.householdId}`);
     return res.json({ message: 'Dependent removed.' });
   } catch (err) {
     console.error('DELETE /api/household/dependents error:', err);
+    if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

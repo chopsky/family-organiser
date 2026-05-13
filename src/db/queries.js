@@ -337,13 +337,48 @@ async function createDependent(householdId, { name, family_role, birthday, color
 }
 
 async function deleteDependent(id, householdId, db = supabase) {
-  const { error } = await db
+  // Dependents are rows in the `users` table with member_type='dependent'.
+  // Deleting them cascades through every users.id-referencing table
+  // (event_reminders, event_assignees, chat_messages, school_activities,
+  // shopping_items.added_by, calendar_events.created_by, audit logs, etc.).
+  // On real households with weeks/months of activity that cascade exceeds
+  // Supabase's default ~30s statement_timeout and the delete fails with
+  // 57014 — same failure mode the admin user-delete had before we wrapped
+  // it in delete_user_cascade(). So we route dependent deletes through
+  // the same RPC for the same reason.
+  //
+  // Ownership check first: confirm the row is genuinely a dependent in
+  // this household before invoking the RPC (which takes only a user_id
+  // and would otherwise let any household admin delete any user by
+  // guessing the UUID).
+  const { data: target, error: lookupErr } = await db
     .from('users')
-    .delete()
+    .select('id, member_type, household_id')
     .eq('id', id)
     .eq('household_id', householdId)
-    .eq('member_type', 'dependent');
-  if (error) throw error;
+    .eq('member_type', 'dependent')
+    .maybeSingle();
+  if (lookupErr) throw lookupErr;
+  if (!target) {
+    const err = new Error('Dependent not found in this household.');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  // Call delete_user_cascade (5-min timeout) — same as admin user delete.
+  const { error: rpcErr } = await db.rpc('delete_user_cascade', { p_user_id: id });
+  if (!rpcErr) return;
+
+  // 42883 = undefined_function. Brief deploy-window fallback to direct
+  // DELETE; will still hit the 30s timeout on big households but at
+  // least small ones can be deleted before the migration is run.
+  if (rpcErr.code === '42883' || /function .*does not exist/i.test(rpcErr.message || '')) {
+    console.warn('[db] delete_user_cascade() not installed — falling back to direct DELETE. Run migration-user-delete-fix.sql.');
+    const { error } = await db.from('users').delete().eq('id', id);
+    if (error) throw error;
+    return;
+  }
+  throw rpcErr;
 }
 
 // ─── Chat message helpers ────────────────────────────────────────────────────
