@@ -1261,10 +1261,16 @@ function RecipeBoxView({ setError }) {
         </>
       )}
 
-      {/* Add recipe FAB */}
+      {/* Add recipe FAB — sits just above the AI chat FAB. Shape and
+          colour match the chat button (same 56px circle, same shadow,
+          same hover-scale animation) but inverts the palette so the two
+          buttons read as a pair without competing for attention: chat
+          is solid plum, add-recipe is butter with a plum plus. The
+          butter colour is also the brand's "meals/cooking" accent, so
+          it lines up with the page context. */}
       <button
         onClick={() => setAddModalOpen(true)}
-        className="fixed bottom-24 md:bottom-8 right-24 md:right-24 bg-primary hover:bg-primary-pressed text-white w-14 h-14 rounded-2xl flex items-center justify-center transition-colors z-20"
+        className="fixed bottom-40 md:bottom-24 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-butter hover:bg-butter-light text-plum shadow-lg flex items-center justify-center transition-all hover:scale-105"
         title="Add recipe"
       >
         <IconPlus className="h-6 w-6" />
