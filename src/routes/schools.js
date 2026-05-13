@@ -200,6 +200,38 @@ router.delete('/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin
 });
 
 /**
+ * DELETE /api/schools/:schoolId/term-dates
+ *
+ * Bulk-remove every term date for the school. Also clears the
+ * source/last-updated metadata so the UI doesn't keep advertising
+ * "Source: SA national, last updated yesterday" after the user has
+ * binned the lot. The school row itself is untouched — children
+ * remain linked, and the user can re-import from any source.
+ */
+router.delete('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    // Ownership check — the schoolId in the URL must belong to the
+    // caller's household. Without this, an admin in household A could
+    // wipe household B's dates by guessing UUIDs.
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find((s) => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+
+    await db.deleteAllTermDatesBySchool(req.params.schoolId);
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+      term_dates_source: null,
+      term_dates_last_updated: null,
+    });
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ message: `All term dates cleared for ${school.school_name}.` });
+  } catch (err) {
+    console.error('DELETE /api/schools/:id/term-dates error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/schools/activities
  * Add a weekly activity for a child.
  */

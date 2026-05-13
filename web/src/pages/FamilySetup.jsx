@@ -187,6 +187,7 @@ export default function FamilySetup() {
   const [editTermDateFields, setEditTermDateFields] = useState({});
   const [savingTermDateEdit, setSavingTermDateEdit] = useState(false);
   const [syncingIcal, setSyncingIcal] = useState(false);
+  const [clearingTermDates, setClearingTermDates] = useState(false);
   const [newYearNudgeDismissed, setNewYearNudgeDismissed] = useState(false);
 
   function loadMembers() {
@@ -731,6 +732,30 @@ export default function FamilySetup() {
       setError(err.response?.data?.error || 'Could not update term date.');
     } finally {
       setSavingTermDateEdit(false);
+    }
+  }
+
+  // Bulk-clear every term date for a school. Country-agnostic — the
+  // backend endpoint just nukes the rows and resets the source/last-
+  // updated metadata, leaving the school itself (and the member's link
+  // to it) untouched. Confirm dialog mentions the school by name so
+  // the user can't bin a sibling's school's dates by mistake.
+  async function handleClearAllTermDates(schoolId) {
+    if (!schoolId) return;
+    const school = householdSchools.find((s) => s.id === schoolId);
+    if (!school) return;
+    if (!window.confirm(`Clear all term dates for ${school.school_name}? You can re-import them at any time.`)) return;
+    setClearingTermDates(true);
+    try {
+      await api.delete(`/schools/${schoolId}/term-dates`);
+      setEditTermDates([]);
+      await loadSchools();
+      setSuccess('Term dates cleared.');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not clear term dates.');
+    } finally {
+      setClearingTermDates(false);
     }
   }
 
@@ -2418,6 +2443,14 @@ export default function FamilySetup() {
                               <span className="text-cream-border">|</span>
                               <button onClick={() => setShowAllDates(true)} className="text-xs font-medium text-primary hover:text-primary-pressed">
                                 View & edit all dates
+                              </button>
+                              <span className="text-cream-border">|</span>
+                              <button
+                                onClick={() => handleClearAllTermDates(editingMember.school_id)}
+                                disabled={clearingTermDates}
+                                className="text-xs font-medium text-coral hover:text-coral/80 disabled:opacity-50"
+                              >
+                                {clearingTermDates ? 'Clearing…' : 'Clear all'}
                               </button>
                             </div>
                           </div>
