@@ -622,46 +622,88 @@ export default function FamilySetup() {
   // terms — so we return an *array* of { key, label, dates } per AY
   // and let the render iterate generically.
   //
-  // Term boundary heuristic: the AI emits a label and a date on each
-  // row; the date alone is enough to bucket once you know the
-  // country. We deliberately don't parse the label for "Term 3" etc.
-  // because it's fragile — date math is the safer source of truth.
+  // Bucketing strategy: use the term_start events themselves as
+  // authoritative boundaries. An event goes into term[i] when the i-th
+  // term_start date is the latest term_start <= the event's date. This
+  // correctly handles schools whose terms cross calendar-quarter
+  // boundaries (e.g. SA Term 3 ending Sep 22 vs Term 4 starting Oct 5).
+  // The earlier static "Sept-20 cutoff" lost both the Sep-22 term_end
+  // (bucketed into Term 4) and the Term 3 boundary view (no term_end
+  // in its bucket → fallback to listing every date).
+  //
+  // Fallback to month-based bucketing only when there are no term_start
+  // events in a year — defensive, rarely hits.
   function groupDatesByTerm(dates, country) {
     const isSa = country === 'ZA';
-    const termDefs = isSa
+    const termLabels = isSa
       ? [
-          // SA terms (rough month boundaries — the actual term-end
-          // dates vary year to year, but no two terms overlap, so a
-          // pure month/day classification works).
-          { key: 'term1', label: 'Term 1', test: (m) => m <= 2 },
-          { key: 'term2', label: 'Term 2', test: (m) => m >= 3 && m <= 5 },
-          // Sep is split: Term 3 ends mid-Sep, Term 4 starts late-Sep.
-          // 20th is a clean dividing line that fits every recent year.
-          { key: 'term3', label: 'Term 3', test: (m, d) => m === 6 || m === 7 || (m === 8 && d < 20) },
-          { key: 'term4', label: 'Term 4', test: (m, d) => (m === 8 && d >= 20) || m >= 9 },
+          { key: 'term1', label: 'Term 1' },
+          { key: 'term2', label: 'Term 2' },
+          { key: 'term3', label: 'Term 3' },
+          { key: 'term4', label: 'Term 4' },
         ]
       : [
-          { key: 'autumn', label: 'Autumn', test: (m) => m >= 8 && m <= 11 },
-          { key: 'spring', label: 'Spring', test: (m) => m >= 0 && m <= 3 },
-          { key: 'summer', label: 'Summer', test: (m) => m >= 4 && m <= 7 },
+          { key: 'autumn', label: 'Autumn' },
+          { key: 'spring', label: 'Spring' },
+          { key: 'summer', label: 'Summer' },
         ];
-
     const getAyFallback = isSa ? getAcademicYearSa : getAcademicYearUk;
 
-    const terms = {};
+    // Group all events by academic year first.
+    const byYear = {};
     for (const td of dates) {
       const ay = td.academic_year || getAyFallback(td.date);
-      if (!terms[ay]) terms[ay] = termDefs.map((def) => ({ ...def, dates: [] }));
-      const d = new Date(td.date);
-      const bucket = terms[ay].find((t) => t.test(d.getMonth(), d.getDate()));
-      if (bucket) bucket.dates.push(td);
+      (byYear[ay] ||= []).push(td);
     }
-    for (const ay of Object.keys(terms)) {
-      for (const t of terms[ay]) {
-        t.dates.sort((a, b) => a.date.localeCompare(b.date));
+
+    const result = {};
+    for (const ay of Object.keys(byYear)) {
+      const yearEvents = byYear[ay];
+      // Term boundaries: sorted term_start dates.
+      const termStarts = yearEvents
+        .filter((e) => e.event_type === 'term_start')
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const termGroups = termLabels.map((def) => ({ ...def, dates: [] }));
+
+      if (termStarts.length > 0) {
+        for (const td of yearEvents) {
+          // Find the latest term_start <= this event's date.
+          let termIdx = 0;
+          for (let i = 0; i < termStarts.length; i++) {
+            if (td.date >= termStarts[i].date) termIdx = i;
+            else break;
+          }
+          if (termIdx < termGroups.length) {
+            termGroups[termIdx].dates.push(td);
+          }
+        }
+      } else {
+        // Fallback: month-based bucketing. Only triggers when no
+        // term_start events exist for the year (e.g. a partially-
+        // imported year planner). Same boundaries as the old static
+        // logic — imperfect but better than nothing.
+        for (const td of yearEvents) {
+          const m = new Date(td.date).getMonth();
+          let idx;
+          if (isSa) {
+            if (m <= 2) idx = 0;
+            else if (m <= 5) idx = 1;
+            else if (m <= 8) idx = 2;
+            else idx = 3;
+          } else if (m >= 8 && m <= 11) idx = 0;
+          else if (m >= 0 && m <= 3) idx = 1;
+          else if (m >= 4 && m <= 7) idx = 2;
+          else continue;
+          if (idx < termGroups.length) termGroups[idx].dates.push(td);
+        }
       }
+
+      for (const g of termGroups) {
+        g.dates.sort((a, b) => a.date.localeCompare(b.date));
+      }
+      result[ay] = termGroups;
     }
-    return terms;
+    return result;
   }
 
   function getTermSummary(termDates) {
