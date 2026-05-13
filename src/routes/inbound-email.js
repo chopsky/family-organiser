@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
-const { scanReceipt, extractFromEmail } = require('../services/ai');
+const { scanReceipt, matchReceiptToList, extractFromEmail } = require('../services/ai');
 const { extractEmailContent, extractPdfText } = require('../services/email-parser');
 const { detectAisle } = require('../utils/aisle-detect');
 
@@ -116,10 +116,27 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       }
 
       let itemsAdded = 0;
+      let itemsCheckedOff = 0;
       let eventsCreated = 0;
       let tasksCreated = 0;
 
-      // Handle receipt/shopping items (from images or email-extracted items)
+      // Handle receipt/shopping items (from images or email-extracted items).
+      //
+      // Both code paths feeding allShoppingItems are receipt-shaped:
+      //   • receiptItems → from scanReceipt() on attached photos
+      //   • emailResult.shopping_items → the prompt restricts this to
+      //     actual grocery/retail receipts (see prompts.js line 544)
+      //
+      // So we treat ALL items here as "things that were purchased",
+      // which means: match against the current shopping list and
+      // CHECK OFF anything that's on it. Unmatched receipt items
+      // (one-off purchases not previously planned) get added as
+      // already-completed so they show up in "Previously purchased"
+      // without cluttering the active list.
+      //
+      // Previous behaviour was to blindly addShoppingItems(), which
+      // re-added every item on the receipt as a new pending row even
+      // when the user had already planned to buy them.
       const allShoppingItems = [...receiptItems];
       if (emailResult?.shopping_items?.length) {
         allShoppingItems.push(...emailResult.shopping_items);
@@ -133,21 +150,46 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
             const name = (item.normalised_name || item.item || '').toLowerCase().trim();
             if (name && !seen.has(name)) {
               seen.add(name);
-              uniqueItems.push({ ...item, normalised_name: name });
+              uniqueItems.push({
+                ...item,
+                normalised_name: name,
+                // Provide both shapes so matchReceiptToList (expects
+                // normalised_name + original_text) is happy.
+                original_text: item.original_text || item.item || name,
+              });
             }
           }
 
-          const defaultList = await db.getDefaultShoppingList(householdId);
-          const enrichedItems = uniqueItems.map((item) => ({
-            item: item.normalised_name || item.item,
-            quantity: item.quantity ? String(item.quantity) : null,
-            list_id: defaultList?.id,
-            aisle_category: detectAisle(item.normalised_name || item.item) || 'Other',
-            source: 'email_forward',
-          }));
+          // Pull the active (not-completed) shopping list to match against.
+          const shoppingList = await db.getShoppingList(householdId);
+          const matchResult = await matchReceiptToList(uniqueItems, shoppingList, { householdId });
+          const toCheckOff = (matchResult.matches || []).filter((m) => m.confidence >= 0.7);
+          await Promise.all(toCheckOff.map((m) => db.completeShoppingItemById(m.list_item_id)));
+          itemsCheckedOff = toCheckOff.length;
 
-          await db.addShoppingItems(householdId, enrichedItems, null);
-          itemsAdded = enrichedItems.length;
+          // Receipt items that didn't match anything on the active list.
+          // Add them as already-completed so they live in Previously
+          // purchased (useful for "buy again" suggestions) without
+          // appearing on the next shopping run.
+          const matchedNames = new Set(
+            (matchResult.matches || [])
+              .filter((m) => m.confidence >= 0.7)
+              .map((m) => m.receipt_item_normalised || m.list_item_name?.toLowerCase())
+          );
+          const unmatchedItems = uniqueItems.filter((u) => !matchedNames.has(u.normalised_name));
+          if (unmatchedItems.length) {
+            const defaultList = await db.getDefaultShoppingList(householdId);
+            const enrichedItems = unmatchedItems.map((item) => ({
+              item: item.normalised_name || item.item,
+              quantity: item.quantity ? String(item.quantity) : null,
+              list_id: defaultList?.id,
+              aisle_category: detectAisle(item.normalised_name || item.item) || 'Other',
+              source: 'email_forward',
+              completed: true,
+            }));
+            await db.addShoppingItems(householdId, enrichedItems, null);
+            itemsAdded = enrichedItems.length;
+          }
         } catch (err) {
           console.warn('[inbound-email] Shopping items failed:', err.message);
         }
@@ -207,15 +249,18 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         }
       }
 
-      // Update log
-      const totalActions = itemsAdded + eventsCreated + tasksCreated;
+      // Update log. `items_added` keeps its semantic of "new rows
+      // inserted on the shopping list" — checked-off items aren't new
+      // rows, so they're reported separately in the console log but
+      // don't bump items_added.
+      const totalActions = itemsAdded + itemsCheckedOff + eventsCreated + tasksCreated;
       await db.updateInboundEmailLog(logId, {
         status: 'completed',
         items_extracted: totalActions,
         items_added: itemsAdded,
       });
 
-      console.log(`[inbound-email] Processed "${subject}" for household ${householdId}: ${itemsAdded} shopping items, ${eventsCreated} events, ${tasksCreated} tasks`);
+      console.log(`[inbound-email] Processed "${subject}" for household ${householdId}: ${itemsCheckedOff} items checked off, ${itemsAdded} items added to history, ${eventsCreated} events, ${tasksCreated} tasks`);
     } catch (err) {
       console.error('[inbound-email] Processing error:', err);
       if (logId) {

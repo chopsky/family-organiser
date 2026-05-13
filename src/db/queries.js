@@ -946,6 +946,11 @@ async function addShoppingItems(householdId, items, addedByUserId, db = supabase
       added_by: addedByUserId,
       list_id: i.list_id || null,
       aisle_category: i.aisle_category || aisleFromCategory || 'Other',
+      // Optional: callers can insert items pre-completed (e.g. a
+      // forwarded receipt with items the user has already bought but
+      // never had on the active list — those land in "Previously
+      // purchased" rather than as new pending rows).
+      ...(i.completed === true ? { completed: true } : {}),
     };
   });
   const { data, error } = await db.from('shopping_items').insert(rows).select();
