@@ -390,26 +390,24 @@ export default function FamilySetup() {
     setShowAddActivity(false);
     setShowAddTermDate(false);
     setEditTermDates([]);
-    // Weekly activities are dependent-only (parents managing a child's
-    // schedule). Term dates load for any member with a school —
-    // matches the lifted Term-dates render block below, otherwise a
-    // full member who imported dates would see "No term dates added
-    // yet" because editTermDates never gets populated.
-    if (member.member_type === 'dependent') {
+    // Weekly activities AND term dates load for any member with a
+    // school linked, regardless of whether they're a dependent or a
+    // full Family Member. A teen with their own login can have an
+    // after-school schedule the same way a younger sibling can —
+    // it's just personal-schedule data tied to a school day.
+    if (member.school_id) {
       setLoadingActivities(true);
       api.get(`/schools/activities/${member.id}`)
         .then(({ data }) => setEditActivities(data.activities || []))
         .catch(() => setEditActivities([]))
         .finally(() => setLoadingActivities(false));
-    } else {
-      setEditActivities([]);
-    }
-    if (member.school_id) {
       api.get(`/schools/${member.school_id}/term-dates`)
         .then(({ data }) => setEditTermDates(data.term_dates || []))
         .catch(() => setEditTermDates([]));
       const school = householdSchools.find(s => s.id === member.school_id);
       setIcalUrl(school?.ical_url || '');
+    } else {
+      setEditActivities([]);
     }
   }
 
@@ -2285,11 +2283,13 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {/* Weekly activities (dependents only — parents managing a
-                  younger child's schedule). Term dates live in a sibling
-                  block below so any member with a school, dependent or
-                  not, can import / view / edit them. */}
-              {editingMember?.member_type === 'dependent' && (
+              {/* Weekly activities — any member with a school linked.
+                  Previously gated to dependents only, but the data model
+                  has no such restriction and a teen with their own login
+                  is just as likely to want their schedule tracked as a
+                  younger sibling. Term dates render in a sibling block
+                  below under the same any-member-with-a-school rule. */}
+              {editingMember?.school_id && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📅 Weekly activities</h3>
                   <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time</p>
