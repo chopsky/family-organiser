@@ -439,7 +439,13 @@ router.post('/:schoolId/import-sa-term-dates', requireAuth, requireHousehold, re
       });
     }
 
-    cache.invalidate(`calendar:${req.householdId}`);
+    // Invalidate same caches as the other school-mutation endpoints —
+    // notably schools:<id>, which /api/schools reads and the calendar
+    // page pulls from. Without this the calendar would keep showing
+    // the stale "no term dates" snapshot for up to 30 minutes (cache
+    // TTL) after the user successfully imported the SA national dates.
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({
       message: `Imported ${inserted} term-date entries for ${school.school_name}.`,
       count: inserted,
