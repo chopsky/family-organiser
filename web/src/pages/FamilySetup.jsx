@@ -389,23 +389,26 @@ export default function FamilySetup() {
     setShowAddActivity(false);
     setShowAddTermDate(false);
     setEditTermDates([]);
-    // Load activities and term dates for this member
+    // Weekly activities are dependent-only (parents managing a child's
+    // schedule). Term dates load for any member with a school —
+    // matches the lifted Term-dates render block below, otherwise a
+    // full member who imported dates would see "No term dates added
+    // yet" because editTermDates never gets populated.
     if (member.member_type === 'dependent') {
       setLoadingActivities(true);
       api.get(`/schools/activities/${member.id}`)
         .then(({ data }) => setEditActivities(data.activities || []))
         .catch(() => setEditActivities([]))
         .finally(() => setLoadingActivities(false));
-      // Load term dates if they have a school
-      if (member.school_id) {
-        api.get(`/schools/${member.school_id}/term-dates`)
-          .then(({ data }) => setEditTermDates(data.term_dates || []))
-          .catch(() => setEditTermDates([]));
-        const school = householdSchools.find(s => s.id === member.school_id);
-        setIcalUrl(school?.ical_url || '');
-      }
     } else {
       setEditActivities([]);
+    }
+    if (member.school_id) {
+      api.get(`/schools/${member.school_id}/term-dates`)
+        .then(({ data }) => setEditTermDates(data.term_dates || []))
+        .catch(() => setEditTermDates([]));
+      const school = householdSchools.find(s => s.id === member.school_id);
+      setIcalUrl(school?.ical_url || '');
     }
   }
 
