@@ -542,21 +542,22 @@ Household members: {{MEMBERS}}.
 Analyse the email subject and content, then extract ALL relevant structured data.
 
 EMAIL TYPES YOU HANDLE:
-1. **Receipts & orders** (Tesco, Sainsbury's, Amazon, Deliveroo, Uber Eats, etc.) → extract shopping items
+1. **Grocery/retail receipts & orders** (Tesco, Sainsbury's, Ocado, Amazon, Pick n Pay, Woolworths, etc.) → extract shopping_items ONLY. Do NOT extract a calendar event for the delivery slot.
 2. **Flight/travel bookings** (airlines, hotels, Airbnb, train tickets) → extract calendar events
 3. **School newsletters & communications** (term dates, events, trips, non-uniform days) → extract calendar events
 4. **Appointment reminders** (dentist, doctor, vet, hairdresser) → extract calendar events
 5. **Restaurant reservations** (OpenTable, Resy, direct bookings) → extract calendar events
 6. **Event invitations** (parties, weddings, concerts, tickets) → extract calendar events
-7. **Delivery tracking** (expected delivery date/time) → extract calendar events
-8. **Bills & reminders** (payments due, subscription renewals) → extract tasks
-9. **General actionable emails** → extract any tasks or events
+7. **Bills & reminders** (payments due, subscription renewals) → extract tasks
+8. **General actionable emails** → extract any tasks or events
 
 CRITICAL CLASSIFICATION RULES:
 - **Booking confirmations** (shows, concerts, theatre, cinema, festivals, experiences, activities) are ALWAYS calendar events, NEVER shopping items. They have a date, time, and venue — extract them as events.
 - **Ticket purchases** are calendar events, not shopping items. The ticket is for attending something on a specific date.
 - Only extract shopping_items for actual **grocery/retail receipts** where the items are physical products bought from a shop or supermarket (Tesco, Sainsbury's, Amazon products, etc.).
 - If an email mentions a price/total but is for a **service, event, or booking**, it is NOT a receipt — it's an event.
+- **A grocery receipt with a delivery slot is STILL just a receipt.** Extract the items only. DO NOT create a "Tesco Grocery Delivery" calendar event — the user already knows when their food arrives; cluttering the family calendar with grocery slots is noise. Only create a delivery-related calendar event for things the household needs to be home for or actively plan around (e.g. an installation appointment, a one-off large-furniture delivery the user has emphasised). Default for grocery delivery slots: no event.
+- **A grocery receipt with no itemised list (e.g. an order-status update like "out for delivery") returns BOTH empty shopping_items AND empty events.** Don't fabricate either.
 
 WHAT IS A RECEIPT (extract shopping_items):
 - "Your order has been placed" / "Thank you for your order" / "Order confirmation" — from a grocery or general retailer (Tesco, Sainsbury's, Ocado, Asda, Waitrose, Amazon Fresh, Pick n Pay, Woolworths, Checkers, etc.).
