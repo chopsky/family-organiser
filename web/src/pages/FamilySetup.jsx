@@ -606,28 +606,63 @@ export default function FamilySetup() {
     }
   }
 
-  function getAcademicYear(dateStr) {
+  // UK academic year runs Sept-Aug, so a Jan date belongs to the AY
+  // that started the previous Sept. SA runs on the calendar year — much
+  // simpler. Used as a fallback when the AI doesn't tag academic_year
+  // on a row (it almost always does).
+  function getAcademicYearUk(dateStr) {
     const d = new Date(dateStr);
     const year = d.getFullYear();
     const month = d.getMonth();
     return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
   }
+  function getAcademicYearSa(dateStr) {
+    return String(new Date(dateStr).getFullYear());
+  }
 
-  function groupDatesByTerm(dates) {
+  // Bucket a list of term-date rows into school terms, grouped by
+  // academic year. The shape of each AY's buckets differs between
+  // countries — UK uses three named seasons, SA uses four numbered
+  // terms — so we return an *array* of { key, label, dates } per AY
+  // and let the render iterate generically.
+  //
+  // Term boundary heuristic: the AI emits a label and a date on each
+  // row; the date alone is enough to bucket once you know the
+  // country. We deliberately don't parse the label for "Term 3" etc.
+  // because it's fragile — date math is the safer source of truth.
+  function groupDatesByTerm(dates, country) {
+    const isSa = country === 'ZA';
+    const termDefs = isSa
+      ? [
+          // SA terms (rough month boundaries — the actual term-end
+          // dates vary year to year, but no two terms overlap, so a
+          // pure month/day classification works).
+          { key: 'term1', label: 'Term 1', test: (m) => m <= 2 },
+          { key: 'term2', label: 'Term 2', test: (m) => m >= 3 && m <= 5 },
+          // Sep is split: Term 3 ends mid-Sep, Term 4 starts late-Sep.
+          // 20th is a clean dividing line that fits every recent year.
+          { key: 'term3', label: 'Term 3', test: (m, d) => m === 6 || m === 7 || (m === 8 && d < 20) },
+          { key: 'term4', label: 'Term 4', test: (m, d) => (m === 8 && d >= 20) || m >= 9 },
+        ]
+      : [
+          { key: 'autumn', label: 'Autumn', test: (m) => m >= 8 && m <= 11 },
+          { key: 'spring', label: 'Spring', test: (m) => m >= 0 && m <= 3 },
+          { key: 'summer', label: 'Summer', test: (m) => m >= 4 && m <= 7 },
+        ];
+
+    const getAyFallback = isSa ? getAcademicYearSa : getAcademicYearUk;
+
     const terms = {};
     for (const td of dates) {
-      const ay = td.academic_year || getAcademicYear(td.date);
-      if (!terms[ay]) terms[ay] = { autumn: [], spring: [], summer: [], other: [] };
-      const month = new Date(td.date).getMonth();
-      if (month >= 8 && month <= 11) terms[ay].autumn.push(td);
-      else if (month >= 0 && month <= 3) terms[ay].spring.push(td);
-      else if (month >= 4 && month <= 7) terms[ay].summer.push(td);
-      else terms[ay].other.push(td);
+      const ay = td.academic_year || getAyFallback(td.date);
+      if (!terms[ay]) terms[ay] = termDefs.map((def) => ({ ...def, dates: [] }));
+      const d = new Date(td.date);
+      const bucket = terms[ay].find((t) => t.test(d.getMonth(), d.getDate()));
+      if (bucket) bucket.dates.push(td);
     }
-    // Sort dates within each term
     for (const ay of Object.keys(terms)) {
-      for (const term of Object.values(terms[ay])) {
-        term.sort((a, b) => a.date.localeCompare(b.date));
+      for (const t of terms[ay]) {
+        t.dates.sort((a, b) => a.date.localeCompare(b.date));
       }
     }
     return terms;
@@ -2269,7 +2304,7 @@ export default function FamilySetup() {
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   {(() => {
                     const school = householdSchools.find(s => s.id === editingMember.school_id);
-                    const grouped = groupDatesByTerm(editTermDates);
+                    const grouped = groupDatesByTerm(editTermDates, household?.country);
                     const academicYears = Object.keys(grouped).sort();
                     const siblings = members.filter(m => m.school_id === editingMember.school_id && m.id !== editingMember.id);
 
@@ -2298,23 +2333,23 @@ export default function FamilySetup() {
 
                         {editTermDates.length > 0 ? (
                           <div className="mt-2 space-y-3">
-                            {/* Compact term summary per academic year */}
+                            {/* Compact term summary per academic year.
+                                grouped[ay] is now a country-aware array
+                                of { key, label, dates } so the render is
+                                identical for UK (Autumn/Spring/Summer)
+                                and SA (Term 1-4). */}
                             {academicYears.map(ay => {
-                              const terms = grouped[ay];
+                              const termGroups = grouped[ay];
                               return (
                                 <div key={ay} className="bg-white rounded-lg border border-cream-border p-3">
                                   <div className="text-[11px] font-semibold text-cocoa uppercase tracking-wide mb-1.5">{ay}</div>
-                                  {[
-                                    { label: 'Autumn', dates: terms.autumn },
-                                    { label: 'Spring', dates: terms.spring },
-                                    { label: 'Summer', dates: terms.summer },
-                                  ].map(({ label, dates: termDates }) => {
+                                  {termGroups.map(({ key, label, dates: termDates }) => {
                                     if (termDates.length === 0) return null;
                                     const summary = getTermSummary(termDates);
                                     return (
-                                      <div key={label} className="mb-1.5 last:mb-0">
+                                      <div key={key} className="mb-1.5 last:mb-0">
                                         <div className="flex items-baseline gap-2">
-                                          <span className="text-xs font-semibold text-bark w-14">{label}</span>
+                                          <span className="text-xs font-semibold text-bark w-16">{label}</span>
                                           <span className="text-[11px] text-cocoa">
                                             {summary.start && summary.end
                                               ? `${formatDateShort(summary.start)} – ${formatDateShort(summary.end)}`
@@ -2460,7 +2495,7 @@ export default function FamilySetup() {
             <p className="text-xs text-cocoa mb-4">{householdSchools.find(s => s.id === editingMember.school_id)?.school_name}</p>
 
             {(() => {
-              const grouped = groupDatesByTerm(editTermDates);
+              const grouped = groupDatesByTerm(editTermDates, household?.country);
               const academicYears = Object.keys(grouped).sort();
               const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term starts', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday' };
               const TYPE_COLORS = { term_start: 'text-sage', term_end: 'text-sage', half_term_start: 'text-amber', half_term_end: 'text-amber', inset_day: 'text-coral', bank_holiday: 'text-plum' };
@@ -2468,18 +2503,18 @@ export default function FamilySetup() {
               return (
                 <div className="space-y-4">
                   {academicYears.map(ay => {
-                    const terms = grouped[ay];
+                    const termGroups = grouped[ay];
                     return (
                       <div key={ay}>
-                        {[
-                          { label: `AUTUMN TERM ${ay}`, dates: terms.autumn },
-                          { label: `SPRING TERM ${ay}`, dates: terms.spring },
-                          { label: `SUMMER TERM ${ay}`, dates: terms.summer },
-                        ].map(({ label, dates: termDates }) => {
+                        {termGroups.map(({ key, label, dates: termDates }) => {
                           if (termDates.length === 0) return null;
+                          // Heading suffixes "TERM" only for UK seasons
+                          // ("AUTUMN TERM"). SA labels already contain
+                          // "Term" so we don't double it up to "TERM 1 TERM".
+                          const heading = `${label.toUpperCase()}${label.toLowerCase().includes('term') ? '' : ' TERM'} ${ay}`;
                           return (
-                            <div key={label} className="mb-3">
-                              <div className="text-[10px] font-bold text-cocoa uppercase tracking-wider mb-1.5 border-b border-cream-border pb-1">{label}</div>
+                            <div key={key} className="mb-3">
+                              <div className="text-[10px] font-bold text-cocoa uppercase tracking-wider mb-1.5 border-b border-cream-border pb-1">{heading}</div>
                               <div className="space-y-1">
                                 {termDates.map(td => (
                                   <div key={td.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white group text-xs">
