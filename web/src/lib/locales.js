@@ -64,15 +64,15 @@ export const LOCALES = {
       titlePrefix: 'UK school term dates',
       desc: "Select your child's school and Housemait automatically imports all term dates, half terms, and INSET days straight into your family calendar.",
       bullets: [
-        'Search any school in England, Scotland, Wales & NI',
+        'Add any school in England, Scotland, Wales & NI',
         'Term dates, half terms & INSET days imported automatically',
         'Syncs with your family calendar so nothing clashes',
         'Supports multiple children at different schools',
       ],
       mock: {
         schoolName: "Queen Elizabeth's School",
-        yearLabel: 'Year',
-        yearValue: 'Year 4',
+        // yearLabel / yearValue intentionally omitted — the app doesn't
+        // ask the user to pick a year.
         academicYear: '2025–2026',
         terms: [
           { name: 'Autumn', pillClass: 'autumn', dates: '3 Sept – 19 Dec', breakLabel: 'Half term', breakDates: '27 Oct – 31 Oct' },
@@ -252,15 +252,15 @@ export const LOCALES = {
       titlePrefix: 'South African school term dates',
       desc: "Select your child's school and Housemait automatically imports all term dates and school holidays straight into your family calendar.",
       bullets: [
-        'Search any school across South Africa',
+        'Add any school across South Africa',
         'Term dates and school holidays imported automatically',
         'Syncs with your family calendar so nothing clashes',
         'Supports multiple children at different schools',
       ],
       mock: {
         schoolName: 'Westville Primary School',
-        yearLabel: 'Grade',
-        yearValue: 'Grade 4',
+        // yearLabel / yearValue intentionally omitted — the app doesn't
+        // ask the user to pick a grade.
         academicYear: '2026',
         terms: [
           { name: 'Term 1', pillClass: 'autumn', dates: '14 Jan – 27 Mar', breakLabel: 'Holiday', breakDates: '28 Mar – 14 Apr' },

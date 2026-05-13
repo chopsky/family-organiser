@@ -296,15 +296,17 @@ const SchoolTermsMock = ({ data }) => {
         <div className="mock-head">
           <h4>🏫 School details</h4>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: data.yearLabel ? '1fr 100px' : '1fr', gap: 10, marginBottom: 20 }}>
           <div className="mock-field">
             <span className="label">School</span>
             <span className="value">{data.schoolName}</span>
           </div>
-          <div className="mock-field">
-            <span className="label">{data.yearLabel}</span>
-            <span className="value">{data.yearValue}</span>
-          </div>
+          {data.yearLabel && (
+            <div className="mock-field">
+              <span className="label">{data.yearLabel}</span>
+              <span className="value">{data.yearValue}</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--coral)' }}>
