@@ -80,6 +80,31 @@ async function sendVerificationEmail(to, name, token) {
   await sendEmail(to, 'Verify your email for Housemait', html);
 }
 
+/**
+ * Confirmation reply for an inbound (forwarded) email after the AI has
+ * processed it. Summarises what got done + offers a one-tap UNDO link
+ * so users can revert mistakes without contacting support. The link is
+ * a single-use token-protected URL — see `inbound_email_log.undo_token`.
+ *
+ * The `summary` arg is the human-readable body, e.g.:
+ *   "Ticked 3 items off your shopping list (milk, bread, eggs)
+ *    and added 2 to Previously purchased."
+ *
+ * Plain-text only because we send to whatever the forwarder's address
+ * is — they may be on a strict client (Outlook on iOS, etc.) that
+ * mangles HTML, and the link survives plain text fine.
+ */
+async function sendInboundEmailConfirmation(to, summary, undoUrl, originalSubject) {
+  const html = emailTemplate('Housemait processed your email', `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Got your forwarded email${originalSubject ? ` (<em>${originalSubject}</em>)` : ''}.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;white-space:pre-line;">${summary}</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:14px;">If anything looks wrong, tap below to revert everything:</p>
+    <div style="text-align:center;">${button('Undo everything', undoUrl)}</div>
+    <p style="color:${BRAND.inkLight};font-size:13px;">The undo link works once — after you tap it, your data is restored to before this email was processed.</p>
+  `);
+  await sendEmail(to, 'Housemait: processed your forwarded email', html);
+}
+
 async function sendInviteEmail(to, inviterName, householdName, token) {
   const url = `${BASE_URL}/signup?invite=${token}`;
   const html = emailTemplate(`You're invited!`, `
@@ -463,6 +488,7 @@ async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId: 
 module.exports = {
   sendVerificationEmail,
   sendInviteEmail,
+  sendInboundEmailConfirmation,
   sendPasswordResetEmail,
   sendWeeklyDigestEmail,
   sendAdminAlert,

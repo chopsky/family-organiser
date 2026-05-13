@@ -1,9 +1,13 @@
 const { Router } = require('express');
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
 const { scanReceipt, matchReceiptToList, extractFromEmail } = require('../services/ai');
 const { extractEmailContent, extractPdfText } = require('../services/email-parser');
 const { detectAisle } = require('../utils/aisle-detect');
+const { sendInboundEmailConfirmation } = require('../services/email');
+
+const API_URL = process.env.API_URL || 'https://api.housemait.com';
 
 const router = Router();
 
@@ -119,6 +123,20 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       let itemsCheckedOff = 0;
       let eventsCreated = 0;
       let tasksCreated = 0;
+      // Track every row this email created or modified so the
+      // confirmation UNDO link can reverse it. checked_off holds IDs
+      // of *existing* rows that got marked completed; added_items /
+      // events / tasks hold IDs of rows that were freshly inserted.
+      const actionsTaken = {
+        checked_off: [],
+        checked_off_names: [], // for the human-readable confirmation summary
+        added_items: [],
+        added_item_names: [],
+        events: [],
+        event_titles: [],
+        tasks: [],
+        task_titles: [],
+      };
 
       // Handle receipt/shopping items (from images or email-extracted items).
       //
@@ -166,6 +184,10 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
           const toCheckOff = (matchResult.matches || []).filter((m) => m.confidence >= 0.7);
           await Promise.all(toCheckOff.map((m) => db.completeShoppingItemById(m.list_item_id)));
           itemsCheckedOff = toCheckOff.length;
+          for (const m of toCheckOff) {
+            actionsTaken.checked_off.push(m.list_item_id);
+            if (m.list_item_name) actionsTaken.checked_off_names.push(m.list_item_name);
+          }
 
           // Receipt items that didn't match anything on the active list.
           // Add them as already-completed so they live in Previously
@@ -187,8 +209,12 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               source: 'email_forward',
               completed: true,
             }));
-            await db.addShoppingItems(householdId, enrichedItems, null);
-            itemsAdded = enrichedItems.length;
+            const inserted = await db.addShoppingItems(householdId, enrichedItems, null);
+            itemsAdded = inserted?.length || enrichedItems.length;
+            for (const row of inserted || []) {
+              actionsTaken.added_items.push(row.id);
+              if (row.item) actionsTaken.added_item_names.push(row.item);
+            }
           }
         } catch (err) {
           console.warn('[inbound-email] Shopping items failed:', err.message);
@@ -229,6 +255,10 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
             if (created && assigneeNames.length > 0) {
               await db.saveEventAssignees(created.id, householdId, assigneeNames, members);
             }
+            if (created?.id) {
+              actionsTaken.events.push(created.id);
+              if (created.title || ev.title) actionsTaken.event_titles.push(created.title || ev.title);
+            }
             eventsCreated++;
           } catch (err) {
             console.warn('[inbound-email] Event creation failed:', err.message);
@@ -239,28 +269,68 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       // Handle tasks
       if (emailResult?.tasks?.length) {
         try {
-          await db.addTasks(householdId, emailResult.tasks.map(t => ({
-            ...t,
-            action: 'add',
-          })), null, members);
-          tasksCreated = emailResult.tasks.length;
+          const insertedTasks = await db.addTasks(
+            householdId,
+            emailResult.tasks.map(t => ({ ...t, action: 'add' })),
+            null,
+            members,
+          );
+          tasksCreated = insertedTasks?.length || emailResult.tasks.length;
+          for (const t of insertedTasks || []) {
+            actionsTaken.tasks.push(t.id);
+            if (t.title) actionsTaken.task_titles.push(t.title);
+          }
         } catch (err) {
           console.warn('[inbound-email] Task creation failed:', err.message);
         }
       }
 
-      // Update log. `items_added` keeps its semantic of "new rows
-      // inserted on the shopping list" — checked-off items aren't new
-      // rows, so they're reported separately in the console log but
-      // don't bump items_added.
+      // Update log + persist the action IDs the undo endpoint will need.
+      // `items_added` keeps its semantic of "new rows inserted on the
+      // shopping list" — checked-off items aren't new rows, so they're
+      // reported separately in the console log but don't bump items_added.
       const totalActions = itemsAdded + itemsCheckedOff + eventsCreated + tasksCreated;
+      const undoToken = totalActions > 0 ? crypto.randomBytes(16).toString('hex') : null;
       await db.updateInboundEmailLog(logId, {
         status: 'completed',
         items_extracted: totalActions,
         items_added: itemsAdded,
+        actions_taken: actionsTaken,
+        undo_token: undoToken,
       });
 
       console.log(`[inbound-email] Processed "${subject}" for household ${householdId}: ${itemsCheckedOff} items checked off, ${itemsAdded} items added to history, ${eventsCreated} events, ${tasksCreated} tasks`);
+
+      // Send a confirmation reply to the forwarder so they know what
+      // happened + can self-revert via the UNDO link. Skipped if no
+      // actions were taken (don't spam users on noise/marketing).
+      if (totalActions > 0 && from) {
+        try {
+          const lines = [];
+          if (itemsCheckedOff) {
+            const names = actionsTaken.checked_off_names.slice(0, 6).join(', ');
+            const extra = actionsTaken.checked_off_names.length > 6 ? `, +${actionsTaken.checked_off_names.length - 6} more` : '';
+            lines.push(`✓ Ticked ${itemsCheckedOff} item${itemsCheckedOff === 1 ? '' : 's'} off your shopping list${names ? ` (${names}${extra})` : ''}.`);
+          }
+          if (itemsAdded) {
+            const names = actionsTaken.added_item_names.slice(0, 6).join(', ');
+            const extra = actionsTaken.added_item_names.length > 6 ? `, +${actionsTaken.added_item_names.length - 6} more` : '';
+            lines.push(`+ Added ${itemsAdded} item${itemsAdded === 1 ? '' : 's'} to Previously purchased${names ? ` (${names}${extra})` : ''}.`);
+          }
+          if (eventsCreated) {
+            const names = actionsTaken.event_titles.slice(0, 4).join(', ');
+            lines.push(`📅 Added ${eventsCreated} event${eventsCreated === 1 ? '' : 's'} to the calendar${names ? ` (${names})` : ''}.`);
+          }
+          if (tasksCreated) {
+            const names = actionsTaken.task_titles.slice(0, 4).join(', ');
+            lines.push(`☑ Added ${tasksCreated} task${tasksCreated === 1 ? '' : 's'}${names ? ` (${names})` : ''}.`);
+          }
+          const undoUrl = `${API_URL}/api/inbound-email/undo/${undoToken}`;
+          await sendInboundEmailConfirmation(from, lines.join('\n'), undoUrl, subject);
+        } catch (err) {
+          console.warn('[inbound-email] Confirmation email failed:', err.message);
+        }
+      }
     } catch (err) {
       console.error('[inbound-email] Processing error:', err);
       if (logId) {
@@ -276,5 +346,115 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
     }
   })();
 });
+
+/**
+ * GET /api/inbound-email/undo/:token
+ *
+ * One-tap reverse of a recent forwarded-email processing. Token comes
+ * from the confirmation email's UNDO link; it's single-use and stored
+ * on the inbound_email_log row. Reverses (best-effort):
+ *   • Re-uncompletes shopping items that were checked off
+ *   • Deletes shopping items that were added (Previously purchased)
+ *   • Deletes calendar events that were created
+ *   • Deletes tasks that were created
+ *
+ * Returns a tiny HTML response so the user gets a confirmation page
+ * when they tap the link from their inbox. No auth — the token is
+ * the auth, and the link is sent only to the original forwarder.
+ */
+router.get('/undo/:token', async (req, res) => {
+  const token = req.params.token;
+  if (!token) {
+    return res.status(400).send(undoHtml('Invalid link.', 'No token in URL.'));
+  }
+  try {
+    const log = await db.getInboundEmailLogByUndoToken(token);
+    if (!log) {
+      return res.status(404).send(undoHtml('Link not found', 'This undo link is invalid or has already been used.'));
+    }
+    if (log.undone_at) {
+      return res.status(409).send(undoHtml('Already undone', "We've already reverted this email — nothing more to do."));
+    }
+
+    const actions = log.actions_taken || {};
+    let restored = 0;
+    let deletedItems = 0;
+    let deletedEvents = 0;
+    let deletedTasks = 0;
+
+    // Uncomplete shopping items that were checked off.
+    for (const itemId of actions.checked_off || []) {
+      try {
+        await db.uncompleteShoppingItem(itemId, log.household_id);
+        restored++;
+      } catch (err) {
+        console.warn('[inbound-email/undo] uncomplete failed for', itemId, err.message);
+      }
+    }
+    // Delete shopping items that were added (the unmatched receipt rows).
+    for (const itemId of actions.added_items || []) {
+      try {
+        await db.deleteShoppingItem(itemId, log.household_id);
+        deletedItems++;
+      } catch (err) {
+        console.warn('[inbound-email/undo] delete shopping item failed for', itemId, err.message);
+      }
+    }
+    // Delete created events.
+    for (const eventId of actions.events || []) {
+      try {
+        await db.deleteCalendarEvent(eventId, log.household_id);
+        deletedEvents++;
+      } catch (err) {
+        console.warn('[inbound-email/undo] delete event failed for', eventId, err.message);
+      }
+    }
+    // Delete created tasks.
+    for (const taskId of actions.tasks || []) {
+      try {
+        await db.deleteTask(taskId, log.household_id);
+        deletedTasks++;
+      } catch (err) {
+        console.warn('[inbound-email/undo] delete task failed for', taskId, err.message);
+      }
+    }
+
+    // Mark the log row as undone so the token can't be reused.
+    await db.updateInboundEmailLog(log.id, {
+      undone_at: new Date().toISOString(),
+      undo_token: null, // free the unique index for future tokens
+    });
+
+    const summaryLines = [];
+    if (restored) summaryLines.push(`Restored ${restored} item${restored === 1 ? '' : 's'} to your shopping list.`);
+    if (deletedItems) summaryLines.push(`Removed ${deletedItems} item${deletedItems === 1 ? '' : 's'} from Previously purchased.`);
+    if (deletedEvents) summaryLines.push(`Deleted ${deletedEvents} event${deletedEvents === 1 ? '' : 's'}.`);
+    if (deletedTasks) summaryLines.push(`Deleted ${deletedTasks} task${deletedTasks === 1 ? '' : 's'}.`);
+    const summary = summaryLines.length ? summaryLines.join('<br>') : 'Nothing to revert.';
+
+    return res.send(undoHtml('Undone', summary));
+  } catch (err) {
+    console.error('[inbound-email/undo] error:', err);
+    return res.status(500).send(undoHtml('Something went wrong', 'We couldn\'t complete the undo. Please try again or contact support.'));
+  }
+});
+
+/**
+ * Minimal HTML response for the undo confirmation page. Standalone
+ * (no SPA, no script) so it loads instantly when tapped from an
+ * email client, including ones that open in their own minimal browser.
+ */
+function undoHtml(heading, body) {
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${heading} — Housemait</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;margin:0;padding:48px 24px;background:#FBF8F3;color:#2D2A33;}
+  .card{max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 16px rgba(107,63,160,0.08);}
+  h1{font-family:'Instrument Serif',Georgia,serif;font-size:32px;font-weight:400;margin:0 0 16px;color:#6B3FA0;}
+  p{line-height:1.6;font-size:16px;color:#2D2A33;margin:0;}
+</style></head>
+<body><div class="card"><h1>${heading}</h1><p>${body}</p></div></body></html>`;
+}
 
 module.exports = router;

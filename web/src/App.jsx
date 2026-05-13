@@ -47,6 +47,7 @@ const AdminHouseholds      = lazy(() => import('./pages/admin/AdminHouseholds'))
 const AdminHouseholdDetail = lazy(() => import('./pages/admin/AdminHouseholdDetail'));
 const AdminAiUsage         = lazy(() => import('./pages/admin/AdminAiUsage'));
 const AdminWhatsApp        = lazy(() => import('./pages/admin/AdminWhatsApp'));
+const AdminInboundEmails   = lazy(() => import('./pages/admin/AdminInboundEmails'));
 const AdminCalendarSync    = lazy(() => import('./pages/admin/AdminCalendarSync'));
 const AdminAnalytics       = lazy(() => import('./pages/admin/AdminAnalytics'));
 
@@ -158,6 +159,7 @@ function AppRoutes() {
         <Route path="/admin/households/:id" element={<RequirePlatformAdmin><AdminLayout><AdminHouseholdDetail /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/ai-usage" element={<RequirePlatformAdmin><AdminLayout><AdminAiUsage /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/whatsapp" element={<RequirePlatformAdmin><AdminLayout><AdminWhatsApp /></AdminLayout></RequirePlatformAdmin>} />
+        <Route path="/admin/inbound-emails" element={<RequirePlatformAdmin><AdminLayout><AdminInboundEmails /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/calendar-sync" element={<RequirePlatformAdmin><AdminLayout><AdminCalendarSync /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/analytics" element={<RequirePlatformAdmin><AdminLayout><AdminAnalytics /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />

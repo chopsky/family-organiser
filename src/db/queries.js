@@ -3308,6 +3308,34 @@ async function getRecentInboundEmails(householdId, limit = 10, db = supabase) {
   return data;
 }
 
+// Admin-wide view of recent inbound-email activity. Joins on
+// households so the UI can show which household forwarded each email
+// without firing N+1 lookups.
+async function getRecentInboundEmailsAdmin({ limit = 100 } = {}, db = supabase) {
+  const cap = Math.min(Math.max(1, limit), 500);
+  const { data, error } = await db
+    .from('inbound_email_log')
+    .select('*, households!inner(id, name)')
+    .order('created_at', { ascending: false })
+    .limit(cap);
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    ...row,
+    household_name: row.households?.name,
+    households: undefined,
+  }));
+}
+
+async function getInboundEmailLogByUndoToken(undoToken, db = supabase) {
+  const { data, error } = await db
+    .from('inbound_email_log')
+    .select()
+    .eq('undo_token', undoToken)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 async function checkDuplicateEmail(householdId, fromEmail, subject, withinMinutes = 5, db = supabase) {
   // Only dedup against successfully completed emails within 5 minutes
   // (catches genuine double-sends from email clients, but allows re-forwards)
@@ -4406,6 +4434,8 @@ module.exports = {
   getHouseholdByInboundToken,
   createInboundEmailLog,
   updateInboundEmailLog,
+  getInboundEmailLogByUndoToken,
+  getRecentInboundEmailsAdmin,
   getRecentInboundEmails,
   checkDuplicateEmail,
   // Event reminders & assignees

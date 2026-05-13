@@ -246,4 +246,21 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/inbound-emails ──────────────────────────────────────────
+//
+// Recent forwarded-email processing log. Powers the AdminInboundEmails
+// page — lets us see what each inbound email did (or failed at) without
+// digging into Railway logs. Includes the AI's classification + the
+// list of action IDs so we can spot failure patterns.
+router.get('/inbound-emails', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+    const rows = await db.getRecentInboundEmailsAdmin({ limit });
+    return res.json({ emails: rows });
+  } catch (err) {
+    console.error('GET /api/admin/inbound-emails error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

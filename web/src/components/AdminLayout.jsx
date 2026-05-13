@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   IconBarChart, IconUsers, IconHome, IconShield,
   IconCpu, IconMessageCircle, IconRefresh, IconTrendingUp,
-  IconArrowLeft,
+  IconArrowLeft, IconFileText,
 } from './Icons';
 
 const adminNav = [
@@ -12,6 +12,7 @@ const adminNav = [
   { to: '/admin/households',    label: 'Households',     Icon: IconHome },
   { to: '/admin/ai-usage',      label: 'AI Usage',       Icon: IconCpu },
   { to: '/admin/whatsapp',      label: 'WhatsApp',       Icon: IconMessageCircle },
+  { to: '/admin/inbound-emails', label: 'Inbound emails', Icon: IconFileText },
   { to: '/admin/calendar-sync', label: 'Calendar Sync',  Icon: IconRefresh },
   { to: '/admin/analytics',     label: 'Analytics',      Icon: IconTrendingUp },
 ];

@@ -544,13 +544,28 @@ CRITICAL CLASSIFICATION RULES:
 - Only extract shopping_items for actual **grocery/retail receipts** where the items are physical products bought from a shop or supermarket (Tesco, Sainsbury's, Amazon products, etc.).
 - If an email mentions a price/total but is for a **service, event, or booking**, it is NOT a receipt — it's an event.
 
+WHAT IS A RECEIPT (extract shopping_items):
+- "Your order has been placed" / "Thank you for your order" / "Order confirmation" — from a grocery or general retailer (Tesco, Sainsbury's, Ocado, Asda, Waitrose, Amazon Fresh, Pick n Pay, Woolworths, Checkers, etc.).
+- "Your delivery is on its way" with itemised contents listed.
+- A photograph attachment showing a till receipt with prices.
+
+WHAT IS NOT A RECEIPT (return empty shopping_items):
+- **Marketing / promotional emails** — "your bag is waiting", "sale ends soon", "we miss you", "you might like these" — these list products but the user hasn't bought anything. Empty shopping_items.
+- **Order status updates** that don't itemise — "your delivery is delayed", "out for delivery", "delivered" with no items listed. These often follow an actual receipt the user already forwarded earlier; re-extracting items duplicates them. Empty shopping_items unless the email contains the full itemised list AND clearly states the order was placed.
+- **Refund / return confirmations** — items going back are not items bought. Empty shopping_items.
+- **Subscription / SaaS receipts** (Stripe, Apple, Google Play, Netflix, Spotify) — these are bills, not grocery purchases. Extract as a task (bill due) if relevant, not as shopping_items.
+- **Restaurant receipts** (Deliveroo, Uber Eats, takeaway receipts) — the items here are prepared meals, not shopping-list goods. Empty shopping_items.
+- **Reviews / loyalty / points emails** — "rate your purchase", "you earned 250 points" — no items to extract.
+- **Wishlist / saved items** — items the user is considering but hasn't bought. Empty shopping_items.
+
 OTHER RULES:
-- For receipts: normalise product names to plain English (e.g. "LURPAK SLTD 250G" → "butter"). IGNORE delivery charges, fees, tips, discounts.
+- For receipts: normalise product names to plain English (e.g. "LURPAK SLTD 250G" → "butter"). IGNORE delivery charges, fees, tips, discounts, loyalty-points lines, and substituted-item notices.
 - For events: resolve dates to YYYY-MM-DD. If a year is not mentioned, assume the next occurrence.
 - For member assignment: match names mentioned in the email to household members. If "Mason" or "Year 4" is mentioned and Mason is a household member, assign to Mason.
 - If the email contains multiple events (e.g. a school newsletter with several dates), extract ALL of them.
 - If you cannot determine a specific field, use null.
 - If the email has no actionable content (marketing, spam, generic newsletters with no dates), return empty arrays.
+- **When uncertain, prefer empty arrays over guessing.** A missed extraction creates frustration; a wrong extraction creates duplicate work for the user.
 
 Respond only with valid JSON matching this schema:
 {
