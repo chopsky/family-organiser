@@ -2377,7 +2377,12 @@ export default function FamilySetup() {
                                             }
                                           </span>
                                         </div>
-                                        {summary.htStart && (
+                                        {/* "Half term" is UK-only terminology — SA schools don't
+                                            use this concept (four discrete terms with breaks
+                                            between, not within). Even if legacy data has half_term_*
+                                            rows, we suppress the sub-line for SA. The dates
+                                            themselves still appear in the full View-and-edit list. */}
+                                        {!isSa && summary.htStart && (
                                           <div className="ml-16 text-[11px] text-cocoa">
                                             Half term: {formatDateShort(summary.htStart)}{summary.htEnd && summary.htEnd !== summary.htStart ? ` – ${formatDateShort(summary.htEnd)}` : ''}
                                           </div>
