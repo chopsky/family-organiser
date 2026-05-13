@@ -751,13 +751,19 @@ router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireA
       ZA: {
         intro: `You are an expert at extracting South African school term dates from website or PDF content. South African schools run on the calendar year (January–December) with four terms. From 2026, a unified national calendar applies to every public school. Extract ALL term dates you can find — for both ${currentAY} and ${nextAY} if available.
 
-The source may label terms as "Term 1", "Term 2" or as "FIRST TERM", "SECOND TERM", "THIRD TERM", "FOURTH TERM" — treat both labelings identically.`,
+The source may label terms as "Term 1", "Term 2" or as "FIRST TERM", "SECOND TERM", "THIRD TERM", "FOURTH TERM" — treat both labelings identically.
+
+CRITICAL distinction between half_term_start and bank_holiday:
+• half_term_start = a non-holiday school BREAK explicitly labelled as a "break" or "half-term" (e.g. "PESACH BREAK", "MID-TERM BREAK", "WINTER BREAK"). Use with end_date for the range.
+• bank_holiday = a NAMED public, religious, or cultural holiday (e.g. Chanukah, Rosh Hashanah, Pesach observance, Sukkot, Christmas, Workers' Day, Heritage Day). These go in as bank_holiday EVEN IF the holiday spans multiple days (use end_date to express the range). A multi-day religious holiday like Chanukah is NOT a half-term — keep it as bank_holiday.
+
+Rule of thumb: if the PDF labels the entry with the name of a holiday (Chanukah, Sukkot, Pesach the festival, etc.) → bank_holiday. If it labels it as a "break" without a holiday name attached, or as just "MID-TERM BREAK" → half_term_start.`,
         lookFor: [
           'Dates in any common format ("3 January 2026", "03/01/2026", "2026-01-03")',
           'Term boundaries — when "FIRST TERM" / "TERM 1" says e.g. "Wednesday 14 January - Friday 27 March", emit one term_start and one term_end',
-          'Mid-term breaks (use half_term_start with end_date)',
-          'School-specific closures: Jewish holidays (Pesach, Rosh Hashanah, Yom Kippur, Sukkot, Chanukah, etc.), sports days, parent evenings',
-          'South African public holidays falling on school days (Human Rights Day, Freedom Day, Workers Day, Youth Day, Heritage Day, Day of Reconciliation, etc.)',
+          'Non-holiday school breaks labelled "BREAK" or "MID-TERM" (use half_term_start + end_date) — NOT named religious holidays',
+          'Named Jewish holidays (Chanukah, Pesach, Rosh Hashanah, Yom Kippur, Sukkot, Shavuot, etc.) → bank_holiday, with end_date if multi-day',
+          'South African public holidays (Human Rights Day, Freedom Day, Workers Day, Youth Day, Heritage Day, Day of Reconciliation, etc.) → bank_holiday',
         ],
         ayFormat: `"${currentAY}" or "${nextAY}"`,
         userIntro: 'Extract all school term dates and closures from this South African school year planner. Emit one JSON entry per date you find — terms, breaks, holidays, and closures all go into the same array:',
