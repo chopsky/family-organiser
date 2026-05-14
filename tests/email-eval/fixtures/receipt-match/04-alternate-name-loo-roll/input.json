@@ -1,0 +1,10 @@
+{
+  "receiptItems": [
+    {"normalised_name": "andrex classic toilet roll 9pk", "original_text": "Andrex Classic Toilet Roll 9 Pack"},
+    {"normalised_name": "tesco kitchen towel 2pk", "original_text": "Tesco Kitchen Towel 2 Pack"}
+  ],
+  "shoppingList": [
+    {"id": "list-loo-roll", "item": "loo roll"},
+    {"id": "list-paper-towels", "item": "paper towels"}
+  ]
+}

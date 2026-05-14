@@ -11,7 +11,8 @@
     "lint:fix": "eslint src/ --fix",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:verbose": "jest --verbose"
+    "test:verbose": "jest --verbose",
+    "eval:emails": "node tests/email-eval/run.js"
   },
   "keywords": [],
   "author": "",

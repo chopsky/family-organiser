@@ -1,0 +1,12 @@
+{
+  "receiptItems": [
+    {"normalised_name": "lurpak salted spreadable 500g", "original_text": "LURPAK SALTED SPREADABLE 500G"},
+    {"normalised_name": "cathedral city mature 350g", "original_text": "Cathedral City Mature 350g"},
+    {"normalised_name": "walkers salt vinegar 6pk", "original_text": "Walkers Salt & Vinegar Crisps 6 Pack"}
+  ],
+  "shoppingList": [
+    {"id": "list-butter", "item": "butter"},
+    {"id": "list-cheese", "item": "cheese"},
+    {"id": "list-crisps", "item": "crisps"}
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Alternative-name vocabulary: 'toilet roll' on the receipt should match 'loo roll' on the list; 'kitchen towel' should match 'paper towels'.",
+  "matches": [
+    {
+      "receipt_contains": "toilet roll",
+      "list_item_contains": "loo roll",
+      "min_confidence": 0.7
+    },
+    {
+      "receipt_contains": "kitchen towel",
+      "list_item_contains": "paper towels",
+      "min_confidence": 0.7
+    }
+  ]
+}

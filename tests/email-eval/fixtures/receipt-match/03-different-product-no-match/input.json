@@ -1,0 +1,10 @@
+{
+  "receiptItems": [
+    {"normalised_name": "alpro almond milk unsweetened 1l", "original_text": "Alpro Almond Milk Unsweetened 1L"},
+    {"normalised_name": "decaf coffee jacobs 200g", "original_text": "Jacobs Decaf Coffee 200g"}
+  ],
+  "shoppingList": [
+    {"id": "list-cow-milk", "item": "semi-skimmed milk"},
+    {"id": "list-regular-coffee", "item": "ground coffee"}
+  ]
+}

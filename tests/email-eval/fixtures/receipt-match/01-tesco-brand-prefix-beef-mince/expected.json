@@ -1,0 +1,10 @@
+{
+  "description": "Brand + fat% + weight on the receipt line should match a generic list entry. Strip 'Tesco', '20%', '500g'.",
+  "matches": [
+    {
+      "receipt_contains": "beef mince",
+      "list_item_contains": "beef mince",
+      "min_confidence": 0.7
+    }
+  ]
+}

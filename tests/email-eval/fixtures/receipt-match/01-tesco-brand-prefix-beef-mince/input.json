@@ -1,0 +1,10 @@
+{
+  "receiptItems": [
+    {"normalised_name": "tesco 20% beef mince 500g", "original_text": "Tesco 20% Beef Mince 500g"}
+  ],
+  "shoppingList": [
+    {"id": "list-beef-mince", "item": "beef mince"},
+    {"id": "list-milk", "item": "skimmed milk"},
+    {"id": "list-bread", "item": "white bread"}
+  ]
+}

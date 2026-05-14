@@ -1,0 +1,20 @@
+{
+  "description": "Three branded receipt items should each match their generic list entry: Lurpak→butter, Cathedral City→cheese, Walkers→crisps.",
+  "matches": [
+    {
+      "receipt_contains": "lurpak",
+      "list_item_contains": "butter",
+      "min_confidence": 0.7
+    },
+    {
+      "receipt_contains": "cathedral city",
+      "list_item_contains": "cheese",
+      "min_confidence": 0.7
+    },
+    {
+      "receipt_contains": "walkers",
+      "list_item_contains": "crisps",
+      "min_confidence": 0.7
+    }
+  ]
+}
