@@ -1204,9 +1204,9 @@ export default function FamilySetup() {
 
       {/* Members */}
       <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Family Members</h2>
+        <h2 className="font-semibold text-bark mb-4 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Family Members</h2>
         {loadingMembers ? <Spinner /> : (
-          <ul className="space-y-2">
+          <ul className="space-y-4">
             {members.filter(m => m.member_type !== 'dependent').map((m) => {
               const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
               return (
@@ -1328,7 +1328,7 @@ export default function FamilySetup() {
         {loadingMembers ? <Spinner /> : (
           <>
             {members.filter(m => m.member_type === 'dependent').length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="space-y-4">
                 {members.filter(m => m.member_type === 'dependent').map((m) => {
                   const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
                   return (
