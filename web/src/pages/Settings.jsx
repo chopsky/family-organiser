@@ -1390,7 +1390,7 @@ export default function Settings() {
       {/* Push Notifications — native app only */}
       {isNative && <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-base md:text-lg font-semibold text-bark mb-1">Push Notifications</h2>
-        <p className="text-xs text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
+        <p className="text-sm text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
         {loadingNotifPrefs ? (
           <div className="py-4 text-center text-sm text-cocoa">Loading...</div>
         ) : notifPrefs ? (
@@ -1855,7 +1855,7 @@ function SchoolsSection() {
   return (
     <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
       <h2 className="text-base md:text-lg font-semibold text-bark mb-3">Schools</h2>
-      <p className="text-xs text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
+      <p className="text-sm text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
       <div className="space-y-3">
         {schools.map(school => (
           <div key={school.id} className="bg-white rounded-xl border border-cream-border p-3">
