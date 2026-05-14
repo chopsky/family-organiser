@@ -55,22 +55,20 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
     : '(no open tasks)';
 
-  // Location prompt: we only include the precise household address when
-  // the user's current message actually looks like it needs it (asking
-  // about restaurants, GPs, day trips, etc.). For everything else we
-  // fall back to the timezone-derived city (or empty). This keeps the
-  // user's full street/postcode out of every prompt sent to the AI
-  // provider — sent only on the small subset of messages where it
-  // demonstrably improves recommendations.
+  // Location prompt: gated entirely on whether the current message
+  // looks location-relevant. If it does and we have a home address,
+  // send the full address. If it does but we only have a timezone,
+  // send the coarse city. If it doesn't, send NOTHING — there's no
+  // reason to share the family's location for "remind me to call the
+  // bank" or "mark milk as bought". See utils/location-relevance.js.
   const userCity = getCityFromTimezone(timezone);
-  const needsAddress = address && address.trim() && messageMentionsLocation(message);
-  let locationStr;
-  if (needsAddress) {
-    locationStr = `The family's home address is ${address.trim()}. Use this for proximity-aware recommendations (restaurants, doctors, services nearby). Mention neighbourhoods or rough distance rather than echoing the full street address back. Treat the exact address as confidential.`;
-  } else if (userCity) {
+  const homeAddress = (address || '').trim();
+  const wantsLocation = messageMentionsLocation(message);
+  let locationStr = '';
+  if (wantsLocation && homeAddress) {
+    locationStr = `The family's home address is ${homeAddress}. Use this for proximity-aware recommendations (restaurants, doctors, services nearby). Mention neighbourhoods or rough distance rather than echoing the full street address back. Treat the exact address as confidential.`;
+  } else if (wantsLocation && userCity) {
     locationStr = `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`;
-  } else {
-    locationStr = '';
   }
 
   const systemPrompt = CLASSIFICATION_SYSTEM

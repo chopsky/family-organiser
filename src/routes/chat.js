@@ -77,23 +77,20 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
 
   const currentUser = members.find(m => m.id === userId);
   const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
-  // Location prompt: we only include the precise household address
-  // when this specific message looks like it needs it (asking about
-  // nearby restaurants, GPs, day trips, etc.). For all other turns we
-  // fall back to the timezone-derived city. This keeps the user's full
-  // street/postcode out of every prompt sent to the AI provider —
-  // sent only on the small subset of messages where it demonstrably
-  // improves recommendations. See utils/location-relevance.js.
+  // Location prompt: gated entirely on whether the current message
+  // looks location-relevant. If it does and we have a home address,
+  // send the full address. If it does but we only have a timezone,
+  // send the coarse city. If it doesn't, send NOTHING — the AI
+  // doesn't need to know where the household is to mark milk as
+  // bought. See utils/location-relevance.js for the matcher.
   const homeAddress = household?.address?.trim();
   const userCity = getCityFromTimezone(userTz);
-  const needsAddress = homeAddress && messageMentionsLocation(currentMessage);
-  let locationStr;
-  if (needsAddress) {
+  const wantsLocation = messageMentionsLocation(currentMessage);
+  let locationStr = '';
+  if (wantsLocation && homeAddress) {
     locationStr = `The family's home address is **${homeAddress}**. Use this for proximity-aware recommendations — suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than echoing the full street address back to the user. Treat the exact address as confidential.`;
-  } else if (userCity) {
+  } else if (wantsLocation && userCity) {
     locationStr = `The family is based in **${userCity}**. Use this for local recommendations — suggest specific places, neighbourhoods, and services in this area.`;
-  } else {
-    locationStr = '';
   }
 
   const membersStr = members.map(m => `${m.name}${m.family_role ? ` (${m.family_role})` : ''}`).join(', ') || 'none';
