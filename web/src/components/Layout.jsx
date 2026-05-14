@@ -155,7 +155,13 @@ export default function Layout({ children }) {
           (me.color_theme && me.color_theme !== user.color_theme) ||
           (me.avatar_url !== undefined && me.avatar_url !== user.avatar_url)
         )) {
-          login({ token, user: { ...user, color_theme: me.color_theme || user.color_theme, avatar_url: me.avatar_url || null }, household });
+          // Pass the FRESH household from the API response, not the
+          // closure `household` from useAuth(). The closure value was
+          // captured at this render — but the effect resolves later,
+          // and another tab/path may have updated the household in
+          // between (most often the household avatar upload, which
+          // would otherwise get overwritten back to null here).
+          login({ token, user: { ...user, color_theme: me.color_theme || user.color_theme, avatar_url: me.avatar_url || null }, household: data.household || household });
         }
       })
       .catch(() => {});
