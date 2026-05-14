@@ -1,0 +1,13 @@
+{
+  "description": "Tier 2.5 recurring-task dedup: Spotify subscription receipt arrives, household already has a recurring task 'Pay Spotify subscription'. AI should NOT create a duplicate task (the existing one already covers awareness of this bill).",
+  "email_type": ["bill", "receipt", "other"],
+  "shopping_items": {
+    "exact_count": 0
+  },
+  "events": {
+    "exact_count": 0
+  },
+  "tasks": {
+    "exact_count": 0
+  }
+}

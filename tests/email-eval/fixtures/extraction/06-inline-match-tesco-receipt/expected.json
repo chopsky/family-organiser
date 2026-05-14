@@ -1,0 +1,21 @@
+{
+  "description": "Tier 2.5 inline matching: receipt contains 5 items, 5 of them are on the household's shopping list (milk, butter, bread, loo roll, beef mince). Eggs is on the list but not on the receipt. The AI should populate list_item_id + match_confidence for each receipt item that matches a list entry — eliminating the need for a separate matchReceiptToList call.",
+  "email_type": "receipt",
+  "shopping_items": {
+    "count_min": 5,
+    "must_contain": ["milk", "butter", "bread"]
+  },
+  "events": {
+    "exact_count": 0
+  },
+  "tasks": {
+    "count_max": 0
+  },
+  "inline_matches": [
+    {"receipt_contains": "milk", "expected_list_item_id": "list-milk-001", "min_confidence": 0.7},
+    {"receipt_contains": "butter", "expected_list_item_id": "list-butter-002", "min_confidence": 0.7},
+    {"receipt_contains": "bread", "expected_list_item_id": "list-bread-003", "min_confidence": 0.7},
+    {"receipt_contains": "toilet roll", "expected_list_item_id": "list-loo-004", "min_confidence": 0.7},
+    {"receipt_contains": "beef mince", "expected_list_item_id": "list-beef-005", "min_confidence": 0.7}
+  ]
+}

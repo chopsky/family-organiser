@@ -1380,6 +1380,55 @@ async function getRecentlyCompletedShopping(householdId, hours = 24, db = supaba
   return data;
 }
 
+/**
+ * Distinct item names completed in the last N days. Used as
+ * normalisation context for AI extraction: if the household consistently
+ * buys "Cathedral City cheddar", a receipt line "CATHEDRAL CITY 350G"
+ * should map to the wording the family actually uses on their list,
+ * not a generic "cheese". Caps at 50 to keep prompts compact.
+ */
+async function getRecentlyPurchasedNames(householdId, days = 60, db = supabase) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const { data, error } = await db
+    .from('shopping_items')
+    .select('item')
+    .eq('household_id', householdId)
+    .eq('completed', true)
+    .gte('completed_at', since.toISOString())
+    .order('completed_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  const seen = new Set();
+  const out = [];
+  for (const row of data || []) {
+    const norm = (row.item || '').toLowerCase().trim();
+    if (norm && !seen.has(norm)) {
+      seen.add(norm);
+      out.push(row.item);
+    }
+    if (out.length >= 50) break;
+  }
+  return out;
+}
+
+/**
+ * Titles of recurring tasks (recurrence column non-null). Passed to AI
+ * extraction so a forwarded bill / subscription receipt doesn't get
+ * duplicated as a new task when an existing recurring task already
+ * covers it.
+ */
+async function getRecurringTaskTitles(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('tasks')
+    .select('title')
+    .eq('household_id', householdId)
+    .not('recurrence', 'is', null)
+    .order('title');
+  if (error) throw error;
+  return (data || []).map((r) => r.title).filter(Boolean);
+}
+
 async function uncompleteTask(taskId, householdId, db = supabase) {
   const { data, error } = await db
     .from('tasks')
@@ -4343,6 +4392,8 @@ module.exports = {
   getTasksForUser,
   getRecentlyCompletedTasks,
   getRecentlyCompletedShopping,
+  getRecentlyPurchasedNames,
+  getRecurringTaskTitles,
   uncompleteTask,
   uncompleteShoppingItem,
   deleteShoppingItem,

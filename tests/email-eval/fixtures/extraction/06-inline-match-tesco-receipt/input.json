@@ -1,0 +1,19 @@
+{
+  "subject": "Fwd: Your tesco.com order 7221-8154-693",
+  "text": "Hello Sam.\n\nThank you for shopping at Tesco. Your order has been placed.\n\nOrder #7221-8154-693\nDelivery: Tomorrow 10:00–11:00\n\nYour items:\n\n1 x Tesco British Skimmed Milk 2 Litre — £1.30\n1 x Lurpak Salted Spreadable 500g — £4.50\n2 x Hovis Soft White Medium Bread 800g — £2.40\n1 x Andrex Classic Toilet Roll 9 Pack — £6.00\n1 x Tesco 20% Beef Mince 500g — £4.00\n\nTotal £18.20\n\nTesco Stores Ltd",
+  "members": ["Sam", "Alex"],
+  "context": {
+    "country": "GB",
+    "shoppingList": [
+      {"id": "list-milk-001", "item": "milk"},
+      {"id": "list-butter-002", "item": "butter"},
+      {"id": "list-bread-003", "item": "bread"},
+      {"id": "list-loo-004", "item": "loo roll"},
+      {"id": "list-beef-005", "item": "beef mince"},
+      {"id": "list-eggs-006", "item": "eggs"}
+    ],
+    "recentPurchases": ["semi-skimmed milk", "sourdough bread", "cheddar"],
+    "recurringTaskTitles": [],
+    "schools": []
+  }
+}

@@ -1,6 +1,6 @@
 {
   "description": "Abandoned-basket marketing email. Items are listed but the user hasn't bought them — must NOT extract shopping items or events or tasks. Should classify as marketing/other, not as a receipt.",
-  "email_type_or": ["other", "noise", "marketing"],
+  "email_type": ["other", "noise", "marketing"],
   "shopping_items": {
     "exact_count": 0
   },

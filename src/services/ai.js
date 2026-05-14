@@ -310,15 +310,75 @@ function parseJSON(text, context) {
 }
 
 /**
- * Extract structured data from any forwarded email — receipts, flights, school newsletters, appointments, etc.
+ * Build the {{CONTEXT}} section of the email-extraction prompt.
+ * Context is optional — empty/missing sections degrade gracefully.
+ *
+ * @param {object} ctx
+ * @param {string} [ctx.country]
+ * @param {Array<{id: string, item: string}>} [ctx.shoppingList]
+ * @param {string[]} [ctx.recentPurchases]
+ * @param {string[]} [ctx.recurringTaskTitles]
+ * @param {Array<{school_name: string, children?: Array<{name: string}>}>} [ctx.schools]
  */
-async function extractFromEmail(emailText, subject, memberNames = [], { householdId, userId } = {}) {
+function buildEmailExtractionContext(ctx = {}) {
+  const sections = [];
+  sections.push(`Country: ${ctx.country || 'unknown'}`);
+
+  if (Array.isArray(ctx.shoppingList) && ctx.shoppingList.length > 0) {
+    sections.push('Current shopping list (use these IDs when matching receipt items):');
+    for (const item of ctx.shoppingList) {
+      sections.push(`  - id: ${item.id} | "${item.item}"`);
+    }
+  } else {
+    sections.push('Current shopping list: (empty)');
+  }
+
+  if (Array.isArray(ctx.recentPurchases) && ctx.recentPurchases.length > 0) {
+    const slice = ctx.recentPurchases.slice(0, 30);
+    sections.push(`Recently purchased (last 60 days, for normalisation hints): ${slice.join(', ')}`);
+  }
+
+  if (Array.isArray(ctx.recurringTaskTitles) && ctx.recurringTaskTitles.length > 0) {
+    sections.push('Existing recurring tasks (do NOT duplicate from bill emails):');
+    for (const t of ctx.recurringTaskTitles) {
+      sections.push(`  - ${t}`);
+    }
+  }
+
+  if (Array.isArray(ctx.schools) && ctx.schools.length > 0) {
+    sections.push('Schools (for school-newsletter attribution):');
+    for (const s of ctx.schools) {
+      const kids = (s.children || []).map((c) => c.name).filter(Boolean).join(', ');
+      sections.push(`  - ${s.school_name}${kids ? ` — children: ${kids}` : ''}`);
+    }
+  }
+
+  return sections.join('\n');
+}
+
+/**
+ * Extract structured data from any forwarded email — receipts, flights, school newsletters, appointments, etc.
+ *
+ * The `context` arg lets the AI make smarter decisions in a single call:
+ *   - Match receipt items inline to the household's shopping list
+ *     (eliminates a follow-up matchReceiptToList call).
+ *   - Normalise product names with household-specific vocabulary.
+ *   - Skip duplicate tasks when a recurring task already covers a bill.
+ *   - Attribute school events to the right child.
+ *
+ * Backwards-compatible: callers that pass no context get the
+ * vanilla classification/extraction behaviour with country='unknown'
+ * and empty arrays — same as before this argument existed.
+ */
+async function extractFromEmail(emailText, subject, memberNames = [], context = {}, { householdId, userId } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
+  const contextStr = buildEmailExtractionContext(context);
 
   const systemPrompt = EMAIL_EXTRACTION_SYSTEM
     .replace(/{{DATE}}/g, today)
-    .replace(/{{MEMBERS}}/g, membersStr);
+    .replace(/{{MEMBERS}}/g, membersStr)
+    .replace(/{{CONTEXT}}/g, contextStr);
 
   const userMessage = subject
     ? `Email subject: ${subject}\n\n${emailText}`
@@ -339,4 +399,4 @@ async function extractFromEmail(emailText, subject, memberNames = [], { househol
   });
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON };
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext };

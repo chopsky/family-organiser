@@ -110,11 +110,38 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         }
       }
 
-      // Use AI to classify and extract from the email text
+      // Gather household context for the AI extractor. This lets the AI
+      // make smarter decisions in a single call: inline-match receipt
+      // items against the household's current shopping list (no second
+      // matchReceiptToList call needed), normalise with household-
+      // specific vocab via recent-purchase hints, avoid duplicating
+      // existing recurring-task bills, and attribute school newsletters
+      // to the right child. See ai.js#buildEmailExtractionContext and
+      // prompts.js EMAIL_EXTRACTION_SYSTEM for the schema and prompt.
+      const [shoppingList, recentPurchases, recurringTaskTitles, schoolsForCtx] = await Promise.all([
+        db.getShoppingList(householdId).catch(() => []),
+        db.getRecentlyPurchasedNames(householdId, 60).catch(() => []),
+        db.getRecurringTaskTitles(householdId).catch(() => []),
+        db.getHouseholdSchools(householdId).catch(() => []),
+      ]);
+      const aiContext = {
+        country: household.country,
+        shoppingList: shoppingList.map((i) => ({ id: i.id, item: i.item })),
+        recentPurchases,
+        recurringTaskTitles,
+        schools: schoolsForCtx,
+      };
+      // listItemsById: lookup table so we can validate the AI's
+      // list_item_id pointers against the *current* shopping list
+      // before checking them off. Guards against an AI hallucination
+      // returning a UUID that doesn't exist in the household.
+      const listItemsById = Object.fromEntries(shoppingList.map((i) => [i.id, i]));
+
+      // Use AI to classify and extract from the email text.
       let emailResult = null;
       if (combinedText.trim()) {
         try {
-          emailResult = await extractFromEmail(combinedText, subject, memberNames, { householdId });
+          emailResult = await extractFromEmail(combinedText, subject, memberNames, aiContext, { householdId });
           console.log('[inbound-email] AI extraction result:', JSON.stringify(emailResult, null, 2));
         } catch (err) {
           console.warn('[inbound-email] Email extraction failed:', err.message);
@@ -142,72 +169,61 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         task_titles: [],
       };
 
-      // Handle receipt/shopping items (from images or email-extracted items).
+      // Handle receipt/shopping items via TWO paths:
+      //   1. Email-extracted items (emailResult.shopping_items) — the AI
+      //      saw the household's shopping list in its context and
+      //      populated list_item_id + match_confidence inline. We just
+      //      check off any item with confidence >= 0.7. No second AI
+      //      call needed (Tier 2.5 — eliminates the old separate
+      //      matchReceiptToList call from this branch).
+      //   2. Photo-attached items (receiptItems from scanReceipt) — the
+      //      receipt OCR pipeline runs separately and DOESN'T see the
+      //      shopping list. For these we still need matchReceiptToList
+      //      to do the fuzzy match.
       //
-      // Both code paths feeding allShoppingItems are receipt-shaped:
-      //   • receiptItems → from scanReceipt() on attached photos
-      //   • emailResult.shopping_items → the prompt restricts this to
-      //     actual grocery/retail receipts (see prompts.js line 544)
-      //
-      // So we treat ALL items here as "things that were purchased",
-      // which means: match against the current shopping list and
-      // CHECK OFF anything that's on it. Unmatched receipt items
-      // (one-off purchases not previously planned) get added as
-      // already-completed so they show up in "Previously purchased"
-      // without cluttering the active list.
-      //
-      // Previous behaviour was to blindly addShoppingItems(), which
-      // re-added every item on the receipt as a new pending row even
-      // when the user had already planned to buy them.
-      const allShoppingItems = [...receiptItems];
-      if (emailResult?.shopping_items?.length) {
-        allShoppingItems.push(...emailResult.shopping_items);
+      // Both paths converge on the same actionsTaken bookkeeping so the
+      // UNDO link can reverse them. checkedOffSet dedupes if the same
+      // list item gets matched by both paths (unlikely but defensible).
+      const checkedOffSet = new Set();
+      async function checkOffListItem(listItemId, listItemName) {
+        if (!listItemId || checkedOffSet.has(listItemId)) return;
+        if (!listItemsById[listItemId]) return; // hallucinated UUID — skip
+        await db.completeShoppingItemById(listItemId);
+        checkedOffSet.add(listItemId);
+        itemsCheckedOff++;
+        actionsTaken.checked_off.push(listItemId);
+        actionsTaken.checked_off_names.push(listItemName || listItemsById[listItemId].item);
       }
 
-      if (allShoppingItems.length) {
-        try {
-          const seen = new Set();
-          const uniqueItems = [];
-          for (const item of allShoppingItems) {
-            const name = (item.normalised_name || item.item || '').toLowerCase().trim();
-            if (name && !seen.has(name)) {
-              seen.add(name);
-              uniqueItems.push({
-                ...item,
-                normalised_name: name,
-                // Provide both shapes so matchReceiptToList (expects
-                // normalised_name + original_text) is happy.
-                original_text: item.original_text || item.item || name,
-              });
+      try {
+        // Path 1: inline matches from extractFromEmail
+        if (emailResult?.shopping_items?.length) {
+          for (const item of emailResult.shopping_items) {
+            if (item.list_item_id && (item.match_confidence ?? 0) >= 0.7) {
+              const listItem = listItemsById[item.list_item_id];
+              await checkOffListItem(item.list_item_id, listItem?.item);
             }
           }
-
-          // Pull the active (not-completed) shopping list to match against.
-          const shoppingList = await db.getShoppingList(householdId);
-          const matchResult = await matchReceiptToList(uniqueItems, shoppingList, { householdId });
-          const toCheckOff = (matchResult.matches || []).filter((m) => m.confidence >= 0.7);
-          await Promise.all(toCheckOff.map((m) => db.completeShoppingItemById(m.list_item_id)));
-          itemsCheckedOff = toCheckOff.length;
-          for (const m of toCheckOff) {
-            actionsTaken.checked_off.push(m.list_item_id);
-            if (m.list_item_name) actionsTaken.checked_off_names.push(m.list_item_name);
-          }
-
-          // Receipt items that didn't match anything on the active list
-          // are deliberately discarded — NOT added to "Previously
-          // purchased" as we used to do. The previous behaviour created
-          // duplicate clutter when the matcher missed a fuzzy variant
-          // (e.g. "Tesco 20% beef mince" vs the list's "beef mince" —
-          // the matcher should have caught it, but on miss it'd add the
-          // verbose receipt-line as a new row, polluting the household's
-          // history with brand/weight-specific noise.) A receipt is
-          // a record of what was bought; if the matcher can't tie
-          // something to an existing list row, the user can manually
-          // add it later if it matters.
-        } catch (err) {
-          console.warn('[inbound-email] Shopping items failed:', err.message);
         }
+        // Path 2: photo-receipt items via the separate matcher
+        if (receiptItems.length) {
+          const matchResult = await matchReceiptToList(receiptItems, shoppingList, { householdId });
+          for (const m of (matchResult.matches || [])) {
+            if ((m.confidence ?? 0) >= 0.7) {
+              await checkOffListItem(m.list_item_id, m.list_item_name);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[inbound-email] Shopping items failed:', err.message);
       }
+
+      // Unmatched receipt items are deliberately discarded — receipts
+      // are records of purchases, not list-building events. If the
+      // matcher missed a fuzzy variant, the user can manually add it
+      // later. The previous "add as completed" behaviour created
+      // verbose duplicates in Previously purchased (e.g. "Tesco 20%
+      // Beef Mince 500g" alongside "beef mince").
 
       // Handle calendar events
       if (emailResult?.events?.length) {

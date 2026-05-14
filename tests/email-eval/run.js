@@ -110,6 +110,22 @@ function checkEmailExpectation(result, expected) {
   failures.push(...checkBlock(result.shopping_items, expected.shopping_items, 'shopping_items'));
   failures.push(...checkBlock(result.events, expected.events, 'events'));
   failures.push(...checkBlock(result.tasks, expected.tasks, 'tasks'));
+
+  // Inline-match assertions: each entry says "for the receipt item
+  // containing X, the AI should set list_item_id = Y with confidence
+  // >= Z." Used to test Tier 2.5's inline matching behaviour.
+  for (const want of expected.inline_matches || []) {
+    const r = want.receipt_contains?.toLowerCase() || '';
+    const minConf = want.min_confidence ?? 0.7;
+    const found = (result.shopping_items || []).find((it) =>
+      JSON.stringify(it).toLowerCase().includes(r) &&
+      it.list_item_id === want.expected_list_item_id &&
+      (it.match_confidence ?? 0) >= minConf
+    );
+    if (!found) {
+      failures.push(`Expected inline match (item~"${want.receipt_contains}" → list_item_id="${want.expected_list_item_id}", conf>=${minConf}) not found`);
+    }
+  }
   return failures;
 }
 
@@ -163,7 +179,8 @@ async function runExtractionFixtures() {
       const result = await extractFromEmail(
         f.input.text || '',
         f.input.subject || '',
-        f.input.members || []
+        f.input.members || [],
+        f.input.context || {}
       );
       if (VERBOSE) console.log('\n    AI:', JSON.stringify(result, null, 2).replace(/\n/g, '\n    '));
       const failures = checkEmailExpectation(result, f.expected);

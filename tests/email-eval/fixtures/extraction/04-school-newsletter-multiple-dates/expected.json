@@ -1,6 +1,6 @@
 {
   "description": "School newsletter listing six discrete dated events. Must extract all of them as calendar events and assign year-group-relevant ones (Year 4 trip) to the matching household member if their year is known.",
-  "email_type_or": ["school", "event", "other"],
+  "email_type": ["school", "event", "other"],
   "shopping_items": {
     "exact_count": 0
   },
