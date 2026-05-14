@@ -1278,7 +1278,7 @@ export default function FamilySetup() {
           admins when blank). Right: pencil-edit button (admins only).
           The edit modal handles name + address + avatar upload in one
           place — replaces the older inline "household name" textfield. */}
-      <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         {success && (
           <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
         )}
@@ -1293,8 +1293,11 @@ export default function FamilySetup() {
             <img
               src={household?.avatar_url || '/family-placeholder.png'}
               alt={household?.name ? `${household.name} household` : 'Household'}
-              className="w-16 h-16 rounded-full object-cover bg-white ring-2 ring-white"
-              style={{ boxShadow: 'rgba(26, 22, 32, 0.06) 0px 2px 8px' }}
+              className="w-24 h-24 rounded-full object-cover ring-2 ring-white"
+              // Backdrop tint so the transparent regions of the
+              // placeholder PNG (it ships with an alpha channel) are
+              // visible against the linen card background.
+              style={{ background: 'var(--cream, #FBF8F3)', boxShadow: 'rgba(26, 22, 32, 0.06) 0px 2px 8px' }}
             />
             {isAdmin && (
               <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -1344,7 +1347,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Members */}
-      <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="font-semibold text-bark mb-4 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Family Members</h2>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-4">
@@ -1463,7 +1466,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Other Family Members (dependents) */}
-      <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Other Family Members</h2>
         <p className="text-xs text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
@@ -1561,7 +1564,7 @@ export default function FamilySetup() {
           yet support (UK and SA each have their own flow inline in the
           member modals; everywhere else sees this card). */}
       {!showSchools && (
-        <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
             <span className="text-base" aria-hidden="true">🌍</span>
             Schools
@@ -1575,7 +1578,7 @@ export default function FamilySetup() {
       )}
 
       {/* Allergies & Dietary Requirements */}
-      <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
           Allergies & Dietary Requirements
