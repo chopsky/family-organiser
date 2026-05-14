@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
-import { IconUsers, IconHome, IconMail } from '../components/Icons';
+import { IconUsers, IconHome, IconMail, IconEdit, IconMapPin, IconCameraSimple } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import { isUkHousehold, isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
@@ -64,7 +64,8 @@ export default function FamilySetup() {
   const isSa = isSouthAfricaHousehold(household);
   const showSchools = hasSchoolsFeature(household);
 
-  const [name, setName]               = useState(household?.name ?? '');
+  // (Household name + address are now edited via the modal — see
+  // hhEdit* state below. The old inline-textfield setup is gone.)
   // Household default reminder time. Previously editable on this page but
   // removed from the UI now that each member sets their own time — the
   // column is kept as the scheduler's fallback for users who haven't set a
@@ -72,13 +73,28 @@ export default function FamilySetup() {
   // never re-edited from the client. Read here only to display in the
   // per-member hint copy.
   const householdReminderTime = household?.reminder_time?.slice(0, 5) ?? '08:00';
-  const [saving, setSaving]           = useState(false);
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
   const [householdAllergies, setHouseholdAllergies] = useState(() => {
     try { return JSON.parse(household?.allergies || '[]'); } catch { return []; }
   });
   const [savingAllergies, setSavingAllergies] = useState(false);
+
+  // ── Household edit modal ────────────────────────────────────────────
+  // Opens from the Household card's pencil icon (or by clicking the
+  // avatar / "Add address" link). Local form state is kept separate
+  // from the live `household` from auth context so a Cancel discards
+  // changes without polluting state. On Save we PATCH /settings, upload
+  // a new avatar if the user picked one, then refresh the auth context.
+  const [showHouseholdEdit, setShowHouseholdEdit] = useState(false);
+  const [hhEditName, setHhEditName] = useState('');
+  const [hhEditAddress, setHhEditAddress] = useState('');
+  const [hhEditAvatarPreview, setHhEditAvatarPreview] = useState(null); // data URL or existing URL
+  const [hhEditAvatarFile, setHhEditAvatarFile] = useState(null); // File when user picked a new image
+  const [hhEditAvatarRemove, setHhEditAvatarRemove] = useState(false); // true if user clicked "Remove photo"
+  const [hhAddressSuggestions, setHhAddressSuggestions] = useState([]);
+  const [hhAddressSearching, setHhAddressSearching] = useState(false);
+  const [hhEditSaving, setHhEditSaving] = useState(false);
 
   const [members, setMembers]         = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
@@ -1009,23 +1025,110 @@ export default function FamilySetup() {
     }
   }
 
-  async function handleSave(e) {
-    e.preventDefault();
+  // ── Household-edit modal: open / save / cancel ─────────────────────
+
+  function openHouseholdEdit() {
+    setHhEditName(household?.name || '');
+    setHhEditAddress(household?.address || '');
+    setHhEditAvatarPreview(household?.avatar_url || null);
+    setHhEditAvatarFile(null);
+    setHhEditAvatarRemove(false);
+    setHhAddressSuggestions([]);
+    setShowHouseholdEdit(true);
+  }
+
+  function closeHouseholdEdit() {
+    setShowHouseholdEdit(false);
+    setHhAddressSuggestions([]);
+  }
+
+  // File picker → preview the picked image immediately (data URL) so
+  // the user sees their choice before saving. The actual upload happens
+  // on Save.
+  function onAvatarFilePicked(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image is too large — please use one under 5 MB.');
+      return;
+    }
+    setHhEditAvatarFile(file);
+    setHhEditAvatarRemove(false);
+    const reader = new FileReader();
+    reader.onload = () => setHhEditAvatarPreview(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  function removeAvatarInEdit() {
+    setHhEditAvatarFile(null);
+    setHhEditAvatarRemove(true);
+    setHhEditAvatarPreview(null);
+  }
+
+  async function handleSaveHousehold() {
     setError(''); setSuccess('');
-    if (!name.trim()) { setError('Household name cannot be empty.'); return; }
-    setSaving(true);
+    if (!hhEditName.trim()) { setError('Household name cannot be empty.'); return; }
+    setHhEditSaving(true);
     try {
+      // 1. Patch name + address.
       const { data } = await api.patch('/settings/settings', {
-        name: name.trim(),
+        name: hhEditName.trim(),
+        address: hhEditAddress.trim() || null,
       });
-      setSuccess('Settings saved!');
-      login({ token, user, household: data.household });
+      let updatedHousehold = data.household;
+
+      // 2. If the user picked a new image, upload it.
+      if (hhEditAvatarFile) {
+        const form = new FormData();
+        form.append('avatar', hhEditAvatarFile);
+        const upRes = await api.post('/household/avatar', form, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (upRes.data?.household) updatedHousehold = upRes.data.household;
+      } else if (hhEditAvatarRemove && household?.avatar_url) {
+        // 3. Or, if the user clicked "Remove photo", clear the avatar.
+        const delRes = await api.delete('/household/avatar');
+        if (delRes.data?.household) updatedHousehold = delRes.data.household;
+      }
+
+      login({ token, user, household: updatedHousehold });
+      setSuccess('Household updated.');
+      setTimeout(() => setSuccess(''), 2500);
+      closeHouseholdEdit();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not save settings.');
+      setError(err.response?.data?.error || 'Could not save household.');
     } finally {
-      setSaving(false);
+      setHhEditSaving(false);
     }
   }
+
+  // Debounced address search — fires 300 ms after the user stops typing
+  // to keep upstream calls (and our proxy's cache hits) lean. Skips
+  // queries shorter than 3 chars (matches the backend's early-return).
+  useEffect(() => {
+    if (!showHouseholdEdit) return;
+    const q = hhEditAddress.trim();
+    if (q.length < 3) { setHhAddressSuggestions([]); return; }
+    // If the current input exactly matches a suggestion the user just
+    // picked, don't re-search — keeps the dropdown closed after a pick.
+    if (hhAddressSuggestions.some((s) => s.label === q)) return;
+    let cancelled = false;
+    setHhAddressSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/household/address-search', { params: { q } });
+        if (!cancelled) setHhAddressSuggestions(data.suggestions || []);
+      } catch {
+        if (!cancelled) setHhAddressSuggestions([]);
+      } finally {
+        if (!cancelled) setHhAddressSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [hhEditAddress, showHouseholdEdit]); // eslint-disable-line react-hooks/exhaustive-deps -- hhAddressSuggestions intentionally omitted to avoid re-searching after picking
 
   function toggleAllergy(key) {
     setHouseholdAllergies(prev =>
@@ -1168,37 +1271,75 @@ export default function FamilySetup() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {!canWrite && <SubscribePrompt message="Subscribe to invite family members and edit profiles" />}
 
-      {/* Household card */}
+      {/* Household identity card.
+          Left: circular avatar (placeholder or uploaded image) — clickable
+          for admins to open the edit modal. Middle: name (display heading)
+          and street address with pin icon (or an "Add address" link for
+          admins when blank). Right: pencil-edit button (admins only).
+          The edit modal handles name + address + avatar upload in one
+          place — replaces the older inline "household name" textfield. */}
       <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="font-semibold text-bark mb-4 flex items-center gap-2"><IconHome className="h-4 w-4" /> Household</h2>
-
-        {isAdmin ? (
-          <form onSubmit={handleSave} className="space-y-4">
-            {success && (
-              <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">{success}</p>
+        {success && (
+          <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
+        )}
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={isAdmin ? openHouseholdEdit : undefined}
+            className={`shrink-0 relative group ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
+            aria-label={isAdmin ? 'Edit household photo' : 'Household photo'}
+            title={isAdmin ? 'Click to edit' : ''}
+          >
+            <img
+              src={household?.avatar_url || '/family-placeholder.png'}
+              alt={household?.name ? `${household.name} household` : 'Household'}
+              className="w-16 h-16 rounded-full object-cover bg-white ring-2 ring-white"
+              style={{ boxShadow: 'rgba(26, 22, 32, 0.06) 0px 2px 8px' }}
+            />
+            {isAdmin && (
+              <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <IconCameraSimple className="h-5 w-5 text-white" />
+              </span>
             )}
-            <div>
-              <label className="text-sm font-medium text-bark block mb-1">Household name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors"
-            >
-              {saving ? 'Saving…' : 'Save changes'}
-            </button>
-          </form>
-        ) : (
-          <div className="space-y-2 text-sm text-cocoa">
-            <p><span className="font-medium text-bark">Name:</span> {household?.name}</p>
-            <p className="text-xs text-cocoa mt-2">Only admins can change household settings.</p>
+          </button>
+
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[22px] font-semibold text-bark truncate" style={{ letterSpacing: '-0.01em' }}>
+              {household?.name || 'Your household'}
+            </h2>
+            {household?.address ? (
+              <p className="text-sm text-cocoa flex items-center gap-1.5 mt-0.5">
+                <IconMapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{household.address}</span>
+              </p>
+            ) : isAdmin ? (
+              <button
+                type="button"
+                onClick={openHouseholdEdit}
+                className="text-sm text-plum hover:underline flex items-center gap-1.5 mt-0.5"
+              >
+                <IconMapPin className="h-3.5 w-3.5" />
+                Add your home address
+              </button>
+            ) : (
+              <p className="text-xs text-cocoa mt-1">No address set.</p>
+            )}
           </div>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={openHouseholdEdit}
+              className="shrink-0 inline-flex items-center gap-1.5 text-sm text-cocoa hover:text-bark transition-colors px-2 py-1"
+              title="Edit household"
+            >
+              <IconEdit className="h-4 w-4" />
+              <span className="hidden sm:inline">Edit</span>
+            </button>
+          )}
+        </div>
+        {!isAdmin && (
+          <p className="text-xs text-cocoa mt-3">Only admins can change household details.</p>
         )}
       </div>
 
@@ -1489,6 +1630,145 @@ export default function FamilySetup() {
       </div>
 
       {/* Add Dependent Modal */}
+      {/* Household edit modal — name + address (with Photon autocomplete)
+          + avatar upload. Backdrop click closes, Esc handled by the
+          browser's natural button focus. Submit either patches settings
+          and uploads the new avatar (if any) or clears it (if user
+          tapped Remove photo). */}
+      {showHouseholdEdit && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={closeHouseholdEdit}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-bark">Edit household</h2>
+              <button onClick={closeHouseholdEdit} className="text-cocoa hover:text-bark p-1" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* Avatar preview + picker */}
+              <div className="flex flex-col items-center gap-3">
+                <label className="relative cursor-pointer group">
+                  <img
+                    src={hhEditAvatarPreview || '/family-placeholder.png'}
+                    alt="Household preview"
+                    className="w-24 h-24 rounded-full object-cover bg-white ring-2 ring-white"
+                    style={{ boxShadow: 'rgba(26, 22, 32, 0.08) 0px 4px 12px' }}
+                  />
+                  <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <IconCameraSimple className="h-7 w-7 text-white" />
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => onAvatarFilePicked(e.target.files?.[0])}
+                  />
+                </label>
+                <div className="flex items-center gap-3 text-xs">
+                  <label className="text-plum hover:underline cursor-pointer">
+                    Choose photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => onAvatarFilePicked(e.target.files?.[0])}
+                    />
+                  </label>
+                  {(household?.avatar_url || hhEditAvatarPreview) && (
+                    <>
+                      <span className="text-cream-border">·</span>
+                      <button
+                        type="button"
+                        onClick={removeAvatarInEdit}
+                        className="text-coral hover:underline"
+                      >
+                        Remove photo
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Household name</label>
+                <input
+                  type="text"
+                  value={hhEditName}
+                  onChange={(e) => setHhEditName(e.target.value)}
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  placeholder="e.g. The Smiths"
+                  autoFocus
+                />
+              </div>
+
+              {/* Address with autocomplete */}
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Home address</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={hhEditAddress}
+                    onChange={(e) => setHhEditAddress(e.target.value)}
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                    placeholder="Start typing your street address…"
+                    autoComplete="off"
+                  />
+                  {hhAddressSearching && (
+                    <span className="absolute right-3 top-2.5 text-xs text-cocoa">Searching…</span>
+                  )}
+                  {hhAddressSuggestions.length > 0 && (
+                    <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-56 overflow-y-auto shadow-lg">
+                      {hhAddressSuggestions.map((s) => (
+                        <li key={s.id || s.label}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHhEditAddress(s.label);
+                              setHhAddressSuggestions([]);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-bark hover:bg-cream transition-colors"
+                          >
+                            {s.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="text-xs text-cocoa mt-1">Used for local-area suggestions (weather, nearby places). Optional.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={closeHouseholdEdit}
+                className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveHousehold}
+                disabled={hhEditSaving}
+                className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors"
+              >
+                {hhEditSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddDependent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAddDependent(false)}>
           <div className="absolute inset-0 bg-black/40" />

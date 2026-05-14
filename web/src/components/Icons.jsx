@@ -172,6 +172,18 @@ export function IconX(p) {
 // always have a one-click path into the Help centre. Geometry matches
 // Lucide's life-buoy (outer ring + inner ring + four diagonal "rope"
 // segments at NE/NW/SE/SW).
+export function IconEdit(p) {
+  return <Icon {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></Icon>;
+}
+
+export function IconMapPin(p) {
+  return <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></Icon>;
+}
+
+export function IconCameraSimple(p) {
+  return <Icon {...p}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></Icon>;
+}
+
 export function IconHelp(p) {
   return (
     <Icon {...p}>

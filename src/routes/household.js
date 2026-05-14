@@ -52,7 +52,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * Body: { name?: string, reminder_time?: string, timezone?: string }
  */
 router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, reminder_time, timezone, allergies, trial_emails_enabled, country } = req.body;
+  const { name, reminder_time, timezone, allergies, trial_emails_enabled, country, address } = req.body;
   const updates = {};
 
   if (name !== undefined) updates.name = name.trim();
@@ -69,6 +69,12 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   if (country !== undefined) {
     const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'ZA', 'OTHER'];
     if (ALLOWED_COUNTRIES.includes(country)) updates.country = country;
+  }
+  // Street address — free-text, typically populated via the Photon
+  // autocomplete on the edit modal. Trimmed; empty string treated as null.
+  if (address !== undefined) {
+    const trimmed = (address || '').trim();
+    updates.address = trimmed.length ? trimmed.substring(0, 500) : null;
   }
 
   if (!Object.keys(updates).length) {
@@ -563,6 +569,131 @@ router.post('/regenerate-email-address', requireAuth, requireHousehold, requireA
   } catch (err) {
     console.error('POST /api/household/regenerate-email-address error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/household/avatar
+ *
+ * Upload a household profile photo. Stored in the same `avatars`
+ * Supabase Storage bucket as user avatars, but at a household-scoped
+ * path (`<householdId>/household.<ext>`) so it doesn't clash with
+ * individual member avatars. Admin only — household identity is a
+ * household-level concern, not personal.
+ */
+router.post('/avatar', requireAuth, requireHousehold, requireAdmin, avatarUpload.single('avatar'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image uploaded. Use field name "avatar".' });
+  }
+  try {
+    const ext = path.extname(req.file.originalname || '.jpg').toLowerCase() || '.jpg';
+    const storagePath = `${req.householdId}/household${ext}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('avatars')
+      .upload(storagePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+    if (uploadError) {
+      console.error('Household avatar upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload image.' });
+    }
+
+    const { data: urlData } = supabaseAdmin.storage.from('avatars').getPublicUrl(storagePath);
+    // Cache-buster so browsers pick up the new image immediately.
+    const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+    const updated = await db.updateHouseholdSettings(req.householdId, { avatar_url: avatarUrl });
+    cache.invalidate(`members:${req.householdId}`);
+    return res.json({ avatar_url: updated.avatar_url, household: updated });
+  } catch (err) {
+    console.error('POST /api/household/avatar error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/household/avatar
+ *
+ * Remove the household profile photo (revert to the front-end's
+ * family-placeholder.png fallback). Best-effort: storage delete is
+ * non-fatal so a missing object doesn't block the DB clear.
+ */
+router.delete('/avatar', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    const { data: files } = await supabaseAdmin.storage.from('avatars').list(req.householdId, {
+      prefix: 'household',
+    });
+    if (files?.length) {
+      await supabaseAdmin.storage.from('avatars').remove(files.map((f) => `${req.householdId}/${f.name}`));
+    }
+    const updated = await db.updateHouseholdSettings(req.householdId, { avatar_url: null });
+    cache.invalidate(`members:${req.householdId}`);
+    return res.json({ avatar_url: null, household: updated });
+  } catch (err) {
+    console.error('DELETE /api/household/avatar error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/household/address-search?q=<text>
+ *
+ * Thin proxy to Photon (OSM-based) for street-address autocomplete.
+ * Proxied (rather than called direct from the browser) for three
+ * reasons: (1) attaches our User-Agent so we don't fingerprint as a
+ * random browser, (2) lets us swap providers later without touching
+ * the frontend, (3) caches identical queries briefly to reduce upstream
+ * load. Free, no API key. Limited to 8 suggestions.
+ *
+ * Returns: { suggestions: [{ id, label, lat, lon }] }
+ */
+router.get('/address-search', requireAuth, requireHousehold, async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 3) return res.json({ suggestions: [] });
+
+  // Brief in-memory cache: same query within 60s reuses the same response.
+  const cacheKey = `address-search:${q.toLowerCase()}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&osm_tag=place&osm_tag=highway`;
+    const upstream = await fetch(url, {
+      headers: { 'User-Agent': 'Housemait (family-organiser@housemait.com)' },
+    });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: 'Address search unavailable.' });
+    }
+    const data = await upstream.json();
+    const suggestions = (data.features || []).map((f) => {
+      const p = f.properties || {};
+      // Build a "Street, City, Country"-ish label from whatever Photon returned.
+      // Photon's properties vary by result type — name (place name), street,
+      // housenumber, city, postcode, country. Format gracefully.
+      const lineParts = [];
+      if (p.name) lineParts.push(p.housenumber ? `${p.housenumber} ${p.name}` : p.name);
+      if (p.street && p.street !== p.name) lineParts.push(p.housenumber ? `${p.housenumber} ${p.street}` : p.street);
+      if (p.city || p.town || p.village) lineParts.push(p.city || p.town || p.village);
+      if (p.postcode) lineParts.push(p.postcode);
+      if (p.country) lineParts.push(p.country);
+      const label = lineParts.join(', ');
+      const [lon, lat] = f.geometry?.coordinates || [];
+      return {
+        id: `${p.osm_type || ''}-${p.osm_id || ''}`,
+        label: label || p.name || 'Unknown',
+        lat: lat ?? null,
+        lon: lon ?? null,
+      };
+    }).filter((s) => s.label && s.label.length > 1);
+
+    const payload = { suggestions };
+    cache.set(cacheKey, payload, 60);
+    return res.json(payload);
+  } catch (err) {
+    console.error('GET /api/household/address-search error:', err);
+    return res.status(502).json({ error: 'Address search unavailable.' });
   }
 });
 
