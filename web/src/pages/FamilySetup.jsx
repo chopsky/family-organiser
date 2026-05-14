@@ -153,6 +153,11 @@ export default function FamilySetup() {
   const [profileReminderTime, setProfileReminderTime] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  // Separate flag for the household-card avatar quick-upload (different
+  // from the per-member uploadingAvatar above). Lets us overlay a
+  // loading state on the household photo without colliding with a
+  // simultaneous member-profile upload.
+  const [uploadingHouseholdAvatar, setUploadingHouseholdAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSchoolId, setProfileSchoolId] = useState(null);
   // Edit-modal mirror of the add-dependent flow's `depAttendsSchool` toggle.
@@ -1062,6 +1067,41 @@ export default function FamilySetup() {
     reader.readAsDataURL(file);
   }
 
+  // Direct-from-card avatar upload. Clicking the household photo on
+  // the FamilySetup page triggers a file picker (via the wrapping
+  // <label>), and the file is uploaded immediately. The bigger
+  // edit-everything modal stays available behind the Edit button for
+  // changing the household name + address.
+  async function handleDirectHouseholdAvatarUpload(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image is too large — please use one under 5 MB.');
+      return;
+    }
+    setUploadingHouseholdAvatar(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('avatar', file);
+      const { data } = await api.post('/household/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (data?.household) {
+        login({ token, user, household: data.household });
+      }
+      setSuccess('Household photo updated.');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not upload photo.');
+    } finally {
+      setUploadingHouseholdAvatar(false);
+    }
+  }
+
   function removeAvatarInEdit() {
     setHhEditAvatarFile(null);
     setHhEditAvatarRemove(true);
@@ -1283,24 +1323,45 @@ export default function FamilySetup() {
           <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
         )}
         <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={isAdmin ? openHouseholdEdit : undefined}
-            className={`shrink-0 relative group ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
-            aria-label={isAdmin ? 'Edit household photo' : 'Household photo'}
-            title={isAdmin ? 'Click to edit' : ''}
+          {/* Clicking the avatar triggers the file picker directly via
+              the wrapping <label> + hidden input — no modal in the way.
+              The Edit button to the right of the household name still
+              opens the modal for changing name + address. */}
+          <label
+            className={`shrink-0 relative group ${isAdmin && !uploadingHouseholdAvatar ? 'cursor-pointer' : 'cursor-default'}`}
+            aria-label={isAdmin ? 'Change household photo' : 'Household photo'}
+            title={isAdmin ? 'Click to change photo' : ''}
           >
             <img
               src={household?.avatar_url || '/family-placeholder2.png'}
               alt={household?.name ? `${household.name} household` : 'Household'}
-              className="w-28 h-28 rounded-full object-cover ring-2 ring-white"
+              className={`w-28 h-28 rounded-full object-cover ring-2 ring-white transition-opacity ${uploadingHouseholdAvatar ? 'opacity-60' : ''}`}
             />
             {isAdmin && (
-              <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <IconCameraSimple className="h-5 w-5 text-white" />
+              <span className={`absolute inset-0 rounded-full bg-bark/0 ${uploadingHouseholdAvatar ? 'bg-bark/30' : 'group-hover:bg-bark/30'} transition-colors flex items-center justify-center ${uploadingHouseholdAvatar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                {uploadingHouseholdAvatar ? (
+                  <span className="text-white text-xs font-medium">Uploading…</span>
+                ) : (
+                  <IconCameraSimple className="h-5 w-5 text-white" />
+                )}
               </span>
             )}
-          </button>
+            {isAdmin && (
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingHouseholdAvatar}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleDirectHouseholdAvatarUpload(file);
+                  // Reset the input so the same file can be re-picked
+                  // immediately (e.g. user picks wrong, picks again).
+                  e.target.value = '';
+                }}
+                className="sr-only"
+              />
+            )}
+          </label>
 
           <div className="flex-1 min-w-0">
             <h2 className="text-[22px] font-semibold text-bark truncate" style={{ letterSpacing: '-0.01em' }}>
