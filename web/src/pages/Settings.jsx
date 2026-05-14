@@ -1568,13 +1568,7 @@ export default function Settings() {
                 <path d="m22 7-10 6L2 7"/>
               </svg>
             )}
-            <span>
-              {accountInfo.email && <span className="text-bark">{accountInfo.email}</span>}
-              {accountInfo.auth_provider && accountInfo.email && <span className="text-cocoa"> · </span>}
-              {accountInfo.auth_provider === 'google' && 'via Google'}
-              {accountInfo.auth_provider === 'apple' && 'via Apple'}
-              {accountInfo.auth_provider === 'email' && 'email + password'}
-            </span>
+            {accountInfo.email && <span className="text-bark">{accountInfo.email}</span>}
           </div>
         )}
       </div>
