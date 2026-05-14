@@ -7,6 +7,7 @@ const { supabaseAdmin } = require('../db/client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const email = require('../services/email');
 const cache = require('../services/cache');
+const { validateEmailAlias } = require('../utils/email-alias');
 
 const router = Router();
 
@@ -568,6 +569,116 @@ router.post('/regenerate-email-address', requireAuth, requireHousehold, requireA
     });
   } catch (err) {
     console.error('POST /api/household/regenerate-email-address error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Inbound email alias + sender allowlist ─────────────────────────
+//
+// The alias replaces the hard-to-remember hex token with a memorable
+// "<slug>@inbound.housemait.com" address. The sender allowlist gates
+// who is allowed to send mail to that address (or to the long token)
+// — prevents the inbound channel becoming a spam vector if either
+// address leaks. See migration-inbound-email-alias-senders.sql for
+// schema notes.
+
+/**
+ * GET /api/household/email-alias/availability?alias=<x>
+ *
+ * Returns { available: boolean, reason?: string }. Used by the
+ * Settings UI to show real-time feedback as the admin types a new
+ * alias. The household's *own* current alias counts as available
+ * so the input doesn't show "already taken" against itself.
+ */
+router.get('/email-alias/availability', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const raw = String(req.query.alias || '');
+    const v = validateEmailAlias(raw);
+    if (!v.ok) return res.json({ available: false, reason: v.reason });
+    const available = await db.isEmailAliasAvailable(v.normalised, req.householdId);
+    return res.json({ available, normalised: v.normalised, reason: available ? null : 'That alias is already taken.' });
+  } catch (err) {
+    console.error('GET /api/household/email-alias/availability error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/household/email-alias
+ * Body: { alias: string | null }   (null clears the alias)
+ *
+ * Admin only. Returns the updated household row so the frontend can
+ * refresh its auth context.
+ */
+router.patch('/email-alias', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    const { alias } = req.body || {};
+    if (alias === null || alias === '') {
+      const updated = await db.setHouseholdEmailAlias(req.householdId, null);
+      return res.json({ household: updated });
+    }
+    const v = validateEmailAlias(alias);
+    if (!v.ok) return res.status(400).json({ error: v.reason });
+    const available = await db.isEmailAliasAvailable(v.normalised, req.householdId);
+    if (!available) return res.status(409).json({ error: 'That alias is already taken.' });
+    const updated = await db.setHouseholdEmailAlias(req.householdId, v.normalised);
+    return res.json({ household: updated });
+  } catch (err) {
+    // 23505 is Postgres unique_violation — race between availability
+    // check and update. Surface as 409 same as a direct collision.
+    if (err.code === '23505') return res.status(409).json({ error: 'That alias was just claimed by someone else. Try another.' });
+    console.error('PATCH /api/household/email-alias error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/household/inbound-senders
+ * Returns { senders: [...] }. Any household member can read this.
+ */
+router.get('/inbound-senders', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const senders = await db.getInboundSenders(req.householdId);
+    return res.json({ senders });
+  } catch (err) {
+    console.error('GET /api/household/inbound-senders error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/household/inbound-senders
+ * Body: { email: string }   Admin only.
+ *
+ * Lightweight email-format validation here; full DKIM/SPF verification
+ * is the responsibility of Postmark on the upstream side. Duplicates
+ * (same email already on the household's list) return 409.
+ */
+router.post('/inbound-senders', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    const raw = String(req.body?.email || '').trim();
+    if (!raw || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw)) {
+      return res.status(400).json({ error: 'Please provide a valid email address.' });
+    }
+    const sender = await db.addInboundSender(req.householdId, raw, req.user.id);
+    return res.status(201).json({ sender });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'That email is already on the allowlist.' });
+    console.error('POST /api/household/inbound-senders error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/household/inbound-senders/:id
+ * Admin only.
+ */
+router.delete('/inbound-senders/:id', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    await db.deleteInboundSender(req.params.id, req.householdId);
+    return res.json({ message: 'Sender removed.' });
+  } catch (err) {
+    console.error('DELETE /api/household/inbound-senders/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -25,15 +25,32 @@ const inboundLimiter = rateLimit({
 });
 
 /**
- * Parse the inbound email token from the To address.
- * Expected format: {token}@inbound.housemait.com
+ * Parse the local part of the To address. Could be either:
+ *   - A 12-char hex token (legacy/backup): "74e142d0586a@inbound.housemait.com"
+ *   - A memorable alias: "shapiro@inbound.housemait.com"
+ * We don't decide here which one it is — return both candidates and
+ * let the household lookup try each. (No alias-format check at parse
+ * time so a typo'd alias still resolves to "household not found"
+ * instead of "couldn't parse address".)
  */
-function parseTokenFromAddress(toAddress) {
+function parseLocalPart(toAddress) {
   if (!toAddress) return null;
   const emailMatch = toAddress.match(/<([^>]+)>/) || [null, toAddress];
   const email = (emailMatch[1] || '').toLowerCase().trim();
-  const match = email.match(/^([a-f0-9]+)@/);
+  const match = email.match(/^([^@]+)@/);
   return match ? match[1] : null;
+}
+
+/**
+ * Normalise a "From" header to just the email part.
+ * Postmark gives us either "Name <addr@host>" or "addr@host"
+ * (or even ToFull[0].Email when the field is present). Extract the
+ * lowercased local-at-host string.
+ */
+function parseFromAddress(rawFrom) {
+  if (!rawFrom) return '';
+  const m = String(rawFrom).match(/<([^>]+)>/);
+  return (m ? m[1] : String(rawFrom)).trim().toLowerCase();
 }
 
 /**
@@ -52,25 +69,54 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
     let householdId = null;
 
     try {
-      // Extract token from To address
+      // Extract local part of the To address
       const toAddress = req.body.ToFull?.[0]?.Email || req.body.To || '';
-      const token = parseTokenFromAddress(toAddress);
+      const localPart = parseLocalPart(toAddress);
 
-      if (!token) {
-        console.warn('[inbound-email] No valid token found in To:', toAddress);
+      if (!localPart) {
+        console.warn('[inbound-email] Could not parse To:', toAddress);
         return;
       }
 
-      // Look up household
-      const household = await db.getHouseholdByInboundToken(token);
+      // Resolve to a household. Try the alias path first (cheap UNIQUE
+      // lookup), fall back to the legacy hex-token path. We accept both
+      // so existing households with no alias set still work, and so
+      // anyone who saved the long token in their contacts isn't broken
+      // by switching to an alias later.
+      let household = await db.getHouseholdByEmailAlias(localPart);
       if (!household) {
-        console.warn('[inbound-email] No household found for token:', token);
+        household = await db.getHouseholdByInboundToken(localPart);
+      }
+      if (!household) {
+        console.warn('[inbound-email] No household found for local part:', localPart);
         return;
       }
       householdId = household.id;
 
       // Extract email metadata
       const { text, images, subject, from } = extractEmailContent(req.body);
+      const fromAddress = parseFromAddress(from);
+
+      // SENDER ALLOWLIST. Mail is only processed when the From address
+      // is on the household's allowlist. This stops accidental
+      // disclosure of either address (alias or long token) from
+      // turning into a spam vector — strangers can knock but only
+      // configured family inboxes get through. We still create a
+      // log row so admins can see rejected attempts.
+      const allowed = await db.isInboundSenderAllowed(householdId, fromAddress);
+      if (!allowed) {
+        console.warn('[inbound-email] Rejected: sender not on allowlist —', fromAddress, 'for household', householdId);
+        try {
+          const rejectedLog = await db.createInboundEmailLog(householdId, from, subject);
+          await db.updateInboundEmailLog(rejectedLog.id, {
+            status: 'rejected',
+            error_message: `Sender ${fromAddress} not on this household's allowlist.`,
+          });
+        } catch (e) {
+          console.warn('[inbound-email] could not log rejection:', e.message);
+        }
+        return;
+      }
 
       // Check for duplicate (same subject + sender within 1 hour)
       const isDuplicate = await db.checkDuplicateEmail(householdId, from, subject, 60);
@@ -79,9 +125,11 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         return;
       }
 
-      // Create log entry
+      // Create log entry + stamp last_used_at on the sender so admins
+      // can distinguish active allowlist entries from forgotten ones.
       const log = await db.createInboundEmailLog(householdId, from, subject);
       logId = log.id;
+      db.touchInboundSender(householdId, fromAddress).catch(() => {});
 
       await db.updateInboundEmailLog(logId, { status: 'processing' });
 

@@ -3356,6 +3356,111 @@ async function getHouseholdByInboundToken(token, db = supabase) {
   return data || null;
 }
 
+// Look up a household by its user-chosen email alias. Stored
+// lowercase per the validator; queries here go through ilike so a
+// caller that passes mixed case still matches. Returns null when no
+// match (rather than throwing) so the webhook can fall back to the
+// token path.
+async function getHouseholdByEmailAlias(alias, db = supabase) {
+  if (!alias) return null;
+  const { data, error } = await db
+    .from('households')
+    .select()
+    .ilike('email_alias', String(alias).trim())
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+// Update a household's email alias. Caller is responsible for
+// validating the format/reserved-list (see utils/email-alias) before
+// invoking. Throws on UNIQUE-constraint violation (let the route
+// surface a clean "already taken" message).
+async function setHouseholdEmailAlias(householdId, alias, db = supabase) {
+  const value = alias == null ? null : String(alias).trim().toLowerCase() || null;
+  const { data, error } = await db
+    .from('households')
+    .update({ email_alias: value })
+    .eq('id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function isEmailAliasAvailable(alias, householdId = null, db = supabase) {
+  if (!alias) return false;
+  let query = db
+    .from('households')
+    .select('id')
+    .ilike('email_alias', String(alias).trim());
+  if (householdId) query = query.neq('id', householdId); // allow re-setting your own
+  const { data, error } = await query.limit(1);
+  if (error) throw error;
+  return (data || []).length === 0;
+}
+
+// Inbound senders allowlist — only emails on this list can have their
+// forwarded mail processed for the household. Backfill populated this
+// from existing member emails at migration time; new entries are
+// added via the Settings UI.
+async function getInboundSenders(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('household_inbound_senders')
+    .select()
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function addInboundSender(householdId, email, addedBy, db = supabase) {
+  const normalised = String(email || '').trim().toLowerCase();
+  if (!normalised) throw new Error('Email is required.');
+  const { data, error } = await db
+    .from('household_inbound_senders')
+    .insert({ household_id: householdId, email: normalised, added_by: addedBy })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteInboundSender(senderId, householdId, db = supabase) {
+  const { error } = await db
+    .from('household_inbound_senders')
+    .delete()
+    .eq('id', senderId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function isInboundSenderAllowed(householdId, email, db = supabase) {
+  const normalised = String(email || '').trim().toLowerCase();
+  if (!normalised) return false;
+  const { data, error } = await db
+    .from('household_inbound_senders')
+    .select('id')
+    .eq('household_id', householdId)
+    .ilike('email', normalised)
+    .limit(1);
+  if (error) throw error;
+  return (data || []).length > 0;
+}
+
+// Best-effort: stamp last_used_at on a sender after we successfully
+// processed mail from them. Used by the admin page to show "active"
+// addresses vs ones added once and never used.
+async function touchInboundSender(householdId, email, db = supabase) {
+  const normalised = String(email || '').trim().toLowerCase();
+  if (!normalised) return;
+  await db
+    .from('household_inbound_senders')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('household_id', householdId)
+    .ilike('email', normalised);
+}
+
 async function createInboundEmailLog(householdId, fromEmail, subject, db = supabase) {
   const { data, error } = await db
     .from('inbound_email_log')
@@ -4518,6 +4623,14 @@ module.exports = {
   getUserUsageStats,
   // Inbound email
   getHouseholdByInboundToken,
+  getHouseholdByEmailAlias,
+  setHouseholdEmailAlias,
+  isEmailAliasAvailable,
+  getInboundSenders,
+  addInboundSender,
+  deleteInboundSender,
+  isInboundSenderAllowed,
+  touchInboundSender,
   createInboundEmailLog,
   updateInboundEmailLog,
   getInboundEmailLogByUndoToken,

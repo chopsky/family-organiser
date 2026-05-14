@@ -255,6 +255,17 @@ export default function Settings() {
   const [receiptEmail, setReceiptEmail] = useState('');
   const [receiptCopied, setReceiptCopied] = useState(false);
   const [regeneratingReceipt, setRegeneratingReceipt] = useState(false);
+  // Alias editor state
+  const [aliasEditing, setAliasEditing] = useState(false);
+  const [aliasInput, setAliasInput] = useState('');
+  const [aliasAvailability, setAliasAvailability] = useState(null); // { available, reason? } | null
+  const [aliasSaving, setAliasSaving] = useState(false);
+  const [aliasError, setAliasError] = useState('');
+  // Sender allowlist state
+  const [senders, setSenders] = useState([]);
+  const [senderInput, setSenderInput] = useState('');
+  const [senderAdding, setSenderAdding] = useState(false);
+  const [senderError, setSenderError] = useState('');
 
   // Edit profile state
   const [editingProfile, setEditingProfile] = useState(false);
@@ -767,19 +778,30 @@ export default function Settings() {
     }
   }
 
-  // Build receipt email address from household token — fetch fresh if not in context
+  // Build the user-facing inbound address. Prefer the household's
+  // chosen alias if it's set; fall back to the long hex token. The
+  // token always works as a backup even when an alias is configured.
   useEffect(() => {
-    if (household?.inbound_email_token) {
-      setReceiptEmail(`${household.inbound_email_token}@inbound.housemait.com`);
+    const local = household?.email_alias || household?.inbound_email_token;
+    if (local) {
+      setReceiptEmail(`${local}@inbound.housemait.com`);
     } else {
-      // Token might not be in the cached auth context — fetch fresh from API
+      // Cache might not have the household with these fields yet — fetch fresh.
       api.get('/household').then(({ data }) => {
-        if (data.household?.inbound_email_token) {
-          setReceiptEmail(`${data.household.inbound_email_token}@inbound.housemait.com`);
-        }
+        const fallback = data.household?.email_alias || data.household?.inbound_email_token;
+        if (fallback) setReceiptEmail(`${fallback}@inbound.housemait.com`);
       }).catch(() => {});
     }
-  }, [household?.inbound_email_token]);
+  }, [household?.email_alias, household?.inbound_email_token]);
+
+  // Load the sender allowlist for this household. Cheap query, but
+  // we only fetch it once per Settings mount — the list is rarely
+  // updated and the Settings page is short-lived.
+  useEffect(() => {
+    api.get('/household/inbound-senders')
+      .then(({ data }) => setSenders(data.senders || []))
+      .catch(() => setSenders([]));
+  }, []);
 
   function handleCopyReceiptEmail() {
     navigator.clipboard.writeText(receiptEmail).then(() => {
@@ -801,6 +823,87 @@ export default function Settings() {
       setError(err.response?.data?.error || 'Could not regenerate receipt email.');
     } finally {
       setRegeneratingReceipt(false);
+    }
+  }
+
+  // ─── Alias editor ────────────────────────────────────────────────
+  // Pull a fresh availability check on every keystroke (debounced).
+  // The backend's GET /email-alias/availability returns both the
+  // format-validity error AND the uniqueness check, so we don't need
+  // to duplicate the regex on the client.
+  useEffect(() => {
+    if (!aliasEditing) return;
+    const trimmed = aliasInput.trim();
+    if (!trimmed) { setAliasAvailability(null); return; }
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/household/email-alias/availability', { params: { alias: trimmed } });
+        setAliasAvailability(data);
+      } catch {
+        setAliasAvailability({ available: false, reason: 'Could not check availability.' });
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [aliasInput, aliasEditing]);
+
+  function openAliasEditor() {
+    setAliasInput(household?.email_alias || '');
+    setAliasAvailability(null);
+    setAliasError('');
+    setAliasEditing(true);
+  }
+
+  async function handleSaveAlias() {
+    const trimmed = aliasInput.trim().toLowerCase();
+    if (!trimmed) {
+      setAliasError('Please enter an alias.');
+      return;
+    }
+    if (aliasAvailability && !aliasAvailability.available) {
+      setAliasError(aliasAvailability.reason || 'That alias is unavailable.');
+      return;
+    }
+    setAliasSaving(true);
+    setAliasError('');
+    try {
+      const { data } = await api.patch('/household/email-alias', { alias: trimmed });
+      // Update auth context so the new alias is reflected everywhere
+      // that reads household from useAuth.
+      login({ token, user, household: data.household });
+      setAliasEditing(false);
+      setSuccess('Alias updated.');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setAliasError(err.response?.data?.error || 'Could not save alias.');
+    } finally {
+      setAliasSaving(false);
+    }
+  }
+
+  async function handleAddSender(e) {
+    e?.preventDefault();
+    const trimmed = senderInput.trim();
+    if (!trimmed) return;
+    setSenderAdding(true);
+    setSenderError('');
+    try {
+      const { data } = await api.post('/household/inbound-senders', { email: trimmed });
+      setSenders((prev) => [...prev, data.sender]);
+      setSenderInput('');
+    } catch (err) {
+      setSenderError(err.response?.data?.error || 'Could not add email.');
+    } finally {
+      setSenderAdding(false);
+    }
+  }
+
+  async function handleDeleteSender(senderId, senderEmail) {
+    if (!window.confirm(`Remove ${senderEmail} from the allowlist? Mail forwarded from this address will be rejected.`)) return;
+    try {
+      await api.delete(`/household/inbound-senders/${senderId}`);
+      setSenders((prev) => prev.filter((s) => s.id !== senderId));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove sender.');
     }
   }
 
@@ -1129,7 +1232,8 @@ export default function Settings() {
           Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
         {receiptEmail ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Inbound address (alias preferred, token fallback) */}
             <div className="flex gap-2">
               <input
                 type="text"
@@ -1145,11 +1249,115 @@ export default function Settings() {
                 {receiptCopied ? 'Copied!' : 'Copy'}
               </button>
             </div>
-            <div className="text-xs text-cocoa space-y-1">
+
+            {/* Alias editor — only admins can change. Inline editor
+                appears under the address input when "Edit" is tapped. */}
+            {isAdmin && !aliasEditing && (
+              <button
+                type="button"
+                onClick={openAliasEditor}
+                className="text-xs font-medium text-plum hover:underline"
+              >
+                {household?.email_alias ? 'Change alias' : 'Pick a memorable alias'}
+              </button>
+            )}
+            {isAdmin && aliasEditing && (
+              <div className="border border-cream-border rounded-xl p-3 bg-white space-y-2">
+                <label className="text-xs font-semibold text-cocoa">Choose an alias</label>
+                <div className="flex items-stretch gap-2">
+                  <input
+                    type="text"
+                    value={aliasInput}
+                    onChange={(e) => setAliasInput(e.target.value.toLowerCase())}
+                    placeholder="e.g. shapiro"
+                    autoFocus
+                    className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <span className="flex items-center text-sm text-cocoa whitespace-nowrap">
+                    @inbound.housemait.com
+                  </span>
+                </div>
+                {aliasAvailability && aliasInput.trim() && (
+                  <p className={`text-xs ${aliasAvailability.available ? 'text-emerald-700' : 'text-coral'}`}>
+                    {aliasAvailability.available
+                      ? `✓ ${aliasAvailability.normalised || aliasInput.trim()} is available`
+                      : `✗ ${aliasAvailability.reason}`}
+                  </p>
+                )}
+                {aliasError && <p className="text-xs text-coral">{aliasError}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSaveAlias}
+                    disabled={aliasSaving || (aliasAvailability && !aliasAvailability.available)}
+                    className="bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white font-medium px-4 py-1.5 rounded-lg text-xs transition-colors"
+                  >
+                    {aliasSaving ? 'Saving…' : 'Save alias'}
+                  </button>
+                  <button
+                    onClick={() => { setAliasEditing(false); setAliasError(''); }}
+                    className="text-xs text-cocoa hover:text-bark"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Sender allowlist — anyone in the household can view; only
+                admins can add/remove. */}
+            <div className="pt-3 border-t border-cream-border">
+              <p className="text-sm font-semibold text-bark mb-2">You can send from these email addresses:</p>
+              {senders.length > 0 ? (
+                <ul className="border border-cream-border rounded-xl divide-y divide-cream-border bg-white">
+                  {senders.map((s) => (
+                    <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
+                      <svg className="h-4 w-4 text-cocoa shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="m22 7-10 6L2 7" />
+                      </svg>
+                      <span className="flex-1 text-sm text-bark truncate">{s.email}</span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSender(s.id, s.email)}
+                          aria-label={`Remove ${s.email}`}
+                          className="text-cocoa hover:text-coral transition-colors p-1"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-cocoa italic">No senders on the allowlist yet — anyone trying to forward to your inbound address will be blocked. Add an email below to get started.</p>
+              )}
+              {isAdmin && (
+                <form onSubmit={handleAddSender} className="mt-3 flex gap-2">
+                  <input
+                    type="email"
+                    value={senderInput}
+                    onChange={(e) => setSenderInput(e.target.value)}
+                    placeholder="another@email.com"
+                    className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <button
+                    type="submit"
+                    disabled={senderAdding || !senderInput.trim()}
+                    className="bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap"
+                  >
+                    {senderAdding ? 'Adding…' : '+ Add email'}
+                  </button>
+                </form>
+              )}
+              {senderError && <p className="text-xs text-coral mt-1">{senderError}</p>}
+            </div>
+
+            <div className="text-xs text-cocoa space-y-1 pt-3 border-t border-cream-border">
               <p className="font-medium text-cocoa">What you can forward:</p>
-              <p>🛒 <strong>Receipts & orders</strong> — Tesco, Amazon, Deliveroo, Uber Eats → items added to shopping list</p>
-              <p>✈️ <strong>Travel bookings</strong> — flights, hotels, train tickets → added to calendar</p>
-              <p>🏫 <strong>School emails</strong> — newsletters, term dates, trips → events added to calendar</p>
+              <p>🛒 <strong>Receipts & orders</strong> — items added to shopping list</p>
+              <p>✈️ <strong>Travel bookings</strong> — flights, hotels → added to calendar</p>
+              <p>🏫 <strong>School emails</strong> — newsletters, term dates → added to calendar</p>
               <p>🏥 <strong>Appointments</strong> — dentist, doctor, vet → added to calendar</p>
               <p>🍽️ <strong>Reservations</strong> — restaurants, events, tickets → added to calendar</p>
             </div>
@@ -1159,7 +1367,7 @@ export default function Settings() {
                 disabled={regeneratingReceipt}
                 className="text-xs text-cocoa hover:text-error transition-colors"
               >
-                {regeneratingReceipt ? 'Regenerating...' : 'Regenerate address'}
+                {regeneratingReceipt ? 'Regenerating...' : 'Regenerate backup address'}
               </button>
             )}
           </div>
