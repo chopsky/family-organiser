@@ -1294,10 +1294,6 @@ export default function FamilySetup() {
               src={household?.avatar_url || '/family-placeholder.png'}
               alt={household?.name ? `${household.name} household` : 'Household'}
               className="w-24 h-24 rounded-full object-cover ring-2 ring-white"
-              // Backdrop tint so the transparent regions of the
-              // placeholder PNG (it ships with an alpha channel) are
-              // visible against the linen card background.
-              style={{ background: 'var(--cream, #FBF8F3)', boxShadow: 'rgba(26, 22, 32, 0.06) 0px 2px 8px' }}
             />
             {isAdmin && (
               <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
