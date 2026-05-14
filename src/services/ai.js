@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { callWithFailover } = require('./ai-client');
 const { getCityFromTimezone } = require('./weather');
+const { messageMentionsLocation } = require('../utils/location-relevance');
 const {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
@@ -54,15 +55,17 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
     : '(no open tasks)';
 
-  // Location prompt: prefer the household's full address when set (gives
-  // proximity-aware suggestions for nearby restaurants/services), fall
-  // back to the timezone-derived city, otherwise empty. The "treat as
-  // confidential" line discourages the model from echoing the full
-  // address back unsolicited — it should reason about proximity but
-  // mention neighbourhoods/distance instead.
+  // Location prompt: we only include the precise household address when
+  // the user's current message actually looks like it needs it (asking
+  // about restaurants, GPs, day trips, etc.). For everything else we
+  // fall back to the timezone-derived city (or empty). This keeps the
+  // user's full street/postcode out of every prompt sent to the AI
+  // provider — sent only on the small subset of messages where it
+  // demonstrably improves recommendations.
   const userCity = getCityFromTimezone(timezone);
+  const needsAddress = address && address.trim() && messageMentionsLocation(message);
   let locationStr;
-  if (address && address.trim()) {
+  if (needsAddress) {
     locationStr = `The family's home address is ${address.trim()}. Use this for proximity-aware recommendations (restaurants, doctors, services nearby). Mention neighbourhoods or rough distance rather than echoing the full street address back. Treat the exact address as confidential.`;
   } else if (userCity) {
     locationStr = `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`;

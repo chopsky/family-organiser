@@ -6,6 +6,7 @@ const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
+const { messageMentionsLocation } = require('../utils/location-relevance');
 
 // Multer config for chat image uploads (10 MB, images only)
 const chatImageUpload = multer({
@@ -60,7 +61,7 @@ function localToUTC(date, time, timezone) {
 /**
  * Build the system prompt with family context injected.
  */
-async function buildSystemPrompt(householdId, householdName, userId) {
+async function buildSystemPrompt(householdId, householdName, userId, currentMessage = '') {
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
@@ -76,14 +77,18 @@ async function buildSystemPrompt(householdId, householdName, userId) {
 
   const currentUser = members.find(m => m.id === userId);
   const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
-  // Location prompt: prefer the household's full address when set, fall
-  // back to the timezone-derived city. With a real address the AI can
-  // recommend nearby restaurants/doctors/services. The confidentiality
-  // hint stops the model echoing the street address back unsolicited.
+  // Location prompt: we only include the precise household address
+  // when this specific message looks like it needs it (asking about
+  // nearby restaurants, GPs, day trips, etc.). For all other turns we
+  // fall back to the timezone-derived city. This keeps the user's full
+  // street/postcode out of every prompt sent to the AI provider —
+  // sent only on the small subset of messages where it demonstrably
+  // improves recommendations. See utils/location-relevance.js.
   const homeAddress = household?.address?.trim();
   const userCity = getCityFromTimezone(userTz);
+  const needsAddress = homeAddress && messageMentionsLocation(currentMessage);
   let locationStr;
-  if (homeAddress) {
+  if (needsAddress) {
     locationStr = `The family's home address is **${homeAddress}**. Use this for proximity-aware recommendations — suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than echoing the full street address back to the user. Treat the exact address as confidential.`;
   } else if (userCity) {
     locationStr = `The family is based in **${userCity}**. Use this for local recommendations — suggest specific places, neighbourhoods, and services in this area.`;
@@ -274,9 +279,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       conversationId = conv.id;
     }
 
-    // Build context-rich system prompt
+    // Build context-rich system prompt. The current user message is
+    // passed in so the prompt builder can gate the precise home
+    // address: it's only added to the prompt when this specific
+    // message asks about somewhere local. See location-relevance.js.
     const household = await db.getHouseholdById(req.householdId);
-    const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id);
+    const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id, message);
 
     // Get recent conversation history for context
     const history = await db.getChatHistory(conversationId, 30);
