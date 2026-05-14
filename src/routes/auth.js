@@ -81,7 +81,16 @@ async function authResponse(user, req = null) {
       created_at: user.created_at || null,
       whatsapp_linked: !!user.whatsapp_linked,
     },
-    household: household ? { id: household.id, name: household.name, join_code: household.join_code, reminder_time: household.reminder_time, country: household.country } : null,
+    // Return the full household row. The previous version returned only
+    // 5 enumerated fields, which silently stripped avatar_url / address /
+    // email_alias / inbound_email_token from the auth-context household
+    // on every refresh-token rotation — making freshly-uploaded
+    // household photos and saved addresses "disappear" on next sync.
+    // The household table has no fields that need redacting (all
+    // contents are household-internal); shipping the full row also
+    // means new columns added in future migrations are surfaced
+    // automatically without touching this serialiser.
+    household: household || null,
   };
 }
 
