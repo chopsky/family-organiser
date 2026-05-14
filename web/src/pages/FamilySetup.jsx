@@ -1291,9 +1291,9 @@ export default function FamilySetup() {
             title={isAdmin ? 'Click to edit' : ''}
           >
             <img
-              src={household?.avatar_url || '/family-placeholder.png'}
+              src={household?.avatar_url || '/family-placeholder2.png'}
               alt={household?.name ? `${household.name} household` : 'Household'}
-              className="w-24 h-24 rounded-full object-cover ring-2 ring-white"
+              className="w-28 h-28 rounded-full object-cover ring-2 ring-white"
             />
             {isAdmin && (
               <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -1658,10 +1658,9 @@ export default function FamilySetup() {
               <div className="flex flex-col items-center gap-3">
                 <label className="relative cursor-pointer group">
                   <img
-                    src={hhEditAvatarPreview || '/family-placeholder.png'}
+                    src={hhEditAvatarPreview || '/family-placeholder2.png'}
                     alt="Household preview"
-                    className="w-24 h-24 rounded-full object-cover bg-white ring-2 ring-white"
-                    style={{ boxShadow: 'rgba(26, 22, 32, 0.08) 0px 4px 12px' }}
+                    className="w-28 h-28 rounded-full object-cover ring-2 ring-white"
                   />
                   <span className="absolute inset-0 rounded-full bg-bark/0 group-hover:bg-bark/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <IconCameraSimple className="h-7 w-7 text-white" />
