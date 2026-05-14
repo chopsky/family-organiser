@@ -25,6 +25,9 @@ UPCOMING CALENDAR EVENTS (next 12 months):
 OPEN TASKS (not yet completed):
 {{TASKS}}
 
+SCHOOL TERM DATES & CLOSURES (use this for any question about school term, break, or holiday timing — do NOT guess from general knowledge, even if the household sounds like a familiar pattern):
+{{SCHOOL_TERM_DATES}}
+
 You will be given a raw message from a family member. Parse it and return structured data.
 
 CONVERSATION CONTEXT:

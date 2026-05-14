@@ -7,6 +7,7 @@ const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai')
 const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
+const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 
 // Multer config for chat image uploads (10 MB, images only)
 const chatImageUpload = multer({
@@ -75,6 +76,17 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     db.getHouseholdSchools(householdId),
   ]);
 
+  // Fetch term dates for the household's schools so the AI can answer
+  // "when does the current term end?" / "when's the next break?" from
+  // real data instead of hallucinating from training-set patterns.
+  // Without this the bot defaulted to UK May half-term even for SA
+  // households on Herzlia's calendar.
+  const schoolIds = schools.map((s) => s.id);
+  const termDates = schoolIds.length > 0
+    ? await db.getTermDatesBySchoolIds(schoolIds).catch(() => [])
+    : [];
+  const termDatesSummary = summariseSchoolTermDates(schools, termDates);
+
   const currentUser = members.find(m => m.id === userId);
   const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
   // Location prompt: gated entirely on whether the current message
@@ -121,6 +133,12 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
       }
     }
     if (schoolLines.length > 0) schoolsStr = schoolLines.join('\n');
+  }
+  // Append real term-date data (current term, future term boundaries,
+  // upcoming closures) so questions like "when does the current term
+  // end?" resolve from household data, not the model's training set.
+  if (termDatesSummary) {
+    schoolsStr = `${schoolsStr === '(none)' ? '' : `${schoolsStr}\n\n`}TERM DATES & CLOSURES (use these for any question about school term, break, or holiday timing — do NOT guess from general knowledge):\n${termDatesSummary}`;
   }
 
   let prompt = CHAT_ASSISTANT_SYSTEM

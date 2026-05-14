@@ -10,6 +10,7 @@ const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
+const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -906,8 +907,21 @@ async function handleTextMessage(text, user, household) {
   const fullUserForTz = household.members.find(m => m.id === user.id);
   const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
 
+  // School term dates for the household — so "when does the current
+  // term end?" gets a real answer instead of UK May-half-term guesses.
+  // Wrapped in try/await so an undefined return (test mocks, prod
+  // hiccup) degrades to "no schools data" rather than crashing the
+  // whole classify call.
+  let householdSchools = [];
+  try { householdSchools = (await db.getHouseholdSchools(household.id)) || []; } catch {}
+  let termDates = [];
+  if (householdSchools.length) {
+    try { termDates = (await db.getTermDatesBySchoolIds(householdSchools.map((s) => s.id))) || []; } catch {}
+  }
+  const schoolTermDates = summariseSchoolTermDates(householdSchools, termDates);
+
   console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${openTasks.length} open tasks, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address });
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 

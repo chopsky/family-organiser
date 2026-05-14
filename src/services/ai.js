@@ -13,7 +13,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '' } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   // Sender is used so the model can resolve "me/I/my" to the actual person.
@@ -78,7 +78,8 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{NOTES}}/g, notesStr)
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr)
-    .replace(/{{TASKS}}/g, tasksStr);
+    .replace(/{{TASKS}}/g, tasksStr)
+    .replace(/{{SCHOOL_TERM_DATES}}/g, schoolTermDates || '(none)');
 
   // Build message array: prior turns (if any) + current user message.
   // History is expected to be [{ role, content }, ...] in chronological order.
