@@ -67,6 +67,13 @@ async function authResponse(user, req = null) {
       id: user.id,
       name: user.name,
       role: user.role,
+      // The user's own email + auth provider are surfaced to the
+      // frontend (Settings → Account card uses these to show "Signed
+      // in with Google" / "Signed in with email" etc.). Other users'
+      // emails stay private — see the comment in /api/household for
+      // the strict member-only redaction we apply there.
+      email: user.email || null,
+      auth_provider: user.auth_provider || null,
       color_theme: user.color_theme || 'sage',
       avatar_url: user.avatar_url || null,
       isPlatformAdmin: user.is_platform_admin || false,
@@ -118,6 +125,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
         householdId: invite.household_id,
         emailVerified: true,
         role: 'member',
+        authProvider: 'email',
       });
 
       // Apply pre-filled profile fields from invite
@@ -140,6 +148,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
       email: emailLower,
       passwordHash,
       name: name.trim(),
+      authProvider: 'email',
     });
 
     const token = generateToken();
@@ -181,6 +190,14 @@ router.post('/login', requireTurnstile, async (req, res) => {
 
     if (!user.email_verified) {
       return res.status(403).json({ error: 'Please verify your email first.' });
+    }
+
+    // Re-stamp auth_provider so the Settings card always reflects the
+    // latest credential the user actually used. A Google-signup user
+    // who later sets a password will now show "Signed in with email"
+    // after their first password login.
+    if (user.auth_provider !== 'email') {
+      try { await db.updateUser(user.id, { auth_provider: 'email' }); user.auth_provider = 'email'; } catch {}
     }
 
     const response = await authResponse(user, req);
@@ -385,8 +402,27 @@ router.post('/reset-password', async (req, res) => {
 // Lightweight authenticated check. Used by the frontend's visibility-change
 // idle detector to trigger the 401 → refresh flow after long absences.
 
-router.get('/me', requireAuth, (req, res) => {
-  return res.json({ id: req.user.id, name: req.user.name, role: req.user.role });
+router.get('/me', requireAuth, async (req, res) => {
+  // Returns the user's own profile fields including email + auth
+  // provider so the Settings → Account card has what it needs to
+  // show "Signed in with Google" / "Signed in with Apple" / their
+  // email address. We do one fresh DB read here rather than relying
+  // on JWT claims so the response reflects any provider re-stamp
+  // that happened on the user's latest sign-in.
+  try {
+    const fresh = await db.getUserById(req.user.id);
+    if (!fresh) return res.status(404).json({ error: 'User not found' });
+    return res.json({
+      id: fresh.id,
+      name: fresh.name,
+      role: fresh.role,
+      email: fresh.email || null,
+      auth_provider: fresh.auth_provider || null,
+    });
+  } catch (err) {
+    console.error('GET /api/auth/me error:', err);
+    return res.json({ id: req.user.id, name: req.user.name, role: req.user.role });
+  }
 });
 
 // ─── POST /api/auth/mark-onboarded ─────────────────────────────────────────
@@ -935,6 +971,7 @@ router.post('/google', async (req, res) => {
         householdId,
         emailVerified: true,
         role,
+        authProvider: 'google',
       });
 
       if (acceptedInvite) {
@@ -948,6 +985,12 @@ router.post('/google', async (req, res) => {
           user = { ...user, ...profileUpdates };
         }
       }
+    } else if (user.auth_provider !== 'google') {
+      // Existing user signing in via Google — stamp the latest method
+      // so Settings reflects the credential they actually used. A user
+      // who originally signed up with email and now signs in with
+      // Google sees "Signed in with Google" after this.
+      try { await db.updateUser(user.id, { auth_provider: 'google' }); user.auth_provider = 'google'; } catch {}
     }
 
     const response = await authResponse(user, req);
@@ -1029,6 +1072,7 @@ router.post('/apple', async (req, res) => {
         householdId,
         emailVerified: true,
         role: 'member',
+        authProvider: 'apple',
       });
 
       if (acceptedInvite) {
@@ -1042,6 +1086,11 @@ router.post('/apple', async (req, res) => {
           user = { ...user, ...profileUpdates };
         }
       }
+    } else if (user.auth_provider !== 'apple') {
+      // Existing user signing in via Apple — re-stamp to reflect the
+      // latest credential used. See the Google block above for the
+      // rationale.
+      try { await db.updateUser(user.id, { auth_provider: 'apple' }); user.auth_provider = 'apple'; } catch {}
     }
 
     const response = await authResponse(user, req);

@@ -113,17 +113,23 @@ async function getUserByEmail(email, db = supabase) {
   return data || null;
 }
 
-async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member' }, db = supabase) {
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null }, db = supabase) {
+  const row = {
+    email,
+    password_hash: passwordHash,
+    name,
+    household_id: householdId,
+    email_verified: emailVerified,
+    role,
+  };
+  // Stamp how this user joined — read in Settings to show "Signed in
+  // with Google" / "Signed in with Apple" / "Signed in with email".
+  // Optional: callers from older code paths pass nothing and we leave
+  // the column NULL.
+  if (authProvider) row.auth_provider = authProvider;
   const { data, error } = await db
     .from('users')
-    .insert({
-      email,
-      password_hash: passwordHash,
-      name,
-      household_id: householdId,
-      email_verified: emailVerified,
-      role,
-    })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;

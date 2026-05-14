@@ -255,6 +255,11 @@ export default function Settings() {
   const [receiptEmail, setReceiptEmail] = useState('');
   const [receiptCopied, setReceiptCopied] = useState(false);
   const [regeneratingReceipt, setRegeneratingReceipt] = useState(false);
+  // Account card: how the user signs in. Populated from /api/auth/me
+  // on mount so it reflects the latest stamp from the user's most
+  // recent sign-in (including users whose AuthContext cache pre-dates
+  // the auth_provider column existing).
+  const [accountInfo, setAccountInfo] = useState({ email: user?.email || null, auth_provider: user?.auth_provider || null });
   // Alias editor state
   const [aliasEditing, setAliasEditing] = useState(false);
   const [aliasInput, setAliasInput] = useState('');
@@ -801,6 +806,16 @@ export default function Settings() {
     api.get('/household/inbound-senders')
       .then(({ data }) => setSenders(data.senders || []))
       .catch(() => setSenders([]));
+  }, []);
+
+  // Pull fresh account info (email + auth provider) for the Account
+  // card. The AuthContext may still hold a stale user object that
+  // pre-dates the auth_provider column existing; /api/auth/me always
+  // returns the latest DB state.
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(({ data }) => setAccountInfo({ email: data.email || null, auth_provider: data.auth_provider || null }))
+      .catch(() => {});
   }, []);
 
   function handleCopyReceiptEmail() {
@@ -1523,14 +1538,45 @@ export default function Settings() {
         </Link>
       </section>
 
-      {/* Signed in as — sits just above the danger zone so the user has
-          a clear reminder of which account they're about to delete. */}
+      {/* Account card — shows name, role, and HOW the user is signed
+          in. Sits just above the danger zone so the user has a clear
+          reminder of which account they're about to delete. */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="font-semibold text-bark mb-2 flex items-center gap-2"><IconUser className="h-4 w-4" /> You</h2>
+        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUser className="h-4 w-4" /> Account</h2>
         <p className="text-sm text-cocoa">
-          Signed in as <span className="font-medium">{user?.name}</span>
-          <span className="text-cocoa"> ({user?.role})</span>
+          Signed in as <span className="font-medium text-bark">{user?.name}</span>
+          {user?.role && <span> ({user.role})</span>}
         </p>
+        {(accountInfo.email || accountInfo.auth_provider) && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-cocoa">
+            {accountInfo.auth_provider === 'google' && (
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.24 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.11V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
+              </svg>
+            )}
+            {accountInfo.auth_provider === 'apple' && (
+              <svg className="h-4 w-4 shrink-0 text-bark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M16.365 1.43c0 1.14-.49 2.27-1.28 3.07-.84.85-2.22 1.5-3.34 1.42-.14-1.1.43-2.27 1.21-3.06.86-.87 2.32-1.52 3.41-1.43zM21 17.36c-.55 1.22-.81 1.77-1.52 2.84-1 1.5-2.41 3.36-4.16 3.38-1.55.01-1.95-.96-4.05-.95-2.1.01-2.54.96-4.1.95-1.75-.03-3.08-1.7-4.08-3.2C.28 16.18-.05 11.27 1.7 8.58c1.24-1.91 3.2-3.04 5.04-3.04 1.88 0 3.06 1.03 4.6 1.03 1.5 0 2.42-1.03 4.6-1.03 1.65 0 3.4.9 4.65 2.45-4.08 2.24-3.42 8.08.4 9.37z"/>
+              </svg>
+            )}
+            {accountInfo.auth_provider === 'email' && (
+              <svg className="h-4 w-4 shrink-0 text-cocoa" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="m22 7-10 6L2 7"/>
+              </svg>
+            )}
+            <span>
+              {accountInfo.email && <span className="text-bark">{accountInfo.email}</span>}
+              {accountInfo.auth_provider && accountInfo.email && <span className="text-cocoa"> · </span>}
+              {accountInfo.auth_provider === 'google' && 'via Google'}
+              {accountInfo.auth_provider === 'apple' && 'via Apple'}
+              {accountInfo.auth_provider === 'email' && 'email + password'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Danger zone — delete account. Sits above the Log out affordance
