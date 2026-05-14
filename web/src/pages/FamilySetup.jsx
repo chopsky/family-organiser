@@ -1405,7 +1405,7 @@ export default function FamilySetup() {
 
       {/* Members */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="font-semibold text-bark mb-4 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Family Members</h2>
+        <h2 className="text-base md:text-lg font-semibold text-bark mb-4">Family Members</h2>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-4">
             {members.filter(m => m.member_type !== 'dependent').map((m) => {
@@ -1524,7 +1524,7 @@ export default function FamilySetup() {
 
       {/* Other Family Members (dependents) */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="font-semibold text-bark mb-3 flex items-center gap-2"><IconUsers className="h-4 w-4" /> Other Family Members</h2>
+        <h2 className="text-base md:text-lg font-semibold text-bark mb-3">Other Family Members</h2>
         <p className="text-xs text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
           <>
@@ -1622,10 +1622,7 @@ export default function FamilySetup() {
           member modals; everywhere else sees this card). */}
       {!showSchools && (
         <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-          <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
-            <span className="text-base" aria-hidden="true">🌍</span>
-            Schools
-          </h2>
+          <h2 className="text-base md:text-lg font-semibold text-bark mb-1">Schools</h2>
           <p className="text-sm text-cocoa">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries —
@@ -1636,10 +1633,7 @@ export default function FamilySetup() {
 
       {/* Allergies & Dietary Requirements */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="font-semibold text-bark mb-1 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-          Allergies & Dietary Requirements
-        </h2>
+        <h2 className="text-base md:text-lg font-semibold text-bark mb-1">Allergies & Dietary Requirements</h2>
         <p className="text-xs text-cocoa mb-4">Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.</p>
         <div className="flex flex-wrap gap-2">
           {[
