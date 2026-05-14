@@ -56,7 +56,10 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || 'Europe/London';
-    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, sender: currentUser?.name || req.user.name, calendarEvents, tasks: openTasks, timezone: userTz });
+    // Pull household record for the address so location-aware
+    // recommendations have a real starting point, not just timezone.
+    const householdRow = await db.getHouseholdById(req.householdId).catch(() => null);
+    const result = await classify(text.trim(), memberNames, notes, { householdId: req.householdId, userId: req.user.id, sender: currentUser?.name || req.user.name, calendarEvents, tasks: openTasks, timezone: userTz, address: householdRow?.address });
 
     // Strip any leaked JSON action blocks from the response message
     if (result.response_message) {

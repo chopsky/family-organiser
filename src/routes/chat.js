@@ -76,10 +76,20 @@ async function buildSystemPrompt(householdId, householdName, userId) {
 
   const currentUser = members.find(m => m.id === userId);
   const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
+  // Location prompt: prefer the household's full address when set, fall
+  // back to the timezone-derived city. With a real address the AI can
+  // recommend nearby restaurants/doctors/services. The confidentiality
+  // hint stops the model echoing the street address back unsolicited.
+  const homeAddress = household?.address?.trim();
   const userCity = getCityFromTimezone(userTz);
-  const locationStr = userCity
-    ? `The family is based in **${userCity}**. Use this for local recommendations — suggest specific places, neighbourhoods, and services in this area.`
-    : '';
+  let locationStr;
+  if (homeAddress) {
+    locationStr = `The family's home address is **${homeAddress}**. Use this for proximity-aware recommendations — suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than echoing the full street address back to the user. Treat the exact address as confidential.`;
+  } else if (userCity) {
+    locationStr = `The family is based in **${userCity}**. Use this for local recommendations — suggest specific places, neighbourhoods, and services in this area.`;
+  } else {
+    locationStr = '';
+  }
 
   const membersStr = members.map(m => `${m.name}${m.family_role ? ` (${m.family_role})` : ''}`).join(', ') || 'none';
   const householdAllergies = (() => { try { return JSON.parse(household?.allergies || '[]'); } catch { return []; } })();

@@ -12,7 +12,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null } = {}) {
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   // Sender is used so the model can resolve "me/I/my" to the actual person.
@@ -54,10 +54,21 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
     : '(no open tasks)';
 
+  // Location prompt: prefer the household's full address when set (gives
+  // proximity-aware suggestions for nearby restaurants/services), fall
+  // back to the timezone-derived city, otherwise empty. The "treat as
+  // confidential" line discourages the model from echoing the full
+  // address back unsolicited — it should reason about proximity but
+  // mention neighbourhoods/distance instead.
   const userCity = getCityFromTimezone(timezone);
-  const locationStr = userCity
-    ? `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`
-    : '';
+  let locationStr;
+  if (address && address.trim()) {
+    locationStr = `The family's home address is ${address.trim()}. Use this for proximity-aware recommendations (restaurants, doctors, services nearby). Mention neighbourhoods or rough distance rather than echoing the full street address back. Treat the exact address as confidential.`;
+  } else if (userCity) {
+    locationStr = `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`;
+  } else {
+    locationStr = '';
+  }
 
   const systemPrompt = CLASSIFICATION_SYSTEM
     .replace(/{{DATE}}/g, today)
