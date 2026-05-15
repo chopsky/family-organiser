@@ -1406,6 +1406,7 @@ export default function FamilySetup() {
       {/* Members */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Family Members</h2>
+        <p className="text-sm text-cocoa mb-3">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-4">
             {members.filter(m => m.member_type !== 'dependent').map((m) => {
