@@ -618,7 +618,7 @@ export default function Calendar() {
       const endStr = weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       return `${startStr} – ${endStr}`;
     }
-    return selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
   }, [viewMode, currentMonth, selectedDate]);
 
   // ── Items for a given date ─────────────────────────────
@@ -1255,7 +1255,7 @@ export default function Calendar() {
 
       {/* ── Nav row ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <div className="text-lg font-semibold" style={{ fontFamily: 'var(--font-display)' }}>{navigationLabel}</div>
+        <div className="text-base md:text-lg font-semibold" style={{ fontFamily: 'var(--font-display)' }}>{navigationLabel}</div>
         <div className="flex items-center gap-1.5">
           <button
             onClick={navigatePrev}
