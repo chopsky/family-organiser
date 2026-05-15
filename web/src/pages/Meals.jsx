@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
@@ -120,7 +121,17 @@ export default function Meals() {
 // ══════════════════════════════════════════════════════════════════
 
 function MealPlanView({ setError, onSwitchToRecipes }) {
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [weekStart, setWeekStart] = useState(() => {
+    // If Dashboard linked us in with ?open=<cat>&date=<YYYY-MM-DD>, jump to
+    // that week so the picker opens in context.
+    const d = searchParams.get('date');
+    if (d) {
+      const parsed = new Date(d + 'T00:00:00');
+      if (!isNaN(parsed)) return getMonday(parsed);
+    }
+    return getMonday(new Date());
+  });
   const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -129,6 +140,17 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   const [pickerCell, setPickerCell] = useState(null); // { date, category }
   const [editingMeal, setEditingMeal] = useState(null); // for editing existing meal via picker
   const [suggesting, setSuggesting] = useState(false);
+
+  // Auto-open the picker when arriving from Dashboard's empty-slot links.
+  // Consume the params immediately so a refresh doesn't re-open the modal.
+  useEffect(() => {
+    const cat = searchParams.get('open');
+    const date = searchParams.get('date');
+    if (cat && date) {
+      setPickerCell({ date, category: cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase() });
+      setSearchParams({}, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const detailRef = useRef(null);
 

@@ -303,21 +303,19 @@ export default function Dashboard() {
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
   const weekMeals = digest?.weekMeals ?? [];
 
-  // This week's dinners — today + next 3 days
-  const DAY_LABELS_FULL = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  // Today's meals by category
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const weekDinners = Array.from({ length: 4 }, (_, i) => {
-    const d = new Date(now);
-    d.setDate(now.getDate() + i);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const meal = weekMeals.find(m => m.date === dateStr && m.category?.toLowerCase() === 'dinner');
-    return {
-      label: DAY_LABELS_FULL[d.getDay()],
-      dateStr,
-      isToday: dateStr === todayDate,
-      meal,
-    };
-  });
+  const TODAY_MEAL_CATEGORIES = [
+    { key: 'breakfast', label: 'Breakfast' },
+    { key: 'lunch', label: 'Lunch' },
+    { key: 'dinner', label: 'Dinner' },
+    { key: 'snack', label: 'Snack' },
+  ];
+  const todayMeals = TODAY_MEAL_CATEGORIES.map(({ key, label }) => ({
+    key,
+    label,
+    meal: weekMeals.find(m => m.date === todayDate && m.category?.toLowerCase() === key),
+  }));
 
   // Find member info for events
   function getMemberForEvent(ev) {
@@ -518,34 +516,37 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 4 — This week's meals */}
+        {/* Card 4 — Today's meals */}
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-sans font-semibold text-bark">This week's meals</h2>
+            <h2 className="text-lg font-sans font-semibold text-bark">Today's meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
           <div className="space-y-2">
-            {weekDinners.map((day) => (
-              <div
-                key={day.dateStr}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${day.isToday ? 'bg-plum-light' : 'bg-cream'}`}
-              >
-                <span className={`text-[11px] font-bold w-8 shrink-0 ${day.isToday ? 'text-primary' : 'text-cocoa'}`}>
-                  {day.label}
-                </span>
-                {day.meal ? (
+            {todayMeals.map(({ key, label, meal }) => (
+              meal ? (
+                <div key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-plum-light">
+                  <span className="text-[11px] font-bold w-16 shrink-0 text-primary uppercase">{label}</span>
                   <div className="flex-1 flex items-center justify-between min-w-0">
-                    <span className="text-sm font-medium text-bark truncate">{day.meal.meal_name}</span>
-                    {(day.meal.recipe?.prep_time_mins || day.meal.prep_time_mins) && (
+                    <span className="text-sm font-medium text-bark truncate">{meal.meal_name}</span>
+                    {(meal.recipe?.prep_time_mins || meal.prep_time_mins) && (
                       <span className="shrink-0 text-[10px] font-medium text-sage bg-sage-light px-2 py-0.5 rounded-full ml-2">
-                        {day.meal.recipe?.prep_time_mins || day.meal.prep_time_mins} min
+                        {meal.recipe?.prep_time_mins || meal.prep_time_mins} min
                       </span>
                     )}
                   </div>
-                ) : (
-                  <span className="text-sm italic text-cocoa/60">Not planned yet</span>
-                )}
-              </div>
+                </div>
+              ) : (
+                <Link
+                  key={key}
+                  to={`/meals?open=${key}&date=${todayDate}`}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cream hover:bg-plum-light/60 transition-colors"
+                >
+                  <span className="text-[11px] font-bold w-16 shrink-0 text-cocoa uppercase">{label}</span>
+                  <span className="text-sm italic text-cocoa/60 flex-1">Tap to add</span>
+                  <span className="text-cocoa/60 text-lg leading-none">+</span>
+                </Link>
+              )
             ))}
           </div>
         </div>
