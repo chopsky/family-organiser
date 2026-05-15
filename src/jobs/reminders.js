@@ -4,17 +4,49 @@ const whatsapp = require('../services/whatsapp');
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 
 /**
+ * Format an ISO timestamp as HH:mm in the household's timezone.
+ */
+function formatEventTime(iso, tz) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('en-GB', {
+      hour: '2-digit', minute: '2-digit', timeZone: tz, hour12: false,
+    });
+  } catch {
+    return String(iso).slice(11, 16);
+  }
+}
+
+/**
+ * Render the assignee bracket for an event. Multi-assignee events
+ * (events with an `assignees` array) are comma-joined; legacy single-
+ * assignee events fall back to `assigned_to_name`.
+ */
+function formatEventAssignee(ev) {
+  if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
+    return ev.assignees.map(a => a.member_name).filter(Boolean).join(', ');
+  }
+  return ev.assigned_to_name || '';
+}
+
+/**
  * Build the daily reminder text for a single user.
  *
- * @param {object} user        - User row from DB
- * @param {object[]} myTasks   - Tasks assigned to this user (overdue + today)
- * @param {object[]} allTasks  - Tasks assigned to everyone (overdue + today)
- * @param {number} shoppingCount - Number of incomplete shopping items
- * @param {object[]} schoolActivities - School activities for today
+ * Morning digest shape: school activities (if any), today's calendar
+ * events, shopping count. Tasks are intentionally NOT included here —
+ * a separate later-in-day nudge job surfaces overdue + due-today tasks
+ * so the morning message stays focused on what's actually scheduled
+ * for the day.
+ *
+ * @param {object} user                 - User row from DB
+ * @param {object[]} todayEvents        - Calendar events for today
+ *                                        (already filtered + sorted)
+ * @param {number} shoppingCount        - Number of incomplete shopping items
+ * @param {object[]} schoolActivities   - School activities for today
+ * @param {string} [tz='Europe/London'] - Household timezone for time formatting
  * @returns {string}
  */
-function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, schoolActivities) {
-  const today = new Date().toISOString().split('T')[0];
+function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActivities, tz = 'Europe/London') {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -30,37 +62,21 @@ function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, schoo
     lines.push('');
   }
 
-  // Personal tasks
-  if (myTasks.length) {
-    lines.push('📋 *YOUR TASKS:*');
-    for (const t of myTasks) {
-      const overdue = t.due_date < today;
-      const icon = overdue ? '🔴' : '🟡';
-      const daysOverdue = overdue
-        ? Math.floor((new Date(today) - new Date(t.due_date)) / 86400000)
-        : 0;
-      const label = overdue ? ` _(overdue by ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''})_` : ' _(due today)_';
-      const rec = t.recurrence ? ` [${t.recurrence}]` : '';
-      lines.push(`${icon} ${t.title}${rec}${label}`);
+  // Today's calendar events
+  const hasEvents = Array.isArray(todayEvents) && todayEvents.length > 0;
+  if (hasEvents) {
+    lines.push("📅 *TODAY'S EVENTS:*");
+    for (const ev of todayEvents) {
+      const startStr = ev.all_day ? 'All day' : formatEventTime(ev.start_time, tz);
+      const who = formatEventAssignee(ev);
+      lines.push(`• ${startStr} — ${ev.title}${who ? ` _(${who})_` : ''}`);
     }
     lines.push('');
   }
 
-  // Household tasks (everyone)
-  if (allTasks.length) {
-    lines.push('🏠 *HOUSEHOLD TASKS (everyone):*');
-    for (const t of allTasks) {
-      const overdue = t.due_date < today;
-      const icon = overdue ? '🔴' : '🟡';
-      const rec = t.recurrence ? ` [${t.recurrence}]` : '';
-      const label = overdue ? ' _(overdue)_' : ' _(due today)_';
-      lines.push(`${icon} ${t.title}${rec}${label}`);
-    }
-    lines.push('');
-  }
-
-  if (!myTasks.length && !allTasks.length) {
-    lines.push('✅ Nothing due today — enjoy your day!');
+  const hasSchool = Array.isArray(schoolActivities) && schoolActivities.length > 0;
+  if (!hasSchool && !hasEvents) {
+    lines.push('✨ Nothing scheduled today.');
     lines.push('');
   }
 
@@ -75,6 +91,40 @@ function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, schoo
 }
 
 /**
+ * Fetch today's events for a household, filtered the same way the
+ * Dashboard / digest endpoint does: drop public_holiday + birthday
+ * categories (they're noise in a "what's on today" context), dedupe
+ * on (title, start_time) since calendar sync can produce duplicates,
+ * and sort by start_time.
+ */
+async function fetchTodayEvents(householdId, todayStr) {
+  const windowStart = `${todayStr}T00:00:00`;
+  const windowEnd = `${todayStr}T23:59:59`;
+  let events = [];
+  try {
+    events = await db.getCalendarEvents(householdId, windowStart, windowEnd) || [];
+  } catch (e) {
+    console.warn('[reminders] events fetch failed:', e.message);
+    return [];
+  }
+  const filtered = events.filter(e => {
+    const start = e.start_time?.split('T')[0];
+    const end = e.end_time?.split('T')[0];
+    const isToday = start === todayStr || (start <= todayStr && (end || todayStr) >= todayStr);
+    return isToday && e.category !== 'public_holiday' && e.category !== 'birthday';
+  });
+  const seen = new Set();
+  return filtered
+    .filter(e => {
+      const key = `${e.title}|${e.start_time}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+}
+
+/**
  * Send daily reminder to a specific member, or all connected members of a household.
  *
  * @param {string} householdId
@@ -82,17 +132,18 @@ function buildDailyReminderMessage(user, myTasks, allTasks, shoppingCount, schoo
  */
 async function sendDailyReminders(householdId, singleMember) {
   const today = new Date().toISOString().split('T')[0];
+
+  // Fetch household for timezone (used to render event times in the
+  // user's local clock rather than UTC).
+  const household = await db.getHouseholdById(householdId).catch(() => null);
+  const tz = household?.timezone || 'Europe/London';
+
   const shoppingItems = await db.getShoppingList(householdId);
   const shoppingCount = shoppingItems.length;
 
-  // All tasks due today or overdue, assigned to everyone (null)
-  const { data: everyoneTasks } = await require('../db/client').supabaseAdmin
-    .from('tasks')
-    .select()
-    .eq('household_id', householdId)
-    .eq('completed', false)
-    .is('assigned_to', null)
-    .lte('due_date', today);
+  // Today's calendar events — same scope across all recipients in the
+  // household (events are household-wide, not per-member).
+  const todayEvents = await fetchTodayEvents(householdId, today);
 
   const targets = singleMember ? [singleMember] : await db.getHouseholdMembers(householdId);
 
@@ -102,15 +153,6 @@ async function sendDailyReminders(householdId, singleMember) {
       console.log(`[reminders] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
       continue;
     }
-
-    // Tasks assigned specifically to this member, due today or overdue
-    const { data: myTasks } = await require('../db/client').supabaseAdmin
-      .from('tasks')
-      .select()
-      .eq('household_id', householdId)
-      .eq('completed', false)
-      .eq('assigned_to', member.id)
-      .lte('due_date', today);
 
     // Get today's school activities for children in this household
     // Only include if today is during term time (not holidays, half term, INSET, or bank holiday)
@@ -139,10 +181,10 @@ async function sendDailyReminders(householdId, singleMember) {
 
     const message = buildDailyReminderMessage(
       member,
-      myTasks || [],
-      everyoneTasks || [],
+      todayEvents,
       shoppingCount,
-      schoolActivities
+      schoolActivities,
+      tz,
     );
 
     // Send via WhatsApp
