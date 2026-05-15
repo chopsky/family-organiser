@@ -184,7 +184,7 @@ export default function IosSubscribe() {
         <div className="text-center mb-10">
           <h1
             className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: '"Gramatika", Georgia, serif', fontWeight: 600 }}
+            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600 }}
           >
             {copy.headline}
           </h1>
@@ -340,7 +340,7 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
 
       <h2
         className="text-[22px] text-charcoal mb-1"
-        style={{ fontFamily: '"Gramatika", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
+        style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, letterSpacing: '-0.02em' }}
       >
         {subscriptionTitle}
       </h2>
@@ -350,7 +350,7 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
         <div className="flex items-baseline gap-2">
           <span
             className="text-[36px] font-semibold text-charcoal leading-none"
-            style={{ fontFamily: '"Gramatika", Georgia, serif' }}
+            style={{ fontFamily: '"Instrument Serif", Georgia, serif' }}
           >
             {priceString || '—'}
           </span>

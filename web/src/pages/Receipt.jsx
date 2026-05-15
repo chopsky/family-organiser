@@ -60,7 +60,7 @@ export default function Receipt() {
     <div className="max-w-3xl mx-auto space-y-5">
       <h1
         className="flex text-[36px] font-normal leading-none text-bark items-center gap-2"
-        style={{ fontFamily: '"Gramatika", Georgia, "Times New Roman", serif' }}
+        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
       >
         <div
           className="hidden"

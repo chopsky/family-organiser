@@ -14,7 +14,7 @@ export const serifHeading =
 // Apply alongside the serifHeading class:
 //   <h1 className={serifHeading} style={serifHeadingStyle}>...</h1>
 export const serifHeadingStyle = {
-  fontFamily: '"Gramatika", Georgia, "Times New Roman", serif',
+  fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
   color: 'var(--color-bark)',
 };
 
