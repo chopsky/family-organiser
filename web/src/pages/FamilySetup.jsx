@@ -1322,7 +1322,7 @@ export default function FamilySetup() {
         {success && (
           <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
         )}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           {/* Clicking the avatar triggers the file picker directly via
               the wrapping <label> + hidden input — no modal in the way.
               The Edit button to the right of the household name still
@@ -1335,7 +1335,7 @@ export default function FamilySetup() {
             <img
               src={household?.avatar_url || '/family-placeholder2.png'}
               alt={household?.name ? `${household.name} household` : 'Household'}
-              className={`w-28 h-28 rounded-full object-cover ring-2 ring-white transition-opacity ${uploadingHouseholdAvatar ? 'opacity-60' : ''}`}
+              className={`w-20 h-20 md:w-28 md:h-28 rounded-full object-cover ring-2 ring-white transition-opacity ${uploadingHouseholdAvatar ? 'opacity-60' : ''}`}
             />
             {isAdmin && (
               <span className={`absolute inset-0 rounded-full bg-bark/0 ${uploadingHouseholdAvatar ? 'bg-bark/30' : 'group-hover:bg-bark/30'} transition-colors flex items-center justify-center ${uploadingHouseholdAvatar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
