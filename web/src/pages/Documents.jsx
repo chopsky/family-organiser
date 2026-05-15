@@ -472,7 +472,7 @@ function FolderCard({ folder, viewMode, userId, onOpen, onEdit, onDelete }) {
           </div>
           <span className="text-[11px] text-warm-grey">{folder.file_count || 0} files</span>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
           <button onClick={onEdit} className="p-1.5 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors" title="Edit">
             <IconFileText className="h-4 w-4" />
           </button>
@@ -490,7 +490,7 @@ function FolderCard({ folder, viewMode, userId, onOpen, onEdit, onDelete }) {
         <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: folder.color + '20' }}>
           <IconFolder className="h-6 w-6" style={{ color: folder.color }} />
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
           <button onClick={onEdit} className="p-1 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
             <IconFileText className="h-3.5 w-3.5" />
           </button>
@@ -541,7 +541,7 @@ function DocumentCard({ doc, viewMode, onPreview, onDownload, onDelete }) {
             {formatFileSize(doc.file_size)} &middot; {formatDate(doc.created_at)}
           </span>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button onClick={onDownload} className="p-1.5 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors" title="Download">
             <IconDownload className="h-4 w-4" />
           </button>
@@ -568,7 +568,7 @@ function DocumentCard({ doc, viewMode, onPreview, onDownload, onDelete }) {
             decoding="async"
             className="w-full h-full object-cover"
           />
-          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <button onClick={onDownload} className="p-1.5 rounded-lg bg-white/90 text-warm-grey hover:text-plum shadow-sm">
               <IconDownload className="h-3.5 w-3.5" />
             </button>
@@ -587,7 +587,7 @@ function DocumentCard({ doc, viewMode, onPreview, onDownload, onDelete }) {
             >
               <FileTypeIcon mimeType={doc.mime_type} color={fileInfo.color} />
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button onClick={onDownload} className="p-1 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
                 <IconDownload className="h-3.5 w-3.5" />
               </button>
