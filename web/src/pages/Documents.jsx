@@ -226,7 +226,7 @@ export default function Documents() {
       <div className="flex items-center justify-between mb-4">
         <h1
           className="flex text-[36px] font-normal leading-none text-bark items-center gap-2"
-          style={{ fontFamily: '"Circular Std", Georgia, "Times New Roman", serif' }}
+          style={{ fontFamily: '"Gramatika", Georgia, "Times New Roman", serif' }}
         >
           <div
             className="hidden"

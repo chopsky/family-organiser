@@ -1,59 +1,18 @@
 @import "tailwindcss";
 
-/* Circular Std — display/editorial face. Book / Medium / Bold / Black + italics. */
+/* Gramatika (trial) — display/editorial face. Only Bold + Bold Italic loaded;
+   all weights resolve to the same file. */
 @font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-Book.woff2') format('woff2');
-  font-weight: 400;
+  font-family: 'Gramatika';
+  src: url('/fonts/gramatika/GramatikaTrial-Bold-BF65dea4c5530e5.otf') format('opentype');
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-BookItalic.woff2') format('woff2');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-MediumItalic.woff2') format('woff2');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-BoldItalic.woff2') format('woff2');
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-Black.woff2') format('woff2');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular/CircularStd-BlackItalic.woff2') format('woff2');
-  font-weight: 900;
+  font-family: 'Gramatika';
+  src: url('/fonts/gramatika/GramatikaTrial-BoldItalic-BF65dea4c5ba1ff.otf') format('opentype');
+  font-weight: 100 900;
   font-style: italic;
   font-display: swap;
 }

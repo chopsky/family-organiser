@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 /**
  * Privacy Policy page.
  * Content mirrors /web/public/privacy.html, re-styled to match the landing-page
- * design system (Inter body, Circular Std headings, plum accents, cream background, tailwind tokens).
+ * design system (Inter body, Gramatika headings, plum accents, cream background, tailwind tokens).
  */
 export default function Privacy() {
   useEffect(() => {
