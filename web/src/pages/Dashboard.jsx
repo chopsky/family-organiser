@@ -314,7 +314,7 @@ export default function Dashboard() {
   const todayMeals = TODAY_MEAL_CATEGORIES.map(({ key, label }) => ({
     key,
     label,
-    meal: weekMeals.find(m => m.date === todayDate && m.category?.toLowerCase() === key),
+    meals: weekMeals.filter(m => m.date === todayDate && m.category?.toLowerCase() === key),
   }));
 
   // Find member info for events
@@ -523,30 +523,34 @@ export default function Dashboard() {
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
           <div className="space-y-2">
-            {todayMeals.map(({ key, label, meal }) => (
-              meal ? (
-                <div key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-plum-light">
-                  <span className="text-[11px] font-bold w-16 shrink-0 text-primary uppercase">{label}</span>
-                  <div className="flex-1 flex items-center justify-between min-w-0">
-                    <span className="text-sm font-medium text-bark truncate">{meal.meal_name}</span>
-                    {(meal.recipe?.prep_time_mins || meal.prep_time_mins) && (
-                      <span className="shrink-0 text-[10px] font-medium text-sage bg-sage-light px-2 py-0.5 rounded-full ml-2">
-                        {meal.recipe?.prep_time_mins || meal.prep_time_mins} min
+            {todayMeals.flatMap(({ key, label, meals }) => (
+              meals.length === 0
+                ? [
+                    <Link
+                      key={key}
+                      to={`/meals?open=${key}&date=${todayDate}&return=dashboard`}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cream hover:bg-plum-light/60 transition-colors"
+                    >
+                      <span className="text-[11px] font-bold w-16 shrink-0 text-cocoa uppercase">{label}</span>
+                      <span className="text-sm italic text-cocoa/60 flex-1">Tap to add</span>
+                      <span className="text-cocoa/60 text-lg leading-none">+</span>
+                    </Link>,
+                  ]
+                : meals.map((meal, i) => (
+                    <div key={meal.id ?? `${key}-${i}`} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-plum-light">
+                      <span className={`text-[11px] font-bold w-16 shrink-0 uppercase ${i === 0 ? 'text-primary' : 'text-primary/40'}`}>
+                        {i === 0 ? label : ''}
                       </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <Link
-                  key={key}
-                  to={`/meals?open=${key}&date=${todayDate}&return=dashboard`}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cream hover:bg-plum-light/60 transition-colors"
-                >
-                  <span className="text-[11px] font-bold w-16 shrink-0 text-cocoa uppercase">{label}</span>
-                  <span className="text-sm italic text-cocoa/60 flex-1">Tap to add</span>
-                  <span className="text-cocoa/60 text-lg leading-none">+</span>
-                </Link>
-              )
+                      <div className="flex-1 flex items-center justify-between min-w-0">
+                        <span className="text-sm font-medium text-bark truncate">{meal.meal_name}</span>
+                        {(meal.recipe?.prep_time_mins || meal.prep_time_mins) && (
+                          <span className="shrink-0 text-[10px] font-medium text-sage bg-sage-light px-2 py-0.5 rounded-full ml-2">
+                            {meal.recipe?.prep_time_mins || meal.prep_time_mins} min
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
             ))}
           </div>
         </div>
