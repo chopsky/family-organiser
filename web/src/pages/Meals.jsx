@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { loadCached } from '../lib/offlineCache';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
@@ -167,9 +168,11 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   // Load meals for the week
   const loadMeals = useCallback(async () => {
     try {
-      const res = await api.get('/meals', { params: { week: weekParam } });
-      const rawMeals = res.data?.meals ?? res.data;
-      setMeals(Array.isArray(rawMeals) ? rawMeals : []);
+      await loadCached(
+        `meals:${weekParam}`,
+        () => api.get('/meals', { params: { week: weekParam } }).then(r => r.data?.meals ?? r.data),
+        (rawMeals) => setMeals(Array.isArray(rawMeals) ? rawMeals : []),
+      );
     } catch {
       setError('Could not load meal plan.');
     } finally {

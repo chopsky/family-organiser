@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import api from '../lib/api';
 import { logIn as revenuecatLogIn, logOut as revenuecatLogOut } from '../lib/revenuecat';
+import { clearAllCache } from '../lib/offlineCache';
 
 const AuthContext = createContext(null);
 
@@ -52,6 +53,9 @@ export function AuthProvider({ children }) {
     safeRemoveItem('user');
     safeRemoveItem('household');
     safeRemoveItem('lastActive');
+    // Drop the offline read cache so the next user on this device
+    // doesn't see the previous user's data flash on first render.
+    clearAllCache();
     setToken(null);
     setUser(null);
     setHousehold(null);

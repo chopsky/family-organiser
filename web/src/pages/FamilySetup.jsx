@@ -7,6 +7,7 @@ import { IconUsers, IconHome, IconMail, IconEdit, IconMapPin, IconCameraSimple }
 import { useCanWrite } from '../context/SubscriptionContext';
 import { isUkHousehold, isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
+import { loadCached } from '../lib/offlineCache';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
@@ -212,8 +213,11 @@ export default function FamilySetup() {
   const [newYearNudgeDismissed, setNewYearNudgeDismissed] = useState(false);
 
   function loadMembers() {
-    return api.get('/household')
-      .then(({ data }) => { const m = data?.members; setMembers(Array.isArray(m) ? m : []); })
+    return loadCached(
+      'household:members',
+      () => api.get('/household').then(r => r.data?.members ?? []),
+      (m) => setMembers(Array.isArray(m) ? m : []),
+    )
       .catch(() => setError('Could not load members.'))
       .finally(() => setLoadingMembers(false));
   }
@@ -221,9 +225,10 @@ export default function FamilySetup() {
   useEffect(() => { loadMembers(); loadSchools(); }, []);
 
   function loadSchools() {
-    api.get('/schools')
-      .then(({ data }) => {
-        const sch = Array.isArray(data?.schools) ? data.schools : [];
+    loadCached(
+      'schools',
+      () => api.get('/schools').then(r => Array.isArray(r.data?.schools) ? r.data.schools : []),
+      (sch) => {
         setHouseholdSchools(sch);
         // Build activities map from school data
         const actMap = {};
@@ -233,8 +238,8 @@ export default function FamilySetup() {
           });
         });
         setChildActivities(actMap);
-      })
-      .catch(() => {});
+      },
+    ).catch(() => {});
   }
 
   async function handleSchoolSearch(query) {

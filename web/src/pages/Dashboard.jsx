@@ -6,6 +6,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
+import { loadCached } from '../lib/offlineCache';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -248,14 +249,15 @@ export default function Dashboard() {
   const [nlResult, setNlResult] = useState('');
 
   useEffect(() => {
-    api.get('/digest')
-      .then(({ data }) => setDigest(data))
+    loadCached('digest', () => api.get('/digest').then(r => r.data), setDigest)
       .catch(() => setError('Could not load dashboard data.'))
       .finally(() => setLoading(false));
 
-    api.get('/schools')
-      .then(({ data }) => { const s = data?.schools; setSchoolData(Array.isArray(s) ? s : []); })
-      .catch(() => {});
+    loadCached(
+      'schools',
+      () => api.get('/schools').then(r => { const s = r.data?.schools; return Array.isArray(s) ? s : []; }),
+      setSchoolData,
+    ).catch(() => {});
   }, []);
 
   async function handleNlSubmit(e) {

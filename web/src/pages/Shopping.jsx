@@ -4,6 +4,7 @@ import { AISLE_CATEGORIES, AISLE_CONFIG, getItemEmoji } from '../lib/shopping-co
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { WriteGate } from '../components/SubscribePrompt';
+import { loadCached } from '../lib/offlineCache';
 
 function AisleIcon({ aisle, stroke }) {
   const props = {
@@ -107,13 +108,17 @@ export default function Shopping() {
   // Load lists on mount
   const loadLists = useCallback(async () => {
     try {
-      const res = await api.get('/shopping-lists');
-      const raw = res.data?.lists ?? res.data;
-      const fetched = Array.isArray(raw) ? raw : [];
-      setLists(fetched);
-      if (fetched.length > 0 && !activeListId) {
-        setActiveListId(fetched[0].id);
-      }
+      await loadCached(
+        'shopping:lists',
+        () => api.get('/shopping-lists').then(r => r.data?.lists ?? r.data),
+        (raw) => {
+          const fetched = Array.isArray(raw) ? raw : [];
+          setLists(fetched);
+          if (fetched.length > 0 && !activeListId) {
+            setActiveListId(fetched[0].id);
+          }
+        },
+      );
     } catch {
       setError('Could not load shopping lists.');
     }
@@ -133,9 +138,11 @@ export default function Shopping() {
     if (!activeListId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const res = await api.get('/shopping', { params: { list_id: activeListId, completed: 'true' } });
-      const rawItems = res.data?.items ?? res.data;
-      setItems(Array.isArray(rawItems) ? rawItems : []);
+      await loadCached(
+        `shopping:items:${activeListId}`,
+        () => api.get('/shopping', { params: { list_id: activeListId, completed: 'true' } }).then(r => r.data?.items ?? r.data),
+        (rawItems) => setItems(Array.isArray(rawItems) ? rawItems : []),
+      );
     } catch {
       setError('Could not load shopping items.');
     } finally {

@@ -5,6 +5,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
+import { readCache, writeCache, loadCached } from '../lib/offlineCache';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -370,11 +371,25 @@ export default function Calendar() {
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       return { events: cached.events, tasks: cached.tasks };
     }
-    const res = await api.get('/calendar/month', { params: { month: mp } });
-    const rawEvents = res.data?.events; const rawTasks = res.data?.tasks;
-    const entry = { events: Array.isArray(rawEvents) ? rawEvents : [], tasks: Array.isArray(rawTasks) ? rawTasks : [], ts: Date.now() };
-    monthCacheRef.current[mp] = entry;
-    return entry;
+    try {
+      const res = await api.get('/calendar/month', { params: { month: mp } });
+      const rawEvents = res.data?.events; const rawTasks = res.data?.tasks;
+      const entry = { events: Array.isArray(rawEvents) ? rawEvents : [], tasks: Array.isArray(rawTasks) ? rawTasks : [], ts: Date.now() };
+      monthCacheRef.current[mp] = entry;
+      writeCache(`calendar:month:${mp}`, { events: entry.events, tasks: entry.tasks });
+      return entry;
+    } catch (err) {
+      // Offline fallback — fall back to whatever we last persisted for
+      // this month, if anything. Memory-cache it too so subsequent
+      // accesses this session don't keep hitting the network.
+      const persisted = readCache(`calendar:month:${mp}`);
+      if (persisted) {
+        const entry = { events: persisted.data.events || [], tasks: persisted.data.tasks || [], ts: Date.now() };
+        monthCacheRef.current[mp] = entry;
+        return entry;
+      }
+      throw err;
+    }
   }
 
   // Prefetch adjacent months in the background
@@ -510,7 +525,11 @@ export default function Calendar() {
   }, [load]);
 
   useEffect(() => {
-    api.get('/household').then(({ data }) => setMembers(data.members ?? [])).catch(() => {});
+    loadCached(
+      'household:members',
+      () => api.get('/household').then(r => r.data.members ?? []),
+      setMembers,
+    ).catch(() => {});
   }, []);
 
   // Scroll to form when it opens

@@ -6,6 +6,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconPlus } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
+import { loadCached } from '../lib/offlineCache';
 
 /* ─── Constants ─── */
 
@@ -516,14 +517,19 @@ export default function Tasks() {
   const load = useCallback(async () => {
     try {
       const params = showAll ? { all: 'true' } : {};
-      const [tasksRes, recentRes] = await Promise.all([
-        api.get('/tasks', { params }),
-        api.get('/tasks/recent'),
+      const tasksKey = `tasks:${showAll ? 'all' : 'active'}`;
+      await Promise.all([
+        loadCached(
+          tasksKey,
+          () => api.get('/tasks', { params }).then(r => r.data?.tasks ?? r.data),
+          (d) => setTasks(Array.isArray(d) ? d : []),
+        ),
+        loadCached(
+          'tasks:recent',
+          () => api.get('/tasks/recent').then(r => r.data?.tasks ?? r.data),
+          (d) => setRecentDone(Array.isArray(d) ? d : []),
+        ),
       ]);
-      const rawTasks = tasksRes.data?.tasks ?? tasksRes.data;
-      const rawRecent = recentRes.data?.tasks ?? recentRes.data;
-      setTasks(Array.isArray(rawTasks) ? rawTasks : []);
-      setRecentDone(Array.isArray(rawRecent) ? rawRecent : []);
     } catch {
       setError('Could not load tasks.');
     } finally {
@@ -534,15 +540,18 @@ export default function Tasks() {
   useEffect(() => {
     setLoading(true);
     load();
-    api.get('/household').then(({ data }) => {
-      const m = data.members ?? [];
-      setMembers(m);
-      // Set default mobile tab to current user or first member
-      if (m.length > 0 && !activeMobileTab) {
-        const me = m.find((mem) => mem.id === user?.id);
-        setActiveMobileTab(me?.name || m[0].name);
-      }
-    }).catch(() => {});
+    loadCached(
+      'household:members',
+      () => api.get('/household').then(r => r.data.members ?? []),
+      (m) => {
+        setMembers(m);
+        // Set default mobile tab to current user or first member
+        if (m.length > 0 && !activeMobileTab) {
+          const me = m.find((mem) => mem.id === user?.id);
+          setActiveMobileTab(me?.name || m[0].name);
+        }
+      },
+    ).catch(() => {});
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─ Scroll tracking ─ */
