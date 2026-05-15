@@ -415,7 +415,7 @@ export default function Dashboard() {
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
                       <span className="text-sm font-bold text-bark shrink-0 tabular-nums">{formatTime(ev.start_time)}</span>
-                      <span className={`w-[3px] h-5 rounded-full shrink-0 ${barColor}`} />
+                      <span className={`w-[3px] h-6 rounded-full shrink-0 ${barColor}`} />
                       <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
                       {member && <div className="shrink-0">{getMemberAvatar(member)}</div>}
                     </div>
