@@ -413,13 +413,11 @@ export default function Dashboard() {
                   const member = getMemberForEvent(ev);
                   const barColor = (member && dotColors[member.color_theme]) || getEventDotColor(ev, i);
                   return (
-                    <div key={ev.id || i} className="flex items-center gap-3 px-4 py-3 bg-cream rounded-xl">
-                      <span className={`w-[3px] h-5 rounded-full shrink-0 ${barColor}`} />
+                    <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
                       <span className="text-sm font-bold text-bark shrink-0 tabular-nums">{formatTime(ev.start_time)}</span>
-                      <p className="text-sm text-bark truncate flex-1 min-w-0">
-                        {ev.title}
-                        {member?.name && <span className="text-cocoa"> · {member.name}</span>}
-                      </p>
+                      <span className={`w-[3px] h-5 rounded-full shrink-0 ${barColor}`} />
+                      <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
+                      {member && <div className="shrink-0">{getMemberAvatar(member)}</div>}
                     </div>
                   );
                 })}
@@ -496,7 +494,7 @@ export default function Dashboard() {
                   aligned]. Cap at 5 rows so the dashboard card stays compact —
                   the 'N items' line at the bottom tells the user how many more
                   there are. */}
-              <div className="flex flex-col" style={{ gap: 4 }}>
+              <div className="flex flex-col" style={{ gap: 6 }}>
                 {shoppingItems.slice(0, 5).map((item) => {
                   const badge = getCatBadge(item.aisle_category || item.category || 'Other');
                   return (
