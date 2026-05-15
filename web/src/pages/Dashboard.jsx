@@ -411,14 +411,15 @@ export default function Dashboard() {
                 .slice(0, 4)
                 .map((ev, i) => {
                   const member = getMemberForEvent(ev);
+                  const barColor = (member && dotColors[member.color_theme]) || getEventDotColor(ev, i);
                   return (
-                    <div key={ev.id || i} className="flex items-center gap-3 px-4 py-3.5 bg-cream rounded-xl">
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${getEventDotColor(ev, i)}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-bark truncate">{ev.title}</p>
-                        <p className="text-xs text-cocoa">{formatTime(ev.start_time)}</p>
-                      </div>
-                      {member && getMemberAvatar(member)}
+                    <div key={ev.id || i} className="flex items-center gap-3 px-4 py-3 bg-cream rounded-xl">
+                      <span className={`w-[3px] h-5 rounded-full shrink-0 ${barColor}`} />
+                      <span className="text-sm font-bold text-bark shrink-0 tabular-nums">{formatTime(ev.start_time)}</span>
+                      <p className="text-sm text-bark truncate flex-1 min-w-0">
+                        {ev.title}
+                        {member?.name && <span className="text-cocoa"> · {member.name}</span>}
+                      </p>
                     </div>
                   );
                 })}
