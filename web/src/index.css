@@ -150,6 +150,12 @@
 }
 
 @layer utilities {
+  /* Explicit gap-5 so it's always present in the built CSS (Tailwind v4
+     only emits utilities it sees referenced in source files). */
+  .gap-5 {
+    gap: calc(var(--spacing) * 5);
+  }
+
   .glass {
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(20px);
