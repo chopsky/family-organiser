@@ -441,7 +441,7 @@ export default function Dashboard() {
                   : null;
                 const dueLabel = formatTaskDueLabel(task.due_date);
                 return (
-                  <li key={task.id} className="flex items-center gap-3 py-2">
+                  <li key={task.id} className="flex items-center gap-3 py-1">
                     <button
                       onClick={() => toggleTask(task)}
                       className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
