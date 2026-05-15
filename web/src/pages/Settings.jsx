@@ -97,7 +97,7 @@ function PlanSection() {
   if (loading && !isActive && !isTrialing && !isExpired && !isInternal) return null;
 
   return (
-    <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+    <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
       <h2 className="text-lg font-semibold text-bark mb-2">Plan</h2>
 
       {isInternal && (
@@ -952,7 +952,7 @@ export default function Settings() {
         const me = members.find((m) => m.id === user?.id);
         const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
         return (
-          <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+          <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
             <div className="flex items-start justify-between mb-3">
               <h2 className="text-lg font-semibold text-bark">My profile</h2>
               {/* Subtle trial indicator — renders nothing unless the household
@@ -990,7 +990,7 @@ export default function Settings() {
       <PlanSection />
 
       {/* Connect WhatsApp */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Connect WhatsApp</h2>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
@@ -1073,7 +1073,7 @@ export default function Settings() {
       </div>
 
       {/* Calendar Sync */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Calendar Sync</h2>
         <p className="text-sm text-cocoa mb-3">
           Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
@@ -1232,7 +1232,7 @@ export default function Settings() {
 
 
       {/* Email Forwarding */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Email Forwarding</h2>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
@@ -1388,7 +1388,7 @@ export default function Settings() {
       {isAdmin && <SchoolsSection />}
 
       {/* Push Notifications — native app only */}
-      {isNative && <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      {isNative && <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Push Notifications</h2>
         <p className="text-sm text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
         {loadingNotifPrefs ? (
@@ -1429,7 +1429,7 @@ export default function Settings() {
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
-      <section className="mt-2 rounded-2xl p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Your data</h2>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
@@ -1451,7 +1451,7 @@ export default function Settings() {
           Sits between "Your data" (non-destructive GDPR surface) and the
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
-      <section className="mt-2 rounded-2xl p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Active sessions</h2>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
@@ -1512,7 +1512,7 @@ export default function Settings() {
       {/* Help & support — small entry point above the danger zone so users
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
-      <section className="mt-2 rounded-2xl p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Help &amp; support</h2>
         <p className="text-sm text-cocoa">
           Quick answers to common questions, plus a way to reach us if
@@ -1529,7 +1529,7 @@ export default function Settings() {
       {/* Account card — shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Account</h2>
         <p className="text-sm text-cocoa">
           Signed in as <span className="font-medium text-bark">{user?.name}</span>
@@ -1566,7 +1566,7 @@ export default function Settings() {
           looking to leave the app see it without having to scroll past
           a destructive action. */}
       <section
-        className="mt-2 rounded-2xl p-6 border"
+        className="mt-2 rounded-2xl p-5 md:p-6 border"
         style={{ borderColor: 'rgba(215, 99, 83, 0.25)', background: 'rgba(215, 99, 83, 0.04)' }}
       >
         <h2 className="text-lg font-semibold text-bark mb-2">Delete account</h2>
@@ -1853,7 +1853,7 @@ function SchoolsSection() {
   if (schools.length === 0) return null;
 
   return (
-    <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+    <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
       <h2 className="text-lg font-semibold text-bark mb-2">Schools</h2>
       <p className="text-sm text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
       <div className="space-y-3">

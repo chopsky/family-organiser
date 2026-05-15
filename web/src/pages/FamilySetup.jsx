@@ -1323,7 +1323,7 @@ export default function FamilySetup() {
           admins when blank). Right: pencil-edit button (admins only).
           The edit modal handles name + address + avatar upload in one
           place — replaces the older inline "household name" textfield. */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         {success && (
           <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
         )}
@@ -1409,7 +1409,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Members */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
@@ -1529,7 +1529,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Other Family Members (dependents) */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Other Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
@@ -1627,7 +1627,7 @@ export default function FamilySetup() {
           yet support (UK and SA each have their own flow inline in the
           member modals; everywhere else sees this card). */}
       {!showSchools && (
-        <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <h2 className="text-lg font-semibold text-bark mb-2">Schools</h2>
           <p className="text-sm text-cocoa">
             School directory and term-date imports are currently available
@@ -1638,7 +1638,7 @@ export default function FamilySetup() {
       )}
 
       {/* Allergies & Dietary Requirements */}
-      <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Allergies & Dietary Requirements</h2>
         <p className="text-sm text-cocoa mb-4">Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.</p>
         <div className="flex flex-wrap gap-2">
