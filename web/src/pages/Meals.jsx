@@ -65,7 +65,7 @@ export default function Meals() {
     <div className="max-w-5xl mx-auto space-y-5">
       <h1
         className="text-[36px] font-normal leading-none text-bark flex items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+        style={{ fontFamily: '"Gramatika", Georgia, "Times New Roman", serif' }}
       >
         <div
           className="hidden"
@@ -385,7 +385,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               alt="Housemait"
               style={{ height: '36px', display: 'inline-block', marginBottom: '12px' }}
             />
-            <h1 style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
+            <h1 style={{ fontFamily: '"Gramatika", Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
               Weekly Meal Plan
             </h1>
             <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>

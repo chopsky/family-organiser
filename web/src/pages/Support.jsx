@@ -25,7 +25,7 @@ export default function Support() {
           <h1
             className="text-bark"
             style={{
-              fontFamily: "'Instrument Serif', serif",
+              fontFamily: "'Gramatika', serif",
               fontWeight: 400,
               fontSize: 42,
               lineHeight: 1.1,

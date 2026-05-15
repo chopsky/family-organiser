@@ -53,7 +53,7 @@ export default function Help() {
         <h1
           className="text-charcoal"
           style={{
-            fontFamily: "'Instrument Serif', serif",
+            fontFamily: "'Gramatika', serif",
             fontWeight: 400,
             fontSize: 'clamp(36px, 6vw, 44px)',
             lineHeight: 1.05,

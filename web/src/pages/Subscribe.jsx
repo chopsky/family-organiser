@@ -139,7 +139,7 @@ export default function Subscribe() {
         <div className="text-center mb-10">
           <h1
             className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 400 }}
+            style={{ fontFamily: '"Gramatika", Georgia, serif', fontWeight: 400 }}
           >
             {copy.headline}
           </h1>
@@ -255,7 +255,7 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
 
       <div className="mb-5">
         <div className="flex items-baseline gap-2">
-          <span className="text-charcoal leading-none" style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 400, fontSize: 46 }}>
+          <span className="text-charcoal leading-none" style={{ fontFamily: '"Gramatika", Georgia, serif', fontWeight: 400, fontSize: 46 }}>
             {p.priceDisplay}
           </span>
           <span className="text-sm text-warm-grey">{p.periodDisplay}</span>
