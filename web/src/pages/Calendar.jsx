@@ -1416,7 +1416,7 @@ export default function Calendar() {
                   <button
                     key={idx}
                     onClick={() => setSelectedDate(new Date(date))}
-                    className={`relative text-center text-xs font-medium py-1.5 rounded-full transition-colors ${
+                    className={`relative text-center text-xs font-medium py-2.5 rounded-full transition-colors ${
                       !isCurrent ? 'text-light-grey' : isToday_ ? 'bg-plum text-white font-bold' : isSelected ? 'bg-plum-light text-plum' : 'hover:bg-plum-light'
                     }`}
                   >
