@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Kalice (trial) — display/editorial serif. */
+@font-face {
+  font-family: 'Kalice';
+  src: url('/fonts/kalice/Kalice-Trial-Regular.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Kalice';
+  src: url('/fonts/kalice/Kalice-Trial-Italic.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @theme {
   /* Font stacks — system fonts only, no external loads */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';

@@ -322,7 +322,7 @@ export default function Shopping() {
         </div>
         <h1
           className="text-[36px] font-normal leading-none text-bark"
-          style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+          style={{ fontFamily: '"Kalice", Georgia, "Times New Roman", serif' }}
         >
           Shopping
         </h1>

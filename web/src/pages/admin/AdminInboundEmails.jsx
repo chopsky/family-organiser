@@ -62,7 +62,7 @@ export default function AdminInboundEmails() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-normal text-charcoal mb-2" style={{ fontFamily: '"Instrument Serif", Georgia, serif' }}>
+      <h1 className="text-3xl font-normal text-charcoal mb-2" style={{ fontFamily: '"Kalice", Georgia, serif' }}>
         Inbound emails
       </h1>
       <p className="text-sm text-warm-grey mb-6">
