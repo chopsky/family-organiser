@@ -87,6 +87,11 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
     lines.push('🛒 *SHOPPING:* List is empty — all done!');
   }
 
+  // Discovery footer — most users wouldn't otherwise know /tasks, /mytasks,
+  // /help exist. Single quiet line keeps it out of the way.
+  lines.push('');
+  lines.push('_Reply /help for all commands._');
+
   return lines.join('\n').trim();
 }
 
