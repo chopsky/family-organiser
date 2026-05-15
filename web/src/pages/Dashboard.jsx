@@ -368,7 +368,7 @@ export default function Dashboard() {
           // with utilities here (custom font family + weight).
           className="text-[36px] md:text-[56px] leading-[1.05] md:leading-[1.02] tracking-[-0.8px] md:tracking-[-1px]"
           style={{
-            fontFamily: '"Gramatika", Georgia, "Times New Roman", serif',
+            fontFamily: '"Circular Std", Georgia, "Times New Roman", serif',
             fontWeight: 400,
             margin: 0,
           }}

@@ -93,7 +93,7 @@ export default function ContactForm({ compact = false }) {
           <h3
             className="text-charcoal"
             style={{
-              fontFamily: "'Gramatika', serif",
+              fontFamily: "'Circular Std', serif",
               fontWeight: 400,
               fontSize: 28,
               lineHeight: 1.15,
