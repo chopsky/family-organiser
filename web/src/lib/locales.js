@@ -53,6 +53,8 @@ export const LOCALES = {
       milkSize: '2L',
       chickenSize: '1kg',
       recurringTasksExample: 'bins, vet, MOT',
+      completedTaskExample: 'Book MOT for the Volvo',
+      parentTerm: 'Mum',
     },
     reviews: [
       { name: 'Sarah K.', initials: 'SK', role: 'Mum of 3', city: 'Bristol' },
@@ -107,6 +109,8 @@ export const LOCALES = {
       milkSize: '1 gallon',
       chickenSize: '2 lb',
       recurringTasksExample: 'bins, vet, oil change',
+      completedTaskExample: 'Book oil change',
+      parentTerm: 'Mom',
     },
     reviews: [
       { name: 'Sarah K.', initials: 'SK', role: 'Mom of 3', city: 'Austin' },
@@ -140,6 +144,8 @@ export const LOCALES = {
       milkSize: '2L',
       chickenSize: '1kg',
       recurringTasksExample: 'bins, vet, school runs',
+      completedTaskExample: 'Book service for the car',
+      parentTerm: 'Mum',
     },
     // Three different European capitals so the testimonial set itself
     // signals "EU-wide" without committing to any single country.
@@ -175,6 +181,8 @@ export const LOCALES = {
       // "rego" = Aussie shorthand for annual vehicle registration —
       // the closest cultural analogue to the UK MOT.
       recurringTasksExample: 'bins, vet, rego',
+      completedTaskExample: 'Book rego inspection',
+      parentTerm: 'Mum',
     },
     reviews: [
       { name: 'Sarah K.', initials: 'SK', role: 'Mum of 3', city: 'Sydney' },
@@ -206,6 +214,8 @@ export const LOCALES = {
       milkSize: '2L',
       chickenSize: '1kg',
       recurringTasksExample: 'bins, vet, oil change',
+      completedTaskExample: 'Book oil change',
+      parentTerm: 'Mom',
     },
     reviews: [
       { name: 'Sarah K.', initials: 'SK', role: 'Mom of 3', city: 'Toronto' },
@@ -238,6 +248,8 @@ export const LOCALES = {
       chickenSize: '1kg',
       // Annual vehicle licence-disc renewal is the SA analogue to MOT.
       recurringTasksExample: 'bins, vet, licence renewal',
+      completedTaskExample: 'Book car service',
+      parentTerm: 'Mom',
     },
     reviews: [
       { name: 'Sarah K.', initials: 'SK', role: 'Mom of 3', city: 'Johannesburg' },
@@ -298,6 +310,8 @@ export const LOCALES = {
       milkSize: '2L',
       chickenSize: '1kg',
       recurringTasksExample: 'bins, vet, school runs',
+      completedTaskExample: 'Book service for the car',
+      parentTerm: 'Mum',
     },
     // No city on reviewers — the default page serves visitors whose
     // country we don't have a dedicated page for, so attaching a city

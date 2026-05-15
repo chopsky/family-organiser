@@ -109,7 +109,10 @@ const ArrowRight = () => (
   </svg>
 )
 
-const CalendarMock = () => (
+/** Calendar mock for the showcase. parentTerm is locale-dependent
+ *  (Mum vs Mom) and only appears on the assignee meta line of two of
+ *  the sample events. Default keeps the historical UK wording. */
+const CalendarMock = ({ parentTerm = 'Mum' }) => (
   <div className="shot-wrap">
     <div className="mock">
       <div className="mock-head">
@@ -125,7 +128,7 @@ const CalendarMock = () => (
           <span className="cal-bar" style={{ background: 'var(--purple)' }} />
           <div style={{ flex: 1 }}>
             <div className="cal-title">School run · Ben</div>
-            <div className="cal-meta">Mum · 25 min</div>
+            <div className="cal-meta">{parentTerm} · 25 min</div>
           </div>
           <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
         </li>
@@ -143,7 +146,7 @@ const CalendarMock = () => (
           <span className="cal-bar" style={{ background: 'var(--sage)' }} />
           <div style={{ flex: 1 }}>
             <div className="cal-title">Swimming · Sofia</div>
-            <div className="cal-meta">Mum · 1 hr</div>
+            <div className="cal-meta">{parentTerm} · 1 hr</div>
           </div>
           <span className="avt" style={{ background: 'var(--sage)' }}>S</span>
         </li>
@@ -160,7 +163,11 @@ const CalendarMock = () => (
   </div>
 )
 
-const TasksMock = () => (
+/** Tasks mock for the showcase. completedTask is the line-through item
+ *  at the top — locale-dependent because "Book MOT for the Volvo"
+ *  doesn't translate (US says "oil change", AU says "rego inspection",
+ *  ZA says "car service" etc). Default keeps the historical UK wording. */
+const TasksMock = ({ completedTask = 'Book MOT for the Volvo' }) => (
   <div className="shot-wrap coral">
     <div className="mock">
       <div className="mock-head">
@@ -170,7 +177,7 @@ const TasksMock = () => (
       <ul className="mock-list">
         <li>
           <span className="task-cb done">✓</span>
-          <div style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>Book MOT for the Volvo</div>
+          <div style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>{completedTask}</div>
           <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
         </li>
         <li>
@@ -476,17 +483,29 @@ export default function LandingPage() {
   const price = pricing[billing]
   const faqs = buildFaqs(locale)
   const planFeatures = buildPlanFeatures(locale)
-  // Feature scrollytelling — template the "Recurring tasks (bins, vet,
-  // MOT)" bullet so each locale shows a locally-resonant chore instead
-  // of the UK-specific MOT example, then append the school-terms entry
-  // when the active locale has its content configured (GB + ZA today).
-  const universalItems = SHOWCASE.map(it => it.id !== 'tasks' ? it : {
-    ...it,
-    bullets: it.bullets.map(b =>
-      b.startsWith('Recurring tasks (')
-        ? `Recurring tasks (${locale.demo.recurringTasksExample})`
-        : b
-    ),
+  // Feature scrollytelling — three locale-aware overrides on the
+  // SHOWCASE entries:
+  //   • cal:   the assignee meta line on two events ("Mum" vs "Mom")
+  //   • tasks: the line-through completed task ("Book MOT for the Volvo"
+  //            vs locale-specific equivalent), plus the recurring-tasks
+  //            bullet ("(bins, vet, MOT)" vs locale-specific)
+  // Everything else stays universal.
+  const universalItems = SHOWCASE.map(it => {
+    if (it.id === 'cal') {
+      return { ...it, mock: <CalendarMock parentTerm={locale.demo.parentTerm} /> }
+    }
+    if (it.id === 'tasks') {
+      return {
+        ...it,
+        mock: <TasksMock completedTask={locale.demo.completedTaskExample} />,
+        bullets: it.bullets.map(b =>
+          b.startsWith('Recurring tasks (')
+            ? `Recurring tasks (${locale.demo.recurringTasksExample})`
+            : b
+        ),
+      }
+    }
+    return it
   })
   const termsItem = buildSchoolTermsItem(locale)
   const showcaseItems = termsItem ? [...universalItems, termsItem] : universalItems
