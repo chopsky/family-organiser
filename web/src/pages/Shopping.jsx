@@ -321,7 +321,7 @@ export default function Shopping() {
           </svg>
         </div>
         <h1
-          className="text-[36px] font-normal leading-none text-bark"
+          className="text-[38px] md:text-[40px] font-normal leading-none text-bark"
           style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
         >
           Shopping

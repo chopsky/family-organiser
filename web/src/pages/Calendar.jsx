@@ -1050,7 +1050,7 @@ export default function Calendar() {
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5 flex-wrap">
-        <h1 className="flex items-center gap-2.5 flex-1 min-w-0" style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif', fontSize: '36px', fontWeight: 400, lineHeight: 1 }}>
+        <h1 className="flex items-center gap-2.5 flex-1 min-w-0 text-[38px] md:text-[40px]" style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif', fontWeight: 400, lineHeight: 1 }}>
           <div
             className="hidden"
             style={{

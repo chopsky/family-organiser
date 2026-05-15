@@ -225,7 +225,7 @@ export default function Documents() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1
-          className="flex text-[36px] font-normal leading-none text-bark items-center gap-2"
+          className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
           style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
         >
           <div
