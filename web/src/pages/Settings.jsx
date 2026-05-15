@@ -98,7 +98,7 @@ function PlanSection() {
 
   return (
     <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-      <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Plan</h2>
+      <h2 className="text-lg font-semibold text-bark mb-2">Plan</h2>
 
       {isInternal && (
         <p className="text-sm text-cocoa">
@@ -954,7 +954,7 @@ export default function Settings() {
         return (
           <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
             <div className="flex items-start justify-between mb-3">
-              <h2 className="text-base md:text-lg font-semibold text-bark">My profile</h2>
+              <h2 className="text-lg font-semibold text-bark">My profile</h2>
               {/* Subtle trial indicator — renders nothing unless the household
                   is trialing. Safe to leave always-mounted; the component
                   guards its own visibility. */}
@@ -991,7 +991,7 @@ export default function Settings() {
 
       {/* Connect WhatsApp */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Connect WhatsApp</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Connect WhatsApp</h2>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
@@ -1074,7 +1074,7 @@ export default function Settings() {
 
       {/* Calendar Sync */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Calendar Sync</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Calendar Sync</h2>
         <p className="text-sm text-cocoa mb-3">
           Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
         </p>
@@ -1233,7 +1233,7 @@ export default function Settings() {
 
       {/* Email Forwarding */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Email Forwarding</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Email Forwarding</h2>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
@@ -1389,7 +1389,7 @@ export default function Settings() {
 
       {/* Push Notifications — native app only */}
       {isNative && <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Push Notifications</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Push Notifications</h2>
         <p className="text-sm text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
         {loadingNotifPrefs ? (
           <div className="py-4 text-center text-sm text-cocoa">Loading...</div>
@@ -1430,7 +1430,7 @@ export default function Settings() {
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
       <section className="mt-2 rounded-2xl p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Your data</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Your data</h2>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
           your household — tasks, events, shopping lists, notes, documents
@@ -1452,7 +1452,7 @@ export default function Settings() {
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
       <section className="mt-2 rounded-2xl p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Active sessions</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Active sessions</h2>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
           don't recognise — the device gets signed out immediately.
@@ -1513,7 +1513,7 @@ export default function Settings() {
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
       <section className="mt-2 rounded-2xl p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Help &amp; support</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Help &amp; support</h2>
         <p className="text-sm text-cocoa">
           Quick answers to common questions, plus a way to reach us if
           you're stuck.
@@ -1530,7 +1530,7 @@ export default function Settings() {
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Account</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Account</h2>
         <p className="text-sm text-cocoa">
           Signed in as <span className="font-medium text-bark">{user?.name}</span>
           {user?.role && <span> ({user.role})</span>}
@@ -1569,7 +1569,7 @@ export default function Settings() {
         className="mt-2 rounded-2xl p-6 border"
         style={{ borderColor: 'rgba(215, 99, 83, 0.25)', background: 'rgba(215, 99, 83, 0.04)' }}
       >
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Delete account</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Delete account</h2>
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
           member of your household, <strong className="text-bark">everything in it</strong>{' '}
@@ -1854,7 +1854,7 @@ function SchoolsSection() {
 
   return (
     <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-      <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Schools</h2>
+      <h2 className="text-lg font-semibold text-bark mb-2">Schools</h2>
       <p className="text-sm text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
       <div className="space-y-3">
         {schools.map(school => (

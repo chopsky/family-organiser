@@ -1405,7 +1405,7 @@ export default function FamilySetup() {
 
       {/* Members */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Family Members</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-4">
@@ -1525,7 +1525,7 @@ export default function FamilySetup() {
 
       {/* Other Family Members (dependents) */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Other Family Members</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Other Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
           <>
@@ -1623,7 +1623,7 @@ export default function FamilySetup() {
           member modals; everywhere else sees this card). */}
       {!showSchools && (
         <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-          <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Schools</h2>
+          <h2 className="text-lg font-semibold text-bark mb-2">Schools</h2>
           <p className="text-sm text-cocoa">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries —
@@ -1634,7 +1634,7 @@ export default function FamilySetup() {
 
       {/* Allergies & Dietary Requirements */}
       <div className="bg-linen rounded-2xl p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Allergies & Dietary Requirements</h2>
+        <h2 className="text-lg font-semibold text-bark mb-2">Allergies & Dietary Requirements</h2>
         <p className="text-sm text-cocoa mb-4">Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.</p>
         <div className="flex flex-wrap gap-2">
           {[
