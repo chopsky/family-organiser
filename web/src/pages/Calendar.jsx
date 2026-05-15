@@ -1880,7 +1880,7 @@ export default function Calendar() {
                           value={formStart}
                           onChange={e => setFormStart(e.target.value)}
                           style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
-                          className="w-[110px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                          className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
                       {/* All day toggle */}
@@ -1910,7 +1910,7 @@ export default function Calendar() {
                           value={formEnd}
                           onChange={e => setFormEnd(e.target.value)}
                           style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
-                          className="w-[110px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                          className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
                       {/* Spacer to align with all-day toggle */}
