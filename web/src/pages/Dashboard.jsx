@@ -344,7 +344,7 @@ export default function Dashboard() {
 
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Greeting — kicker (date + event count) above, serif headline below.
           Matches the Housemait editorial greeting style. */}
       <div>
