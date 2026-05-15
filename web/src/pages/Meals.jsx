@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
@@ -122,6 +122,7 @@ export default function Meals() {
 
 function MealPlanView({ setError, onSwitchToRecipes }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => {
     // If Dashboard linked us in with ?open=<cat>&date=<YYYY-MM-DD>, jump to
     // that week so the picker opens in context.
@@ -140,14 +141,20 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   const [pickerCell, setPickerCell] = useState(null); // { date, category }
   const [editingMeal, setEditingMeal] = useState(null); // for editing existing meal via picker
   const [suggesting, setSuggesting] = useState(false);
+  // When the picker was opened via a Dashboard deep-link, remember to
+  // bounce back to /dashboard after the save so the user sees the
+  // newly-added meal in context. Cleared once consumed.
+  const [returnAfterSave, setReturnAfterSave] = useState(null);
 
   // Auto-open the picker when arriving from Dashboard's empty-slot links.
   // Consume the params immediately so a refresh doesn't re-open the modal.
   useEffect(() => {
     const cat = searchParams.get('open');
     const date = searchParams.get('date');
+    const ret = searchParams.get('return');
     if (cat && date) {
       setPickerCell({ date, category: cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase() });
+      if (ret === 'dashboard') setReturnAfterSave('/dashboard');
       setSearchParams({}, { replace: true });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -309,6 +316,11 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       setPickerCell(null);
       setEditingMeal(null);
       await loadMeals();
+      if (returnAfterSave) {
+        const to = returnAfterSave;
+        setReturnAfterSave(null);
+        navigate(to);
+      }
       return;
     }
     try {
@@ -329,6 +341,11 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       setPickerCell(null);
       setEditingMeal(null);
       await loadMeals();
+      if (returnAfterSave) {
+        const to = returnAfterSave;
+        setReturnAfterSave(null);
+        navigate(to);
+      }
     } catch {
       setError('Could not save meal.');
     }

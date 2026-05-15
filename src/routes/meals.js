@@ -96,6 +96,7 @@ router.post('/meals', requireAuth, requireHousehold, async (req, res) => {
     // Notify household about the meal plan update
     push.sendToHousehold(req.householdId, req.user.id, { title: 'Meal plan updated', body: meal_name.trim(), category: 'meal_plan_updated' }).catch(() => {});
 
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ meal });
   } catch (err) {
     console.error('POST /api/meals error:', err);
@@ -122,6 +123,7 @@ router.patch('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
 
   try {
     const meal = await db.updateMealPlanEntry(req.params.id, req.householdId, updates);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ meal });
   } catch (err) {
     if (err.code === 'PGRST116') return res.status(404).json({ error: 'Meal not found' });
@@ -137,6 +139,7 @@ router.patch('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
 router.delete('/meals/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     await db.deleteMealPlanEntry(req.params.id, req.householdId);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/meals/:id error:', err);
@@ -253,6 +256,7 @@ router.post('/meals/accept-suggestion', requireAuth, requireHousehold, async (re
       is_recurring: false,
     }, req.user.id);
 
+    cache.invalidate(`digest:${req.householdId}`);
     return res.status(201).json({ meal, recipe });
   } catch (err) {
     console.error('POST /api/meals/accept-suggestion error:', err);

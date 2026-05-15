@@ -539,7 +539,7 @@ export default function Dashboard() {
               ) : (
                 <Link
                   key={key}
-                  to={`/meals?open=${key}&date=${todayDate}`}
+                  to={`/meals?open=${key}&date=${todayDate}&return=dashboard`}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cream hover:bg-plum-light/60 transition-colors"
                 >
                   <span className="text-[11px] font-bold w-16 shrink-0 text-cocoa uppercase">{label}</span>
