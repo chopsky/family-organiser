@@ -1050,6 +1050,81 @@ export default function Calendar() {
     };
   }
 
+  /**
+   * Multi-assignee aware. Returns an array of { name, hex, initial, avatar_url }
+   * for an event. Prefers `ev.assignees` (populated by /calendar/month for
+   * events created via the multi-select UI) and falls back to the legacy
+   * single-assignee `assigned_to_name` for older rows.
+   */
+  function getEventMembers(ev) {
+    const list = [];
+    if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
+      for (const a of ev.assignees) {
+        const m = members.find(x => x.name === a.member_name) || null;
+        list.push({
+          name: a.member_name,
+          initial: a.member_name?.[0]?.toUpperCase() || '?',
+          hex: m?.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage,
+          avatar_url: m?.avatar_url || null,
+        });
+      }
+      return list;
+    }
+    if (ev.assigned_to_name) {
+      const info = getMemberInfo(ev.assigned_to_name);
+      const m = members.find(x => x.name === ev.assigned_to_name);
+      list.push({
+        name: ev.assigned_to_name,
+        initial: info.initial,
+        hex: info.hex,
+        avatar_url: m?.avatar_url || null,
+      });
+    }
+    return list;
+  }
+
+  /**
+   * Render up to 3 stacked avatars with a "+N" overflow pill. Size in px;
+   * `ringColor` is the background colour behind the stack so the ring blends.
+   */
+  function renderMemberStack(list, { size = 24, ringColor = '#FFFFFF' } = {}) {
+    if (!list || list.length === 0) return null;
+    const visible = list.slice(0, 3);
+    const overflow = list.length - visible.length;
+    const fontSize = Math.max(9, Math.round(size * 0.4));
+    return (
+      <div className="flex -space-x-2 shrink-0">
+        {visible.map((m, i) => (
+          m.avatar_url ? (
+            <img
+              key={`${m.name}-${i}`}
+              src={m.avatar_url}
+              alt={m.name}
+              className="rounded-full object-cover"
+              style={{ width: size, height: size, boxShadow: `0 0 0 2px ${ringColor}` }}
+            />
+          ) : (
+            <div
+              key={`${m.name}-${i}`}
+              className="rounded-full flex items-center justify-center font-bold text-white"
+              style={{ width: size, height: size, background: m.hex, fontSize, boxShadow: `0 0 0 2px ${ringColor}` }}
+            >
+              {m.initial}
+            </div>
+          )
+        ))}
+        {overflow > 0 && (
+          <div
+            className="rounded-full flex items-center justify-center font-semibold"
+            style={{ width: size, height: size, background: '#EAE7E0', color: '#6B6774', fontSize, boxShadow: `0 0 0 2px ${ringColor}` }}
+          >
+            +{overflow}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Type badge styling
   function getTypeBadge(item) {
     const cat = item.category || 'general';
@@ -1457,7 +1532,9 @@ export default function Calendar() {
                 {[...eventsForDate(selectedDate).map(e => ({ ...e, _type: 'event' })), ...tasksForDate(selectedDate).map(t => ({ ...t, _type: 'task' }))].map(item => {
                   const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
                   const badge = getTypeBadge(item);
-                  const memberInfo = getMemberInfo(item.assigned_to_name);
+                  const eventMembers = item._type === 'task'
+                    ? (item.assigned_to_name ? [{ name: item.assigned_to_name, initial: item.assigned_to_name[0]?.toUpperCase() || '?', hex: getMemberInfo(item.assigned_to_name).hex, avatar_url: members.find(x => x.name === item.assigned_to_name)?.avatar_url || null }] : [])
+                    : getEventMembers(item);
                   return (
                     <div
                       key={item.id}
@@ -1477,11 +1554,7 @@ export default function Calendar() {
                         </div>
                       </div>
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
-                      {item.assigned_to_name && (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ background: memberInfo.hex }}>
-                          {memberInfo.initial}
-                        </div>
-                      )}
+                      {renderMemberStack(eventMembers, { size: 24, ringColor: '#FFFFFF' })}
                     </div>
                   );
                 })}
@@ -1701,7 +1774,8 @@ export default function Calendar() {
                   const height = Math.max(((endMin - startMin) / 60) * hourH, 20);
                   const layout = overlapLayout.get(ev.id) || { col: 0, totalCols: 1 };
                   const hex = getEventHex(ev);
-                  const memberInfo = ev.assigned_to_name ? getMemberInfo(ev.assigned_to_name) : null;
+                  const eventMembers = getEventMembers(ev);
+                  const ringHex = hex + '18';
 
                   return (
                     <div
@@ -1736,9 +1810,9 @@ export default function Calendar() {
                           </div>
                         )}
                       </div>
-                      {memberInfo && height > 32 && (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 mt-0.5" style={{ background: hex, border: '2px solid rgba(255,255,255,0.3)' }}>
-                          {memberInfo.initial}
+                      {eventMembers.length > 0 && height > 32 && (
+                        <div className="mt-0.5">
+                          {renderMemberStack(eventMembers, { size: 24, ringColor: ringHex })}
                         </div>
                       )}
                     </div>
@@ -1771,7 +1845,9 @@ export default function Calendar() {
             {todayEvents.map(item => {
               const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
               const badge = getTypeBadge(item);
-              const memberInfo = item.assigned_to_name ? getMemberInfo(item.assigned_to_name) : null;
+              const eventMembers = item._type === 'task'
+                ? (item.assigned_to_name ? [{ name: item.assigned_to_name, initial: item.assigned_to_name[0]?.toUpperCase() || '?', hex: getMemberInfo(item.assigned_to_name).hex, avatar_url: members.find(x => x.name === item.assigned_to_name)?.avatar_url || null }] : [])
+                : getEventMembers(item);
 
               return (
                 <div
@@ -1809,11 +1885,7 @@ export default function Calendar() {
                   >
                     {badge.label}
                   </span>
-                  {memberInfo && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: memberInfo.hex }}>
-                      {memberInfo.initial}
-                    </div>
-                  )}
+                  {renderMemberStack(eventMembers, { size: 28, ringColor: '#FFFFFF' })}
                 </div>
               );
             })}

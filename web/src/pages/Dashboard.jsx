@@ -445,12 +445,9 @@ export default function Dashboard() {
                   const primary = assignees[0];
                   const barColor = (primary && dotColors[primary.color_theme]) || getEventDotColor(ev, i);
                   const duration = formatDuration(ev.start_time, ev.end_time);
-                  // Names: join up to 2 in full, then "+N more" if there are extras.
-                  let namesLabel = '';
-                  if (assignees.length === 1) namesLabel = assignees[0].name;
-                  else if (assignees.length === 2) namesLabel = `${assignees[0].name}, ${assignees[1].name}`;
-                  else if (assignees.length > 2) namesLabel = `${assignees[0].name}, ${assignees[1].name} +${assignees.length - 2}`;
-                  const metaParts = [namesLabel, duration].filter(Boolean);
+                  // The avatars on the right already show who's involved —
+                  // keep the subtitle to just duration so the row stays light.
+                  const metaParts = [duration].filter(Boolean);
                   // Stack up to 3 avatars; overflow shows "+N" pill.
                   const visibleAvatars = assignees.slice(0, 3);
                   const overflowCount = assignees.length - visibleAvatars.length;
