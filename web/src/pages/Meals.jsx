@@ -446,24 +446,25 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                 0,
               );
               const cardClass = isToday
-                ? 'bg-bark text-white'
-                : 'bg-linen text-bark';
-              const metaTextClass = isToday ? 'text-white/60' : 'text-cocoa';
+                ? 'bg-linen ring-2 ring-plum'
+                : 'bg-linen';
               return (
                 <div
                   key={dayIdx}
-                  className={`rounded-2xl p-5 ${cardClass}`}
+                  className={`rounded-2xl p-5 text-bark ${cardClass}`}
                   style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
                 >
                   {/* Date header */}
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className={`text-[11px] font-bold uppercase tracking-[0.12em] ${metaTextClass}`}>{DAY_HEADERS[dayIdx]}</div>
+                      <div className={`text-[11px] font-bold uppercase tracking-[0.12em] ${isToday ? 'text-plum' : 'text-cocoa'}`}>
+                        {DAY_HEADERS[dayIdx]}{isToday ? ' · TODAY' : ''}
+                      </div>
                       <div className="text-[34px] leading-none mt-1" style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 400 }}>
                         {date.getDate()}
                       </div>
                     </div>
-                    <div className={`text-xs ${metaTextClass}`}>{plannedCount}/4 meals planned</div>
+                    <div className="text-xs text-cocoa">{plannedCount}/4 meals planned</div>
                   </div>
 
                   {/* 2×2 meal slots */}
@@ -493,14 +494,11 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                         );
                       }
                       // Empty slot — tap to open the picker for this cell.
-                      const emptyClass = isToday
-                        ? 'bg-white/5 border-white/15 text-white/60'
-                        : 'bg-cream border-cream-border text-cocoa/70';
                       return (
                         <button
                           key={category}
                           onClick={() => { setPickerCell({ date: toDateStr(date), category }); setEditingMeal(null); }}
-                          className={`text-left p-3 rounded-xl border border-dashed transition-colors ${emptyClass}`}
+                          className="text-left p-3 rounded-xl border border-dashed bg-cream border-cream-border text-cocoa/70 transition-colors"
                         >
                           <div className={`text-[10px] font-bold uppercase tracking-[0.1em] mb-1`}>
                             {category}
