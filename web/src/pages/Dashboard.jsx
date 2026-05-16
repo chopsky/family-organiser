@@ -417,7 +417,7 @@ export default function Dashboard() {
           {todayEvents.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">No events today</p>
           ) : (
-            <div className="divide-y divide-light-grey">
+            <div className="divide-y divide-[#1b14240f]">
               {todayEvents
                 .sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date))
                 .slice(0, 4)
