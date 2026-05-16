@@ -435,8 +435,88 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
             </p>
           </div>
 
-          {/* Weekly grid */}
-          <div className="bg-linen rounded-2xl  border border-cream-border overflow-hidden">
+          {/* ── Mobile: one card per day with a 2×2 meal-slot grid ──
+              Desktop keeps the dense 7-column table further down (more
+              compact for week-at-a-glance on a wide screen). */}
+          <div className="md:hidden space-y-4 no-print">
+            {weekDates.map((date, dayIdx) => {
+              const isToday = toDateStr(date) === toDateStr(today);
+              const plannedCount = PLAN_CATEGORIES.reduce(
+                (n, c) => n + (getMealsForCell(date, c).length > 0 ? 1 : 0),
+                0,
+              );
+              const cardClass = isToday
+                ? 'bg-bark text-white'
+                : 'bg-linen text-bark';
+              const metaTextClass = isToday ? 'text-white/60' : 'text-cocoa';
+              return (
+                <div
+                  key={dayIdx}
+                  className={`rounded-2xl p-5 ${cardClass}`}
+                  style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+                >
+                  {/* Date header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className={`text-[11px] font-bold uppercase tracking-[0.12em] ${metaTextClass}`}>{DAY_HEADERS[dayIdx]}</div>
+                      <div className="text-[34px] leading-none mt-1" style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 400 }}>
+                        {date.getDate()}
+                      </div>
+                    </div>
+                    <div className={`text-xs ${metaTextClass}`}>{plannedCount}/4 meals planned</div>
+                  </div>
+
+                  {/* 2×2 meal slots */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {PLAN_CATEGORIES.map(category => {
+                      const cellMeals = getMealsForCell(date, category);
+                      const colors = getCatColours(category);
+                      const isFilled = cellMeals.length > 0;
+                      if (isFilled) {
+                        const primary = cellMeals[0];
+                        return (
+                          <button
+                            key={category}
+                            onClick={() => setDetailMeal(primary)}
+                            className={`text-left p-3 rounded-xl ${colors.light} ${colors.border} border transition-colors`}
+                          >
+                            <div className={`text-[10px] font-bold uppercase tracking-[0.1em] ${colors.text} mb-1`}>
+                              {category}
+                            </div>
+                            <div className="text-sm font-semibold text-bark line-clamp-2">
+                              {primary.meal_name}
+                            </div>
+                            {cellMeals.length > 1 && (
+                              <div className="text-[11px] text-cocoa mt-1">+{cellMeals.length - 1} more</div>
+                            )}
+                          </button>
+                        );
+                      }
+                      // Empty slot — tap to open the picker for this cell.
+                      const emptyClass = isToday
+                        ? 'bg-white/5 border-white/15 text-white/60'
+                        : 'bg-cream border-cream-border text-cocoa/70';
+                      return (
+                        <button
+                          key={category}
+                          onClick={() => { setPickerCell({ date: toDateStr(date), category }); setEditingMeal(null); }}
+                          className={`text-left p-3 rounded-xl border border-dashed transition-colors ${emptyClass}`}
+                        >
+                          <div className={`text-[10px] font-bold uppercase tracking-[0.1em] mb-1`}>
+                            {category}
+                          </div>
+                          <div className="text-lg leading-none">+</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Weekly grid — desktop only */}
+          <div className="hidden md:block bg-linen rounded-2xl  border border-cream-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] border-collapse">
                 <thead>
