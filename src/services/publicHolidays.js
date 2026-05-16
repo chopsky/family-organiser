@@ -116,12 +116,19 @@ async function insertHolidaysForHousehold(householdId, countryCode, year, create
     const endTime = `${h.date}T23:59:59`;
 
     try {
+      // Dedupe by (title, date) only — don't constrain to category =
+      // 'public_holiday' because legacy rows seeded before that column
+      // existed have category=NULL, and an over-narrow filter caused
+      // every subsequent seed/refresh run to re-insert them as fresh
+      // duplicates. all_day=true narrows enough to avoid clobbering
+      // user-created timed events that happen to share a name with a
+      // holiday (e.g. "Boxing Day breakfast").
       const { data: existing } = await db.getSupabase()
         .from('calendar_events')
         .select('id')
         .eq('household_id', householdId)
-        .eq('category', 'public_holiday')
         .eq('title', title)
+        .eq('all_day', true)
         .gte('start_time', `${h.date}T00:00:00`)
         .lte('start_time', `${h.date}T23:59:59`)
         .limit(1);
