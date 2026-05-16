@@ -74,6 +74,26 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
         seen.add(key);
         return true;
       });
+      // Attach the multi-assignee list (event_assignees rows) so the
+      // Dashboard can render stacked avatars + "A, B +N" name labels.
+      // Single-assignee events still surface via the legacy
+      // assigned_to_name column; only events created with the
+      // multi-select "Select members" UI populate event_assignees.
+      try {
+        const eventIds = todayEvents.map(e => e.id).filter(Boolean);
+        const rows = await db.getEventAssigneesBatch(eventIds);
+        const byEvent = new Map();
+        for (const r of rows) {
+          if (!byEvent.has(r.event_id)) byEvent.set(r.event_id, []);
+          byEvent.get(r.event_id).push({ member_id: r.member_id, member_name: r.member_name });
+        }
+        todayEvents = todayEvents.map(e => ({
+          ...e,
+          assignees: byEvent.get(e.id) || [],
+        }));
+      } catch (assigneeErr) {
+        console.warn('digest: assignees batch fetch failed:', assigneeErr.message);
+      }
       console.log(`[digest] DB returned ${allTodayEvents.length}, after filter+dedup: ${todayEvents.length}`);
     } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
     try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
