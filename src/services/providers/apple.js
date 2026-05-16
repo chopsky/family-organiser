@@ -269,10 +269,19 @@ function expandRecurrence(eventData, externalEventId) {
 
     if (tzid && !rawDt.endsWith('Z')) {
       // ── DST-aware expansion ──
-      // Expand in LOCAL time so UNTIL boundaries and occurrence dates are correct,
-      // then convert each occurrence individually to UTC.
-      // Use raw local DTSTART (without Z) so rrule treats it as local.
-      const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`, { tzid });
+      // Expand WITHOUT a tzid option — passing tzid to rrule produces
+      // Date objects whose UTC interpretation depends on the system TZ
+      // env var (Node's V8 quirk). With TZ=Europe/London the dates come
+      // back as wall-time-treated-as-UTC; with TZ=UTC (Railway's default)
+      // they come back as proper UTC. We need a deterministic answer
+      // independent of where the process runs.
+      //
+      // Without tzid, rrule consistently returns floating-as-UTC Dates
+      // across every environment (16:30 BST → Date instance whose
+      // getUTC* fields read 16:30). localDateToUtc() below then does the
+      // per-occurrence wall-time → UTC conversion using Intl, which is
+      // DST-aware. Net result: correct UTC regardless of TZ env.
+      const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`);
       const occurrences = rule.between(windowStart, windowEnd, true);
 
       return occurrences.map((occDate) => {
