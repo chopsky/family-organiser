@@ -438,7 +438,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
           {/* ── Mobile: one card per day with a 2×2 meal-slot grid ──
               Desktop keeps the dense 7-column table further down (more
               compact for week-at-a-glance on a wide screen). */}
-          <div className="md:hidden space-y-4 no-print">
+          <div className="md:hidden print:hidden space-y-4 no-print">
             {weekDates.map((date, dayIdx) => {
               const isToday = toDateStr(date) === toDateStr(today);
               const plannedCount = PLAN_CATEGORIES.reduce(
@@ -515,8 +515,8 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
             })}
           </div>
 
-          {/* Weekly grid — desktop only */}
-          <div className="hidden md:block bg-linen rounded-2xl  border border-cream-border overflow-hidden">
+          {/* Weekly grid — desktop only on screen, always visible in print */}
+          <div className="hidden md:block print:block bg-linen rounded-2xl  border border-cream-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] border-collapse">
                 <thead>
