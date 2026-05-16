@@ -1186,11 +1186,23 @@ async function handleTextMessage(text, user, household) {
         list_id: defaultList.id,
         aisle_category: i.category || 'Other',
       }));
-      const saved = await db.addShoppingItems(household.id, enriched, user.id);
-      actions.shoppingAdded = toAdd.map((i) => i.item);
-      const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
+      // Detect override hint from the user's original message — words
+      // like "another"/"more"/"extra" mean the user wants the duplicate
+      // even if the item is already on the list.
+      const { detectOverrideHint } = require('../utils/shoppingDedupe');
+      const overrideHint = detectOverrideHint(text);
+      const { created, duplicates, updated } = await db.addShoppingItemsWithDedupe(
+        household.id, enriched, user.id, { overrideHint },
+      );
+      const saved = [...created, ...updated];
+      // Surface skipped duplicates on the actions object so the AI's
+      // response_message can mention them (rendered into the
+      // broadcast/reply downstream).
+      actions.shoppingAdded = saved.map((i) => i.item);
+      actions.shoppingDuplicates = duplicates.map(d => d.existing.item);
+      const savedIds = saved.map((s) => s?.id).filter(Boolean);
       if (savedIds.length) {
-        const names = toAdd.map((i) => i.item).join(', ');
+        const names = saved.map((i) => i.item).join(', ');
         rememberAdd(user.id, 'shopping', savedIds, names);
       }
     }
@@ -1263,6 +1275,14 @@ async function handleTextMessage(text, user, household) {
     // Partial success — at least one matched, at least one didn't.
     const list = unmatched.map((t) => `"${t}"`).join(', ');
     response += `\n\n(I couldn't find ${list} in your open tasks.)`;
+  }
+
+  // Surface duplicate-skip info so the user knows we didn't silently lose
+  // their request. Reply "another milk" / "extra X" if they want the dup.
+  const dups = actions.shoppingDuplicates || [];
+  if (dups.length > 0) {
+    const list = dups.map((n) => `*${n}*`).join(', ');
+    response += `\n\n(${list} ${dups.length === 1 ? 'was' : 'were'} already on your list — skipped. Reply "another ${dups[0]}" if you want a second.)`;
   }
 
   return {

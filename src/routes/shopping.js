@@ -92,14 +92,24 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       aisle_category: i.aisle_category || detectAisle(i.item || i),
     }));
 
-    const saved = await db.addShoppingItems(req.householdId, enrichedItems, req.user.id);
+    // overrideHint: clients can pass override_hint=true to bypass dedupe
+    // (e.g. a future "add anyway" button). Default off — manual UI adds
+    // should be the natural dedupe path.
+    const overrideHint = req.body.override_hint === true;
+    const { created, duplicates, updated } = await db.addShoppingItemsWithDedupe(
+      req.householdId,
+      enrichedItems,
+      req.user.id,
+      { overrideHint },
+    );
+    const saved = [...created, ...updated];
 
-    // Notify household that shopping list was updated
-    push.sendToHousehold(req.householdId, req.user.id, { title: 'Shopping list updated', body: `${req.user.name} added items`, category: 'shopping_updated' }).catch(() => {});
-
-    // WhatsApp broadcast — mirrors the format the bot uses when items are
-    // added via a WhatsApp message, so in-app adds reach WhatsApp members too.
+    // Notify household that shopping list was updated (only if anything actually changed)
     if (saved.length) {
+      push.sendToHousehold(req.householdId, req.user.id, { title: 'Shopping list updated', body: `${req.user.name} added items`, category: 'shopping_updated' }).catch(() => {});
+
+      // WhatsApp broadcast — mirrors the format the bot uses when items are
+      // added via a WhatsApp message, so in-app adds reach WhatsApp members too.
       try {
         const members = await db.getHouseholdMembers(req.householdId);
         const itemNames = saved.map((i) => i.item).join(', ');
@@ -111,7 +121,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     cache.invalidate(`shopping-lists:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
-    return res.status(201).json({ items: saved });
+    return res.status(201).json({
+      items: saved,
+      duplicates: duplicates.map(d => ({
+        submitted_name: d.submitted.item,
+        existing_name: d.existing.item,
+      })),
+    });
   } catch (err) {
     console.error('POST /api/shopping error:', err);
     return res.status(500).json({ error: 'Internal server error' });

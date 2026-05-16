@@ -957,6 +957,116 @@ const VALID_SHOPPING_CATEGORIES = new Set([
   'groceries', 'clothing', 'household', 'school', 'pets', 'party', 'gifts', 'other',
 ]);
 
+const { normalizeItemName } = require('../utils/shoppingDedupe');
+
+/**
+ * Dedupe-aware add. Skips items whose normalized name already exists
+ * as an incomplete row on the same list. Returns:
+ *   { created:   [<row>, ...]   newly-inserted rows
+ *     duplicates:[{ submitted, existing }, ...]  skipped because already on list
+ *     updated:   [<row>, ...]   existing rows whose quantity was bumped
+ *   }
+ *
+ * Behaviour:
+ *   • overrideHint = true → dedupe is bypassed entirely; everything is inserted.
+ *   • else if existing item's quantity differs from incoming AND incoming
+ *     has a non-empty quantity → update the existing row's quantity.
+ *     This handles "milk is on the list with no quantity, I want 2".
+ *   • else → skip the incoming item, return the existing row as a duplicate.
+ */
+async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, options = {}, db = supabase) {
+  const { overrideHint = false } = options;
+  if (!items.length) return { created: [], duplicates: [], updated: [] };
+
+  // Bypass: act exactly like addShoppingItems for compatibility.
+  if (overrideHint) {
+    const created = await addShoppingItems(householdId, items, addedByUserId, db);
+    return { created, duplicates: [], updated: [] };
+  }
+
+  // Determine which list(s) we'll be inserting into so we can fetch
+  // their existing active rows. Most calls target a single list, but
+  // a batch could span multiple if the caller pre-routed items.
+  const listIds = Array.from(new Set(items.map(i => i.list_id).filter(Boolean)));
+
+  // Load existing incomplete items for the target lists. If a row
+  // has no list_id (legacy), we still check household-wide to be
+  // safe against grandfathered rows that pre-date the list_id column.
+  let existingQuery = db
+    .from('shopping_items')
+    .select()
+    .eq('household_id', householdId)
+    .eq('completed', false);
+  if (listIds.length) existingQuery = existingQuery.in('list_id', listIds);
+  const { data: existing, error: existingErr } = await existingQuery;
+  if (existingErr) throw existingErr;
+
+  // Build (listId, normalizedName) → existing row index. Items
+  // without a list_id fall back to a 'none' bucket so they still match
+  // each other.
+  const indexKey = (listId, normalized) => `${listId || 'none'}|${normalized}`;
+  const existingByKey = new Map();
+  for (const row of existing || []) {
+    const k = indexKey(row.list_id, normalizeItemName(row.item));
+    // Keep the OLDEST one if there are already duplicates lurking — the
+    // newer ones we'll either delete via a separate cleanup or leave
+    // alone. Dedupe-on-write is forward-looking, not retroactive.
+    if (!existingByKey.has(k)) existingByKey.set(k, row);
+  }
+
+  const toInsert = [];
+  const duplicates = [];
+  const toBumpQuantity = []; // { id, quantity }
+
+  for (const item of items) {
+    const normalized = normalizeItemName(item.item);
+    if (!normalized) {
+      // Defensive — shouldn't happen given upstream validation, but
+      // an empty name shouldn't match every other empty key.
+      toInsert.push(item);
+      continue;
+    }
+    const k = indexKey(item.list_id, normalized);
+    const match = existingByKey.get(k);
+    if (!match) {
+      toInsert.push(item);
+      continue;
+    }
+    // Match found. Decide: bump quantity, or skip.
+    const incomingQty = item.quantity ? String(item.quantity).trim() : '';
+    const existingQty = match.quantity ? String(match.quantity).trim() : '';
+    if (incomingQty && incomingQty !== existingQty) {
+      // User supplied a specific quantity that differs from what's
+      // stored — update the existing row rather than creating a dup.
+      toBumpQuantity.push({ id: match.id, quantity: incomingQty });
+    } else {
+      duplicates.push({ submitted: item, existing: match });
+    }
+  }
+
+  let created = [];
+  if (toInsert.length) {
+    created = await addShoppingItems(householdId, toInsert, addedByUserId, db);
+  }
+
+  const updated = [];
+  for (const bump of toBumpQuantity) {
+    const { data, error } = await db
+      .from('shopping_items')
+      .update({ quantity: bump.quantity })
+      .eq('id', bump.id)
+      .select()
+      .single();
+    if (error) {
+      console.warn('[addShoppingItemsWithDedupe] failed to bump quantity:', error.message);
+      continue;
+    }
+    if (data) updated.push(data);
+  }
+
+  return { created, duplicates, updated };
+}
+
 async function addShoppingItems(householdId, items, addedByUserId, db = supabase) {
   if (!items.length) return [];
   const rows = items.map((i) => {
@@ -4484,6 +4594,7 @@ module.exports = {
   deleteInvite,
   getPendingInvites,
   addShoppingItems,
+  addShoppingItemsWithDedupe,
   getShoppingList,
   getShoppingLists,
   createShoppingList,

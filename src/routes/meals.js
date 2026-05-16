@@ -373,7 +373,12 @@ Return ONLY valid JSON:
 
     let added = [];
     if (itemsToAdd.length > 0) {
-      added = await db.addShoppingItems(req.householdId, itemsToAdd, req.user.id);
+      // Meal-plan → shopping pulls in many ingredients at once. Dedupe so
+      // "milk" used in three recipes doesn't create three rows.
+      const result = await db.addShoppingItemsWithDedupe(
+        req.householdId, itemsToAdd, req.user.id, { overrideHint: false },
+      );
+      added = [...result.created, ...result.updated];
     }
 
     return res.json({

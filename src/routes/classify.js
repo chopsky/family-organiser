@@ -123,7 +123,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
               list_id: defaultList.id,
               aisle_category: i.category || 'Other',
             }));
-            ops.push(db.addShoppingItems(req.householdId, enriched, req.user.id));
+            // Use deduped insert. classify is called from the in-app text bar;
+            // detect override hint from the same text the AI just classified.
+            const { detectOverrideHint } = require('../utils/shoppingDedupe');
+            const overrideHint = detectOverrideHint(req.body.text || '');
+            ops.push(db.addShoppingItemsWithDedupe(
+              req.householdId, enriched, req.user.id, { overrideHint },
+            ).then(r => [...r.created, ...r.updated]));
           }
           if (toRemove.length) ops.push(db.completeShoppingItemsByName(req.householdId, toRemove.map((i) => i.item)));
         }

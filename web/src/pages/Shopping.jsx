@@ -171,7 +171,15 @@ export default function Shopping() {
     try {
       const payload = { item: addText.trim(), list_id: activeListId };
       if (addAisle !== 'auto') payload.aisle_category = addAisle;
-      await api.post('/shopping', payload);
+      const { data } = await api.post('/shopping', payload);
+      // Surface dedupe hits — the server skipped because an active row
+      // already exists. Show the EXISTING item name so the user sees
+      // exactly what they were duplicating, in their original casing.
+      const dups = Array.isArray(data?.duplicates) ? data.duplicates : [];
+      if (dups.length > 0) {
+        const existingName = dups[0].existing_name || dups[0].submitted_name || 'That item';
+        setError(`"${existingName}" is already on your list.`);
+      }
       setAddText('');
       await loadItems();
     } catch {

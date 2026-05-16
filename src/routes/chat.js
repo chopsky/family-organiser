@@ -371,7 +371,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             list_id: defaultList.id,
             aisle_category: i.aisle_category || i.category || 'Other',
           }));
-          await db.addShoppingItems(req.householdId, enriched, req.user.id);
+          const { detectOverrideHint } = require('../utils/shoppingDedupe');
+          const overrideHint = detectOverrideHint(message || '');
+          await db.addShoppingItemsWithDedupe(req.householdId, enriched, req.user.id, { overrideHint });
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
