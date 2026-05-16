@@ -79,6 +79,18 @@ function formatTime(dateStr) {
   return d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
 }
 
+function formatDuration(startIso, endIso) {
+  if (!startIso || !endIso) return '';
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const totalMin = Math.round(ms / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours === 0) return `${mins} min`;
+  if (mins === 0) return hours === 1 ? '1 hr' : `${hours} hrs`;
+  return hours === 1 ? `1 hr ${mins} min` : `${hours} hrs ${mins} min`;
+}
+
 function getMonday(d) {
   const date = new Date(d);
   const day = date.getDay();
@@ -400,23 +412,30 @@ export default function Dashboard() {
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-sans font-semibold text-bark">Today's schedule</h2>
-            <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">View calendar →</Link>
+            <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">Week →</Link>
           </div>
           {todayEvents.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">No events today</p>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-light-grey">
               {todayEvents
                 .sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date))
                 .slice(0, 4)
                 .map((ev, i) => {
                   const member = getMemberForEvent(ev);
                   const barColor = (member && dotColors[member.color_theme]) || getEventDotColor(ev, i);
+                  const duration = formatDuration(ev.start_time, ev.end_time);
+                  const metaParts = [member?.name, duration].filter(Boolean);
                   return (
-                    <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
-                      <span className="text-sm font-bold text-bark shrink-0 tabular-nums">{formatTime(ev.start_time)}</span>
-                      <span className={`w-[3px] h-6 rounded-full shrink-0 ${barColor}`} />
-                      <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
+                    <div key={ev.id || i} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                      <span className="text-sm font-bold text-bark shrink-0 tabular-nums w-14">{formatTime(ev.start_time)}</span>
+                      <span className={`w-[3px] h-10 rounded-full shrink-0 ${barColor}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-bark truncate">{ev.title}</p>
+                        {metaParts.length > 0 && (
+                          <p className="text-xs text-cocoa truncate mt-0.5">{metaParts.join(' · ')}</p>
+                        )}
+                      </div>
                       {member && <div className="shrink-0">{getMemberAvatar(member)}</div>}
                     </div>
                   );
