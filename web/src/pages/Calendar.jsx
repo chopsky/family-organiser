@@ -1876,7 +1876,6 @@ export default function Calendar() {
                       {item._type === 'task'
                         ? (item.due_time ? new Date(`2000-01-01T${item.due_time}`).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }) : 'All day')
                         : (item.all_day ? 'All day' : formatTime(item.start_time))}
-                      {item.assigned_to_name ? ` · ${item.assigned_to_name}` : ''}
                     </div>
                   </div>
                   <span
