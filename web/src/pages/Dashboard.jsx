@@ -336,6 +336,25 @@ export default function Dashboard() {
     return members.find(m => m.name === ev.assigned_to_name);
   }
 
+  // Multi-assignee aware. Events created via the new "Select members"
+  // UI store the full list in `ev.assignees`; older events only set
+  // `assigned_to_name`. Returns members in source order, deduped against
+  // the household roster — anyone removed from the household post-hoc
+  // is silently dropped.
+  function getMembersForEvent(ev) {
+    if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
+      const seen = new Set();
+      const out = [];
+      for (const a of ev.assignees) {
+        const m = members.find(x => x.name === a.member_name);
+        if (m && !seen.has(m.id)) { seen.add(m.id); out.push(m); }
+      }
+      if (out.length) return out;
+    }
+    const single = getMemberForEvent(ev);
+    return single ? [single] : [];
+  }
+
   function getMemberAvatar(member) {
     if (!member) return null;
     const ac = avatarColors[member.color_theme] || avatarColors.sage;
@@ -422,10 +441,19 @@ export default function Dashboard() {
                 .sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date))
                 .slice(0, 4)
                 .map((ev, i) => {
-                  const member = getMemberForEvent(ev);
-                  const barColor = (member && dotColors[member.color_theme]) || getEventDotColor(ev, i);
+                  const assignees = getMembersForEvent(ev);
+                  const primary = assignees[0];
+                  const barColor = (primary && dotColors[primary.color_theme]) || getEventDotColor(ev, i);
                   const duration = formatDuration(ev.start_time, ev.end_time);
-                  const metaParts = [member?.name, duration].filter(Boolean);
+                  // Names: join up to 2 in full, then "+N more" if there are extras.
+                  let namesLabel = '';
+                  if (assignees.length === 1) namesLabel = assignees[0].name;
+                  else if (assignees.length === 2) namesLabel = `${assignees[0].name}, ${assignees[1].name}`;
+                  else if (assignees.length > 2) namesLabel = `${assignees[0].name}, ${assignees[1].name} +${assignees.length - 2}`;
+                  const metaParts = [namesLabel, duration].filter(Boolean);
+                  // Stack up to 3 avatars; overflow shows "+N" pill.
+                  const visibleAvatars = assignees.slice(0, 3);
+                  const overflowCount = assignees.length - visibleAvatars.length;
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                       <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-12">{formatTime(ev.start_time)}</span>
@@ -436,7 +464,20 @@ export default function Dashboard() {
                           <p className="text-xs text-cocoa truncate mt-0.5">{metaParts.join(' · ')}</p>
                         )}
                       </div>
-                      {member && <div className="shrink-0">{getMemberAvatar(member)}</div>}
+                      {visibleAvatars.length > 0 && (
+                        <div className="shrink-0 flex -space-x-2">
+                          {visibleAvatars.map(m => (
+                            <div key={m.id} className="ring-2 ring-linen rounded-full">
+                              {getMemberAvatar(m)}
+                            </div>
+                          ))}
+                          {overflowCount > 0 && (
+                            <div className="ring-2 ring-linen rounded-full w-8 h-8 bg-cream text-cocoa text-[11px] font-semibold flex items-center justify-center">
+                              +{overflowCount}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
