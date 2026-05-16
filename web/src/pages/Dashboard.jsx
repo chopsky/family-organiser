@@ -76,7 +76,7 @@ function getGreeting() {
 function formatTime(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function formatDuration(startIso, endIso) {
@@ -428,7 +428,7 @@ export default function Dashboard() {
                   const metaParts = [member?.name, duration].filter(Boolean);
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                      <span className="text-sm font-bold text-bark shrink-0 tabular-nums w-14">{formatTime(ev.start_time)}</span>
+                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-12">{formatTime(ev.start_time)}</span>
                       <span className={`w-[3px] h-10 rounded-full shrink-0 ${barColor}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-bark truncate">{ev.title}</p>
