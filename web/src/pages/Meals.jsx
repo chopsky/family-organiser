@@ -445,14 +445,14 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                 (n, c) => n + (getMealsForCell(date, c).length > 0 ? 1 : 0),
                 0,
               );
-              const cardClass = isToday
-                ? 'bg-linen ring-2 ring-plum'
-                : 'bg-linen';
               return (
                 <div
                   key={dayIdx}
-                  className={`rounded-2xl p-5 text-bark ${cardClass}`}
-                  style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+                  className="rounded-2xl p-5 text-bark bg-linen"
+                  style={{
+                    boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px',
+                    border: isToday ? '1px solid var(--color-plum)' : undefined,
+                  }}
                 >
                   {/* Date header */}
                   <div className="flex items-start justify-between mb-4">
