@@ -484,7 +484,7 @@ export default function Shopping() {
                         </div>
 
                         {/* Name */}
-                        <span className={`flex-1 text-sm font-medium ${item.completed ? 'line-through text-warm-grey' : 'text-bark'}`}>
+                        <span className={`flex-1 text-sm font-medium capitalize ${item.completed ? 'line-through text-warm-grey' : 'text-bark'}`}>
                           {item.item}
                         </span>
 
@@ -545,7 +545,7 @@ export default function Shopping() {
                           <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
                         </div>
                         {/* Name */}
-                        <span className="flex-1 text-sm font-medium text-bark" style={{ opacity: 0.7 }}>{item.item}</span>
+                        <span className="flex-1 text-sm font-medium text-bark capitalize" style={{ opacity: 0.7 }}>{item.item}</span>
                         {/* Aisle pill */}
                         <span
                           className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"

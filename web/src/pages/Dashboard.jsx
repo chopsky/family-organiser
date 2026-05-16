@@ -565,7 +565,7 @@ export default function Dashboard() {
                       >
                         {badge.label}
                       </span>
-                      <span className="flex-1 text-sm text-bark truncate">{item.item}</span>
+                      <span className="flex-1 text-sm text-bark truncate capitalize">{item.item}</span>
                       {item.quantity && (
                         <span className="shrink-0 text-cocoa" style={{ fontSize: 12 }}>{item.quantity}</span>
                       )}
