@@ -539,14 +539,14 @@ export default function Dashboard() {
           ) : (
             <>
               {/* One item per row: [badge] [name (truncates)] [quantity, right-
-                  aligned]. Cap at 5 rows so the dashboard card stays compact —
-                  the 'N items' line at the bottom tells the user how many more
-                  there are. */}
-              <div className="flex flex-col" style={{ gap: 6 }}>
+                  aligned], with a hairline divider between rows. Cap at 5
+                  rows so the dashboard card stays compact — the 'N items'
+                  line at the bottom tells the user how many more there are. */}
+              <div className="flex flex-col divide-y divide-[#1b14240f]">
                 {shoppingItems.slice(0, 5).map((item) => {
                   const badge = getCatBadge(item.aisle_category || item.category || 'Other');
                   return (
-                    <div key={item.id} className="flex items-center" style={{ gap: 10, padding: '4px 0' }}>
+                    <div key={item.id} className="flex items-center gap-2.5 py-2.5 first:pt-0 last:pb-0">
                       <span
                         className={`shrink-0 uppercase tracking-wide ${badge.bg} ${badge.text}`}
                         style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}
