@@ -2,23 +2,17 @@
  * Fetch today's weather for a household, ready to feed into
  * buildDigestWeatherLine() for the morning WhatsApp digest.
  *
- * Resolution order for "where is this household":
- *   1. household.address — geocoded via Photon (OSM, no key needed).
- *      Address autocomplete already uses Photon so we know it handles
- *      our address shapes.
- *   2. household.timezone — derive a representative city when no
- *      address is on file (e.g. 'Africa/Johannesburg' → 'Johannesburg').
- *      Uses the TIMEZONE_CITIES map in services/weather.js.
- *
- * Returns null if neither yields a location — caller must handle.
+ * Location source is *only* household.address (geocoded via Photon
+ * — OSM, no API key). Timezone is NOT used as a fallback because
+ * tz-derived cities are too vague — a Bristol family would see
+ * London weather, a Cape Town family would see Joburg weather, and
+ * the digest stops being trustworthy. Better to omit the line
+ * entirely and let the user notice they should set an address.
  *
  * Cache: 12h in-memory per household. Open-Meteo + Photon are both
  * free and fast, but we still don't want to re-fetch on every cron
- * heartbeat or admin trigger. Same digest run for a household uses
- * one cached result.
+ * heartbeat or admin trigger.
  */
-
-const { getCityFromTimezone } = require('./weather');
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const cache = new Map(); // key: householdId → { data, ts }
@@ -41,35 +35,9 @@ async function geocodeViaPhoton(query) {
   }
 }
 
-async function geocodeViaOpenMeteo(name) {
-  try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const result = data.results?.[0];
-    if (!result) return null;
-    return { lat: result.latitude, lon: result.longitude, cityName: result.name };
-  } catch {
-    return null;
-  }
-}
-
 async function resolveLocation(household) {
-  if (household?.address?.trim()) {
-    const hit = await geocodeViaPhoton(household.address.trim());
-    if (hit) return hit;
-  }
-  // Fallback: derive a representative city from the household timezone.
-  const cityLabel = getCityFromTimezone?.(household?.timezone) || null;
-  if (cityLabel) {
-    // cityLabel is like "Johannesburg, South Africa" — geocode the
-    // bare city for coords.
-    const cityOnly = cityLabel.split(',')[0].trim();
-    const hit = await geocodeViaOpenMeteo(cityOnly);
-    if (hit) return hit;
-  }
-  return null;
+  if (!household?.address?.trim()) return null;
+  return geocodeViaPhoton(household.address.trim());
 }
 
 /**
