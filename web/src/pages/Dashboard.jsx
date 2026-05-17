@@ -324,6 +324,22 @@ export default function Dashboard() {
     }
   }
 
+  // Outstanding-task count, computed from the digest. Used by both
+  // the badge effect below and the Tasks card render. Computing it
+  // here (before any early return) keeps hook order stable, which
+  // the Rules of Hooks require — running useEffect AFTER an early
+  // `if (loading) return` previously crashed with React #301
+  // ("Max update depth exceeded") on iOS.
+  const outstandingCount = (digest?.outstanding ?? []).length;
+
+  // Update the iOS app-icon badge whenever the outstanding-task count
+  // shifts. Shows the same number a user would see on the Tasks tab.
+  // No-op on web. MUST stay above the loading early-return so the
+  // hook is called on every render (Rules of Hooks).
+  useEffect(() => {
+    setBadgeCount(outstandingCount);
+  }, [outstandingCount]);
+
   if (loading) return <Spinner />;
 
   const now = new Date();
@@ -336,13 +352,6 @@ export default function Dashboard() {
   const members = digest?.members ?? [];
   const outstanding = digest?.outstanding ?? [];
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
-
-  // Update the iOS app-icon badge whenever the outstanding-task count
-  // shifts. Shows the same number a user would see on the Tasks tab.
-  // No-op on web.
-  useEffect(() => {
-    setBadgeCount(outstanding.length);
-  }, [outstanding.length]);
   const weekMeals = digest?.weekMeals ?? [];
 
   // Today's meals by category
