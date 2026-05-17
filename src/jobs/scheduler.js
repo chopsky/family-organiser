@@ -74,6 +74,33 @@ async function runDailyReminderCheck() {
 }
 
 /**
+ * Daily 09:00 (per household timezone) — nudge each household about
+ * any tracked subscription renewing in the next 3 days. Called every
+ * minute by cron and gated to fire once per household per day.
+ */
+async function runSubscriptionRenewalCheck() {
+  try {
+    const { runSubscriptionRemindersForHousehold } = require('./subscription-reminders');
+    const households = await db.getAllHouseholds();
+    for (const household of households) {
+      const tz = household.timezone || 'Europe/London';
+      const nowInTZ = currentHHMMInTZ(tz);
+      if (nowInTZ !== '09:00') continue;
+      const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
+      const lockKey = `subscription_renewals:${household.id}`;
+      const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+      if (!acquired) continue;
+      const stats = await runSubscriptionRemindersForHousehold(household.id);
+      if (stats.sent > 0 || stats.advanced > 0) {
+        console.log(`[scheduler] subscription renewals for "${household.name}": sent=${stats.sent} advanced=${stats.advanced}`);
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] Subscription renewal check failed:', err.message);
+  }
+}
+
+/**
  * Run overdue nudge check for every household.
  * Sends at 14:00 in the household's timezone (6 hours after default reminder).
  * Called every minute by cron.
@@ -501,6 +528,10 @@ function startScheduler() {
   // ── Evening school prep reminders: check every minute (fires at 19:00) ─────
   cron.schedule('* * * * *', () => runEveningSchoolPrepCheck());
   console.log('✓ Evening school prep reminder started (19:00 per household timezone)');
+
+  // ── Subscription renewal nudges: fires at 09:00 per household tz ───────────
+  cron.schedule('* * * * *', () => runSubscriptionRenewalCheck());
+  console.log('✓ Subscription renewal scheduler started (09:00 per household timezone)');
 
   // ── Scheduler lock cleanup: daily at 03:00 UTC ─────────────────────────────
   cron.schedule('0 3 * * *', () => db.cleanupSchedulerLocks());

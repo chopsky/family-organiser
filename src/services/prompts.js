@@ -45,6 +45,9 @@ INTENT DETECTION:
 - "mixed": A combination of add/remove operations
 - "note_save": User wants you to remember/save something (e.g. "remember our wifi password is ABC123", "save the alarm code as 4567", "our vet's number is 012 345 6789"). Extract the key (what it is) and value (the info to save).
 - "note_recall": User is asking about something that IS in the saved household notes above. Look up the answer from the notes and include it in response_message.
+- "subscription_add": User wants to track a recurring paid subscription so the bot can remind them before each renewal (e.g. "Netflix renews 1st of every month £15.99", "remember Disney+ — £8.99 a month on the 4th", "Amazon Prime renews 15 March every year, £95"). Extract the name, amount, currency (if a symbol is present — £/$/€/R), recurrence (monthly/yearly), renewal_day_of_month (1-31), and renewal_month (1-12, yearly only).
+- "subscription_remove": User wants to stop tracking one (e.g. "cancel Netflix tracking", "I've cancelled Disney+", "stop tracking Spotify"). Extract a target name to match against existing subscriptions.
+- "subscription_list": User wants to see all subscriptions or total spend (e.g. "what subscriptions do we have?", "how much am I spending on subscriptions?"). No fields needed.
 - "create_event": User wants to add a calendar event (e.g. "add dentist on Monday at 10am", "schedule Logan's tennis for Saturday 5pm", "put anniversary on 20 March"). Extract event details into the "calendar_event" field.
 - "update_event": User wants to change an existing calendar event (e.g. "move my dentist to Tuesday", "change the haircut to 3pm", "reassign tennis to Lynn", "update the party to be at home instead"). Populate the "target" field identifying which event they mean, and the "updates" field with only the fields being changed.
 - "delete_event": User wants to cancel or remove a calendar event (e.g. "cancel my dentist", "remove the haircut on Friday", "delete the party next weekend"). Populate the "target" field identifying which event they mean. Distinct from "complete" — this is removal, not marking done.
@@ -243,6 +246,8 @@ RESPONSE MESSAGE:
 - For query_list/query_tasks: leave empty (the app will generate the list view)
 - For note_save: confirm what was saved, e.g. "Got it! I've saved your wifi password. Any family member can ask me for it anytime."
 - For note_recall: include the answer from the notes, e.g. "Your wifi password is ABC123"
+- For subscription_add: confirm + when the next reminder will fire, e.g. "Tracking Netflix — £15.99 on the 1st of each month. I'll nudge you 3 days before each renewal."
+- For subscription_remove/list: leave response_message empty — the handler builds the reply with the current numbers.
 - For chat: answer helpfully and conversationally
 
 CRITICAL OUTPUT FORMAT:
@@ -257,7 +262,7 @@ CRITICAL OUTPUT FORMAT:
 
 Respond only with valid JSON matching this schema:
 {
-  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "chat",
+  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "chat",
   "shopping_items": [
     {
       "item": string,
@@ -327,6 +332,16 @@ Respond only with valid JSON matching this schema:
     "day_of_week": integer (0=Monday...4=Friday),
     "time_end": "HH:MM" | null,
     "action": "add" | "remove"
+  } | null,
+  "subscription": {
+    "name": string,
+    "amount": number | null,
+    "currency": "GBP" | "USD" | "EUR" | "ZAR" | "CAD" | "AUD" | "NZD" | null,
+    "recurrence": "monthly" | "yearly",
+    "renewal_day_of_month": integer | null,
+    "renewal_month": integer | null,
+    "target_name": string | null,
+    "action": "add" | "remove" | "list"
   } | null,
   "response_message": string
 }`;

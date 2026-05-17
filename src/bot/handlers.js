@@ -96,6 +96,8 @@ const SLASH_COMMANDS = {
   todo:     'tasks',
   mytasks:  'mytasks',
   'my-tasks': 'mytasks',
+  subscriptions: 'subscriptions',
+  subs:     'subscriptions',
   help:     'help',
 };
 function matchSlashCommand(text) {
@@ -112,6 +114,7 @@ const SLASH_HELP_TEXT =
   '• `/shopping` — show the shopping list\n' +
   '• `/tasks` — show today\'s + overdue tasks\n' +
   '• `/mytasks` — show only tasks assigned to you\n' +
+  '• `/subscriptions` — show tracked subscriptions + monthly total\n' +
   '• `/help` — this message\n\n' +
   'You can also chat to me normally — _"add milk to the list"_, _"weather in Brighton tomorrow"_, _"what\'s on this Saturday?"_.';
 
@@ -844,6 +847,8 @@ async function handleTextMessage(text, user, household) {
         return { response: await handleTasks(user, household), actions };
       case 'mytasks':
         return { response: await handleMyTasks(user, household), actions };
+      case 'subscriptions':
+        return { response: await handleSubscriptionsList(household), actions };
       case 'help':
         return { response: SLASH_HELP_TEXT, actions };
     }
@@ -995,6 +1000,89 @@ async function handleTextMessage(text, user, household) {
   // Handle note recall — AI already included the answer in response_message
   if (result.intent === 'note_recall') {
     return { response: result.response_message || "I couldn't find that in my notes.", actions };
+  }
+
+  // ── Subscription tracker ──
+  // v1 is chat-managed: add / remove / list. Cron in scheduler.js nudges
+  // 3 days before each renewal.
+  if (result.intent === 'subscription_add' && result.subscription?.name) {
+    const sub = result.subscription;
+    const { currencyForCountry, formatMoney } = require('../utils/currency');
+    const { computeNextRenewal } = require('../utils/subscription-renewal');
+    // Currency: prefer what the AI parsed from a symbol in the user's
+    // text, fall back to the household's country default.
+    const fallback = currencyForCountry(household.country);
+    const currency = sub.currency || fallback.code;
+    // Pick a sensible default renewal day if missing (1st of the month).
+    const day = sub.renewal_day_of_month || 1;
+    const month = sub.recurrence === 'yearly' ? (sub.renewal_month || 1) : null;
+    const todayYmd = new Date().toISOString().split('T')[0];
+    const nextRenewal = computeNextRenewal(todayYmd, {
+      recurrence: sub.recurrence || 'monthly',
+      renewal_day_of_month: day,
+      renewal_month: month,
+    });
+    const created = await db.createSubscription(household.id, {
+      name: sub.name.trim(),
+      amount: typeof sub.amount === 'number' ? sub.amount : null,
+      currency,
+      recurrence: sub.recurrence || 'monthly',
+      renewal_day_of_month: day,
+      renewal_month: month,
+      next_renewal_at: nextRenewal,
+    }, user.id).catch((err) => {
+      console.error('[handlers] subscription_add insert failed:', err.message);
+      return null;
+    });
+    if (!created) {
+      return { response: "⚠️ I couldn't save that subscription — please try again.", actions };
+    }
+    const moneyStr = created.amount != null ? ` — ${formatMoney(created.amount, currency)}` : '';
+    const cadence = created.recurrence === 'yearly' ? 'yearly' : 'monthly';
+    const renewLabel = new Date(nextRenewal).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    return {
+      response: result.response_message
+        || `💳 Tracking *${created.name}*${moneyStr} (${cadence}). Next renewal: ${renewLabel}. I'll nudge you 3 days before.`,
+      actions,
+    };
+  }
+
+  if (result.intent === 'subscription_remove' && result.subscription) {
+    const target = result.subscription.target_name || result.subscription.name;
+    if (!target) {
+      return { response: "Which subscription should I stop tracking? Say it by name (e.g. 'cancel Netflix tracking').", actions };
+    }
+    const match = await db.findSubscriptionByName(household.id, target).catch(() => null);
+    if (!match) {
+      return { response: `🤔 I couldn't find a tracked subscription matching *${target}*. Reply /subscriptions to see what I have.`, actions };
+    }
+    await db.deleteSubscription(match.id, household.id);
+    return { response: `Stopped tracking *${match.name}*. ✅`, actions };
+  }
+
+  if (result.intent === 'subscription_list') {
+    const subs = await db.listSubscriptions(household.id).catch(() => []);
+    if (!subs.length) {
+      return { response: 'You don\'t have any tracked subscriptions yet. Tell me one like "Netflix renews 1st of the month, £15.99".', actions };
+    }
+    const { formatMoney } = require('../utils/currency');
+    const monthlyTotal = subs.reduce((sum, s) => {
+      if (s.amount == null) return sum;
+      return sum + (s.recurrence === 'yearly' ? s.amount / 12 : s.amount);
+    }, 0);
+    const lines = ['*Your tracked subscriptions:*', ''];
+    for (const s of subs) {
+      const price = s.amount != null ? formatMoney(s.amount, s.currency) : '?';
+      const cad = s.recurrence === 'yearly' ? '/yr' : '/mo';
+      const next = new Date(s.next_renewal_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      lines.push(`• *${s.name}* — ${price}${cad} · next ${next}`);
+    }
+    if (monthlyTotal > 0) {
+      // Display total in whichever currency the first subscription used (close enough — v1 doesn't FX-convert).
+      lines.push('');
+      lines.push(`_Approx. ${formatMoney(monthlyTotal, subs[0].currency)} / month total._`);
+    }
+    return { response: lines.join('\n'), actions };
   }
 
   // Handle calendar event creation (primary path — intent explicitly create_event)
@@ -1494,6 +1582,30 @@ async function handleMyTasks(user, household) {
   const tasks = await db.getTasks(household.id, { assignedToId: user.id });
   const heading = `${user.name}'s Tasks`;
   return formatTaskList(tasks, heading);
+}
+
+async function handleSubscriptionsList(household) {
+  const subs = await db.listSubscriptions(household.id).catch(() => []);
+  if (!subs.length) {
+    return 'You don\'t have any tracked subscriptions yet. Tell me about one like _"Netflix renews 1st of the month, £15.99"_.';
+  }
+  const { formatMoney } = require('../utils/currency');
+  const monthlyTotal = subs.reduce((sum, s) => {
+    if (s.amount == null) return sum;
+    return sum + (s.recurrence === 'yearly' ? s.amount / 12 : s.amount);
+  }, 0);
+  const lines = ['*Your tracked subscriptions:*', ''];
+  for (const s of subs) {
+    const price = s.amount != null ? formatMoney(s.amount, s.currency) : '?';
+    const cad = s.recurrence === 'yearly' ? '/yr' : '/mo';
+    const next = new Date(s.next_renewal_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    lines.push(`• *${s.name}* — ${price}${cad} · next ${next}`);
+  }
+  if (monthlyTotal > 0) {
+    lines.push('');
+    lines.push(`_Approx. ${formatMoney(monthlyTotal, subs[0].currency)} / month total._`);
+  }
+  return lines.join('\n');
 }
 
 // ─── Recipe helpers ──────────────────────────────────────────────────────────

@@ -187,6 +187,7 @@ describe('POST /api/shopping', () => {
   test('adds items and returns saved rows', async () => {
     const saved = [{ id: 'i-new', item: 'eggs', category: 'groceries' }];
     db.addShoppingItems.mockResolvedValue(saved);
+    db.addShoppingItemsWithDedupe.mockResolvedValue({ created: saved, duplicates: [], updated: [] });
 
     const res = await request(app)
       .post('/api/shopping')
@@ -199,6 +200,7 @@ describe('POST /api/shopping', () => {
 
   test('accepts single-item shorthand', async () => {
     db.addShoppingItems.mockResolvedValue([{ id: 'i-1', item: 'butter' }]);
+    db.addShoppingItemsWithDedupe.mockResolvedValue({ created: [{ id: 'i-1', item: 'butter' }], duplicates: [], updated: [] });
     const res = await request(app).post('/api/shopping').set(AUTH).send({ item: 'butter', category: 'groceries' });
     expect(res.status).toBe(201);
   });

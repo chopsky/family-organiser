@@ -4531,6 +4531,87 @@ async function findHouseholdByRevenuecatAppUserId(appUserId, db = supabase) {
   return data || null;
 }
 
+// ─── Household subscriptions (Netflix, Spotify, etc.) ────────────────────────
+//
+// Tracked so the bot can nudge a few days before each renewal. All
+// chat-managed — no Settings UI in v1.
+
+async function listSubscriptions(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('household_subscriptions')
+    .select()
+    .eq('household_id', householdId)
+    .order('next_renewal_at');
+  if (error) throw error;
+  return data || [];
+}
+
+async function createSubscription(householdId, fields, userId, db = supabase) {
+  const row = {
+    household_id: householdId,
+    name: fields.name,
+    amount: fields.amount ?? null,
+    currency: fields.currency || null,
+    recurrence: fields.recurrence || 'monthly',
+    renewal_day_of_month: fields.renewal_day_of_month ?? null,
+    renewal_month: fields.renewal_month ?? null,
+    next_renewal_at: fields.next_renewal_at,
+    notes: fields.notes || null,
+    created_by: userId || null,
+  };
+  const { data, error } = await db
+    .from('household_subscriptions')
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Find best-match subscription by fuzzy name match. Case-insensitive
+ *  substring on either side. Returns the first hit ordered by next
+ *  renewal date (earliest first) so "cancel Netflix" hits the soonest. */
+async function findSubscriptionByName(householdId, name, db = supabase) {
+  const all = await listSubscriptions(householdId, db);
+  const needle = String(name || '').toLowerCase().trim();
+  if (!needle) return null;
+  return all.find((s) => {
+    const haystack = String(s.name || '').toLowerCase();
+    return haystack.includes(needle) || needle.includes(haystack);
+  }) || null;
+}
+
+async function deleteSubscription(id, householdId, db = supabase) {
+  const { error } = await db
+    .from('household_subscriptions')
+    .delete()
+    .eq('id', id)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+/** Rows whose next_renewal_at is between two YYYY-MM-DD strings
+ *  (inclusive). Used by the daily nudge cron. */
+async function getSubscriptionsRenewingBetween(startYmd, endYmd, db = supabase) {
+  const { data, error } = await db
+    .from('household_subscriptions')
+    .select()
+    .gte('next_renewal_at', startYmd)
+    .lte('next_renewal_at', endYmd);
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateSubscriptionRenewal(id, nextRenewalAt, remindedForDate, db = supabase) {
+  const patch = { next_renewal_at: nextRenewalAt, updated_at: new Date().toISOString() };
+  if (remindedForDate) patch.reminded_for_date = remindedForDate;
+  const { error } = await db
+    .from('household_subscriptions')
+    .update(patch)
+    .eq('id', id);
+  if (error) throw error;
+}
+
 module.exports = {
   getAllHouseholds,
   getTasksDueNextWeek,
@@ -4790,4 +4871,11 @@ module.exports = {
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,
+  // Household subscriptions (Netflix, Spotify, etc.)
+  listSubscriptions,
+  createSubscription,
+  findSubscriptionByName,
+  deleteSubscription,
+  getSubscriptionsRenewingBetween,
+  updateSubscriptionRenewal,
 };
