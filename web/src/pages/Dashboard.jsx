@@ -359,10 +359,10 @@ export default function Dashboard() {
     if (!member) return null;
     const ac = avatarColors[member.color_theme] || avatarColors.sage;
     if (member.avatar_url) {
-      return <img src={member.avatar_url} alt={member.name} className="w-8 h-8 rounded-full object-cover" />;
+      return <img src={member.avatar_url} alt={member.name} className="w-7 h-7 rounded-full object-cover" />;
     }
     return (
-      <div className={`w-8 h-8 rounded-full ${ac} flex items-center justify-center text-xs font-bold`}>
+      <div className={`w-7 h-7 rounded-full ${ac} flex items-center justify-center text-xs font-bold`}>
         {member.name?.[0]?.toUpperCase()}
       </div>
     );
@@ -460,7 +460,7 @@ export default function Dashboard() {
                             </div>
                           ))}
                           {overflowCount > 0 && (
-                            <div className="ring-2 ring-cream rounded-full w-8 h-8 bg-linen text-cocoa text-[11px] font-semibold flex items-center justify-center">
+                            <div className="ring-2 ring-cream rounded-full w-7 h-7 bg-linen text-cocoa text-[11px] font-semibold flex items-center justify-center">
                               +{overflowCount}
                             </div>
                           )}
