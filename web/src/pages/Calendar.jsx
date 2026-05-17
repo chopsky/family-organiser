@@ -1936,6 +1936,24 @@ export default function Calendar() {
                       inputs have a wide intrinsic min-width that would
                       otherwise force the row to overflow. */}
                   <div className="flex-1 min-w-0 space-y-2">
+                    {/* All-day toggle — own row, right-aligned. Was inline
+                        with the start row, but on narrow phones it ate
+                        enough horizontal space that the native iOS date
+                        picker had no room to render "DD Mmm YYYY" and the
+                        date string wrapped/truncated. Promoting it to
+                        its own row frees the entire row width for the
+                        date+time pair on both lines. */}
+                    <div className="flex justify-end">
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-warm-grey cursor-pointer whitespace-nowrap select-none">
+                        <div
+                          className={`relative w-8 h-[18px] rounded-full transition-colors cursor-pointer ${formAllDay ? 'bg-plum' : 'bg-light-grey'}`}
+                          onClick={() => setFormAllDay(!formAllDay)}
+                        >
+                          <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${formAllDay ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                        </div>
+                        All day
+                      </label>
+                    </div>
                     {/* Start row */}
                     <div className="flex items-center gap-2">
                       <input
@@ -1957,16 +1975,6 @@ export default function Calendar() {
                           className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
-                      {/* All day toggle */}
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-warm-grey cursor-pointer whitespace-nowrap select-none">
-                        <div
-                          className={`relative w-8 h-[18px] rounded-full transition-colors cursor-pointer ${formAllDay ? 'bg-plum' : 'bg-light-grey'}`}
-                          onClick={() => setFormAllDay(!formAllDay)}
-                        >
-                          <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${formAllDay ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
-                        </div>
-                        All day
-                      </label>
                     </div>
                     {/* End row */}
                     <div className="flex items-center gap-2">
@@ -1987,8 +1995,6 @@ export default function Calendar() {
                           className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
                       )}
-                      {/* Spacer to align with all-day toggle */}
-                      <div className="w-[82px]" />
                     </div>
                   </div>
                 </div>
