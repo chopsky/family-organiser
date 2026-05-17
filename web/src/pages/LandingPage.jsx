@@ -585,6 +585,9 @@ export default function LandingPage() {
                 Start 30-day free trial <ArrowRight />
               </a>
             </div>
+            <div className="hero-price">
+              Then {pricing.monthly.amount}/month. Cancel anytime.
+            </div>
             <div className="hero-meta">
               <span className="stars">★★★★★</span>
               <span>4.9 · 2,100+ families</span>
