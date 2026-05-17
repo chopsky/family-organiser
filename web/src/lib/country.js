@@ -29,6 +29,30 @@ export const COUNTRY_LABELS = {
 };
 
 /**
+ * Per-country WhatsApp phone-number placeholder. Used in Settings →
+ * Connect WhatsApp and the onboarding ConnectWhatsApp step so users
+ * see a hint that matches their dialling code (a UK user sees +44…,
+ * a SA user sees +27…, etc.) rather than a one-size-fits-all GB
+ * example. UK uses the Ofcom-reserved 07700 9xxxxx range that's
+ * specifically allocated for examples; other countries use a
+ * non-allocated-but-plausible-looking format.
+ */
+const WHATSAPP_PHONE_PLACEHOLDERS = {
+  GB: '+44 7700 900000',
+  IE: '+353 85 123 4567',
+  US: '+1 555 123 4567',
+  CA: '+1 555 123 4567',
+  AU: '+61 412 345 678',
+  NZ: '+64 21 123 4567',
+  ZA: '+27 71 234 5678',
+};
+
+export function getWhatsAppPlaceholder(countryCode) {
+  if (!countryCode) return '+44 7700 900000';
+  return WHATSAPP_PHONE_PLACEHOLDERS[countryCode.toUpperCase()] || '+44 7700 900000';
+}
+
+/**
  * Country code from the marketing locale cookie set by useLocale (see
  * web/src/hooks/useLocale.js).
  *

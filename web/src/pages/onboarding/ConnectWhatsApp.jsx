@@ -15,11 +15,15 @@
 
 import { useState } from 'react';
 import api from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import { getWhatsAppPlaceholder } from '../../lib/country';
 import {
   serifHeading, serifHeadingStyle, kicker, primaryBtn, inputBase, skipLink,
 } from './_styles';
 
 export default function ConnectWhatsApp({ next, setError }) {
+  const { household } = useAuth();
+  const phonePlaceholder = getWhatsAppPlaceholder(household?.country);
   const [stage, setStage]     = useState('intro'); // intro | phone | code | done
   const [phone, setPhone]     = useState('');
   const [code, setCode]       = useState('');
@@ -110,7 +114,7 @@ export default function ConnectWhatsApp({ next, setError }) {
           </h1>
           <p className="text-cocoa mt-5 max-w-md mx-auto">
             We'll send you a 6-digit code to verify. Use the full international
-            format (e.g. <code>+44 7700 900 123</code>).
+            format (e.g. <code>{phonePlaceholder}</code>).
           </p>
         </div>
 
@@ -119,7 +123,7 @@ export default function ConnectWhatsApp({ next, setError }) {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+44 7700 900 123"
+            placeholder={phonePlaceholder}
             className={inputBase}
             autoComplete="tel"
             autoFocus

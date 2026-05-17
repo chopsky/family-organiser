@@ -8,6 +8,7 @@ import Spinner from '../components/Spinner';
 import { IconSettings } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
+import { getWhatsAppPlaceholder } from '../lib/country';
 
 const avatarColors = {
   red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
@@ -1057,7 +1058,7 @@ export default function Settings() {
                 type="tel"
                 value={whatsappPhone}
                 onChange={(e) => setWhatsappPhone(e.target.value)}
-                placeholder="+44 7700 900000"
+                placeholder={getWhatsAppPlaceholder(household?.country)}
                 className="flex-1 border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
               />
               <button
