@@ -448,7 +448,7 @@ export default function Dashboard() {
                   const visibleAvatars = assignees.slice(0, 3);
                   const overflowCount = assignees.length - visibleAvatars.length;
                   return (
-                    <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
+                    <div key={ev.id || i} className="flex items-center gap-2 px-3 py-2.5 bg-cream rounded-xl">
                       <span className={`w-[3px] h-7 rounded-full shrink-0 ${barColor}`} />
                       <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-10">{formatTime(ev.start_time)}</span>
                       <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
