@@ -7,9 +7,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Housemait uses the camera so you can scan receipts and snap photos of school letters, appointment slips and other documents to add to your household.</string>
+	<string>Housemait uses the camera so you can set a profile or household photo, scan receipts, and snap photos of school letters, appointment slips and other documents to add to your household.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Housemait needs access to your photo library so you can attach existing photos to documents and shopping items.</string>
+	<string>Housemait needs access to your photo library so you can set a profile or household photo and attach existing photos to documents and shopping items.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Housemait uses your microphone to convert speech to text when you tap the voice input button on the AI chat.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
