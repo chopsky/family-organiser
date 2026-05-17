@@ -1,6 +1,8 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
 const { pickDigestFooter } = require('../utils/whatsapp-tips');
+const { buildDigestWeatherLine } = require('../utils/weather-line');
+const { fetchTodayForecastForHousehold } = require('../services/digest-weather');
 
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 
@@ -47,11 +49,17 @@ function formatEventAssignee(ev) {
  * @param {string} [tz='Europe/London'] - Household timezone for time formatting
  * @returns {string}
  */
-function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActivities, tz = 'Europe/London', linkedAt = null) {
+function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActivities, tz = 'Europe/London', linkedAt = null, weatherLine = null) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   const lines = [`${greeting}, ${user.name}! Here's what's on for today:\n`];
+
+  // Weather one-liner — null on quiet days so we don't pad with filler.
+  if (weatherLine) {
+    lines.push(weatherLine);
+    lines.push('');
+  }
 
   // School activities for today
   if (schoolActivities && schoolActivities.length > 0) {
@@ -152,6 +160,17 @@ async function sendDailyReminders(householdId, singleMember) {
   // household (events are household-wide, not per-member).
   const todayEvents = await fetchTodayEvents(householdId, today);
 
+  // Today's weather one-liner — one fetch per household run, shared
+  // across every member's digest. Cached 12h inside the helper so a
+  // re-trigger / second cron tick doesn't re-fetch.
+  let weatherLine = null;
+  try {
+    const forecast = await fetchTodayForecastForHousehold(household);
+    weatherLine = buildDigestWeatherLine(forecast);
+  } catch (e) {
+    console.warn('[reminders] weather fetch failed:', e.message);
+  }
+
   const targets = singleMember ? [singleMember] : await db.getHouseholdMembers(householdId);
 
   for (const member of targets) {
@@ -193,6 +212,7 @@ async function sendDailyReminders(householdId, singleMember) {
       schoolActivities,
       tz,
       member.whatsapp_linked_at || null,
+      weatherLine,
     );
 
     // Send via WhatsApp
