@@ -6,6 +6,7 @@ import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings }
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
+import { confirmDestructive } from '../lib/action-sheet';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -828,7 +829,8 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id) {
-    if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    const ok = await confirmDestructive({ title: 'Delete this event?', message: 'This cannot be undone.' });
+    if (!ok) return;
     // Optimistic: yank from local state + close the modal immediately so the
     // user sees instant feedback. The reconciling load() runs in the
     // background and is mostly a safety net (a parallel update from another
@@ -866,7 +868,8 @@ export default function Calendar() {
   }
 
   async function deleteTask(task) {
-    if (!window.confirm(`Delete "${task.title}"? This can't be undone.`)) return;
+    const ok = await confirmDestructive({ title: `Delete "${task.title}"?`, message: "This can't be undone." });
+    if (!ok) return;
     setDeletingTask(prev => new Set(prev).add(task.id));
     try {
       await api.delete(`/tasks/${task.id}`);

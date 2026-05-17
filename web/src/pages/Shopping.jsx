@@ -6,6 +6,8 @@ import ErrorBanner from '../components/ErrorBanner';
 import { WriteGate } from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
+import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
+import { confirmDestructive } from '../lib/action-sheet';
 
 function AisleIcon({ aisle, stroke }) {
   const props = {
@@ -128,6 +130,11 @@ export default function Shopping() {
   useEffect(() => {
     loadLists();
   }, [loadLists]);
+
+  // Pull-to-refresh — fetch lists + items in parallel. No-op on web.
+  const ptr = usePullToRefresh(async () => {
+    await Promise.all([loadLists(), loadItems()].map(p => p?.catch?.(() => {})));
+  });
 
   // Load items when active list changes
   const loadItems = useCallback(async () => {
@@ -269,7 +276,12 @@ export default function Shopping() {
   }
 
   async function deleteList(listId, listName) {
-    if (!window.confirm(`Delete "${listName}" list and all its items?`)) return;
+    const ok = await confirmDestructive({
+      title: `Delete "${listName}" list?`,
+      message: 'Every item on this list will be removed.',
+      confirmLabel: 'Delete list',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/shopping-lists/${listId}`);
       await loadLists();
@@ -319,7 +331,8 @@ export default function Shopping() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
+    <div {...ptr.bindings} className="max-w-3xl mx-auto space-y-5">
+      <PullIndicator state={ptr.state} />
       {/* Page header */}
       <div className="flex items-center gap-3">
         <div

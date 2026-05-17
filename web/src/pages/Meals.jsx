@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { loadCached } from '../lib/offlineCache';
+import { confirmDestructive } from '../lib/action-sheet';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
@@ -216,7 +217,8 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
 
   // Delete meal
   async function deleteMeal(id) {
-    if (!window.confirm('Remove this meal from the plan?')) return;
+    const ok = await confirmDestructive({ title: 'Remove this meal from the plan?', confirmLabel: 'Remove' });
+    if (!ok) return;
     try {
       await api.delete(`/meals/${id}`);
       setDetailMeal(null);
@@ -1183,7 +1185,8 @@ function RecipeBoxView({ setError }) {
 
   // Delete recipe
   async function deleteRecipe(id) {
-    if (!window.confirm('Delete this recipe? This cannot be undone.')) return;
+    const ok = await confirmDestructive({ title: 'Delete this recipe?', message: 'This cannot be undone.' });
+    if (!ok) return;
     try {
       await api.delete(`/recipes/${id}`);
       setDetailRecipe(null);

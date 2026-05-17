@@ -8,6 +8,7 @@ import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
+import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -261,6 +262,17 @@ export default function Dashboard() {
   const [nlSending, setNlSending] = useState(false);
   const [nlResult, setNlResult] = useState('');
 
+  // Pull-to-refresh: refetches digest + schools. No-op on web.
+  const ptr = usePullToRefresh(async () => {
+    await Promise.all([
+      api.get('/digest').then(r => setDigest(r.data)).catch(() => {}),
+      api.get('/schools').then(r => {
+        const s = r.data?.schools;
+        setSchoolData(Array.isArray(s) ? s : []);
+      }).catch(() => {}),
+    ]);
+  });
+
   useEffect(() => {
     loadCached('digest', () => api.get('/digest').then(r => r.data), setDigest)
       .catch(() => setError('Could not load dashboard data.'))
@@ -377,7 +389,8 @@ export default function Dashboard() {
 
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div {...ptr.bindings} className="max-w-5xl mx-auto space-y-6">
+      <PullIndicator state={ptr.state} />
       {/* Greeting — kicker (date + event count) above, serif headline below.
           Matches the Housemait editorial greeting style. */}
       <div>

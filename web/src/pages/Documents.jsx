@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { confirmDestructive } from '../lib/action-sheet';
 import {
   IconFolder, IconFileText, IconPlus, IconUpload, IconDownload,
   IconTrash, IconLock, IconEye, IconGrid, IconList, IconX,
@@ -151,7 +152,12 @@ export default function Documents() {
   }
 
   async function handleDeleteFolder(folderId) {
-    if (!confirm('Delete this folder and all its contents? This cannot be undone.')) return;
+    const ok = await confirmDestructive({
+      title: 'Delete this folder?',
+      message: 'Every document inside will also be deleted. This cannot be undone.',
+      confirmLabel: 'Delete folder',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/documents/folders/${folderId}`);
       fetchData();
@@ -209,7 +215,11 @@ export default function Documents() {
   }
 
   async function handleDeleteDocument(docId) {
-    if (!confirm('Delete this document? This cannot be undone.')) return;
+    const ok = await confirmDestructive({
+      title: 'Delete this document?',
+      message: 'This cannot be undone.',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/documents/${docId}`);
       fetchData();

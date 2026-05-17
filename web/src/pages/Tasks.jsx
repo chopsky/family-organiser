@@ -8,6 +8,7 @@ import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
+import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 
 /* ─── Constants ─── */
 
@@ -707,8 +708,12 @@ export default function Tasks() {
 
   /* ─ Render ─ */
 
+  // Pull-to-refresh — re-runs the same load() the page uses on mount. No-op on web.
+  const ptr = usePullToRefresh(async () => { await load(); });
+
   return (
-    <div className="space-y-5">
+    <div {...ptr.bindings} className="space-y-5">
+      <PullIndicator state={ptr.state} />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1
