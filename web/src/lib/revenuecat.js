@@ -100,6 +100,33 @@ export async function configure() {
 }
 
 /**
+ * Read the App Store storefront country for the current user.
+ *
+ * On iOS this returns the ISO 3166-1 alpha-2 code of the user's Apple
+ * ID's Country/Region setting (e.g. 'ZA', 'GB'). That's the same
+ * country Apple uses to determine App Store pricing, IAP availability,
+ * and which subscription tiers the user can buy — so it's the most
+ * authoritative single signal for "where this user actually is" at
+ * signup time. Far more reliable than browser timezone (which can
+ * differ for travellers, expats, or anyone whose device clock has
+ * been overridden).
+ *
+ * Returns null on web, on Android, before RevenueCat is configured,
+ * or on any SDK error — caller should fall back to other signals.
+ */
+export async function getStorefrontCountry() {
+  if (!isIapPlatform()) return null;
+  try {
+    const { countryCode } = await Purchases.getStorefront();
+    if (typeof countryCode !== 'string' || countryCode.length !== 2) return null;
+    return countryCode.toUpperCase();
+  } catch (err) {
+    console.warn('[revenuecat] getStorefront failed:', err?.message || err);
+    return null;
+  }
+}
+
+/**
  * Tell RevenueCat the current user's identifier (our household.id).
  * Subsequent purchases / webhook events will carry this as
  * app_user_id, which our webhook handler resolves directly to a

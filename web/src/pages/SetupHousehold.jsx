@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { detectCountryFromTimezone, detectCountryFromLocaleCookie } from '../lib/country';
 import { readLocaleCookie } from '../hooks/useLocale';
+import { getStorefrontCountry } from '../lib/revenuecat';
 import ErrorBanner from '../components/ErrorBanner';
 
 export default function SetupHousehold() {
@@ -32,21 +33,27 @@ export default function SetupHousehold() {
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
       // Country detection cascade:
-      //   1. Locale cookie (housemait-locale) — set when the visitor landed
-      //      on a country-specific marketing page (/gb, /us, /za, etc.).
-      //      Driven by Vercel's edge geo-routing, so it reflects what we
-      //      actually KNOW about the visitor from their IP. Most reliable.
-      //   2. Browser timezone — fallback when no locale cookie exists
-      //      (visitor came directly to /signup, or via /eu which covers
-      //      multiple countries).
+      //   1. App Store storefront (iOS only) — the user's Apple ID
+      //      Country/Region. This is the single most authoritative
+      //      signal for App Store installs because it's the same
+      //      country Apple uses for IAP pricing, so what we store
+      //      always matches what they're paying. Travellers and
+      //      expats classified correctly without us having to guess.
+      //   2. Locale cookie (housemait-locale) — set by Vercel edge
+      //      middleware when the web visitor lands on a country-
+      //      specific marketing page (/gb, /us, /za, etc.). Reflects
+      //      what we KNOW from their IP at landing time.
+      //   3. Browser timezone — last-resort fallback for direct
+      //      /signup visits with no cookie (and not on iOS).
       //
-      // Cookie wins over timezone because the marketing site IS the
-      // source of truth for what region the visitor signed up for. A
-      // Canadian on a US-locked timezone is correctly classified as CA
-      // via the cookie; a UK expat in Spain who came in via /gb is
-      // correctly classified as GB.
+      // Storefront wins over cookie because the App Store country is
+      // immutable per Apple ID and matches the user's purchase
+      // experience. Cookie wins over timezone because the marketing
+      // site IS the source of truth for what region a web visitor
+      // signed up for.
       const country =
-        detectCountryFromLocaleCookie(readLocaleCookie())
+        (await getStorefrontCountry())
+        || detectCountryFromLocaleCookie(readLocaleCookie())
         || detectCountryFromTimezone(timezone);
       const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone, country });
       login(data);
