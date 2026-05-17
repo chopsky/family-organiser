@@ -1,5 +1,6 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
+const { pickDigestFooter } = require('../utils/whatsapp-tips');
 
 // ─── Message builders (pure functions — easy to test) ─────────────────────────
 
@@ -46,7 +47,7 @@ function formatEventAssignee(ev) {
  * @param {string} [tz='Europe/London'] - Household timezone for time formatting
  * @returns {string}
  */
-function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActivities, tz = 'Europe/London') {
+function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActivities, tz = 'Europe/London', linkedAt = null) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -87,10 +88,11 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
     lines.push('🛒 *SHOPPING:* List is empty — all done!');
   }
 
-  // Discovery footer — most users wouldn't otherwise know /tasks, /mytasks,
-  // /help exist. Single quiet line keeps it out of the way.
+  // Discovery footer — rotates through "💡 Did you know…" tips for
+  // the first 14 days post-WhatsApp-link, then settles into a quiet
+  // "_Reply /help for all commands._" line.
   lines.push('');
-  lines.push('_Reply /help for all commands._');
+  lines.push(pickDigestFooter(linkedAt));
 
   return lines.join('\n').trim();
 }
@@ -190,6 +192,7 @@ async function sendDailyReminders(householdId, singleMember) {
       shoppingCount,
       schoolActivities,
       tz,
+      member.whatsapp_linked_at || null,
     );
 
     // Send via WhatsApp

@@ -1156,10 +1156,13 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid or expired code. Please request a new one.' });
     }
 
-    // Link the phone number
+    // Link the phone number. whatsapp_linked_at lets the morning-digest
+    // job calculate "days since linked" so it can surface a rotating
+    // tip footer for the first ~14 days.
     await db.updateUser(req.user.id, {
       whatsapp_phone: record.phone,
       whatsapp_linked: true,
+      whatsapp_linked_at: new Date().toISOString(),
     });
 
     await db.markWhatsAppVerificationCodeUsed(record.id);
@@ -1167,20 +1170,24 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
 
     // Send a welcome / onboarding message. Fire-and-forget — a WhatsApp
     // hiccup must not break the connect flow since the DB is already updated.
+    //
+    // The welcome stays deliberately tight (only the headline use cases
+    // + a "more to come" line). Feature discovery is dripped via a
+    // "💡 Did you know…" footer on the morning digest for the first 14
+    // days — see src/utils/whatsapp-tips.js + src/jobs/reminders.js.
     const whatsapp = require('../services/whatsapp');
     const welcome = [
-      `👋 Welcome to Housemait, ${req.user.name}!`,
+      `👋 Hey ${req.user.name} — Housemait here.`,
       '',
-      `Here's what you can do — just chat naturally:`,
+      `I'm your family's calm second brain. Just message me like a friend:`,
       '',
-      `🛒 "We need milk and eggs" — adds to shopping list`,
-      `📋 "Remind me to book car service" — creates a task`,
-      `📅 "Dentist on Tuesday at 3pm" — adds to calendar`,
-      `🍲 "Recipe for shepherd's pie" — generates a recipe`,
-      `🌤 "Will it rain today?" — weather`,
-      `❓ Ask me anything about your household`,
+      `  🛒 "We need milk and eggs"`,
+      `  📋 "Remind me to book the dentist"`,
+      `  📅 "Sofia football Saturday 10am"`,
       '',
-      `📌 *Pin this chat* so it stays at the top — swipe right (iOS) or tap-and-hold (Android), then tap Pin.`,
+      `I can also help with recipes, weather, school dates, receipts, and lots more — but no rush. I'll show you new tricks over the next few days.`,
+      '',
+      `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
     ].join('\n');
 
     whatsapp.sendMessage(record.phone, welcome).catch((err) => {
