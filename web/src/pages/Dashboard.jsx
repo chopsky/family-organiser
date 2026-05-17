@@ -449,8 +449,8 @@ export default function Dashboard() {
                   const overflowCount = assignees.length - visibleAvatars.length;
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
+                      <span className={`w-[3px] h-7 rounded-full shrink-0 ${barColor}`} />
                       <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-10">{formatTime(ev.start_time)}</span>
-                      <span className={`w-[3px] h-6 rounded-full shrink-0 ${barColor}`} />
                       <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
                       {visibleAvatars.length > 0 && (
                         <div className="shrink-0 flex -space-x-2">
