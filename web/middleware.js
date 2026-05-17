@@ -84,6 +84,15 @@ function pathForCountry(country) {
   return '/'; // international default — x-default in hreflang
 }
 
+/** Returns the bare locale code ('gb'/'us'/'eu'/...) for a country, or
+ *  null when the country isn't one we have a locale for. Used to stamp
+ *  the housemait-locale cookie on transactional routes. */
+function localeCodeForCountry(country) {
+  const path = pathForCountry(country);
+  if (path === '/') return null; // no useful locale for this country
+  return path.slice(1); // strip leading slash → 'gb'/'us'/'za'/...
+}
+
 export default function middleware(request) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -92,8 +101,29 @@ export default function middleware(request) {
   // well-known endpoints. These render the same for every visitor and
   // must remain universally reachable so e.g. a UK customer logging in
   // from a US-IP airport WiFi isn't bounced.
-  if (SKIP_PATHS.has(path)) return;
-  if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return;
+  //
+  // BUT: stamp the housemait-locale cookie on these paths if it's
+  // missing, so a direct visit to /signup (no prior marketing-page
+  // render) still carries the visitor's geo-derived country into the
+  // signup flow. Without this, /signup falls back to browser timezone,
+  // which misclassifies travellers/expats. Self-redirect to install
+  // the cookie; the second pass through middleware sees it set and
+  // returns immediately (no loop).
+  if (SKIP_PATHS.has(path) || SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
+    const cookieHeader = request.headers.get('cookie') || '';
+    if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return; // already set
+    const country = request.headers.get('x-vercel-ip-country') || '';
+    const code = localeCodeForCountry(country);
+    if (!code) return; // unrecognized country — leave the page alone
+    const maxAge = 60 * 60 * 24 * 30; // 30 days, mirrors useLocale.js
+    const headers = new Headers();
+    headers.set(
+      'Set-Cookie',
+      `housemait-locale=${code}; Path=/; Max-Age=${maxAge}; SameSite=Lax; Secure`,
+    );
+    headers.set('Location', request.url);
+    return new Response(null, { status: 307, headers });
+  }
 
   // Bot bypass MUST come before the geo check. Googlebot's IP geolocates
   // to the US, but we still want it to be able to crawl /gb so that
