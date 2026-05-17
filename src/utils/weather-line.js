@@ -69,13 +69,18 @@ function buildDigestWeatherLine(forecast) {
     return `☀️ Sunny in ${city} today — ${hi}°C high.`;
   }
 
-  // 8. Partly cloudy + warm → still worth mentioning if it's nice out
-  if ((code === 2 || code === 3) && hi >= 20) {
-    return `🌤 Mild and ${code === 2 ? 'partly cloudy' : 'cloudy'} in ${city} — ${hi}°C high.`;
+  // 8. Partly cloudy / overcast — always include so users know what
+  //    to expect on the way out. Phrasing splits by warmth.
+  if (code === 2 || code === 3) {
+    const adj = code === 2 ? 'partly cloudy' : 'cloudy';
+    if (hi >= 20) return `🌤 Mild and ${adj} in ${city} — ${hi}°C high.`;
+    if (hi >= 12) return `🌤 ${adj.charAt(0).toUpperCase()}${adj.slice(1)} in ${city} — ${hi}°C high.`;
+    return `🌤 Cool and ${adj} in ${city} — ${hi}°C high.`;
   }
 
-  // 9. Nothing actionable — omit the line entirely.
-  return null;
+  // 9. Catch-all — never omit, even for unknown WMO codes. People
+  //    want to glance at the digest and know what to wear.
+  return `🌤 ${hi}°C high in ${city} today (low ${lo}°).`;
 }
 
 module.exports = { buildDigestWeatherLine };
