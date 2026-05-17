@@ -444,11 +444,28 @@ export default function Dashboard() {
                   const assignees = getMembersForEvent(ev);
                   const primary = assignees[0];
                   const barColor = (primary && dotColors[primary.color_theme]) || getEventDotColor(ev, i);
+                  // Stack up to 3 avatars; overflow shows "+N" pill.
+                  const visibleAvatars = assignees.slice(0, 3);
+                  const overflowCount = assignees.length - visibleAvatars.length;
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
-                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-12">{formatTime(ev.start_time)}</span>
+                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-10">{formatTime(ev.start_time)}</span>
                       <span className={`w-[3px] h-6 rounded-full shrink-0 ${barColor}`} />
                       <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
+                      {visibleAvatars.length > 0 && (
+                        <div className="shrink-0 flex -space-x-2">
+                          {visibleAvatars.map(m => (
+                            <div key={m.id} className="ring-2 ring-cream rounded-full">
+                              {getMemberAvatar(m)}
+                            </div>
+                          ))}
+                          {overflowCount > 0 && (
+                            <div className="ring-2 ring-cream rounded-full w-8 h-8 bg-linen text-cocoa text-[11px] font-semibold flex items-center justify-center">
+                              +{overflowCount}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
