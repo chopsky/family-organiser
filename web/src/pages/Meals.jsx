@@ -641,7 +641,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       {/* Shopping List Summary Modal */}
       {shoppingListSummary && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] flex flex-col">
+          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl pb-safe sm:pb-0 border border-cream-border max-h-[85vh] flex flex-col">
             <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-bark">Shopping List Updated</h3>
@@ -705,7 +705,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
       {/* AI Suggestions modal */}
       {suggestResults && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] flex flex-col">
+          <div className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl pb-safe sm:pb-0 border border-cream-border max-h-[85vh] flex flex-col">
             <div className="px-5 py-4 border-b border-cream-border flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-bark">Dinner Suggestions</h3>
@@ -785,7 +785,7 @@ const MealDetailPopup = forwardRef(function MealDetailPopup({ meal, onClose, onE
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div ref={ref} className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl  border border-cream-border max-h-[85vh] overflow-y-auto">
+      <div ref={ref} className="bg-linen w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl pb-safe sm:pb-0 border border-cream-border max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className={`px-5 py-4 ${colors.bg} sm:rounded-t-2xl`}>
           <div className="flex items-start justify-between">

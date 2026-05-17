@@ -98,6 +98,15 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Bottom-sheet safe padding. Drops onto any element whose bottom
+     edge sits flush with the viewport bottom (bottom-anchored
+     modals, banners). Keeps content clear of the iPhone home
+     indicator while preserving a sensible default on non-notched
+     devices. */
+  .pb-safe {
+    padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
+  }
+
   /* ── iOS safe-area insets (Capacitor / PWA) ── */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);

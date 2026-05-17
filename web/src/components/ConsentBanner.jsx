@@ -49,7 +49,7 @@ export default function ConsentBanner() {
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4 md:px-6 md:pb-6 pointer-events-none"
+      className="fixed inset-x-0 bottom-0 z-[60] px-4 pb-safe md:px-6 pointer-events-none"
     >
       <div
         className="mx-auto max-w-3xl bg-white border border-cream-border rounded-2xl shadow-[0_10px_30px_-12px_rgba(74,29,130,0.18),0_4px_12px_rgba(27,20,36,0.06)] p-5 md:p-6 pointer-events-auto"

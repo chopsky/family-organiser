@@ -316,8 +316,14 @@ export default function Layout({ children }) {
               }`
             }
           >
-            <Icon className="h-[26px] w-[26px]" />
-            <span className="text-[11px] font-semibold tracking-[0.01em]">{label}</span>
+            {({ isActive }) => (
+              <>
+                {/* Bolder stroke when active — mimics the SF Symbols
+                    active-state look without needing filled icon variants. */}
+                <Icon className="h-[26px] w-[26px]" strokeWidth={isActive ? 2.4 : 1.5} />
+                <span className="text-[11px] font-semibold tracking-[0.01em]">{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
 
