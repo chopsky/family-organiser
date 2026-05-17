@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -9,6 +9,7 @@ import { WriteGate } from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -263,7 +264,7 @@ export default function Dashboard() {
   const [nlResult, setNlResult] = useState('');
 
   // Pull-to-refresh: refetches digest + schools. No-op on web.
-  const ptr = usePullToRefresh(async () => {
+  const refreshAll = useCallback(async () => {
     await Promise.all([
       api.get('/digest').then(r => setDigest(r.data)).catch(() => {}),
       api.get('/schools').then(r => {
@@ -271,7 +272,12 @@ export default function Dashboard() {
         setSchoolData(Array.isArray(s) ? s : []);
       }).catch(() => {}),
     ]);
-  });
+  }, []);
+  const ptr = usePullToRefresh(refreshAll);
+
+  // Refresh when the app comes back to foreground (iOS). Throttled
+  // to 30s so quick app-switches don't volley refreshes.
+  useAppForegroundRefresh(refreshAll);
 
   useEffect(() => {
     loadCached('digest', () => api.get('/digest').then(r => r.data), setDigest)

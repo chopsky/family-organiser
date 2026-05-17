@@ -7,6 +7,7 @@ import { WriteGate } from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
 
 function AisleIcon({ aisle, stroke }) {
@@ -132,9 +133,12 @@ export default function Shopping() {
   }, [loadLists]);
 
   // Pull-to-refresh — fetch lists + items in parallel. No-op on web.
-  const ptr = usePullToRefresh(async () => {
+  const refreshAll = useCallback(async () => {
     await Promise.all([loadLists(), loadItems()].map(p => p?.catch?.(() => {})));
-  });
+  }, [loadLists, loadItems]);
+  const ptr = usePullToRefresh(refreshAll);
+  // Foreground refresh — re-pulls when the app returns from background.
+  useAppForegroundRefresh(refreshAll);
 
   // Load items when active list changes
   const loadItems = useCallback(async () => {

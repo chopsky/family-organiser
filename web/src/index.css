@@ -98,6 +98,25 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Kill the iOS long-press text-selection callout on UI chrome.
+     Long-pressing a button or label currently pops "Copy / Select All"
+     — a giveaway that this is a WebView. Disable selection by default
+     on the app root; re-enable only on actual text content (paragraphs,
+     headings, list items) + any input/editable surface.
+     Inputs explicitly re-enable selection so users can copy/paste text
+     they're editing. */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  p, h1, h2, h3, h4, h5, h6, li, blockquote, code, pre,
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
   /* Bottom-sheet safe padding. Drops onto any element whose bottom
      edge sits flush with the viewport bottom (bottom-anchored
      modals, banners). Keeps content clear of the iPhone home

@@ -9,6 +9,7 @@ import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 
 /* ─── Constants ─── */
 
@@ -710,6 +711,8 @@ export default function Tasks() {
 
   // Pull-to-refresh — re-runs the same load() the page uses on mount. No-op on web.
   const ptr = usePullToRefresh(async () => { await load(); });
+  // Foreground refresh — re-pulls when the app comes back from background.
+  useAppForegroundRefresh(load);
 
   return (
     <div {...ptr.bindings} className="space-y-5">
