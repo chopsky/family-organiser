@@ -11,7 +11,7 @@
 
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getLocaleByPath, LOCALE_COOKIE } from '../lib/locales';
+import { getLocaleByPath, LOCALE_COOKIE, LOCALES } from '../lib/locales';
 
 export function useLocale() {
   const { pathname } = useLocation();
@@ -39,4 +39,20 @@ export function readLocaleCookie() {
   if (typeof document === 'undefined') return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${LOCALE_COOKIE}=([^;]+)`));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+/** Resolve the marketing-homepage path for the visitor's saved locale —
+ *  e.g. '/gb' if they came in from the UK marketing page, '/' if no
+ *  locale cookie has been set yet. Used by logo links on /login and
+ *  /signup so clicking "home" sends the visitor back to the country
+ *  marketing page they came from, not the international default.
+ *
+ *  This is a CLIENT-side equivalent of the edge middleware's
+ *  pathForCountry() — needed because React Router's <Link> doesn't go
+ *  through Vercel's edge, so the geo redirect never fires for in-app
+ *  navigation. */
+export function localeHomePath() {
+  const code = readLocaleCookie();
+  if (code && LOCALES[code]) return LOCALES[code].path;
+  return '/';
 }
