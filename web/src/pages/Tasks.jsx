@@ -7,6 +7,7 @@ import { IconCheck, IconPlus } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
+import { confirm as hapticConfirm } from '../lib/haptics';
 
 /* ─── Constants ─── */
 
@@ -667,6 +668,7 @@ export default function Tasks() {
   }
 
   async function toggle(task) {
+    hapticConfirm();
     setToggling((s) => new Set([...s, task.id]));
     try {
       await api.patch(`/tasks/${task.id}`, { completed: !task.completed });

@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { WriteGate } from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
+import { confirm as hapticConfirm } from '../lib/haptics';
 
 function AisleIcon({ aisle, stroke }) {
   const props = {
@@ -201,6 +202,7 @@ export default function Shopping() {
 
   async function toggleItem(item) {
     const next = !item.completed;
+    hapticConfirm(); // medium-impact "committed action" tick
     const completedAt = next ? new Date().toISOString() : null;
     setItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, completed: next, completed_at: completedAt } : i))

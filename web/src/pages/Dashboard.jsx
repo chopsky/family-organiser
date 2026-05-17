@@ -7,6 +7,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
+import { confirm as hapticConfirm } from '../lib/haptics';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -294,6 +295,7 @@ export default function Dashboard() {
 
   // Toggle task completion
   async function toggleTask(task) {
+    hapticConfirm();
     try {
       await api.patch(`/tasks/${task.id}`, { completed: !task.completed });
       const { data } = await api.get('/digest');

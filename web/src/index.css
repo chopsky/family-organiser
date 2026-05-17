@@ -83,6 +83,21 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Native-feel scroll on iOS: stop overscroll from chaining into the
+     parent (so the app body doesn't bounce when a list inside is at
+     the edge). Tailwind v4's `hover:` variant is already gated by
+     `@media (hover: hover)`, so sticky-tap-hover isn't a thing for us. */
+  body, html {
+    overscroll-behavior: contain;
+  }
+
+  /* Disable tap-highlight on iOS — that grey/black flash on tap reads
+     as web-y. Components define their own :active feedback (now also
+     via haptics) where wanted. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* ── iOS safe-area insets (Capacitor / PWA) ── */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);

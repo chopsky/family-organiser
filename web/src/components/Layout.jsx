@@ -7,6 +7,7 @@ import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, 
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
+import { tap as hapticTap } from '../lib/haptics';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
@@ -308,6 +309,7 @@ export default function Layout({ children }) {
           <NavLink
             key={to}
             to={to}
+            onClick={() => { hapticTap(); }}
             className={({ isActive }) =>
               `flex-1 max-w-[80px] flex flex-col items-center gap-[3px] py-1 ${
                 isActive ? 'text-plum' : 'text-warm-grey'
