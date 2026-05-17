@@ -436,7 +436,7 @@ export default function Dashboard() {
           {todayEvents.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">No events today</p>
           ) : (
-            <div className="divide-y divide-[#1b14240f]">
+            <div className="space-y-2">
               {todayEvents
                 .sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date))
                 .slice(0, 4)
@@ -444,37 +444,11 @@ export default function Dashboard() {
                   const assignees = getMembersForEvent(ev);
                   const primary = assignees[0];
                   const barColor = (primary && dotColors[primary.color_theme]) || getEventDotColor(ev, i);
-                  const duration = formatDuration(ev.start_time, ev.end_time);
-                  // The avatars on the right already show who's involved —
-                  // keep the subtitle to just duration so the row stays light.
-                  const metaParts = [duration].filter(Boolean);
-                  // Stack up to 3 avatars; overflow shows "+N" pill.
-                  const visibleAvatars = assignees.slice(0, 3);
-                  const overflowCount = assignees.length - visibleAvatars.length;
                   return (
-                    <div key={ev.id || i} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                    <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-xl">
                       <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-12">{formatTime(ev.start_time)}</span>
-                      <span className={`w-[3px] h-10 rounded-full shrink-0 ${barColor}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-bark truncate">{ev.title}</p>
-                        {metaParts.length > 0 && (
-                          <p className="text-xs text-cocoa truncate mt-0.5">{metaParts.join(' · ')}</p>
-                        )}
-                      </div>
-                      {visibleAvatars.length > 0 && (
-                        <div className="shrink-0 flex -space-x-2">
-                          {visibleAvatars.map(m => (
-                            <div key={m.id} className="ring-2 ring-linen rounded-full">
-                              {getMemberAvatar(m)}
-                            </div>
-                          ))}
-                          {overflowCount > 0 && (
-                            <div className="ring-2 ring-linen rounded-full w-8 h-8 bg-cream text-cocoa text-[11px] font-semibold flex items-center justify-center">
-                              +{overflowCount}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <span className={`w-[3px] h-6 rounded-full shrink-0 ${barColor}`} />
+                      <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
                     </div>
                   );
                 })}
