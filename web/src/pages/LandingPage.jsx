@@ -588,12 +588,6 @@ export default function LandingPage() {
             <div className="hero-price">
               Then {pricing.monthly.amount}/month. Cancel anytime.
             </div>
-            <div className="hero-meta">
-              <span className="stars">★★★★★</span>
-              <span>4.9 · 2,100+ families</span>
-              <span className="divider" />
-              <span>No credit card to start</span>
-            </div>
             <div className="quicks">
               {QUICK_CHIPS.map(c => (
                 <span className="chip" key={c.label}>
