@@ -8,6 +8,7 @@ import { useCanWrite } from '../context/SubscriptionContext';
 import { isUkHousehold, isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
+import { pickPhoto } from '../lib/photo-picker';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
@@ -1079,7 +1080,10 @@ export default function FamilySetup() {
   // changing the household name + address.
   async function handleDirectHouseholdAvatarUpload(file) {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
+    // Blobs from the iOS Camera plugin have .type set ('image/jpeg' or
+    // similar) but no .name; web File objects have both. Either way
+    // type-check works.
+    if (file.type && !file.type.startsWith('image/')) {
       setError('Please choose an image file.');
       return;
     }
@@ -1091,7 +1095,8 @@ export default function FamilySetup() {
     setError('');
     try {
       const form = new FormData();
-      form.append('avatar', file);
+      // Synthesize a filename for blobs that don't carry one.
+      form.append('avatar', file, file.name || 'household.jpg');
       const { data } = await api.post('/household/avatar', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -1332,7 +1337,16 @@ export default function FamilySetup() {
               the wrapping <label> + hidden input — no modal in the way.
               The Edit button to the right of the household name still
               opens the modal for changing name + address. */}
-          <label
+          <button
+            type="button"
+            disabled={!isAdmin || uploadingHouseholdAvatar}
+            onClick={async () => {
+              if (!isAdmin || uploadingHouseholdAvatar) return;
+              // On iOS: native photo picker (Photo Library / Take Photo).
+              // On web: hidden <input type="file"> click. Same return shape.
+              const blob = await pickPhoto();
+              if (blob) await handleDirectHouseholdAvatarUpload(blob);
+            }}
             className={`shrink-0 relative group ${isAdmin && !uploadingHouseholdAvatar ? 'cursor-pointer' : 'cursor-default'}`}
             aria-label={isAdmin ? 'Change household photo' : 'Household photo'}
             title={isAdmin ? 'Click to change photo' : ''}
@@ -1351,22 +1365,7 @@ export default function FamilySetup() {
                 )}
               </span>
             )}
-            {isAdmin && (
-              <input
-                type="file"
-                accept="image/*"
-                disabled={uploadingHouseholdAvatar}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleDirectHouseholdAvatarUpload(file);
-                  // Reset the input so the same file can be re-picked
-                  // immediately (e.g. user picks wrong, picks again).
-                  e.target.value = '';
-                }}
-                className="sr-only"
-              />
-            )}
-          </label>
+          </button>
 
           <div className="flex-1 min-w-0">
             <h2 className="text-[22px] font-semibold text-bark truncate" style={{ letterSpacing: '-0.01em' }}>

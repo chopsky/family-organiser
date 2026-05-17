@@ -9,6 +9,7 @@ import { IconSettings } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { getWhatsAppPlaceholder } from '../lib/country';
+import { pickPhoto } from '../lib/photo-picker';
 
 const avatarColors = {
   red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
@@ -346,13 +347,14 @@ export default function Settings() {
     setEditingProfile(true);
   }
 
-  async function handleAvatarUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadAvatarBlob(blob) {
+    if (!blob) return;
     setUploadingAvatar(true);
     try {
       const formData = new FormData();
-      formData.append('avatar', file);
+      // Camera-plugin Blobs don't carry a filename — the backend needs
+      // one for multipart, so synthesize a stable jpg name.
+      formData.append('avatar', blob, blob.name || 'avatar.jpg');
       const { data } = await api.post('/household/profile/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -364,6 +366,14 @@ export default function Settings() {
     } finally {
       setUploadingAvatar(false);
     }
+  }
+
+  // iOS: opens the native photo picker (with "Take Photo" / "Photo Library").
+  // Web: falls back inside pickPhoto() to a hidden <input type="file">.
+  async function handlePickAvatar() {
+    if (uploadingAvatar) return;
+    const blob = await pickPhoto();
+    if (blob) await uploadAvatarBlob(blob);
   }
 
   async function handleAvatarRemove() {
@@ -1749,10 +1759,14 @@ export default function Settings() {
                   </div>
                 )}
                 <div className="flex items-center gap-3">
-                  <label className={`text-sm font-medium cursor-pointer ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}>
+                  <button
+                    type="button"
+                    onClick={handlePickAvatar}
+                    disabled={uploadingAvatar}
+                    className={`text-sm font-medium ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}
+                  >
                     {uploadingAvatar ? 'Uploading…' : 'Upload photo'}
-                    <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={uploadingAvatar} className="hidden" />
-                  </label>
+                  </button>
                   {profileAvatar && (
                     <button type="button" onClick={handleAvatarRemove} disabled={uploadingAvatar} className="text-sm text-error hover:text-error/80 transition-colors">
                       Remove

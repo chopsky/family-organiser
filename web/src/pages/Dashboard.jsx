@@ -10,6 +10,7 @@ import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
+import { setBadgeCount } from '../lib/badge';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -335,6 +336,13 @@ export default function Dashboard() {
   const members = digest?.members ?? [];
   const outstanding = digest?.outstanding ?? [];
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
+
+  // Update the iOS app-icon badge whenever the outstanding-task count
+  // shifts. Shows the same number a user would see on the Tasks tab.
+  // No-op on web.
+  useEffect(() => {
+    setBadgeCount(outstanding.length);
+  }, [outstanding.length]);
   const weekMeals = digest?.weekMeals ?? [];
 
   // Today's meals by category
