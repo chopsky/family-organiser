@@ -18,10 +18,11 @@
 
 const TIPS = [
   '💡 _Did you know:_ forward me a recipe link and I\'ll save it to your Recipe Box.',
-  '💡 _Did you know:_ photograph a receipt and I\'ll log the items into your shopping list.',
-  '💡 _Did you know:_ ask "what\'s on this Saturday?" and I\'ll check all family calendars at once.',
+  '💡 _Did you know:_ snap a shopping receipt and I\'ll check off the items on your shopping list.',
   '💡 _Did you know:_ say "remember the wifi password is XYZ" and I\'ll keep it safe for you.',
+  '💡 _Did you know:_ ask "what\'s on this Saturday?" and I\'ll check all family calendars at once.',
   '💡 _Did you know:_ voice notes work — talk to me hands-free while driving.',
+  '💡 _Did you know:_ say "I need a restaurant for date night" and I\'ll suggest some great nearby options',
   '💡 _Did you know:_ reply /tasks to see what\'s pending across the whole household.',
   '💡 _Did you know:_ ask "when are we all free next week?" and I\'ll find a shared slot.',
   '💡 _Did you know:_ snap the school newsletter — I\'ll pull dates straight into the calendar.',
@@ -29,8 +30,9 @@ const TIPS = [
   '💡 _Did you know:_ forward me an email by sending it on to your personal Housemait inbox.',
   '💡 _Did you know:_ ask "what did I have for dinner last Friday?" and I\'ll check the meal plan.',
   '💡 _Did you know:_ /shopping shows your current list in one tap, no scrolling needed.',
-  '💡 _Did you know:_ I respect "another", "more", "extra" — say "add another milk" and it adds a second one.',
+  '💡 _Did you know:_ tell me "Netflix renews 1st of every month" and I\'ll remind you 3 days before so you can cancel if needed.',
   '💡 _Did you know:_ you can plan a whole week of meals from your Recipe Box with one ask.',
+  '💡 _Did you know:_ ask "when is the next school holiday?" and I\'ll give you the dates.',
 ];
 
 /** Total day-1 to day-N range during which a tip footer is shown. */
