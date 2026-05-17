@@ -1553,7 +1553,9 @@ export default function Calendar() {
                         <div className="text-[11px] text-warm-grey">
                           {item._type === 'task'
                             ? (item.due_time ? item.due_time.substring(0, 5) : 'All day')
-                            : (item.all_day ? 'All day' : formatTime(item.start_time))}
+                            : (item.all_day
+                                ? 'All day'
+                                : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
                         </div>
                       </div>
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
@@ -1878,7 +1880,9 @@ export default function Calendar() {
                     <div className="text-xs text-warm-grey">
                       {item._type === 'task'
                         ? (item.due_time ? new Date(`2000-01-01T${item.due_time}`).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }) : 'All day')
-                        : (item.all_day ? 'All day' : formatTime(item.start_time))}
+                        : (item.all_day
+                            ? 'All day'
+                            : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
                     </div>
                   </div>
                   <span
