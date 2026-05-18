@@ -132,14 +132,6 @@ export default function Shopping() {
     loadLists();
   }, [loadLists]);
 
-  // Pull-to-refresh — fetch lists + items in parallel. No-op on web.
-  const refreshAll = useCallback(async () => {
-    await Promise.all([loadLists(), loadItems()].map(p => p?.catch?.(() => {})));
-  }, [loadLists, loadItems]);
-  const ptr = usePullToRefresh(refreshAll);
-  // Foreground refresh — re-pulls when the app returns from background.
-  useAppForegroundRefresh(refreshAll);
-
   // Load items when active list changes
   const loadItems = useCallback(async () => {
     // No list selected yet (e.g. the lists fetch hasn't completed, or
@@ -165,6 +157,17 @@ export default function Shopping() {
   useEffect(() => {
     loadItems();
   }, [loadItems]);
+
+  // Pull-to-refresh + foreground refresh — must sit AFTER loadLists +
+  // loadItems are declared because the dep array reads them at the
+  // moment useCallback runs. Putting this block above either declaration
+  // hits the TDZ ("Cannot access 'loadItems' before initialization" —
+  // minified to a one-letter name on iOS). No-op on web.
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadLists(), loadItems()].map(p => p?.catch?.(() => {})));
+  }, [loadLists, loadItems]);
+  const ptr = usePullToRefresh(refreshAll);
+  useAppForegroundRefresh(refreshAll);
 
   // Computed values
   const incompleteItems = items.filter(i => !i.completed);
