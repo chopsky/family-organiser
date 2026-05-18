@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { localeHomePath } from './hooks/useLocale';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 // File renamed from CookieConsent.jsx — many ad-blocker rules match on
@@ -65,6 +66,31 @@ function PageLoader() {
   );
 }
 
+/**
+ * Locale-aware redirect for the root path.
+ *
+ * Single chokepoint that every "send the user home" code path flows
+ * through (the four marketing-page logo links, the logout flows in
+ * Layout/Settings, the 401 handler in api.js, the catch-all path="*"
+ * fallback, and any future `to="/"` we forget to convert). If the
+ * visitor previously interacted with a locale-specific marketing page,
+ * a `housemait-locale` cookie was set — we send them back to that
+ * country's landing page instead of dropping them on the international
+ * default.
+ *
+ * Mirrors the Vercel edge middleware (which redirects on IP-geo for
+ * fresh, direct visits) but runs in the client where React Router's
+ * <Link> + navigate() bypass the edge.
+ *
+ * Falls through to {children} when no usable cookie is set, so first-
+ * touch visitors still see the international page.
+ */
+function LocaleRedirect({ children }) {
+  const homePath = localeHomePath();
+  if (homePath !== '/') return <Navigate to={homePath} replace />;
+  return children;
+}
+
 function RequireAuth({ children }) {
   const { token, needsHousehold, needsOnboarding } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
@@ -113,7 +139,7 @@ function AppRoutes() {
             user, so /signup is the more useful default. Returning users can
             tap the "Already have an account? Log in" link on Signup. On
             web the LandingPage handles its own login/signup CTAs. */}
-        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/signup" replace /> : <LandingPage />)} />
+        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/signup" replace /> : <LocaleRedirect><LandingPage /></LocaleRedirect>)} />
         {/* Country-specific marketing variants. Same LandingPage component;
             it reads pricing, audience tagline, and feature flags via
             useLocale() based on the route path. Each variant emits its
