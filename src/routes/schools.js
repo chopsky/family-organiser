@@ -4,8 +4,15 @@ const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const saTermDates = require('../services/saTermDates');
+const { validateTermDates } = require('../services/termDateValidator');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
+
+const VALID_EVENT_TYPES = new Set([
+  'term_start', 'term_end',
+  'half_term_start', 'half_term_end',
+  'inset_day', 'bank_holiday',
+]);
 
 const router = Router();
 
@@ -572,10 +579,17 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
 });
 
 /**
- * POST /api/schools/:schoolId/import-website
- * Scrape term dates from a school's website using AI.
+ * POST /api/schools/:schoolId/import-website/preview
+ *
+ * Fetches the school's website / PDF, runs the AI extractor, and
+ * runs a deterministic validation pass — but does NOT touch the
+ * database. The admin sees the proposed dates in a preview UI, edits
+ * any that look wrong, then POSTs the approved list to /confirm.
+ *
+ * This is the safety net for a feature that previously trusted the
+ * AI's first-pass output and wrote straight to the canonical store.
  */
-router.post('/:schoolId/import-website', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   const { website_url } = req.body;
   if (!website_url?.trim()) {
     return res.status(400).json({ error: 'School website URL is required.' });
@@ -799,8 +813,8 @@ ${cfg.lookFor.map((line) => `- ${line}`).join('\n')}
 
 Return ONLY a valid JSON array with no other text:
 [
-  {"event_type": "term_start", "date": "YYYY-MM-DD", "label": "Description", "academic_year": "YYYY-YYYY"},
-  {"event_type": "half_term_start", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "label": "Description", "academic_year": "YYYY-YYYY"},
+  {"event_type": "term_start", "date": "YYYY-MM-DD", "label": "Description", "academic_year": "YYYY-YYYY", "source_quote": "the exact snippet from the source text containing this date"},
+  {"event_type": "half_term_start", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "label": "Description", "academic_year": "YYYY-YYYY", "source_quote": "..."},
   ...
 ]
 
@@ -808,6 +822,13 @@ Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_d
 For half terms / mid-term breaks, use half_term_start with an end_date spanning the break.
 For school-specific closures (religious holidays etc), use bank_holiday with a descriptive label.
 Include the academic_year field (${cfg.ayFormat}) for each entry.
+
+CRITICAL — source_quote field:
+- For every entry, include a "source_quote" field with the EXACT substring from the source text (10–80 characters) that contains this date.
+- Copy verbatim — do not paraphrase, reformat, or invent text.
+- If a weekday name appears next to the date in the source (e.g. "Monday 6 January"), include it. This helps us spot off-by-one mistakes.
+- If you genuinely cannot find a clean snippet for an entry, set source_quote to null.
+
 If you genuinely cannot find any term dates in the content, return an empty array [].
 Do NOT wrap in markdown code fences.`,
       messages: [{ role: 'user', content: `${cfg.userIntro}\n\n${pageText}` }],
@@ -859,26 +880,98 @@ Do NOT wrap in markdown code fences.`,
     }
 
     if (!Array.isArray(dates) || dates.length === 0) {
-      return res.json({ imported: 0, message: 'No term dates found on that page. Try a different URL or add dates manually.' });
+      return res.json({
+        dates: [],
+        source_url: website_url.trim(),
+        source_text_preview: '',
+        message: 'No term dates found on that page. Try a different URL or add dates manually.',
+      });
     }
 
-    const termDates = dates.map(d => ({
-      ...d,
-      academic_year: d.academic_year || currentAY,
-      source: 'website_scrape',
-    }));
+    // Default missing academic_year before validation so the AY-pairing
+    // logic groups rows correctly.
+    const normalised = dates
+      .filter(d => d && typeof d === 'object')
+      .map(d => ({
+        ...d,
+        academic_year: d.academic_year || currentAY,
+      }));
 
-    // Load school metadata to check current source
+    const validated = validateTermDates(normalised, pageText);
+
+    return res.json({
+      dates: validated,
+      source_url: website_url.trim(),
+      // ~800 chars of the source text gives the admin enough context
+      // to eyeball a single date by hand if a warning makes them suspicious.
+      source_text_preview: pageText.substring(0, 800),
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/import-website/preview error:', err);
+    return res.status(500).json({ error: `Failed to import from website: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/schools/:schoolId/import-website/confirm
+ *
+ * Writes the admin-approved list of term dates to the database. This
+ * is the only path that mutates state — /preview is read-only AI work.
+ *
+ * Body: { dates: [{event_type, date, end_date?, label, academic_year, ...}] }
+ * The client is allowed to edit any field before sending. We re-validate
+ * the shape here because the request is now coming from an editable form.
+ */
+router.post('/:schoolId/import-website/confirm', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { dates } = req.body || {};
+  if (!Array.isArray(dates) || dates.length === 0) {
+    return res.status(400).json({ error: 'No dates to save.' });
+  }
+
+  // Server-side sanity check — the preview client can edit anything,
+  // so don't trust the shape blindly.
+  const errors = [];
+  const cleaned = [];
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i] || {};
+    if (!VALID_EVENT_TYPES.has(d.event_type)) {
+      errors.push(`Row ${i + 1}: invalid event_type "${d.event_type}"`);
+      continue;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) {
+      errors.push(`Row ${i + 1}: invalid date "${d.date}"`);
+      continue;
+    }
+    if (d.end_date && !/^\d{4}-\d{2}-\d{2}$/.test(d.end_date)) {
+      errors.push(`Row ${i + 1}: invalid end_date "${d.end_date}"`);
+      continue;
+    }
+    if (!d.academic_year || typeof d.academic_year !== 'string') {
+      errors.push(`Row ${i + 1}: missing academic_year`);
+      continue;
+    }
+    cleaned.push({
+      event_type: d.event_type,
+      date: d.date,
+      end_date: d.end_date || null,
+      label: d.label || '',
+      academic_year: d.academic_year,
+      source: 'website_scrape',
+    });
+  }
+  if (errors.length > 0) {
+    return res.status(400).json({ error: 'Some rows are invalid.', details: errors });
+  }
+
+  try {
     const school = await db.getHouseholdSchools(req.householdId)
       .then(schools => schools.find(s => s.id === req.params.schoolId));
 
-    // If source changed, clear ALL existing dates first to avoid conflicts
     if (school?.term_dates_source && school.term_dates_source !== 'website_scrape') {
       await db.deleteAllTermDatesBySchool(req.params.schoolId);
     } else {
-      // Same source — merge by academic year
       const datesByYear = {};
-      for (const td of termDates) {
+      for (const td of cleaned) {
         (datesByYear[td.academic_year] ??= []).push(td);
       }
       for (const ay of Object.keys(datesByYear)) {
@@ -886,9 +979,7 @@ Do NOT wrap in markdown code fences.`,
       }
     }
 
-    await db.addSchoolTermDates(req.params.schoolId, termDates);
-
-    // Update household_schools metadata
+    await db.addSchoolTermDates(req.params.schoolId, cleaned);
     await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: 'website_scrape',
       term_dates_last_updated: new Date().toISOString(),
@@ -897,12 +988,12 @@ Do NOT wrap in markdown code fences.`,
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({
-      imported: termDates.length,
-      message: `Imported ${termDates.length} term date(s) from website.`,
+      imported: cleaned.length,
+      message: `Imported ${cleaned.length} term date(s) from website.`,
     });
   } catch (err) {
-    console.error('POST /api/schools/:id/import-website error:', err);
-    return res.status(500).json({ error: `Failed to import from website: ${err.message}` });
+    console.error('POST /api/schools/:id/import-website/confirm error:', err);
+    return res.status(500).json({ error: `Failed to save term dates: ${err.message}` });
   }
 });
 

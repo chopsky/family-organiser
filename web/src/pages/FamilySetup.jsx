@@ -202,6 +202,14 @@ export default function FamilySetup() {
   const [importingLA, setImportingLA] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [importingWebsite, setImportingWebsite] = useState(false);
+  // Draft import: holds the AI-extracted rows + source-text snippet
+  // between the /preview call and the admin's "Save" tap. null while
+  // not previewing. Each row carries a `warnings: string[]` from the
+  // backend validator (src/services/termDateValidator.js). The admin
+  // can edit any row in-place before confirming.
+  const [draftImport, setDraftImport] = useState(null);
+  const [savingDraftImport, setSavingDraftImport] = useState(false);
+  const [showSourceQuoteFor, setShowSourceQuoteFor] = useState(null); // row index whose quote tooltip is open
   const [termImportIcalUrl, setTermImportIcalUrl] = useState('');
   const [importingTermIcal, setImportingTermIcal] = useState(false);
   const [importError, setImportError] = useState('');
@@ -576,29 +584,72 @@ export default function FamilySetup() {
   }
 
   async function handleImportWebsite() {
+    // Step 1 of 2: fetch a preview from the backend (no DB writes yet).
+    // The admin then reviews, edits, and confirms in a separate panel —
+    // see handleConfirmImportWebsite below.
     if (!termDateSchoolId || !websiteUrl.trim()) return;
     setImportingWebsite(true);
     setImportError('');
     try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-website`, { website_url: websiteUrl.trim() });
-      if (data.imported === 0) {
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-website/preview`, { website_url: websiteUrl.trim() });
+      if (!Array.isArray(data.dates) || data.dates.length === 0) {
         setImportError(data.message || 'No term dates found on that page. Try a different URL or another import method.');
         return;
       }
-      setSuccess(data.message || 'Term dates imported!');
-      setTimeout(() => setSuccess(''), 3000);
+      setDraftImport({
+        schoolId: termDateSchoolId,
+        schoolName: termDateSchoolName,
+        sourceUrl: data.source_url || websiteUrl.trim(),
+        sourceTextPreview: data.source_text_preview || '',
+        dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
+      });
       setShowTermDateOptions(false);
-      setImportError('');
-      await loadSchools();
-      if (editingMember?.school_id === termDateSchoolId) {
-        const { data: tdData } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
-        setEditTermDates(tdData.term_dates || []);
-      }
     } catch (err) {
       setImportError(err.response?.data?.error || 'Could not import from website. Try another option below.');
     } finally {
       setImportingWebsite(false);
     }
+  }
+
+  // Step 2 of 2: commit the admin-approved draft to the database.
+  async function handleConfirmImportWebsite() {
+    if (!draftImport || !draftImport.schoolId) return;
+    setSavingDraftImport(true);
+    try {
+      // Strip client-only fields before sending.
+      // eslint-disable-next-line no-unused-vars
+      const payload = draftImport.dates.map(({ _id, warnings, source_quote, ...rest }) => rest);
+      const { data } = await api.post(`/schools/${draftImport.schoolId}/import-website/confirm`, { dates: payload });
+      setSuccess(data.message || 'Term dates imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      const sid = draftImport.schoolId;
+      setDraftImport(null);
+      await loadSchools();
+      if (editingMember?.school_id === sid) {
+        const { data: tdData } = await api.get(`/schools/${sid}/term-dates`);
+        setEditTermDates(tdData.term_dates || []);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Could not save term dates.';
+      const details = err.response?.data?.details;
+      setImportError(details ? `${msg}\n${details.join('\n')}` : msg);
+    } finally {
+      setSavingDraftImport(false);
+    }
+  }
+
+  function updateDraftRow(rowId, patch) {
+    setDraftImport(prev => prev ? {
+      ...prev,
+      dates: prev.dates.map(d => d._id === rowId ? { ...d, ...patch } : d),
+    } : prev);
+  }
+
+  function removeDraftRow(rowId) {
+    setDraftImport(prev => prev ? {
+      ...prev,
+      dates: prev.dates.filter(d => d._id !== rowId),
+    } : prev);
   }
 
   async function handleImportTermIcal() {
@@ -2319,7 +2370,7 @@ export default function FamilySetup() {
                     disabled={importingWebsite || !websiteUrl.trim()}
                     className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
                   >
-                    {importingWebsite ? 'Importing...' : 'Import'}
+                    {importingWebsite ? 'Finding…' : 'Find dates'}
                   </button>
                 </div>
               </div>
@@ -2886,6 +2937,120 @@ export default function FamilySetup() {
                 className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors"
               >
                 {savingProfile ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Imported Dates Panel — opens after /import-website/preview
+          returns. Admin can edit any row, delete rows, and only commits
+          to the DB on Save. Each row shows yellow warning chips from the
+          server-side validator and an info button revealing the AI's
+          source quote. */}
+      {draftImport && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4" onClick={() => { if (!savingDraftImport) setDraftImport(null); }}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold text-bark">Review imported dates</h2>
+              <button onClick={() => setDraftImport(null)} disabled={savingDraftImport} className="text-cocoa hover:text-bark p-1 disabled:opacity-50">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-cocoa mb-1">{draftImport.schoolName}</p>
+            <p className="text-sm text-cocoa mb-4">
+              We found <span className="font-medium text-bark">{draftImport.dates.length}</span> proposed date{draftImport.dates.length === 1 ? '' : 's'}. Check each row — especially any with yellow warnings — then tap Save.
+            </p>
+
+            {importError && (
+              <div className="bg-coral/10 border border-coral/30 rounded-xl px-4 py-3 mb-4">
+                <p className="text-sm text-bark font-medium whitespace-pre-line">{importError}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {draftImport.dates.map((d) => {
+                const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term starts', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday' };
+                const hasWarnings = Array.isArray(d.warnings) && d.warnings.length > 0;
+                const isQuoteOpen = showSourceQuoteFor === d._id;
+                return (
+                  <div key={d._id} className={`bg-white rounded-lg border ${hasWarnings ? 'border-coral/40' : 'border-cream-border'} p-3`}>
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <select
+                        value={d.event_type}
+                        onChange={(e) => updateDraftRow(d._id, { event_type: e.target.value })}
+                        className="border border-cream-border rounded px-1.5 py-1 text-xs bg-white"
+                      >
+                        {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      <input
+                        type="date"
+                        value={d.date || ''}
+                        onChange={(e) => updateDraftRow(d._id, { date: e.target.value })}
+                        className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                      />
+                      <span className="text-cocoa text-xs self-center">to</span>
+                      <input
+                        type="date"
+                        value={d.end_date || ''}
+                        onChange={(e) => updateDraftRow(d._id, { end_date: e.target.value })}
+                        className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                      />
+                      <input
+                        type="text"
+                        value={d.label || ''}
+                        onChange={(e) => updateDraftRow(d._id, { label: e.target.value })}
+                        placeholder="Label"
+                        className="flex-1 min-w-[120px] border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                      />
+                      <div className="flex items-center gap-1 ml-auto">
+                        {d.source_quote && (
+                          <button
+                            onClick={() => setShowSourceQuoteFor(isQuoteOpen ? null : d._id)}
+                            className={`text-xs px-1.5 py-0.5 rounded ${isQuoteOpen ? 'bg-plum-light text-plum' : 'text-cocoa hover:text-plum'}`}
+                            title="Show source quote"
+                            type="button"
+                          >ⓘ</button>
+                        )}
+                        <button onClick={() => removeDraftRow(d._id)} className="text-error/60 hover:text-error p-0.5" title="Remove from import" type="button">🗑</button>
+                      </div>
+                    </div>
+                    {hasWarnings && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {d.warnings.map((w, wi) => (
+                          <span key={wi} className="inline-block bg-coral-light text-coral text-[11px] font-medium px-2 py-0.5 rounded-full">
+                            ⚠ {w}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {isQuoteOpen && d.source_quote && (
+                      <div className="mt-2 text-[11px] text-cocoa bg-oat border border-cream-border rounded px-2 py-1.5 italic break-words">
+                        &ldquo;{d.source_quote}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-cream-border">
+              <button
+                onClick={() => setDraftImport(null)}
+                disabled={savingDraftImport}
+                className="text-sm text-cocoa hover:text-bark px-3 py-2 disabled:opacity-50"
+                type="button"
+              >Cancel</button>
+              <button
+                onClick={handleConfirmImportWebsite}
+                disabled={savingDraftImport || draftImport.dates.length === 0}
+                className="text-sm bg-primary text-white font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50"
+                type="button"
+              >
+                {savingDraftImport ? 'Saving…' : `Save ${draftImport.dates.length} date${draftImport.dates.length === 1 ? '' : 's'}`}
               </button>
             </div>
           </div>
