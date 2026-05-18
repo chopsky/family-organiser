@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import { DashboardSkeleton } from '../components/Skeleton';
+import { BottomSheet } from '../components/BottomSheet';
 import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
@@ -645,9 +646,8 @@ export default function Dashboard() {
       </div>
 
       {/* NL input modal */}
-      {nlModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-linen w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl shadow-lg border border-cream-border p-5 pb-safe sm:pb-5">
+      <BottomSheet open={nlModalOpen} onDismiss={() => setNlModalOpen(false)} desktopWidthClass="sm:w-[440px]">
+        <div className="p-5 pb-safe sm:pb-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-bark">
                 {nlMode === 'event' ? 'Add event' : 'Add task'}
@@ -676,9 +676,8 @@ export default function Dashboard() {
                 {nlSending ? 'Adding...' : nlMode === 'event' ? 'Add event' : 'Add task'}
               </button>
             </form>
-          </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 }
