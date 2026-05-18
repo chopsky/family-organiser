@@ -126,20 +126,21 @@
     padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
   }
 
-  /* Page transition — fires on every route change. Subtle fade +
-     slide-from-right gives the iOS "push" feel without needing a
-     full animation library. The wrapper around <Routes> is keyed
-     by pathname so React re-mounts the wrapper on each navigation,
-     triggering this entrance animation cleanly. */
+  /* Page transition — fires on every route change. Pure opacity
+     fade (no transform). A previous version used translateX for a
+     subtle slide, but ANY transform — even translateX(0) — on a
+     parent creates a "containing block" that breaks position:fixed
+     descendants. The mobile bottom nav (fixed bottom-0 inside
+     Layout, inside this wrapper) started positioning against the
+     wrapper's height instead of the viewport. Keeping it opacity-
+     only sidesteps that and the perceived improvement is 90% the
+     same as fade-slide. */
   .page-transition {
-    animation: page-enter 220ms ease-out;
-    /* will-change hints the compositor to promote this onto its own
-       layer for the transform/opacity changes. */
-    will-change: transform, opacity;
+    animation: page-enter 200ms ease-out;
   }
   @keyframes page-enter {
-    from { opacity: 0; transform: translateX(8px); }
-    to   { opacity: 1; transform: translateX(0); }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
     .page-transition { animation: none; }
