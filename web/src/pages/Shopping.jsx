@@ -10,6 +10,7 @@ import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
 import { PageListSkeleton } from '../components/Skeleton';
+import { share } from '../lib/share';
 
 function AisleIcon({ aisle, stroke }) {
   const props = {
@@ -365,6 +366,30 @@ export default function Shopping() {
           Shopping
         </h1>
         <span className="text-sm font-medium text-cocoa">{itemCount} items</span>
+        <button
+          type="button"
+          onClick={async () => {
+            const lines = incompleteItems
+              .map((i) => `• ${i.item}${i.quantity ? ` (${i.quantity}${i.unit ? ' ' + i.unit : ''})` : ''}`);
+            if (!lines.length) {
+              setError('No items to share yet.');
+              return;
+            }
+            const activeList = lists.find((l) => l.id === activeListId);
+            const title = `Housemait shopping list${activeList?.name ? ` — ${activeList.name}` : ''}`;
+            const body = `${title}\n\n${lines.join('\n')}`;
+            await share({ title, text: body, dialogTitle: 'Share shopping list' });
+          }}
+          className="ml-auto p-2 rounded-full text-warm-grey hover:text-plum hover:bg-plum-light transition-colors"
+          title="Share list"
+          aria-label="Share shopping list"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <polyline points="16 6 12 2 8 6" />
+            <line x1="12" y1="2" x2="12" y2="15" />
+          </svg>
+        </button>
       </div>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
