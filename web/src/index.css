@@ -126,6 +126,25 @@
     padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
   }
 
+  /* Page transition — fires on every route change. Subtle fade +
+     slide-from-right gives the iOS "push" feel without needing a
+     full animation library. The wrapper around <Routes> is keyed
+     by pathname so React re-mounts the wrapper on each navigation,
+     triggering this entrance animation cleanly. */
+  .page-transition {
+    animation: page-enter 220ms ease-out;
+    /* will-change hints the compositor to promote this onto its own
+       layer for the transform/opacity changes. */
+    will-change: transform, opacity;
+  }
+  @keyframes page-enter {
+    from { opacity: 0; transform: translateX(8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-transition { animation: none; }
+  }
+
   /* ── iOS safe-area insets (Capacitor / PWA) ── */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);

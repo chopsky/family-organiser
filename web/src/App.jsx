@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { lazy, Suspense } from 'react';
@@ -87,10 +87,27 @@ function RequirePlatformAdmin({ children }) {
   return children;
 }
 
+/**
+ * Wraps Routes in a div keyed by pathname so a CSS animation fires on
+ * every route change. Pairs with the `.page-transition` keyframe in
+ * index.css. On iOS this gives a subtle slide-fade between pages —
+ * closer to UIKit's push transition than the previous instant swap.
+ * On reduced-motion settings the animation auto-disables (see CSS).
+ */
+function RouteTransition({ children }) {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="page-transition">
+      {children}
+    </div>
+  );
+}
+
 function AppRoutes() {
   const { token, needsHousehold } = useAuth();
   return (
     <Suspense fallback={<PageLoader />}>
+      <RouteTransition>
       <Routes>
         {/* On iOS / native: a fresh install almost always means a brand-new
             user, so /signup is the more useful default. Returning users can
@@ -164,6 +181,7 @@ function AppRoutes() {
         <Route path="/admin/analytics" element={<RequirePlatformAdmin><AdminLayout><AdminAnalytics /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </RouteTransition>
     </Suspense>
   );
 }
