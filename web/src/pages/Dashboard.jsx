@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
+import { DashboardSkeleton } from '../components/Skeleton';
 import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
@@ -340,7 +341,7 @@ export default function Dashboard() {
     setBadgeCount(outstandingCount);
   }, [outstandingCount]);
 
-  if (loading) return <Spinner />;
+  if (loading) return <DashboardSkeleton />;
 
   const now = new Date();
   // Dropped the year to match the kicker format the greeting uses

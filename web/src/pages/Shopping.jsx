@@ -9,6 +9,7 @@ import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
+import { PageListSkeleton } from '../components/Skeleton';
 
 function AisleIcon({ aisle, stroke }) {
   const props = {
@@ -461,7 +462,7 @@ export default function Shopping() {
       </div>
       </WriteGate>
 
-      {loading ? <Spinner /> : (
+      {loading ? <PageListSkeleton rows={6} /> : (
         <>
           {/* Aisle groups */}
           {groupedByAisle.map(([aisle, aisleItems]) => {

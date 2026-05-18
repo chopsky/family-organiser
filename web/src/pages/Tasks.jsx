@@ -10,6 +10,7 @@ import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
+import { PageListSkeleton } from '../components/Skeleton';
 
 /* ─── Constants ─── */
 
@@ -1021,7 +1022,7 @@ export default function Tasks() {
 
       {/* Main content */}
       {loading ? (
-        <Spinner />
+        <PageListSkeleton rows={6} />
       ) : (
         <>
           {/* ─── MOBILE: Tabbed view ─── */}

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { loadCached } from '../lib/offlineCache';
 import { confirmDestructive } from '../lib/action-sheet';
+import { PageListSkeleton } from '../components/Skeleton';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
@@ -413,7 +414,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
         .print-only { display: none; }
       `}</style>
 
-      {loading ? <Spinner /> : (
+      {loading ? <PageListSkeleton rows={5} headerWidth="35%" /> : (
         // space-y-5 restores the vertical gap between the grid and the
         // action buttons. The outer container's space-y-5 applies only
         // to its DIRECT children; wrapping the grid + buttons in this
