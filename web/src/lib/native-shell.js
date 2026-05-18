@@ -17,14 +17,17 @@ function isNative() {
 export async function setupNativeShell() {
   if (!isNative()) return;
 
-  // Status bar — keep it dark-content on the cream background so the
-  // system clock + battery icons stay readable. Style.Light = light
-  // text (used by dark themes); Style.Dark = dark text (what we want
-  // for #FBF8F3 cream). Setting overlaysWebView=true lets the SPA
-  // draw under the bar so safe-area-inset-top still applies.
+  // Status bar — Capacitor's Style naming is the opposite of intuition:
+  //   Style.Light = "light theme" = DARK text/icons (for light backgrounds)
+  //   Style.Dark  = "dark theme"  = LIGHT/WHITE text/icons (for dark backgrounds)
+  // We want black system text against our cream #FBF8F3 background,
+  // so Style.Light. (A previous version of this file used Style.Dark
+  // and the clock + battery rendered white-on-cream, unreadable.)
+  // overlaysWebView=true lets the SPA draw under the bar so
+  // safe-area-inset-top still applies.
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
-    await StatusBar.setStyle({ style: Style.Dark });
+    await StatusBar.setStyle({ style: Style.Light });
     await StatusBar.setOverlaysWebView({ overlay: true });
   } catch (err) {
     console.warn('[native-shell] status bar setup failed:', err?.message || err);
