@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { localeHomePath } from '../hooks/useLocale'
 
 /**
  * Terms of Service page.
@@ -32,11 +33,11 @@ export default function Terms() {
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
+          <Link to={localeHomePath()} className="flex items-center gap-2.5">
             <img src="/housemait-logo2.png" alt="Housemait" className="h-7" />
           </Link>
           <Link
-            to="/"
+            to={localeHomePath()}
             className="text-sm font-medium text-warm-grey hover:text-plum transition-colors duration-200 inline-flex items-center gap-1.5"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">

@@ -11,6 +11,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ContactForm from '../components/ContactForm';
+import { localeHomePath } from '../hooks/useLocale';
 
 export default function Support() {
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function Support() {
           </a>
         </p>
         <p className="text-center text-sm text-cocoa mt-3">
-          <Link to="/" className="hover:underline">← Back to housemait.com</Link>
+          <Link to={localeHomePath()} className="hover:underline">← Back to housemait.com</Link>
         </p>
       </div>
     </div>

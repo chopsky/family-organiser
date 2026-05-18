@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import TurnstileWidget from '../components/TurnstileWidget';
+import { localeHomePath } from '../hooks/useLocale';
 
 export default function ForgotPassword() {
   const [email, setEmail]     = useState('');
@@ -38,7 +39,7 @@ export default function ForgotPassword() {
     >
       <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" aria-label="Housemait home" className="inline-block">
+          <Link to={localeHomePath()} aria-label="Housemait home" className="inline-block">
             <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
           </Link>
         </div>
