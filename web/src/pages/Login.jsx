@@ -92,27 +92,100 @@ export default function Login() {
     return '/dashboard';
   }
 
-  // paddingTop accommodates the iOS status bar via env(safe-area-inset-top).
-  // Desktop has no safe area so it's effectively just 2rem on web.
   return (
     <div
-      className="min-h-screen bg-oat px-4 pb-8 md:pb-12 flex flex-col items-center"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+      // Full-bleed "concierge" stage. The blobs + radial fade fill the
+      // viewport; the card sits centered. paddingTop on the stage
+      // accounts for the iOS status bar (env(safe-area-inset-top)).
+      className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
+      style={{
+        background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
+      }}
     >
-      <div className="my-auto w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to={localeHomePath()} aria-label="Housemait home" className="inline-block">
-            <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
-          </Link>
-          <h1 className="text-bark" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 42, lineHeight: 1.1, letterSpacing: '-0.015em' }}>Welcome <em style={{ fontStyle: 'italic', color: '#6B2FB8' }}>back.</em></h1>
-        </div>
+      {/* Coral blob (bottom-left) — purely decorative ambient lighting. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 760, height: 760, borderRadius: '50%',
+          left: -180, bottom: -300,
+          background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+      {/* Purple blob (top-right). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 600, height: 600, borderRadius: '50%',
+          right: -160, top: -200,
+          background: 'radial-gradient(circle, rgba(108,61,217,0.18) 0%, rgba(108,61,217,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
 
-        <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
+      {/* Glass card. backdrop-filter has -webkit- prefix via the
+          WebkitBackdropFilter style (Safari/iOS). max-w-[420px] hits the
+          spec width on desktop and collapses gracefully on phones. */}
+      <div
+        id="login-concierge-card"
+        className="relative w-full max-w-[420px]"
+        style={{
+          background: 'rgba(255,253,250,0.86)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+          border: '1px solid rgba(255,255,255,0.9)',
+          borderRadius: 24,
+          boxShadow: '0 30px 80px -20px rgba(26,22,32,0.25), inset 0 2px 0 rgba(255,255,255,0.6)',
+          padding: '40px 36px 32px',
+        }}
+      >
+        {/* Glyph chip — uses the existing Housemait logomark rather
+            than the abstract house glyph from the design (user's
+            instruction: keep the current logomark). */}
+        <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: 60, height: 60,
+              borderRadius: 18,
+              background: '#EFE9FB',
+              border: '1px solid rgba(108,61,217,0.18)',
+            }}
+          >
+            <img src="/housemait-logomark.png" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          </div>
+        </Link>
+
+        <h1
+          className="text-center"
+          style={{
+            fontFamily: "'Instrument Serif', serif",
+            fontWeight: 400,
+            fontSize: 40,
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            color: '#1A1620',
+            margin: 0,
+          }}
+        >
+          Welcome <em style={{ fontStyle: 'italic', color: '#6C3DD9' }}>home.</em>
+        </h1>
+
+        {/* Sub-copy slot. We don't have the household-preview endpoint
+            described in the design handoff, so the line is intentionally
+            hidden (the handoff says: omit rather than show a placeholder). */}
+
+        {/* Status / error banners — placed inside the card above the
+            auth controls so they sit where the user is looking. */}
+        <div style={{ marginTop: 24 }}>
           {verified && (
-            <p className="text-sm text-success bg-success/10 rounded-lg px-3 py-2 mb-4">Email verified! You can now log in.</p>
+            <p className="text-sm text-success bg-success/10 rounded-lg px-3 py-2 mb-3">Email verified! You can now log in.</p>
           )}
           {tokenError === 'invalid-token' && (
-            <p className="text-sm text-error bg-error/10 rounded-lg px-3 py-2 mb-4">Invalid or expired verification link.</p>
+            <p className="text-sm text-error bg-error/10 rounded-lg px-3 py-2 mb-3">Invalid or expired verification link.</p>
           )}
 
           <ErrorBanner message={error} onDismiss={() => setError('')} />
@@ -122,91 +195,241 @@ export default function Login() {
               type="button"
               onClick={handleResend}
               disabled={resendState === 'sending' || !email.trim()}
-              className="text-sm text-primary hover:underline disabled:opacity-50 disabled:no-underline mb-4"
+              className="text-sm hover:underline disabled:opacity-50 disabled:no-underline mb-3"
+              style={{ color: '#6C3DD9' }}
             >
               {resendState === 'sending' ? 'Sending…' : 'Resend verification email'}
             </button>
           )}
           {resendState === 'sent' && (
-            <p className="text-sm text-success bg-success/10 rounded-lg px-3 py-2 mb-4">
+            <p className="text-sm text-success bg-success/10 rounded-lg px-3 py-2 mb-3">
               If that email is registered and unverified, a new verification link has been sent. Check your inbox.
             </p>
           )}
 
-          <SocialButtons onSuccess={handleSocialSuccess} onError={setError} />
+          {/* Auth controls — stacked, gap 10px per design. SocialButtons
+              renders the Google (and on iOS native, Apple) buttons with
+              the existing wiring. The design-skin styling is applied via
+              the wrapper class below. */}
+          <div className="login-concierge-auth">
+            <SocialButtons onSuccess={handleSocialSuccess} onError={setError} />
 
-          {!showEmailForm ? (
-            <button
-              type="button"
-              onClick={() => setShowEmailForm(true)}
-              className="w-full mt-3 flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <path d="M3 7l9 6 9-6" />
-              </svg>
-              Continue with Email
-            </button>
-          ) : (
-          <>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-cream-border" /></div>
-            <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-cocoa">or log in with email</span></div>
+            {!showEmailForm ? (
+              // "Continue with Email" reveals the existing email/password
+              // form. We don't have a magic-link backend, so this stays as
+              // the existing email/password flow (per user instruction).
+              <button
+                type="button"
+                onClick={() => setShowEmailForm(true)}
+                className="w-full flex items-center justify-center gap-2 transition-all"
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: 12,
+                  background: '#FFFFFF',
+                  color: '#1A1620',
+                  border: '1px solid rgba(26,22,32,0.10)',
+                  boxShadow: '0 1px 0 rgba(26,22,32,0.04)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  lineHeight: 1.45,
+                  marginTop: 10,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <path d="M3 7l9 6 9-6" />
+                </svg>
+                Continue with Email
+              </button>
+            ) : (
+              <>
+                {/* OR divider */}
+                <div className="flex items-center gap-3" style={{ margin: '14px 0 4px' }}>
+                  <div className="flex-1" style={{ height: 1, background: 'rgba(26,22,32,0.12)' }} />
+                  <span
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: 11,
+                      fontWeight: 400,
+                      letterSpacing: '0.08em',
+                      color: '#8A8493',
+                      textTransform: 'uppercase',
+                    }}
+                  >Or</span>
+                  <div className="flex-1" style={{ height: 1, background: 'rgba(26,22,32,0.12)' }} />
+                </div>
+
+                <form onSubmit={handleSubmit} autoComplete="on" className="space-y-3 mt-3">
+                  <div>
+                    <label htmlFor="login-email" className="block text-xs font-medium mb-1" style={{ color: '#4A4453' }}>Email</label>
+                    <input
+                      id="login-email"
+                      name="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@household.com"
+                      autoComplete="username"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#FFFFFF',
+                        border: '1px solid rgba(26,22,32,0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        color: '#1A1620',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="login-password" className="block text-xs font-medium mb-1" style={{ color: '#4A4453' }}>Password</label>
+                    <input
+                      id="login-password"
+                      name="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Your password"
+                      autoComplete="current-password"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#FFFFFF',
+                        border: '1px solid rgba(26,22,32,0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        color: '#1A1620',
+                        outline: 'none',
+                      }}
+                    />
+                    <div className="text-right mt-1">
+                      <Link to="/forgot-password" className="text-xs hover:underline" style={{ color: '#6C3DD9' }}>Forgot password?</Link>
+                    </div>
+                  </div>
+                  <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full transition-all disabled:opacity-60"
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: 12,
+                      background: '#6C3DD9',
+                      color: '#FFFFFF',
+                      border: '1px solid transparent',
+                      boxShadow: '0 6px 16px -8px rgba(108,61,217,0.45)',
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {loading ? 'Logging in…' : 'Log in'}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
-
-          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
-            <div>
-              <label htmlFor="login-email" className="block text-sm font-medium text-bark mb-1">Email</label>
-              <input
-                id="login-email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                autoComplete="username"
-              />
-            </div>
-            <div>
-              <label htmlFor="login-password" className="block text-sm font-medium text-bark mb-1">Password</label>
-              <input
-                id="login-password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your password"
-                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                autoComplete="current-password"
-              />
-              <div className="text-right mt-1">
-                <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
-              </div>
-            </div>
-            <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-3 rounded-2xl transition-colors"
-            >
-              {loading ? 'Logging in...' : 'Log in'}
-            </button>
-          </form>
-          </>
-          )}
         </div>
 
-        <p className="text-center text-sm text-cocoa mt-6">
-          Don't have an account? <Link to="/signup" className="text-primary font-medium hover:underline">Sign up</Link>
+        <p
+          className="text-center"
+          style={{
+            marginTop: 20,
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 13,
+            fontWeight: 400,
+            color: '#4A4453',
+            lineHeight: 1.45,
+          }}
+        >
+          New to Housemait?{' '}
+          <Link
+            to="/signup"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 700,
+              fontSize: 13,
+              color: '#4A22A8',
+              textDecoration: 'none',
+              borderBottom: '1.5px solid #4A22A8',
+              paddingBottom: 1,
+            }}
+          >
+            Create an account →
+          </Link>
         </p>
 
-        <p className="text-center text-xs text-cocoa/70 mt-6">
-          <Link to="/terms" className="hover:text-primary hover:underline">Terms of Service</Link>
-          <span className="mx-2">·</span>
-          <Link to="/privacy" className="hover:text-primary hover:underline">Privacy Policy</Link>
+        <p
+          className="text-center"
+          style={{
+            marginTop: 14,
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 12,
+            color: '#8A8493',
+            lineHeight: 1.45,
+          }}
+        >
+          By continuing, you agree to our{' '}
+          <Link to="/terms" style={{ color: '#4A4453', textDecoration: 'none' }}>Terms</Link>.
         </p>
       </div>
+
+      {/* Scoped overrides for the SocialButtons component inside the
+          concierge card. SocialButtons ships its own utility classes (a
+          bordered pill, cream-border, etc.) that don't match this
+          design's primary-Google + ghost-Apple composition. Rather than
+          fork the component, we restyle its children via a parent class.
+          The first SSO button (Google, when shown) becomes the primary
+          purple CTA; subsequent buttons (Apple on iOS native) stay
+          white/ghost. */}
+      <style>{`
+        /* Scope to the SocialButtons wrapper (a <div>) — not the email
+           <form>, which also has space-y-3 but whose Log-in button has
+           its own inline styling. */
+        .login-concierge-auth > div.space-y-3 > * + * { margin-top: 10px !important; }
+        .login-concierge-auth button[disabled] { cursor: wait; }
+        .login-concierge-auth > div.space-y-3 > button {
+          padding: 14px 18px !important;
+          border-radius: 12px !important;
+          font-family: Inter, sans-serif !important;
+          font-weight: 600 !important;
+          font-size: 14px !important;
+          line-height: 1.45 !important;
+          width: 100% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 10px !important;
+          transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .login-concierge-auth > div.space-y-3 > button:first-child {
+          background: #6C3DD9 !important;
+          color: #FFFFFF !important;
+          border: 1px solid transparent !important;
+          box-shadow: 0 6px 16px -8px rgba(108,61,217,0.45) !important;
+        }
+        .login-concierge-auth > div.space-y-3 > button:first-child:hover {
+          background: #5A30C2 !important;
+        }
+        .login-concierge-auth > div.space-y-3 > button:nth-child(n+2) {
+          background: #FFFFFF !important;
+          color: #1A1620 !important;
+          border: 1px solid rgba(26,22,32,0.10) !important;
+          box-shadow: 0 1px 0 rgba(26,22,32,0.04) !important;
+        }
+        /* Mobile (< 481px): shrink card padding + headline so it fits
+           a narrow phone without horizontal scroll. Tagged by id since
+           the card uses inline styles that need !important to beat. */
+        @media (max-width: 480px) {
+          #login-concierge-card { padding: 28px 22px 22px !important; }
+          #login-concierge-card h1 { font-size: 34px !important; }
+        }
+      `}</style>
     </div>
   );
 }
