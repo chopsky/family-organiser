@@ -121,7 +121,7 @@ export default function Login() {
         style={{
           width: 600, height: 600, borderRadius: '50%',
           right: -160, top: -200,
-          background: 'radial-gradient(circle, rgba(108,61,217,0.18) 0%, rgba(108,61,217,0) 70%)',
+          background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)',
           filter: 'blur(20px)',
         }}
       />
@@ -152,7 +152,7 @@ export default function Login() {
               width: 60, height: 60,
               borderRadius: 18,
               background: '#EFE9FB',
-              border: '1px solid rgba(108,61,217,0.18)',
+              border: '1px solid rgba(107,63,160,0.18)',
             }}
           >
             <img src="/housemait-logomark.png" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
@@ -171,7 +171,7 @@ export default function Login() {
             margin: 0,
           }}
         >
-          Welcome <em style={{ fontStyle: 'italic', color: '#6C3DD9' }}>home.</em>
+          Welcome <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>home.</em>
         </h1>
 
         {/* Sub-copy slot. We don't have the household-preview endpoint
@@ -196,7 +196,7 @@ export default function Login() {
               onClick={handleResend}
               disabled={resendState === 'sending' || !email.trim()}
               className="text-sm hover:underline disabled:opacity-50 disabled:no-underline mb-3"
-              style={{ color: '#6C3DD9' }}
+              style={{ color: '#6B3FA0' }}
             >
               {resendState === 'sending' ? 'Sending…' : 'Resend verification email'}
             </button>
@@ -307,7 +307,7 @@ export default function Login() {
                       }}
                     />
                     <div className="text-right mt-1">
-                      <Link to="/forgot-password" className="text-xs hover:underline" style={{ color: '#6C3DD9' }}>Forgot password?</Link>
+                      <Link to="/forgot-password" className="text-xs hover:underline" style={{ color: '#6B3FA0' }}>Forgot password?</Link>
                     </div>
                   </div>
                   <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
@@ -318,10 +318,10 @@ export default function Login() {
                     style={{
                       padding: '14px 18px',
                       borderRadius: 12,
-                      background: '#6C3DD9',
+                      background: '#6B3FA0',
                       color: '#FFFFFF',
                       border: '1px solid transparent',
-                      boxShadow: '0 6px 16px -8px rgba(108,61,217,0.45)',
+                      boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
                       fontFamily: 'Inter, sans-serif',
                       fontWeight: 600,
                       fontSize: 14,
@@ -354,9 +354,9 @@ export default function Login() {
               fontFamily: 'Inter, sans-serif',
               fontWeight: 700,
               fontSize: 13,
-              color: '#4A22A8',
+              color: '#6B3FA0',
               textDecoration: 'none',
-              borderBottom: '1.5px solid #4A22A8',
+              borderBottom: '1.5px solid #6B3FA0',
               paddingBottom: 1,
             }}
           >
@@ -375,7 +375,9 @@ export default function Login() {
           }}
         >
           By continuing, you agree to our{' '}
-          <Link to="/terms" style={{ color: '#4A4453', textDecoration: 'none' }}>Terms</Link>.
+          <Link to="/terms" style={{ color: '#4A4453', textDecoration: 'none' }}>Terms</Link>
+          {' '}and{' '}
+          <Link to="/privacy" style={{ color: '#4A4453', textDecoration: 'none' }}>Privacy Policy</Link>.
         </p>
       </div>
 
@@ -408,13 +410,13 @@ export default function Login() {
           transition: transform .15s ease, box-shadow .15s ease;
         }
         .login-concierge-auth > div.space-y-3 > button:first-child {
-          background: #6C3DD9 !important;
+          background: #6B3FA0 !important;
           color: #FFFFFF !important;
           border: 1px solid transparent !important;
-          box-shadow: 0 6px 16px -8px rgba(108,61,217,0.45) !important;
+          box-shadow: 0 6px 16px -8px rgba(107,63,160,0.45) !important;
         }
         .login-concierge-auth > div.space-y-3 > button:first-child:hover {
-          background: #5A30C2 !important;
+          background: #5A3488 !important;
         }
         .login-concierge-auth > div.space-y-3 > button:nth-child(n+2) {
           background: #FFFFFF !important;

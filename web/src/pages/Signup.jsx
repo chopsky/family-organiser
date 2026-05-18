@@ -75,112 +75,323 @@ export default function Signup() {
     navigate(data.household ? '/dashboard' : '/setup');
   }
 
-  // paddingTop accommodates the iOS status bar via env(safe-area-inset-top).
-  // Desktop has no safe area so it's effectively just 2rem on web.
   return (
     <div
-      className="min-h-screen bg-oat px-4 pb-8 md:pb-12 flex flex-col items-center"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+      className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
+      style={{
+        background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
+      }}
     >
-      <div className="my-auto w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to={localeHomePath()} aria-label="Housemait home" className="inline-block">
-            <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
-          </Link>
-          <h1 className="text-bark" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 42, lineHeight: 1.1, letterSpacing: '-0.015em' }}>Your calmer family life<br /><em style={{ fontStyle: 'italic', color: '#6B2FB8' }}>starts here.</em></h1>
-          {inviteToken && (
-            <p className="text-primary mt-2 font-medium">You've been invited to join a household!</p>
-          )}
-        </div>
+      {/* Decorative ambient blobs — same as Login.jsx. Kept inline rather
+          than extracted so each page can live as a single file. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 760, height: 760, borderRadius: '50%',
+          left: -180, bottom: -300,
+          background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 600, height: 600, borderRadius: '50%',
+          right: -160, top: -200,
+          background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
 
-        <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
+      <div
+        id="signup-concierge-card"
+        className="relative w-full max-w-[420px]"
+        style={{
+          background: 'rgba(255,253,250,0.86)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+          border: '1px solid rgba(255,255,255,0.9)',
+          borderRadius: 24,
+          boxShadow: '0 30px 80px -20px rgba(26,22,32,0.25), inset 0 2px 0 rgba(255,255,255,0.6)',
+          padding: '40px 36px 32px',
+        }}
+      >
+        <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: 60, height: 60,
+              borderRadius: 18,
+              background: '#EFE9FB',
+              border: '1px solid rgba(107,63,160,0.18)',
+            }}
+          >
+            <img src="/housemait-logomark.png" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          </div>
+        </Link>
+
+        <h1
+          className="text-center"
+          style={{
+            fontFamily: "'Instrument Serif', serif",
+            fontWeight: 400,
+            fontSize: 40,
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            color: '#1A1620',
+            margin: 0,
+          }}
+        >
+          Your calmer family life<br />
+          <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>starts here.</em>
+        </h1>
+
+        {inviteToken && (
+          <p
+            className="text-center"
+            style={{
+              marginTop: 12,
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 13,
+              color: '#6B3FA0',
+              fontWeight: 500,
+            }}
+          >
+            You&apos;ve been invited to join a household!
+          </p>
+        )}
+
+        <div style={{ marginTop: 24 }}>
           <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-          <SocialButtons inviteToken={inviteToken} onSuccess={handleSocialSuccess} onError={setError} />
+          <div className="signup-concierge-auth">
+            <SocialButtons inviteToken={inviteToken} onSuccess={handleSocialSuccess} onError={setError} />
 
-          {!showEmailForm ? (
-            <button
-              type="button"
-              onClick={() => setShowEmailForm(true)}
-              className="w-full mt-3 flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <path d="M3 7l9 6 9-6" />
-              </svg>
-              Continue with Email
-            </button>
-          ) : (
-          <>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-cream-border" /></div>
-            <div className="relative flex justify-center text-sm"><span className="bg-white px-4 text-cocoa">or sign up with email</span></div>
+            {!showEmailForm ? (
+              <button
+                type="button"
+                onClick={() => setShowEmailForm(true)}
+                className="w-full flex items-center justify-center gap-2 transition-all"
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: 12,
+                  background: '#FFFFFF',
+                  color: '#1A1620',
+                  border: '1px solid rgba(26,22,32,0.10)',
+                  boxShadow: '0 1px 0 rgba(26,22,32,0.04)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  lineHeight: 1.45,
+                  marginTop: 10,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <path d="M3 7l9 6 9-6" />
+                </svg>
+                Continue with Email
+              </button>
+            ) : (
+              <>
+                <div className="flex items-center gap-3" style={{ margin: '14px 0 4px' }}>
+                  <div className="flex-1" style={{ height: 1, background: 'rgba(26,22,32,0.12)' }} />
+                  <span
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: 11,
+                      fontWeight: 400,
+                      letterSpacing: '0.08em',
+                      color: '#8A8493',
+                      textTransform: 'uppercase',
+                    }}
+                  >Or</span>
+                  <div className="flex-1" style={{ height: 1, background: 'rgba(26,22,32,0.12)' }} />
+                </div>
+
+                <form onSubmit={handleSubmit} autoComplete="on" className="space-y-3 mt-3">
+                  <div>
+                    <label htmlFor="signup-name" className="block text-xs font-medium mb-1" style={{ color: '#4A4453' }}>Name</label>
+                    <input
+                      id="signup-name"
+                      name="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Sarah"
+                      autoComplete="given-name"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#FFFFFF',
+                        border: '1px solid rgba(26,22,32,0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        color: '#1A1620',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="signup-email" className="block text-xs font-medium mb-1" style={{ color: '#4A4453' }}>Email</label>
+                    <input
+                      id="signup-email"
+                      name="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@household.com"
+                      autoComplete="email"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#FFFFFF',
+                        border: '1px solid rgba(26,22,32,0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        color: '#1A1620',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="signup-password" className="block text-xs font-medium mb-1" style={{ color: '#4A4453' }}>Password</label>
+                    <input
+                      id="signup-password"
+                      name="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      autoComplete="new-password"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#FFFFFF',
+                        border: '1px solid rgba(26,22,32,0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        color: '#1A1620',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full transition-all disabled:opacity-60"
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: 12,
+                      background: '#6B3FA0',
+                      color: '#FFFFFF',
+                      border: '1px solid transparent',
+                      boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {loading ? 'Creating account…' : 'Create account'}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
-
-          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
-            <div>
-              <label htmlFor="signup-name" className="block text-sm font-medium text-bark mb-1">Name</label>
-              <input
-                id="signup-name"
-                name="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sarah"
-                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                autoComplete="given-name"
-              />
-            </div>
-            <div>
-              <label htmlFor="signup-email" className="block text-sm font-medium text-bark mb-1">Email</label>
-              <input
-                id="signup-email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                autoComplete="email"
-              />
-            </div>
-            <div>
-              <label htmlFor="signup-password" className="block text-sm font-medium text-bark mb-1">Password</label>
-              <input
-                id="signup-password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                autoComplete="new-password"
-              />
-            </div>
-            <TurnstileWidget ref={turnstileRef} onChange={setTurnstileToken} />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-3 rounded-2xl transition-colors"
-            >
-              {loading ? 'Creating account...' : 'Create account'}
-            </button>
-          </form>
-          </>
-          )}
         </div>
 
-        <p className="text-center text-sm text-cocoa mt-6">
-          Already have an account? <Link to="/login" className="text-primary font-medium hover:underline">Log in</Link>
+        <p
+          className="text-center"
+          style={{
+            marginTop: 20,
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 13,
+            fontWeight: 400,
+            color: '#4A4453',
+            lineHeight: 1.45,
+          }}
+        >
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 700,
+              fontSize: 13,
+              color: '#6B3FA0',
+              textDecoration: 'none',
+              borderBottom: '1.5px solid #6B3FA0',
+              paddingBottom: 1,
+            }}
+          >
+            Log in →
+          </Link>
         </p>
 
-        <p className="text-center text-xs text-cocoa/70 mt-6 px-4 leading-relaxed">
-          By creating an account you agree to our{' '}
-          <Link to="/terms" className="hover:text-primary hover:underline">Terms of Service</Link>
+        <p
+          className="text-center"
+          style={{
+            marginTop: 14,
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 12,
+            color: '#8A8493',
+            lineHeight: 1.45,
+          }}
+        >
+          By creating an account, you agree to our{' '}
+          <Link to="/terms" style={{ color: '#4A4453', textDecoration: 'none' }}>Terms</Link>
           {' '}and{' '}
-          <Link to="/privacy" className="hover:text-primary hover:underline">Privacy Policy</Link>.
+          <Link to="/privacy" style={{ color: '#4A4453', textDecoration: 'none' }}>Privacy Policy</Link>.
         </p>
       </div>
+
+      {/* Same scoped SocialButtons re-skin as Login.jsx. See that file
+          for rationale — primary purple Google button + ghost Apple. */}
+      <style>{`
+        .signup-concierge-auth > div.space-y-3 > * + * { margin-top: 10px !important; }
+        .signup-concierge-auth button[disabled] { cursor: wait; }
+        .signup-concierge-auth > div.space-y-3 > button {
+          padding: 14px 18px !important;
+          border-radius: 12px !important;
+          font-family: Inter, sans-serif !important;
+          font-weight: 600 !important;
+          font-size: 14px !important;
+          line-height: 1.45 !important;
+          width: 100% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 10px !important;
+          transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .signup-concierge-auth > div.space-y-3 > button:first-child {
+          background: #6B3FA0 !important;
+          color: #FFFFFF !important;
+          border: 1px solid transparent !important;
+          box-shadow: 0 6px 16px -8px rgba(107,63,160,0.45) !important;
+        }
+        .signup-concierge-auth > div.space-y-3 > button:first-child:hover {
+          background: #5A3488 !important;
+        }
+        .signup-concierge-auth > div.space-y-3 > button:nth-child(n+2) {
+          background: #FFFFFF !important;
+          color: #1A1620 !important;
+          border: 1px solid rgba(26,22,32,0.10) !important;
+          box-shadow: 0 1px 0 rgba(26,22,32,0.04) !important;
+        }
+        @media (max-width: 480px) {
+          #signup-concierge-card { padding: 28px 22px 22px !important; }
+          #signup-concierge-card h1 { font-size: 34px !important; }
+        }
+      `}</style>
     </div>
   );
 }
