@@ -24,6 +24,7 @@
     "@capacitor/push-notifications": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@capawesome/capacitor-app-shortcuts": "^8.0.1",
     "@capawesome/capacitor-badge": "^8.0.2",
     "@capgo/capacitor-social-login": "^8.3.20",
     "@revenuecat/purchases-capacitor": "^13.0.1",

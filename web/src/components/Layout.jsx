@@ -8,6 +8,7 @@ import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
 import { tap as hapticTap } from '../lib/haptics';
+import { onShortcutTapped } from '../lib/app-shortcuts';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
@@ -130,6 +131,18 @@ export default function Layout({ children }) {
 
   // Close "More" sheet on navigation
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);
+
+  // iOS home-screen quick actions — when the user long-presses the
+  // app icon and picks "Add Task" / "View Calendar" / etc., the
+  // plugin fires this listener. Navigate to whatever route the
+  // shortcut config carries. No-op on web.
+  useEffect(() => {
+    let cleanup = () => {};
+    onShortcutTapped((route) => {
+      if (route) navigate(route);
+    }).then((fn) => { cleanup = fn; });
+    return () => cleanup();
+  }, [navigate]);
 
   // Esc-to-close + body-scroll-lock while the More sheet is open. The
   // sheet itself eats taps via stopPropagation; the backdrop click is

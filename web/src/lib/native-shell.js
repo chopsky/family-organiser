@@ -54,4 +54,14 @@ export async function setupNativeShell() {
   } catch (err) {
     console.warn('[native-shell] keyboard setup failed:', err?.message || err);
   }
+
+  // Home-screen quick actions (long-press the app icon for "Add
+  // Task" / "Add to Shopping" / "View Calendar" / "Open Shopping
+  // List" shortcuts). Registered once per launch — idempotent.
+  try {
+    const { registerShortcuts } = await import('./app-shortcuts.js');
+    await registerShortcuts();
+  } catch (err) {
+    console.warn('[native-shell] app shortcuts setup failed:', err?.message || err);
+  }
 }
