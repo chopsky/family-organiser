@@ -14,29 +14,45 @@
  * heartbeat or admin trigger.
  */
 
-const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours for successful fetches
+// Negative cache is much shorter so a transient Photon / Open-Meteo
+// hiccup at digest time doesn't silently kill weather for the rest of
+// the day. A retry an hour later (e.g. admin manually re-firing
+// /reminders) gets a fresh shot. 12h on a null was poisoning the
+// next digest in cases where the API recovered minutes after the miss.
+const NEG_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for null/failure
 const cache = new Map(); // key: householdId → { data, ts }
 
 async function geocodeViaPhoton(query) {
   try {
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[digest-weather] Photon HTTP ${res.status} for "${query}"`);
+      return null;
+    }
     const data = await res.json();
     const feature = data.features?.[0];
-    if (!feature) return null;
+    if (!feature) {
+      console.warn(`[digest-weather] Photon returned no match for "${query}" — try a simpler / more standard address`);
+      return null;
+    }
     const [lon, lat] = feature.geometry.coordinates;
     const props = feature.properties || {};
     // Best human label for the line: city/town/village, falling back to name.
     const cityName = props.city || props.town || props.village || props.county || props.name || null;
     return { lat, lon, cityName };
-  } catch {
+  } catch (err) {
+    console.warn(`[digest-weather] Photon fetch threw for "${query}":`, err.message);
     return null;
   }
 }
 
 async function resolveLocation(household) {
-  if (!household?.address?.trim()) return null;
+  if (!household?.address?.trim()) {
+    console.log(`[digest-weather] household ${household?.id} has no address — skipping weather`);
+    return null;
+  }
   return geocodeViaPhoton(household.address.trim());
 }
 
@@ -51,7 +67,10 @@ async function fetchTodayForecastForHousehold(household) {
   if (!household?.id) return null;
 
   const cached = cache.get(household.id);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
+  if (cached) {
+    const ttl = cached.data ? CACHE_TTL_MS : NEG_CACHE_TTL_MS;
+    if (Date.now() - cached.ts < ttl) return cached.data;
+  }
 
   const loc = await resolveLocation(household);
   if (!loc) {
@@ -71,7 +90,10 @@ async function fetchTodayForecastForHousehold(household) {
     if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
     const data = await res.json();
     const d = data.daily;
-    if (!d || !Array.isArray(d.time) || d.time.length === 0) return null;
+    if (!d || !Array.isArray(d.time) || d.time.length === 0) {
+      console.warn(`[digest-weather] Open-Meteo returned no daily data for household ${household.id} (lat=${loc.lat}, lon=${loc.lon})`);
+      return null;
+    }
     const forecast = {
       cityName: loc.cityName || 'home',
       code: Number(d.weather_code?.[0]),
