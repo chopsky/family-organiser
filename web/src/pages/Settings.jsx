@@ -5,13 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
+import WhatsAppPairing from '../components/WhatsAppPairing';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconHelp, IconUser, IconTrash, IconGraduation,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
-import { getWhatsAppPlaceholder } from '../lib/country';
 import { pickPhoto } from '../lib/photo-picker';
 
 const avatarColors = {
@@ -269,14 +269,11 @@ export default function Settings() {
   const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(true);
   const [savingNotifPref, setSavingNotifPref] = useState(null); // which key is saving
 
-  // WhatsApp link state
-  const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [whatsappCode, setWhatsappCode] = useState('');
-  const [sendingWhatsappCode, setSendingWhatsappCode] = useState(false);
-  const [verifyingWhatsapp, setVerifyingWhatsapp] = useState(false);
-  const [whatsappCodeSent, setWhatsappCodeSent] = useState(false);
+  // WhatsApp link state. Phone is now learnt from the inbound webhook
+  // (pull-push pairing) rather than entered up front, so no phone/code
+  // local state needed — that all lives in WhatsAppPairing.
   const [disconnectingWhatsapp, setDisconnectingWhatsapp] = useState(false);
-  const [whatsappBotNumber, setWhatsappBotNumber] = useState(null); // populated on load + after verify
+  const [whatsappBotNumber, setWhatsappBotNumber] = useState(null); // for "Open in WhatsApp" link when already connected
 
   // Calendar feed state
   const [feedUrl, setFeedUrl] = useState('');
@@ -485,40 +482,9 @@ export default function Settings() {
   // for ?connected=<provider> are no longer needed. Inbound subscriptions
   // are managed via the read-only feed flow further down in this file.)
 
-  async function handleSendWhatsappCode(e) {
-    e.preventDefault();
-    setError('');
-    if (!whatsappPhone.trim()) { setError('Please enter your phone number.'); return; }
-    setSendingWhatsappCode(true);
-    try {
-      await api.post('/auth/whatsapp-send-code', { phone: whatsappPhone.trim() });
-      setWhatsappCodeSent(true);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not send verification code.');
-    } finally {
-      setSendingWhatsappCode(false);
-    }
-  }
-
-  async function handleVerifyWhatsapp(e) {
-    e.preventDefault();
-    setError('');
-    if (!whatsappCode.trim()) { setError('Please enter the verification code.'); return; }
-    setVerifyingWhatsapp(true);
-    try {
-      const { data } = await api.post('/auth/whatsapp-verify-code', { code: whatsappCode.trim() });
-      if (data?.bot_number) setWhatsappBotNumber(data.bot_number);
-      setSuccess("WhatsApp connected! We've sent you a welcome message — tap the button below to open the chat.");
-      setWhatsappCodeSent(false);
-      setWhatsappPhone('');
-      setWhatsappCode('');
-      loadMembers();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Invalid code. Please try again.');
-    } finally {
-      setVerifyingWhatsapp(false);
-    }
-  }
+  // The previous handleSendWhatsappCode / handleVerifyWhatsapp pair
+  // is gone — see /components/WhatsAppPairing.jsx + the pull-push
+  // pairing endpoints in /src/routes/auth.js for the replacement.
 
   // ── Active sessions ──────────────────────────────────────────────
   // Pulls the caller's live refresh tokens from /api/auth/sessions with
@@ -1077,58 +1043,23 @@ export default function Settings() {
               {disconnectingWhatsapp ? 'Disconnecting…' : 'Disconnect WhatsApp'}
             </button>
           </div>
-        ) : whatsappCodeSent ? (
-          <form onSubmit={handleVerifyWhatsapp} className="space-y-3">
-            <p className="text-sm text-cocoa">
-              A verification code has been sent to your WhatsApp. Enter it below:
-            </p>
-            <input
-              type="text"
-              value={whatsappCode}
-              onChange={(e) => setWhatsappCode(e.target.value)}
-              placeholder="Enter 6-digit code"
-              maxLength={6}
-              className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center text-lg tracking-widest"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={verifyingWhatsapp}
-                className="flex-1 bg-[#25D366] hover:bg-[#1DA851] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors"
-              >
-                {verifyingWhatsapp ? 'Verifying…' : 'Verify'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setWhatsappCodeSent(false); setWhatsappCode(''); }}
-                className="px-4 py-2.5 rounded-2xl text-sm text-cocoa hover:bg-oat transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
         ) : (
           <>
             <p className="text-sm text-cocoa mb-3">
               Link your WhatsApp to receive daily reminders and manage your household via chat.
             </p>
-            <form onSubmit={handleSendWhatsappCode} className="flex gap-2">
-              <input
-                type="tel"
-                value={whatsappPhone}
-                onChange={(e) => setWhatsappPhone(e.target.value)}
-                placeholder={getWhatsAppPlaceholder(household?.country)}
-                className="flex-1 border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
-              />
-              <button
-                type="submit"
-                disabled={sendingWhatsappCode}
-                className="inline-flex items-center gap-2 bg-[#51ad50] hover:bg-[#418c40] disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors whitespace-nowrap"
-              >
-                {sendingWhatsappCode ? 'Sending…' : 'Send code'}
-              </button>
-            </form>
+            <WhatsAppPairing
+              autoStart={false}
+              onSuccess={async () => {
+                // Refresh members so the connected state flips without a page reload.
+                try {
+                  const { data } = await api.get('/household');
+                  if (data.members) setMembers(data.members);
+                } catch { /* ignore */ }
+              }}
+              onError={setError}
+              compact
+            />
           </>
         )}
       </AccordionItem>

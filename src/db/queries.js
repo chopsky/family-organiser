@@ -833,6 +833,76 @@ async function markWhatsAppVerificationCodeUsed(id, db = supabase) {
 }
 
 /**
+ * Pull-push pairing: create a code without a phone number yet. The
+ * user opens WhatsApp and messages the bot with this code; the inbound
+ * webhook then consumes it via consumeWhatsAppPairingCode below.
+ */
+async function createWhatsAppPairingCode(userId, code, expiresAt, db = supabase) {
+  const { data, error } = await db
+    .from('whatsapp_verification_codes')
+    .insert({ user_id: userId, code, expires_at: expiresAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Look up an unused, unexpired pairing code (case-insensitive on the
+ * code itself). Returns the row or null. Caller is responsible for
+ * marking it used AND linking the phone on the user.
+ */
+async function findUnusedPairingCode(code, db = supabase) {
+  const { data, error } = await db
+    .from('whatsapp_verification_codes')
+    .select()
+    .ilike('code', code)
+    .eq('used', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+/**
+ * Race-safe consume: atomically marks the row used + records the phone.
+ * Updates only if used is still false (so two webhook retries can't
+ * both consume the same code). Returns the row that was actually
+ * updated, or null if someone else already took it.
+ */
+async function consumePairingCode(rowId, phone, db = supabase) {
+  const { data, error } = await db
+    .from('whatsapp_verification_codes')
+    .update({ used: true, phone })
+    .eq('id', rowId)
+    .eq('used', false)
+    .select()
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+/**
+ * Has the pairing code (created by createWhatsAppPairingCode) been
+ * consumed yet? Returns the row if used + phone set, else null. The
+ * frontend polls this to know when to flip the UI to "Connected".
+ */
+async function getPairingCodeStatus(userId, code, db = supabase) {
+  const { data, error } = await db
+    .from('whatsapp_verification_codes')
+    .select()
+    .eq('user_id', userId)
+    .ilike('code', code)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+/**
  * Record that we've just received an inbound WhatsApp message from a user.
  * Used by the webhook to refresh their 24-hour customer-service window so
  * broadcast.js knows when free-form outbound is allowed vs when we must
@@ -4742,6 +4812,10 @@ module.exports = {
   createWhatsAppVerificationCode,
   getWhatsAppVerificationCode,
   markWhatsAppVerificationCodeUsed,
+  createWhatsAppPairingCode,
+  findUnusedPairingCode,
+  consumePairingCode,
+  getPairingCodeStatus,
   touchWhatsAppInbound,
   markUserOnboarded,
   createInvite,

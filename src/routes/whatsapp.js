@@ -11,6 +11,7 @@ const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
 const broadcast = require('../services/broadcast');
 const handlers = require('../bot/handlers');
+const cache = require('../services/cache');
 
 const router = Router();
 
@@ -40,14 +41,70 @@ router.post('/webhook', async (req, res) => {
     // Look up user by WhatsApp phone
     const user = await db.getUserByWhatsAppPhone(phone);
 
+    // ── Pull-push pairing: an unlinked sender sending "CONNECT XXXXXX" (or
+    // just the code on its own) is trying to link their WhatsApp to their
+    // app account. We match the code in their message body against the
+    // whatsapp_verification_codes table, and if it's still valid, link
+    // the From phone to the owning user. See /api/auth/whatsapp-init-pairing.
+    //
+    // Done BEFORE the "unknown user" reply below so first-time pairers
+    // don't get the "sign up first" message.
+    if (!user && typeof Body === 'string' && Body.trim()) {
+      // Pull a 5-10 char alphanumeric token from the message. Matches
+      // both "CONNECT K3X9P2" and the bare code.
+      const tokenMatch = Body.toUpperCase().match(/\b([23456789ABCDEFGHJKMNPQRSTVWXYZ]{5,10})\b/);
+      const token = tokenMatch ? tokenMatch[1] : null;
+      if (token) {
+        try {
+          const row = await db.findUnusedPairingCode(token);
+          if (row) {
+            // Atomic consume — guards against two webhook retries both
+            // trying to link the same code. Whoever loses the race gets
+            // null back and just falls through.
+            const consumed = await db.consumePairingCode(row.id, phone);
+            if (consumed) {
+              await db.updateUser(row.user_id, {
+                whatsapp_phone: phone,
+                whatsapp_linked: true,
+                whatsapp_linked_at: new Date().toISOString(),
+              });
+              const linkedUser = await db.getUserById(row.user_id).catch(() => null);
+              const greetingName = linkedUser?.name ? ` ${linkedUser.name}` : '';
+              const welcome = [
+                `👋 Hey${greetingName} — Housemait here.`,
+                '',
+                `Your WhatsApp is now linked! Just message me like a friend:`,
+                '',
+                `  🛒 "We need milk and eggs"`,
+                `  📋 "Remind me to book the dentist"`,
+                `  📅 "Sofia football Saturday 10am"`,
+                '',
+                `I can also help with recipes, weather, school dates, receipts, and lots more. I'll show you new tricks over the next few days.`,
+                '',
+                `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
+              ].join('\n');
+              await whatsapp.sendMessage(phone, welcome).catch((e) =>
+                console.error('[whatsapp-pair] welcome failed:', e.message)
+              );
+              if (linkedUser?.household_id) cache.invalidate(`members:${linkedUser.household_id}`);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('[whatsapp-pair] consume failed:', err.message);
+          // Fall through to "unknown user" reply
+        }
+      }
+    }
+
     if (!user) {
       // Unknown user — send a helpful response
       await whatsapp.sendMessage(phone,
         `👋 Hi${ProfileName ? ` ${ProfileName}` : ''}! Welcome to Housemait.\n\n` +
         `I don't have your number linked yet. To get started:\n` +
-        `1. Sign up at the Housemait web app\n` +
-        `2. Go to Settings → Connect WhatsApp\n` +
-        `3. Enter your phone number and verify it\n\n` +
+        `1. Sign in to the Housemait app\n` +
+        `2. Go to Settings → Notifications → Connect WhatsApp\n` +
+        `3. Send me the pairing code shown on screen\n\n` +
         `Once linked, just message me naturally to manage your shopping list and tasks!`
       );
       return;
