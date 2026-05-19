@@ -173,6 +173,16 @@
   summary::-webkit-details-marker {
     display: none;
   }
+
+  /* Accordion chevron rotation. Pair with class="acc-chevron" on the
+     chevron SVG inside any <details><summary>. Used by Settings page
+     and any future accordion sections. */
+  .acc-chevron {
+    transition: transform 200ms ease;
+  }
+  details[open] > summary .acc-chevron {
+    transform: rotate(180deg);
+  }
 }
 
 /* ── Landing page scoped styles ── */
