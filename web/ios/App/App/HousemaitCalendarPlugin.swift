@@ -12,16 +12,18 @@
  deprecated as of iOS 17), and our needs are narrow enough that a slim
  in-tree plugin is easier to maintain than a vendored dependency.
 
+ Capacitor 8 in-tree plugin pattern: conform to CAPBridgedPlugin and
+ declare identifier / jsName / pluginMethods. This is the modern
+ registration path — the old CAP_PLUGIN macro from a .m sidecar file
+ only works for plugins shipped as SPM/Cocoapod packages, not for
+ plugins living inside the App target. Pure Swift here.
+
  iOS 17+ split EKEventStore authorisation into fullAccess (read+write)
  and writeOnly. We need read, so we request full access. The legacy
  path for iOS 16 falls back to requestAccess(to:) which the framework
  still honours.
 
- The JS side calls four methods (registered below in the .m file):
-   - requestAccess        → 'granted' | 'denied' | 'not_determined'
-   - getAuthorizationStatus → same
-   - listCalendars        → [{ id, name, type, color }]
-   - getEvents(start, end, calendarIds?) → [{ id, title, … }]
+ JS-side identifier (what registerPlugin() uses): "HousemaitCalendar"
  */
 
 import Foundation
@@ -29,7 +31,19 @@ import Capacitor
 import EventKit
 
 @objc(HousemaitCalendarPlugin)
-public class HousemaitCalendarPlugin: CAPPlugin {
+public class HousemaitCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
+    // CAPBridgedPlugin requirements — these expose the plugin to the
+    // Capacitor 8 bridge without needing a .m sidecar file. The
+    // jsName must match what registerPlugin('…') uses in JS.
+    public let identifier = "HousemaitCalendarPlugin"
+    public let jsName = "HousemaitCalendar"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getAuthorizationStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestAccess", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "listCalendars", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getEvents", returnType: CAPPluginReturnPromise),
+    ]
+
     private let eventStore = EKEventStore()
     private let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
