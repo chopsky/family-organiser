@@ -22,8 +22,9 @@
  *   compact=false          — denser layout (used inside Settings)
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../lib/api';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 
 const POLL_INTERVAL_MS = 2500;
 const MAX_POLL_DURATION_MS = 11 * 60 * 1000; // a little longer than the 10-min server TTL
@@ -57,42 +58,56 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll while waiting. Server flips `linked: true` once the inbound
-  // webhook consumes the code. Gives up after the server-side TTL.
-  useEffect(() => {
-    if (stage !== 'waiting' || !pairing?.code) return undefined;
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - (pollStartedAtRef.current || 0) > MAX_POLL_DURATION_MS) {
-        clearInterval(pollRef.current);
+  // One-shot status check, used both inside the interval and on
+  // foreground events (so the user doesn't have to wait up to ~2.5s
+  // after returning from WhatsApp to see the success state).
+  const pollOnce = useCallback(async () => {
+    if (!pairing?.code) return;
+    if (Date.now() - (pollStartedAtRef.current || 0) > MAX_POLL_DURATION_MS) {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
+      setStage('error');
+      onErrorRef.current?.('Pairing code expired. Tap Generate a new code to try again.');
+      return;
+    }
+    try {
+      const { data } = await api.get('/auth/whatsapp-pairing-status', {
+        params: { code: pairing.code },
+      });
+      if (data?.linked) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        setStage('done');
+        onSuccessRef.current?.(data.phone || null);
+      } else if (data?.expired) {
+        if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
         setStage('error');
         onErrorRef.current?.('Pairing code expired. Tap Generate a new code to try again.');
-        return;
       }
-      try {
-        const { data } = await api.get('/auth/whatsapp-pairing-status', {
-          params: { code: pairing.code },
-        });
-        if (data?.linked) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setStage('done');
-          onSuccessRef.current?.(data.phone || null);
-        } else if (data?.expired) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setStage('error');
-          onErrorRef.current?.('Pairing code expired. Tap Generate a new code to try again.');
-        }
-      } catch {
-        /* transient — keep polling */
-      }
-    }, POLL_INTERVAL_MS);
+    } catch {
+      /* transient — caller will retry on next tick */
+    }
+  }, [pairing?.code]);
+
+  // Background interval poll while in the waiting stage.
+  useEffect(() => {
+    if (stage !== 'waiting' || !pairing?.code) return undefined;
+    pollRef.current = setInterval(pollOnce, POLL_INTERVAL_MS);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = null;
     };
-  }, [stage, pairing?.code]);
+  }, [stage, pairing?.code, pollOnce]);
+
+  // When the app/tab returns to the foreground (user came back from
+  // WhatsApp), poll immediately. iOS suspends the JS engine while in
+  // the background so the next setInterval tick can take ~2.5s to fire
+  // — without this, the user sees the "waiting" state for an awkward
+  // moment after their WhatsApp message has already been linked.
+  useAppForegroundRefresh(() => {
+    if (stage === 'waiting') pollOnce();
+  }, { throttleMs: 0 });
 
   if (stage === 'idle') {
     return (

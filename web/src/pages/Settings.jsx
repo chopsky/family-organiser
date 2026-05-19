@@ -6,6 +6,7 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconHelp, IconUser, IconTrash, IconGraduation,
@@ -331,6 +332,12 @@ export default function Settings() {
   }
 
   useEffect(() => { loadMembers(); }, []);
+
+  // Refetch members when the app/tab returns from the background — the
+  // user may have just completed a WhatsApp pairing handshake in another
+  // app and we need to pick up the now-linked state. Throttle short so a
+  // quick app-switch back from WhatsApp definitely fires.
+  useAppForegroundRefresh(() => { loadMembers(); }, { throttleMs: 2000 });
 
   // Fetch the bot's WhatsApp number once so we can render the
   // "Open in WhatsApp" deep-link button for linked users.
