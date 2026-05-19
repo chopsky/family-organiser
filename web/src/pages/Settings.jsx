@@ -1074,34 +1074,53 @@ export default function Settings() {
       {/* Calendar Sync */}
       <AccordionItem title="Calendar Sync" icon={IconCalendar}>
         <p className="text-sm text-cocoa mb-3">
-          Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
+          Show your household events in the calendar app on your phone or laptop. One-way — events you create here appear there automatically.
         </p>
 
 
         {feedUrl ? (
           <div className="space-y-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={feedUrl}
-                className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-sm bg-oat text-cocoa select-all"
-                onClick={(e) => e.target.select()}
-              />
-              <button
-                onClick={handleCopyFeed}
-                className="bg-primary hover:bg-primary-pressed text-white font-medium px-4 py-2 rounded-2xl text-sm transition-colors whitespace-nowrap"
-              >
-                {feedCopied ? 'Copied!' : 'Copy'}
-              </button>
+            {/* Apple Calendar — tappable webcal:// link. iOS / macOS
+                hand the scheme to Calendar.app which shows a native
+                one-tap subscribe sheet. Works inside Capacitor's
+                WKWebView because non-http(s) schemes are routed via
+                UIApplication.shared.open(). On other browsers (Chrome
+                on Android, Edge) clicking is a no-op — those users
+                will use the copy-URL flow below. */}
+            <a
+              href={feedUrl.replace(/^https?:\/\//, 'webcal://')}
+              className="block w-full bg-primary hover:bg-primary-pressed text-white font-medium px-4 py-3 rounded-2xl text-sm text-center transition-colors"
+            >
+              Subscribe in Apple Calendar
+            </a>
+            <p className="text-xs text-cocoa text-center -mt-1">
+              Opens the iOS or macOS Calendar app with a one-tap confirm.
+            </p>
+
+            <div className="pt-3 border-t border-cream-border">
+              <p className="text-xs font-medium text-bark mb-2">Google Calendar or Outlook? Copy the URL:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={feedUrl}
+                  className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-xs bg-oat text-cocoa select-all"
+                  onClick={(e) => e.target.select()}
+                />
+                <button
+                  onClick={handleCopyFeed}
+                  className="border border-cream-border text-bark hover:bg-cream font-medium px-3 py-2 rounded-2xl text-xs transition-colors whitespace-nowrap"
+                >
+                  {feedCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-xs text-cocoa mt-2">
+                <span className="font-medium">Google:</span> Settings &rarr; Add calendar &rarr; From URL.{' '}
+                <span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web.
+              </p>
             </div>
-            <div className="text-xs text-cocoa space-y-1">
-              <p className="font-medium text-cocoa">How to subscribe:</p>
-              <p><span className="font-medium">Apple Calendar:</span> File &rarr; New Calendar Subscription &rarr; paste URL</p>
-              <p><span className="font-medium">Google Calendar:</span> Settings &rarr; Add calendar &rarr; From URL &rarr; paste URL</p>
-              <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web &rarr; paste URL</p>
-            </div>
-            <div className="flex gap-3">
+
+            <div className="flex gap-3 pt-3 border-t border-cream-border">
               <button
                 onClick={handleRegenerateFeed}
                 disabled={loadingFeed}
