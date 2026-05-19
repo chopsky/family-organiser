@@ -1506,7 +1506,7 @@ export default function Settings() {
                     <p className="text-xs text-cocoa mb-3">Choose which messages the Housemait bot sends you on WhatsApp.</p>
                     <div className="space-y-1">
                       {[
-                        { key: 'whatsapp_daily_reminder', label: 'Daily morning reminder', desc: "Today's schedule, shopping, and weather" },
+                        { key: 'whatsapp_daily_reminder', label: 'Daily morning reminder', desc: "Your morning briefing of what's on for today" },
                         { key: 'whatsapp_event_reminders', label: 'Event reminders', desc: 'Heads-up before an event starts (uses per-event timing)' },
                         { key: 'whatsapp_weekly_digest', label: 'Weekly digest', desc: 'Sunday recap of the week ahead and tasks done' },
                         { key: 'whatsapp_overdue_nudge', label: 'Overdue task nudges', desc: 'Gentle reminder when tasks are past due' },
