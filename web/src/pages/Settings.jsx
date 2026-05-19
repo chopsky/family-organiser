@@ -5,7 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
-import { IconSettings } from '../components/Icons';
+import {
+  IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
+  IconDownload, IconShield, IconHelp, IconUser, IconTrash, IconGraduation,
+} from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { getWhatsAppPlaceholder } from '../lib/country';
@@ -205,7 +208,7 @@ function PlanSection() {
  * `danger` flips the card to the coral-tinted destructive styling used
  * by the Delete-account section.
  */
-function AccordionItem({ title, defaultOpen = false, danger = false, children }) {
+function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = false, children }) {
   const baseStyle = danger
     ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
     : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
@@ -215,10 +218,12 @@ function AccordionItem({ title, defaultOpen = false, danger = false, children })
   // others. Native HTML feature (Safari 17.4+, Chrome 120+, Firefox 119+).
   // Older browsers ignore the attribute and just allow multiple-open,
   // which is the previous behaviour (graceful fallback).
+  const iconColor = danger ? 'text-error' : 'text-plum';
   return (
     <details name="settings-accordion" className={className} style={baseStyle} open={defaultOpen}>
-      <summary className="flex items-center justify-between px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
-        <h2 className="text-lg font-semibold text-bark">{title}</h2>
+      <summary className="flex items-center gap-3 px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
+        {IconCmp && <IconCmp className={`w-5 h-5 shrink-0 ${iconColor}`} />}
+        <h2 className="flex-1 text-lg font-semibold text-bark">{title}</h2>
         <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
@@ -1047,7 +1052,7 @@ export default function Settings() {
       <PlanSection />
 
       {/* Connect WhatsApp */}
-      <AccordionItem title="Connect WhatsApp">
+      <AccordionItem title="Connect WhatsApp" icon={IconMessageCircle}>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
@@ -1129,7 +1134,7 @@ export default function Settings() {
       </AccordionItem>
 
       {/* Calendar Sync */}
-      <AccordionItem title="Calendar Sync">
+      <AccordionItem title="Calendar Sync" icon={IconCalendar}>
         <p className="text-sm text-cocoa mb-3">
           Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
         </p>
@@ -1287,7 +1292,7 @@ export default function Settings() {
 
 
       {/* Email Forwarding */}
-      <AccordionItem title="Email Forwarding">
+      <AccordionItem title="Email Forwarding" icon={IconMail}>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
@@ -1446,7 +1451,7 @@ export default function Settings() {
           once linked). Each subsection lists per-type toggles wired to
           notification_preferences. Rendered always so users on web also
           know the section exists; subsection content adapts to capability. */}
-      <AccordionItem title="Notifications">
+      <AccordionItem title="Notifications" icon={IconBell}>
         {loadingNotifPrefs ? (
           <div className="py-4 text-center text-sm text-cocoa">Loading…</div>
         ) : notifPrefs ? (
@@ -1544,7 +1549,7 @@ export default function Settings() {
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
-      <AccordionItem title="Your data">
+      <AccordionItem title="Your data" icon={IconDownload}>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
           your household — tasks, events, shopping lists, notes, documents
@@ -1565,7 +1570,7 @@ export default function Settings() {
           Sits between "Your data" (non-destructive GDPR surface) and the
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
-      <AccordionItem title="Active sessions">
+      <AccordionItem title="Active sessions" icon={IconShield}>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
           don't recognise — the device gets signed out immediately.
@@ -1625,7 +1630,7 @@ export default function Settings() {
       {/* Help & support — small entry point above the danger zone so users
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
-      <AccordionItem title="Help & support">
+      <AccordionItem title="Help & support" icon={IconHelp}>
         <p className="text-sm text-cocoa">
           Quick answers to common questions, plus a way to reach us if
           you're stuck.
@@ -1641,7 +1646,7 @@ export default function Settings() {
       {/* Account card — shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
-      <AccordionItem title="Account">
+      <AccordionItem title="Account" icon={IconUser}>
         <p className="text-sm text-cocoa">
           Signed in as <span className="font-medium text-bark">{user?.name}</span>
           {user?.role && <span> ({user.role})</span>}
@@ -1676,7 +1681,7 @@ export default function Settings() {
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
           a destructive action. */}
-      <AccordionItem title="Delete account" danger>
+      <AccordionItem title="Delete account" danger icon={IconTrash}>
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
           member of your household, <strong className="text-bark">everything in it</strong>{' '}
@@ -1964,7 +1969,7 @@ function SchoolsSection() {
   if (schools.length === 0) return null;
 
   return (
-    <AccordionItem title="Schools">
+    <AccordionItem title="Schools" icon={IconGraduation}>
       <p className="text-sm text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
       <div className="space-y-3">
         {schools.map(school => (

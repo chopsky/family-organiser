@@ -196,3 +196,15 @@ export function IconHelp(p) {
     </Icon>
   );
 }
+
+export function IconBell(p) {
+  return <Icon {...p}><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 003.4 0" /></Icon>;
+}
+
+export function IconGraduation(p) {
+  return <Icon {...p}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></Icon>;
+}
+
+export function IconCreditCard(p) {
+  return <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></Icon>;
+}
