@@ -210,8 +210,13 @@ function AccordionItem({ title, defaultOpen = false, danger = false, children })
     ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
     : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
   const className = danger ? 'rounded-2xl border' : 'bg-linen rounded-2xl';
+  // name="settings-accordion" makes the browser treat all <details>
+  // sharing this name as an exclusive group — opening one closes the
+  // others. Native HTML feature (Safari 17.4+, Chrome 120+, Firefox 119+).
+  // Older browsers ignore the attribute and just allow multiple-open,
+  // which is the previous behaviour (graceful fallback).
   return (
-    <details className={className} style={baseStyle} open={defaultOpen}>
+    <details name="settings-accordion" className={className} style={baseStyle} open={defaultOpen}>
       <summary className="flex items-center justify-between px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
         <h2 className="text-lg font-semibold text-bark">{title}</h2>
         <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
