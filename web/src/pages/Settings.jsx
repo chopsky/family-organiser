@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -194,9 +194,68 @@ function PlanSection() {
   );
 }
 
+/**
+ * Panel — wraps a Settings section. Renders nothing unless the URL's
+ * ?section= query matches this panel's id, OR when no section is active
+ * (then nothing renders — the index list shows instead).
+ *
+ * Why a wrapper rather than rewriting each section: keeps the existing
+ * card JSX untouched (1900+ lines of carefully-tuned UI), so this whole
+ * refactor is reversible by removing the wrappers + index + back button.
+ */
+function Panel({ id, activeSection, children }) {
+  if (activeSection !== id) return null;
+  return children;
+}
+
+/**
+ * SettingsIndex — the iOS-style list of rows shown when no section is
+ * active. Each row is a button that updates ?section=<key>, drilling
+ * down into the existing section JSX (wrapped in <Panel>).
+ *
+ * Rows can carry a `summary` (current state at-a-glance, e.g. "Connected"
+ * for WhatsApp) and are grouped under quiet uppercase headers.
+ */
+function SettingsIndex({ groups, onSelect, onLogout }) {
+  return (
+    <div className="space-y-6">
+      {groups.map((group) => (
+        <div key={group.title}>
+          <div className="text-[11px] font-semibold text-cocoa uppercase tracking-wider px-1 mb-2">{group.title}</div>
+          <div className="bg-linen rounded-2xl overflow-hidden" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+            {group.rows.map((row, i) => (
+              <button
+                key={row.key}
+                type="button"
+                onClick={() => onSelect(row.key)}
+                className={`w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-oat transition-colors ${i > 0 ? 'border-t border-cream-border' : ''}`}
+              >
+                <span className="flex-1 text-sm font-medium text-bark">{row.label}</span>
+                {row.summary && <span className="text-xs text-cocoa truncate max-w-[55%]">{row.summary}</span>}
+                <svg className="w-4 h-4 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={onLogout}
+        className="w-full py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
+      >
+        Log out
+      </button>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { household, user, isAdmin, login, logout, token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeSection = searchParams.get('section');
 
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
@@ -934,8 +993,61 @@ export default function Settings() {
   }
 
 
+  // ── Index list rows ─────────────────────────────────────────────
+  // Grouped iOS-style. Each row drills to a Panel via ?section=<key>.
+  // Summaries show current state at a glance so the user doesn't have
+  // to drill in just to check (e.g. "Connected" for WhatsApp).
+  const me = members.find((m) => m.id === user?.id);
+  const whatsappLinked = !!me?.whatsapp_linked;
+  const indexGroups = [
+    {
+      title: 'You',
+      rows: [
+        { key: 'profile', label: 'Your details', summary: user?.name },
+        { key: 'plan', label: 'Plan' },
+      ],
+    },
+    {
+      title: 'Connections',
+      rows: [
+        { key: 'whatsapp', label: 'WhatsApp', summary: whatsappLinked ? 'Connected' : 'Not connected' },
+        { key: 'calendar', label: 'Calendar sync' },
+        { key: 'email', label: 'Email forwarding' },
+        ...(isAdmin ? [{ key: 'schools', label: 'Schools' }] : []),
+      ],
+    },
+    {
+      title: 'Notifications',
+      rows: [
+        { key: 'push', label: 'Push notifications' },
+      ],
+    },
+    {
+      title: 'Account',
+      rows: [
+        { key: 'account', label: 'Account', summary: accountInfo.email || undefined },
+        { key: 'sessions', label: 'Active sessions' },
+        { key: 'data', label: 'Export my data' },
+        { key: 'help', label: 'Help & support' },
+        { key: 'danger', label: 'Delete account' },
+      ],
+    },
+  ];
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {activeSection && (
+        <button
+          type="button"
+          onClick={() => setSearchParams({})}
+          className="inline-flex items-center gap-1 text-sm text-cocoa hover:text-bark transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          Back to Settings
+        </button>
+      )}
       <h1
         className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
         style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
@@ -958,7 +1070,16 @@ export default function Settings() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
+      {!activeSection && (
+        <SettingsIndex
+          groups={indexGroups}
+          onSelect={(key) => setSearchParams({ section: key })}
+          onLogout={() => { logout(); navigate('/'); }}
+        />
+      )}
+
       {/* My profile */}
+      <Panel id="profile" activeSection={activeSection}>
       {(() => {
         const me = members.find((m) => m.id === user?.id);
         const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
@@ -996,11 +1117,15 @@ export default function Settings() {
           </div>
         );
       })()}
+      </Panel>
 
       {/* Plan / subscription */}
+      <Panel id="plan" activeSection={activeSection}>
       <PlanSection />
+      </Panel>
 
       {/* Connect WhatsApp */}
+      <Panel id="whatsapp" activeSection={activeSection}>
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Connect WhatsApp</h2>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
@@ -1082,8 +1207,10 @@ export default function Settings() {
           </>
         )}
       </div>
+      </Panel>
 
       {/* Calendar Sync */}
+      <Panel id="calendar" activeSection={activeSection}>
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Calendar Sync</h2>
         <p className="text-sm text-cocoa mb-3">
@@ -1240,9 +1367,11 @@ export default function Settings() {
         </div>
 
       </div>
+      </Panel>
 
 
       {/* Email Forwarding */}
+      <Panel id="email" activeSection={activeSection}>
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Email Forwarding</h2>
         <p className="text-sm text-cocoa mb-3">
@@ -1394,11 +1523,15 @@ export default function Settings() {
           </p>
         )}
       </div>
+      </Panel>
 
       {/* Schools (admin only) */}
+      <Panel id="schools" activeSection={activeSection}>
       {isAdmin && <SchoolsSection />}
+      </Panel>
 
       {/* Push Notifications — native app only */}
+      <Panel id="push" activeSection={activeSection}>
       {isNative && <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Push Notifications</h2>
         <p className="text-sm text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
@@ -1436,10 +1569,12 @@ export default function Settings() {
           </div>
         ) : null}
       </div>}
+      </Panel>
 
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
+      <Panel id="data" activeSection={activeSection}>
       <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Your data</h2>
         <p className="text-sm text-cocoa">
@@ -1457,11 +1592,13 @@ export default function Settings() {
           {exporting ? 'Preparing…' : 'Export my data'}
         </button>
       </section>
+      </Panel>
 
       {/* Active sessions — lets users see + revoke live refresh tokens.
           Sits between "Your data" (non-destructive GDPR surface) and the
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
+      <Panel id="sessions" activeSection={activeSection}>
       <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Active sessions</h2>
         <p className="text-sm text-cocoa">
@@ -1519,10 +1656,12 @@ export default function Settings() {
           </button>
         )}
       </section>
+      </Panel>
 
       {/* Help & support — small entry point above the danger zone so users
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
+      <Panel id="help" activeSection={activeSection}>
       <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Help &amp; support</h2>
         <p className="text-sm text-cocoa">
@@ -1536,10 +1675,12 @@ export default function Settings() {
           Visit the help centre
         </Link>
       </section>
+      </Panel>
 
       {/* Account card — shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
+      <Panel id="account" activeSection={activeSection}>
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-lg font-semibold text-bark mb-2">Account</h2>
         <p className="text-sm text-cocoa">
@@ -1571,11 +1712,13 @@ export default function Settings() {
           </div>
         )}
       </div>
+      </Panel>
 
       {/* Danger zone — delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
           a destructive action. */}
+      <Panel id="danger" activeSection={activeSection}>
       <section
         className="mt-2 rounded-2xl p-5 md:p-6 border"
         style={{ borderColor: 'rgba(215, 99, 83, 0.25)', background: 'rgba(215, 99, 83, 0.04)' }}
@@ -1600,16 +1743,11 @@ export default function Settings() {
           Delete my account
         </button>
       </section>
+      </Panel>
 
-      {/* Log out — bottom of the page. Standard convention in most
-          settings UIs; users scrolling to the end of Settings expect to
-          find it here. */}
-      <button
-        onClick={() => { logout(); navigate('/'); }}
-        className="w-full mt-6 py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
-      >
-        Log out
-      </button>
+      {/* Log out lives inside SettingsIndex (rendered on the index view).
+          Removed from the bottom-of-page slot because it's no longer the
+          end of a long scroll — the index list shows it consistently. */}
 
       {/* Delete Account Modal */}
       {deleteOpen && (
