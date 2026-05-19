@@ -194,6 +194,37 @@ function PlanSection() {
   );
 }
 
+/**
+ * AccordionItem — collapsible card. Uses native <details>/<summary> so
+ * the browser owns open/close state (no React, no useState), and screen
+ * readers already understand the disclosure pattern.
+ *
+ * The chevron rotates via a CSS rule in index.css
+ * (`details[open] > summary .acc-chevron`). Default: closed.
+ *
+ * `danger` flips the card to the coral-tinted destructive styling used
+ * by the Delete-account section.
+ */
+function AccordionItem({ title, defaultOpen = false, danger = false, children }) {
+  const baseStyle = danger
+    ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
+    : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
+  const className = danger ? 'rounded-2xl border' : 'bg-linen rounded-2xl';
+  return (
+    <details className={className} style={baseStyle} open={defaultOpen}>
+      <summary className="flex items-center justify-between px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
+        <h2 className="text-lg font-semibold text-bark">{title}</h2>
+        <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </summary>
+      <div className="px-5 pb-5 md:px-6 md:pb-6">
+        {children}
+      </div>
+    </details>
+  );
+}
+
 export default function Settings() {
   const { household, user, isAdmin, login, logout, token } = useAuth();
   const navigate = useNavigate();
@@ -1001,8 +1032,7 @@ export default function Settings() {
       <PlanSection />
 
       {/* Connect WhatsApp */}
-      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Connect WhatsApp</h2>
+      <AccordionItem title="Connect WhatsApp">
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
@@ -1081,11 +1111,10 @@ export default function Settings() {
             </form>
           </>
         )}
-      </div>
+      </AccordionItem>
 
       {/* Calendar Sync */}
-      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Calendar Sync</h2>
+      <AccordionItem title="Calendar Sync">
         <p className="text-sm text-cocoa mb-3">
           Subscribe to your household calendar in Apple Calendar, Google Calendar, or Outlook.
         </p>
@@ -1239,12 +1268,11 @@ export default function Settings() {
           )}
         </div>
 
-      </div>
+      </AccordionItem>
 
 
       {/* Email Forwarding */}
-      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Email Forwarding</h2>
+      <AccordionItem title="Email Forwarding">
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
@@ -1393,14 +1421,13 @@ export default function Settings() {
             Your household does not have a forwarding email address yet. It will be generated automatically.
           </p>
         )}
-      </div>
+      </AccordionItem>
 
       {/* Schools (admin only) */}
       {isAdmin && <SchoolsSection />}
 
       {/* Push Notifications — native app only */}
-      {isNative && <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Push Notifications</h2>
+      {isNative && <AccordionItem title="Push Notifications">
         <p className="text-sm text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
         {loadingNotifPrefs ? (
           <div className="py-4 text-center text-sm text-cocoa">Loading...</div>
@@ -1435,13 +1462,12 @@ export default function Settings() {
             ))}
           </div>
         ) : null}
-      </div>}
+      </AccordionItem>}
 
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
-      <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Your data</h2>
+      <AccordionItem title="Your data">
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
           your household — tasks, events, shopping lists, notes, documents
@@ -1456,14 +1482,13 @@ export default function Settings() {
         >
           {exporting ? 'Preparing…' : 'Export my data'}
         </button>
-      </section>
+      </AccordionItem>
 
       {/* Active sessions — lets users see + revoke live refresh tokens.
           Sits between "Your data" (non-destructive GDPR surface) and the
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
-      <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Active sessions</h2>
+      <AccordionItem title="Active sessions">
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
           don't recognise — the device gets signed out immediately.
@@ -1518,13 +1543,12 @@ export default function Settings() {
             {revokingAllOthers ? 'Revoking…' : 'Revoke all other sessions'}
           </button>
         )}
-      </section>
+      </AccordionItem>
 
       {/* Help & support — small entry point above the danger zone so users
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
-      <section className="mt-2 rounded-2xl p-5 md:p-6 bg-linen" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Help &amp; support</h2>
+      <AccordionItem title="Help & support">
         <p className="text-sm text-cocoa">
           Quick answers to common questions, plus a way to reach us if
           you're stuck.
@@ -1535,13 +1559,12 @@ export default function Settings() {
         >
           Visit the help centre
         </Link>
-      </section>
+      </AccordionItem>
 
       {/* Account card — shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
-      <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-lg font-semibold text-bark mb-2">Account</h2>
+      <AccordionItem title="Account">
         <p className="text-sm text-cocoa">
           Signed in as <span className="font-medium text-bark">{user?.name}</span>
           {user?.role && <span> ({user.role})</span>}
@@ -1570,17 +1593,13 @@ export default function Settings() {
             {accountInfo.email && <span className="text-bark">{accountInfo.email}</span>}
           </div>
         )}
-      </div>
+      </AccordionItem>
 
       {/* Danger zone — delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
           a destructive action. */}
-      <section
-        className="mt-2 rounded-2xl p-5 md:p-6 border"
-        style={{ borderColor: 'rgba(215, 99, 83, 0.25)', background: 'rgba(215, 99, 83, 0.04)' }}
-      >
-        <h2 className="text-lg font-semibold text-bark mb-2">Delete account</h2>
+      <AccordionItem title="Delete account" danger>
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
           member of your household, <strong className="text-bark">everything in it</strong>{' '}
@@ -1599,7 +1618,7 @@ export default function Settings() {
         >
           Delete my account
         </button>
-      </section>
+      </AccordionItem>
 
       {/* Log out — bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
@@ -1868,8 +1887,7 @@ function SchoolsSection() {
   if (schools.length === 0) return null;
 
   return (
-    <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-      <h2 className="text-lg font-semibold text-bark mb-2">Schools</h2>
+    <AccordionItem title="Schools">
       <p className="text-sm text-cocoa mb-3">Schools connected to your household. Manage term dates and calendar feeds from the Family page.</p>
       <div className="space-y-3">
         {schools.map(school => (
@@ -1902,6 +1920,6 @@ function SchoolsSection() {
           </div>
         ))}
       </div>
-    </div>
+    </AccordionItem>
   );
 }
