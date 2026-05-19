@@ -233,7 +233,10 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-cream flex flex-col md:flex-row">
       {/* ── Desktop Sidebar ── */}
-      <aside className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30">
+      <aside
+        className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30"
+        style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 0px 14px' }}
+      >
         {/* Logo */}
         <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
           <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
@@ -245,8 +248,10 @@ export default function Layout({ children }) {
           {mainNav.map(renderNavLink)}
         </nav>
 
-        {/* User footer */}
-        <div className="px-4 py-4 border-t border-light-grey flex items-center gap-2.5">
+        {/* User footer — top border uses a warmer grey than the global
+            --color-light-grey so it sits more softly against the cream
+            page background. */}
+        <div className="px-4 py-4 flex items-center gap-2.5" style={{ borderTop: '1px solid #f2f0ed' }}>
           {renderAvatar('w-8 h-8', 'text-xs')}
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
