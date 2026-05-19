@@ -1114,10 +1114,10 @@ export default function Settings() {
                   {feedCopied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              <p className="text-xs text-cocoa mt-2">
-                <span className="font-medium">Google:</span> Settings &rarr; Add calendar &rarr; From URL.{' '}
-                <span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web.
-              </p>
+              <div className="text-xs text-cocoa mt-2 space-y-1">
+                <p><span className="font-medium">Google:</span> Settings &rarr; Add calendar &rarr; From URL.</p>
+                <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web.</p>
+              </div>
             </div>
 
             <div className="flex gap-3 pt-3 border-t border-cream-border">
