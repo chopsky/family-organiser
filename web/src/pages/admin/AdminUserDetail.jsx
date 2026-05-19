@@ -4,6 +4,8 @@ import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu, IconMessageCircle } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import DailyChart from '../../components/DailyChart';
+import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 const avatarColors = {
   red: 'bg-red', 'burnt-orange': 'bg-burnt-orange', amber: 'bg-amber', gold: 'bg-gold',
@@ -242,9 +244,19 @@ export default function AdminUserDetail() {
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* AI Usage */}
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <IconCpu className="h-5 w-5 text-plum" />
-            <h3 className="font-display text-base font-semibold text-charcoal">AI Usage (30d)</h3>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <IconCpu className="h-5 w-5 text-plum" />
+              <h3 className="font-display text-base font-semibold text-charcoal">AI Usage (30d)</h3>
+            </div>
+            {usage?.ai?.lastUsedAt && (
+              <span
+                className={`text-xs font-medium ${staleness(usage.ai.lastUsedAt)}`}
+                title={new Date(usage.ai.lastUsedAt).toLocaleString()}
+              >
+                {formatRelativeTime(usage.ai.lastUsedAt)}
+              </span>
+            )}
           </div>
           {usageLoading ? (
             <div className="flex justify-center py-4"><Spinner /></div>
@@ -346,29 +358,6 @@ export default function AdminUserDetail() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function DailyChart({ data }) {
-  const max = Math.max(1, ...data.map((d) => d.calls));
-  return (
-    <div className="flex items-end gap-1 h-20">
-      {data.map((d) => {
-        const heightPct = d.calls > 0 ? Math.max(8, (d.calls / max) * 100) : 0;
-        const dayLabel = new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        return (
-          <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${dayLabel}: ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
-            <div className="flex-1 w-full flex items-end">
-              <div
-                className={`w-full rounded-t-sm ${d.calls > 0 ? 'bg-plum' : 'bg-light-grey'}`}
-                style={{ height: d.calls > 0 ? `${heightPct}%` : '2px' }}
-              />
-            </div>
-            <span className="text-[9px] text-warm-grey font-medium leading-tight text-center">{d.calls}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }

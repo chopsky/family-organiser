@@ -4,7 +4,9 @@ import api from '../../lib/api';
 import { IconArrowLeft } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
+import DailyChart from '../../components/DailyChart';
 import { formatBytes } from '../../lib/formatBytes';
+import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB — mirrors src/routes/documents.js
 const FILE_QUOTA_COUNT = 500;
@@ -27,6 +29,8 @@ export default function AdminHouseholdDetail() {
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aiUsage, setAiUsage] = useState(null);
+  const [aiUsageLoading, setAiUsageLoading] = useState(true);
 
   const loadHousehold = useCallback(async () => {
     try {
@@ -40,6 +44,13 @@ export default function AdminHouseholdDetail() {
   }, [id]);
 
   useEffect(() => { loadHousehold(); }, [loadHousehold]);
+
+  useEffect(() => {
+    api.get(`/admin/households/${id}/ai-usage`)
+      .then(({ data }) => setAiUsage(data))
+      .catch((err) => console.error('Failed to load household AI usage:', err))
+      .finally(() => setAiUsageLoading(false));
+  }, [id]);
 
   async function patchSubscription(updates) {
     setSaving(true);
@@ -164,6 +175,12 @@ export default function AdminHouseholdDetail() {
         />
       </div>
 
+      {/* AI Usage */}
+      <div className="mt-6">
+        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">AI Usage (30d)</h3>
+        <AiUsageCard usage={aiUsage} loading={aiUsageLoading} />
+      </div>
+
       {/* Members */}
       <div className="mt-6">
         <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Members</h3>
@@ -271,6 +288,93 @@ function QuotaBar({ label, used, limit, pct }) {
           className="h-full bg-plum rounded-full transition-all duration-300"
           style={{ width: `${pct}%` }}
         />
+      </div>
+    </div>
+  );
+}
+
+function AiUsageCard({ usage, loading }) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">Loading AI usage…</p>
+      </div>
+    );
+  }
+  if (!usage || usage.totalCalls === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">No AI calls in the last 30 days</p>
+      </div>
+    );
+  }
+
+  const byProvider = Object.entries(usage.byProvider || {}).sort((a, b) => b[1] - a[1]);
+  const byFeature = Object.entries(usage.byFeature || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+      {/* Headline metrics */}
+      <div className="flex items-baseline gap-3 flex-wrap mb-4">
+        <span className="font-display text-2xl font-bold text-charcoal">{usage.totalCalls}</span>
+        <span className="text-warm-grey text-sm">total calls</span>
+        {usage.lastUsedAt && (
+          <span
+            className={`text-xs font-medium ml-auto ${staleness(usage.lastUsedAt)}`}
+            title={new Date(usage.lastUsedAt).toLocaleString()}
+          >
+            Last used {formatRelativeTime(usage.lastUsedAt)}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-5 pb-5 border-b border-light-grey">
+        <div>
+          <p className="text-lg font-bold text-charcoal">{usage.avgLatencyMs}ms</p>
+          <p className="text-[11px] text-warm-grey">Avg Latency</p>
+        </div>
+        <div>
+          <p className="text-lg font-bold text-charcoal">{usage.failoverCalls}</p>
+          <p className="text-[11px] text-warm-grey">Failovers</p>
+        </div>
+        <div>
+          <p className="text-lg font-bold text-charcoal">{byProvider.length}</p>
+          <p className="text-[11px] text-warm-grey">Providers Used</p>
+        </div>
+      </div>
+
+      {/* Daily chart */}
+      {usage.daily?.length > 0 && (
+        <div className="mb-5 pb-5 border-b border-light-grey">
+          <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Last 10 Days</p>
+          <DailyChart data={usage.daily} />
+        </div>
+      )}
+
+      {/* Provider + feature breakdown */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div>
+          <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">By Provider</p>
+          <div className="space-y-1.5">
+            {byProvider.map(([provider, count]) => (
+              <div key={provider} className="flex items-center justify-between text-sm">
+                <span className="text-warm-grey capitalize">{provider}</span>
+                <span className="font-medium text-charcoal">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Top Features</p>
+          <div className="space-y-1.5">
+            {byFeature.map(([feature, count]) => (
+              <div key={feature} className="flex items-center justify-between text-sm">
+                <span className="text-warm-grey capitalize">{feature.replace(/_/g, ' ')}</span>
+                <span className="font-medium text-charcoal">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

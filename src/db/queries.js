@@ -3346,17 +3346,21 @@ async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}, db = supa
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await db
     .from('ai_usage_log')
-    .select('household_id')
+    .select('household_id, created_at')
     .gte('created_at', since)
     .not('household_id', 'is', null);
   if (error) throw error;
 
-  const counts = {};
+  // Aggregate counts + last_used_at per household
+  const stats = {};
   for (const row of data || []) {
-    counts[row.household_id] = (counts[row.household_id] || 0) + 1;
+    const s = stats[row.household_id] || { calls: 0, lastUsedAt: null };
+    s.calls++;
+    if (!s.lastUsedAt || row.created_at > s.lastUsedAt) s.lastUsedAt = row.created_at;
+    stats[row.household_id] = s;
   }
 
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  const sorted = Object.entries(stats).sort((a, b) => b[1].calls - a[1].calls).slice(0, limit);
   if (sorted.length === 0) return [];
 
   const ids = sorted.map(([id]) => id);
@@ -3364,24 +3368,32 @@ async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}, db = supa
   const nameMap = {};
   for (const h of households || []) nameMap[h.id] = h.name;
 
-  return sorted.map(([id, calls]) => ({ household_id: id, name: nameMap[id] || 'Unknown', calls }));
+  return sorted.map(([id, s]) => ({
+    household_id: id,
+    name: nameMap[id] || 'Unknown',
+    calls: s.calls,
+    last_used_at: s.lastUsedAt,
+  }));
 }
 
 async function getAiUsageTopUsers({ days = 30, limit = 10 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await db
     .from('ai_usage_log')
-    .select('user_id')
+    .select('user_id, created_at')
     .gte('created_at', since)
     .not('user_id', 'is', null);
   if (error) throw error;
 
-  const counts = {};
+  const stats = {};
   for (const row of data || []) {
-    counts[row.user_id] = (counts[row.user_id] || 0) + 1;
+    const s = stats[row.user_id] || { calls: 0, lastUsedAt: null };
+    s.calls++;
+    if (!s.lastUsedAt || row.created_at > s.lastUsedAt) s.lastUsedAt = row.created_at;
+    stats[row.user_id] = s;
   }
 
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  const sorted = Object.entries(stats).sort((a, b) => b[1].calls - a[1].calls).slice(0, limit);
   if (sorted.length === 0) return [];
 
   const ids = sorted.map(([id]) => id);
@@ -3389,7 +3401,67 @@ async function getAiUsageTopUsers({ days = 30, limit = 10 } = {}, db = supabase)
   const userMap = {};
   for (const u of users || []) userMap[u.id] = u;
 
-  return sorted.map(([id, calls]) => ({ user_id: id, name: userMap[id]?.name || 'Unknown', email: userMap[id]?.email || '', calls }));
+  return sorted.map(([id, s]) => ({
+    user_id: id,
+    name: userMap[id]?.name || 'Unknown',
+    email: userMap[id]?.email || '',
+    calls: s.calls,
+    last_used_at: s.lastUsedAt,
+  }));
+}
+
+/**
+ * Per-household AI usage detail: totals, daily breakdown for the last 10 days,
+ * and the timestamp of the most recent call (within the window) so admins can
+ * spot idle households.
+ */
+async function getHouseholdAiUsage(householdId, { days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await db
+    .from('ai_usage_log')
+    .select('provider, feature, latency_ms, is_failover, created_at')
+    .eq('household_id', householdId)
+    .gte('created_at', since);
+  if (error) throw error;
+
+  const rows = data || [];
+  const byProvider = {};
+  const byFeature = {};
+  const byDate = {};
+  let totalLatency = 0;
+  let latencyCount = 0;
+  let lastUsedAt = null;
+
+  for (const r of rows) {
+    byProvider[r.provider] = (byProvider[r.provider] || 0) + 1;
+    byFeature[r.feature] = (byFeature[r.feature] || 0) + 1;
+    if (r.latency_ms) { totalLatency += r.latency_ms; latencyCount++; }
+    if (!lastUsedAt || r.created_at > lastUsedAt) lastUsedAt = r.created_at;
+    const date = (r.created_at || '').slice(0, 10);
+    if (date) byDate[date] = (byDate[date] || 0) + 1;
+  }
+
+  // Daily — last 10 days with zero-fill for continuous axis
+  const daily = [];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  for (let i = 9; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    daily.push({ date, calls: byDate[date] || 0 });
+  }
+
+  return {
+    totalCalls: rows.length,
+    avgLatencyMs: latencyCount > 0 ? Math.round(totalLatency / latencyCount) : 0,
+    failoverCalls: rows.filter((r) => r.is_failover).length,
+    lastUsedAt,
+    byProvider,
+    byFeature,
+    daily,
+  };
 }
 
 async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
@@ -3409,10 +3481,12 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
   const aiByDate = {};
   let aiTotalLatency = 0;
   let aiLatencyCount = 0;
+  let aiLastUsedAt = null;
   for (const r of aiRows) {
     aiByProvider[r.provider] = (aiByProvider[r.provider] || 0) + 1;
     aiByFeature[r.feature] = (aiByFeature[r.feature] || 0) + 1;
     if (r.latency_ms) { aiTotalLatency += r.latency_ms; aiLatencyCount++; }
+    if (!aiLastUsedAt || r.created_at > aiLastUsedAt) aiLastUsedAt = r.created_at;
     const date = (r.created_at || '').slice(0, 10);
     if (date) aiByDate[date] = (aiByDate[date] || 0) + 1;
   }
@@ -3446,6 +3520,7 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
       totalCalls: aiRows.length,
       avgLatencyMs: aiLatencyCount > 0 ? Math.round(aiTotalLatency / aiLatencyCount) : 0,
       failoverCalls: aiRows.filter((r) => r.is_failover).length,
+      lastUsedAt: aiLastUsedAt,
       byProvider: aiByProvider,
       byFeature: aiByFeature,
       daily: dailyAi,
@@ -4818,6 +4893,7 @@ module.exports = {
   getAnalytics,
   getAiUsageTopHouseholds,
   getAiUsageTopUsers,
+  getHouseholdAiUsage,
   getUserUsageStats,
   // Inbound email
   getHouseholdByInboundToken,

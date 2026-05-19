@@ -168,6 +168,19 @@ router.get('/households/:id', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/households/:id/ai-usage ─────────────────────────────────
+
+router.get('/households/:id/ai-usage', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const usage = await db.getHouseholdAiUsage(req.params.id, { days });
+    return res.json(usage);
+  } catch (err) {
+    console.error('GET /api/admin/households/:id/ai-usage error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── PATCH /api/admin/households/:id/subscription ──────────────────────────
 
 router.patch('/households/:id/subscription', async (req, res) => {

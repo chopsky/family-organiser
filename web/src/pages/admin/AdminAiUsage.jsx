@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconCpu } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 export default function AdminAiUsage() {
   const [data, setData] = useState(null);
@@ -109,6 +110,7 @@ export default function AdminAiUsage() {
               <thead>
                 <tr className="border-b border-light-grey text-left">
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Household</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Last Used</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Calls</th>
                 </tr>
               </thead>
@@ -118,11 +120,14 @@ export default function AdminAiUsage() {
                     <td className="px-4 py-3">
                       <Link to={`/admin/households/${h.household_id}`} className="font-medium text-plum hover:underline">{h.name}</Link>
                     </td>
+                    <td className={`px-4 py-3 text-xs hidden sm:table-cell ${staleness(h.last_used_at)}`} title={h.last_used_at ? new Date(h.last_used_at).toLocaleString() : ''}>
+                      {formatRelativeTime(h.last_used_at)}
+                    </td>
                     <td className="px-4 py-3 text-right text-charcoal">{h.calls}</td>
                   </tr>
                 ))}
                 {topHouseholds.length === 0 && (
-                  <tr><td colSpan="2" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
+                  <tr><td colSpan="3" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
                 )}
               </tbody>
             </table>
@@ -136,6 +141,7 @@ export default function AdminAiUsage() {
               <thead>
                 <tr className="border-b border-light-grey text-left">
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">User</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Last Used</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Calls</th>
                 </tr>
               </thead>
@@ -146,11 +152,14 @@ export default function AdminAiUsage() {
                       <Link to={`/admin/users/${u.user_id}`} className="font-medium text-plum hover:underline">{u.name}</Link>
                       <p className="text-xs text-warm-grey">{u.email}</p>
                     </td>
+                    <td className={`px-4 py-3 text-xs hidden sm:table-cell ${staleness(u.last_used_at)}`} title={u.last_used_at ? new Date(u.last_used_at).toLocaleString() : ''}>
+                      {formatRelativeTime(u.last_used_at)}
+                    </td>
                     <td className="px-4 py-3 text-right text-charcoal">{u.calls}</td>
                   </tr>
                 ))}
                 {topUsers.length === 0 && (
-                  <tr><td colSpan="2" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
+                  <tr><td colSpan="3" className="px-4 py-6 text-center text-warm-grey">No data yet</td></tr>
                 )}
               </tbody>
             </table>
