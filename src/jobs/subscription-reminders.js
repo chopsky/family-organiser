@@ -80,6 +80,9 @@ async function runSubscriptionRemindersForHousehold(householdId) {
 
     const body = buildReminderMessage(sub);
     for (const member of linked) {
+      // Per-user opt-out (Settings → Notifications → WhatsApp).
+      const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
+      if (prefs && prefs.whatsapp_subscription_reminder === false) continue;
       try {
         await whatsapp.sendMessage(member.whatsapp_phone, body);
         await db.logWhatsAppMessage({

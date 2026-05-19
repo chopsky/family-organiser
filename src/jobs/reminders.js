@@ -179,6 +179,14 @@ async function sendDailyReminders(householdId, singleMember) {
       console.log(`[reminders] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
       continue;
     }
+    // Per-user opt-out (Settings → Notifications → WhatsApp). Default
+    // true: a null row, missing column, or any non-false value all
+    // mean "send". Only an explicit false skips.
+    const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
+    if (prefs && prefs.whatsapp_daily_reminder === false) {
+      console.log(`[reminders] Skipping ${member.name} — daily reminder disabled by user pref`);
+      continue;
+    }
 
     // Get today's school activities for children in this household
     // Only include if today is during term time (not holidays, half term, INSET, or bank holiday)
