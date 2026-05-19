@@ -1118,9 +1118,23 @@ router.post('/whatsapp-send-code', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Phone number is required' });
   }
 
-  // Normalise phone: ensure + prefix
-  let normalised = phone.trim();
-  if (!normalised.startsWith('+')) normalised = `+${normalised}`;
+  // Look up household country so we can expand a national-format number
+  // (e.g. SA "0833586883") into proper E.164 (+27833586883). Without
+  // this the route used to just prepend '+' and Twilio rejected the
+  // result with code 21211. See utils/phone-normalise.js for rules.
+  let countryCode = 'GB';
+  try {
+    if (req.householdId) {
+      const hh = await db.getHouseholdById(req.householdId);
+      if (hh?.country) countryCode = hh.country;
+    }
+  } catch { /* fall back to GB default */ }
+
+  const { normaliseWhatsAppPhone } = require('../utils/phone-normalise');
+  const normalised = normaliseWhatsAppPhone(phone, countryCode);
+  if (!normalised || normalised.length < 8) {
+    return res.status(400).json({ error: 'Please enter a valid phone number including country code (e.g. +27 83 358 6883).' });
+  }
 
   try {
     const whatsapp = require('../services/whatsapp');
@@ -1138,6 +1152,11 @@ router.post('/whatsapp-send-code', requireAuth, async (req, res) => {
     return res.json({ success: true, message: 'Verification code sent via WhatsApp' });
   } catch (err) {
     console.error('POST /api/auth/whatsapp-send-code error:', err.message, err.code, err.moreInfo);
+    // Twilio code 21211 = "not a valid phone number". Rewrap as a
+    // friendly client error rather than the raw Twilio string.
+    if (err.code === 21211) {
+      return res.status(400).json({ error: 'That phone number does not look valid. Please use international format including country code (e.g. +27 83 358 6883).' });
+    }
     return res.status(500).json({ error: `Failed to send verification code: ${err.message || 'Unknown error'}` });
   }
 });
