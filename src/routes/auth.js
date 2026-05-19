@@ -1235,6 +1235,78 @@ router.get('/whatsapp-bot-info', requireAuth, (req, res) => {
   });
 });
 
+// ─── Pull-push pairing flow ──────────────────────────────────────────────────
+// /whatsapp-init-pairing: app asks the server for a short code, server
+// stashes it with the user_id and 10-min TTL. UI then asks the user to
+// open WhatsApp and message the bot with that code — the inbound
+// webhook (src/routes/whatsapp.js) consumes it and links the phone.
+// /whatsapp-pairing-status: the app polls this while the user is in
+// WhatsApp; when the code's row has been marked used we know the
+// webhook fired and the link is complete.
+//
+// Why this exists: the old /whatsapp-send-code flow needed a Twilio
+// Authentication-category Content Template (Meta-approved), which
+// requires Business Verification — out of reach for sole traders
+// without a registered company. Pull-push doesn't need any template.
+
+// Alphabet excludes 0/O/1/I/L/U to reduce mis-typing on a phone
+// keypad. 6 chars gives ~1 in a billion collision odds within the
+// 10-minute TTL — fine.
+const PAIRING_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+function generatePairingCode(len = 6) {
+  let out = '';
+  for (let i = 0; i < len; i++) {
+    out += PAIRING_ALPHABET[Math.floor(Math.random() * PAIRING_ALPHABET.length)];
+  }
+  return out;
+}
+
+router.post('/whatsapp-init-pairing', requireAuth, async (req, res) => {
+  try {
+    const whatsapp = require('../services/whatsapp');
+    if (!whatsapp.isConfigured()) {
+      return res.status(503).json({ error: 'WhatsApp is not configured on this server' });
+    }
+    const code = generatePairingCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await db.createWhatsAppPairingCode(req.user.id, code, expiresAt);
+    const botNumber = whatsapp.getBotNumberForWaLink();
+    const message = `CONNECT ${code}`;
+    const deepLink = botNumber
+      ? `https://wa.me/${botNumber}?text=${encodeURIComponent(message)}`
+      : null;
+    return res.json({
+      code,
+      message,
+      bot_number: botNumber,
+      deep_link: deepLink,
+      expires_at: expiresAt,
+    });
+  } catch (err) {
+    console.error('POST /api/auth/whatsapp-init-pairing error:', err);
+    return res.status(500).json({ error: 'Failed to start WhatsApp pairing.' });
+  }
+});
+
+router.get('/whatsapp-pairing-status', requireAuth, async (req, res) => {
+  const { code } = req.query;
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'code query param is required' });
+  }
+  try {
+    const row = await db.getPairingCodeStatus(req.user.id, code.trim());
+    if (!row) return res.json({ linked: false });
+    return res.json({
+      linked: !!row.used && !!row.phone,
+      phone: row.phone || null,
+      expired: new Date(row.expires_at) < new Date(),
+    });
+  } catch (err) {
+    console.error('GET /api/auth/whatsapp-pairing-status error:', err);
+    return res.status(500).json({ error: 'Failed to check pairing status.' });
+  }
+});
+
 // ─── POST /api/auth/whatsapp-disconnect ───────────────────────────────────────
 
 router.post('/whatsapp-disconnect', requireAuth, async (req, res) => {
