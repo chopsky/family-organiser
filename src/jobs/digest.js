@@ -107,6 +107,12 @@ async function sendWeeklyDigest(householdId) {
       console.log(`[digest] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
       continue;
     }
+    // Per-user opt-out (Settings → Notifications → WhatsApp).
+    const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
+    if (prefs && prefs.whatsapp_weekly_digest === false) {
+      console.log(`[digest] Skipping ${member.name} — weekly digest disabled by user pref`);
+      continue;
+    }
 
     // Send via WhatsApp
     if (whatsapp.isConfigured()) {

@@ -43,6 +43,9 @@ async function sendOverdueNudges(householdId) {
       console.log(`[overdue-nudge] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
       continue;
     }
+    // Per-user opt-out (Settings → Notifications → WhatsApp).
+    const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
+    if (prefs && prefs.whatsapp_overdue_nudge === false) continue;
 
     const overdueTasks = await db.getOverdueTasksForUser(householdId, member.id);
     if (!overdueTasks.length) continue;

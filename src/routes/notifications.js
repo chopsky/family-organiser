@@ -6,11 +6,21 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 const router = Router();
 
 const DEFAULT_PREFERENCES = {
+  // Push (iOS app)
   calendar_reminders: true,
   task_assigned: true,
   shopping_updated: true,
   meal_plan_updated: true,
   family_activity: true,
+  // WhatsApp bot — each gates its respective cron job. See
+  // /supabase/migration-whatsapp-notif-prefs.sql and the matching
+  // jobs in /src/jobs/. Default true so users see no behaviour
+  // change until they opt out.
+  whatsapp_daily_reminder: true,
+  whatsapp_event_reminders: true,
+  whatsapp_weekly_digest: true,
+  whatsapp_overdue_nudge: true,
+  whatsapp_subscription_reminder: true,
 };
 
 /**

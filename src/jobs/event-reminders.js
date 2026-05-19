@@ -93,6 +93,10 @@ async function processEventReminders() {
         const message = `🔔 *Reminder:* ${event.title}\nStarts in ${reminder.reminder_offset} (${formattedTime})`;
 
         for (const recipient of recipients) {
+          // Per-user opt-out (Settings → Notifications → WhatsApp).
+          // Overrides per-event reminder_offset if disabled.
+          const prefs = await db.getNotificationPreferences(recipient.id).catch(() => null);
+          if (prefs && prefs.whatsapp_event_reminders === false) continue;
           try {
             await whatsapp.sendTemplate(recipient.whatsapp_phone, message);
           } catch (err) {

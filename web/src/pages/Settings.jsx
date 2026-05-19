@@ -338,13 +338,23 @@ export default function Settings() {
       .catch(() => setWhatsappBotNumber(null));
   }, []);
 
-  // Load notification preferences (native iOS/Android only)
+  // Load notification preferences on every platform. Push toggles
+  // only render on native iOS (where APNs actually delivers); WhatsApp
+  // toggles render on every platform because the bot messages don't
+  // care which device opened Settings. The endpoint hands back full
+  // defaults when no row exists, so falling back to a hand-rolled
+  // shape is just belt-and-braces in case of a transient API blip.
   const isNative = Capacitor.isNativePlatform();
   useEffect(() => {
-    if (!isNative) { setLoadingNotifPrefs(false); return; }
     api.get('/notifications/preferences')
       .then(({ data }) => setNotifPrefs(data))
-      .catch(() => setNotifPrefs({ calendar_reminders: true, task_assigned: true, shopping_updated: true, meal_plan_updated: true, family_activity: true }))
+      .catch(() => setNotifPrefs({
+        calendar_reminders: true, task_assigned: true, shopping_updated: true,
+        meal_plan_updated: true, family_activity: true,
+        whatsapp_daily_reminder: true, whatsapp_event_reminders: true,
+        whatsapp_weekly_digest: true, whatsapp_overdue_nudge: true,
+        whatsapp_subscription_reminder: true,
+      }))
       .finally(() => setLoadingNotifPrefs(false));
   }, []);
 
@@ -1431,43 +1441,105 @@ export default function Settings() {
       {/* Schools (admin only) */}
       {isAdmin && <SchoolsSection />}
 
-      {/* Push Notifications — native app only */}
-      {isNative && <AccordionItem title="Push Notifications">
-        <p className="text-sm text-cocoa mb-4">Choose which notifications you receive on your phone.</p>
+      {/* Notifications — unified on every platform. Two subsections:
+          Push (iOS only, where APNs delivers) and WhatsApp (any platform
+          once linked). Each subsection lists per-type toggles wired to
+          notification_preferences. Rendered always so users on web also
+          know the section exists; subsection content adapts to capability. */}
+      <AccordionItem title="Notifications">
         {loadingNotifPrefs ? (
-          <div className="py-4 text-center text-sm text-cocoa">Loading...</div>
+          <div className="py-4 text-center text-sm text-cocoa">Loading…</div>
         ) : notifPrefs ? (
-          <div className="space-y-1">
-            {[
-              { key: 'calendar_reminders', label: 'Calendar reminders', desc: 'New events and upcoming reminders' },
-              { key: 'task_assigned', label: 'Task assignments', desc: 'When a task is assigned to you' },
-              { key: 'shopping_updated', label: 'Shopping list updates', desc: 'When someone adds to the shopping list' },
-              { key: 'meal_plan_updated', label: 'Meal plan changes', desc: 'When the meal plan is updated' },
-              { key: 'family_activity', label: 'Family activity', desc: 'New members and household updates' },
-            ].map(({ key, label, desc }) => (
-              <div key={key} className="flex items-center justify-between py-3 px-1">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-bark">{label}</p>
-                  <p className="text-xs text-cocoa">{desc}</p>
-                </div>
-                <button
-                  onClick={() => toggleNotifPref(key)}
-                  disabled={savingNotifPref === key}
-                  className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${
-                    notifPrefs[key] ? 'bg-primary' : 'bg-sand'
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
-                      notifPrefs[key] ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            ))}
+          <div className="space-y-6">
+            {/* Push subsection — iOS app only */}
+            <div>
+              <h3 className="text-sm font-semibold text-bark mb-1">Push notifications</h3>
+              {isNative ? (
+                <>
+                  <p className="text-xs text-cocoa mb-3">Delivered to your iPhone&apos;s lock screen.</p>
+                  <div className="space-y-1">
+                    {[
+                      { key: 'calendar_reminders', label: 'Calendar reminders', desc: 'New events and upcoming reminders' },
+                      { key: 'task_assigned', label: 'Task assignments', desc: 'When a task is assigned to you' },
+                      { key: 'shopping_updated', label: 'Shopping list updates', desc: 'When someone adds to the shopping list' },
+                      { key: 'meal_plan_updated', label: 'Meal plan changes', desc: 'When the meal plan is updated' },
+                      { key: 'family_activity', label: 'Family activity', desc: 'New members and household updates' },
+                    ].map(({ key, label, desc }) => (
+                      <div key={key} className="flex items-center justify-between py-3 px-1">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-bark">{label}</p>
+                          <p className="text-xs text-cocoa">{desc}</p>
+                        </div>
+                        <button
+                          onClick={() => toggleNotifPref(key)}
+                          disabled={savingNotifPref === key}
+                          className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${
+                            notifPrefs[key] ? 'bg-primary' : 'bg-sand'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                              notifPrefs[key] ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-cocoa">Available in the Housemait iOS app.</p>
+              )}
+            </div>
+
+            {/* WhatsApp subsection — works on every platform once linked */}
+            <div className="pt-6 border-t border-cream-border">
+              <h3 className="text-sm font-semibold text-bark mb-1">WhatsApp notifications</h3>
+              {(() => {
+                const meRow = members.find((m) => m.id === user?.id);
+                const linked = !!meRow?.whatsapp_linked;
+                if (!linked) {
+                  return <p className="text-xs text-cocoa">Connect WhatsApp (above) to receive bot messages.</p>;
+                }
+                return (
+                  <>
+                    <p className="text-xs text-cocoa mb-3">Choose which messages the Housemait bot sends you on WhatsApp.</p>
+                    <div className="space-y-1">
+                      {[
+                        { key: 'whatsapp_daily_reminder', label: 'Daily morning reminder', desc: "Today's schedule, shopping, and weather" },
+                        { key: 'whatsapp_event_reminders', label: 'Event reminders', desc: 'Heads-up before an event starts (uses per-event timing)' },
+                        { key: 'whatsapp_weekly_digest', label: 'Weekly digest', desc: 'Sunday recap of the week ahead and tasks done' },
+                        { key: 'whatsapp_overdue_nudge', label: 'Overdue task nudges', desc: 'Gentle reminder when tasks are past due' },
+                        { key: 'whatsapp_subscription_reminder', label: 'Subscription renewals', desc: 'Three days before a tracked subscription renews' },
+                      ].map(({ key, label, desc }) => (
+                        <div key={key} className="flex items-center justify-between py-3 px-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-bark">{label}</p>
+                            <p className="text-xs text-cocoa">{desc}</p>
+                          </div>
+                          <button
+                            onClick={() => toggleNotifPref(key)}
+                            disabled={savingNotifPref === key}
+                            className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${
+                              notifPrefs[key] !== false ? 'bg-primary' : 'bg-sand'
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                                notifPrefs[key] !== false ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         ) : null}
-      </AccordionItem>}
+      </AccordionItem>
 
       {/* Your data — GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
