@@ -10,41 +10,31 @@
  * Auto-refreshes on app foreground so events added in iOS Calendar
  * while the user was away appear next time they switch back.
  *
- * The per-device user preference (which calendars to include) is
- * persisted via localStorage so it survives reloads and isn't
- * leaked to other devices.
+ * Selected calendars come from native-calendar-selection.js — a
+ * shared single-source-of-truth that the NativeCalendarPicker also
+ * writes to. Subscribing to its changes means flipping a calendar
+ * off in Settings immediately removes its events from this hook
+ * (previously each consumer had its own useState seeded from
+ * localStorage and writes didn't propagate within the same tab).
  *
  * @param {Date|null} start - lower bound (inclusive). Null disables the fetch.
  * @param {Date|null} end   - upper bound (exclusive-ish).
  * @returns {{
  *   events: Array,
  *   status: 'granted'|'denied'|'not_determined',
- *   selectedCalendarIds: string[],
  *   refresh: () => void
  * }}
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { nativeCalendar } from '../lib/native-calendar';
+import { getSelectedCalendarIds, subscribeToSelection } from '../lib/native-calendar-selection';
 import { useAppForegroundRefresh } from './useAppForegroundRefresh';
-
-const SELECTED_CALENDARS_KEY = 'housemait-native-calendars';
-
-function readSelected() {
-  try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SELECTED_CALENDARS_KEY) : null;
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
 
 export function useNativeCalendarEvents(start, end) {
   const [events, setEvents] = useState([]);
   const [status, setStatus] = useState('not_determined');
-  const [selectedIds, setSelectedIds] = useState(() => readSelected() ?? []);
+  const [selectedIds, setSelectedIds] = useState(() => getSelectedCalendarIds());
   const requestSeq = useRef(0);
 
   // Re-read status whenever the hook mounts. Cheap.
@@ -56,23 +46,32 @@ export function useNativeCalendarEvents(start, end) {
     return () => { cancelled = true; };
   }, []);
 
+  // Stay in sync with the picker — flipping a calendar off there
+  // should immediately empty the events list here.
+  useEffect(() => {
+    const unsub = subscribeToSelection((ids) => setSelectedIds(ids));
+    return unsub;
+  }, []);
+
   const fetchEvents = useCallback(async () => {
     if (!nativeCalendar.isAvailable() || !start || !end) {
       setEvents([]);
       return;
     }
-    const current = nativeCalendar.getAuthorizationStatus
-      ? await nativeCalendar.getAuthorizationStatus()
-      : 'denied';
+    const current = await nativeCalendar.getAuthorizationStatus();
     setStatus(current);
     if (current !== 'granted') {
       setEvents([]);
       return;
     }
+    // No calendars chosen → no events (intentional; user has to opt in).
+    if (!selectedIds || selectedIds.length === 0) {
+      setEvents([]);
+      return;
+    }
     const seq = ++requestSeq.current;
     const data = await nativeCalendar.getEvents(start, end, selectedIds);
-    // Drop stale responses if the window changed mid-flight.
-    if (seq !== requestSeq.current) return;
+    if (seq !== requestSeq.current) return; // window changed mid-flight
     setEvents(data);
   }, [start, end, selectedIds]);
 
@@ -80,22 +79,8 @@ export function useNativeCalendarEvents(start, end) {
     fetchEvents();
   }, [fetchEvents]);
 
-  // Refresh when the app comes back to the foreground — covers the
-  // "user added an event in iOS Calendar, then came back to Housemait"
-  // case without manual refresh. Throttle short because the underlying
-  // EventKit query is local and cheap.
+  // Refresh when the app comes back to the foreground.
   useAppForegroundRefresh(() => { fetchEvents(); }, { throttleMs: 2000 });
 
-  return { events, status, selectedCalendarIds: selectedIds, setSelectedCalendarIds: writeAndSet(setSelectedIds), refresh: fetchEvents };
-}
-
-function writeAndSet(setter) {
-  return (ids) => {
-    setter(ids);
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(SELECTED_CALENDARS_KEY, JSON.stringify(ids));
-      }
-    } catch { /* ignore */ }
-  };
+  return { events, status, refresh: fetchEvents };
 }
