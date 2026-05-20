@@ -46,8 +46,8 @@ describe('validateTermDates', () => {
     );
     const endRow = rows.find(r => r.event_type === 'term_end');
     const startRow = rows.find(r => r.event_type === 'term_start');
-    const flagged = endRow.warnings.some(w => /without a preceding/i.test(w))
-      || startRow.warnings.some(w => /without a matching/i.test(w));
+    const flagged = endRow.warnings.some(w => /no matching term-start/i.test(w))
+      || startRow.warnings.some(w => /no matching term-end/i.test(w));
     expect(flagged).toBe(true);
   });
 
@@ -61,7 +61,7 @@ describe('validateTermDates', () => {
       NOW
     );
     const endRow = rows.find(r => r.event_type === 'term_end');
-    expect(endRow.warnings.some(w => /not after/i.test(w))).toBe(true);
+    expect(endRow.warnings.some(w => /on or before its term-start/i.test(w))).toBe(true);
   });
 
   it('flags a half_term that falls outside any term in the same year', () => {
@@ -75,7 +75,7 @@ describe('validateTermDates', () => {
       NOW
     );
     const halfRow = rows.find(r => r.event_type === 'half_term_start');
-    expect(halfRow.warnings.some(w => /does not fall inside any term/i.test(w))).toBe(true);
+    expect(halfRow.warnings.some(w => /falls outside any term/i.test(w))).toBe(true);
   });
 
   it('does NOT flag a half_term that sits inside a term', () => {
@@ -91,8 +91,8 @@ describe('validateTermDates', () => {
     );
     const halfStart = rows.find(r => r.event_type === 'half_term_start');
     const halfEnd = rows.find(r => r.event_type === 'half_term_end');
-    expect(halfStart.warnings.filter(w => /does not fall inside/i.test(w))).toEqual([]);
-    expect(halfEnd.warnings.filter(w => /does not fall inside/i.test(w))).toEqual([]);
+    expect(halfStart.warnings.filter(w => /falls outside/i.test(w))).toEqual([]);
+    expect(halfEnd.warnings.filter(w => /falls outside/i.test(w))).toEqual([]);
   });
 
   it('flags an inset_day that falls on a Saturday', () => {
@@ -111,7 +111,7 @@ describe('validateTermDates', () => {
       'Autumn term begins Tuesday 1 September 2026',
       NOW
     );
-    expect(row.warnings.some(w => /hallucination/i.test(w))).toBe(true);
+    expect(row.warnings.some(w => /may have invented/i.test(w))).toBe(true);
   });
 
   it('does not flag a quote that IS present (case + whitespace normalised)', () => {
@@ -120,7 +120,7 @@ describe('validateTermDates', () => {
       'Welcome - Autumn term begins on Tuesday',
       NOW
     );
-    expect(row.warnings.filter(w => /hallucination/i.test(w))).toEqual([]);
+    expect(row.warnings.filter(w => /may have invented/i.test(w))).toEqual([]);
   });
 
   it('flags duplicate rows', () => {
@@ -151,7 +151,7 @@ describe('validateTermDates', () => {
       '',
       NOW
     );
-    expect(row.warnings.some(w => /could not be parsed/i.test(w))).toBe(true);
+    expect(row.warnings.some(w => /couldn't be read/i.test(w))).toBe(true);
   });
 
   it('does not mutate the input rows', () => {

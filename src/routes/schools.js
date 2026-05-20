@@ -553,12 +553,25 @@ Only return valid JSON array, nothing else.`;
       }
     }
 
-    // Clear all existing dates when switching to iCal (full replacement)
-    await db.deleteAllTermDatesBySchool(req.params.schoolId);
-
-    if (termDates.length > 0) {
-      await db.addSchoolTermDates(req.params.schoolId, termDates);
+    // BUG-fix: previously this route called deleteAllTermDatesBySchool
+    // BEFORE checking termDates.length. If the iCal feed had only
+    // sports/parent-evening events with no term boundaries, the user
+    // would lose all their existing term dates with nothing to replace
+    // them. Now we keep existing data intact in the zero-results case
+    // and report it back to the UI for an explicit error.
+    if (termDates.length === 0) {
+      return res.json({
+        imported: 0,
+        total_events: eventList.length,
+        message: eventList.length === 0
+          ? 'No events found in the iCal feed.'
+          : `Found ${eventList.length} events in the feed but none look like term boundaries (term start, half term, INSET, bank holiday). Your existing term dates have been kept.`,
+      });
     }
+
+    // Safe to replace now that we know termDates is non-empty.
+    await db.deleteAllTermDatesBySchool(req.params.schoolId);
+    await db.addSchoolTermDates(req.params.schoolId, termDates);
 
     // Save iCal URL on the school and update metadata
     await db.updateHouseholdSchool(req.params.schoolId, { ical_url: ical_url.trim() });
@@ -578,7 +591,19 @@ Only return valid JSON array, nothing else.`;
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-ical error:', err);
-    return res.status(500).json({ error: `Failed to import calendar: ${err.message}` });
+    // ical.async.fromURL throws ENOTFOUND / 404 / ETIMEDOUT etc.; rewrap
+    // into a friendlier message rather than leaking the raw network error.
+    const msg = (err.message || '').toLowerCase();
+    if (msg.includes('enotfound') || msg.includes('eai_again') || msg.includes('econnrefused')) {
+      return res.status(400).json({ error: "Couldn't reach that URL. Double-check it and try again." });
+    }
+    if (msg.includes('404') || msg.includes('not found')) {
+      return res.status(400).json({ error: 'That URL returned a 404 — the calendar may have moved or been deleted.' });
+    }
+    if (msg.includes('etimedout') || msg.includes('timed out')) {
+      return res.status(400).json({ error: 'The server took too long to respond. Try again in a moment, or use a different source.' });
+    }
+    return res.status(500).json({ error: `Could not import that calendar. Try a different iCal URL, or add dates manually.` });
   }
 });
 

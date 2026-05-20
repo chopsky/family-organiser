@@ -60,8 +60,9 @@ function checkDayOfWeek(row) {
   if (!found) return;
   const actual = dayOfWeekUTC(d);
   if (actual !== found.dow) {
+    // Friendlier framing: lead with the conflict, suggest the likely fix.
     row.warnings.push(
-      `${row.date} is a ${WEEKDAY_LABEL[actual]}, source says ${WEEKDAY_LABEL[found.dow]}`
+      `${row.date} is a ${WEEKDAY_LABEL[actual]} but the source says ${WEEKDAY_LABEL[found.dow]}. The date might be off by a day — check before saving.`
     );
   }
 }
@@ -72,19 +73,19 @@ function checkInsetNotWeekend(row) {
   if (!d) return;
   const dow = dayOfWeekUTC(d);
   if (dow === 0 || dow === 6) {
-    row.warnings.push(`INSET day falls on a ${WEEKDAY_LABEL[dow]}`);
+    row.warnings.push(`INSET day falls on a ${WEEKDAY_LABEL[dow]} — schools normally hold these on a weekday.`);
   }
 }
 
 function checkSaneWindow(row, now) {
   const d = parseISODate(row.date);
   if (!d) {
-    row.warnings.push('Date could not be parsed');
+    row.warnings.push('That date couldn\'t be read. Edit it before saving.');
     return;
   }
   const months = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
   if (months < -18 || months > 18) {
-    row.warnings.push('Date is more than 18 months from today - double-check it');
+    row.warnings.push('More than 18 months from today — double-check the year.');
   }
 }
 
@@ -94,7 +95,7 @@ function checkSourceQuotePresent(row, sourceText) {
   const needle = normaliseWhitespace(row.source_quote);
   if (needle.length < 5) return;
   if (!haystack.includes(needle)) {
-    row.warnings.push('Quote not found in source - possible hallucination');
+    row.warnings.push("The quoted text isn't on the source page — the AI may have invented this date.");
   }
 }
 
@@ -115,17 +116,17 @@ function checkTermOrderingAndHalfTermContainment(rows) {
     for (const r of sorted) {
       if (r.event_type === 'term_start') {
         if (openStart) {
-          openStart.warnings.push('Two term_start entries without a term_end between them');
+          openStart.warnings.push("Two term-starts in a row — a term-end is missing between them.");
         }
         openStart = r;
       } else if (r.event_type === 'term_end') {
         if (!openStart) {
-          r.warnings.push('term_end without a preceding term_start in the same academic year');
+          r.warnings.push("Term-end has no matching term-start before it.");
         } else {
           const s = parseISODate(openStart.date);
           const e = parseISODate(r.date);
           if (e <= s) {
-            r.warnings.push('term_end is not after its term_start');
+            r.warnings.push("Term-end is on or before its term-start — one of the dates is probably wrong.");
           }
           terms.push({ start: openStart, end: r });
           openStart = null;
@@ -133,7 +134,7 @@ function checkTermOrderingAndHalfTermContainment(rows) {
       }
     }
     if (openStart) {
-      openStart.warnings.push('term_start without a matching term_end in the same academic year');
+      openStart.warnings.push("Term-start has no matching term-end after it.");
     }
 
     for (const r of sorted) {
@@ -145,7 +146,7 @@ function checkTermOrderingAndHalfTermContainment(rows) {
         return d >= s && d <= e;
       });
       if (!inside) {
-        r.warnings.push('Half-term date does not fall inside any term in the same academic year');
+        r.warnings.push("Half-term falls outside any term — the term boundaries are probably missing or wrong.");
       }
     }
   }
@@ -156,7 +157,7 @@ function checkDuplicates(rows) {
   for (const r of rows) {
     const key = `${r.event_type}|${r.date}|${r.academic_year || ''}`;
     if (seen.has(key)) {
-      r.warnings.push('Duplicate row (same type + date + year as another entry)');
+      r.warnings.push('Duplicate of another row — you can delete one of them.');
     } else {
       seen.set(key, r);
     }

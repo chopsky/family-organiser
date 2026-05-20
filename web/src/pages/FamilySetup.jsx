@@ -471,10 +471,30 @@ export default function FamilySetup() {
 
   async function handleAddTermDate() {
     if (!termDateDate || !editingMember?.school_id) return;
+    // Half-term entries need both ends of the range to be useful. A
+    // half-term row with only a start date renders as a single line in
+    // the grouped view, and the validator later flags it as
+    // half-term-outside-any-term-bounds. Validate up-front instead of
+    // accepting a malformed row.
+    if (termDateType === 'half_term_start' && !termDateEndDate) {
+      setError('Half-term needs both a start date and an end date (the day school resumes).');
+      return;
+    }
+    // Same hard-stop for ranges where the end is before the start.
+    if (termDateEndDate && termDateEndDate < termDateDate) {
+      setError('The end date is before the start date.');
+      return;
+    }
     setSavingTermDate(true);
+    setError('');
     try {
-      const now = new Date();
-      const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+      // Derive the academic year from the actual date being added (not
+      // today). Adding a date for next term that crosses an AY boundary
+      // previously bucketed under "today's" AY, which then showed under
+      // the wrong year heading in the grouped view.
+      const academicYear = (household?.country === 'ZA')
+        ? getAcademicYearSa(termDateDate)
+        : getAcademicYearUk(termDateDate);
       const { data } = await api.post(`/schools/${editingMember.school_id}/term-dates`, {
         dates: [{
           academic_year: academicYear,
@@ -589,10 +609,23 @@ export default function FamilySetup() {
     // The admin then reviews, edits, and confirms in a separate panel -
     // see handleConfirmImportWebsite below.
     if (!termDateSchoolId || !websiteUrl.trim()) return;
+    // Normalise the URL: users often paste "school.com/term-dates" with
+    // no scheme. Auto-prepend https:// so the server-side fetch doesn't
+    // explode with an unhelpful error. Reject only obviously-malformed
+    // input (whitespace mid-string, no dot in the host).
+    let normalisedUrl = websiteUrl.trim();
+    if (!/^https?:\/\//i.test(normalisedUrl)) normalisedUrl = `https://${normalisedUrl}`;
+    try {
+      const u = new URL(normalisedUrl);
+      if (!u.hostname.includes('.')) throw new Error('bad host');
+    } catch {
+      setImportError("That doesn't look like a valid website address. Make sure it starts with https://");
+      return;
+    }
     setImportingWebsite(true);
     setImportError('');
     try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-website/preview`, { website_url: websiteUrl.trim() });
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-website/preview`, { website_url: normalisedUrl });
       if (!Array.isArray(data.dates) || data.dates.length === 0) {
         setImportError(data.message || 'No term dates found on that page. Try a different URL or another import method.');
         return;
@@ -600,7 +633,7 @@ export default function FamilySetup() {
       setDraftImport({
         schoolId: termDateSchoolId,
         schoolName: termDateSchoolName,
-        sourceUrl: data.source_url || websiteUrl.trim(),
+        sourceUrl: data.source_url || normalisedUrl,
         sourceTextPreview: data.source_text_preview || '',
         dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
       });
@@ -723,10 +756,15 @@ export default function FamilySetup() {
   // simpler. Used as a fallback when the AI doesn't tag academic_year
   // on a row (it almost always does).
   function getAcademicYearUk(dateStr) {
+    // Must use HYPHEN here — the server stores AYs as `${year}-${year+1}`
+    // (schools.js + routes that fall back to currentAY). The fallback
+    // previously used a slash, so rows missing academic_year would
+    // bucket into "2025/2026" while properly-tagged rows lived in
+    // "2025-2026", showing as two separate years in the grouped UI.
     const d = new Date(dateStr);
     const year = d.getFullYear();
     const month = d.getMonth();
-    return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+    return month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
   }
   function getAcademicYearSa(dateStr) {
     return String(new Date(dateStr).getFullYear());
@@ -2382,21 +2420,27 @@ export default function FamilySetup() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-cream-border p-4">
+                // The LA path resolves a council from GIAS and scrapes
+                // their term-dates page. It only applies to state
+                // schools — private/independent schools have no
+                // local authority, so the button would just 400. When
+                // we have no LA on the school record, demote the card
+                // visually and point the user toward Website / PDF /
+                // Manual instead.
+                <div className={`bg-white rounded-xl border p-4 ${termDateSchoolLA ? 'border-cream-border' : 'border-cream-border/60 opacity-70'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
                       <p className="text-xs text-cocoa mt-1">
-                        Most state schools follow their council&apos;s term dates.
                         {termDateSchoolLA
-                          ? ` We will import them from ${termDateSchoolLA} council.`
-                          : ' We will look up and import them automatically.'}
+                          ? `Most state schools follow their council's term dates. We will import them from ${termDateSchoolLA} council.`
+                          : "Doesn't apply to this school — there's no local authority on file (typical for private or independent schools). Use Import from school website or Upload the school's PDF instead."}
                       </p>
                     </div>
                     <button
                       onClick={handleImportLADates}
-                      disabled={importingLA}
-                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                      disabled={importingLA || !termDateSchoolLA}
+                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {importingLA ? 'Importing...' : 'Import'}
                     </button>
