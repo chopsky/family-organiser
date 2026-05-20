@@ -18,12 +18,30 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { nativeCalendar } from '../lib/native-calendar';
 import {
   getSelectedCalendarIds,
   setSelectedCalendarIds,
   subscribeToSelection,
 } from '../lib/native-calendar-selection';
+
+// Deep-link to iOS's per-app Settings → Privacy panel. iOS exposes
+// the well-known "app-settings:" URL for this; the app handler picks
+// it up via UIApplication.shared.open. We route through Capacitor's
+// Browser-style open so it works inside the WebView.
+async function openIosAppSettings() {
+  try {
+    const { App } = await import('@capacitor/app');
+    if (App.openUrl) {
+      await App.openUrl({ url: 'app-settings:' });
+      return;
+    }
+  } catch { /* fall through */ }
+  // Fallback: plain href — iOS treats app-settings: as a registered
+  // scheme inside a WKWebView's navigation policy decider.
+  try { window.location.href = 'app-settings:'; } catch { /* ignore */ }
+}
 
 export default function NativeCalendarPicker() {
   const [status, setStatus] = useState('not_determined');
@@ -97,15 +115,28 @@ export default function NativeCalendarPicker() {
       )}
 
       {status === 'denied' && (
-        <div className="text-xs text-cocoa space-y-2">
-          <p>Calendar access is off. To enable it:</p>
-          <p className="font-medium text-bark">iOS Settings → Privacy &amp; Security → Calendars → Housemait → Full Access.</p>
+        <div className="space-y-3">
+          <p className="text-sm text-cocoa">
+            Calendar access is turned off for Housemait. Tap the button below to open iOS Settings and switch it on — then return here.
+          </p>
+          {Capacitor.isNativePlatform() && (
+            <button
+              type="button"
+              onClick={openIosAppSettings}
+              className="bg-primary hover:bg-primary-pressed text-white text-sm font-medium px-4 py-2 rounded-2xl transition-colors"
+            >
+              Open iOS Settings
+            </button>
+          )}
+          <p className="text-xs text-cocoa">
+            Or do it manually: <span className="font-medium text-bark">Settings → Privacy &amp; Security → Calendars → Housemait → Full Access</span>.
+          </p>
           <button
             type="button"
             onClick={handleGrant}
-            className="mt-2 text-primary hover:underline"
+            className="text-xs text-primary hover:underline"
           >
-            Re-check
+            I&apos;ve enabled it — re-check
           </button>
         </div>
       )}
