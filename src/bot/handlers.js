@@ -884,19 +884,26 @@ async function handleTextMessage(text, user, household) {
     console.log('[handlers] Pre-classified as weather for:', text.slice(0, 50));
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     try {
+      // Prefer an explicit location in the message ("weather in
+      // Brighton tomorrow"). Fall back to the household address saved
+      // under Family → Household - the user already told us where they
+      // live, no need to make them retype it. If neither exists,
+      // surface the "add your address" hint.
       const locationName = extractLocationFromMessage(text);
-      if (!locationName) {
+      const householdAddress = household?.address?.trim();
+      const lookup = locationName || householdAddress;
+      if (!lookup) {
         return {
-          response: "I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
+          response: "I don't know where you live yet. Add your home address under Family → Household in the app, or ask with a city like _\"weather in Brighton tomorrow\"_. 📍",
           actions,
         };
       }
-      const geo = await geocodeLocation(locationName);
+      const geo = await geocodeLocation(lookup);
       if (!geo) {
-        return {
-          response: `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_. 🗺️`,
-          actions,
-        };
+        const hint = locationName
+          ? `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_.`
+          : `I couldn't geocode your saved home address. Check it under Family → Household, or ask with a city like _"weather in Brighton tomorrow"_.`;
+        return { response: `🗺️ ${hint}`, actions };
       }
       const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: text });
       const prefix = `📍 *${geo.name}, ${geo.country}*\n\n`;
@@ -976,19 +983,26 @@ async function handleTextMessage(text, user, household) {
   // block above for the rationale).
   if (result.intent === 'weather') {
     try {
+      // Prefer an explicit location in the message ("weather in
+      // Brighton tomorrow"). Fall back to the household address saved
+      // under Family → Household - the user already told us where they
+      // live, no need to make them retype it. If neither exists,
+      // surface the "add your address" hint.
       const locationName = extractLocationFromMessage(text);
-      if (!locationName) {
+      const householdAddress = household?.address?.trim();
+      const lookup = locationName || householdAddress;
+      if (!lookup) {
         return {
-          response: "I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
+          response: "I don't know where you live yet. Add your home address under Family → Household in the app, or ask with a city like _\"weather in Brighton tomorrow\"_. 📍",
           actions,
         };
       }
-      const geo = await geocodeLocation(locationName);
+      const geo = await geocodeLocation(lookup);
       if (!geo) {
-        return {
-          response: `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_. 🗺️`,
-          actions,
-        };
+        const hint = locationName
+          ? `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_.`
+          : `I couldn't geocode your saved home address. Check it under Family → Household, or ask with a city like _"weather in Brighton tomorrow"_.`;
+        return { response: `🗺️ ${hint}`, actions };
       }
       const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: text });
       const prefix = `📍 *${geo.name}, ${geo.country}*\n\n`;

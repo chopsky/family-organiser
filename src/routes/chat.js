@@ -399,16 +399,24 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
-          // Explicit-location only - Housemait doesn't ship location services,
-          // so we won't pretend to know where the user is. See bot/handlers.js
-          // for the full rationale.
+          // Prefer an explicit location from the message ("weather in
+          // Brighton tomorrow"). Otherwise fall back to the household
+          // address saved under Family → Household settings - the user
+          // already told us where they live, no reason to make them
+          // type it again. Last resort is the "I don't know where you
+          // are" hint.
           const locationName = extractLocationFromMessage(message);
-          if (!locationName) {
-            cleanContent += "\n\n📍 I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_.";
+          const householdAddress = household?.address?.trim();
+          const lookup = locationName || householdAddress;
+          if (!lookup) {
+            cleanContent += "\n\n📍 I don't know where you live yet. Add your home address under Family → Household, or ask with a city like _\"weather in Brighton tomorrow\"_.";
           } else {
-            const geo = await geocodeLocation(locationName);
+            const geo = await geocodeLocation(lookup);
             if (!geo) {
-              cleanContent += `\n\n🗺️ I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_.`;
+              const fallbackHint = locationName
+                ? `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_.`
+                : `I couldn't geocode your saved home address. Check it under Family → Household, or ask with a city like _"weather in Brighton tomorrow"_.`;
+              cleanContent += `\n\n🗺️ ${fallbackHint}`;
             } else {
               const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: message });
               cleanContent += `\n\n📍 **${geo.name}, ${geo.country}**\n\n` + report;
