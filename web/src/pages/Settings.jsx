@@ -6,7 +6,6 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
-import NativeCalendarPicker from '../components/NativeCalendarPicker';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
@@ -1147,15 +1146,6 @@ export default function Settings() {
             {loadingFeed ? 'Generating…' : 'Generate Calendar Feed'}
           </button>
         )}
-
-        {/* iPhone Calendar import (native iOS only — renders null on
-            web/Android). Sits between the export flow above and the
-            URL-paste external feeds below because it's the easier
-            primary path for iOS users — most have their personal
-            calendar already linked to iOS Calendar. */}
-        <div className="mt-5 pt-5 border-t border-cream-border">
-          <NativeCalendarPicker />
-        </div>
 
         {/* External feed subscriptions (read-only inbound) */}
         <div className="mt-5 pt-5 border-t border-cream-border">

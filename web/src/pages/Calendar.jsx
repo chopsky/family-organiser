@@ -7,22 +7,6 @@ import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
 import { confirmDestructive } from '../lib/action-sheet';
-import { useNativeCalendarEvents } from '../hooks/useNativeCalendarEvents';
-
-/**
- * Compute the start/end window to fetch from the iPhone's Calendar
- * app, based on the current view. We fetch one month either side of
- * the visible viewport so quick swipes don't re-hit EventKit each time.
- * Memoised so we don't re-trigger the EventKit fetch on every render.
- */
-function useNativeWindowFor(viewMode, currentMonth, selectedDate) {
-  return useMemo(() => {
-    const anchor = viewMode === 'day' ? selectedDate : currentMonth;
-    const start = new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1);
-    const end = new Date(anchor.getFullYear(), anchor.getMonth() + 2, 1);
-    return { start, end };
-  }, [viewMode, currentMonth, selectedDate]);
-}
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -306,29 +290,6 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState('month');
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(new Date(today));
-
-  // iPhone Calendar overlay — read events from the device's Calendar
-  // app via the in-tree EventKit plugin. Renders nothing on web/Android
-  // (the hook is platform-safe). See web/src/lib/native-calendar.js
-  // for the iOS-side plumbing.
-  const nativeWindow = useNativeWindowFor(viewMode, currentMonth, selectedDate);
-  const { events: nativeRawEvents } = useNativeCalendarEvents(nativeWindow.start, nativeWindow.end);
-  // Normalise to our event shape so eventsForDate/render don't need to
-  // know about the EventKit source. is_native + native_calendar_color
-  // are extra fields the render layer can read for visual distinction.
-  const nativeEvents = nativeRawEvents.map((e) => ({
-    id: `native-${e.id}`,
-    title: e.title,
-    start_time: e.startISO,
-    end_time: e.endISO,
-    all_day: !!e.allDay,
-    location: e.location || null,
-    category: 'native',
-    is_native: true,
-    native_calendar_color: e.calendarColor,
-    native_calendar_name: e.calendarName,
-    native_event_id: e.id,
-  }));
   const [morePopup, setMorePopup] = useState(null); // { date, items, rect }
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -385,7 +346,7 @@ export default function Calendar() {
   const settingsRef = useRef(null);
 
   // Filters
-  const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays', 'school', 'native']));
+  const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays', 'school']));
   const [activeMemberFilters, setActiveMemberFilters] = useState(null); // null = all members shown
   const toggleFilter = (key) => setActiveFilters(prev => {
     const next = new Set(prev);
@@ -684,14 +645,7 @@ export default function Calendar() {
 
   function eventsForDate(date) {
     const ds = toDateStr(date);
-    const native = activeFilters.has('native')
-      ? nativeEvents.filter((e) => {
-        const start = e.start_time?.split('T')[0];
-        const end = e.end_time?.split('T')[0];
-        return start === ds || (start <= ds && end >= ds);
-      })
-      : [];
-    const own = events.filter(e => {
+    return events.filter(e => {
       const start = e.start_time?.split('T')[0];
       const end = e.end_time?.split('T')[0];
       if (!(start === ds || (start <= ds && end >= ds))) return false;
@@ -705,7 +659,6 @@ export default function Calendar() {
       if (activeMemberFilters && e.assigned_to_name && !activeMemberFilters.has(e.assigned_to_name)) return false;
       return true;
     });
-    return [...own, ...native];
   }
 
   function tasksForDate(date) {

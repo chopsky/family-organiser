@@ -14,8 +14,6 @@
 	<string>Housemait uses your microphone to convert speech to text when you tap the voice input button on the AI chat.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Housemait uses speech recognition to convert what you say into text in the AI chat, so you can ask questions hands-free.</string>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Housemait shows events from your iPhone's Calendar app alongside your household events so you can see your day in one place. This is read-only — Housemait never writes to your Calendar.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
