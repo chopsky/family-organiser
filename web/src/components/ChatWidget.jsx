@@ -543,16 +543,20 @@ I'm always here if you need me!`;
                       placeholder="Ask me anything..."
                       rows={1}
                       disabled={loading}
-                      className="w-full resize-none bg-transparent text-base leading-relaxed placeholder:text-warm-grey/70 focus:outline-none disabled:opacity-50 max-h-40 overflow-y-auto"
+                      className="w-full resize-none bg-transparent text-base leading-relaxed placeholder:text-warm-grey/70 focus:outline-none disabled:opacity-50 overflow-y-auto"
                       style={{
-                        // Auto-grow up to ~6 lines. The max-h above caps
-                        // it and the overflow becomes scrollable.
+                        // Auto-grow up to 3 lines. With ~26px line-height
+                        // at text-base/leading-relaxed, that's ~78px. Past
+                        // that the overflow becomes scrollable inside the
+                        // box - the compose card itself stays the same
+                        // height so the chat history doesn't jump around.
                         height: 'auto',
-                        minHeight: '24px',
+                        minHeight: '26px',
+                        maxHeight: '78px',
                       }}
                       onInput={(e) => {
                         e.target.style.height = 'auto';
-                        e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                        e.target.style.height = `${Math.min(e.target.scrollHeight, 78)}px`;
                       }}
                     />
                     <div className="flex items-center justify-between mt-2">
@@ -590,7 +594,7 @@ I'm always here if you need me!`;
                         <button
                           type="submit"
                           disabled={!input.trim() || loading}
-                          className="w-9 h-9 rounded-full bg-coral hover:bg-coral/90 disabled:bg-light-grey disabled:text-warm-grey text-white flex items-center justify-center transition-colors shrink-0"
+                          className="w-10 h-10 rounded-full bg-plum hover:bg-plum/90 disabled:bg-light-grey text-white flex items-center justify-center transition-colors shrink-0"
                           aria-label="Send"
                         >
                           <SendIcon className="h-4 w-4" />
