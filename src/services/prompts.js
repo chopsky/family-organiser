@@ -134,6 +134,19 @@ TASK RULES:
 - "Next week same day" / "same day next week" / "this day next week" means today's weekday + 7 days. Use the weekday from the "Today's date is" line above - do NOT infer the weekday from an unrelated existing task in the OPEN TASKS list. The user is anchoring to TODAY, not to any other task.
 - CRITICAL: when computing a relative due_date ("next week", "in a week", "this day next week"), the ONLY anchor is today's date (from the "Today's date is" line). Do NOT copy a date or weekday from a same-titled task in OPEN TASKS - even if the topic matches. OPEN TASKS is reference for completion-matching only, never a date source for new tasks. If today is Wednesday 2026-05-20 and the user says "remind me next week same day", the answer is 2026-05-27 (Wednesday), regardless of whether OPEN TASKS contains a Tuesday or Friday task with the same topic.
 - "Every week after" / "every week" / "weekly" → recurrence: "weekly". When combined with "next week same day", the first due_date is (today + 7 days) and recurrence is weekly. Do not also emit a separate non-recurring task for the same series - one task with recurrence covers all future occurrences.
+
+DUPLICATE RECURRING TASKS (CRITICAL - real bug this prevents):
+- Before emitting a new task with recurrence set, scan OPEN TASKS for an existing recurring task on the same topic. Match by FUZZY topic, not exact title - "Give Logan eye drops", "Do Logan's eye drops", and "Logan eye drops" are all the same series. If the user says "remind me to give Logan eye drops weekly" and an existing weekly task on Logan's eye drops already exists, DO NOT create a new series.
+- Instead, emit an "update_task" intent that points at the existing series and applies whichever fields the user changed (assignees, recurrence cadence, due_date if explicitly given). Schema:
+    intent: "update_task"
+    target: { title: <EXACT title from OPEN TASKS>, context: null, assigned_to_name: null }
+    updates: { assigned_to_names: [...], recurrence: "weekly" | ..., due_date: <YYYY-MM-DD or null> }
+- Example: OPEN TASKS contains "Give Logan eye drops" (weekly, assigned Lynn). User says "remind Lynn AND me to give Logan eye drops next week same day and weekly thereafter".
+  → intent: update_task
+    target: { title: "Give Logan eye drops" }
+    updates: { assigned_to_names: ["Lynn", "{{SENDER}}"], recurrence: "weekly" }
+  → NOT: intent: add with a new task. That creates a parallel series and the household ends up with two weekly Logan eye-drop reminders forever.
+- Only emit "add" with recurrence when NO fuzzy-matching recurring task exists in OPEN TASKS. The cost of a false duplicate (two weekly reminders firing in parallel for months) is much higher than the cost of a false update (the user re-confirms or asks to add a separate one).
 - Resolve person references: "remind Dad", "Jake needs to" → use exact member name from the list
 - assigned_to_names: ARRAY of exact names from member list. Examples:
   • "remind Lynn to feed the cat" → ["Lynn"]
