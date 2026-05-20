@@ -2477,19 +2477,37 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* Option 4: Manual */}
+              {/* Option 4: Manual. Opens the "View & edit all dates"
+                  panel with the Add-date form pre-expanded so the user
+                  can start typing dates immediately. The same UI is
+                  also reachable later via Edit child → Term dates →
+                  View & edit all dates. */}
               <div className="bg-white rounded-xl border border-cream-border p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-bark">✏️ Add manually</h3>
-                    <p className="text-xs text-cocoa mt-1">Enter term dates yourself. You can do this now or later from the child's profile.</p>
+                    <p className="text-xs text-cocoa mt-1">Enter term dates yourself, one at a time. Useful for schools without a published calendar URL.</p>
                   </div>
-                  <button
-                    onClick={() => setShowTermDateOptions(false)}
-                    className="shrink-0 border border-cream-border text-cocoa text-xs font-medium px-4 py-2 rounded-lg hover:bg-sand transition-colors"
-                  >
-                    Skip for now
-                  </button>
+                  <div className="shrink-0 flex flex-col gap-2 items-end">
+                    {editingMember?.school_id && (
+                      <button
+                        onClick={() => {
+                          setShowTermDateOptions(false);
+                          setShowAllDates(true);
+                          setShowAddTermDate(true);
+                        }}
+                        className="bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed transition-colors"
+                      >
+                        Add now
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowTermDateOptions(false)}
+                      className="border border-cream-border text-cocoa text-xs font-medium px-4 py-2 rounded-lg hover:bg-sand transition-colors"
+                    >
+                      Skip for now
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
