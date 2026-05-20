@@ -116,11 +116,45 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-cream)' }}>
-      {/* Progress bar — thin strip at the very top, animates as you advance */}
+    <div
+      // Concierge stage — matches Login.jsx + Signup.jsx so the visual
+      // language stays consistent from sign-up through to the wizard's
+      // final step. Radial gradient + two ambient blobs fill the
+      // viewport, the card holds each step's content.
+      className="relative min-h-screen overflow-hidden flex flex-col"
+      style={{
+        background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
+      }}
+    >
+      {/* Decorative ambient blobs — aria-hidden because they're
+          decorative-only, identical to the Login/Signup treatment. */}
       <div
-        className="sticky top-0 z-10 h-1"
-        style={{ background: 'var(--color-light-grey)' }}
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 760, height: 760, borderRadius: '50%',
+          left: -180, bottom: -300,
+          background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 600, height: 600, borderRadius: '50%',
+          right: -160, top: -200,
+          background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+
+      {/* Progress bar — thin strip at the very top of the stage,
+          animates as the user advances. Sits above the blobs in
+          stacking order so it stays crisp. */}
+      <div
+        className="relative z-10 h-1 safe-top"
+        style={{ background: 'rgba(26, 22, 32, 0.08)' }}
       >
         <div
           className="h-full transition-all duration-300"
@@ -131,13 +165,39 @@ export default function Onboarding() {
         />
       </div>
 
-      {/* `safe-top` adds the iOS safe-area-inset-top (notch / Dynamic
-          Island padding). Combined with pt-20 that gives ~80px below
-          the notch on iPhone 17 — enough breathing room above the
-          kicker text. No-op on devices without a notch so web and
-          older iPhones stay consistent with the previous layout. */}
-      <main className="safe-top flex-1 flex items-start justify-center px-5 pt-20 pb-12 md:pt-20 md:pb-16">
-        <div className="w-full max-w-xl">
+      {/* Main content — glass card with the same look as the Login
+          card. max-w-[420px] matches the Login/Signup card width so
+          everything looks like one product. */}
+      <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-10 pb-8 md:pt-12 md:pb-10">
+        <div
+          className="relative w-full max-w-[480px]"
+          style={{
+            background: 'rgba(255,253,250,0.86)',
+            backdropFilter: 'blur(18px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+            border: '1px solid rgba(255,255,255,0.9)',
+            borderRadius: 24,
+            boxShadow: '0 30px 80px -20px rgba(26,22,32,0.25), inset 0 2px 0 rgba(255,255,255,0.6)',
+            padding: '32px 28px 28px',
+          }}
+        >
+          {/* Logomark in the same purple-tinted chip used by Login /
+              Signup — kept here so every step inherits the same
+              header without each step having to render its own. */}
+          <div
+            className="mx-auto mb-5"
+            style={{
+              width: 56, height: 56,
+              borderRadius: 16,
+              background: '#EFE9FB',
+              border: '1px solid rgba(107,63,160,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-hidden="true"
+          >
+            <img src="/housemait-logomark.png" alt="" style={{ width: 34, height: 34, objectFit: 'contain' }} />
+          </div>
+
           <ErrorBanner message={error} onDismiss={() => setError('')} />
           <Suspense fallback={<StepSkeleton />}>
             {CurrentStep ? (
@@ -158,11 +218,10 @@ export default function Onboarding() {
         </div>
       </main>
 
-      {/* Footer nav — back + step counter + sign-out. "Next" / "Skip"
-          buttons live inside each step so they can control their own
-          wording. `safe-bottom` keeps it clear of the iPhone home indicator. */}
-      <footer className="border-t border-light-grey bg-white/60 backdrop-blur-sm safe-bottom">
-        <div className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between text-sm">
+      {/* Footer nav — Back / step counter / sign-out. Transparent
+          over the stage; sits flush with the safe-area bottom. */}
+      <footer className="relative z-10 safe-bottom">
+        <div className="max-w-[480px] mx-auto px-5 py-4 flex items-center justify-between text-sm">
           {!isFirst ? (
             <button
               type="button"

@@ -7,14 +7,10 @@ import { serifHeading, serifHeadingStyle, kicker, primaryBtn } from './_styles';
 
 export default function Welcome({ user, household, next }) {
   const firstName = user?.name?.split(' ')[0] || 'there';
+  // The logomark chip is now rendered by Onboarding.jsx (the wizard
+  // frame) above every step — no need for individual steps to repeat it.
   return (
     <div className="text-center">
-      <img
-        src="/housemait-logomark.png"
-        alt="Housemait"
-        className="mx-auto mb-8"
-        style={{ width: '60.67px', height: '48px', display: 'block' }}
-      />
       <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
         {household?.name ? household.name : 'Your Household'}
       </p>
