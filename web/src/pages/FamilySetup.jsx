@@ -3119,7 +3119,7 @@ export default function FamilySetup() {
                 // range. For single-day events (term start/end, INSET)
                 // showing a 'to' field invites confusion ("what do I
                 // put for term_start's end date?"). Hide it.
-                const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday / closure' };
+                const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term', inset_day: 'INSET Day', bank_holiday: 'Holiday / closure' };
                 const hasWarnings = Array.isArray(d.warnings) && d.warnings.length > 0;
                 const isQuoteOpen = showSourceQuoteFor === d._id;
                 const isRange = d.event_type === 'half_term_start' || d.event_type === 'bank_holiday';
@@ -3241,7 +3241,7 @@ export default function FamilySetup() {
               // feeds) still display with a friendly label rather than
               // a raw "half_term_end" string. The picker filters this
               // map down to the recommended set for new entries.
-              const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday / closure' };
+              const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Holiday / closure' };
               const PICKER_TYPES = ['term_start', 'term_end', 'half_term_start', 'inset_day', 'bank_holiday'];
               const TYPE_COLORS = { term_start: 'text-sage', term_end: 'text-sage', half_term_start: 'text-amber', half_term_end: 'text-amber', inset_day: 'text-coral', bank_holiday: 'text-plum' };
 
@@ -3365,7 +3365,7 @@ export default function FamilySetup() {
                           <option value="term_end">Term end</option>
                           <option value="half_term_start">Half term</option>
                           <option value="inset_day">INSET day</option>
-                          <option value="bank_holiday">Bank holiday / closure</option>
+                          <option value="bank_holiday">Holiday / closure</option>
                         </select>
                         <input type="text" value={termDateLabel} onChange={(e) => setTermDateLabel(e.target.value)} placeholder="Label (optional)" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white" />
                       </div>
