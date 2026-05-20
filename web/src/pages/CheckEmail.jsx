@@ -89,41 +89,50 @@ export default function CheckEmail() {
             lineHeight: 1.5,
           }}
         >
-          We&apos;ve sent you a verification link. Click it to activate your account, then come back and log in.
+          We&apos;ve sent you a verification link. Open the email and tap the
+          button — we&apos;ll bring you straight back here to finish setting up.
         </p>
-
-        <Link
-          to="/login"
-          className="block text-center w-full transition-all"
-          style={{
-            marginTop: 24,
-            padding: '14px 18px',
-            borderRadius: 12,
-            background: '#6B3FA0',
-            color: '#FFFFFF',
-            border: '1px solid transparent',
-            boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
-            fontSize: 14,
-            lineHeight: 1.45,
-            textDecoration: 'none',
-          }}
-        >
-          Go to login
-        </Link>
 
         <p
           className="text-center"
           style={{
-            marginTop: 14,
+            marginTop: 24,
             fontFamily: 'Inter, sans-serif',
             fontSize: 12,
             color: '#8A8493',
-            lineHeight: 1.45,
+            lineHeight: 1.5,
           }}
         >
           Didn&apos;t get the email? Check your spam folder, then try signing up again.
+        </p>
+
+        {/* Tiny escape hatch for users who've already verified on
+            another device or whose Universal Link didn't fire — they
+            can still get to login manually. Demoted from a big purple
+            CTA because the verify-link flow handles 99% of cases. */}
+        <p
+          className="text-center"
+          style={{
+            marginTop: 16,
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 13,
+            color: '#4A4453',
+            lineHeight: 1.45,
+          }}
+        >
+          Already verified?{' '}
+          <Link
+            to="/login"
+            style={{
+              fontWeight: 700,
+              color: '#6B3FA0',
+              textDecoration: 'none',
+              borderBottom: '1.5px solid #6B3FA0',
+              paddingBottom: 1,
+            }}
+          >
+            Log in
+          </Link>
         </p>
       </div>
     </div>
