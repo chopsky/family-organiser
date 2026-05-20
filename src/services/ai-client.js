@@ -16,6 +16,10 @@ const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const GPT_MODEL = 'gpt-4o';
 const DEFAULT_TIMEOUT_MS = 12000; // abort after 12s for chat
 const LONG_TIMEOUT_MS = 30000;   // 30s for complex tasks (imports, scraping)
+// Reasoning-mode tasks (Claude with adaptive thinking on a long PDF or
+// website body) can legitimately run past 30s — extending headroom so
+// the abort doesn't kill an in-flight response just before it finishes.
+const REASONING_TIMEOUT_MS = 90000;
 
 function getGeminiClient() {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -230,8 +234,55 @@ function logAiUsage({ householdId, userId, provider, model, feature, latencyMs, 
 }
 
 async function callWithFailover(opts) {
-  const { feature, householdId, userId } = opts;
+  const { feature, householdId, userId, preferClaude } = opts;
   let attempt = 0;
+
+  // High-stakes, low-volume features (school term-date extraction is the
+  // canonical example) can pass preferClaude:true to flip the order:
+  // Claude as primary, Gemini as failover. Gemini Flash is great for
+  // chat-volume work but its date-reasoning slips show up here (off-by-
+  // one weekdays, hallucinated extra rows). The per-call cost difference
+  // is pennies; the user-visible cost of a wrong school closure date is
+  // a parent showing up on a day school is shut.
+  if (preferClaude) {
+    const claudeStart = Date.now();
+    try {
+      const result = await callClaude(opts);
+      logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: false });
+      return result;
+    } catch (err) {
+      console.warn(`[ai-failover] Claude (primary) failed (${err.message || err.code}), falling back to Gemini`);
+      logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: false, error: err.message || String(err.code) });
+      attempt++;
+    }
+    if (process.env.GEMINI_API_KEY) {
+      const geminiStart = Date.now();
+      try {
+        // Gemini Flash's "thinking" budget eats into maxOutputTokens and
+        // can truncate JSON for long extractions. We turn it off here
+        // even when the caller asked for thinking — that flag is for
+        // Claude. Gemini is only here because Claude failed.
+        const result = await callGemini({ ...opts, useThinking: false });
+        logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: true });
+        return result;
+      } catch (err) {
+        console.warn(`[ai-failover] Gemini (fallback) failed (${err.message || err.code}), trying GPT-4o`);
+        logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: true, error: err.message || String(err.code) });
+      }
+    }
+    if (process.env.OPENAI_API_KEY) {
+      const gptStart = Date.now();
+      try {
+        const result = await callGPT(opts);
+        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true });
+        return result;
+      } catch (gptErr) {
+        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true, error: gptErr.message });
+        throw gptErr;
+      }
+    }
+    throw new Error('All AI providers failed');
+  }
 
   // Try Gemini first (if API key is set)
   if (process.env.GEMINI_API_KEY) {
@@ -277,6 +328,7 @@ module.exports = {
   callGemini,
   callClaude,
   callGPT,
+  REASONING_TIMEOUT_MS,
   isTransient,
   GEMINI_MODEL,
   CLAUDE_MODEL,

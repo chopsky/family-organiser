@@ -3,7 +3,7 @@ const multer = require('multer');
 const ical = require('node-ical');
 const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
-const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
+const { callWithFailover, LONG_TIMEOUT_MS, REASONING_TIMEOUT_MS } = require('../services/ai-client');
 const saTermDates = require('../services/saTermDates');
 const { validateTermDates } = require('../services/termDateValidator');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
@@ -108,10 +108,11 @@ CRITICAL - source_quote field:
 If you genuinely cannot find any term dates in the content, return an empty array [].
 Do NOT wrap in markdown code fences.`,
     messages: [{ role: 'user', content: `${cfg.userIntro}\n\n${pageText}` }],
-    timeoutMs: LONG_TIMEOUT_MS,
+    timeoutMs: REASONING_TIMEOUT_MS,
     maxTokens: 8192,
     responseFormat: 'json',
-    useThinking: false,
+    useThinking: true,
+    preferClaude: true,
     feature: 'school_website_extraction',
     householdId,
     userId,
@@ -717,9 +718,10 @@ Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_d
 For half terms, use half_term_start with an end_date spanning the week.
 Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
         messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
-        timeoutMs: LONG_TIMEOUT_MS,
+        timeoutMs: REASONING_TIMEOUT_MS,
         maxTokens: 4096,
-        useThinking: false,
+        useThinking: true,
+        preferClaude: true,
         feature: 'school_la_term_dates',
         householdId: req.householdId,
         userId: req.user.id,
@@ -1029,7 +1031,7 @@ CRITICAL - source_quote field:
 If you genuinely cannot find any term dates in the content, return an empty array [].
 Do NOT wrap in markdown code fences.`,
       messages: [{ role: 'user', content: `${cfg.userIntro}\n\n${pageText}` }],
-      timeoutMs: LONG_TIMEOUT_MS,
+      timeoutMs: REASONING_TIMEOUT_MS,
       // 8192: a full SA year planner can emit 80+ entries (terms × 2 +
       // ~40 holidays per year × 2 years). The old 4096 cap silently
       // truncated Gemini's response mid-array, leaving the parser with
@@ -1042,7 +1044,8 @@ Do NOT wrap in markdown code fences.`,
       // Claude doesn't have an equivalent knob, but it usually behaves;
       // the lenient JSON extraction further down is its safety net.
       responseFormat: 'json',
-      useThinking: false,
+      useThinking: true,
+      preferClaude: true,
       feature: 'school_website_extraction',
       householdId: req.householdId,
       userId: req.user.id,
