@@ -2,6 +2,103 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
+import { localeHomePath } from '../hooks/useLocale';
+
+// Shared stage/card wrapper so the three render branches (invalid
+// token, form, success) all sit on the same concierge background.
+function Stage({ children }) {
+  return (
+    <div
+      className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
+      style={{
+        background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
+      }}
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 760, height: 760, borderRadius: '50%',
+          left: -180, bottom: -300,
+          background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute"
+        style={{
+          width: 600, height: 600, borderRadius: '50%',
+          right: -160, top: -200,
+          background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+      <div
+        className="relative w-full max-w-[420px]"
+        style={{
+          background: 'rgba(255,253,250,0.86)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+          border: '1px solid rgba(255,255,255,0.9)',
+          borderRadius: 24,
+          boxShadow: '0 30px 80px -20px rgba(26,22,32,0.25), inset 0 2px 0 rgba(255,255,255,0.6)',
+          padding: '40px 36px 32px',
+        }}
+      >
+        <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: 60, height: 60,
+              borderRadius: 18,
+              background: '#EFE9FB',
+              border: '1px solid rgba(107,63,160,0.18)',
+            }}
+          >
+            <img src="/housemait-logomark.png" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          </div>
+        </Link>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const headlineStyle = {
+  fontFamily: "'Instrument Serif', serif",
+  fontWeight: 400,
+  fontSize: 40,
+  lineHeight: 1.05,
+  letterSpacing: '-0.02em',
+  color: '#1A1620',
+  margin: 0,
+};
+const labelStyle = { color: '#4A4453' };
+const inputStyle = {
+  width: '100%',
+  padding: '12px 14px',
+  borderRadius: 12,
+  background: '#FFFFFF',
+  border: '1px solid rgba(26,22,32,0.10)',
+  fontFamily: 'Inter, sans-serif',
+  fontSize: 14,
+  color: '#1A1620',
+  outline: 'none',
+};
+const ctaStyle = {
+  padding: '14px 18px',
+  borderRadius: 12,
+  background: '#6B3FA0',
+  color: '#FFFFFF',
+  border: '1px solid transparent',
+  boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
+  fontFamily: 'Inter, sans-serif',
+  fontWeight: 600,
+  fontSize: 14,
+  lineHeight: 1.45,
+};
 
 export default function ResetPassword() {
   const [password, setPassword]   = useState('');
@@ -32,65 +129,72 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
-        <div className="my-auto bg-white rounded-2xl shadow-sm border border-cream-border p-8 max-w-md text-center">
-          <p className="text-error mb-4">Invalid reset link.</p>
-          <Link to="/forgot-password" className="text-primary font-medium hover:underline">Request a new one</Link>
-        </div>
-      </div>
+      <Stage>
+        <h1 className="text-center" style={headlineStyle}>
+          Invalid <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>link.</em>
+        </h1>
+        <p className="text-center" style={{ marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#4A4453' }}>
+          The reset link is missing or has expired. Request a new one to try again.
+        </p>
+        <Link to="/forgot-password" className="block text-center w-full transition-all" style={{ ...ctaStyle, marginTop: 24, textDecoration: 'none' }}>
+          Request a new link
+        </Link>
+      </Stage>
     );
   }
 
   return (
-    <div className="min-h-screen bg-oat px-4 py-8 md:py-12 flex flex-col items-center">
-      <div className="my-auto w-full max-w-md">
-        <div className="text-center mb-8">
-          <img src="/housemait-logomark.png" alt="Housemait" className="h-16 mx-auto mb-4 rounded-2xl" />
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-cream-border p-8">
-          <h2 className="text-xl font-semibold text-bark mb-6">Set a new password</h2>
-          <ErrorBanner message={error} onDismiss={() => setError('')} />
-          {success ? (
-            <p className="text-success bg-success/10 rounded-lg px-3 py-2">Password updated! Redirecting to login...</p>
-          ) : (
-            <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
-              <div>
-                <label htmlFor="reset-password" className="block text-sm font-medium text-bark mb-1">New password</label>
-                <input
-                  id="reset-password"
-                  name="new-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  autoComplete="new-password"
-                />
-              </div>
-              <div>
-                <label htmlFor="reset-confirm" className="block text-sm font-medium text-bark mb-1">Confirm password</label>
-                <input
-                  id="reset-confirm"
-                  name="confirm-password"
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Same password again"
-                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  autoComplete="new-password"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-3 rounded-2xl transition-colors"
-              >
-                {loading ? 'Updating...' : 'Update password'}
-              </button>
-            </form>
-          )}
-        </div>
+    <Stage>
+      <h1 className="text-center" style={headlineStyle}>
+        Set a new <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>password.</em>
+      </h1>
+
+      <div style={{ marginTop: 24 }}>
+        <ErrorBanner message={error} onDismiss={() => setError('')} />
+
+        {success ? (
+          <p className="text-success bg-success/10 rounded-xl px-3 py-3 text-sm text-center">
+            Password updated! Redirecting to login…
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-3">
+            <div>
+              <label htmlFor="reset-password" className="block text-xs font-medium mb-1" style={labelStyle}>New password</label>
+              <input
+                id="reset-password"
+                name="new-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label htmlFor="reset-confirm" className="block text-xs font-medium mb-1" style={labelStyle}>Confirm password</label>
+              <input
+                id="reset-confirm"
+                name="confirm-password"
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Same password again"
+                autoComplete="new-password"
+                style={inputStyle}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full transition-all disabled:opacity-60"
+              style={ctaStyle}
+            >
+              {loading ? 'Updating…' : 'Update password'}
+            </button>
+          </form>
+        )}
       </div>
-    </div>
+    </Stage>
   );
 }
