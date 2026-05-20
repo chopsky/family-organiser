@@ -202,6 +202,7 @@ export default function FamilySetup() {
   const [importingLA, setImportingLA] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [importingWebsite, setImportingWebsite] = useState(false);
+  const [importingPdf, setImportingPdf] = useState(false);
   // Draft import: holds the AI-extracted rows + source-text snippet
   // between the /preview call and the admin's "Save" tap. null while
   // not previewing. Each row carries a `warnings: string[]` from the
@@ -608,6 +609,45 @@ export default function FamilySetup() {
       setImportError(err.response?.data?.error || 'Could not import from website. Try another option below.');
     } finally {
       setImportingWebsite(false);
+    }
+  }
+
+  /**
+   * Alternative to the URL flow: the user uploads the school's
+   * term-dates PDF directly. Useful when the school hosts the PDF
+   * behind SharePoint / Google Drive auth, or when the term-dates
+   * page is JavaScript-rendered and our HTML scrape returns gibberish.
+   *
+   * Same preview-and-confirm pattern as the URL flow — the response
+   * shape is identical, so the same review panel + confirm endpoint
+   * handle it from here.
+   */
+  async function handleImportPdf(file) {
+    if (!termDateSchoolId || !file) return;
+    setImportingPdf(true);
+    setImportError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post(`/schools/${termDateSchoolId}/import-pdf/preview`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (!Array.isArray(data.dates) || data.dates.length === 0) {
+        setImportError(data.message || 'No term dates found in that PDF. Try a different file.');
+        return;
+      }
+      setDraftImport({
+        schoolId: termDateSchoolId,
+        schoolName: termDateSchoolName,
+        sourceUrl: data.source_url || file.name,
+        sourceTextPreview: data.source_text_preview || '',
+        dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
+      });
+      setShowTermDateOptions(false);
+    } catch (err) {
+      setImportError(err.response?.data?.error || 'Could not read that PDF. Try a different file or another import method.');
+    } finally {
+      setImportingPdf(false);
     }
   }
 
@@ -2384,6 +2424,35 @@ export default function FamilySetup() {
                     {importingWebsite ? 'Finding…' : 'Find dates'}
                   </button>
                 </div>
+              </div>
+
+              {/* Option: Upload a PDF directly. Fallback for schools
+                  that host the term-dates PDF behind SharePoint /
+                  Google Drive share links (common at private schools)
+                  or whose term-dates page is a JS-rendered SPA we
+                  can't scrape. User downloads the PDF from their
+                  browser and uploads it here. */}
+              <div className="bg-white rounded-xl border border-cream-border p-4">
+                <h3 className="text-sm font-semibold text-bark">📄 Upload the school's PDF</h3>
+                <p className="text-xs text-cocoa mt-1">If the website link above doesn't work, download the term-dates PDF from your browser and upload it.</p>
+                <label className="mt-2 inline-flex items-center gap-2 cursor-pointer">
+                  <span className="bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed transition-colors">
+                    {importingPdf ? 'Reading…' : 'Choose PDF'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    disabled={importingPdf}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      // Reset the input so the same file can be picked
+                      // again later (useful if a first parse failed).
+                      e.target.value = '';
+                      if (file) handleImportPdf(file);
+                    }}
+                    className="hidden"
+                  />
+                </label>
               </div>
 
               {/* Option 3: iCal import */}
