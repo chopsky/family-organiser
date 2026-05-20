@@ -97,19 +97,25 @@ export default function middleware(request) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // Skip non-locale pages — auth flow, legal, authenticated routes,
-  // well-known endpoints. These render the same for every visitor and
-  // must remain universally reachable so e.g. a UK customer logging in
-  // from a US-IP airport WiFi isn't bounced.
+  // Skip non-locale pages. Split into two buckets:
   //
-  // BUT: stamp the housemait-locale cookie on these paths if it's
-  // missing, so a direct visit to /signup (no prior marketing-page
-  // render) still carries the visitor's geo-derived country into the
-  // signup flow. Without this, /signup falls back to browser timezone,
-  // which misclassifies travellers/expats. Self-redirect to install
-  // the cookie; the second pass through middleware sees it set and
-  // returns immediately (no loop).
-  if (SKIP_PATHS.has(path) || SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
+  //   1. SKIP_PREFIXES — machine endpoints like /.well-known/ and /api/.
+  //      Returned as-is, with NO redirects and NO cookie stamping. Apple's
+  //      apps_swcd daemon fetching /.well-known/apple-app-site-association
+  //      is cookie-less; if we 307-self-redirected to install a cookie it
+  //      would never set the cookie and we'd loop forever (which is what
+  //      was breaking iOS Password AutoFill on the iOS app login form).
+  //
+  //   2. SKIP_PATHS — transactional human-facing pages like /signup.
+  //      Stamp the housemait-locale cookie if it's missing so a direct
+  //      visit to /signup (no prior marketing-page render) still carries
+  //      the visitor's geo-derived country into the signup flow. Browser
+  //      keeps the cookie on the second hit so the self-redirect resolves
+  //      after one pass; no loop.
+  if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
+    return;
+  }
+  if (SKIP_PATHS.has(path)) {
     const cookieHeader = request.headers.get('cookie') || '';
     if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return; // already set
     const country = request.headers.get('x-vercel-ip-country') || '';
