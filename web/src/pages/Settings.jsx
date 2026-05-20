@@ -1192,7 +1192,13 @@ export default function Settings() {
                     <span className="font-medium">Apple:</span> open the iPhone <span className="font-medium">Calendar</span> app &rarr; tap <span className="font-medium">Calendars</span> at the bottom &rarr; tap <span className="font-medium">(i)</span> next to a calendar &rarr; turn on <span className="font-medium">Public Calendar</span> &rarr; tap <span className="font-medium">Share Link…</span> &rarr; <span className="font-medium">Copy</span>.
                   </p>
                   <p>
-                    <span className="font-medium">Google or Outlook:</span> you&apos;ll need a desktop browser to get the iCal URL — open <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> or <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> on a computer, follow their publish-calendar flow, then paste the URL back here.
+                    <span className="font-medium">Google:</span> open <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> in Safari, tap <span className="font-medium">AA</span> in the address bar &rarr; <span className="font-medium">Request Desktop Website</span>. Sign in &rarr; gear icon &rarr; <span className="font-medium">Settings</span> &rarr; pick your calendar under &ldquo;Settings for my calendars&rdquo; &rarr; scroll to <span className="font-medium">Integrate calendar</span> &rarr; copy <span className="font-medium">Secret address in iCal format</span>.
+                  </p>
+                  <p>
+                    <span className="font-medium">Outlook:</span> open <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> in Safari, tap <span className="font-medium">AA</span> &rarr; <span className="font-medium">Request Desktop Website</span>. Sign in &rarr; <span className="font-medium">Settings</span> &rarr; <span className="font-medium">Shared calendars</span> &rarr; <span className="font-medium">Publish a calendar</span> &rarr; choose &ldquo;Can view all details&rdquo; &rarr; copy the ICS URL.
+                  </p>
+                  <p style={{ fontStyle: 'italic' }}>
+                    Both are fiddly on a small screen — if you have a computer handy, it&apos;s easier there.
                   </p>
                 </div>
               ) : (
