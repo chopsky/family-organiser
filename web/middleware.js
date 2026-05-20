@@ -40,6 +40,7 @@ const SKIP_PATHS = new Set([
   '/forgot-password',
   '/reset-password',
   '/check-email',
+  '/verify',
   '/verified',
   '/privacy',
   '/terms',
