@@ -1150,7 +1150,7 @@ export default function Settings() {
         {/* External feed subscriptions (read-only inbound) */}
         <div className="mt-5 pt-5 border-t border-cream-border">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-bark">Subscribed calendars</p>
+            <p className="text-base font-medium text-bark">Subscribed calendars</p>
             {!showAddFeed && (
               <button
                 onClick={() => setShowAddFeed(true)}
@@ -1160,7 +1160,7 @@ export default function Settings() {
               </button>
             )}
           </div>
-          <p className="text-xs text-cocoa mb-3">
+          <p className="text-sm text-cocoa mb-3">
             Show external calendars not already on your phone — school timetables, sports fixtures, shared family calendars from a URL. Visible to everyone in your household. Read-only — edits happen in the source calendar.
           </p>
 
