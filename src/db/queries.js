@@ -58,6 +58,62 @@ async function updateHouseholdSettings(id, settings, db = supabase) {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+/**
+ * The 16 colour themes shown in the Settings → Edit Profile picker
+ * and on every avatar in the app. Order is deliberate — earlier
+ * colours are picked first when auto-assigning to new members of a
+ * household so two members never share a colour until the household
+ * grows past 16 people.
+ *
+ * Kept in sync with the `avatarColors` map duplicated across the web
+ * pages (Settings, Layout, Dashboard, AdminUserDetail, etc.); the
+ * names here MUST match those keys exactly because the UI looks up
+ * the className/bg-colour by name.
+ */
+const COLOR_THEMES = [
+  'red', 'burnt-orange', 'amber', 'gold',
+  'leaf', 'emerald', 'teal', 'sky',
+  'cobalt', 'indigo', 'purple', 'magenta',
+  'rose', 'terracotta', 'moss', 'slate',
+];
+
+/**
+ * Pick a colour theme for a newly-joining household member.
+ *
+ * Walks the canonical 16-colour list in order and returns the first
+ * one not yet used by anyone else in the household. Stable: the first
+ * member always gets red, the second burnt-orange, etc. — so the
+ * "who's who" colour-coding in the calendar and avatars stays
+ * predictable.
+ *
+ * If a household somehow has more than 16 members, falls back to a
+ * random colour from the list (collisions become inevitable past 16).
+ *
+ * @param {string} householdId
+ * @returns {Promise<string>}
+ */
+async function pickColorForNewMember(householdId, db = supabase) {
+  if (!householdId) return COLOR_THEMES[0];
+  try {
+    const { data, error } = await db
+      .from('users')
+      .select('color_theme')
+      .eq('household_id', householdId);
+    if (error) {
+      console.warn('[pickColorForNewMember] members lookup failed:', error.message);
+      return COLOR_THEMES[0];
+    }
+    const used = new Set((data || []).map((r) => r.color_theme).filter(Boolean));
+    for (const c of COLOR_THEMES) {
+      if (!used.has(c)) return c;
+    }
+    return COLOR_THEMES[Math.floor(Math.random() * COLOR_THEMES.length)];
+  } catch (err) {
+    console.warn('[pickColorForNewMember] threw:', err?.message || err);
+    return COLOR_THEMES[0];
+  }
+}
+
 async function createUser({ householdId, name, role = 'member' }, db = supabase) {
   const { data, error } = await db
     .from('users')
@@ -4781,6 +4837,8 @@ module.exports = {
   getHouseholdPrimaryContact,
   getHouseholdUsageCounts,
   setTrialEmailsEnabled,
+  pickColorForNewMember,
+  COLOR_THEMES,
   createUser,
   getHouseholdMembers,
   findUserByName,

@@ -137,15 +137,16 @@ router.post('/register', requireTurnstile, async (req, res) => {
         authProvider: 'email',
       });
 
-      // Apply pre-filled profile fields from invite
+      // Apply pre-filled profile fields from invite. Colour theme:
+      // honour the inviter's pick if they set one, otherwise auto-
+      // assign the first colour not yet used by anyone in the household
+      // so every member gets a distinct avatar without admin effort.
       const profileUpdates = {};
       if (invite.family_role) profileUpdates.family_role = invite.family_role;
       if (invite.birthday) profileUpdates.birthday = invite.birthday;
-      if (invite.color_theme) profileUpdates.color_theme = invite.color_theme;
+      profileUpdates.color_theme = invite.color_theme || await db.pickColorForNewMember(invite.household_id);
       if (invite.school_id) profileUpdates.school_id = invite.school_id;
-      if (Object.keys(profileUpdates).length > 0) {
-        await db.updateUser(user.id, profileUpdates);
-      }
+      await db.updateUser(user.id, profileUpdates);
 
       await db.markInviteAccepted(invite.id);
       const response = await authResponse({ ...user, ...profileUpdates }, req);
@@ -341,7 +342,11 @@ router.post('/create-household', requireAuth, async (req, res) => {
 
   try {
     const household = await db.createHousehold(name.trim(), timezone, safeCountry);
-    const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin' });
+    // Brand-new household has no members yet, so pickColorForNewMember
+    // returns the first colour in the canonical list (red). Subsequent
+    // members will fall through to the next unused colour.
+    const color_theme = await db.pickColorForNewMember(household.id);
+    const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin', color_theme });
 
     // Seed public holidays in the background (don't block response)
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id, household.country)
@@ -1027,12 +1032,10 @@ router.post('/google', async (req, res) => {
         const profileUpdates = {};
         if (acceptedInvite.family_role) profileUpdates.family_role = acceptedInvite.family_role;
         if (acceptedInvite.birthday) profileUpdates.birthday = acceptedInvite.birthday;
-        if (acceptedInvite.color_theme) profileUpdates.color_theme = acceptedInvite.color_theme;
+        profileUpdates.color_theme = acceptedInvite.color_theme || await db.pickColorForNewMember(acceptedInvite.household_id);
         if (acceptedInvite.school_id) profileUpdates.school_id = acceptedInvite.school_id;
-        if (Object.keys(profileUpdates).length > 0) {
-          await db.updateUser(user.id, profileUpdates);
-          user = { ...user, ...profileUpdates };
-        }
+        await db.updateUser(user.id, profileUpdates);
+        user = { ...user, ...profileUpdates };
       }
     } else if (user.auth_provider !== 'google') {
       // Existing user signing in via Google — stamp the latest method
@@ -1128,12 +1131,10 @@ router.post('/apple', async (req, res) => {
         const profileUpdates = {};
         if (acceptedInvite.family_role) profileUpdates.family_role = acceptedInvite.family_role;
         if (acceptedInvite.birthday) profileUpdates.birthday = acceptedInvite.birthday;
-        if (acceptedInvite.color_theme) profileUpdates.color_theme = acceptedInvite.color_theme;
+        profileUpdates.color_theme = acceptedInvite.color_theme || await db.pickColorForNewMember(acceptedInvite.household_id);
         if (acceptedInvite.school_id) profileUpdates.school_id = acceptedInvite.school_id;
-        if (Object.keys(profileUpdates).length > 0) {
-          await db.updateUser(user.id, profileUpdates);
-          user = { ...user, ...profileUpdates };
-        }
+        await db.updateUser(user.id, profileUpdates);
+        user = { ...user, ...profileUpdates };
       }
     } else if (user.auth_provider !== 'apple') {
       // Existing user signing in via Apple — re-stamp to reflect the
