@@ -162,6 +162,11 @@ export default function FamilySetup() {
 
   // Add dependent state
   const [showAddDependent, setShowAddDependent] = useState(false);
+  // Set of member-ids currently being deleted. Used to show a busy
+  // affordance in the row while the (potentially slow) cascade RPC
+  // runs, and to suppress duplicate clicks. The row itself is hidden
+  // optimistically before the request fires.
+  const [removingMemberIds, setRemovingMemberIds] = useState(() => new Set());
   const [depName, setDepName] = useState('');
   const [depRole, setDepRole] = useState('');
   const [depBirthday, setDepBirthday] = useState('');
@@ -463,11 +468,28 @@ export default function FamilySetup() {
 
   async function handleRemoveDependent(member) {
     if (!window.confirm(`Remove ${member.name}?`)) return;
+    // Optimistic delete: hide the row immediately so the user sees
+    // something happen. The backend cascade (delete_user_cascade RPC)
+    // can take 5-15s on households with months of activity — the old
+    // code awaited silently and the row stayed on screen the whole
+    // time, which read as "nothing happened, did I really click it?"
+    // On failure, re-insert the row at its original position and show
+    // the error.
+    setRemovingMemberIds((prev) => new Set(prev).add(member.id));
+    const prevMembers = members;
+    setMembers((cur) => cur.filter((m) => m.id !== member.id));
     try {
       await api.delete(`/household/dependents/${member.id}`);
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
     } catch (err) {
+      // Rollback the optimistic removal.
+      setMembers(prevMembers);
       setError(err.response?.data?.error || 'Could not remove member.');
+    } finally {
+      setRemovingMemberIds((prev) => {
+        const next = new Set(prev);
+        next.delete(member.id);
+        return next;
+      });
     }
   }
 
@@ -1222,11 +1244,23 @@ export default function FamilySetup() {
 
   async function handleRemoveMember(member) {
     if (!window.confirm(`Remove ${member.name} from the household?`)) return;
+    // Same optimistic pattern as handleRemoveDependent above — the
+    // backend cascade-delete is slow on real households and silent
+    // awaits read as broken UI.
+    setRemovingMemberIds((prev) => new Set(prev).add(member.id));
+    const prevMembers = members;
+    setMembers((cur) => cur.filter((m) => m.id !== member.id));
     try {
       await api.delete(`/household/members/${member.id}`);
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
     } catch (err) {
+      setMembers(prevMembers);
       setError(err.response?.data?.error || 'Could not remove member.');
+    } finally {
+      setRemovingMemberIds((prev) => {
+        const next = new Set(prev);
+        next.delete(member.id);
+        return next;
+      });
     }
   }
 
@@ -1661,7 +1695,8 @@ export default function FamilySetup() {
                 {isAdmin && m.id !== user?.id && m.role !== 'admin' && (
                   <button
                     onClick={() => handleRemoveMember(m)}
-                    className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10"
+                    disabled={removingMemberIds.has(m.id)}
+                    className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10 disabled:opacity-50 disabled:cursor-wait"
                     title="Remove member"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -1818,7 +1853,8 @@ export default function FamilySetup() {
                           </button>
                           <button
                             onClick={() => handleRemoveDependent(m)}
-                            className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10"
+                            disabled={removingMemberIds.has(m.id)}
+                            className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10 disabled:opacity-50 disabled:cursor-wait"
                             title="Remove"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
