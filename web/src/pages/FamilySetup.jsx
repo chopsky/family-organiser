@@ -1521,7 +1521,18 @@ export default function FamilySetup() {
                 // chat without typing the link manually. wa.me opens
                 // the recipient's WhatsApp share-sheet on tap; the
                 // user picks who to send to.
-                const inviteUrl = `${window.location.origin}/signup?invite=${inv.token}`;
+                //
+                // Pinned to the production housemait.com hostname
+                // rather than window.location.origin. Inside the
+                // Capacitor iOS app, window.location.origin resolves
+                // to "capacitor://localhost" — exactly what an SA user
+                // hit in production when their recipient got a
+                // capacitor://localhost/signup?invite=… link they
+                // couldn't open. The invite recipient by definition
+                // doesn't have the app yet, so the URL needs to point
+                // at the public site every time, regardless of where
+                // the inviter is currently using Housemait.
+                const inviteUrl = `https://housemait.com/signup?invite=${inv.token}`;
                 const inviteeName = (inv.name || '').trim();
                 const greeting = inviteeName ? `Hi ${inviteeName.split(' ')[0]}` : 'Hey';
                 const waText = `${greeting} — I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}`;
