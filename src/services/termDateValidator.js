@@ -215,6 +215,30 @@ function checkDuplicates(rows) {
       seen.set(key, r);
     }
   }
+
+  // Same event_type + same academic year + same normalised label, but
+  // different dates: almost certainly the same real-world event with one
+  // row hallucinated or off by a day. The AI sometimes emits both a
+  // "last day of attendance" and the term-end date when the PDF only
+  // gives one. Flag the second row and point at the other date.
+  const byLabel = new Map();
+  for (const r of rows) {
+    const label = normaliseWhitespace(r.label);
+    if (!label) continue;
+    const k = `${r.event_type}|${r.academic_year || ''}|${label}`;
+    if (!byLabel.has(k)) byLabel.set(k, []);
+    byLabel.get(k).push(r);
+  }
+  for (const group of byLabel.values()) {
+    if (group.length < 2) continue;
+    const dates = group.map(r => r.date).filter(Boolean);
+    for (let i = 1; i < group.length; i++) {
+      const others = dates.filter((_, idx) => idx !== i).join(', ');
+      group[i].warnings.push(
+        `Same label and academic year as another row (${others}) but a different date — one of them is probably wrong.`
+      );
+    }
+  }
 }
 
 /**

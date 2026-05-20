@@ -166,6 +166,35 @@ describe('validateTermDates', () => {
     expect(rows[0].warnings.some(w => /duplicate/i.test(w))).toBe(false);
   });
 
+  it('flags same-label same-AY rows on different dates as near-duplicates', () => {
+    // Real PDF case: AI emitted two "Term 2 Ends" term_end rows, one on
+    // 24 June and one on 25 June, even though the source only said
+    // "Thursday 25 June". Exact-date dedup misses this, so the label-
+    // based check exists to surface the real-world duplicate.
+    const rows = validateTermDates(
+      [
+        { event_type: 'term_end', date: '2026-06-24', label: 'Term 2 Ends', academic_year: '2025-2026' },
+        { event_type: 'term_end', date: '2026-06-25', label: 'Term 2 Ends', academic_year: '2025-2026' },
+      ],
+      '',
+      NOW
+    );
+    expect(rows[1].warnings.some(w => /Same label and academic year/i.test(w))).toBe(true);
+    expect(rows[0].warnings.some(w => /Same label and academic year/i.test(w))).toBe(false);
+  });
+
+  it('does not flag same-label rows in different academic years', () => {
+    const rows = validateTermDates(
+      [
+        { event_type: 'term_end', date: '2025-06-25', label: 'Term 2 Ends', academic_year: '2024-2025' },
+        { event_type: 'term_end', date: '2026-06-25', label: 'Term 2 Ends', academic_year: '2025-2026' },
+      ],
+      '',
+      NOW
+    );
+    expect(rows.every(r => r.warnings.filter(w => /Same label/i.test(w)).length === 0)).toBe(true);
+  });
+
   it('flags a date more than 18 months from now', () => {
     const [row] = validateTermDates(
       [{ event_type: 'term_start', date: '2031-09-01', academic_year: '2031-2032' }],
