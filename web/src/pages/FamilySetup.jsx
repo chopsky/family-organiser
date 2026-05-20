@@ -3115,15 +3115,28 @@ export default function FamilySetup() {
 
             <div className="space-y-2">
               {draftImport.dates.map((d) => {
-                const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term starts', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday' };
+                // Only half-term and bank-holiday rows can span a
+                // range. For single-day events (term start/end, INSET)
+                // showing a 'to' field invites confusion ("what do I
+                // put for term_start's end date?"). Hide it.
+                const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday / closure' };
                 const hasWarnings = Array.isArray(d.warnings) && d.warnings.length > 0;
                 const isQuoteOpen = showSourceQuoteFor === d._id;
+                const isRange = d.event_type === 'half_term_start' || d.event_type === 'bank_holiday';
                 return (
                   <div key={d._id} className={`bg-white rounded-lg border ${hasWarnings ? 'border-coral/40' : 'border-cream-border'} p-3`}>
                     <div className="flex items-start gap-2 flex-wrap">
                       <select
                         value={d.event_type}
-                        onChange={(e) => updateDraftRow(d._id, { event_type: e.target.value })}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          // Switching away from a range type — drop
+                          // the stale end_date so it doesn't sneak
+                          // into the saved record.
+                          const patch = { event_type: next };
+                          if (next !== 'half_term_start' && next !== 'bank_holiday') patch.end_date = null;
+                          updateDraftRow(d._id, patch);
+                        }}
                         className="border border-cream-border rounded px-1.5 py-1 text-xs bg-white"
                       >
                         {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -3133,14 +3146,20 @@ export default function FamilySetup() {
                         value={d.date || ''}
                         onChange={(e) => updateDraftRow(d._id, { date: e.target.value })}
                         className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                        title={isRange ? 'From' : 'Date'}
                       />
-                      <span className="text-cocoa text-xs self-center">to</span>
-                      <input
-                        type="date"
-                        value={d.end_date || ''}
-                        onChange={(e) => updateDraftRow(d._id, { end_date: e.target.value })}
-                        className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
-                      />
+                      {isRange && (
+                        <>
+                          <span className="text-cocoa text-xs self-center">to</span>
+                          <input
+                            type="date"
+                            value={d.end_date || ''}
+                            onChange={(e) => updateDraftRow(d._id, { end_date: e.target.value })}
+                            className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                            title="To (optional)"
+                          />
+                        </>
+                      )}
                       <input
                         type="text"
                         value={d.label || ''}
@@ -3217,7 +3236,13 @@ export default function FamilySetup() {
             {(() => {
               const grouped = groupDatesByTerm(editTermDates, household?.country);
               const academicYears = Object.keys(grouped).sort();
-              const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term starts', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday' };
+              // Labels for rendering — half_term_end stays in the map
+              // so existing rows of that type (older imports / iCal
+              // feeds) still display with a friendly label rather than
+              // a raw "half_term_end" string. The picker filters this
+              // map down to the recommended set for new entries.
+              const TYPE_LABELS = { term_start: 'Term starts', term_end: 'Term ends', half_term_start: 'Half term', half_term_end: 'Half term ends', inset_day: 'INSET Day', bank_holiday: 'Bank Holiday / closure' };
+              const PICKER_TYPES = ['term_start', 'term_end', 'half_term_start', 'inset_day', 'bank_holiday'];
               const TYPE_COLORS = { term_start: 'text-sage', term_end: 'text-sage', half_term_start: 'text-amber', half_term_end: 'text-amber', inset_day: 'text-coral', bank_holiday: 'text-plum' };
 
               return (
@@ -3239,44 +3264,71 @@ export default function FamilySetup() {
                                 {termDates.map(td => (
                                   <div key={td.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white group text-xs">
                                     {editingTermDate === td.id ? (
-                                      <div className="flex-1 space-y-1.5">
-                                        <div className="flex gap-2">
-                                          <select
-                                            value={editTermDateFields.event_type || td.event_type}
-                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, event_type: e.target.value }))}
-                                            className="border border-cream-border rounded px-1.5 py-1 text-xs bg-white"
-                                          >
-                                            {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                                          </select>
-                                          <input
-                                            type="text"
-                                            value={editTermDateFields.label ?? td.label ?? ''}
-                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, label: e.target.value }))}
-                                            placeholder="Label"
-                                            className="flex-1 border border-cream-border rounded px-2 py-1 text-xs bg-white"
-                                          />
-                                        </div>
-                                        <div className="flex gap-2 items-center">
-                                          <input
-                                            type="date"
-                                            value={editTermDateFields.date || td.date}
-                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, date: e.target.value }))}
-                                            className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
-                                          />
-                                          <span className="text-cocoa">to</span>
-                                          <input
-                                            type="date"
-                                            value={editTermDateFields.end_date ?? td.end_date ?? ''}
-                                            onChange={(e) => setEditTermDateFields(prev => ({ ...prev, end_date: e.target.value }))}
-                                            className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
-                                          />
-                                          <div className="flex-1" />
-                                          <button onClick={() => { setEditingTermDate(null); setEditTermDateFields({}); }} className="text-xs text-cocoa">Cancel</button>
-                                          <button onClick={() => handleUpdateTermDate(td.id)} disabled={savingTermDateEdit} className="text-xs bg-primary text-white px-2 py-1 rounded font-medium disabled:opacity-50">
-                                            {savingTermDateEdit ? 'Saving...' : 'Save'}
-                                          </button>
-                                        </div>
-                                      </div>
+                                      (() => {
+                                        // Same range-vs-single rule as
+                                        // the import-review panel and
+                                        // the manual-add form: only
+                                        // half-term and bank-holiday
+                                        // can span multiple days, so
+                                        // hide the 'to' field for the
+                                        // single-day types and label
+                                        // the lone field 'Date'.
+                                        const editType = editTermDateFields.event_type || td.event_type;
+                                        const isRange = editType === 'half_term_start' || editType === 'bank_holiday';
+                                        return (
+                                          <div className="flex-1 space-y-1.5">
+                                            <div className="flex gap-2">
+                                              <select
+                                                value={editType}
+                                                onChange={(e) => {
+                                                  const next = e.target.value;
+                                                  setEditTermDateFields(prev => {
+                                                    const patch = { ...prev, event_type: next };
+                                                    if (next !== 'half_term_start' && next !== 'bank_holiday') patch.end_date = null;
+                                                    return patch;
+                                                  });
+                                                }}
+                                                className="border border-cream-border rounded px-1.5 py-1 text-xs bg-white"
+                                              >
+                                                {PICKER_TYPES.map(k => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
+                                              </select>
+                                              <input
+                                                type="text"
+                                                value={editTermDateFields.label ?? td.label ?? ''}
+                                                onChange={(e) => setEditTermDateFields(prev => ({ ...prev, label: e.target.value }))}
+                                                placeholder="Label"
+                                                className="flex-1 border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                                              />
+                                            </div>
+                                            <div className="flex gap-2 items-center">
+                                              <input
+                                                type="date"
+                                                value={editTermDateFields.date || td.date}
+                                                onChange={(e) => setEditTermDateFields(prev => ({ ...prev, date: e.target.value }))}
+                                                className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                                                title={isRange ? 'From' : 'Date'}
+                                              />
+                                              {isRange && (
+                                                <>
+                                                  <span className="text-cocoa">to</span>
+                                                  <input
+                                                    type="date"
+                                                    value={editTermDateFields.end_date ?? td.end_date ?? ''}
+                                                    onChange={(e) => setEditTermDateFields(prev => ({ ...prev, end_date: e.target.value }))}
+                                                    className="border border-cream-border rounded px-2 py-1 text-xs bg-white"
+                                                    title="To (optional)"
+                                                  />
+                                                </>
+                                              )}
+                                              <div className="flex-1" />
+                                              <button onClick={() => { setEditingTermDate(null); setEditTermDateFields({}); }} className="text-xs text-cocoa">Cancel</button>
+                                              <button onClick={() => handleUpdateTermDate(td.id)} disabled={savingTermDateEdit} className="text-xs bg-primary text-white px-2 py-1 rounded font-medium disabled:opacity-50">
+                                                {savingTermDateEdit ? 'Saving...' : 'Save'}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()
                                     ) : (
                                       <>
                                         <div className="flex-1">
