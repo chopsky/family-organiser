@@ -58,7 +58,7 @@ router.post('/webhook', async (req, res) => {
         try {
           const row = await db.findUnusedPairingCode(token);
           if (row) {
-            // Atomic consume — guards against two webhook retries both
+            // Atomic consume - guards against two webhook retries both
             // trying to link the same code. Whoever loses the race gets
             // null back and just falls through.
             const consumed = await db.consumePairingCode(row.id, phone);
@@ -71,7 +71,7 @@ router.post('/webhook', async (req, res) => {
               const linkedUser = await db.getUserById(row.user_id).catch(() => null);
               const greetingName = linkedUser?.name ? ` ${linkedUser.name}` : '';
               const welcome = [
-                `👋 Hey${greetingName} — Housemait here.`,
+                `👋 Hey${greetingName} - Housemait here.`,
                 '',
                 `Your WhatsApp is now linked! Just message me like a friend:`,
                 '',
@@ -98,7 +98,7 @@ router.post('/webhook', async (req, res) => {
     }
 
     if (!user) {
-      // Unknown user — send a helpful response
+      // Unknown user - send a helpful response
       await whatsapp.sendMessage(phone,
         `👋 Hi${ProfileName ? ` ${ProfileName}` : ''}! Welcome to Housemait.\n\n` +
         `I don't have your number linked yet. To get started:\n` +
@@ -111,7 +111,7 @@ router.post('/webhook', async (req, res) => {
     }
 
     // Subscription gate for the bot. The web app's subscription middleware
-    // only runs on /api/* routes — WhatsApp comes in via Twilio's webhook
+    // only runs on /api/* routes - WhatsApp comes in via Twilio's webhook
     // at /whatsapp/webhook and bypasses it entirely. Re-check here so
     // expired households don't keep getting AI replies (which cost
     // Anthropic credits we aren't recouping).
@@ -149,7 +149,7 @@ router.post('/webhook', async (req, res) => {
       console.warn('[whatsapp] subscription check failed (failing open):', err.message);
     }
 
-    // Refresh the user's 24h customer-service window. Fire-and-forget — the
+    // Refresh the user's 24h customer-service window. Fire-and-forget - the
     // webhook has already returned 200 above, and a DB hiccup here must not
     // block the reply. Once this write lands, broadcast.js can send free-form
     // WhatsApp messages to this user for the next 24 hours; outside that
@@ -224,7 +224,7 @@ router.post('/webhook', async (req, res) => {
         const notification = handlers.buildBroadcastMessage(user.name, result.actions);
         if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
-        // Verbose error logging — the old single-line console.error ate
+        // Verbose error logging - the old single-line console.error ate
         // the most useful fields (err.code / err.name / Supabase
         // .details + .hint / full stack). This block emits a structured
         // object that Railway preserves as-is, so any future 'Sorry I
@@ -245,7 +245,7 @@ router.post('/webhook', async (req, res) => {
         });
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, body: text, error: err.message });
 
-        // A slightly more diagnostic user-facing message — picks a
+        // A slightly more diagnostic user-facing message - picks a
         // rough category from the error shape so the user knows whether
         // to retry now or later.
         let userMsg;

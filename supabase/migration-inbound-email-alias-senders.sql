@@ -12,7 +12,7 @@
 --
 --   2. A per-household allowlist of sender email addresses. Inbound
 --      mail is now only processed when the From: header matches an
---      entry on this list — both for the alias address and for the
+--      entry on this list - both for the alias address and for the
 --      long token address. This prevents accidental disclosure of
 --      either address from being abused as a spam vector.
 --
@@ -24,7 +24,7 @@
 -- Run in Supabase SQL Editor. Idempotent.
 
 -- Memorable alias on households. UNIQUE so multiple families can't
--- claim the same one. Nullable — households without one fall back
+-- claim the same one. Nullable - households without one fall back
 -- to the long token.
 ALTER TABLE households
   ADD COLUMN IF NOT EXISTS email_alias TEXT UNIQUE;

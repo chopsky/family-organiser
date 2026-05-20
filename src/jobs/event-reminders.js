@@ -50,7 +50,7 @@ async function processEventReminders() {
         // (multiple API replicas, deploy overlap) grabs the same row first,
         // claimEventReminder returns false and we skip silently.
         // Trade-off: a transient send error after this point won't be
-        // retried — better than the previous behaviour of double-sending
+        // retried - better than the previous behaviour of double-sending
         // every reminder when two replicas were alive.
         const claimed = await db.claimEventReminder(reminder.id);
         if (!claimed) continue;

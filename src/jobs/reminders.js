@@ -4,7 +4,7 @@ const { pickDigestFooter } = require('../utils/whatsapp-tips');
 const { buildDigestWeatherLine } = require('../utils/weather-line');
 const { fetchTodayForecastForHousehold } = require('../services/digest-weather');
 
-// ─── Message builders (pure functions — easy to test) ─────────────────────────
+// ─── Message builders (pure functions - easy to test) ─────────────────────────
 
 /**
  * Format an ISO timestamp as HH:mm in the household's timezone.
@@ -36,7 +36,7 @@ function formatEventAssignee(ev) {
  * Build the daily reminder text for a single user.
  *
  * Morning digest shape: school activities (if any), today's calendar
- * events, shopping count. Tasks are intentionally NOT included here —
+ * events, shopping count. Tasks are intentionally NOT included here -
  * a separate later-in-day nudge job surfaces overdue + due-today tasks
  * so the morning message stays focused on what's actually scheduled
  * for the day.
@@ -55,7 +55,7 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
 
   const lines = [`${greeting}, ${user.name}! Here's what's on for today:\n`];
 
-  // Weather one-liner — null on quiet days so we don't pad with filler.
+  // Weather one-liner - null on quiet days so we don't pad with filler.
   if (weatherLine) {
     lines.push(weatherLine);
     lines.push('');
@@ -66,7 +66,7 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
     lines.push('🏫 *SCHOOL:*');
     for (const act of schoolActivities) {
       const timeStr = act.time_end ? ` until ${act.time_end.substring(0, 5)}` : '';
-      lines.push(`• ${act.child_name} — ${act.activity}${timeStr}${act.reminder_text ? ` (${act.reminder_text})` : ''}`);
+      lines.push(`• ${act.child_name} - ${act.activity}${timeStr}${act.reminder_text ? ` (${act.reminder_text})` : ''}`);
     }
     lines.push('');
   }
@@ -78,7 +78,7 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
     for (const ev of todayEvents) {
       const startStr = ev.all_day ? 'All day' : formatEventTime(ev.start_time, tz);
       const who = formatEventAssignee(ev);
-      lines.push(`• ${startStr} — ${ev.title}${who ? ` _(${who})_` : ''}`);
+      lines.push(`• ${startStr} - ${ev.title}${who ? ` _(${who})_` : ''}`);
     }
     lines.push('');
   }
@@ -93,10 +93,10 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
   if (shoppingCount > 0) {
     lines.push(`🛒 *SHOPPING:* ${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the list. Reply /shopping to see it.`);
   } else {
-    lines.push('🛒 *SHOPPING:* List is empty — all done!');
+    lines.push('🛒 *SHOPPING:* List is empty - all done!');
   }
 
-  // Discovery footer — rotates through "💡 Did you know…" tips for
+  // Discovery footer - rotates through "💡 Did you know…" tips for
   // the first 14 days post-WhatsApp-link, then settles into a quiet
   // "_Reply /help for all commands._" line.
   lines.push('');
@@ -156,11 +156,11 @@ async function sendDailyReminders(householdId, singleMember) {
   const shoppingItems = await db.getShoppingList(householdId);
   const shoppingCount = shoppingItems.length;
 
-  // Today's calendar events — same scope across all recipients in the
+  // Today's calendar events - same scope across all recipients in the
   // household (events are household-wide, not per-member).
   const todayEvents = await fetchTodayEvents(householdId, today);
 
-  // Today's weather one-liner — one fetch per household run, shared
+  // Today's weather one-liner - one fetch per household run, shared
   // across every member's digest. Cached 12h inside the helper so a
   // re-trigger / second cron tick doesn't re-fetch.
   let weatherLine = null;
@@ -176,7 +176,7 @@ async function sendDailyReminders(householdId, singleMember) {
   for (const member of targets) {
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
     if (!hasWhatsApp) {
-      console.log(`[reminders] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
+      console.log(`[reminders] Skipping ${member.name} - whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
       continue;
     }
     // Per-user opt-out (Settings → Notifications → WhatsApp). Default
@@ -184,7 +184,7 @@ async function sendDailyReminders(householdId, singleMember) {
     // mean "send". Only an explicit false skips.
     const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
     if (prefs && prefs.whatsapp_daily_reminder === false) {
-      console.log(`[reminders] Skipping ${member.name} — daily reminder disabled by user pref`);
+      console.log(`[reminders] Skipping ${member.name} - daily reminder disabled by user pref`);
       continue;
     }
 
@@ -202,7 +202,7 @@ async function sendDailyReminders(householdId, singleMember) {
           // Check if today is during term time for this child's school
           const { isSchoolInSession } = require('../utils/school-terms');
           const inSession = await isSchoolInSession(child.school_id, todayStr);
-          if (!inSession) continue; // Skip — school holiday, inset day, half term, etc.
+          if (!inSession) continue; // Skip - school holiday, inset day, half term, etc.
 
           const activities = await db.getChildActivities(child.id);
           const todayActivities = activities.filter(a => a.day_of_week === dayOfWeek && a.term_only !== false);
@@ -246,7 +246,7 @@ async function sendDailyReminders(householdId, singleMember) {
         });
       }
     } else {
-      console.log(`[reminders] Skipping ${member.name} — whatsapp service not configured`);
+      console.log(`[reminders] Skipping ${member.name} - whatsapp service not configured`);
     }
   }
 }

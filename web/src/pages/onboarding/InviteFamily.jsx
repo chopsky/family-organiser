@@ -1,5 +1,5 @@
 /**
- * Step 2 — invite family members. Inline form that posts to the existing
+ * Step 2 - invite family members. Inline form that posts to the existing
  * POST /api/household/invite endpoint. The user can send multiple invites
  * before advancing, or skip entirely. Admin-only; if the user isn't an
  * admin (e.g. they joined an existing household via invite) the form
@@ -50,8 +50,8 @@ export default function InviteFamily({ user, household, next, setError }) {
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
           You've joined <strong>{household?.name || 'your household'}</strong>.
-          You'll see whatever your family adds — tasks, shopping lists, the
-          calendar — all shared. Let's finish setting up your account.
+          You'll see whatever your family adds - tasks, shopping lists, the
+          calendar - all shared. Let's finish setting up your account.
         </p>
         <button type="button" onClick={next} className={primaryBtn + ' mt-8'}>
           Continue →
@@ -64,13 +64,13 @@ export default function InviteFamily({ user, household, next, setError }) {
     <div>
       <div className="text-center">
         <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-          Step 1 — invite family
+          Step 1 - invite family
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
           Who's <i>in the house</i>?
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
-          Housemait works best when everyone's on it — shared shopping lists,
+          Housemait works best when everyone's on it - shared shopping lists,
           tasks that can be assigned, a calendar you can all add to. Invite
           them now, or add them later from Family Setup.
         </p>

@@ -135,7 +135,7 @@ async function importGIAS(csvPath) {
 }
 
 async function downloadGIAS() {
-  // The GIAS download page requires clicking through — provide instructions
+  // The GIAS download page requires clicking through - provide instructions
   console.log('');
   console.log('GIAS CSV must be downloaded manually:');
   console.log('  1. Go to: https://get-information-schools.service.gov.uk/Downloads');

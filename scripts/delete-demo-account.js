@@ -17,7 +17,7 @@ async function run() {
     .maybeSingle();
 
   if (!sarah) {
-    console.log('No demo account found — nothing to delete.');
+    console.log('No demo account found - nothing to delete.');
     return;
   }
 

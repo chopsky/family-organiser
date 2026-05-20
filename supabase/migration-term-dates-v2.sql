@@ -1,4 +1,4 @@
--- Term Dates v2 — metadata columns, iCal sync tracking, and academic_year backfill
+-- Term Dates v2 - metadata columns, iCal sync tracking, and academic_year backfill
 -- Depends on: migration-school.sql
 
 -- =============================================================================

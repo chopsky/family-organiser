@@ -2,7 +2,7 @@
  * Cloudflare Turnstile validation middleware.
  *
  * Bots hitting /register, /login, /forgot-password, /contact are the main
- * abuse surface — fake accounts burning trial slots, credential stuffing,
+ * abuse surface - fake accounts burning trial slots, credential stuffing,
  * email bombing via password resets, contact-form spam. The 20/hour auth
  * rate limiter (see app.js) is a strong baseline but doesn't stop a bot
  * rotating residential proxies. Turnstile is the second layer.
@@ -33,7 +33,7 @@ async function requireTurnstile(req, res, next) {
   if (!secret) {
     if (!warnedNoSecret) {
       console.warn(
-        '[turnstile] TURNSTILE_SECRET_KEY not set — bot protection is OFF for ' +
+        '[turnstile] TURNSTILE_SECRET_KEY not set - bot protection is OFF for ' +
         'register/login/forgot-password/contact. Set it in Railway env to enable.'
       );
       warnedNoSecret = true;
@@ -42,7 +42,7 @@ async function requireTurnstile(req, res, next) {
   }
 
   // iOS native clients skip Turnstile entirely. The threat model for a
-  // signed App Store binary is fundamentally different from web — no
+  // signed App Store binary is fundamentally different from web - no
   // bot signups via App Review's flow, no credential stuffing from a
   // controlled native binary. Apple rejected 1.1.0(8) under Guideline
   // 2.1(a) when an iPad reviewer hit a Turnstile race during login, so
@@ -51,7 +51,7 @@ async function requireTurnstile(req, res, next) {
   // Detection: Capacitor iOS apps send the Origin header
   // "capacitor://localhost". The User-Agent also includes "Capacitor"
   // but is more easily forged; we use both as a defence-in-depth check.
-  // Either match is sufficient — if both are missing we treat as web.
+  // Either match is sufficient - if both are missing we treat as web.
   const origin = req.get('Origin') || '';
   const userAgent = req.get('User-Agent') || '';
   const isCapacitorRequest =
@@ -97,7 +97,7 @@ async function requireTurnstile(req, res, next) {
     return next();
   } catch (err) {
     // Network blip talking to Cloudflare. Fail-open rather than locking
-    // legitimate users out — abuse is constrained by the rate limiter
+    // legitimate users out - abuse is constrained by the rate limiter
     // anyway, and Cloudflare outages are very rare.
     console.error('[turnstile] siteverify call failed:', err.message);
     return next();

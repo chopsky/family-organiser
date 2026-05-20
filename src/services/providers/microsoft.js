@@ -1,10 +1,10 @@
-// Microsoft Graph (Outlook) provider — reduced to a single export.
+// Microsoft Graph (Outlook) provider - reduced to a single export.
 //
 // Two-way sync was removed in favour of read-only inbound iCal feeds
 // (see src/services/externalFeed.js + the external_calendar_feeds
 // table). The OAuth flow, push/pull/webhook handlers, and supporting
 // helpers are all gone. The one piece worth keeping is
-// `deleteEventsBatch` — used by the disconnect-cleanup path on the
+// `deleteEventsBatch` - used by the disconnect-cleanup path on the
 // off-chance any future user is mid-migration with leftover sync_mappings
 // pointing at events Housemait once pushed into their Outlook calendar.
 //
@@ -28,7 +28,7 @@ function getClient(accessToken) {
  * Bulk-delete events from Outlook during a connection cleanup.
  *
  * Iterates the user's sync mappings and issues a Graph DELETE for each.
- * 404 from Graph means the event is already gone — counted as a success
+ * 404 from Graph means the event is already gone - counted as a success
  * because the end state is what the user wanted. Other errors count as
  * failures so the UI can warn about orphaned events.
  */

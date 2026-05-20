@@ -43,12 +43,12 @@ function buildWeeklyDigestMessage(user, householdName, completedTasks, completed
       const who = t.assigned_to_name || 'Everyone';
       const overdue = t.due_date < today;
       const label = overdue ? ` _(overdue, was due ${t.due_date})_` : '';
-      lines.push(`  🔴 ${who} — ${t.title}${label}`);
+      lines.push(`  🔴 ${who} - ${t.title}${label}`);
     }
     if (outstandingTasks.length > 8) lines.push(`  … and ${outstandingTasks.length - 8} more`);
     lines.push('');
   } else {
-    lines.push('⏳ *CARRYING OVER:* Nothing — all caught up! 🎉\n');
+    lines.push('⏳ *CARRYING OVER:* Nothing - all caught up! 🎉\n');
   }
 
   // ── Coming up next week ──
@@ -58,11 +58,11 @@ function buildWeeklyDigestMessage(user, householdName, completedTasks, completed
       const who = t.assigned_to_name || 'Everyone';
       const dayName = new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
       const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
-      lines.push(`  📌 ${dayName}: ${who} — ${t.title}${rec}`);
+      lines.push(`  📌 ${dayName}: ${who} - ${t.title}${rec}`);
     }
     if (upcomingTasks.length > 8) lines.push(`  … and ${upcomingTasks.length - 8} more`);
   } else {
-    lines.push('📅 *COMING UP NEXT WEEK:* Nothing scheduled — enjoy the week!');
+    lines.push('📅 *COMING UP NEXT WEEK:* Nothing scheduled - enjoy the week!');
   }
 
   return lines.join('\n').trim();
@@ -104,13 +104,13 @@ async function sendWeeklyDigest(householdId) {
   for (const member of members) {
     const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
     if (!hasWhatsApp) {
-      console.log(`[digest] Skipping ${member.name} — whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
+      console.log(`[digest] Skipping ${member.name} - whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
       continue;
     }
     // Per-user opt-out (Settings → Notifications → WhatsApp).
     const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
     if (prefs && prefs.whatsapp_weekly_digest === false) {
-      console.log(`[digest] Skipping ${member.name} — weekly digest disabled by user pref`);
+      console.log(`[digest] Skipping ${member.name} - weekly digest disabled by user pref`);
       continue;
     }
 
@@ -137,7 +137,7 @@ async function sendWeeklyDigest(householdId) {
         });
       }
     } else {
-      console.log(`[digest] Skipping ${member.name} — whatsapp service not configured`);
+      console.log(`[digest] Skipping ${member.name} - whatsapp service not configured`);
     }
   }
 }
@@ -179,7 +179,7 @@ async function sendWeeklyDigestEmail(householdId) {
   const claimed = await db.markEmailSentIfNew(householdId, weekKey);
   if (!claimed) {
     console.log(
-      `[digest] ${weekKey} already sent to household ${householdId} — skipping duplicate run`
+      `[digest] ${weekKey} already sent to household ${householdId} - skipping duplicate run`
     );
     return;
   }
@@ -208,7 +208,7 @@ async function sendWeeklyDigestEmail(householdId) {
     if (!member.email) continue;
     const normalised = member.email.toLowerCase().trim();
     if (seenEmails.has(normalised)) {
-      console.log(`[digest] Already emailed ${normalised} in this household run — skipping ${member.name}`);
+      console.log(`[digest] Already emailed ${normalised} in this household run - skipping ${member.name}`);
       continue;
     }
     seenEmails.add(normalised);

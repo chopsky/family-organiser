@@ -2,8 +2,8 @@
 --
 -- Until now the Household card on the Family page showed only the
 -- household name in an inline text field. The new design shows the
--- household as an identity card — circular profile photo + name +
--- street address — edited via a modal.
+-- household as an identity card - circular profile photo + name +
+-- street address - edited via a modal.
 --
 -- Two new columns:
 --

@@ -90,7 +90,7 @@ export function AuthProvider({ children }) {
       const now = Date.now();
       // Only check if the tab was idle for > 24 hours
       if (lastActive && now - Number(lastActive) > 24 * 60 * 60 * 1000) {
-        // Trigger any authenticated call — the 401 interceptor handles the rest
+        // Trigger any authenticated call - the 401 interceptor handles the rest
         api.get('/auth/me').catch(() => {});
       }
       safeSetItem('lastActive', String(now));

@@ -1,5 +1,5 @@
 /**
- * useOnlineStatus — tracks browser/WebView network state.
+ * useOnlineStatus - tracks browser/WebView network state.
  *
  * Uses the standard `navigator.onLine` flag plus `online` / `offline`
  * window events. Works identically in the browser and inside the

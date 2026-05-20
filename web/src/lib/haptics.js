@@ -1,14 +1,14 @@
 /**
- * Haptic feedback helpers — iOS only.
+ * Haptic feedback helpers - iOS only.
  *
  * Wraps @capacitor/haptics so callers don't have to import + null-check
  * + try/catch on every press. Three semantic levels:
  *
- *   tap()        — quick light tick. Use for button presses, list-row
+ *   tap()        - quick light tick. Use for button presses, list-row
  *                  taps, bottom-tab switches. Cheap and frequent.
- *   confirm()    — medium impact for committed actions. Toggling a
+ *   confirm()    - medium impact for committed actions. Toggling a
  *                  task complete, marking shopping done, saving.
- *   warn()       — heavier "are you sure" feedback. Reserve for
+ *   warn()       - heavier "are you sure" feedback. Reserve for
  *                  destructive confirmations (delete account, remove
  *                  household member, etc).
  *

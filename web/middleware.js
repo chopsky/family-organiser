@@ -1,9 +1,9 @@
 /**
- * Strict regional redirect — Vercel Edge Middleware.
+ * Strict regional redirect - Vercel Edge Middleware.
  *
  * Every "marketing-ish" request is forced to the locale page matching
  * the visitor's IP-derived country. This explicitly includes typo /
- * 404-style paths (`/asdfkjaskdj`, `/old-link-from-2022`, etc.) — those
+ * 404-style paths (`/asdfkjaskdj`, `/old-link-from-2022`, etc.) - those
  * would otherwise fall through to the SPA rewrite and render the
  * default-locale landing, which makes the geo enforcement leaky.
  *
@@ -14,10 +14,10 @@
  *
  * Search-engine crawlers also bypass entirely. Without this, Googlebot
  * crawling from US IPs would always be redirected to /us and never
- * index /gb, /eu, /au, /ca, /za — collapsing the hreflang setup.
+ * index /gb, /eu, /au, /ca, /za - collapsing the hreflang setup.
  *
  * Choice of 307 (not 301): geo redirects are temporary by their
- * nature — the destination depends on where the visitor is right now,
+ * nature - the destination depends on where the visitor is right now,
  * not where they "should" be canonically. Using 301 would teach search
  * engines and browsers to permanently associate / with /gb.
  */
@@ -47,7 +47,7 @@ const SKIP_PATHS = new Set([
   '/support',
 ]);
 
-// Prefix-match paths — anything starting with one of these is bypassed.
+// Prefix-match paths - anything starting with one of these is bypassed.
 // Mostly authenticated app routes that already require a JWT to render
 // anything useful, and a few well-known infra endpoints.
 const SKIP_PREFIXES = [
@@ -82,7 +82,7 @@ function pathForCountry(country) {
   if (cc === 'CA') return '/ca';
   if (cc === 'ZA') return '/za';
   if (EU_OR_EEA.has(cc)) return '/eu';
-  return '/'; // international default — x-default in hreflang
+  return '/'; // international default - x-default in hreflang
 }
 
 /** Returns the bare locale code ('gb'/'us'/'eu'/...) for a country, or
@@ -100,14 +100,14 @@ export default function middleware(request) {
 
   // Skip non-locale pages. Split into two buckets:
   //
-  //   1. SKIP_PREFIXES — machine endpoints like /.well-known/ and /api/.
+  //   1. SKIP_PREFIXES - machine endpoints like /.well-known/ and /api/.
   //      Returned as-is, with NO redirects and NO cookie stamping. Apple's
   //      apps_swcd daemon fetching /.well-known/apple-app-site-association
   //      is cookie-less; if we 307-self-redirected to install a cookie it
   //      would never set the cookie and we'd loop forever (which is what
   //      was breaking iOS Password AutoFill on the iOS app login form).
   //
-  //   2. SKIP_PATHS — transactional human-facing pages like /signup.
+  //   2. SKIP_PATHS - transactional human-facing pages like /signup.
   //      Stamp the housemait-locale cookie if it's missing so a direct
   //      visit to /signup (no prior marketing-page render) still carries
   //      the visitor's geo-derived country into the signup flow. Browser
@@ -121,7 +121,7 @@ export default function middleware(request) {
     if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return; // already set
     const country = request.headers.get('x-vercel-ip-country') || '';
     const code = localeCodeForCountry(country);
-    if (!code) return; // unrecognized country — leave the page alone
+    if (!code) return; // unrecognized country - leave the page alone
     const maxAge = 60 * 60 * 24 * 30; // 30 days, mirrors useLocale.js
     const headers = new Headers();
     headers.set(
@@ -140,7 +140,7 @@ export default function middleware(request) {
   if (CRAWLER_UA.test(userAgent)) return;
 
   // x-vercel-ip-country is set by Vercel's edge from the request's
-  // TCP-level source IP geolocation. It's never user-controllable —
+  // TCP-level source IP geolocation. It's never user-controllable -
   // a tampered cookie or header from the client can't poison this.
   const country = request.headers.get('x-vercel-ip-country') || '';
   const expected = pathForCountry(country);
@@ -154,7 +154,7 @@ export default function middleware(request) {
 }
 
 export const config = {
-  // Match almost everything — the SKIP_PATHS / SKIP_PREFIXES lists
+  // Match almost everything - the SKIP_PATHS / SKIP_PREFIXES lists
   // above do the heavy lifting inside the function. The matcher itself
   // only excludes things that should never invoke the middleware at
   // all: static assets, API rewrites, and Vercel internals.

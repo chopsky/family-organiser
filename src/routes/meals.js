@@ -360,7 +360,7 @@ Return ONLY valid JSON:
 
     // Add items to shopping list
     // shopping_items.list_id is NOT NULL since multi-list support
-    // landed — pick up the default list + aisle_category before insert.
+    // landed - pick up the default list + aisle_category before insert.
     // Same pattern as classify.js and shopping.js.
     const defaultList = await db.getDefaultShoppingList(req.householdId);
     const itemsToAdd = (result.need_to_buy || []).map(i => ({

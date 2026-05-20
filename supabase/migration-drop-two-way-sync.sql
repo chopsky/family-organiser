@@ -12,7 +12,7 @@
 -- We also NULL out calendar_events.subscription_id before dropping
 -- calendar_subscriptions, since some historical rows (including
 -- soft-deleted ones) still reference it. The subscription_id column
--- itself is left in place — to be dropped in a separate cleanup
+-- itself is left in place - to be dropped in a separate cleanup
 -- migration once we've verified nothing depends on it (e.g. analytics
 -- queries, soft-delete restoration paths). Leaving the column also
 -- gives a safety net: if for any reason a row still has a non-null
@@ -23,7 +23,7 @@
 -- Run this in the Supabase SQL Editor.
 
 -- 1. Decouple calendar_events from calendar_subscriptions so the FK
---    cascade doesn't matter. Pure UPDATE — no rows deleted.
+--    cascade doesn't matter. Pure UPDATE - no rows deleted.
 UPDATE calendar_events
    SET subscription_id = NULL
  WHERE subscription_id IS NOT NULL;

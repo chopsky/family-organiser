@@ -3,14 +3,14 @@
 --
 -- Context: those names were seeded for every new household pre-multi-
 -- region. Production usage data showed that 100% of items live in
--- "Default" — the supermarket-named lists were dead weight cluttering
+-- "Default" - the supermarket-named lists were dead weight cluttering
 -- the Shopping UI. The seeding code now only creates "Default" for all
 -- new households (see DEFAULT_LISTS_BY_COUNTRY in src/db/queries.js).
 -- This SQL cleans up the existing rows in the same spirit.
 --
 -- Safety: we ONLY delete a list if it has zero items. If any household
 -- has somehow been using "Tesco" (none currently do, but defensive), we
--- leave it alone — their data stays, and they can rename or delete it
+-- leave it alone - their data stays, and they can rename or delete it
 -- themselves.
 --
 -- Idempotent: running twice in a row is a no-op once the empty lists
@@ -19,7 +19,7 @@
 -- Run in Supabase SQL editor.
 
 -- ── Step 1: preview what will be deleted ──────────────────────────
--- Read-only — shows the household_id, country, list name, and item
+-- Read-only - shows the household_id, country, list name, and item
 -- count for every candidate row. Sanity-check the list before the
 -- DELETE below. Item count should be 0 for every row that the next
 -- step actually removes (rows with items are preserved).

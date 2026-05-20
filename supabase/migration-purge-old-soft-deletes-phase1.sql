@@ -4,21 +4,21 @@
 -- the two-way sync rip-out left ~50k rows sitting in calendar_events
 -- with deleted_at NOT NULL. The partial index added in
 -- migration-calendar-events-month-index.sql means they no longer hurt
--- query performance — but they still bloat the table, indexes, and
+-- query performance - but they still bloat the table, indexes, and
 -- backups. 90 days is a conservative cutoff: anything that old is well
 -- past any plausible "I deleted that by accident" recovery window.
 --
--- Run order (all in the Supabase SQL Editor — no local tooling needed):
+-- Run order (all in the Supabase SQL Editor - no local tooling needed):
 --   1. Run section 1 (PREVIEW) to count what will be deleted and
 --      sanity-check.
 --   2. Run section 2 (BACKUP) to snapshot the to-be-deleted rows into
---      sibling tables. Replaces pg_dump for our purposes — recovery is
+--      sibling tables. Replaces pg_dump for our purposes - recovery is
 --      a one-line INSERT...SELECT away.
 --   3. Run section 3 (DELETE) inside its BEGIN/COMMIT transaction.
 --   4. Run section 4 (POST) to refresh planner stats.
 --
 -- After a few weeks of confidence (or once you're happy nothing was
--- needed back), drop the backup tables — see section 5.
+-- needed back), drop the backup tables - see section 5.
 --
 -- Phase 2 (later, optional): drop the cutoff to 30 days once Phase 1
 -- has been uneventful.
@@ -66,12 +66,12 @@ SELECT id, household_id, title, start_time, deleted_at
 
 -- ─── 2. BACKUP ─────────────────────────────────────────────────────────────
 -- Snapshot the rows we're about to purge into sibling tables. If anything
--- ever needs to be restored, we can SELECT from these — see section 5
+-- ever needs to be restored, we can SELECT from these - see section 5
 -- for the recovery one-liners. Drop the backup tables once you're sure
 -- nothing was needed (a couple of weeks is plenty).
 --
 -- These tables get the same column shape as the source via SELECT *. They
--- intentionally have NO indexes / FKs / constraints — they're a flat
+-- intentionally have NO indexes / FKs / constraints - they're a flat
 -- recovery dump, not a working table.
 
 CREATE TABLE calendar_events_purged_backup AS
@@ -99,7 +99,7 @@ SELECT COUNT(*) AS assignees_backed_up FROM event_assignees_purged_backup;
 -- Wrapped in a transaction so if anything goes wrong (locks, timeout,
 -- you change your mind) you can ROLLBACK without leaving partial state.
 -- If the FK delete_action above was 'c' (CASCADE), the assignees DELETE
--- below is redundant but harmless — keeps the migration safe to re-run
+-- below is redundant but harmless - keeps the migration safe to re-run
 -- on a project where someone forgot to set CASCADE.
 
 BEGIN;

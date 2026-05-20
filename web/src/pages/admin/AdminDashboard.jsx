@@ -102,9 +102,9 @@ export default function AdminDashboard() {
                       {u.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-warm-grey hidden sm:table-cell">{u.email || '—'}</td>
+                  <td className="px-4 py-3 text-warm-grey hidden sm:table-cell">{u.email || '-'}</td>
                   <td className="px-4 py-3 text-warm-grey hidden md:table-cell">
-                    {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
                   </td>
                 </tr>
               ))}
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
                     <SubscriptionBadge household={h} />
                   </td>
                   <td className="px-4 py-3 text-warm-grey hidden md:table-cell">
-                    {h.created_at ? new Date(h.created_at).toLocaleDateString() : '—'}
+                    {h.created_at ? new Date(h.created_at).toLocaleDateString() : '-'}
                   </td>
                 </tr>
               ))}

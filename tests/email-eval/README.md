@@ -2,8 +2,8 @@
 
 A regression-test corpus for the inbound-email pipeline's two AI stages:
 
-- `extractFromEmail` — classifies a forwarded email and pulls out structured data (shopping items, events, tasks).
-- `matchReceiptToList` — fuzzy-matches receipt items against the household's shopping list.
+- `extractFromEmail` - classifies a forwarded email and pulls out structured data (shopping items, events, tasks).
+- `matchReceiptToList` - fuzzy-matches receipt items against the household's shopping list.
 
 This corpus exists because the prompts get tweaked often. Each tweak fixes a specific case but risks silently breaking a different one. Without an eval suite, we'd be flying blind. With it, every prompt change runs against the historical corpus and we see immediately whether we broke anything.
 
@@ -18,7 +18,7 @@ npm run eval:emails -- --verbose              # print raw AI responses
 
 Exits 0 if every fixture passes, 1 otherwise. Hook into pre-push or CI to gate prompt changes.
 
-Each fixture makes real AI calls — ~$0.001–$0.005 per fixture, ~10–60s total runtime depending on suite size and provider speed. Don't run on every save; run before pushing prompt changes.
+Each fixture makes real AI calls - ~$0.001–$0.005 per fixture, ~10–60s total runtime depending on suite size and provider speed. Don't run on every save; run before pushing prompt changes.
 
 ## Add a fixture from a real failure
 
@@ -27,7 +27,7 @@ When something goes wrong in production (you see it via the admin `/admin/inboun
 1. Decide which stage failed: classification/extraction (`extractFromEmail`) or matching (`matchReceiptToList`).
 2. Create a new directory under `fixtures/extraction/` or `fixtures/receipt-match/`. Name it descriptively, e.g. `05-tesco-delivery-status-no-items`.
 3. Write `input.json` with the email content (or receipt + list pair). **Anonymise**: replace real names, addresses, order numbers with safe placeholders. The AI needs realistic structure, not real PII.
-4. Write `expected.json` describing what the AI *should* return. Only assert what matters for this case — the format below lets you be selective.
+4. Write `expected.json` describing what the AI *should* return. Only assert what matters for this case - the format below lets you be selective.
 5. Run `npm run eval:emails -- --only=<your-fixture-name>` to confirm it fails as-is.
 6. Tweak the prompt in `src/services/prompts.js` until it passes.
 7. Run the full suite to confirm you didn't regress anything else.
@@ -37,7 +37,7 @@ When something goes wrong in production (you see it via the admin `/admin/inboun
 
 ### Extraction (`fixtures/extraction/<name>/`)
 
-`input.json` — what the inbound-email handler sees:
+`input.json` - what the inbound-email handler sees:
 
 ```json
 {
@@ -47,7 +47,7 @@ When something goes wrong in production (you see it via the admin `/admin/inboun
 }
 ```
 
-`expected.json` — what `extractFromEmail` should return. Every field is **optional** — only declare what you want to assert.
+`expected.json` - what `extractFromEmail` should return. Every field is **optional** - only declare what you want to assert.
 
 ```json
 {
@@ -109,7 +109,7 @@ Notes:
 ```
 
 Notes:
-- `receipt_contains` and `list_item_contains` are case-insensitive substrings of the AI's `receipt_item` and `list_item_name` fields. You don't have to know the exact wording the AI will use — just the unmistakable part.
+- `receipt_contains` and `list_item_contains` are case-insensitive substrings of the AI's `receipt_item` and `list_item_name` fields. You don't have to know the exact wording the AI will use - just the unmistakable part.
 - `min_confidence` defaults to 0.7 (the threshold the inbound-email handler uses to actually check items off).
 - `no_match_for`: receipt items that should NOT find any list match above confidence 0.6. Use this for cases like almond milk vs cow's milk that look superficially similar but are genuinely different products.
 

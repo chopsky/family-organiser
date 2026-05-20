@@ -1,5 +1,5 @@
 /**
- * Offline read cache — iOS-only.
+ * Offline read cache - iOS-only.
  *
  * Persists the last successful response for each cache key into
  * localStorage so the app can render last-known data when the
@@ -7,10 +7,10 @@
  * Capacitor WebView starts before the network is up).
  *
  * Scope is deliberately narrow:
- *   • Read-only — mutations still fail when offline. We don't queue
+ *   • Read-only - mutations still fail when offline. We don't queue
  *     writes; that's a much bigger feature with its own conflict
  *     story.
- *   • No-op on the web — `isNative()` short-circuits every call so
+ *   • No-op on the web - `isNative()` short-circuits every call so
  *     the web bundle behaves exactly as before.
  *
  * Keys are caller-defined strings. Use stable keys that include any
@@ -41,7 +41,7 @@ export function readCache(key) {
 }
 
 /**
- * Persist a cache entry. Silent on quota/serialisation failure —
+ * Persist a cache entry. Silent on quota/serialisation failure -
  * cache misses are recoverable, throwing here would break the
  * network fetch path for no benefit.
  */
@@ -50,7 +50,7 @@ export function writeCache(key, data) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify({ data, ts: Date.now() }));
   } catch {
-    // Quota exceeded, JSON cycle, etc — ignore.
+    // Quota exceeded, JSON cycle, etc - ignore.
   }
 }
 
@@ -63,7 +63,7 @@ export function writeCache(key, data) {
  * If the network fetch fails AND there was no cached fallback,
  * the error propagates so the caller can render its existing
  * error state. If there WAS a cached fallback, the error is
- * swallowed — we already showed the user something useful.
+ * swallowed - we already showed the user something useful.
  *
  * Returns the value finally rendered (fresh on success, cached
  * on network failure with cache hit).

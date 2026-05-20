@@ -17,7 +17,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   // Sender is used so the model can resolve "me/I/my" to the actual person.
-  // Fall back to a neutral value when unknown — the prompt still works, it just
+  // Fall back to a neutral value when unknown - the prompt still works, it just
   // can't resolve first-person pronouns.
   const senderStr = sender || 'Unknown';
   const notesStr = notes.length > 0
@@ -40,7 +40,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       }).join('\n') + (calendarEvents.length > 100 ? `\n... and ${calendarEvents.length - 100} more events` : '')
     : '(no upcoming events)';
 
-  // Cap at 50 open tasks — enough for the classifier to match completion
+  // Cap at 50 open tasks - enough for the classifier to match completion
   // signals like "Elementor paid" against "Pay Elementor", without blowing
   // up the prompt for busy households.
   const cappedTasks = tasks.slice(0, 50);
@@ -51,14 +51,14 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
           : 'no due date';
         const who = t.assigned_to_name ? ` (${t.assigned_to_name})` : '';
         const priority = t.priority && t.priority !== 'medium' ? ` [${t.priority}]` : '';
-        return `- "${t.title}"${who} — due ${due}${priority}`;
+        return `- "${t.title}"${who} - due ${due}${priority}`;
       }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
     : '(no open tasks)';
 
   // Location prompt: gated entirely on whether the current message
   // looks location-relevant. If it does and we have a home address,
   // send the full address. If it does but we only have a timezone,
-  // send the coarse city. If it doesn't, send NOTHING — there's no
+  // send the coarse city. If it doesn't, send NOTHING - there's no
   // reason to share the family's location for "remind me to call the
   // bank" or "mark milk as bought". See utils/location-relevance.js.
   const userCity = getCityFromTimezone(timezone);
@@ -84,7 +84,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   // Build message array: prior turns (if any) + current user message.
   // History is expected to be [{ role, content }, ...] in chronological order.
   // We keep assistant replies as plain text context even though the current
-  // turn returns JSON — the system prompt tells the model to treat history as
+  // turn returns JSON - the system prompt tells the model to treat history as
   // reference only and still reply with the required JSON schema.
   const priorTurns = Array.isArray(history)
     ? history.filter((t) => t && t.role && t.content).slice(-10)
@@ -221,7 +221,7 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], 
 
 /**
  * Retry a function up to `maxRetries` times with a delay between attempts.
- * This handles retries within a single provider attempt — cross-provider failover
+ * This handles retries within a single provider attempt - cross-provider failover
  * is handled by callWithFailover in ai-client.js.
  */
 async function withRetry(fn, { maxRetries = 1, delayMs = 2000 } = {}) {
@@ -296,7 +296,7 @@ function parseJSON(text, context) {
   if (block && block !== stripped) candidates.push(block);
 
   // Trailing-comma repair on the extracted block (skip on the raw stripped
-  // version — more likely to corrupt a perfectly valid string).
+  // version - more likely to corrupt a perfectly valid string).
   if (block) {
     const detrailed = block.replace(/,(\s*[}\]])/g, '$1');
     if (detrailed !== block) candidates.push(detrailed);
@@ -311,7 +311,7 @@ function parseJSON(text, context) {
     }
   }
 
-  // Everything failed — log the raw output so the Railway logs show exactly
+  // Everything failed - log the raw output so the Railway logs show exactly
   // what the model returned, and surface the first (most informative) error.
   console.error(`[ai] Failed to parse ${context} JSON:`, firstErr.message);
   console.error(`[ai] Raw length: ${text.length} chars`);
@@ -324,7 +324,7 @@ function parseJSON(text, context) {
 
 /**
  * Build the {{CONTEXT}} section of the email-extraction prompt.
- * Context is optional — empty/missing sections degrade gracefully.
+ * Context is optional - empty/missing sections degrade gracefully.
  *
  * @param {object} ctx
  * @param {string} [ctx.country]
@@ -362,7 +362,7 @@ function buildEmailExtractionContext(ctx = {}) {
     sections.push('Schools (for school-newsletter attribution):');
     for (const s of ctx.schools) {
       const kids = (s.children || []).map((c) => c.name).filter(Boolean).join(', ');
-      sections.push(`  - ${s.school_name}${kids ? ` — children: ${kids}` : ''}`);
+      sections.push(`  - ${s.school_name}${kids ? ` - children: ${kids}` : ''}`);
     }
   }
 
@@ -370,7 +370,7 @@ function buildEmailExtractionContext(ctx = {}) {
 }
 
 /**
- * Extract structured data from any forwarded email — receipts, flights, school newsletters, appointments, etc.
+ * Extract structured data from any forwarded email - receipts, flights, school newsletters, appointments, etc.
  *
  * The `context` arg lets the AI make smarter decisions in a single call:
  *   - Match receipt items inline to the household's shopping list
@@ -381,7 +381,7 @@ function buildEmailExtractionContext(ctx = {}) {
  *
  * Backwards-compatible: callers that pass no context get the
  * vanilla classification/extraction behaviour with country='unknown'
- * and empty arrays — same as before this argument existed.
+ * and empty arrays - same as before this argument existed.
  */
 async function extractFromEmail(emailText, subject, memberNames = [], context = {}, { householdId, userId } = {}) {
   const today = new Date().toISOString().split('T')[0];

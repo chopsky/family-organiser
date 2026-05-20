@@ -6,7 +6,7 @@
 export function formatRelativeTime(iso) {
   if (!iso) return 'Never';
   const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '—';
+  if (Number.isNaN(then)) return '-';
   const diffMs = Date.now() - then;
   if (diffMs < 0) return 'just now';
 

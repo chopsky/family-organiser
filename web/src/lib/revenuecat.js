@@ -1,5 +1,5 @@
 /**
- * RevenueCat client wrapper — IAP Phase 2b.
+ * RevenueCat client wrapper - IAP Phase 2b.
  *
  * Thin layer over @revenuecat/purchases-capacitor that:
  *
@@ -8,7 +8,7 @@
  *      and Android (Capacitor.isNativePlatform() === false), which
  *      lets the rest of the app call into it unconditionally.
  *
- *   2. Hides the SDK's verbose response shapes — callers want
+ *   2. Hides the SDK's verbose response shapes - callers want
  *      "did the purchase succeed" or "what's the active entitlement",
  *      not the full CustomerInfo blob.
  *
@@ -22,7 +22,7 @@
  *   - configure() runs once at app boot from main.jsx. Idempotent.
  *   - logIn(householdId) runs after a successful auth (or on
  *     app-restart restore from localStorage) so the SDK's app_user_id
- *     equals our households.id — that's what the webhook resolver
+ *     equals our households.id - that's what the webhook resolver
  *     expects (see src/routes/revenuecat-webhook.js#resolveHousehold).
  *   - logOut() runs on user logout to clear the SDK's identity.
  *   - getOfferings() / purchasePackage() / restorePurchases() power
@@ -40,7 +40,7 @@ import { Purchases } from '@revenuecat/purchases-capacitor';
 console.log('[revenuecat] module loaded; isNative=', Capacitor.isNativePlatform(), 'platform=', Capacitor.getPlatform());
 
 // Static import (was previously dynamic). The SDK is only useful on
-// iOS native — on web/Android it returns a stub from registerPlugin
+// iOS native - on web/Android it returns a stub from registerPlugin
 // that throws "UNIMPLEMENTED" when called. We gate every call site
 // with isIapPlatform() so the stub never runs. The earlier dynamic
 // import was hanging in the Capacitor WebView for reasons unclear;
@@ -61,7 +61,7 @@ export function isIapPlatform() {
 let _configured = false;
 
 /**
- * Initialise the RevenueCat SDK. Idempotent — safe to call multiple
+ * Initialise the RevenueCat SDK. Idempotent - safe to call multiple
  * times (subsequent calls are no-ops). Should run as early as possible
  * in the app lifecycle (main.jsx), BEFORE any logIn/getOfferings call.
  *
@@ -82,7 +82,7 @@ export async function configure() {
   const apiKey = import.meta.env?.VITE_REVENUECAT_IOS_KEY;
   if (!apiKey) {
     console.warn(
-      '[revenuecat] VITE_REVENUECAT_IOS_KEY not set — IAP disabled. ' +
+      '[revenuecat] VITE_REVENUECAT_IOS_KEY not set - IAP disabled. ' +
       'Add the iOS public API key in Vercel env vars.'
     );
     return;
@@ -105,14 +105,14 @@ export async function configure() {
  * On iOS this returns the ISO 3166-1 alpha-2 code of the user's Apple
  * ID's Country/Region setting (e.g. 'ZA', 'GB'). That's the same
  * country Apple uses to determine App Store pricing, IAP availability,
- * and which subscription tiers the user can buy — so it's the most
+ * and which subscription tiers the user can buy - so it's the most
  * authoritative single signal for "where this user actually is" at
  * signup time. Far more reliable than browser timezone (which can
  * differ for travellers, expats, or anyone whose device clock has
  * been overridden).
  *
  * Returns null on web, on Android, before RevenueCat is configured,
- * or on any SDK error — caller should fall back to other signals.
+ * or on any SDK error - caller should fall back to other signals.
  */
 export async function getStorefrontCountry() {
   if (!isIapPlatform()) return null;
@@ -132,7 +132,7 @@ export async function getStorefrontCountry() {
  * app_user_id, which our webhook handler resolves directly to a
  * household row.
  *
- * Safe to call even if configure() failed — the SDK will buffer the
+ * Safe to call even if configure() failed - the SDK will buffer the
  * call until/unless configure succeeds.
  */
 export async function logIn(householdId) {
@@ -160,7 +160,7 @@ export async function logOut() {
   try {
     await Purchases.logOut();
   } catch (err) {
-    // Calling logOut while already anonymous is fine — RevenueCat
+    // Calling logOut while already anonymous is fine - RevenueCat
     // throws a specific error code we can ignore. Log other errors.
     if (err?.code !== '22' /* PURCHASES_ERROR_OPERATION_ALREADY_IN_PROGRESS */) {
       console.error('[revenuecat] logOut failed:', err);
@@ -169,7 +169,7 @@ export async function logOut() {
 }
 
 /**
- * Fetch the current "offering" — the bundle of packages we want to
+ * Fetch the current "offering" - the bundle of packages we want to
  * sell on iOS. Returns the offering tagged "Current" in RevenueCat
  * (Phase 0 setup: a `default` offering with Monthly + Annual packages).
  *
@@ -219,7 +219,7 @@ export async function purchasePackage(pkg) {
 
 /**
  * Re-sync the user's purchases from Apple. Required by App Review
- * Guideline 3.1.1 — every paid app must offer a "Restore Purchases"
+ * Guideline 3.1.1 - every paid app must offer a "Restore Purchases"
  * button so users on a new device / fresh install can recover access
  * without paying twice.
  *
@@ -235,7 +235,7 @@ export async function restorePurchases() {
 
 /**
  * Return RevenueCat's current view of the user's entitlement state.
- * Useful as a fast-path on app launch — if the SDK already has cached
+ * Useful as a fast-path on app launch - if the SDK already has cached
  * state from a recent purchase, we can mark the user active locally
  * before the server's `/subscription/status` call resolves.
  */

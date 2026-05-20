@@ -6,7 +6,7 @@
  * implementation of the commitments in /privacy Section 8 "Data retention".
  *
  * What this removes, and why:
- *   - whatsapp_message_log, ai_usage_log: 90 days. Operational logs only —
+ *   - whatsapp_message_log, ai_usage_log: 90 days. Operational logs only -
  *     we use them for debugging and anomaly detection during active
  *     investigation windows; beyond 90 days they stop being useful and
  *     start being an unnecessary privacy tail.
@@ -16,16 +16,16 @@
  *     correlatable user_id metadata.
  *   - deletion_audit_log IP / user-agent columns older than 90 days.
  *     The audit row itself is kept (for 6-year dispute window) but the
- *     personal-data fields are nulled — UK GDPR data-minimisation (Art
+ *     personal-data fields are nulled - UK GDPR data-minimisation (Art
  *     5(1)(c)). Matches the same retention we apply to refresh_tokens.
  *
  * Household-level cleanups (Phase 8 / spec §9):
- *   - runHouseholdRetentionCleanup — households inactive >12 months get
+ *   - runHouseholdRetentionCleanup - households inactive >12 months get
  *     permanently deleted. The `inactive_since` column is set by the
  *     trial-expiry middleware and the Stripe cancel webhook; cleared on
  *     resubscribe. See src/middleware/subscriptionStatus.js and
  *     src/routes/stripe-webhook.js.
- *   - runOrphanHouseholdCleanup — households that no one can log in to
+ *   - runOrphanHouseholdCleanup - households that no one can log in to
  *     (zero members of member_type='account') older than 30 days get
  *     deleted. These accumulate from abandoned signups and admins
  *     leaving dependent-only households.
@@ -35,7 +35,7 @@
  *   - Active refresh tokens. Only rows where expires_at is already past
  *     are removed.
  *
- * Idempotent. Safe to re-run — a second invocation 5 seconds later is a
+ * Idempotent. Safe to re-run - a second invocation 5 seconds later is a
  * no-op because the first one removed all the eligible rows.
  */
 
@@ -46,13 +46,13 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // Household retention thresholds. Pulled to constants so tests can
 // monkeypatch the window if needed, and so the numbers are in one place.
-const HOUSEHOLD_INACTIVE_RETENTION_DAYS = 365;   // 12 months — spec §9
+const HOUSEHOLD_INACTIVE_RETENTION_DAYS = 365;   // 12 months - spec §9
 const ORPHAN_HOUSEHOLD_MIN_AGE_DAYS = 30;        // don't nuke brand-new signups mid-onboarding
 const AUDIT_LOG_IP_RETENTION_DAYS = 90;          // IP / user-agent fields only, not the row itself
 
 /**
  * Delete rows from a table where `column < cutoff`. Logs the count. Errors
- * are caught and logged — one failing table mustn't block the others.
+ * are caught and logged - one failing table mustn't block the others.
  */
 async function sweep(table, column, cutoffIso, label) {
   try {
@@ -78,7 +78,7 @@ async function sweep(table, column, cutoffIso, label) {
 /**
  * Null out IP address + user-agent on audit-log rows older than the
  * retention window. The row itself stays for the full 6-year dispute
- * window (set in docs/gdpr-copy.md) — only the personal-data fields are
+ * window (set in docs/gdpr-copy.md) - only the personal-data fields are
  * scrubbed so we retain the "yes, this deletion happened on this date"
  * evidence without holding IP data longer than necessary.
  */
@@ -107,14 +107,14 @@ async function nullifyOldAuditLogIPs(cutoffIso) {
  * continuously inactive for the full window.
  *
  * Each deletion goes through db.deleteHouseholdCascade (a plpgsql
- * function with a 5-minute statement timeout — handles the biggest
+ * function with a 5-minute statement timeout - handles the biggest
  * households without timing out). We iterate one at a time rather than
  * firing a bulk DELETE to keep memory pressure predictable and let
  * individual failures not block the batch.
  *
  * Logs each deletion to deletion_audit_log with a system-deletion
  * marker so the 6-year audit window still covers retention-driven
- * removals — a regulator or upset user asking "when was my household
+ * removals - a regulator or upset user asking "when was my household
  * deleted?" gets a truthful answer.
  */
 async function runHouseholdRetentionCleanup() {
@@ -136,19 +136,19 @@ async function runHouseholdRetentionCleanup() {
   if (matched.length === 0) {
     return 0;
   }
-  console.log(`[retention] ${matched.length} household(s) past ${HOUSEHOLD_INACTIVE_RETENTION_DAYS}-day inactive window — deleting`);
+  console.log(`[retention] ${matched.length} household(s) past ${HOUSEHOLD_INACTIVE_RETENTION_DAYS}-day inactive window - deleting`);
 
   let deleted = 0;
   for (const h of matched) {
     try {
       // Write the audit marker BEFORE the cascade so the row is the last
-      // evidence of the household's existence. Best-effort — logging
+      // evidence of the household's existence. Best-effort - logging
       // failure doesn't block the deletion (right-to-erasure trumps
       // our audit habit). We use deletion_mode='household_deleted' +
       // user_id/user_email=null to distinguish system deletions from
       // user-initiated ones without touching the existing CHECK
       // constraint. If the `user_id NOT NULL` constraint bites, the
-      // insert throws, we log, and carry on — the DB deletion still
+      // insert throws, we log, and carry on - the DB deletion still
       // happens below.
       try {
         await supabaseAdmin.from('deletion_audit_log').insert({
@@ -158,7 +158,7 @@ async function runHouseholdRetentionCleanup() {
           household_name: h.name,
           deletion_mode: 'household_deleted',
           stripe_cancelled: false,
-          // ip/user_agent intentionally null — system-initiated.
+          // ip/user_agent intentionally null - system-initiated.
         });
       } catch (auditErr) {
         console.warn(`[retention] audit-log insert failed for household ${h.id} (carrying on):`, auditErr.message || auditErr);
@@ -177,7 +177,7 @@ async function runHouseholdRetentionCleanup() {
 }
 
 /**
- * Delete orphan households — households where nobody can log in because
+ * Delete orphan households - households where nobody can log in because
  * there are no members of member_type='account'. This covers:
  *   • Abandoned signups where the user created a household but never
  *     came back (no sole-admin to trigger the normal cascade).
@@ -185,7 +185,7 @@ async function runHouseholdRetentionCleanup() {
  *   • Manual admin cleanup that left a household empty of accounts.
  *
  * Guardrails:
- *   • Minimum age of 30 days — don't nuke a household that's in the
+ *   • Minimum age of 30 days - don't nuke a household that's in the
  *     middle of a multi-step onboarding flow (unlikely to leave zero
  *     account members, but belt-and-braces).
  *   • We never run this on `is_internal=true` households. Defensive:
@@ -226,7 +226,7 @@ async function runOrphanHouseholdCleanup() {
         .eq('household_id', h.id)
         .eq('member_type', 'account');
       if (countErr) throw countErr;
-      if ((count || 0) > 0) continue; // not orphan — skip
+      if ((count || 0) > 0) continue; // not orphan - skip
 
       // Audit row before the cascade (same rationale as retention cleanup).
       try {
@@ -244,7 +244,7 @@ async function runOrphanHouseholdCleanup() {
 
       await db.deleteHouseholdCascade(h.id);
       deleted += 1;
-      console.log(`[retention] Deleted orphan household ${h.id} ("${h.name}") — no account-type members`);
+      console.log(`[retention] Deleted orphan household ${h.id} ("${h.name}") - no account-type members`);
     } catch (err) {
       console.error(`[retention] Orphan check/delete failed for ${h.id}:`, err.message || err);
     }
@@ -276,19 +276,19 @@ async function runRetentionCleanup() {
     sweep('refresh_tokens',            'expires_at', nowIso, 'expired refresh tokens'),
   ]);
 
-  // GDPR data-minimisation on audit-log rows (not the rows themselves —
+  // GDPR data-minimisation on audit-log rows (not the rows themselves -
   // only the IP + user-agent columns, which stop being useful for fraud
   // investigation long before the 6-year dispute window closes).
   const ipScrub = await nullifyOldAuditLogIPs(ninetyDaysAgo);
 
-  // Household-level cleanups — these cascade a lot of data so run them
+  // Household-level cleanups - these cascade a lot of data so run them
   // sequentially (not via Promise.all) to spread the DB load.
   const retentionDeleted = await runHouseholdRetentionCleanup();
   const orphanDeleted    = await runOrphanHouseholdCleanup();
 
   const totalRowDeletes = waLogged + aiLogged + email + password + whatsapp + refresh;
   console.log(
-    `[retention] Daily cleanup complete — ${totalRowDeletes} row(s) removed, ` +
+    `[retention] Daily cleanup complete - ${totalRowDeletes} row(s) removed, ` +
     `${ipScrub} audit IP(s) scrubbed, ${retentionDeleted} inactive household(s) ` +
     `deleted, ${orphanDeleted} orphan household(s) deleted.`
   );

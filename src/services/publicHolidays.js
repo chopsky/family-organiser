@@ -116,7 +116,7 @@ async function insertHolidaysForHousehold(householdId, countryCode, year, create
     const endTime = `${h.date}T23:59:59`;
 
     try {
-      // Dedupe by (title, date) only — don't constrain to category =
+      // Dedupe by (title, date) only - don't constrain to category =
       // 'public_holiday' because legacy rows seeded before that column
       // existed have category=NULL, and an over-narrow filter caused
       // every subsequent seed/refresh run to re-insert them as fresh
@@ -186,7 +186,7 @@ async function seedHolidaysForNewHousehold(householdId, timezone, createdByUserI
     (country && country !== 'OTHER' ? country : null) ||
     countryFromTimezone(timezone);
   if (!countryCode) {
-    console.log(`No country mapping for timezone "${timezone}" / country "${country}" — skipping holiday seed`);
+    console.log(`No country mapping for timezone "${timezone}" / country "${country}" - skipping holiday seed`);
     return;
   }
 

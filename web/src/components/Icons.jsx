@@ -1,4 +1,4 @@
-// Flat line-art SVG icons — 24×24 viewBox, stroke-based, no fill
+// Flat line-art SVG icons - 24×24 viewBox, stroke-based, no fill
 // Usage: <IconHome className="h-5 w-5" />
 
 const defaults = { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -167,7 +167,7 @@ export function IconX(p) {
   return <Icon {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>;
 }
 
-// Lifebuoy — friendly, on-brand "help is here if you need it" icon.
+// Lifebuoy - friendly, on-brand "help is here if you need it" icon.
 // Used in the desktop sidebar footer next to the settings cog so users
 // always have a one-click path into the Help centre. Geometry matches
 // Lucide's life-buoy (outer ring + inner ring + four diagonal "rope"

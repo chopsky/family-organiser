@@ -33,12 +33,12 @@ const avatarColors = {
  * page layout stays readable; it only reads from SubscriptionContext
  * and doesn't need any props.
  *
- *   • internal  → "Internal account — unlimited access"
+ *   • internal  → "Internal account - unlimited access"
  *   • trialing  → "Free trial · X days left" + Subscribe CTA
  *   • active    → Plan name + "Manage subscription" (opens Stripe Portal)
  *   • expired   → "Your subscription has ended" + Subscribe CTA
  *   • cancelled → same as expired
- *   • loading   → subtle loading state (no spinner — this card is ambient)
+ *   • loading   → subtle loading state (no spinner - this card is ambient)
  */
 function PlanSection() {
   const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
@@ -47,7 +47,7 @@ function PlanSection() {
 
   // Phase 3 (IAP rebuild): the iOS-hide hack is gone. iOS users now see
   // their real subscription state and a working Manage button. The
-  // Manage button routes by `provider` (see openCustomerPortal) — Apple
+  // Manage button routes by `provider` (see openCustomerPortal) - Apple
   // subscribers deep-link to their Apple ID subscriptions; Stripe
   // subscribers (e.g. someone who subscribed on web and later opened
   // the iOS app) hit the Stripe portal as before.
@@ -58,7 +58,7 @@ function PlanSection() {
   // Surfacing a duplicate toggle in Settings didn't add value and gave
   // users two ways to disable (one of which only they'd discover).
   // If you ever want to re-add it, the PATCH /api/settings/settings
-  // endpoint still accepts trial_emails_enabled — just wire a UI back.
+  // endpoint still accepts trial_emails_enabled - just wire a UI back.
 
   // Manage-subscription button routing depends on which platform the
   // household is billed through:
@@ -70,7 +70,7 @@ function PlanSection() {
   //               external scheme handler).
   //   • Stripe  → open the Stripe customer portal (current default).
   //
-  // We don't need to handle "isIos() && provider==='stripe'" specially —
+  // We don't need to handle "isIos() && provider==='stripe'" specially -
   // a household billed through Stripe but accessed via iOS still has a
   // valid Stripe portal URL; we just open it. (App Review concerns about
   // anti-steering apply to the Subscribe flow, not to managing an
@@ -79,7 +79,7 @@ function PlanSection() {
     if (portalLoading) return;
 
     if (provider === 'apple') {
-      // Universal deep link — works inside Capacitor WebView and Safari.
+      // Universal deep link - works inside Capacitor WebView and Safari.
       // No API round-trip needed; iOS handles the URL natively.
       window.location.href = 'itms-apps://apps.apple.com/account/subscriptions';
       return;
@@ -98,7 +98,7 @@ function PlanSection() {
     }
   }
 
-  // Don't render anything while we don't know the state yet — the subtle
+  // Don't render anything while we don't know the state yet - the subtle
   // indicator in My profile covers the "I know nothing" case silently.
   if (loading && !isActive && !isTrialing && !isExpired && !isInternal) return null;
 
@@ -199,7 +199,7 @@ function PlanSection() {
 }
 
 /**
- * AccordionItem — collapsible card. Uses native <details>/<summary> so
+ * AccordionItem - collapsible card. Uses native <details>/<summary> so
  * the browser owns open/close state (no React, no useState), and screen
  * readers already understand the disclosure pattern.
  *
@@ -215,7 +215,7 @@ function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = fal
     : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
   const className = danger ? 'rounded-2xl border' : 'bg-linen rounded-2xl';
   // name="settings-accordion" makes the browser treat all <details>
-  // sharing this name as an exclusive group — opening one closes the
+  // sharing this name as an exclusive group - opening one closes the
   // others. Native HTML feature (Safari 17.4+, Chrome 120+, Firefox 119+).
   // Older browsers ignore the attribute and just allow multiple-open,
   // which is the previous behaviour (graceful fallback).
@@ -253,7 +253,7 @@ export default function Settings() {
   const [deleting, setDeleting]             = useState(false);
   const [deleteError, setDeleteError]       = useState('');
 
-  // Data export (GDPR Article 20 — right to portability)
+  // Data export (GDPR Article 20 - right to portability)
   const [exporting, setExporting] = useState(false);
 
   // Active sessions (Settings → Active sessions)
@@ -272,7 +272,7 @@ export default function Settings() {
 
   // WhatsApp link state. Phone is now learnt from the inbound webhook
   // (pull-push pairing) rather than entered up front, so no phone/code
-  // local state needed — that all lives in WhatsAppPairing.
+  // local state needed - that all lives in WhatsAppPairing.
   const [disconnectingWhatsapp, setDisconnectingWhatsapp] = useState(false);
   const [whatsappBotNumber, setWhatsappBotNumber] = useState(null); // for "Open in WhatsApp" link when already connected
 
@@ -281,7 +281,7 @@ export default function Settings() {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedCopied, setFeedCopied] = useState(false);
 
-  // External (inbound) calendar feeds — Cozi/FamilyWall-style read-only
+  // External (inbound) calendar feeds - Cozi/FamilyWall-style read-only
   // subscriptions to the user's Apple/Google/Outlook calendar via iCal URL.
   // Replaces the old two-way sync entirely.
   const [externalFeeds, setExternalFeeds] = useState([]);
@@ -333,7 +333,7 @@ export default function Settings() {
 
   useEffect(() => { loadMembers(); }, []);
 
-  // Refetch members when the app/tab returns from the background — the
+  // Refetch members when the app/tab returns from the background - the
   // user may have just completed a WhatsApp pairing handshake in another
   // app and we need to pick up the now-linked state. Throttle short so a
   // quick app-switch back from WhatsApp definitely fires.
@@ -407,7 +407,7 @@ export default function Settings() {
     setUploadingAvatar(true);
     try {
       const formData = new FormData();
-      // Camera-plugin Blobs don't carry a filename — the backend needs
+      // Camera-plugin Blobs don't carry a filename - the backend needs
       // one for multipart, so synthesize a stable jpg name.
       formData.append('avatar', blob, blob.name || 'avatar.jpg');
       const { data } = await api.post('/household/profile/avatar', formData, {
@@ -485,12 +485,12 @@ export default function Settings() {
       .catch(() => {});
   }, []);
 
-  // (Two-way sync removed — the loadConnections + OAuth callback handler
+  // (Two-way sync removed - the loadConnections + OAuth callback handler
   // for ?connected=<provider> are no longer needed. Inbound subscriptions
   // are managed via the read-only feed flow further down in this file.)
 
   // The previous handleSendWhatsappCode / handleVerifyWhatsapp pair
-  // is gone — see /components/WhatsAppPairing.jsx + the pull-push
+  // is gone - see /components/WhatsAppPairing.jsx + the pull-push
   // pairing endpoints in /src/routes/auth.js for the replacement.
 
   // ── Active sessions ──────────────────────────────────────────────
@@ -505,7 +505,7 @@ export default function Settings() {
     })();
     return api
       .get('/auth/sessions', {
-        // Passed as a header so the server can mark the current row —
+        // Passed as a header so the server can mark the current row -
         // the raw token never appears in the response.
         headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : {},
       })
@@ -518,14 +518,14 @@ export default function Settings() {
 
   async function handleRevokeSession(sessionId, isCurrent) {
     if (isCurrent) {
-      if (!window.confirm('This is your current session — revoking will sign you out of this browser. Continue?')) return;
+      if (!window.confirm('This is your current session - revoking will sign you out of this browser. Continue?')) return;
     }
     setRevokingSessionId(sessionId);
     setError('');
     try {
       await api.delete(`/auth/sessions/${sessionId}`);
       if (isCurrent) {
-        // Revoked the session we're using — force a fresh login. Clears
+        // Revoked the session we're using - force a fresh login. Clears
         // tokens locally too in case the refresh interceptor misses it.
         try { localStorage.removeItem('token'); localStorage.removeItem('refreshToken'); } catch { /* noop */ }
         window.location.href = '/login';
@@ -563,7 +563,7 @@ export default function Settings() {
   }
 
   // Turn a user-agent string into a short, readable label. UA parsing is
-  // famously unreliable — we only try to catch the common cases and fall
+  // famously unreliable - we only try to catch the common cases and fall
   // back to "Unknown device" rather than risking nonsense.
   function describeDevice(ua) {
     if (!ua) return 'Unknown device';
@@ -634,7 +634,7 @@ export default function Settings() {
   // Re-posts the user's password to the server for re-auth, then the
   // server decides whether to delete just this user or the whole
   // household (sole-member case). On success we clear the local auth
-  // state and send the user back to the landing page — from their
+  // state and send the user back to the landing page - from their
   // perspective they're logged out, because their session no longer
   // corresponds to a valid user row.
   async function handleDeleteAccount() {
@@ -654,10 +654,10 @@ export default function Settings() {
     setDeleting(true);
     try {
       // Backend requires BOTH the password and the literal string
-      // "DELETE" — matches the two-factor feel of a destructive action.
+      // "DELETE" - matches the two-factor feel of a destructive action.
       await api.delete('/auth/account', { data: { password: deletePassword, confirmation: 'DELETE' } });
       // Clear the auth context without calling the server's /auth/logout
-      // endpoint — the refresh token we'd post there was just deleted with
+      // endpoint - the refresh token we'd post there was just deleted with
       // the rest of our data, so attempting it would 404.
       logout();
       navigate('/', { replace: true });
@@ -767,7 +767,7 @@ export default function Settings() {
       setExternalFeeds(prev => [...prev, data.feed]);
       const stats = data.refresh;
       const summary = stats
-        ? `Subscribed — pulled ${stats.fetched} event${stats.fetched === 1 ? '' : 's'}.`
+        ? `Subscribed - pulled ${stats.fetched} event${stats.fetched === 1 ? '' : 's'}.`
         : 'Subscribed.';
       setSuccess(summary);
       setNewFeedUrl('');
@@ -826,7 +826,7 @@ export default function Settings() {
     if (local) {
       setReceiptEmail(`${local}@inbound.housemait.com`);
     } else {
-      // Cache might not have the household with these fields yet — fetch fresh.
+      // Cache might not have the household with these fields yet - fetch fresh.
       api.get('/household').then(({ data }) => {
         const fallback = data.household?.email_alias || data.household?.inbound_email_token;
         if (fallback) setReceiptEmail(`${fallback}@inbound.housemait.com`);
@@ -835,7 +835,7 @@ export default function Settings() {
   }, [household?.email_alias, household?.inbound_email_token]);
 
   // Load the sender allowlist for this household. Cheap query, but
-  // we only fetch it once per Settings mount — the list is rarely
+  // we only fetch it once per Settings mount - the list is rarely
   // updated and the Settings page is short-lived.
   useEffect(() => {
     api.get('/household/inbound-senders')
@@ -990,7 +990,7 @@ export default function Settings() {
           <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
             <div className="flex items-start justify-between mb-3">
               <h2 className="text-lg font-semibold text-bark">My profile</h2>
-              {/* Subtle trial indicator — renders nothing unless the household
+              {/* Subtle trial indicator - renders nothing unless the household
                   is trialing. Safe to leave always-mounted; the component
                   guards its own visibility. */}
               <TrialIndicatorSubtle />
@@ -1074,18 +1074,18 @@ export default function Settings() {
       {/* Calendar Sync */}
       <AccordionItem title="Calendar Sync" icon={IconCalendar}>
         <p className="text-sm text-cocoa mb-3">
-          Show your household events in the calendar app on your phone or laptop. One-way — events you create here appear there automatically.
+          Show your household events in the calendar app on your phone or laptop. One-way - events you create here appear there automatically.
         </p>
 
 
         {feedUrl ? (
           <div className="space-y-3">
-            {/* Apple Calendar — tappable webcal:// link. iOS / macOS
+            {/* Apple Calendar - tappable webcal:// link. iOS / macOS
                 hand the scheme to Calendar.app which shows a native
                 one-tap subscribe sheet. Works inside Capacitor's
                 WKWebView because non-http(s) schemes are routed via
                 UIApplication.shared.open(). On other browsers (Chrome
-                on Android, Edge) clicking is a no-op — those users
+                on Android, Edge) clicking is a no-op - those users
                 will use the copy-URL flow below. */}
             <a
               href={feedUrl.replace(/^https?:\/\//, 'webcal://')}
@@ -1161,7 +1161,7 @@ export default function Settings() {
             )}
           </div>
           <p className="text-sm text-cocoa mb-3">
-            Show external calendars not already on your phone — school timetables, sports fixtures, shared family calendars from a URL. Visible to everyone in your household. Read-only — edits happen in the source calendar.
+            Show external calendars not already on your phone - school timetables, sports fixtures, shared family calendars from a URL. Visible to everyone in your household. Read-only - edits happen in the source calendar.
           </p>
 
           {showAddFeed && (
@@ -1180,7 +1180,7 @@ export default function Settings() {
                 onChange={(e) => setNewFeedUrl(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              {/* Instructions adapt to platform — the desktop iCloud.com /
+              {/* Instructions adapt to platform - the desktop iCloud.com /
                   Google Calendar / Outlook publish flows are completely
                   different (and mostly impossible) on a phone. iOS users
                   get a much simpler Apple path via the Calendar app;
@@ -1198,7 +1198,7 @@ export default function Settings() {
                     <span className="font-medium">Outlook:</span> open <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> in Safari, tap <span className="font-medium">AA</span> &rarr; <span className="font-medium">Request Desktop Website</span>. Sign in &rarr; <span className="font-medium">Settings</span> &rarr; <span className="font-medium">Shared calendars</span> &rarr; <span className="font-medium">Publish a calendar</span> &rarr; choose &ldquo;Can view all details&rdquo; &rarr; copy the ICS URL.
                   </p>
                   <p style={{ fontStyle: 'italic' }}>
-                    Both are fiddly on a small screen — if you have a computer handy, it&apos;s easier there.
+                    Both are fiddly on a small screen - if you have a computer handy, it&apos;s easier there.
                   </p>
                 </div>
               ) : (
@@ -1274,7 +1274,7 @@ export default function Settings() {
       {/* Email Forwarding */}
       <AccordionItem title="Email Forwarding" icon={IconMail}>
         <p className="text-sm text-cocoa mb-3">
-          Forward any email to your household's unique address and our AI will automatically extract the details — receipts, flight bookings, school newsletters, appointment reminders, and more.
+          Forward any email to your household's unique address and our AI will automatically extract the details - receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
         {receiptEmail ? (
           <div className="space-y-4">
@@ -1295,7 +1295,7 @@ export default function Settings() {
               </button>
             </div>
 
-            {/* Alias editor — only admins can change. Inline editor
+            {/* Alias editor - only admins can change. Inline editor
                 appears under the address input when "Edit" is tapped. */}
             {isAdmin && !aliasEditing && (
               <button
@@ -1348,7 +1348,7 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Sender allowlist — anyone in the household can view; only
+            {/* Sender allowlist - anyone in the household can view; only
                 admins can add/remove. */}
             <div className="pt-3 border-t border-cream-border">
               <p className="text-sm font-semibold text-bark mb-2">You can send from these email addresses:</p>
@@ -1375,7 +1375,7 @@ export default function Settings() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-cocoa italic">No senders on the allowlist yet — anyone trying to forward to your inbound address will be blocked. Add an email below to get started.</p>
+                <p className="text-xs text-cocoa italic">No senders on the allowlist yet - anyone trying to forward to your inbound address will be blocked. Add an email below to get started.</p>
               )}
               {isAdmin && (
                 <form onSubmit={handleAddSender} className="mt-3 flex gap-2">
@@ -1400,11 +1400,11 @@ export default function Settings() {
 
             <div className="text-xs text-cocoa space-y-1 pt-3 border-t border-cream-border">
               <p className="font-medium text-cocoa">What you can forward:</p>
-              <p>🛒 <strong>Receipts & orders</strong> — items added to shopping list</p>
-              <p>✈️ <strong>Travel bookings</strong> — flights, hotels → added to calendar</p>
-              <p>🏫 <strong>School emails</strong> — newsletters, term dates → added to calendar</p>
-              <p>🏥 <strong>Appointments</strong> — dentist, doctor, vet → added to calendar</p>
-              <p>🍽️ <strong>Reservations</strong> — restaurants, events, tickets → added to calendar</p>
+              <p>🛒 <strong>Receipts & orders</strong> - items added to shopping list</p>
+              <p>✈️ <strong>Travel bookings</strong> - flights, hotels → added to calendar</p>
+              <p>🏫 <strong>School emails</strong> - newsletters, term dates → added to calendar</p>
+              <p>🏥 <strong>Appointments</strong> - dentist, doctor, vet → added to calendar</p>
+              <p>🍽️ <strong>Reservations</strong> - restaurants, events, tickets → added to calendar</p>
             </div>
             {isAdmin && (
               <button
@@ -1426,7 +1426,7 @@ export default function Settings() {
       {/* Schools (admin only) */}
       {isAdmin && <SchoolsSection />}
 
-      {/* Notifications — unified on every platform. Two subsections:
+      {/* Notifications - unified on every platform. Two subsections:
           Push (iOS only, where APNs delivers) and WhatsApp (any platform
           once linked). Each subsection lists per-type toggles wired to
           notification_preferences. Rendered always so users on web also
@@ -1436,7 +1436,7 @@ export default function Settings() {
           <div className="py-4 text-center text-sm text-cocoa">Loading…</div>
         ) : notifPrefs ? (
           <div className="space-y-6">
-            {/* Push subsection — iOS app only */}
+            {/* Push subsection - iOS app only */}
             <div>
               <h3 className="text-sm font-semibold text-bark mb-1">Push notifications</h3>
               {isNative ? (
@@ -1477,7 +1477,7 @@ export default function Settings() {
               )}
             </div>
 
-            {/* WhatsApp subsection — works on every platform once linked */}
+            {/* WhatsApp subsection - works on every platform once linked */}
             <div className="pt-6 border-t border-cream-border">
               <h3 className="text-sm font-semibold text-bark mb-1">WhatsApp notifications</h3>
               {(() => {
@@ -1526,13 +1526,13 @@ export default function Settings() {
         ) : null}
       </AccordionItem>
 
-      {/* Your data — GDPR right to portability (Article 20). Sits above
+      {/* Your data - GDPR right to portability (Article 20). Sits above
           the danger zone because it's a non-destructive action and should
           be the first thing users see in the "my rights" area. */}
       <AccordionItem title="Your data" icon={IconDownload}>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
-          your household — tasks, events, shopping lists, notes, documents
+          your household - tasks, events, shopping lists, notes, documents
           metadata, message history. Safe to generate any time; nothing is
           deleted.
         </p>
@@ -1546,14 +1546,14 @@ export default function Settings() {
         </button>
       </AccordionItem>
 
-      {/* Active sessions — lets users see + revoke live refresh tokens.
+      {/* Active sessions - lets users see + revoke live refresh tokens.
           Sits between "Your data" (non-destructive GDPR surface) and the
           delete-account danger zone since it's security-adjacent but
           non-destructive to the account itself. */}
       <AccordionItem title="Active sessions" icon={IconShield}>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
-          don't recognise — the device gets signed out immediately.
+          don't recognise - the device gets signed out immediately.
         </p>
 
         <div className="mt-4 space-y-2">
@@ -1594,7 +1594,7 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Bulk action — show only when more than one session exists. */}
+        {/* Bulk action - show only when more than one session exists. */}
         {sessions.length > 1 && (
           <button
             type="button"
@@ -1607,7 +1607,7 @@ export default function Settings() {
         )}
       </AccordionItem>
 
-      {/* Help & support — small entry point above the danger zone so users
+      {/* Help & support - small entry point above the danger zone so users
           who land in Settings looking for "how do I…?" find a nudge to the
           /help page (FAQ + contact form) rather than reading on. */}
       <AccordionItem title="Help & support" icon={IconHelp}>
@@ -1623,7 +1623,7 @@ export default function Settings() {
         </Link>
       </AccordionItem>
 
-      {/* Account card — shows name, role, and HOW the user is signed
+      {/* Account card - shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
       <AccordionItem title="Account" icon={IconUser}>
@@ -1657,7 +1657,7 @@ export default function Settings() {
         )}
       </AccordionItem>
 
-      {/* Danger zone — delete account. Sits above the Log out affordance
+      {/* Danger zone - delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
           a destructive action. */}
@@ -1665,7 +1665,7 @@ export default function Settings() {
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
           member of your household, <strong className="text-bark">everything in it</strong>{' '}
-          — tasks, events, shopping lists, notes, documents — will also be
+          - tasks, events, shopping lists, notes, documents - will also be
           deleted. This cannot be undone.
         </p>
         <button
@@ -1682,7 +1682,7 @@ export default function Settings() {
         </button>
       </AccordionItem>
 
-      {/* Log out — bottom of the page. Standard convention in most
+      {/* Log out - bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
           find it here. */}
       <button
@@ -1751,7 +1751,7 @@ export default function Settings() {
                 />
               </div>
 
-              {/* Typed-DELETE confirmation — matches the spec's two-step
+              {/* Typed-DELETE confirmation - matches the spec's two-step
                   destructive-action pattern (Phase 8 / GDPR). Input is
                   case-sensitive; the backend also enforces this. */}
               <div>

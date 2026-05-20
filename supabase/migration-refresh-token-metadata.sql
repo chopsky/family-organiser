@@ -2,13 +2,13 @@
 -- revoke their active sessions from Settings → Active sessions.
 --
 -- Run this in the Supabase SQL editor. All columns are nullable with sensible
--- defaults — existing rows remain valid, old sessions just show up as
+-- defaults - existing rows remain valid, old sessions just show up as
 -- "Unknown device / Unknown location" in the UI until the next refresh
 -- repopulates them.
 --
 -- Privacy note: IP addresses in the refresh_tokens table fall under the
 -- same auth-ephemera retention as the tokens themselves (see
--- src/jobs/retention.js — expired tokens are deleted daily at 04:00 UTC).
+-- src/jobs/retention.js - expired tokens are deleted daily at 04:00 UTC).
 
 ALTER TABLE refresh_tokens
   ADD COLUMN IF NOT EXISTS user_agent    text,

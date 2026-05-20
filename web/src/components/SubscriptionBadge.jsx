@@ -54,7 +54,7 @@ export default function SubscriptionBadge({ household }) {
 
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-warm-grey text-xs font-semibold">
-      —
+      -
     </span>
   );
 }

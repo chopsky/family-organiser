@@ -7,12 +7,12 @@ import { localeHomePath } from '../hooks/useLocale'
  *
  * Scaffold based on standard UK SaaS terms (English & Welsh law, ICO-
  * aligned language, UK-resident friendly). Has not been reviewed by a
- * solicitor — the banner at the top says so. Content here is a starting
+ * solicitor - the banner at the top says so. Content here is a starting
  * point; any production use should be run past a tech solicitor (roughly
  * one-hour review, ~£300-500) to tune the liability caps, dispute-
  * resolution wording, and any jurisdiction specifics before relying on it.
  *
- * Paired with the existing Privacy Policy (/privacy) — the two documents
+ * Paired with the existing Privacy Policy (/privacy) - the two documents
  * reference each other.
  */
 export default function Terms() {
@@ -24,7 +24,7 @@ export default function Terms() {
   return (
     <div className="landing-page min-h-screen bg-cream font-sans antialiased text-charcoal">
       {/* ═══ Top bar ═══ */}
-      {/* paddingTop pushes the nav content below the iOS status bar — without
+      {/* paddingTop pushes the nav content below the iOS status bar - without
           this, the logo and Back link sit under the status bar on iPhone.
           Apple reviewers tap the Terms link from the IAP paywall and would hit
           this same issue. */}
@@ -79,7 +79,7 @@ export default function Terms() {
               <li>You must be at least <strong>16 years old</strong> to create an account and agree to these Terms (see Section 5 for children added as household dependents).</li>
               <li>You must provide accurate information when signing up and keep it up to date.</li>
               <li>You are responsible for keeping your account credentials secure. Don't share your password. Tell us if you suspect someone else has accessed your account.</li>
-              <li>One person per account. Don't share your login with anyone — create separate accounts for each family member.</li>
+              <li>One person per account. Don't share your login with anyone - create separate accounts for each family member.</li>
             </ul>
           </Section>
 
@@ -90,7 +90,7 @@ export default function Terms() {
               delete the household.
             </p>
             <p>
-              Data added to a household — tasks, lists, events, notes, documents, meal plans — is
+              Data added to a household - tasks, lists, events, notes, documents, meal plans - is
               shared with all members of that household. By inviting someone, you're giving them
               access to everything already in the household. By joining a household, you're
               acknowledging that other members can see what you add.
@@ -105,7 +105,7 @@ export default function Terms() {
               <li>Attempt to reverse engineer, probe, or circumvent the Service's security.</li>
               <li>Scrape, crawl, or use automated tools against the Service without our written permission.</li>
               <li>Resell, sublicense, or commercially redistribute the Service.</li>
-              <li>Use the Service to send spam, phishing messages, or any unsolicited bulk communications — including via the WhatsApp integration.</li>
+              <li>Use the Service to send spam, phishing messages, or any unsolicited bulk communications - including via the WhatsApp integration.</li>
               <li>Impersonate another person or misrepresent your relationship to them.</li>
               <li>Abuse the AI features (receipt scanner, classifier, chat) to generate harmful, illegal, or deceptive content.</li>
             </ul>
@@ -117,7 +117,7 @@ export default function Terms() {
 
           <Section title="4. Content you provide">
             <p>
-              You own the content you put into Housemait — your shopping lists, your tasks, your
+              You own the content you put into Housemait - your shopping lists, your tasks, your
               photos, your documents. By uploading or entering content, you grant us a limited
               licence to store, process, and display it back to you and the other members of your
               household, purely so the Service can work. We don't use your content to train AI
@@ -153,7 +153,7 @@ export default function Terms() {
               Microsoft calendar sync, WhatsApp (via Twilio), push notifications (Apple Push
               Notification service), and AI providers. When you enable an integration you're also
               agreeing to that provider's own terms. We're not responsible for outages, bugs, or
-              policy changes on those platforms — though we'll do our best to work around them.
+              policy changes on those platforms - though we'll do our best to work around them.
             </p>
             <p>
               Your use of the WhatsApp integration is also subject to{' '}
@@ -173,11 +173,11 @@ export default function Terms() {
               Current plans (UK pricing, VAT included where applicable):
             </p>
             <ul className="list-disc pl-6 space-y-1.5">
-              <li><strong>Monthly</strong> — £5.99 / month, billed monthly.</li>
-              <li><strong>Annual</strong> — £59.99 / year, billed annually (works out at roughly £5 / month — about 2 months free vs. monthly billing).</li>
+              <li><strong>Monthly</strong> - £5.99 / month, billed monthly.</li>
+              <li><strong>Annual</strong> - £59.99 / year, billed annually (works out at roughly £5 / month - about 2 months free vs. monthly billing).</li>
             </ul>
             <p>
-              Both plans include the same features — there are no feature gates between tiers. You
+              Both plans include the same features - there are no feature gates between tiers. You
               can view the current pricing at any time on the{' '}
               <strong>Settings → Plan</strong> screen or on our website. Payments are processed by{' '}
               <strong>Stripe</strong>; we don't see or store your card details.
@@ -197,7 +197,7 @@ export default function Terms() {
             </p>
             <p>
               <strong>Refunds.</strong> Subscription fees are generally non-refundable for partial
-              periods — when you cancel you keep access for the time you've paid for, but we
+              periods - when you cancel you keep access for the time you've paid for, but we
               don't pro-rata earlier in the cycle. Your statutory rights as a UK consumer
               (including the 14-day right to cancel a new subscription under the Consumer
               Contracts Regulations 2013, where it applies) are not affected. To request a
@@ -260,8 +260,8 @@ export default function Terms() {
             <ul className="list-disc pl-6 space-y-1.5">
               <li>
                 If you are the <strong>only member</strong> of your household, the entire
-                household is deleted — shopping lists, calendars, meals, tasks, family profiles,
-                documents, chat history — all of it.
+                household is deleted - shopping lists, calendars, meals, tasks, family profiles,
+                documents, chat history - all of it.
               </li>
               <li>
                 If <strong>other members remain</strong>, only your user record is removed. Your
@@ -292,7 +292,7 @@ export default function Terms() {
 
           <Section title="12. Disclaimers">
             <p>
-              Housemait is a <strong>personal organiser tool</strong> — not medical, legal,
+              Housemait is a <strong>personal organiser tool</strong> - not medical, legal,
               financial, or emergency advice. The AI features (classifier, receipt matcher, chat
               assistant) can and do make mistakes. Always sanity-check anything the Service does
               on your behalf, especially around schedules, allergies, medications, financial
@@ -301,7 +301,7 @@ export default function Terms() {
             <p>
               To the maximum extent permitted by law, the Service is provided <strong>“as is”</strong>{' '}
               and <strong>“as available”</strong>, without warranties of any kind, express or
-              implied — including fitness for a particular purpose, merchantability,
+              implied - including fitness for a particular purpose, merchantability,
               non-infringement, and accuracy of AI-generated content.
             </p>
           </Section>
@@ -314,7 +314,7 @@ export default function Terms() {
               claim, or (b) £100.
             </p>
             <p>
-              We're not liable for indirect, incidental, consequential, or special damages —
+              We're not liable for indirect, incidental, consequential, or special damages -
               including lost data, lost profits, missed appointments, or any harm arising from
               reliance on AI output.
             </p>
@@ -338,7 +338,7 @@ export default function Terms() {
             <p>
               These Terms are governed by the law of <strong>England and Wales</strong>. Any
               dispute arising out of or in connection with these Terms or the Service falls under
-              the exclusive jurisdiction of the courts of England and Wales — except that if you
+              the exclusive jurisdiction of the courts of England and Wales - except that if you
               are a consumer resident in another UK jurisdiction, you may also bring proceedings
               in the courts of that jurisdiction.
             </p>

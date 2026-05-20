@@ -117,7 +117,7 @@ describe('validateTermDates', () => {
   it('does not flag a quote that IS present (case + whitespace normalised)', () => {
     const [row] = validateTermDates(
       [{ event_type: 'term_start', date: '2026-09-01', source_quote: 'autumn   TERM  begins' }],
-      'Welcome — Autumn term begins on Tuesday',
+      'Welcome - Autumn term begins on Tuesday',
       NOW
     );
     expect(row.warnings.filter(w => /hallucination/i.test(w))).toEqual([]);

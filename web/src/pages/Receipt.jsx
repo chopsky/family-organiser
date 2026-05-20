@@ -105,7 +105,7 @@ export default function Receipt() {
                 <IconReceipt className="h-10 w-10 mx-auto text-cocoa" />
                 <p className="text-bark font-medium">Tap to choose a photo</p>
                 <p className="text-cocoa text-sm">or drag and drop here</p>
-                <p className="text-cocoa text-xs">JPG, PNG, WebP — max 10 MB</p>
+                <p className="text-cocoa text-xs">JPG, PNG, WebP - max 10 MB</p>
               </div>
             )}
             <input
@@ -181,7 +181,7 @@ export default function Receipt() {
             </h2>
             <ul className="space-y-1">
               {(result.extracted?.items ?? []).map((item, i) => (
-                <li key={i} className="text-sm text-cocoa">• {item.normalised_name ?? item.name ?? String(item)}{item.price ? ` — ${item.price}` : ''}</li>
+                <li key={i} className="text-sm text-cocoa">• {item.normalised_name ?? item.name ?? String(item)}{item.price ? ` - ${item.price}` : ''}</li>
               ))}
             </ul>
           </div>

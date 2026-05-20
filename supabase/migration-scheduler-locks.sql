@@ -1,6 +1,6 @@
 -- Scheduler deduplication locks
 -- Prevents duplicate notifications when multiple instances overlap (e.g. rolling deploys)
--- Each lock is a unique (lock_key, lock_date) pair — if it already exists, skip sending.
+-- Each lock is a unique (lock_key, lock_date) pair - if it already exists, skip sending.
 
 CREATE TABLE IF NOT EXISTS scheduler_locks (
   id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,

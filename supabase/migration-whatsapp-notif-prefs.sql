@@ -2,7 +2,7 @@
 --
 -- The notification_preferences table previously only held push-side
 -- toggles (calendar_reminders, task_assigned, …). The WhatsApp bot
--- has been sending five distinct message types unconditionally —
+-- has been sending five distinct message types unconditionally -
 -- anyone with whatsapp_linked=true gets all of them. This migration
 -- adds per-type opt-out columns so users can turn off any subset
 -- from Settings → Notifications.

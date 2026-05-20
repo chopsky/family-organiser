@@ -82,7 +82,7 @@ describe('transcribeVoice()', () => {
     }));
 
     await transcribeVoice(Buffer.from('audio'), 'recording.mp3');
-    // Should not throw — just verify it calls the API
+    // Should not throw - just verify it calls the API
     expect(mockCreate).toHaveBeenCalled();
   });
 

@@ -6,15 +6,15 @@ gives you copy-ready bodies for the Postmark template editor.
 
 For each template you'll need to set:
 
-- **Template Alias** — the exact string the codebase imports (e.g.
+- **Template Alias** - the exact string the codebase imports (e.g.
   `housemait-welcome`).
-- **Subject** — supports `{{merge_fields}}` exactly like the body.
-- **HTML body** — what most clients render.
-- **Text body** — fallback for plain-text-only clients (also useful for
+- **Subject** - supports `{{merge_fields}}` exactly like the body.
+- **HTML body** - what most clients render.
+- **Text body** - fallback for plain-text-only clients (also useful for
   rule-based filters that downrank HTML-only mail).
-- **Stream** — `transactional` for welcome / expired, `broadcast` for
+- **Stream** - `transactional` for welcome / expired, `broadcast` for
   the day-20 / 25 / 28 nudges. The codebase already passes the right
-  stream — Postmark just needs both streams to exist.
+  stream - Postmark just needs both streams to exist.
 
 The HTML uses inline styles only (most email clients strip `<style>`
 blocks). Brand colours match `CLAUDE.md`:
@@ -31,12 +31,12 @@ blocks). Brand colours match `CLAUDE.md`:
 
 ---
 
-## 1. `housemait-welcome` — Day 1
+## 1. `housemait-welcome` - Day 1
 
 **When:** Inline from `POST /api/auth/create-household`. Fires the
 moment a user finishes signup + creates their household.
 
-**Stream:** `transactional` (always sends — ignores opt-out).
+**Stream:** `transactional` (always sends - ignores opt-out).
 
 **Merge fields available:**
 
@@ -58,15 +58,15 @@ Welcome to Housemait, {{first_name}}!
 Hi {{first_name}},
 
 Welcome aboard. Your free 30-day trial of Housemait is up and running
-— your whole household has full access until {{trial_end_date}}.
+- your whole household has full access until {{trial_end_date}}.
 
 Here's where to start:
 
-  • Add your family — invite your partner or older kids so they can
+  • Add your family - invite your partner or older kids so they can
     add shopping items, see the calendar, and tick things off.
-  • Set up your shopping list — try saying "add milk" to the WhatsApp
+  • Set up your shopping list - try saying "add milk" to the WhatsApp
     bot, or scan a receipt to auto-tick what you've bought.
-  • Drop in this week's meals — drag recipes onto the planner and
+  • Drop in this week's meals - drag recipes onto the planner and
     we'll build the shopping list for you.
 
 We'll send a couple of optional check-ins as your trial progresses,
@@ -75,9 +75,9 @@ plus one reminder when it's about to end.
 You can manage your subscription, billing, and family settings any
 time at {{app_url}}.
 
-Questions? Just reply — this email goes straight to the team.
+Questions? Just reply - this email goes straight to the team.
 
-— The Housemait team
+- The Housemait team
 ```
 
 ### HTML body
@@ -112,7 +112,7 @@ Questions? Just reply — this email goes straight to the team.
                 Welcome aboard, {{first_name}}.
               </h1>
               <p style="margin:0;font-size:16px;line-height:1.55;color:#2D2A33;">
-                Your free 30-day trial is up and running — your whole household has full access until <strong style="color:#6B3FA0;">{{trial_end_date}}</strong>.
+                Your free 30-day trial is up and running - your whole household has full access until <strong style="color:#6B3FA0;">{{trial_end_date}}</strong>.
               </p>
             </td>
           </tr>
@@ -127,17 +127,17 @@ Questions? Just reply — this email goes straight to the team.
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="padding:6px 0;vertical-align:top;font-size:15px;line-height:1.55;color:#2D2A33;">
-                    <strong style="color:#6B3FA0;">1.&nbsp;</strong>&nbsp;<strong>Add your family</strong> — invite your partner or older kids so they can add shopping items, see the calendar, and tick things off.
+                    <strong style="color:#6B3FA0;">1.&nbsp;</strong>&nbsp;<strong>Add your family</strong> - invite your partner or older kids so they can add shopping items, see the calendar, and tick things off.
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:6px 0;vertical-align:top;font-size:15px;line-height:1.55;color:#2D2A33;">
-                    <strong style="color:#6B3FA0;">2.&nbsp;</strong>&nbsp;<strong>Set up your shopping list</strong> — try saying <em>"add milk"</em> to the WhatsApp bot, or scan a receipt to auto-tick what you've bought.
+                    <strong style="color:#6B3FA0;">2.&nbsp;</strong>&nbsp;<strong>Set up your shopping list</strong> - try saying <em>"add milk"</em> to the WhatsApp bot, or scan a receipt to auto-tick what you've bought.
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:6px 0;vertical-align:top;font-size:15px;line-height:1.55;color:#2D2A33;">
-                    <strong style="color:#6B3FA0;">3.&nbsp;</strong>&nbsp;<strong>Drop in this week's meals</strong> — drag recipes onto the planner and we'll build the shopping list for you.
+                    <strong style="color:#6B3FA0;">3.&nbsp;</strong>&nbsp;<strong>Drop in this week's meals</strong> - drag recipes onto the planner and we'll build the shopping list for you.
                   </td>
                 </tr>
               </table>
@@ -166,10 +166,10 @@ Questions? Just reply — this email goes straight to the team.
           <tr>
             <td style="padding:24px 32px 28px 32px;">
               <p style="margin:0;font-size:13px;line-height:1.5;color:#6B6774;">
-                Questions? Just reply to this email — it goes straight to the team.
+                Questions? Just reply to this email - it goes straight to the team.
               </p>
               <p style="margin:16px 0 0 0;font-size:13px;line-height:1.5;color:#6B6774;">
-                — The Housemait team
+                - The Housemait team
               </p>
             </td>
           </tr>
@@ -193,7 +193,7 @@ Questions? Just reply — this email goes straight to the team.
 
 ---
 
-## 2. `housemait-trial-day-20` — Day 20
+## 2. `housemait-trial-day-20` - Day 20
 
 **When:** Daily 09:00 BST cron, 20 days after `trial_started_at`.
 
@@ -226,7 +226,7 @@ How's it going, {{first_name}}?
 ```
 Hi {{first_name}},
 
-You've got {{days_remaining}} days left on your Housemait trial — and
+You've got {{days_remaining}} days left on your Housemait trial - and
 it looks like you've been busy:
 
   • {{family_members_count}} family members on board
@@ -236,14 +236,14 @@ it looks like you've been busy:
   • {{tasks_completed}} tasks completed
 
 Your trial ends on {{trial_end_date}}. To keep going, subscribe at
-{{subscribe_url}} — £5.99/month or £59.99/year (saves £11.89).
+{{subscribe_url}} - £5.99/month or £59.99/year (saves £11.89).
 
-Not feeling it yet? No worries. Just let it expire — we'll keep your
+Not feeling it yet? No worries. Just let it expire - we'll keep your
 data for 30 days in case you change your mind.
 
-— The Housemait team
+- The Housemait team
 
-—
+-
 You're receiving this because you signed up for Housemait.
 Stop these check-ins: {{unsubscribe_url}}
 ```
@@ -278,7 +278,7 @@ Stop these check-ins: {{unsubscribe_url}}
                 How's it going, {{first_name}}?
               </h1>
               <p style="margin:0;font-size:16px;line-height:1.55;color:#2D2A33;">
-                {{days_remaining}} days left on your trial — and you've been busy.
+                {{days_remaining}} days left on your trial - and you've been busy.
               </p>
             </td>
           </tr>
@@ -371,10 +371,10 @@ Stop these check-ins: {{unsubscribe_url}}
           <tr>
             <td style="padding:16px 32px 28px 32px;border-top:1px solid #E8E5EC;">
               <p style="margin:16px 0 0 0;font-size:14px;line-height:1.55;color:#6B6774;">
-                Not feeling it yet? No worries. Just let it expire — we'll keep your data for 30 days in case you change your mind.
+                Not feeling it yet? No worries. Just let it expire - we'll keep your data for 30 days in case you change your mind.
               </p>
               <p style="margin:16px 0 0 0;font-size:13px;line-height:1.5;color:#6B6774;">
-                — The Housemait team
+                - The Housemait team
               </p>
             </td>
           </tr>
@@ -398,7 +398,7 @@ Stop these check-ins: {{unsubscribe_url}}
 
 ---
 
-## 3. `housemait-trial-day-25` — Day 25
+## 3. `housemait-trial-day-25` - Day 25
 
 **Same merge fields as day 20**, but `{{days_remaining}}` will be `5`.
 
@@ -415,7 +415,7 @@ Stop these check-ins: {{unsubscribe_url}}
 ```
 Hi {{first_name}},
 
-Quick heads-up: your Housemait trial ends on {{trial_end_date}} —
+Quick heads-up: your Housemait trial ends on {{trial_end_date}} -
 just {{days_remaining}} days from now.
 
 Subscribe to keep using the app uninterrupted: {{subscribe_url}}
@@ -427,9 +427,9 @@ If you decide not to subscribe, your account will be paused and your
 data preserved for 30 days. You can come back any time and pick up
 right where you left off.
 
-— The Housemait team
+- The Housemait team
 
-—
+-
 Stop these reminders: {{unsubscribe_url}}
 ```
 
@@ -511,7 +511,7 @@ Stop these reminders: {{unsubscribe_url}}
                 If you decide not to subscribe, your account will be paused and your data preserved for 30 days. You can come back any time and pick up right where you left off.
               </p>
               <p style="margin:16px 0 0 0;font-size:13px;line-height:1.5;color:#6B6774;">
-                — The Housemait team
+                - The Housemait team
               </p>
             </td>
           </tr>
@@ -534,7 +534,7 @@ Stop these reminders: {{unsubscribe_url}}
 
 ---
 
-## 4. `housemait-trial-day-28` — Day 28
+## 4. `housemait-trial-day-28` - Day 28
 
 **Same merge fields as day 20**, but `{{days_remaining}}` will be `2`.
 
@@ -551,19 +551,19 @@ Your Housemait trial ends in {{days_remaining}} days
 ```
 Hi {{first_name}},
 
-Last reminder — your trial ends on {{trial_end_date}}.
+Last reminder - your trial ends on {{trial_end_date}}.
 
 Subscribe now to avoid interruption: {{subscribe_url}}
 
   • £5.99 / month
   • £59.99 / year (saves £11.89 vs monthly)
 
-One subscription covers your whole household — every family member
+One subscription covers your whole household - every family member
 gets full access.
 
-— The Housemait team
+- The Housemait team
 
-—
+-
 Stop these reminders: {{unsubscribe_url}}
 ```
 
@@ -591,7 +591,7 @@ Stop these reminders: {{unsubscribe_url}}
             </td>
           </tr>
 
-          <!-- Coral banner — final-push urgency -->
+          <!-- Coral banner - final-push urgency -->
           <tr>
             <td style="padding:8px 32px 0 32px;">
               <div style="display:inline-block;padding:6px 12px;background-color:#FDF0EB;color:#E8724A;font-size:13px;font-weight:600;border-radius:8px;">
@@ -651,10 +651,10 @@ Stop these reminders: {{unsubscribe_url}}
           <tr>
             <td style="padding:16px 32px 28px 32px;border-top:1px solid #E8E5EC;">
               <p style="margin:16px 0 0 0;font-size:14px;line-height:1.55;color:#6B6774;">
-                One subscription covers your whole household — every family member gets full access.
+                One subscription covers your whole household - every family member gets full access.
               </p>
               <p style="margin:16px 0 0 0;font-size:13px;line-height:1.5;color:#6B6774;">
-                — The Housemait team
+                - The Housemait team
               </p>
             </td>
           </tr>
@@ -677,11 +677,11 @@ Stop these reminders: {{unsubscribe_url}}
 
 ---
 
-## 5. `housemait-trial-expired` — Day 30
+## 5. `housemait-trial-expired` - Day 30
 
 **When:** Daily 09:00 BST cron, 30 days after `trial_started_at`.
 
-**Stream:** `transactional` (always sends — even if user opted out).
+**Stream:** `transactional` (always sends - even if user opted out).
 
 **Merge fields:**
 
@@ -694,7 +694,7 @@ Stop these reminders: {{unsubscribe_url}}
 
 > **Important:** This is the email an iOS user will see when their app
 > "stops accepting writes". The paragraph that mentions iOS in the
-> body is the bridge — keep it in.
+> body is the bridge - keep it in.
 
 ### Subject
 
@@ -714,13 +714,13 @@ Your data is safe. We'll keep it on hand for 30 days in case you'd
 like to come back. To resume access, subscribe at {{subscribe_url}}.
 
 If you're using Housemait on iOS or another mobile device and writes
-have stopped working: that's expected — the trial is over. Once
+have stopped working: that's expected - the trial is over. Once
 you've subscribed on the web, your apps will pick up immediately,
 no re-install or re-login needed.
 
 Thanks for trying us.
 
-— The Housemait team
+- The Housemait team
 ```
 
 ### HTML body
@@ -765,7 +765,7 @@ Thanks for trying us.
                 <tr>
                   <td style="padding:18px 20px;">
                     <p style="margin:0;font-size:15px;line-height:1.55;color:#2D2A33;">
-                      <strong style="color:#7DAE82;">✓ Your data is safe.</strong> We'll keep your household's lists, meals, calendar and tasks for 30 days — so you can come back any time and pick up where you left off.
+                      <strong style="color:#7DAE82;">✓ Your data is safe.</strong> We'll keep your household's lists, meals, calendar and tasks for 30 days - so you can come back any time and pick up where you left off.
                     </p>
                   </td>
                 </tr>
@@ -788,7 +788,7 @@ Thanks for trying us.
                 Using Housemait on a phone or tablet?
               </h2>
               <p style="margin:0;font-size:14px;line-height:1.55;color:#6B6774;">
-                If your iOS or mobile app has stopped saving changes — that's expected, the trial is over. Once you've subscribed on the web, your apps will pick up immediately. No re-install or re-login needed.
+                If your iOS or mobile app has stopped saving changes - that's expected, the trial is over. Once you've subscribed on the web, your apps will pick up immediately. No re-install or re-login needed.
               </p>
             </td>
           </tr>
@@ -799,7 +799,7 @@ Thanks for trying us.
                 Thanks for trying us.
               </p>
               <p style="margin:12px 0 0 0;font-size:13px;line-height:1.5;color:#6B6774;">
-                — The Housemait team
+                - The Housemait team
               </p>
             </td>
           </tr>
@@ -834,7 +834,7 @@ For each of the five templates above:
 2. Set the **Subject** field to the line under "### Subject".
 3. Paste the HTML body into the **HTML** tab.
 4. Paste the text body into the **Text** tab.
-5. Postmark validates the merge-field syntax automatically — fix any
+5. Postmark validates the merge-field syntax automatically - fix any
    typos it flags.
 6. Use Postmark's **Send Test** feature with sample values for the
    merge fields to spot-check the rendering before saving.
@@ -842,9 +842,9 @@ For each of the five templates above:
 ## How to verify
 
 - Trigger `runTrialEmailCheck()` manually from the admin console (the
-  scheduler exposes `triggerTrialEmails` for ad-hoc runs — see
+  scheduler exposes `triggerTrialEmails` for ad-hoc runs - see
   `src/jobs/scheduler.js` line ~492). This will fire any households
   due that day.
-- Or wait 24 hours and check Postmark's Activity tab — every send is
+- Or wait 24 hours and check Postmark's Activity tab - every send is
   logged with the rendered subject + body, so you can see exactly
   what your users get.

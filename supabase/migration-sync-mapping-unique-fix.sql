@@ -18,16 +18,16 @@
 -- UID gets its own durable mapping row; multiple UIDs can coexist for a
 -- single event. The per-UID lookup used by processChange() now hits a
 -- stable row every time, so "Re-linking" stops firing for events that
--- legitimately already have a mapping — the count stabilises at zero
+-- legitimately already have a mapping - the count stabilises at zero
 -- once the first post-migration sync replaces the orphaned rows.
 --
 -- This also unblocks future improvements: multiple calendar subscriptions
 -- overlapping on the same event, shared-calendar sync, cross-account
--- mirrors — none of which the old 1:1 schema supported cleanly.
+-- mirrors - none of which the old 1:1 schema supported cleanly.
 
 -- ── 1. Clean up accidental duplicates before tightening the constraint ──
 -- Under the old constraint, (connection_id, external_event_id) was only
--- "mostly" unique — two different events sharing the same external UID
+-- "mostly" unique - two different events sharing the same external UID
 -- for the same connection was possible in edge cases (e.g. a prior
 -- upsert-swap then create). Keep the most recently synced row per pair.
 DELETE FROM calendar_sync_mappings a

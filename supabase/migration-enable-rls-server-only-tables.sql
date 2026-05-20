@@ -9,17 +9,17 @@
 -- All three tables are accessed exclusively from the Node API using
 -- the Supabase service-role key, which bypasses RLS unconditionally.
 -- They were never meant to be reachable from the browser via the
--- anon/authenticated PostgREST path — but with RLS disabled, the
+-- anon/authenticated PostgREST path - but with RLS disabled, the
 -- public anon key (which is, by design, embedded in the web bundle
 -- and therefore readable by anyone) gives full SELECT/INSERT/UPDATE/
 -- DELETE access via PostgREST.
 --
--- The most urgent of the three is refresh_tokens — anyone with a leak
+-- The most urgent of the three is refresh_tokens - anyone with a leak
 -- could impersonate users indefinitely until manual rotation.
 --
 -- Fix: turn on RLS, add NO policies. With RLS on and zero policies,
 -- non-service-role queries return zero rows / zero rights. The
--- service-role keeps working because it bypasses RLS — see Supabase
+-- service-role keeps working because it bypasses RLS - see Supabase
 -- docs: "service_role key bypasses Row Level Security".
 --
 -- Same approach we used for external_calendar_feeds in

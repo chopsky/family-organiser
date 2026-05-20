@@ -18,7 +18,7 @@ function escapeHtml(value) {
 
 function isLikelyEmail(value) {
   if (typeof value !== 'string') return false;
-  // Conservative — same shape as auth.js validation. Full RFC compliance
+  // Conservative - same shape as auth.js validation. Full RFC compliance
   // isn't worth the regex complexity for a contact form; Postmark will
   // bounce anything obviously broken when used as Reply-To.
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -41,7 +41,7 @@ router.post('/', requireTurnstile, async (req, res) => {
 
   // Honeypot: pretend success, drop on the floor.
   if (website) {
-    return res.status(200).json({ message: 'Thanks — we\'ll be in touch.' });
+    return res.status(200).json({ message: 'Thanks - we\'ll be in touch.' });
   }
 
   if (!name?.trim() || !senderEmail?.trim() || !message?.trim()) {
@@ -81,7 +81,7 @@ router.post('/', requireTurnstile, async (req, res) => {
       html,
       { replyTo: `${cleanName} <${cleanEmail}>` }
     );
-    return res.status(200).json({ message: 'Thanks — we\'ll be in touch.' });
+    return res.status(200).json({ message: 'Thanks - we\'ll be in touch.' });
   } catch (err) {
     console.error('POST /api/contact error:', err);
     return res.status(500).json({ error: 'Something went wrong sending your message. Please email us directly at support@housemait.com.' });

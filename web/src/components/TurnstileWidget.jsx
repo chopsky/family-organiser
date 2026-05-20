@@ -1,5 +1,5 @@
 /**
- * Cloudflare Turnstile widget — bot verification on Login, Signup,
+ * Cloudflare Turnstile widget - bot verification on Login, Signup,
  * ForgotPassword, and Support forms.
  *
  * Mostly invisible: most users see no challenge. Only suspicious sessions
@@ -24,13 +24,13 @@ const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload
 
 // Skip Turnstile entirely on iOS native. Reasoning:
 //   • The threat model for a signed App Store binary is fundamentally
-//     different from web — no bot signups via App Review's flow, no
+//     different from web - no bot signups via App Review's flow, no
 //     credential stuffing from a controlled native binary.
 //   • Loading the Cloudflare script in the WebView introduces race
 //     conditions where users (especially App Reviewers using iPad
 //     hardware keyboards) can submit before a token is ready, resulting
 //     in opaque "login failed" errors. Apple rejected 1.1.0(8) for
-//     exactly this — Guideline 2.1(a), iPad login error.
+//     exactly this - Guideline 2.1(a), iPad login error.
 //   • Server-side middleware fail-opens when the request lacks a token,
 //     so the iOS native flow is allowed. See src/middleware/turnstile.js.
 function isIosNative() {
@@ -61,7 +61,7 @@ function loadScript() {
 
 /**
  * forwardRef so parent forms can imperatively call `reset()` on a failed
- * submission. Turnstile tokens are SINGLE-USE — once the backend has
+ * submission. Turnstile tokens are SINGLE-USE - once the backend has
  * validated one (even before deciding the request itself was bad), that
  * token is dead. Parents that don't reset after an error will trip the
  * "Bot verification failed" message on the next submit, even though the
@@ -90,7 +90,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
   }), []);
 
   useEffect(() => {
-    // iOS native bypass — see top-of-file comment.
+    // iOS native bypass - see top-of-file comment.
     if (isIosNative()) {
       onChange?.(null);
       return;
@@ -108,7 +108,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
     // Load the Cloudflare script and render the widget on mount. We
     // previously deferred this until first user interaction to avoid
     // blocking iOS WebView's tap-event delivery during the first paint
-    // — but iOS native now bypasses Turnstile entirely (see
+    // - but iOS native now bypasses Turnstile entirely (see
     // isIosNative() above), so the widget only ever renders on web,
     // where eager loading is fine and gives users immediate feedback
     // that bot protection is running.
@@ -118,7 +118,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: SITE_KEY,
           theme,
-          // 'normal' renders Cloudflare's visible managed widget — the
+          // 'normal' renders Cloudflare's visible managed widget - the
           // small "Verify you are human" checkbox card. Most users see no
           // challenge (it just resolves automatically), but the widget is
           // visible and gives users a clear signal that bot protection is
@@ -164,7 +164,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
         widgetIdRef.current = null;
       }
     };
-  // onChange is intentionally excluded — wrapping it in useCallback in every
+  // onChange is intentionally excluded - wrapping it in useCallback in every
   // parent would be noise. Re-rendering only when SITE_KEY/theme changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);

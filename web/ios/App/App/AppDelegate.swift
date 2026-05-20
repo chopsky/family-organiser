@@ -52,7 +52,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // names and emits the corresponding JS events ('registration' /
     // 'registrationError'). Without these two methods, the plugin's
     // PushNotifications.register() call resolves successfully but no token
-    // is ever delivered — iOS receives the APNs token but has nowhere to
+    // is ever delivered - iOS receives the APNs token but has nowhere to
     // forward it. The bare npx-cap-add-ios template omits these; they have
     // to be added by hand once the push plugin is installed.
 

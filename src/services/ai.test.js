@@ -92,7 +92,7 @@ describe('classify()', () => {
         { item: 'milk', category: 'groceries', quantity: null, action: 'remove' },
       ],
       tasks: [],
-      response_message: "Got it — I've marked milk as done.",
+      response_message: "Got it - I've marked milk as done.",
     };
 
     mockMessagesStream.mockReturnValue(mockStream(expected));
@@ -117,7 +117,7 @@ describe('classify()', () => {
           action: 'complete',
         },
       ],
-      response_message: "Great — marked Jake's homework as done!",
+      response_message: "Great - marked Jake's homework as done!",
     };
 
     mockMessagesStream.mockReturnValue(mockStream(expected));
@@ -215,7 +215,7 @@ describe('classify()', () => {
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
     const sys = mockMessagesStream.mock.calls[0][0].system;
     // The "BE CONSERVATIVE" guidance and the trampoline worked example should
-    // both be present — they were added to prevent the classifier from
+    // both be present - they were added to prevent the classifier from
     // hijacking new scheduling statements into updates of same-topic items.
     expect(sys).toContain('BE CONSERVATIVE');
     expect(sys).toContain('trampoline');
@@ -257,7 +257,7 @@ describe('classify()', () => {
     // Must see 14:00 (local BST), never 13:00 (server UTC).
     expect(call.system).toContain('Haircut');
     expect(call.system).toContain('14:00');
-    // The substring "13:00" must not appear as a time for the event — this
+    // The substring "13:00" must not appear as a time for the event - this
     // was the exact bug where the AI told users their 2PM event was at 1PM.
     expect(call.system).not.toContain(' 13:00:');
   });
@@ -335,7 +335,7 @@ describe('classify()', () => {
     // single turn when a completion message carries scheduling context.
     expect(sys).toContain('COMPLETION + SCHEDULING');
     expect(sys).toContain('populate BOTH');
-    // The car-service walked example — both the original failing phrasing
+    // The car-service walked example - both the original failing phrasing
     // and the hint to derive the event title from the task title.
     expect(sys).toContain('Booked my car in for a service on Wednesday morning');
     expect(sys).toContain('Book car service');
@@ -550,7 +550,7 @@ describe('matchReceiptToList()', () => {
   });
 });
 
-// ─── parseJSON() — AI output parsing robustness ─────────────────────────────
+// ─── parseJSON() - AI output parsing robustness ─────────────────────────────
 
 describe('parseJSON()', () => {
   const originalError = console.error;

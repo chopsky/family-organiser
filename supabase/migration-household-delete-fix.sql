@@ -1,6 +1,6 @@
--- Fix household deletion — three related problems rolled into one migration.
+-- Fix household deletion - three related problems rolled into one migration.
 --
--- Run this in the Supabase SQL editor. Idempotent — safe to re-run.
+-- Run this in the Supabase SQL editor. Idempotent - safe to re-run.
 --
 -- ─── Problem 1: event_reminders FK wasn't CASCADE ───────────────────────────
 -- event_reminders.household_id was created in migration-event-reminders.sql
@@ -11,7 +11,7 @@
 -- ─── Problem 2: missing index on event_reminders.household_id ───────────────
 -- The cascade from households had to full-scan event_reminders to find
 -- matching rows. Slow on any meaningful dataset. (Other indexes existed
--- but only on (event_id) and (sent, remind_at) — neither helps here.)
+-- but only on (event_id) and (sent, remind_at) - neither helps here.)
 --
 -- ─── Problem 3: statement timeout during cascade ───────────────────────────
 -- Even after fixing the FK and adding the index, a real household with a
@@ -56,7 +56,7 @@ BEGIN
 END;
 $$;
 
--- Only trusted roles can call it — the backend calls via the service
+-- Only trusted roles can call it - the backend calls via the service
 -- role; end users can't invoke it directly via PostgREST.
 REVOKE ALL ON FUNCTION delete_household_cascade(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION delete_household_cascade(uuid) TO service_role;

@@ -3,7 +3,7 @@
  *
  * Used in place of <Spinner /> on first-load. Mimics the rough shape
  * of the eventual page so the transition to real content feels like
- * "details filling in" rather than "spinner replaced by data" —
+ * "details filling in" rather than "spinner replaced by data" -
  * which is the single biggest perceived-native upgrade for a
  * content-heavy app like this one.
  *
@@ -65,7 +65,7 @@ export function SkeletonCard({ rows = 3, className = '' }) {
   );
 }
 
-/** Dashboard skeleton — greeting kicker + serif headline + 4 cards. */
+/** Dashboard skeleton - greeting kicker + serif headline + 4 cards. */
 export function DashboardSkeleton() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -84,7 +84,7 @@ export function DashboardSkeleton() {
   );
 }
 
-/** Simple page skeleton — h1 + 5 row stubs. Reusable on Tasks /
+/** Simple page skeleton - h1 + 5 row stubs. Reusable on Tasks /
  *  Shopping / Documents / etc. */
 export function PageListSkeleton({ rows = 6, headerWidth = '40%' }) {
   return (

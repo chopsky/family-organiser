@@ -1,9 +1,9 @@
 /**
  * Unified AI client with automatic failover.
  *
- * Primary: Gemini 2.5 Flash (Google) — fast, smart, great value
- * Fallback 1: Claude (Anthropic) — excellent tone, structured output
- * Fallback 2: GPT-4o (OpenAI) — reliable backup
+ * Primary: Gemini 2.5 Flash (Google) - fast, smart, great value
+ * Fallback 1: Claude (Anthropic) - excellent tone, structured output
+ * Fallback 2: GPT-4o (OpenAI) - reliable backup
  */
 require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
@@ -100,7 +100,7 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
     // Gemini 2.5 Flash has thinking ON by default and the thinking
     // budget eats into maxOutputTokens. For mechanical tasks like
     // structured extraction or classification, callers should pass
-    // useThinking: false — otherwise the model can burn 5-7k tokens
+    // useThinking: false - otherwise the model can burn 5-7k tokens
     // "thinking" and run out before finishing the JSON output. (Seen
     // in the wild on the school year-planner extraction: response
     // truncated mid-array at ~2k chars even with maxTokens=8192.)

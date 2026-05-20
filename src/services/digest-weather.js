@@ -3,8 +3,8 @@
  * buildDigestWeatherLine() for the morning WhatsApp digest.
  *
  * Location source is *only* household.address (geocoded via Photon
- * — OSM, no API key). Timezone is NOT used as a fallback because
- * tz-derived cities are too vague — a Bristol family would see
+ * - OSM, no API key). Timezone is NOT used as a fallback because
+ * tz-derived cities are too vague - a Bristol family would see
  * London weather, a Cape Town family would see Joburg weather, and
  * the digest stops being trustworthy. Better to omit the line
  * entirely and let the user notice they should set an address.
@@ -34,7 +34,7 @@ async function geocodeViaPhoton(query) {
     const data = await res.json();
     const feature = data.features?.[0];
     if (!feature) {
-      console.warn(`[digest-weather] Photon returned no match for "${query}" — try a simpler / more standard address`);
+      console.warn(`[digest-weather] Photon returned no match for "${query}" - try a simpler / more standard address`);
       return null;
     }
     const [lon, lat] = feature.geometry.coordinates;
@@ -50,7 +50,7 @@ async function geocodeViaPhoton(query) {
 
 async function resolveLocation(household) {
   if (!household?.address?.trim()) {
-    console.log(`[digest-weather] household ${household?.id} has no address — skipping weather`);
+    console.log(`[digest-weather] household ${household?.id} has no address - skipping weather`);
     return null;
   }
   return geocodeViaPhoton(household.address.trim());

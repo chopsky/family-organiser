@@ -1,5 +1,5 @@
 /**
- * Step 2 — connect the user's WhatsApp number via pull-push pairing.
+ * Step 2 - connect the user's WhatsApp number via pull-push pairing.
  *
  * Previously sent an OTP from the server to the user's WhatsApp via a
  * Twilio Authentication template. That template needs Meta Business
@@ -19,28 +19,28 @@ import {
 export default function ConnectWhatsApp({ next, setError }) {
   const [stage, setStage] = useState('intro'); // intro | pairing | done
 
-  // ── Intro screen — features + "Connect" / "Skip" ──────────────────────
+  // ── Intro screen - features + "Connect" / "Skip" ──────────────────────
   if (stage === 'intro') {
     return (
       <div>
         <div className="text-center">
           <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-            Step 2 — WhatsApp
+            Step 2 - WhatsApp
           </p>
           <h1 className={serifHeading} style={serifHeadingStyle}>
             Manage everything from <i>WhatsApp</i>.
           </h1>
           <p className="text-cocoa mt-5 max-w-md mx-auto">
-            Add tasks, tick things off, check your calendar, scan receipts — just by
+            Add tasks, tick things off, check your calendar, scan receipts - just by
             messaging the Housemait bot.
           </p>
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-3 text-sm text-bark">
-          <Feature icon="🛒" text={`"We need milk and eggs" — adds to shopping`} />
-          <Feature icon="📋" text={`"Remind me to book car service" — creates a task`} />
-          <Feature icon="📅" text={`"Dentist on Tuesday at 3pm" — adds to the calendar`} />
-          <Feature icon="📸" text="Send a receipt photo — matches items back to your list" />
+          <Feature icon="🛒" text={`"We need milk and eggs" - adds to shopping`} />
+          <Feature icon="📋" text={`"Remind me to book car service" - creates a task`} />
+          <Feature icon="📅" text={`"Dentist on Tuesday at 3pm" - adds to the calendar`} />
+          <Feature icon="📸" text="Send a receipt photo - matches items back to your list" />
         </div>
 
         <div className="mt-10 flex flex-col items-center gap-3">
@@ -59,20 +59,20 @@ export default function ConnectWhatsApp({ next, setError }) {
     );
   }
 
-  // ── Pairing — show code + tap-to-WhatsApp + poll status ───────────────
+  // ── Pairing - show code + tap-to-WhatsApp + poll status ───────────────
   if (stage === 'pairing') {
     return (
       <div>
         <div className="text-center">
           <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-            Step 2 — WhatsApp
+            Step 2 - WhatsApp
           </p>
           <h1 className={serifHeading} style={serifHeadingStyle}>
             Send us a <i>quick message</i>.
           </h1>
           <p className="text-cocoa mt-5 max-w-md mx-auto">
             Tap the button below to open WhatsApp with the message pre-typed.
-            Just press Send — we&apos;ll do the rest.
+            Just press Send - we&apos;ll do the rest.
           </p>
         </div>
 
@@ -92,7 +92,7 @@ export default function ConnectWhatsApp({ next, setError }) {
     );
   }
 
-  // ── Success — continue to next step ────
+  // ── Success - continue to next step ────
   return (
     <div className="text-center">
       <div

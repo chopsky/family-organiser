@@ -24,7 +24,7 @@ const mainNav = [
 
 // Mobile bottom-tab order from the iOS design handoff: Home · Calendar ·
 // Tasks · Shopping · More. Meal Plan, Receipt, Documents, Family and
-// Settings live behind the More sheet (see `MoreSheet` below) — that's
+// Settings live behind the More sheet (see `MoreSheet` below) - that's
 // the design's deliberate pattern: keep the bottom bar to four
 // destinations the user touches every day, plus a curated "More" set.
 const mobileNav = [
@@ -48,7 +48,7 @@ const moreNav = [
 
 // 2×2 feature tiles that head the More sheet. Colours are taken from the
 // Housemait iOS design handoff (warm amber / brand plum / sky blue / dusty
-// rose) — they're tile-only accents, not part of the global token set, so
+// rose) - they're tile-only accents, not part of the global token set, so
 // they're inlined rather than promoted to Tailwind utilities.
 const moreTiles = [
   {
@@ -86,7 +86,7 @@ const moreTiles = [
 ];
 
 // Account section rows. Notifications, Connected apps and Privacy &
-// data are intentionally omitted — they're all reachable from inside
+// data are intentionally omitted - they're all reachable from inside
 // Settings, and surfacing them as separate rows promised destinations
 // we don't yet deep-link cleanly. Help & support links to /help, which
 // hosts the FAQ + contact form (logged-out users have /support).
@@ -132,7 +132,7 @@ export default function Layout({ children }) {
   // Close "More" sheet on navigation
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);
 
-  // iOS home-screen quick actions — when the user long-presses the
+  // iOS home-screen quick actions - when the user long-presses the
   // app icon and picks "Add Task" / "View Calendar" / etc., the
   // plugin fires this listener. Navigate to whatever route the
   // shortcut config carries. No-op on web.
@@ -172,7 +172,7 @@ export default function Layout({ children }) {
         )) {
           // Pass the FRESH household from the API response, not the
           // closure `household` from useAuth(). The closure value was
-          // captured at this render — but the effect resolves later,
+          // captured at this render - but the effect resolves later,
           // and another tab/path may have updated the household in
           // between (most often the household avatar upload, which
           // would otherwise get overwritten back to null here).
@@ -248,7 +248,7 @@ export default function Layout({ children }) {
           {mainNav.map(renderNavLink)}
         </nav>
 
-        {/* User footer — top border uses a warmer grey than the global
+        {/* User footer - top border uses a warmer grey than the global
             --color-light-grey so it sits more softly against the cream
             page background. */}
         <div className="px-4 py-4 flex items-center gap-2.5" style={{ borderTop: '1px solid #f2f0ed' }}>
@@ -273,7 +273,7 @@ export default function Layout({ children }) {
 
       {/* ── Mobile Top Bar ──────────────────────────────────────────
            Minimal: wordmark logo on the left, avatar-as-settings on the
-           right. Page title/household name intentionally omitted — each
+           right. Page title/household name intentionally omitted - each
            page renders its own H1 at the top of the body so mobile gets
            the same editorial feel as desktop. */}
       <header
@@ -307,7 +307,7 @@ export default function Layout({ children }) {
           Five tabs from the iOS design handoff: Home · Calendar · Tasks
           · Shopping · More. The background is a vertical cream gradient
           (opaque at the bottom, fading to transparent at the top) plus
-          a saturated backdrop-blur — so page content visibly fades
+          a saturated backdrop-blur - so page content visibly fades
           *under* the bar instead of slamming into a hard top border.
           The cream rgba values match Tailwind token `--color-cream`
           (#FBF8F3 → rgb 251,248,243).
@@ -336,7 +336,7 @@ export default function Layout({ children }) {
           >
             {({ isActive }) => (
               <>
-                {/* Bolder stroke when active — mimics the SF Symbols
+                {/* Bolder stroke when active - mimics the SF Symbols
                     active-state look without needing filled icon variants. */}
                 <Icon className="h-[26px] w-[26px]" strokeWidth={isActive ? 2.4 : 1.5} />
                 <span className="text-[11px] font-semibold tracking-[0.01em]">{label}</span>
@@ -345,7 +345,7 @@ export default function Layout({ children }) {
           </NavLink>
         ))}
 
-        {/* More tab — opens the redesigned bottom sheet. The sheet itself
+        {/* More tab - opens the redesigned bottom sheet. The sheet itself
             is rendered outside the <nav> so it can take the full viewport
             instead of being clipped by the tab bar. The button matches
             the layout/sizing of the NavLinks above so the row stays
@@ -364,13 +364,13 @@ export default function Layout({ children }) {
       {/* ── More bottom sheet ──────────────────────────────────────
           A native-feeling iOS-style sheet: backdrop fades in over 250ms;
           panel slides up with `cubic-bezier(0.32, 0.72, 0, 1)` over 320ms.
-          Designed mobile-first — it auto-hides on ≥768px where the
+          Designed mobile-first - it auto-hides on ≥768px where the
           desktop sidebar already exposes everything in this menu. */}
       {moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
 
       <Suspense fallback={null}><ChatWidget /></Suspense>
 
-      {/* Trial-ended overlay — only renders for expired households who
+      {/* Trial-ended overlay - only renders for expired households who
           haven't dismissed it this session. Scoped to Layout so it
           never appears on the Subscribe / Login / Signup routes (which
           don't use Layout). */}
@@ -380,7 +380,7 @@ export default function Layout({ children }) {
 }
 
 /**
- * MoreSheet — iOS-style bottom sheet exposed from the 5th tab on mobile.
+ * MoreSheet - iOS-style bottom sheet exposed from the 5th tab on mobile.
  *
  * Anatomy (top → bottom):
  *   • Drag handle (5×40 pill)
@@ -393,7 +393,7 @@ export default function Layout({ children }) {
  * Layout in the source tree maps to the Housemait iOS design handoff
  * (`design_handoff_housemait_ios/README.md` § "More sheet"). Tile accent
  * colours are inlined because they're tile-only and not reused elsewhere
- * — promoting them to Tailwind utilities would just add noise.
+ * - promoting them to Tailwind utilities would just add noise.
  *
  * Animation: a `mounted` flag flips on the next frame so the slide-up
  * transition runs from `translateY(100%)` → `translateY(0)`. Reduced
@@ -406,7 +406,7 @@ export default function Layout({ children }) {
  *   • Press Esc (wired one level up in Layout)
  *   • Tap any nav link inside the sheet (parent's pathname effect)
  *   • Drag the handle / header bar downward past ~100 px or with a
- *     downward flick — the iOS-native gesture users expect when they
+ *     downward flick - the iOS-native gesture users expect when they
  *     see a drag handle pill at the top.
  *
  * The drag listener is scoped to the handle + header strip so touches
@@ -436,7 +436,7 @@ function MoreSheet({ onClose }) {
   // depends on it (none while dragging, spring-easing otherwise) and
   // reading mutable values off a ref during render violates React's
   // ref-stability contract. Drag start/end each cause exactly one
-  // additional render — negligible. Frame-by-frame finger tracking
+  // additional render - negligible. Frame-by-frame finger tracking
   // happens via `dragOffset` (also state) inside onDragMove.
   const [isDragging, setIsDragging] = useState(false);
   // Stable per-gesture state we don't want to render on (start coords
@@ -460,7 +460,7 @@ function MoreSheet({ onClose }) {
     const touch = e.touches?.[0];
     if (!touch) return;
     const dy = touch.clientY - dragRef.current.startY;
-    // Downward drags only — clamp upward delta to 0 so the sheet stays
+    // Downward drags only - clamp upward delta to 0 so the sheet stays
     // glued to translateY(0) at rest. Some sheet libraries allow a small
     // overscroll above the resting position; we deliberately don't.
     setDragOffset(Math.max(0, dy));
@@ -470,7 +470,7 @@ function MoreSheet({ onClose }) {
     if (!isDragging) return;
     const elapsed = Date.now() - dragRef.current.startTime;
     const distance = dragOffset;
-    // velocity in px/ms — anything > ~0.6 reads as a deliberate flick
+    // velocity in px/ms - anything > ~0.6 reads as a deliberate flick
     // even if the absolute distance is small. Tuned by feel against
     // Apple's bottom-sheet gesture in Maps.
     const velocity = elapsed > 0 ? distance / elapsed : 0;
@@ -478,7 +478,7 @@ function MoreSheet({ onClose }) {
     setIsDragging(false);
 
     if (distance > 100 || velocity > 0.6) {
-      // Dismiss. Don't reset dragOffset — the sheet is about to unmount
+      // Dismiss. Don't reset dragOffset - the sheet is about to unmount
       // anyway, and resetting would cause a brief reverse animation
       // before the parent's `moreOpen=false` removes us from the tree.
       onClose();
@@ -518,7 +518,7 @@ function MoreSheet({ onClose }) {
           boxShadow: '0 -10px 30px rgba(0,0,0,0.12)',
         }}
       >
-        {/* Drag handle + header — touch listeners scoped here so touches
+        {/* Drag handle + header - touch listeners scoped here so touches
             inside the FAQ tile grid below stay tappable. touchAction:none
             tells the browser not to interpret this region as scrollable
             content, which would otherwise fight our setDragOffset. */}
@@ -552,7 +552,7 @@ function MoreSheet({ onClose }) {
           </div>
         </div>
 
-        {/* Scrollable body — only flexes when content overflows the
+        {/* Scrollable body - only flexes when content overflows the
             88vh cap (rare on a phone, common on a small landscape view). */}
         <div className="flex-1 overflow-y-auto">
           {/* 2×2 feature tiles */}
@@ -589,7 +589,7 @@ function MoreSheet({ onClose }) {
             </div>
             <div className="bg-white rounded-2xl border border-light-grey overflow-hidden">
               {moreAccountRows.map((row) => {
-                // All nav rows now have a divider below — Logout is the
+                // All nav rows now have a divider below - Logout is the
                 // bottom-most row with no border-bottom, so we render the
                 // borders unconditionally on the link/anchor rows.
                 const rowClasses = 'flex items-center px-4 py-3.5 border-b border-light-grey';
@@ -614,7 +614,7 @@ function MoreSheet({ onClose }) {
                 );
               })}
 
-              {/* Logout — destructive, hence coral text + no chevron.
+              {/* Logout - destructive, hence coral text + no chevron.
                   Tapped → confirmation modal renders below.            */}
               <button
                 type="button"
@@ -630,7 +630,7 @@ function MoreSheet({ onClose }) {
         </div>
       </div>
 
-      {/* Logout confirmation modal — sits ABOVE the bottom sheet (z-[70]
+      {/* Logout confirmation modal - sits ABOVE the bottom sheet (z-[70]
           vs sheet's z-[60]). Click outside the dialog cancels. */}
       {showLogoutConfirm && (
         <div

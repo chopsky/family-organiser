@@ -380,7 +380,7 @@ export default function Calendar() {
       writeCache(`calendar:month:${mp}`, { events: entry.events, tasks: entry.tasks });
       return entry;
     } catch (err) {
-      // Offline fallback — fall back to whatever we last persisted for
+      // Offline fallback - fall back to whatever we last persisted for
       // this month, if anything. Memory-cache it too so subsequent
       // accesses this session don't keep hitting the network.
       const persisted = readCache(`calendar:month:${mp}`);
@@ -470,7 +470,7 @@ export default function Calendar() {
           if (tdEnd < rangeStartStr || td.date > rangeEndStr) continue;
           schoolEvents.push({
             id: `td-${td.id}`,
-            title: `${school.school_name} — ${td.label || (td.event_type || 'school event').replace(/_/g, ' ')}`,
+            title: `${school.school_name} - ${td.label || (td.event_type || 'school event').replace(/_/g, ' ')}`,
             start_time: `${td.date}T00:00:00Z`,
             end_time: td.end_date ? `${td.end_date}T23:59:59Z` : `${td.date}T23:59:59Z`,
             all_day: true,
@@ -487,14 +487,14 @@ export default function Calendar() {
               const jsDay = d.getDay();
               const ourDay = (jsDay + 6) % 7;
               if (ourDay === act.day_of_week) {
-                // Use local-date components, NOT toISOString — during BST,
+                // Use local-date components, NOT toISOString - during BST,
                 // a `Date` for "Mon 4 May 00:00 local" is "Sun 3 May 23:00 UTC",
                 // so toISOString().split('T')[0] would return Sunday's date and
                 // the activity would render on the wrong day.
                 const dateStr = toDateStr(d);
                 schoolEvents.push({
                   id: `act-${act.id}-${dateStr}`,
-                  title: `${child.name} — ${act.activity}`,
+                  title: `${child.name} - ${act.activity}`,
                   start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
                   end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
                   all_day: !act.time_start,
@@ -757,7 +757,7 @@ export default function Calendar() {
       };
       if (formAllDay) {
         // All-day events are stored at UTC midnight (the canonical "this
-        // day" marker), so we can ship them as naked timestamps — Postgres
+        // day" marker), so we can ship them as naked timestamps - Postgres
         // will interpret them as UTC, which is what we want.
         payload.start_time = `${formDate}T00:00:00`;
         payload.end_time = `${formEndDate || formDate}T23:59:59`;
@@ -822,7 +822,7 @@ export default function Calendar() {
     return COLOR_HEX[getEventColor(ev)] || COLOR_HEX.sage;
   }
 
-  // Returns { bg, text } — light background with coloured text for softer event pills
+  // Returns { bg, text } - light background with coloured text for softer event pills
   function getEventStyle(ev) {
     const hex = getEventHex(ev);
     return { bg: hex + '18', text: hex }; // 18 = ~9% opacity in hex alpha
@@ -841,7 +841,7 @@ export default function Calendar() {
     invalidateMonthCache();
     try {
       await api.delete(`/calendar/events/${id}`);
-      // Background refresh — don't await. If it adds the event back because
+      // Background refresh - don't await. If it adds the event back because
       // delete actually failed, the catch block below has already shown an
       // error and triggered the rollback path.
       load().catch(() => {});
@@ -942,7 +942,7 @@ export default function Calendar() {
   // ── Search results ─────────────────────────────────────
   //
   // Search hits the backend (GET /api/calendar/search) with the full
-  // typed query — no date filter, so it covers every event + task in
+  // typed query - no date filter, so it covers every event + task in
   // the household, not just the ~3-month window that's been loaded
   // into memory. Debounced 300 ms so each keystroke doesn't fire a
   // request, and only sends once the query is at least 2 chars.
@@ -981,7 +981,7 @@ export default function Calendar() {
             title: t.title,
           });
         }
-        // School term dates live in their own table — added to the
+        // School term dates live in their own table - added to the
         // backend payload so we can surface them here. The title shown
         // in the dropdown carries the school name so a parent searching
         // "Pesach" sees "Pesach (Herzlia)" rather than a context-free
@@ -1210,7 +1210,7 @@ export default function Calendar() {
                         const dotColor = result.type === 'event'
                           ? getEventHex(result.item)
                           : result.type === 'school_date'
-                            ? '#6B3FA0' // plum — matches the school chips/avatars
+                            ? '#6B3FA0' // plum - matches the school chips/avatars
                             : '#7A8694';
                         return (
                           <button
@@ -1245,7 +1245,7 @@ export default function Calendar() {
             <option value="day">Day</option>
           </select>
 
-          {/* Add event button — hidden for expired households; inline
+          {/* Add event button - hidden for expired households; inline
               SubscribePrompt appears below the toolbar instead. */}
           {canWrite && (
             <button
@@ -1575,7 +1575,7 @@ export default function Calendar() {
       {/* ── Week View ───────────────────────────────────────── */}
       {viewMode === 'week' && (
         <div
-          // Mobile vs desktop chrome stacks differ — mobile has the sticky
+          // Mobile vs desktop chrome stacks differ - mobile has the sticky
           // header + bottom nav (~320px combined), desktop just the page
           // padding + H1 (~240px). Tailwind responsive class swaps the
           // offset at the md: breakpoint.
@@ -1628,7 +1628,7 @@ export default function Calendar() {
             );
           })()}
 
-          {/* Time grid — takes the remaining vertical space below the
+          {/* Time grid - takes the remaining vertical space below the
               week headers + all-day strip. flex-1 stretches it; min-h-0
               lets it actually shrink below its content size so the
               overflow-y-auto kicks in. The viewport cap lives on the
@@ -1718,7 +1718,7 @@ export default function Calendar() {
           // See note on the week-view card above for the offset rationale.
           className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_280px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_190px)]"
         >
-          {/* Day header — date itself is already shown in the toolbar's
+          {/* Day header - date itself is already shown in the toolbar's
               navigation label above, so we keep just the event count here. */}
           <div className="flex items-center justify-end px-5 py-3 bg-cream border-b border-light-grey">
             <div className="text-xs text-warm-grey">
@@ -1789,7 +1789,7 @@ export default function Calendar() {
                       style={{
                         // Left gutter (44px) reserves room for the time
                         // labels on the left rail. We distribute the
-                        // *remaining* width across `totalCols` columns —
+                        // *remaining* width across `totalCols` columns -
                         // the previous formula proportionally shaved the
                         // gutter from every column, which made the
                         // rightmost card overflow past the hour line.
@@ -1839,7 +1839,7 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* ── Today's Events Panel (month view only — week view shows its
+      {/* ── Today's Events Panel (month view only - week view shows its
             own timed events inline, day view IS today's events). On mobile
             month view we still hide it because the selected-day panel
             above already lists the day's events. ── */}
@@ -1899,7 +1899,7 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Day Detail Panel removed — "+N more" popup handles overflow */}
+      {/* Day Detail Panel removed - "+N more" popup handles overflow */}
 
       {/* ── Event Form Modal ───────────────────────────────────── */}
       {showForm && (
@@ -1935,12 +1935,12 @@ export default function Calendar() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   </div>
                   {/* min-w-0 on the flex-1 wrapper prevents the inner row from
-                      growing past the modal width on narrow phones — flex
+                      growing past the modal width on narrow phones - flex
                       items default to min-width:auto, and native iOS date
                       inputs have a wide intrinsic min-width that would
                       otherwise force the row to overflow. */}
                   <div className="flex-1 min-w-0 space-y-2">
-                    {/* All-day toggle — own row, right-aligned. Was inline
+                    {/* All-day toggle - own row, right-aligned. Was inline
                         with the start row, but on narrow phones it ate
                         enough horizontal space that the native iOS date
                         picker had no room to render "DD Mmm YYYY" and the
@@ -2244,7 +2244,7 @@ export default function Calendar() {
                   className="w-full border-[1.5px] border-light-grey rounded-[10px] px-3 py-2 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20 resize-none"
                 />
               </div>
-              {/* min-w-0 on each grid child is critical — without it, native iOS
+              {/* min-w-0 on each grid child is critical - without it, native iOS
                   <input type="date"> and <input type="time"> report an intrinsic
                   min-width that exceeds the grid track on narrow phones, causing
                   the right column to overflow the modal. Same fix as Tasks.jsx. */}

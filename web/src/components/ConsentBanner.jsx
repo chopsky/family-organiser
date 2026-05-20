@@ -4,16 +4,16 @@
  * PECR + UK GDPR require an explicit opt-in for non-essential tracking
  * cookies (currently just Google Analytics). The banner appears once for
  * any visitor who hasn't recorded a choice in localStorage, with two
- * options of equal prominence: "Accept" and "Decline" — the ICO requires
+ * options of equal prominence: "Accept" and "Decline" - the ICO requires
  * declining to be no harder than accepting, so they're styled symmetrically
  * (the same hover-treated outline button), not as a dimmed afterthought.
  *
  * Mounted once at the App level so it shows over every public route.
  * On any auth'd in-app route the banner will still surface if no choice
- * exists — that's intentional, the legal requirement applies regardless
+ * exists - that's intentional, the legal requirement applies regardless
  * of whether the visitor is signed in.
  *
- * Hidden on iOS native (Capacitor) — Google Analytics is not loaded
+ * Hidden on iOS native (Capacitor) - Google Analytics is not loaded
  * inside the iOS app bundle (the gtag <script> in index.html only fires
  * in real browser environments), and the iOS app discloses analytics
  * separately via the App Privacy nutrition labels in App Store Connect.
@@ -35,7 +35,7 @@ const isNative = () => {
 export default function ConsentBanner() {
   const [choice, setChoice] = useState(() => getConsent());
 
-  // Native apps don't need a cookie banner — see top-of-file comment.
+  // Native apps don't need a cookie banner - see top-of-file comment.
   if (isNative()) return null;
   if (choice) return null;
 
@@ -58,7 +58,7 @@ export default function ConsentBanner() {
           <p className="text-sm text-charcoal leading-relaxed flex-1">
             We use a few cookies to keep Housemait running, and (if you're
             happy with it) Google Analytics to understand which pages help
-            families the most. You're in control — see our{' '}
+            families the most. You're in control - see our{' '}
             <Link to="/privacy" className="text-plum hover:underline font-medium">Privacy Policy</Link>{' '}
             for details.
           </p>

@@ -4,13 +4,13 @@
  * Runs hourly. Looks at the last hour of ai_usage_log entries and alerts
  * the operator if either:
  *
- *   1. Gemini is being SKIPPED — most calls are landing on Claude as
+ *   1. Gemini is being SKIPPED - most calls are landing on Claude as
  *      primary (is_failover=false), suggesting GEMINI_API_KEY is unset
  *      or misnamed in the environment. This is the failure mode that bit
  *      us in late April: Gemini went dark for ~6 days unnoticed because
  *      Claude silently absorbed the load.
  *
- *   2. Gemini is FAILING — Gemini is being attempted but throwing on
+ *   2. Gemini is FAILING - Gemini is being attempted but throwing on
  *      most calls (auth, quota, model-not-found, etc.). The classifier
  *      still works because callWithFailover catches and falls through to
  *      Claude, but it's slower and more expensive than it should be.
@@ -19,7 +19,7 @@
  * scheduler_locks) so a multi-day outage doesn't spam the inbox.
  *
  * Email recipient: ADMIN_ALERT_EMAIL, falling back to SUPPORT_EMAIL.
- * If neither is configured the alert is logged-only — that's intentional;
+ * If neither is configured the alert is logged-only - that's intentional;
  * the cron should never crash the API just because Postmark is down.
  */
 
@@ -27,7 +27,7 @@ const { supabaseAdmin: supabase } = require('../db/client');
 const db = require('../db/queries');
 const email = require('../services/email');
 
-// Thresholds — picked to be loud enough to catch real problems without
+// Thresholds - picked to be loud enough to catch real problems without
 // firing on quiet hours. If hourly volume is below MIN_VOLUME we don't
 // have enough signal to draw any conclusions (e.g. dead-of-night).
 const MIN_VOLUME = 5;
@@ -50,7 +50,7 @@ async function checkAiHealth() {
 
     const total = rows.length;
     if (total < MIN_VOLUME) {
-      // Not enough volume to draw conclusions — quiet hour, skip.
+      // Not enough volume to draw conclusions - quiet hour, skip.
       return;
     }
 
@@ -71,7 +71,7 @@ async function checkAiHealth() {
     if (skipRate >= SKIP_RATE_THRESHOLD) {
       condition = 'gemini-skipped';
       body = [
-        `Gemini is being skipped on most AI calls — over the last hour, ${claudePrimaryCount} of ${total} calls (${Math.round(skipRate * 100)}%) went to Claude as primary (is_failover=false).`,
+        `Gemini is being skipped on most AI calls - over the last hour, ${claudePrimaryCount} of ${total} calls (${Math.round(skipRate * 100)}%) went to Claude as primary (is_failover=false).`,
         ``,
         `This usually means <code>GEMINI_API_KEY</code> is missing or misnamed in the Railway production environment. Check Railway → API service → Variables. Confirm a key exists and is non-empty.`,
         ``,
@@ -82,7 +82,7 @@ async function checkAiHealth() {
       // Surface a sample error so the recipient can triage without digging into logs.
       const sampleError = rows.find((r) => r.provider === 'gemini' && r.error)?.error || 'unknown';
       body = [
-        `Gemini is failing on most calls — over the last hour, ${geminiErrors} of ${geminiAttempts} Gemini calls (${Math.round(failureRate * 100)}%) errored.`,
+        `Gemini is failing on most calls - over the last hour, ${geminiErrors} of ${geminiAttempts} Gemini calls (${Math.round(failureRate * 100)}%) errored.`,
         ``,
         `Sample error: <code>${escapeHtml(sampleError)}</code>`,
         ``,
@@ -103,13 +103,13 @@ async function checkAiHealth() {
 
     const subject =
       condition === 'gemini-skipped'
-        ? 'Gemini API key may be unset — Claude is doing all AI calls'
-        : 'Gemini failing on most calls — check quota or API key';
+        ? 'Gemini API key may be unset - Claude is doing all AI calls'
+        : 'Gemini failing on most calls - check quota or API key';
 
     await email.sendAdminAlert(subject, body);
     console.log(`[ai-health] Sent admin alert: ${condition}`);
   } catch (err) {
-    // Never crash the cron loop — log and move on.
+    // Never crash the cron loop - log and move on.
     console.error('[ai-health] checkAiHealth failed:', err.message);
   }
 }

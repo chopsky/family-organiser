@@ -93,7 +93,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     }));
 
     // overrideHint: clients can pass override_hint=true to bypass dedupe
-    // (e.g. a future "add anyway" button). Default off — manual UI adds
+    // (e.g. a future "add anyway" button). Default off - manual UI adds
     // should be the natural dedupe path.
     const overrideHint = req.body.override_hint === true;
     const { created, duplicates, updated } = await db.addShoppingItemsWithDedupe(
@@ -108,7 +108,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     if (saved.length) {
       push.sendToHousehold(req.householdId, req.user.id, { title: 'Shopping list updated', body: `${req.user.name} added items`, category: 'shopping_updated' }).catch(() => {});
 
-      // WhatsApp broadcast — mirrors the format the bot uses when items are
+      // WhatsApp broadcast - mirrors the format the bot uses when items are
       // added via a WhatsApp message, so in-app adds reach WhatsApp members too.
       try {
         const members = await db.getHouseholdMembers(req.householdId);
@@ -136,7 +136,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * PATCH /api/shopping/:id
- * Update a shopping item — completion status, quantity, unit, description, category.
+ * Update a shopping item - completion status, quantity, unit, description, category.
  *
  * Body: { completed?, quantity?, unit?, description?, category?, item? }
  */
@@ -196,7 +196,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 
     // Fresh check-off side-effects: dedupe prior purchases of the same
     // item, then broadcast to other household members on WhatsApp.
-    // We only run these on a real state transition (open → completed) —
+    // We only run these on a real state transition (open → completed) -
     // not on idempotent PATCHes or on un-checks.
     if (completed === true && wasCompleted === false) {
       // Dedupe: clear older completed rows for the same item in this
@@ -214,7 +214,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
           console.log(`[shopping] purged ${purged} prior "${data.item}" purchase${purged === 1 ? '' : 's'} for list ${data.list_id}`);
         }
       } catch (err) {
-        // Non-fatal — the user's check-off itself succeeded; only the
+        // Non-fatal - the user's check-off itself succeeded; only the
         // history dedupe failed. Log and carry on.
         console.error('[shopping] purgePriorPurchases failed:', err.message);
       }

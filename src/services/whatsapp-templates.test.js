@@ -1,7 +1,7 @@
 /**
  * Unit tests for the WhatsApp 24-hour window check and send-path router.
  *
- * These are pure-function tests — no Twilio calls, no DB. The integration
+ * These are pure-function tests - no Twilio calls, no DB. The integration
  * wiring (broadcast.js → whatsapp-templates → whatsapp service) is exercised
  * by hand against the Twilio sandbox; this file just guards the logic that
  * decides WHICH path to take for each member.
@@ -88,7 +88,7 @@ describe('decideSendPath()', () => {
 
   test("returns 'skip' for a linked member outside the window when no template SID is configured yet", () => {
     // This is the state we ship in before the user has registered the
-    // template with Meta — out-of-window sends would hit 63016, so we
+    // template with Meta - out-of-window sends would hit 63016, so we
     // skip entirely rather than waste a round-trip.
     expect(decideSendPath(LINKED_OUT_OF_WINDOW, { templateSid: null, whatsappConfigured: true, nowMs: NOW })).toBe('skip');
     expect(decideSendPath(LINKED_NEVER_REPLIED, { templateSid: '', whatsappConfigured: true, nowMs: NOW })).toBe('skip');

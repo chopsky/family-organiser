@@ -5,14 +5,14 @@
  * unit-tested without a live Supabase connection. The DB query in
  * queries.js wires these together:
  *
- *   1. `tokenize(query)` — split the user's input into distinctive words,
+ *   1. `tokenize(query)` - split the user's input into distinctive words,
  *      dropping English connectives ("in", "of", "the") and generic school
  *      nouns ("school", "academy", "primary") that appear in thousands of
  *      names and wouldn't meaningfully narrow the search.
- *   2. `buildOrFilter(tokens)` — build a PostgREST `or()` clause that
+ *   2. `buildOrFilter(tokens)` - build a PostgREST `or()` clause that
  *      matches any row where any token hits name / local_authority /
  *      address. Deliberately broad; JS filter tightens it.
- *   3. `filterAndRank(rows, tokens)` — keep only rows where every
+ *   3. `filterAndRank(rows, tokens)` - keep only rows where every
  *      distinctive token is present somewhere in the combined searchable
  *      text, then rank rows that match entirely on name above rows that
  *      match via LA/address.
@@ -75,7 +75,7 @@ function tokenize(query) {
  *
  * We strip chars that are special in the filter syntax: commas (clause
  * separators), parens (grouping), asterisks (would become unwanted
- * wildcards). Apostrophes are kept — they URL-encode fine and match DB
+ * wildcards). Apostrophes are kept - they URL-encode fine and match DB
  * values that contain them literally.
  */
 function buildOrFilter(tokens) {

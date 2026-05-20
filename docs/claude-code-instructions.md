@@ -1,10 +1,10 @@
-# Housemait — 30-Day Free Trial Implementation
+# Housemait - 30-Day Free Trial Implementation
 
 ## Overview
 
 Implement a 30-day free trial system for Housemait. Every new user gets full access to all features for 30 days from signup. No credit card is required at signup. After 30 days, the user is prompted to subscribe (£5.99/month or £59.99/year) to continue using the app.
 
-There is no "Pro" tier or separate plan name — users simply have either an active trial, an active subscription, or an expired/inactive state.
+There is no "Pro" tier or separate plan name - users simply have either an active trial, an active subscription, or an expired/inactive state.
 
 ---
 
@@ -67,9 +67,9 @@ Create middleware that checks the user's trial/subscription status on every auth
 6. If subscription_status === 'expired' or 'cancelled' → return 402 with { status: 'expired' }
 ```
 
-**Important — race condition prevention:** When transitioning a trial to expired (step 5), use a conditional UPDATE that includes `WHERE subscription_status = 'trialing'`. This prevents two simultaneous requests from both attempting the update. If two requests hit at the exact moment of expiry, only one will modify the row — the second's UPDATE will affect zero rows, which is fine.
+**Important - race condition prevention:** When transitioning a trial to expired (step 5), use a conditional UPDATE that includes `WHERE subscription_status = 'trialing'`. This prevents two simultaneous requests from both attempting the update. If two requests hit at the exact moment of expiry, only one will modify the row - the second's UPDATE will affect zero rows, which is fine.
 
-The 402 response should include enough info for the frontend to show the upgrade prompt. Do NOT block the entire app — the frontend should handle the 402 gracefully and show a subscribe modal/page rather than a hard wall.
+The 402 response should include enough info for the frontend to show the upgrade prompt. Do NOT block the entire app - the frontend should handle the 402 gracefully and show a subscribe modal/page rather than a hard wall.
 
 ### Trial info endpoint
 
@@ -100,7 +100,7 @@ Install Stripe: `npm install stripe`
 Use Stripe in test mode during development. You'll need:
 - STRIPE_SECRET_KEY (env var)
 - STRIPE_WEBHOOK_SECRET (env var)
-- Two Price IDs — one for monthly (£5.99) and one for annual (£59.99/year)
+- Two Price IDs - one for monthly (£5.99) and one for annual (£59.99/year)
 
 Create these products/prices in the Stripe dashboard or via the API.
 
@@ -119,7 +119,7 @@ Creates a Stripe Checkout Session and returns the URL. The frontend redirects th
 - customer_email: user's email
 - Allow promotion codes (for future discount campaigns)
 
-**Mid-trial subscription handling:** When a user subscribes during their trial (e.g. on day 12), do NOT pass Stripe a trial period. Their billing starts immediately. The trade-off is they "lose" their remaining trial days, but this keeps the implementation simple and avoids needing to credit unused days. When the webhook confirms the subscription is active, set `subscription_status = 'active'` and ignore the trial fields from that point forward — the active status takes precedence over any remaining trial time.
+**Mid-trial subscription handling:** When a user subscribes during their trial (e.g. on day 12), do NOT pass Stripe a trial period. Their billing starts immediately. The trade-off is they "lose" their remaining trial days, but this keeps the implementation simple and avoids needing to credit unused days. When the webhook confirms the subscription is active, set `subscription_status = 'active'` and ignore the trial fields from that point forward - the active status takes precedence over any remaining trial time.
 
 ### Webhook handler
 
@@ -146,7 +146,7 @@ Handle these events:
 
 Verify webhook signatures using STRIPE_WEBHOOK_SECRET.
 
-**Endpoint security note:** The Stripe webhook URL must be publicly accessible (Railway handles this automatically). The endpoint itself is secured by Stripe's signature verification, NOT by your normal auth middleware. If your Express app applies auth middleware globally, exclude the webhook route — otherwise Stripe's requests will be rejected.
+**Endpoint security note:** The Stripe webhook URL must be publicly accessible (Railway handles this automatically). The endpoint itself is secured by Stripe's signature verification, NOT by your normal auth middleware. If your Express app applies auth middleware globally, exclude the webhook route - otherwise Stripe's requests will be rejected.
 
 ### Customer portal
 
@@ -159,10 +159,10 @@ Creates a Stripe Customer Portal session so users can manage their subscription 
 ### Stripe test cards (for QA)
 
 Use these test card numbers in Stripe test mode:
-- `4242 4242 4242 4242` — successful payment (any CVC, any future expiry)
-- `4000 0000 0000 9995` — declined (insufficient funds)
-- `4000 0025 0000 3155` — requires 3D Secure authentication (UK SCA testing)
-- `4000 0000 0000 0341` — successful payment but fails on subscription renewal (good for testing invoice.payment_failed)
+- `4242 4242 4242 4242` - successful payment (any CVC, any future expiry)
+- `4000 0000 0000 9995` - declined (insufficient funds)
+- `4000 0025 0000 3155` - requires 3D Secure authentication (UK SCA testing)
+- `4000 0000 0000 0341` - successful payment but fails on subscription renewal (good for testing invoice.payment_failed)
 
 Full list at stripe.com/docs/testing.
 
@@ -184,20 +184,20 @@ Fetch from GET /api/subscription/status on app load.
 Display a subtle, non-intrusive indicator in the app:
 - **Days 1–20:** Small text in the account/settings area only. Something like "Free trial · 24 days left". Use the Housemait brand colours (plum text). Do NOT show a banner or countdown on the main screens.
 - **Days 21–25:** Show a dismissible card on the home/dashboard screen: "Your free trial ends in X days. Subscribe to keep all your features." With a "Subscribe" button linking to the pricing/checkout page.
-- **Days 26–30:** Make the card non-dismissible and slightly more prominent. Copy becomes more specific: "Your trial ends on [date]. You've [scanned X receipts / planned X meals / added X items] — subscribe to keep going." Pull actual usage stats from the database.
+- **Days 26–30:** Make the card non-dismissible and slightly more prominent. Copy becomes more specific: "Your trial ends on [date]. You've [scanned X receipts / planned X meals / added X items] - subscribe to keep going." Pull actual usage stats from the database.
 - **After expiry:** The app enters a read-only expired state (see section 8 below).
 
 ### Subscribe page / modal
 
 Show two pricing cards:
 - Monthly: £5.99/month
-- Annual: £59.99/year (save £11.89 — or "2 months free")
+- Annual: £59.99/year (save £11.89 - or "2 months free")
 
 Highlight annual as "Most popular" or "Best value". Each card has a "Subscribe" button that calls POST /api/subscription/checkout with the selected plan, then redirects to the Stripe Checkout URL.
 
 ### Handle 402 responses
 
-Add a global Axios/fetch interceptor that catches 402 responses from the API. When received, show the subscribe modal rather than an error screen. The app should degrade gracefully — don't crash or show a blank page.
+Add a global Axios/fetch interceptor that catches 402 responses from the API. When received, show the subscribe modal rather than an error screen. The app should degrade gracefully - don't crash or show a blank page.
 
 ---
 
@@ -206,9 +206,9 @@ Add a global Axios/fetch interceptor that catches 402 responses from the API. Wh
 Trigger on new user signup. Use SendGrid's dynamic template system.
 
 **Template variables:**
-- {{first_name}} — from the signup form
-- {{trial_end_date}} — formatted as "21 May 2026"
-- {{app_url}} — link to housemait.com or a deep link
+- {{first_name}} - from the signup form
+- {{trial_end_date}} - formatted as "21 May 2026"
+- {{app_url}} - link to housemait.com or a deep link
 
 **Subject:** Welcome to Housemait! Your 30-day free trial starts now 🏠
 
@@ -220,19 +220,19 @@ See the attached welcome-email.docx for the full email copy to use as the SendGr
 
 Set up scheduled jobs (cron via Railway or a simple setInterval) to send nudge emails:
 
-### Day 20 — Gentle reminder
+### Day 20 - Gentle reminder
 - **Subject:** You've got 10 days left on your Housemait trial
 - **Content:** Remind them what they've been using. Include usage stats if possible (e.g., "You've added X items to your shopping lists"). Mention the subscribe option. Keep it friendly and low-pressure.
 
-### Day 25 — Stronger nudge
-- **Subject:** 5 days left — don't lose your Housemait features
+### Day 25 - Stronger nudge
+- **Subject:** 5 days left - don't lose your Housemait features
 - **Content:** More specific about what happens when the trial ends. Highlight the annual plan savings. Include a direct link to the subscribe page.
 
-### Day 28 — Final push
+### Day 28 - Final push
 - **Subject:** Your Housemait trial ends in 2 days
 - **Content:** Urgency without being pushy. "Your trial ends on [date]. Subscribe now to keep everything running smoothly for your family." Direct CTA button to checkout.
 
-### Day 30 — Trial expired
+### Day 30 - Trial expired
 - **Subject:** Your Housemait trial has ended
 - **Content:** "We hope you enjoyed Housemait. Your trial has ended, but your data is still safe. Subscribe anytime to pick up where you left off." Reassure them nothing is deleted.
 
@@ -261,8 +261,8 @@ Example: `trial_ends_at` stored as `2026-05-21T00:00:00Z` should display as "21 
 - **Never delete user data on trial expiry.** The household's data (lists, calendars, meals, etc.) should persist indefinitely (subject to the data retention policy in section 9). This is both good UX and a strong conversion lever.
 - **Trial is per household, not per user.** When one member of a household signs up and starts a trial, all family members share that same trial period.
 - **Only one trial per household.** Prevent abuse by checking if a household has ever had trial_started_at set. Don't allow resetting the trial.
-- **Internal/beta accounts bypass everything.** Households with `is_internal = TRUE` skip all subscription checks. Use this for your own account, family, friends, and testers — anyone who needs permanent free access. Manually set this in the database or via a Supabase admin function. Do NOT expose this as a user-facing setting.
-- **Mid-trial subscriptions start billing immediately.** Don't pass a Stripe trial period — keep the implementation simple. Active subscription status overrides any remaining trial time.
+- **Internal/beta accounts bypass everything.** Households with `is_internal = TRUE` skip all subscription checks. Use this for your own account, family, friends, and testers - anyone who needs permanent free access. Manually set this in the database or via a Supabase admin function. Do NOT expose this as a user-facing setting.
+- **Mid-trial subscriptions start billing immediately.** Don't pass a Stripe trial period - keep the implementation simple. Active subscription status overrides any remaining trial time.
 - **Always use Europe/London for user-facing dates.** Database stays in UTC; format on display.
 - **Stripe webhooks must be idempotent.** Use the `processed_stripe_events` table to dedupe.
 - **Annual pricing is the priority.** On the subscribe page, pre-select or highlight the annual plan. Show the savings clearly (e.g., "Save £10.88" or "2 months free").
@@ -278,9 +278,9 @@ Example: `trial_ends_at` stored as `2026-05-21T00:00:00Z` should display as "21 
 
 ---
 
-## 8. Expired trial — read-only state
+## 8. Expired trial - read-only state
 
-When a user's trial expires and they haven't subscribed, the app should NOT lock them out entirely or show a blank page. Instead, it enters a read-only state that lets them see their data but not interact with it. The goal is to remind them of the value they've already built up, making the decision to subscribe feel like continuing — not starting over.
+When a user's trial expires and they haven't subscribed, the app should NOT lock them out entirely or show a blank page. Instead, it enters a read-only state that lets them see their data but not interact with it. The goal is to remind them of the value they've already built up, making the decision to subscribe feel like continuing - not starting over.
 
 ### What the user sees
 
@@ -289,7 +289,7 @@ On login, show a **non-dismissible overlay/modal** on the home screen with:
 - A summary of their household's data, pulled from the database. For example:
   - "You've got X shopping lists, X meals saved, and your school calendar synced"
   - "Your family of X is set up and ready to go"
-- Reassurance: "Your data is safe — subscribe anytime to pick up right where you left off."
+- Reassurance: "Your data is safe - subscribe anytime to pick up right where you left off."
 - Two CTA buttons:
   - **"Subscribe"** (primary, prominent) → goes to the subscribe page / Stripe checkout
   - **"Just browsing"** (secondary, muted text link) → dismisses the modal and shows the read-only app

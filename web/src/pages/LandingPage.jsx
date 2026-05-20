@@ -70,8 +70,8 @@ function buildPricing(locale) {
   }
 }
 
-/** Pricing-card feature list. The school-terms bullet is UK-only —
- *  see locale.schoolTerms — so the list is built dynamically. */
+/** Pricing-card feature list. The school-terms bullet is UK-only -
+ *  see locale.schoolTerms - so the list is built dynamically. */
 function buildPlanFeatures(locale) {
   const features = [
     'Unlimited household members',
@@ -93,7 +93,7 @@ function buildPlanFeatures(locale) {
   return features
 }
 
-/** Testimonial quotes — universal across locales. The reviewer names,
+/** Testimonial quotes - universal across locales. The reviewer names,
  *  roles, and cities are localised via `locale.reviews` so an Austin
  *  parent doesn't see "Bristol" in the social proof set. The order
  *  here matters: REVIEW_QUOTES[i] pairs with locale.reviews[i]. */
@@ -164,7 +164,7 @@ const CalendarMock = ({ parentTerm = 'Mum' }) => (
 )
 
 /** Tasks mock for the showcase. completedTask is the line-through item
- *  at the top — locale-dependent because "Book MOT for the Volvo"
+ *  at the top - locale-dependent because "Book MOT for the Volvo"
  *  doesn't translate (US says "oil change", AU says "rego inspection",
  *  ZA says "car service" etc). Default keeps the historical UK wording. */
 const TasksMock = ({ completedTask = 'Book MOT for the Volvo' }) => (
@@ -291,7 +291,7 @@ const ShoppingMock = () => (
 )
 
 /** School-terms feature mock. The data shape is dictated by
- *  locale.schoolTerms.mock — see /lib/locales.js for the source of truth.
+ *  locale.schoolTerms.mock - see /lib/locales.js for the source of truth.
  *  Takes a `data` prop rather than reading the locale itself so the mock
  *  stays a pure rendering component (easier to test in isolation, no
  *  hook dependency). */
@@ -483,7 +483,7 @@ export default function LandingPage() {
   const price = pricing[billing]
   const faqs = buildFaqs(locale)
   const planFeatures = buildPlanFeatures(locale)
-  // Feature scrollytelling — three locale-aware overrides on the
+  // Feature scrollytelling - three locale-aware overrides on the
   // SHOWCASE entries:
   //   • cal:   the assignee meta line on two events ("Mum" vs "Mom")
   //   • tasks: the line-through completed task ("Book MOT for the Volvo"

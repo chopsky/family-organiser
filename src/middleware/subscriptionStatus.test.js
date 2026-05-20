@@ -1,7 +1,7 @@
 /**
  * Unit tests for the subscription / trial gate.
  *
- * Tests exercise the middleware directly with mock req/res/next objects —
+ * Tests exercise the middleware directly with mock req/res/next objects -
  * no Express, no HTTP. The Supabase chain is replaced with a handmade stub
  * so we can assert exactly which queries ran and with what filters, which
  * matters for the conditional-UPDATE race-prevention behaviour.
@@ -23,7 +23,7 @@
  *     WHERE clause is present on every UPDATE call.
  */
 
-// Must be set BEFORE requiring the middleware — the module throws at load
+// Must be set BEFORE requiring the middleware - the module throws at load
 // time if JWT_SECRET is missing (same pattern as middleware/auth.js).
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-subscription-status';
 
@@ -34,7 +34,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-subscription
 // We expose a shared chainable object so tests can prime .single() for the
 // select path and capture .update() payload + .eq() filter args for the
 // update path. Because both .eq() calls chain on the same object, the
-// terminal UPDATE awaits the chain itself — we make it thenable for that.
+// terminal UPDATE awaits the chain itself - we make it thenable for that.
 const mockChain = {
   select: jest.fn(),
   update: jest.fn(),
@@ -144,7 +144,7 @@ describe('requireActiveSubscription', () => {
       expect(supabaseAdmin.from).not.toHaveBeenCalled();
     });
 
-    // Guard against over-eager prefix match — /authorize shouldn't hit /auth's exclusion.
+    // Guard against over-eager prefix match - /authorize shouldn't hit /auth's exclusion.
     test('prefix-only match: /authorize is NOT treated as excluded', async () => {
       primeChain({ household: { id: HOUSEHOLD_ID, is_internal: false, subscription_status: 'active', trial_ends_at: null } });
       const req = makeReq({ path: '/authorize' });
@@ -153,7 +153,7 @@ describe('requireActiveSubscription', () => {
 
       await requireActiveSubscription(req, res, next);
 
-      // DB WAS consulted (not excluded) — and because status is active, next() runs.
+      // DB WAS consulted (not excluded) - and because status is active, next() runs.
       expect(supabaseAdmin.from).toHaveBeenCalledWith('households');
       expect(next).toHaveBeenCalled();
     });
@@ -162,12 +162,12 @@ describe('requireActiveSubscription', () => {
   // ── 2. Safe HTTP methods (read-only state) ─────────────────────────
 
   describe('safe HTTP methods', () => {
-    // Reads are never gated — expired households retain read access to
+    // Reads are never gated - expired households retain read access to
     // their own data. Only mutations require an active entitlement.
     test.each(['GET', 'HEAD', 'OPTIONS'])(
       '%s on a gated path passes through regardless of subscription state',
       async (method) => {
-        // Prime the chain to return an EXPIRED household — proof that the
+        // Prime the chain to return an EXPIRED household - proof that the
         // method check short-circuits before status is even examined.
         primeChain({
           household: {
@@ -185,7 +185,7 @@ describe('requireActiveSubscription', () => {
 
         expect(next).toHaveBeenCalledTimes(1);
         expect(res.status).not.toHaveBeenCalled();
-        // DB was never hit — safe methods short-circuit before the lookup.
+        // DB was never hit - safe methods short-circuit before the lookup.
         expect(supabaseAdmin.from).not.toHaveBeenCalled();
       }
     );
@@ -380,7 +380,7 @@ describe('requireActiveSubscription', () => {
         status: 'expired',
         trial_ended_at: oneDayAgo,
       });
-      // No UPDATE — the row is already in the correct state.
+      // No UPDATE - the row is already in the correct state.
       expect(mockChain.update).not.toHaveBeenCalled();
     });
 
@@ -452,13 +452,13 @@ describe('requireActiveSubscription', () => {
 
   // ── 6. Race-condition / concurrent expiry ──────────────────────────
 
-  describe('race condition — simultaneous trial expiry', () => {
+  describe('race condition - simultaneous trial expiry', () => {
     // When two requests cross the trial-end boundary at the same instant,
     // both read `subscription_status = 'trialing'` and both attempt the
     // UPDATE. The DB enforces atomicity: the first UPDATE matches 1 row,
     // the second matches 0 (because the WHERE-still-trialing filter fails
     // the moment the first has flipped the row). Both requests must still
-    // return 402 — the response doesn't depend on which request "won".
+    // return 402 - the response doesn't depend on which request "won".
     test('both requests return 402 trial_expired; both UPDATE calls carry the status guard', async () => {
       const oneSecondAgo = new Date(Date.now() - 1000).toISOString();
 
@@ -511,7 +511,7 @@ describe('requireActiveSubscription', () => {
         requireActiveSubscription(req2, res2, next2),
       ]);
 
-      // Both attempted the UPDATE (now also carrying inactive_since — Phase 8).
+      // Both attempted the UPDATE (now also carrying inactive_since - Phase 8).
       expect(mockChain.update).toHaveBeenCalledTimes(2);
       expect(mockChain.update).toHaveBeenCalledWith(expect.objectContaining({
         subscription_status: 'expired',
@@ -521,7 +521,7 @@ describe('requireActiveSubscription', () => {
       // because the second UPDATE's WHERE-still-trialing clause fails).
       expect(updateCounts).toEqual([1, 0]);
 
-      // Neither request passed through — both got 402 with identical body.
+      // Neither request passed through - both got 402 with identical body.
       expect(next1).not.toHaveBeenCalled();
       expect(next2).not.toHaveBeenCalled();
       expect(res1.status).toHaveBeenCalledWith(402);

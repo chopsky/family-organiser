@@ -14,7 +14,7 @@ export default function Login() {
   const [error, setError]         = useState('');
   const [resendState, setResendState] = useState('idle'); // idle | sending | sent
   const [turnstileToken, setTurnstileToken] = useState(null);
-  // Email form is hidden by default — Continue with Email button reveals it.
+  // Email form is hidden by default - Continue with Email button reveals it.
   // Keeps the initial surface focused on the SSO options (the cleaner /
   // less data-entry path) and removes the visual clutter of all the
   // email/password fields stacked next to the SSO buttons.
@@ -51,10 +51,10 @@ export default function Login() {
       navigate(postLoginRoute(data));
     } catch (err) {
       // Surface a more useful message than "Something went wrong" when
-      // axios fails before getting a response — typically CORS, network,
+      // axios fails before getting a response - typically CORS, network,
       // or wrong API URL.
       setError(err.response?.data?.error || 'Something went wrong.');
-      // Turnstile tokens are single-use — the backend already consumed
+      // Turnstile tokens are single-use - the backend already consumed
       // ours validating this submission. Re-submitting with the same
       // token would trip "Bot verification failed" on the second try.
       // Clear and reset so the next submit gets a fresh challenge.
@@ -103,7 +103,7 @@ export default function Login() {
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
       }}
     >
-      {/* Coral blob (bottom-left) — purely decorative ambient lighting. */}
+      {/* Coral blob (bottom-left) - purely decorative ambient lighting. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute"
@@ -142,7 +142,7 @@ export default function Login() {
           padding: '40px 36px 32px',
         }}
       >
-        {/* Glyph chip — uses the existing Housemait logomark rather
+        {/* Glyph chip - uses the existing Housemait logomark rather
             than the abstract house glyph from the design (user's
             instruction: keep the current logomark). */}
         <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
@@ -178,7 +178,7 @@ export default function Login() {
             described in the design handoff, so the line is intentionally
             hidden (the handoff says: omit rather than show a placeholder). */}
 
-        {/* Status / error banners — placed inside the card above the
+        {/* Status / error banners - placed inside the card above the
             auth controls so they sit where the user is looking. */}
         <div style={{ marginTop: 24 }}>
           {verified && (
@@ -207,7 +207,7 @@ export default function Login() {
             </p>
           )}
 
-          {/* Auth controls — stacked, gap 10px per design. SocialButtons
+          {/* Auth controls - stacked, gap 10px per design. SocialButtons
               renders the Google (and on iOS native, Apple) buttons with
               the existing wiring. The design-skin styling is applied via
               the wrapper class below. */}
@@ -390,7 +390,7 @@ export default function Login() {
           purple CTA; subsequent buttons (Apple on iOS native) stay
           white/ghost. */}
       <style>{`
-        /* Scope to the SocialButtons wrapper (a <div>) — not the email
+        /* Scope to the SocialButtons wrapper (a <div>) - not the email
            <form>, which also has space-y-3 but whose Log-in button has
            its own inline styling. */
         .login-concierge-auth > div.space-y-3 > * + * { margin-top: 10px !important; }

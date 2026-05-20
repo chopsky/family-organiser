@@ -159,7 +159,7 @@ function DashboardAiInput() {
     }, 500);
   }
 
-  // Web Speech API — supported in Safari (incl. iOS WKWebView from iOS
+  // Web Speech API - supported in Safari (incl. iOS WKWebView from iOS
   // 14.5+), Chrome, Edge. Each recognized phrase replaces the input
   // value; users can submit normally with the send button or by
   // pressing Enter. Tapping the mic again while recording stops it.
@@ -329,7 +329,7 @@ export default function Dashboard() {
   // Outstanding-task count, computed from the digest. Used by both
   // the badge effect below and the Tasks card render. Computing it
   // here (before any early return) keeps hook order stable, which
-  // the Rules of Hooks require — running useEffect AFTER an early
+  // the Rules of Hooks require - running useEffect AFTER an early
   // `if (loading) return` previously crashed with React #301
   // ("Max update depth exceeded") on iOS.
   const outstandingCount = (digest?.outstanding ?? []).length;
@@ -378,7 +378,7 @@ export default function Dashboard() {
   // Multi-assignee aware. Events created via the new "Select members"
   // UI store the full list in `ev.assignees`; older events only set
   // `assigned_to_name`. Returns members in source order, deduped against
-  // the household roster — anyone removed from the household post-hoc
+  // the household roster - anyone removed from the household post-hoc
   // is silently dropped.
   function getMembersForEvent(ev) {
     if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
@@ -416,7 +416,7 @@ export default function Dashboard() {
   return (
     <div {...ptr.bindings} className="max-w-5xl mx-auto space-y-6">
       <PullIndicator state={ptr.state} />
-      {/* Greeting — kicker (date + event count) above, serif headline below.
+      {/* Greeting - kicker (date + event count) above, serif headline below.
           Matches the Housemait editorial greeting style. */}
       <div>
         <p
@@ -433,7 +433,7 @@ export default function Dashboard() {
           {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
         </p>
         <h1
-          // Responsive sizing via Tailwind arbitrary values — mobile gets
+          // Responsive sizing via Tailwind arbitrary values - mobile gets
           // the cosier 36px treatment, desktop the full 56px editorial
           // headline. Inline styles cover properties Tailwind can't express
           // with utilities here (custom font family + weight).
@@ -452,12 +452,12 @@ export default function Dashboard() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* Trial reminder card — only renders when the household is trialing
+      {/* Trial reminder card - only renders when the household is trialing
           and has ≤10 days remaining. Silently no-ops otherwise (active,
           expired, internal testers, or the first 20 days of the trial). */}
       <TrialIndicatorCard />
 
-      {/* AI chat input — replaced with a subscribe prompt for expired
+      {/* AI chat input - replaced with a subscribe prompt for expired
           households so typing into a broken input doesn't turn into a
           jarring 402 → redirect moment. */}
       <WriteGate size="lg" message="Subscribe to create events, tasks, and more with AI">
@@ -467,7 +467,7 @@ export default function Dashboard() {
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        {/* Card 1 — Today's schedule */}
+        {/* Card 1 - Today's schedule */}
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-sans font-semibold text-bark">Today's schedule</h2>
@@ -513,7 +513,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 2 — Tasks */}
+        {/* Card 2 - Tasks */}
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-sans font-semibold text-bark">Tasks</h2>
@@ -562,7 +562,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 3 — Grocery list */}
+        {/* Card 3 - Grocery list */}
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-sans font-semibold text-bark">Grocery list</h2>
@@ -580,7 +580,7 @@ export default function Dashboard() {
             <>
               {/* One item per row: [badge] [name (truncates)] [quantity, right-
                   aligned], with a hairline divider between rows. Cap at 5
-                  rows so the dashboard card stays compact — the 'N items'
+                  rows so the dashboard card stays compact - the 'N items'
                   line at the bottom tells the user how many more there are. */}
               <div className="flex flex-col divide-y divide-[#1b14240f]">
                 {shoppingItems.slice(0, 5).map((item) => {
@@ -605,7 +605,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 4 — Today's meals */}
+        {/* Card 4 - Today's meals */}
         <div className="bg-linen rounded-2xl p-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-sans font-semibold text-bark">Today's meals</h2>

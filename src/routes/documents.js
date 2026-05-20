@@ -1,5 +1,5 @@
 /**
- * Documents routes — family file storage with folders and Cloudflare R2 backend.
+ * Documents routes - family file storage with folders and Cloudflare R2 backend.
  */
 
 const { Router } = require('express');
@@ -14,7 +14,7 @@ const { validateUpload, normaliseFilename } = require('../utils/fileValidation')
 const router = Router();
 
 // 25 MB file size limit. File-type allowlist + magic-byte sniffing happens
-// in src/utils/fileValidation.js after multer parses the body — see the
+// in src/utils/fileValidation.js after multer parses the body - see the
 // upload handler below.
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -162,7 +162,7 @@ router.get('/usage', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * GET /api/documents/activity
- * Recent document download activity across the household. Admin-only —
+ * Recent document download activity across the household. Admin-only -
  * non-admins could use this to fingerprint other members' private-folder
  * access patterns. Powers the "Recent activity" surface in Settings.
  */
@@ -188,7 +188,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const docs = await db.getDocuments(req.householdId, req.user.id, req.query.folder_id || null);
 
     // Attach a signed preview URL for image documents so the frontend can
-    // render thumbnails. Signing is cheap (HMAC only — no network), and the
+    // render thumbnails. Signing is cheap (HMAC only - no network), and the
     // browser lazy-loads the actual image bytes only when the card scrolls
     // into view. We use the default 5-min TTL (see r2.js); the frontend
     // re-fetches the list (and gets fresh URLs) every time the user opens
@@ -261,11 +261,11 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
     }
 
     // Filename hygiene happens in two passes:
-    //   1. normaliseFilename() — Unicode NFKC + strip BiDi / zero-width /
+    //   1. normaliseFilename() - Unicode NFKC + strip BiDi / zero-width /
     //      control characters. This is the DISPLAY name we show users
     //      and store in the DB. See utils/fileValidation.js for the
     //      attack-surface rationale.
-    //   2. ASCII-only sanitisation for the storage-key path — we still
+    //   2. ASCII-only sanitisation for the storage-key path - we still
     //      want R2 keys to be plain `[a-zA-Z0-9._-]` to dodge any
     //      S3-compatibility quirk with non-ASCII keys.
     const displayName = normaliseFilename(req.file.originalname) || `file.${validated.ext}`;
@@ -278,7 +278,7 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
     await r2.uploadFile(storageKey, req.file.buffer, validated.mime);
 
     // Record in database with the normalised display name + validated
-    // MIME. We never store the raw originalname — see normaliseFilename
+    // MIME. We never store the raw originalname - see normaliseFilename
     // for what gets stripped.
     const doc = await db.createDocument(req.householdId, {
       name: displayName,
@@ -310,7 +310,7 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
  *
  * This endpoint also writes one row to document_access_log so households
  * can see who's been opening which file. Logging failures are swallowed
- * so the user's download path is never blocked by an audit-log issue —
+ * so the user's download path is never blocked by an audit-log issue -
  * we'd rather lose one log row than fail the user's request.
  */
 router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
@@ -323,12 +323,12 @@ router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Use the default 5-min TTL — see r2.js for rationale. The frontend
+    // Use the default 5-min TTL - see r2.js for rationale. The frontend
     // fetches a fresh URL on every preview/download click, so the user
     // never holds onto a stale URL anyway.
     const url = await r2.getSignedDownloadUrl(doc.file_path);
 
-    // Log the access. Best-effort — wrap in its own try so a logging
+    // Log the access. Best-effort - wrap in its own try so a logging
     // failure doesn't bubble up. req.ip respects X-Forwarded-For via the
     // trusted-proxy config in app.js; req.get('user-agent') is plain.
     try {
@@ -356,7 +356,7 @@ router.get('/:id/url', requireAuth, requireHousehold, async (req, res) => {
  * Per-document access history. Visible to:
  *   - the document's uploader, AND
  *   - household admins.
- * Anyone else gets 403 — the privacy story for private folders is that
+ * Anyone else gets 403 - the privacy story for private folders is that
  * non-owners shouldn't even know the file exists, let alone who's been
  * looking at it.
  */

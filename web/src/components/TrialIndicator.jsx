@@ -1,5 +1,5 @@
 /**
- * Trial indicator — Phase 4.
+ * Trial indicator - Phase 4.
  *
  * Three visual variants keyed off `daysRemaining` from SubscriptionContext.
  * Only renders for trialing households; active/expired/internal return null.
@@ -28,14 +28,14 @@ function safeSetItem(key, value) {
   try { localStorage.setItem(key, value); } catch { /* Safari private mode */ }
 }
 function todayYMD() {
-  // London time — app is UK-first and trial date arithmetic should match
+  // London time - app is UK-first and trial date arithmetic should match
   // the time zone displayed in emails/UI (spec §6 "date formatting").
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
 }
 const DISMISSED_KEY_PREFIX = 'trial-dismissed:';
 
 /**
- * Format the trial end date as "21 May 2026" — matches the format we use
+ * Format the trial end date as "21 May 2026" - matches the format we use
  * in emails (spec §6).
  */
 function formatTrialEndDate(iso) {
@@ -50,7 +50,7 @@ function formatTrialEndDate(iso) {
 }
 
 /**
- * Subtle variant — one-line text for Settings "Plan" row.
+ * Subtle variant - one-line text for Settings "Plan" row.
  * Renders nothing when the user isn't trialing (covers active, expired,
  * internal, and not-yet-loaded states).
  */
@@ -75,7 +75,7 @@ export function TrialIndicatorSubtle({ className = '' }) {
 }
 
 /**
- * Card variant — renders for days 6–10 remaining (dismissible) and
+ * Card variant - renders for days 6–10 remaining (dismissible) and
  * days 1–5 remaining (non-dismissible, with usage stats). Returns null
  * otherwise (trial days 1–20 show the subtle text in Settings instead).
  *
@@ -85,7 +85,7 @@ export function TrialIndicatorSubtle({ className = '' }) {
 export function TrialIndicatorCard() {
   const { isTrialing, daysRemaining, trialEndsAt } = useSubscription();
 
-  // Dismiss state — keyed on today's date so the dismissal only lasts
+  // Dismiss state - keyed on today's date so the dismissal only lasts
   // until midnight in London time.
   const today = todayYMD();
   const dismissedKey = `${DISMISSED_KEY_PREFIX}${today}`;
@@ -177,7 +177,7 @@ function WarningContent({ daysRemaining }) {
 }
 
 function FinalPushContent({ daysRemaining, trialEndsAt }) {
-  // Usage stats — fetched lazily so we only hit the endpoint for users
+  // Usage stats - fetched lazily so we only hit the endpoint for users
   // who actually see this card. If the fetch fails we fall back to a
   // generic line ("you've been busy…") rather than showing "loading" or
   // breaking the CTA.
@@ -210,7 +210,7 @@ function FinalPushContent({ daysRemaining, trialEndsAt }) {
       </h3>
       <p className="text-sm text-charcoal/80 mt-1">
         {summary || (usageErrored
-          ? "You've been busy — subscribe to keep your family's plans in one place."
+          ? "You've been busy - subscribe to keep your family's plans in one place."
           : 'Subscribe to keep everything running smoothly for your family.')}
       </p>
       <div className="mt-3 flex items-center gap-3">
@@ -225,7 +225,7 @@ function FinalPushContent({ daysRemaining, trialEndsAt }) {
 
 function SubscribeButton({ variant = 'plum' }) {
   // iOS: render a plain-text note instead of a Subscribe button (App
-  // Store rules — no external payment entry points in the app).
+  // Store rules - no external payment entry points in the app).
   if (isIos()) {
     return (
       <p className="text-xs text-warm-grey italic">
@@ -271,7 +271,7 @@ function buildUsageSentence(usage) {
   }
   if (parts.length === 0) return null;
 
-  // "X, Y, and Z" — natural joining
+  // "X, Y, and Z" - natural joining
   const joined = parts.length === 1
     ? parts[0]
     : parts.length === 2

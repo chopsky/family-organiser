@@ -1,12 +1,12 @@
 /**
- * Trial lifecycle emails — Phase 7.
+ * Trial lifecycle emails - Phase 7.
  *
  * Runs once daily at 09:00 Europe/London (configured in
  * src/jobs/scheduler.js). Finds households at specific trial days and
  * sends the appropriate email via Postmark.
  *
- * Day 20 / 25 / 28 — broadcast stream, respects `trial_emails_enabled`.
- * Day 30 (trial_expired) — transactional stream, always sends.
+ * Day 20 / 25 / 28 - broadcast stream, respects `trial_emails_enabled`.
+ * Day 30 (trial_expired) - transactional stream, always sends.
  *
  * Dedupe is enforced by the `sent_emails` table's UNIQUE
  * (household_id, email_type) constraint: every send is gated by an
@@ -15,7 +15,7 @@
  *
  * ### Why we don't also fire the welcome email here
  * The welcome email is triggered inline from /api/auth/create-household
- * at the exact moment the trial starts — that's more responsive than
+ * at the exact moment the trial starts - that's more responsive than
  * waiting up to 24 hours for the cron's next tick, and the user
  * expects to see it within minutes of signup. The cron only handles
  * the day 20+ lifecycle emails.
@@ -25,12 +25,12 @@ const db = require('../db/queries');
 const email = require('../services/email');
 
 // Tuples describing each lifecycle email the cron can send.
-//   dayCount  — integer trial day (1-indexed). Used to find households
+//   dayCount  - integer trial day (1-indexed). Used to find households
 //               whose trial_started_at falls within the matching
 //               24-hour window.
-//   emailType — dedupe key in sent_emails
-//   sender    — email.js function to invoke
-//   respectOptOut — nudge emails (20/25/28) skip when
+//   emailType - dedupe key in sent_emails
+//   sender    - email.js function to invoke
+//   respectOptOut - nudge emails (20/25/28) skip when
 //                   trial_emails_enabled=false; transactional (30)
 //                   always sends.
 const NUDGE_SCHEDULE = [
@@ -65,7 +65,7 @@ async function processNudgeDay({ dayCount, emailType, sender, respectOptOut }) {
     console.log(`[trial-emails] No households at day ${dayCount}`);
     return;
   }
-  console.log(`[trial-emails] ${households.length} household(s) at day ${dayCount} — emailType=${emailType}`);
+  console.log(`[trial-emails] ${households.length} household(s) at day ${dayCount} - emailType=${emailType}`);
   for (const household of households) {
     try {
       if (respectOptOut && !household.trial_emails_enabled) {
@@ -74,7 +74,7 @@ async function processNudgeDay({ dayCount, emailType, sender, respectOptOut }) {
         // they re-enable mid-trial (the timestamp is within the
         // one-day window, not the email send itself). Simpler: skip
         // entirely, log, move on.
-        console.log(`[trial-emails] household ${household.id} opted out — skipping day ${dayCount}`);
+        console.log(`[trial-emails] household ${household.id} opted out - skipping day ${dayCount}`);
         continue;
       }
       await dispatchEmail({ household, emailType, sender });
@@ -94,7 +94,7 @@ async function processExpiredDay() {
   console.log(`[trial-emails] ${households.length} household(s) trial_expired`);
   for (const household of households) {
     try {
-      // The trial_expired email is transactional — send regardless of
+      // The trial_expired email is transactional - send regardless of
       // trial_emails_enabled. Users who opted out of nudges still need
       // to know their trial has ended.
       await dispatchEmail({ household, emailType: 'trial_expired', sender: email.sendTrialExpiredEmail });
@@ -111,13 +111,13 @@ async function processExpiredDay() {
 async function dispatchEmail({ household, emailType, sender }) {
   const claimed = await db.markEmailSentIfNew(household.id, emailType);
   if (!claimed) {
-    console.log(`[trial-emails] ${emailType} already sent to household ${household.id} — skipping`);
+    console.log(`[trial-emails] ${emailType} already sent to household ${household.id} - skipping`);
     return;
   }
 
   const recipient = await db.getHouseholdPrimaryContact(household.id);
   if (!recipient?.email) {
-    console.warn(`[trial-emails] household ${household.id} has no contactable admin — skipping ${emailType}`);
+    console.warn(`[trial-emails] household ${household.id} has no contactable admin - skipping ${emailType}`);
     // Don't delete the sent_emails row: the household still doesn't
     // have a reachable admin, so skipping is the correct final state.
     return;
@@ -132,7 +132,7 @@ async function dispatchEmail({ household, emailType, sender }) {
     console.warn(`[trial-emails] usage-counts failed for household ${household.id}:`, err.message);
   }
 
-  // Extract a first name — the users table stores a single `name`
+  // Extract a first name - the users table stores a single `name`
   // field. Split on whitespace, take the first token, fall back to
   // 'there' inside the email service.
   const firstName = (recipient.name || '').trim().split(/\s+/)[0] || '';

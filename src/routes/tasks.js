@@ -106,7 +106,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       }
     }
 
-    // WhatsApp broadcast — mirrors the format the bot uses when tasks are
+    // WhatsApp broadcast - mirrors the format the bot uses when tasks are
     // added through a WhatsApp message, so in-app adds are visible to
     // members who live in WhatsApp.
     if (saved.length) {

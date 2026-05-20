@@ -7,8 +7,8 @@
  *
  * Allowed:
  * - The configured production WEB_URL (e.g. https://www.housmait.com)
- * - capacitor://localhost — Capacitor iOS wrapper
- * - http://localhost — dev server
+ * - capacitor://localhost - Capacitor iOS wrapper
+ * - http://localhost - dev server
  * - Vercel preview URLs for this project (hash-based or git-branch form)
  *
  * Rejected:
@@ -32,7 +32,7 @@ function isAllowedOrigin(origin) {
   if (origin === process.env.WEB_URL) return true;
   // Accept www and bare-domain variants of WEB_URL automatically. iOS's
   // WKWebView (server.hostname in capacitor.config.json) is configured to
-  // load from https://www.housemait.com — that origin must be allowed
+  // load from https://www.housemait.com - that origin must be allowed
   // even if Railway's WEB_URL happens to be set to the bare-domain form,
   // or vice versa. Without this, switching WEB_URL between www / bare
   // silently breaks the iOS app via CORS rejection.
@@ -43,7 +43,7 @@ function isAllowedOrigin(origin) {
       const stripWww = (h) => h.replace(/^www\./, '');
       if (stripWww(reqUrl.hostname) === stripWww(webUrl.hostname)) return true;
     }
-  } catch { /* malformed URL — fall through to remaining checks */ }
+  } catch { /* malformed URL - fall through to remaining checks */ }
   if (origin === 'capacitor://localhost') return true;
   if (origin === 'http://localhost') return true;
   return PREVIEW_PATTERNS.some((re) => re.test(origin));

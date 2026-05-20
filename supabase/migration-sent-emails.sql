@@ -1,10 +1,10 @@
--- Subscription email dedupe — Phase 7.
+-- Subscription email dedupe - Phase 7.
 --
 -- Purpose: the daily trial-email cron (src/jobs/trial-emails.js) runs
 -- once per day at 09:00 Europe/London. Without a dedupe barrier, a
 -- rolling deploy or accidentally-duplicate scheduler run could send the
 -- same household two "Your trial ends in 2 days" emails. The UNIQUE
--- constraint below makes that impossible at the DB level — the second
+-- constraint below makes that impossible at the DB level - the second
 -- INSERT conflicts and the sender skips the send.
 --
 -- We don't need to track individual recipients; the trial emails are
@@ -12,11 +12,11 @@
 -- the household), so dedup is per-household-per-email-type.
 --
 -- email_type values used by the cron:
---   'welcome'              — day 1, fires from /api/auth/create-household
---   'trial_day_20'         — day 20 nudge (broadcast stream, respects opt-out)
---   'trial_day_25'         — day 25 nudge
---   'trial_day_28'         — day 28 final push
---   'trial_expired'        — day 30+ transactional (always sends)
+--   'welcome'              - day 1, fires from /api/auth/create-household
+--   'trial_day_20'         - day 20 nudge (broadcast stream, respects opt-out)
+--   'trial_day_25'         - day 25 nudge
+--   'trial_day_28'         - day 28 final push
+--   'trial_expired'        - day 30+ transactional (always sends)
 --
 -- Run this in the Supabase SQL editor.
 
@@ -40,9 +40,9 @@ CREATE INDEX IF NOT EXISTS idx_sent_emails_household_type
   ON sent_emails (household_id, email_type);
 
 -- RLS: matches the pattern on every other table in this codebase. All
--- access is via service_role (the Node backend) — no policies means
+-- access is via service_role (the Node backend) - no policies means
 -- anon / authenticated clients see nothing, which is what we want.
 ALTER TABLE sent_emails ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE sent_emails IS
-  'Dedupe ledger for subscription lifecycle emails (welcome, trial nudges, expiry). One row per (household, email type). RLS enabled with no policies — service_role only.';
+  'Dedupe ledger for subscription lifecycle emails (welcome, trial nudges, expiry). One row per (household, email type). RLS enabled with no policies - service_role only.';

@@ -1,5 +1,5 @@
 {
-  "description": "Tesco order summary / status update with no itemised list. Should classify as a receipt (or related) and create zero events — historically AI invented 'Tesco Grocery Delivery' events from the delivery slot.",
+  "description": "Tesco order summary / status update with no itemised list. Should classify as a receipt (or related) and create zero events - historically AI invented 'Tesco Grocery Delivery' events from the delivery slot.",
   "email_type": ["receipt", "delivery", "other"],
   "shopping_items": {
     "exact_count": 0

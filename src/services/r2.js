@@ -10,7 +10,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 // Trim credentials to defend against stray whitespace/newlines when pasting
-// into Railway / .env — the AWS SDK rejects the Authorization header if the
+// into Railway / .env - the AWS SDK rejects the Authorization header if the
 // secret contains a \n, producing "Invalid character in header content".
 const ACCOUNT_ID = process.env.R2_ACCOUNT_ID?.trim();
 const ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID?.trim();
@@ -35,7 +35,7 @@ const client = ACCOUNT_ID
 
 function ensureClient() {
   if (!client) {
-    throw new Error('R2 is not configured — set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY');
+    throw new Error('R2 is not configured - set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY');
   }
 }
 
@@ -93,7 +93,7 @@ async function deleteFiles(keys) {
 /**
  * Generate a signed URL for downloading a file.
  *
- * Default TTL is 5 minutes — short enough that a stolen URL has limited
+ * Default TTL is 5 minutes - short enough that a stolen URL has limited
  * value if a user's device is compromised, long enough that "click
  * preview, get distracted, come back" still works. The frontend always
  * fetches a fresh URL on every preview/download request, so there's no

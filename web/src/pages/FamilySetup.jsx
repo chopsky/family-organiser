@@ -66,10 +66,10 @@ export default function FamilySetup() {
   const isSa = isSouthAfricaHousehold(household);
   const showSchools = hasSchoolsFeature(household);
 
-  // (Household name + address are now edited via the modal — see
+  // (Household name + address are now edited via the modal - see
   // hhEdit* state below. The old inline-textfield setup is gone.)
   // Household default reminder time. Previously editable on this page but
-  // removed from the UI now that each member sets their own time — the
+  // removed from the UI now that each member sets their own time - the
   // column is kept as the scheduler's fallback for users who haven't set a
   // personal time. The seed value (set on signup) remains in the DB and is
   // never re-edited from the client. Read here only to display in the
@@ -139,7 +139,7 @@ export default function FamilySetup() {
   const [depSchoolResults, setDepSchoolResults] = useState([]);
   const [depSelectedSchool, setDepSelectedSchool] = useState(null);
   const [searchingSchools, setSearchingSchools] = useState(false);
-  // SA path for the add-dependent modal — see the equivalent newSa* vars
+  // SA path for the add-dependent modal - see the equivalent newSa* vars
   // above for the same pattern.
   const [depSaSchoolName, setDepSaSchoolName] = useState('');
   const [depSaSchoolExistingId, setDepSaSchoolExistingId] = useState(null);
@@ -172,10 +172,10 @@ export default function FamilySetup() {
   const [editSelectedSchoolData, setEditSelectedSchoolData] = useState(null); // full GIAS school data for new school creation
   // SA path for the edit-profile modal. profileSaSchoolName tracks the
   // (possibly newly-typed) name; profileSaSchoolExistingId, if set,
-  // means "reuse this household_schools row" — typically populated when
+  // means "reuse this household_schools row" - typically populated when
   // the user clicks a chip to pick a sibling's school. The existing
   // profileSchoolId already covers "this member is currently linked to
-  // school X" for both UK and SA — these two new vars handle the typing
+  // school X" for both UK and SA - these two new vars handle the typing
   // step before that link is persisted.
   const [profileSaSchoolName, setProfileSaSchoolName] = useState('');
   const [profileSaSchoolExistingId, setProfileSaSchoolExistingId] = useState(null);
@@ -308,7 +308,7 @@ export default function FamilySetup() {
           schoolId = schoolData.school.id;
         }
       } else if (depAttendsSchool && depSelectedSchool) {
-        // UK path — match by GIAS URN.
+        // UK path - match by GIAS URN.
         const existingSchool = householdSchools.find(s => s.school_urn === depSelectedSchool.urn);
         if (existingSchool) {
           schoolId = existingSchool.id;
@@ -345,7 +345,7 @@ export default function FamilySetup() {
           setTermDateSchoolLA(newSchool.local_authority || '');
           setImportError('');
           setShowTermDateOptions(true);
-          return; // Don't show generic success — the term date flow will handle it
+          return; // Don't show generic success - the term date flow will handle it
         }
       }
       setSuccess('Member added!');
@@ -358,7 +358,7 @@ export default function FamilySetup() {
   }
 
   // Remove a household_schools row (typed school) from the SA chip
-  // picker. Warns if any family members are linked to it — the backend
+  // picker. Warns if any family members are linked to it - the backend
   // will refuse the delete in that case (FK constraint), so we surface
   // the problem upfront rather than show a generic 500. Refreshes both
   // the schools list and the chip-selection state so the UI matches
@@ -428,7 +428,7 @@ export default function FamilySetup() {
     // Weekly activities AND term dates load for any member with a
     // school linked, regardless of whether they're a dependent or a
     // full Family Member. A teen with their own login can have an
-    // after-school schedule the same way a younger sibling can —
+    // after-school schedule the same way a younger sibling can -
     // it's just personal-schedule data tied to a school day.
     if (member.school_id) {
       setLoadingActivities(true);
@@ -527,11 +527,11 @@ export default function FamilySetup() {
 
   // South African national term-date import. The unified national
   // calendar (effective 2026 onwards) applies to every public school,
-  // so there's no per-school lookup negotiation — one tap copies the
+  // so there's no per-school lookup negotiation - one tap copies the
   // canonical national dates onto this household_schools row.
   async function handleImportSaTermDates() {
     if (!termDateSchoolId) return;
-    setImportingLA(true); // reuse the LA-import busy flag — only one
+    setImportingLA(true); // reuse the LA-import busy flag - only one
                           // primary import button is on screen per country
     setImportError('');
     try {
@@ -585,7 +585,7 @@ export default function FamilySetup() {
 
   async function handleImportWebsite() {
     // Step 1 of 2: fetch a preview from the backend (no DB writes yet).
-    // The admin then reviews, edits, and confirms in a separate panel —
+    // The admin then reviews, edits, and confirms in a separate panel -
     // see handleConfirmImportWebsite below.
     if (!termDateSchoolId || !websiteUrl.trim()) return;
     setImportingWebsite(true);
@@ -679,7 +679,7 @@ export default function FamilySetup() {
   }
 
   // UK academic year runs Sept-Aug, so a Jan date belongs to the AY
-  // that started the previous Sept. SA runs on the calendar year — much
+  // that started the previous Sept. SA runs on the calendar year - much
   // simpler. Used as a fallback when the AI doesn't tag academic_year
   // on a row (it almost always does).
   function getAcademicYearUk(dateStr) {
@@ -694,8 +694,8 @@ export default function FamilySetup() {
 
   // Bucket a list of term-date rows into school terms, grouped by
   // academic year. The shape of each AY's buckets differs between
-  // countries — UK uses three named seasons, SA uses four numbered
-  // terms — so we return an *array* of { key, label, dates } per AY
+  // countries - UK uses three named seasons, SA uses four numbered
+  // terms - so we return an *array* of { key, label, dates } per AY
   // and let the render iterate generically.
   //
   // Bucketing strategy: use the term_start events themselves as
@@ -708,7 +708,7 @@ export default function FamilySetup() {
   // in its bucket → fallback to listing every date).
   //
   // Fallback to month-based bucketing only when there are no term_start
-  // events in a year — defensive, rarely hits.
+  // events in a year - defensive, rarely hits.
   function groupDatesByTerm(dates, country) {
     const isSa = country === 'ZA';
     const termLabels = isSa
@@ -757,7 +757,7 @@ export default function FamilySetup() {
         // Fallback: month-based bucketing. Only triggers when no
         // term_start events exist for the year (e.g. a partially-
         // imported year planner). Same boundaries as the old static
-        // logic — imperfect but better than nothing.
+        // logic - imperfect but better than nothing.
         for (const td of yearEvents) {
           const m = new Date(td.date).getMonth();
           let idx;
@@ -853,7 +853,7 @@ export default function FamilySetup() {
     }
   }
 
-  // Bulk-clear every term date for a school. Country-agnostic — the
+  // Bulk-clear every term date for a school. Country-agnostic - the
   // backend endpoint just nukes the rows and resets the source/last-
   // updated metadata, leaving the school itself (and the member's link
   // to it) untouched. Confirm dialog mentions the school by name so
@@ -983,7 +983,7 @@ export default function FamilySetup() {
       //
       // Three flows feed into payload.school_id:
       //   • UK new school: profileSchoolId starts with 'new:' (GIAS-search
-      //     hasn't been linked yet) — create from editSelectedSchoolData.
+      //     hasn't been linked yet) - create from editSelectedSchoolData.
       //   • SA: branch on profileAttendsSchool + the SA name/existingId
       //     state. Existing id wins; otherwise create-by-name.
       //   • Existing link (either country): just use profileSchoolId.
@@ -1055,7 +1055,7 @@ export default function FamilySetup() {
       }
       setEditingMember(null);
 
-      // If school changed, show term date import options — but ONLY if the school has no term dates yet
+      // If school changed, show term date import options - but ONLY if the school has no term dates yet
       if (schoolChanged) {
         const school = freshSchools.find(s => s.id === payload.school_id);
         if (school && (!school.term_dates || school.term_dates.length === 0)) {
@@ -1114,7 +1114,7 @@ export default function FamilySetup() {
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image is too large — please use one under 5 MB.');
+      setError('Image is too large - please use one under 5 MB.');
       return;
     }
     setHhEditAvatarFile(file);
@@ -1139,7 +1139,7 @@ export default function FamilySetup() {
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image is too large — please use one under 5 MB.');
+      setError('Image is too large - please use one under 5 MB.');
       return;
     }
     setUploadingHouseholdAvatar(true);
@@ -1206,7 +1206,7 @@ export default function FamilySetup() {
     }
   }
 
-  // Debounced address search — fires 300 ms after the user stops typing
+  // Debounced address search - fires 300 ms after the user stops typing
   // to keep upstream calls (and our proxy's cache hits) lean. Skips
   // queries shorter than 3 chars (matches the backend's early-return).
   useEffect(() => {
@@ -1214,7 +1214,7 @@ export default function FamilySetup() {
     const q = hhEditAddress.trim();
     if (q.length < 3) { setHhAddressSuggestions([]); return; }
     // If the current input exactly matches a suggestion the user just
-    // picked, don't re-search — keeps the dropdown closed after a pick.
+    // picked, don't re-search - keeps the dropdown closed after a pick.
     if (hhAddressSuggestions.some((s) => s.label === q)) return;
     let cancelled = false;
     setHhAddressSearching(true);
@@ -1288,7 +1288,7 @@ export default function FamilySetup() {
     setError('');
     try {
       // If a school is selected, ensure it exists as a household_schools row
-      // before the invite is created — the invites table FK references that
+      // before the invite is created - the invites table FK references that
       // table. Two paths mirror handleAddDependent: UK by GIAS URN, SA by
       // free-text name (with optional existing-row pointer for siblings).
       let schoolId = null;
@@ -1337,7 +1337,7 @@ export default function FamilySetup() {
       setTimeout(() => setSuccess(''), 3000);
       const { data } = await api.get('/household/invites');
       setPendingInvites(data.invites ?? []);
-      // Refresh household schools — a new one may have just been created.
+      // Refresh household schools - a new one may have just been created.
       const refreshedSchools = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(refreshedSchools);
     } catch (err) {
@@ -1373,19 +1373,19 @@ export default function FamilySetup() {
       {!canWrite && <SubscribePrompt message="Subscribe to invite family members and edit profiles" />}
 
       {/* Household identity card.
-          Left: circular avatar (placeholder or uploaded image) — clickable
+          Left: circular avatar (placeholder or uploaded image) - clickable
           for admins to open the edit modal. Middle: name (display heading)
           and street address with pin icon (or an "Add address" link for
           admins when blank). Right: pencil-edit button (admins only).
           The edit modal handles name + address + avatar upload in one
-          place — replaces the older inline "household name" textfield. */}
+          place - replaces the older inline "household name" textfield. */}
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         {success && (
           <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
         )}
         <div className="flex items-center gap-5">
           {/* Clicking the avatar triggers the file picker directly via
-              the wrapping <label> + hidden input — no modal in the way.
+              the wrapping <label> + hidden input - no modal in the way.
               The Edit button to the right of the household name still
               opens the modal for changing name + address. */}
           <button
@@ -1525,7 +1525,7 @@ export default function FamilySetup() {
                 // Pinned to the production housemait.com hostname
                 // rather than window.location.origin. Inside the
                 // Capacitor iOS app, window.location.origin resolves
-                // to "capacitor://localhost" — exactly what an SA user
+                // to "capacitor://localhost" - exactly what an SA user
                 // hit in production when their recipient got a
                 // capacitor://localhost/signup?invite=… link they
                 // couldn't open. The invite recipient by definition
@@ -1535,7 +1535,7 @@ export default function FamilySetup() {
                 const inviteUrl = `https://housemait.com/signup?invite=${inv.token}`;
                 const inviteeName = (inv.name || '').trim();
                 const greeting = inviteeName ? `Hi ${inviteeName.split(' ')[0]}` : 'Hey';
-                const waText = `${greeting} — I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}`;
+                const waText = `${greeting} - I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}`;
                 const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
                 return (
                   <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-xl px-3 py-2">
@@ -1684,7 +1684,7 @@ export default function FamilySetup() {
         )}
       </div>
 
-      {/* Schools coming-soon placeholder — only for countries we don't
+      {/* Schools coming-soon placeholder - only for countries we don't
           yet support (UK and SA each have their own flow inline in the
           member modals; everywhere else sees this card). */}
       {!showSchools && (
@@ -1692,7 +1692,7 @@ export default function FamilySetup() {
           <h2 className="text-lg font-semibold text-bark mb-2">Schools</h2>
           <p className="text-sm text-cocoa">
             School directory and term-date imports are currently available
-            in the UK and South Africa. Coming soon to more countries —
+            in the UK and South Africa. Coming soon to more countries -
             until then, the rest of Housemait works the same.
           </p>
         </div>
@@ -1751,7 +1751,7 @@ export default function FamilySetup() {
       </div>
 
       {/* Add Dependent Modal */}
-      {/* Household edit modal — name + address (with Photon autocomplete)
+      {/* Household edit modal - name + address (with Photon autocomplete)
           + avatar upload. Backdrop click closes, Esc handled by the
           browser's natural button focus. Submit either patches settings
           and uploads the new avatar (if any) or clears it (if user
@@ -1944,7 +1944,7 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle — only shown for countries we support. UK
+              {/* School toggle - only shown for countries we support. UK
                   gets the GIAS search; SA gets a free-text name input
                   plus chips for any existing household schools. Other
                   countries see the Schools coming-soon card up top
@@ -1994,7 +1994,7 @@ export default function FamilySetup() {
                       {depSelectedSchool && householdSchools.find(s => s.school_urn === depSelectedSchool.urn) && (
                         <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
                           <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === depSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
-                          <p className="text-xs text-plum/70">Term dates already set up — just add {depName || 'their'} activities below.</p>
+                          <p className="text-xs text-plum/70">Term dates already set up - just add {depName || 'their'} activities below.</p>
                         </div>
                       )}
                     </div>
@@ -2137,7 +2137,7 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle — same pattern as the add-dependent flow.
+              {/* School toggle - same pattern as the add-dependent flow.
                   Pre-fills the school + year group on the invite so the
                   fields are already set when the invitee accepts.
                   Only shown for countries with a school flow (UK + SA). */}
@@ -2205,7 +2205,7 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {/* SA: free-text + existing-school chips — see Add Dependent
+              {/* SA: free-text + existing-school chips - see Add Dependent
                   modal above for the same pattern + rationale. */}
               {isSa && newAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
@@ -2313,14 +2313,14 @@ export default function FamilySetup() {
             )}
 
             {/* Four equal options, no recommended badge or section headers
-                — the user already knows which type of school their kid
+                - the user already knows which type of school their kid
                 attends, and each card's subtitle says when it applies. The
                 top card varies by country: UK gets the LA import, SA gets
                 the unified national term-date import. The three fallback
                 cards (website / iCal / manual) are identical across
-                countries — they're generic over school type. */}
+                countries - they're generic over school type. */}
             <div className="space-y-3">
-              {/* Country-specific top card — UK: LA, SA: national. */}
+              {/* Country-specific top card - UK: LA, SA: national. */}
               {isSa ? (
                 <div className="bg-white rounded-xl border border-cream-border p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -2551,7 +2551,7 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle — same pattern as the add-dependent form.
+              {/* School toggle - same pattern as the add-dependent form.
                   Hidden by default for members without a school; defaulted on
                   if the member already has a school attached (so existing data
                   isn't surprise-hidden). Toggling off clears the selection so
@@ -2584,7 +2584,7 @@ export default function FamilySetup() {
               </div>
               )}
 
-              {/* School details — only shown when the toggle above is on. The
+              {/* School details - only shown when the toggle above is on. The
                   activities + term-dates card below is still dependent-only
                   because those are the bits a parent manages on a younger
                   child's behalf. */}
@@ -2683,7 +2683,7 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {/* Weekly activities — any member with a school linked.
+              {/* Weekly activities - any member with a school linked.
                   Previously gated to dependents only, but the data model
                   has no such restriction and a teen with their own login
                   is just as likely to want their schedule tracked as a
@@ -2717,7 +2717,7 @@ export default function FamilySetup() {
                                   ))}
                                 </div>
                               ) : (
-                                <div className="text-cocoa text-sm py-2">—</div>
+                                <div className="text-cocoa text-sm py-2">-</div>
                               )}
                             </div>
                           );
@@ -2757,7 +2757,7 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {/* Term dates — shown for any member who has a school, not
+              {/* Term dates - shown for any member who has a school, not
                   just dependents. Without this lift, an adult member who
                   was added with a school would land in a dead-end where
                   they could see the linked school but had no UI to
@@ -2819,7 +2819,7 @@ export default function FamilySetup() {
                                             }
                                           </span>
                                         </div>
-                                        {/* "Half term" is UK-only terminology — SA schools don't
+                                        {/* "Half term" is UK-only terminology - SA schools don't
                                             use this concept (four discrete terms with breaks
                                             between, not within). Even if legacy data has half_term_*
                                             rows, we suppress the sub-line for SA. The dates
@@ -2954,7 +2954,7 @@ export default function FamilySetup() {
         </div>
       )}
 
-      {/* Review Imported Dates Panel — opens after /import-website/preview
+      {/* Review Imported Dates Panel - opens after /import-website/preview
           returns. Admin can edit any row, delete rows, and only commits
           to the DB on Save. Each row shows yellow warning chips from the
           server-side validator and an info button revealing the AI's
@@ -2973,7 +2973,7 @@ export default function FamilySetup() {
             </div>
             <p className="text-xs text-cocoa mb-1">{draftImport.schoolName}</p>
             <p className="text-sm text-cocoa mb-4">
-              We found <span className="font-medium text-bark">{draftImport.dates.length}</span> proposed date{draftImport.dates.length === 1 ? '' : 's'}. Check each row — especially any with yellow warnings — then tap Save.
+              We found <span className="font-medium text-bark">{draftImport.dates.length}</span> proposed date{draftImport.dates.length === 1 ? '' : 's'}. Check each row - especially any with yellow warnings - then tap Save.
             </p>
 
             {importError && (

@@ -9,9 +9,9 @@
  *
  * This module exposes three helpers:
  *
- *   • getConsent()      — read the persisted choice ('accepted' | 'declined' | null)
- *   • setConsent()      — persist a new choice and call gtag('consent', 'update', …)
- *   • initAnalytics()   — call once on boot to restore a prior "accepted"
+ *   • getConsent()      - read the persisted choice ('accepted' | 'declined' | null)
+ *   • setConsent()      - persist a new choice and call gtag('consent', 'update', …)
+ *   • initAnalytics()   - call once on boot to restore a prior "accepted"
  *                         choice before the first GA event fires. The
  *                         wait_for_update=500ms in index.html gives this
  *                         module a window to upgrade consent before the
@@ -32,7 +32,7 @@ export function getConsent() {
     if (value === 'accepted' || value === 'declined') return value;
     return null;
   } catch {
-    // Private mode / blocked storage. Treat as undecided — the banner will
+    // Private mode / blocked storage. Treat as undecided - the banner will
     // show every visit, which is the conservative-but-still-functional
     // behaviour. Consent stays at the safe "denied" default.
     return null;
@@ -48,7 +48,7 @@ export function setConsent(choice) {
   try {
     localStorage.setItem(STORAGE_KEY, choice);
   } catch {
-    // Falls through to in-memory only — banner won't reappear in this tab.
+    // Falls through to in-memory only - banner won't reappear in this tab.
   }
   applyConsentToGtag(choice);
   if (choice === 'declined') {
@@ -71,7 +71,7 @@ export function initAnalytics() {
 
 function applyConsentToGtag(choice) {
   if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
-  // Only analytics_storage is in scope — we don't run ads. The other three
+  // Only analytics_storage is in scope - we don't run ads. The other three
   // signals stay denied per the defaults in index.html, regardless of choice,
   // which keeps us out of any "Marketing storage" / ad-personalisation
   // collection paths inside GA4.

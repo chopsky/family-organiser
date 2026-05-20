@@ -119,7 +119,7 @@ describe('validateUpload()', () => {
       );
     });
 
-    test('canonicalises MIME — server-derived, not client-claimed', () => {
+    test('canonicalises MIME - server-derived, not client-claimed', () => {
       // Even though we don't take a claimed-MIME parameter (by design),
       // confirm the function returns the canonical mime for the extension.
       const pdf = bufferWithMagic([0x25, 0x50, 0x44, 0x46, 0x2D]);
@@ -135,7 +135,7 @@ describe('validateUpload()', () => {
     });
 
     test('rejects a binary file masquerading as .txt', () => {
-      // Contains a NUL — characteristic of binaries
+      // Contains a NUL - characteristic of binaries
       const bin = Buffer.from([0x48, 0x69, 0x00, 0x21]);
       expect(() => validateUpload(bin, 'binary.txt')).toThrow(/plain text/);
     });
@@ -191,7 +191,7 @@ describe('normaliseFilename()', () => {
   test('strips NUL and other C0 control characters (incl. tab)', () => {
     expect(normaliseFilename('clean\x00name.pdf')).toBe('cleanname.pdf');
     // Tab is in the C0 range and is removed entirely. A filename with a
-    // raw tab is non-standard anyway — a clean strip produces a valid
+    // raw tab is non-standard anyway - a clean strip produces a valid
     // name without any "tab→space" gymnastics.
     expect(normaliseFilename('tab\x09sep.csv')).toBe('tabsep.csv');
     expect(normaliseFilename('bell\x07name.pdf')).toBe('bellname.pdf');
@@ -202,7 +202,7 @@ describe('normaliseFilename()', () => {
     expect(normaliseFilename('report.ＰＤＦ')).toBe('report.PDF');
   });
 
-  test('collapses consecutive dots — defeats evil.pdf.exe chains', () => {
+  test('collapses consecutive dots - defeats evil.pdf.exe chains', () => {
     expect(normaliseFilename('evil.pdf...exe')).toBe('evil.pdf.exe');
     // (The validator then rejects the .exe extension separately.)
   });
@@ -235,7 +235,7 @@ describe('normaliseFilename()', () => {
   });
 
   test('does not mangle legitimate accented characters', () => {
-    // Accented Latin should survive — these are not lookalike abuse.
+    // Accented Latin should survive - these are not lookalike abuse.
     expect(normaliseFilename('café-menu.pdf')).toBe('café-menu.pdf');
     expect(normaliseFilename('résumé.docx')).toBe('résumé.docx');
   });

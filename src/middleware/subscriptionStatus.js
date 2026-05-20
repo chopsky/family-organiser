@@ -3,11 +3,11 @@ const { supabaseAdmin } = require('../db/client');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  throw new Error('Missing JWT_SECRET environment variable — refusing to start with insecure defaults');
+  throw new Error('Missing JWT_SECRET environment variable - refusing to start with insecure defaults');
 }
 
 /**
- * Subscription / trial gate — Phase 2.
+ * Subscription / trial gate - Phase 2.
  *
  * Mounted in app.js as:
  *   app.use('/api', requireActiveSubscription);
@@ -15,10 +15,10 @@ if (!JWT_SECRET) {
  * Because routes in this codebase apply `requireAuth` per-handler (not via
  * `router.use()` at router level), `req.householdId` is NOT set by the time
  * this middleware runs. We therefore re-verify the JWT here to extract the
- * household id. Cost: one extra jwt.verify() per API request — HS256 over a
+ * household id. Cost: one extra jwt.verify() per API request - HS256 over a
  * short token, negligible.
  *
- * Scope — mutations only. Safe (read-only) HTTP methods pass through
+ * Scope - mutations only. Safe (read-only) HTTP methods pass through
  * unconditionally; only mutating requests (POST/PATCH/PUT/DELETE) are
  * gated. This matches the product spec's read-only expired state:
  * households whose trial has ended stay able to LOAD their data (so the
@@ -42,21 +42,21 @@ if (!JWT_SECRET) {
  * mutation.
  */
 
-// Path prefixes (relative to the /api mount — req.path inside this
+// Path prefixes (relative to the /api mount - req.path inside this
 // middleware strips the /api baseUrl). Any request whose path starts with
 // one of these bypasses the gate entirely.
 const EXCLUDED_PATH_PREFIXES = [
-  '/auth',           // login, register, refresh, verify, logout, account deletion — must work for expired users
-  '/subscription',   // /status, and later /checkout + /portal — expired users need these
-  '/admin',          // platform staff tools — not gated by customer subscription state
-  '/inbound-email',  // Postmark/SendGrid webhook — no user auth at all
-  '/webhooks',       // Stripe (HMAC-signed) + RevenueCat (Bearer-token) webhooks — secured at handler level, not by user auth
-  '/unsubscribe',    // one-click email-footer links — mailgun-style clients POST with no bearer token
+  '/auth',           // login, register, refresh, verify, logout, account deletion - must work for expired users
+  '/subscription',   // /status, and later /checkout + /portal - expired users need these
+  '/admin',          // platform staff tools - not gated by customer subscription state
+  '/inbound-email',  // Postmark/SendGrid webhook - no user auth at all
+  '/webhooks',       // Stripe (HMAC-signed) + RevenueCat (Bearer-token) webhooks - secured at handler level, not by user auth
+  '/unsubscribe',    // one-click email-footer links - mailgun-style clients POST with no bearer token
 ];
 
 // HTTP methods that don't mutate state. These bypass the gate even for
 // expired households so the frontend can render the read-only view the
-// product spec describes (Section 8 — "What the user sees… A summary of
+// product spec describes (Section 8 - "What the user sees… A summary of
 // their household's data, pulled from the database").
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -68,16 +68,16 @@ function isExcluded(path) {
 }
 
 async function requireActiveSubscription(req, res, next) {
-  // 1. Excluded path — pass through immediately (no token decode, no DB read).
+  // 1. Excluded path - pass through immediately (no token decode, no DB read).
   if (isExcluded(req.path)) return next();
 
-  // 2. Safe (read-only) method — pass through. Expired households keep
+  // 2. Safe (read-only) method - pass through. Expired households keep
   //    read access to their own data; only mutations need entitlement.
   //    Short-circuits before the JWT verify and DB lookup so reads are
   //    essentially free at this layer.
   if (SAFE_METHODS.has(req.method)) return next();
 
-  // 3. No bearer token — let the downstream route's requireAuth 401 it. The
+  // 3. No bearer token - let the downstream route's requireAuth 401 it. The
   //    gate only makes decisions for requests that ARE authenticated; it
   //    doesn't take on the 401 role.
   const header = req.headers.authorization;
@@ -87,10 +87,10 @@ async function requireActiveSubscription(req, res, next) {
   try {
     payload = jwt.verify(header.slice(7), JWT_SECRET);
   } catch {
-    return next(); // bad/expired token — downstream requireAuth will surface the 401
+    return next(); // bad/expired token - downstream requireAuth will surface the 401
   }
 
-  // 4. Token is valid but has no householdId — user just registered and
+  // 4. Token is valid but has no householdId - user just registered and
   //    hasn't created/joined a household yet. Nothing to gate on; they
   //    need to reach /api/auth/create-household (already excluded) or
   //    /api/auth/join. If they somehow hit a gated route in this state
@@ -98,7 +98,7 @@ async function requireActiveSubscription(req, res, next) {
   const householdId = payload.householdId;
   if (!householdId) return next();
 
-  // 5. Load the subscription state. Fail open on errors — we don't want
+  // 5. Load the subscription state. Fail open on errors - we don't want
   //    the gate itself to become a reliability hazard.
   let household;
   try {
@@ -111,7 +111,7 @@ async function requireActiveSubscription(req, res, next) {
       console.warn(
         '[subscriptionStatus] household lookup failed for',
         householdId,
-        '—',
+        '-',
         error?.message || 'no row'
       );
       return next();
@@ -135,14 +135,14 @@ async function requireActiveSubscription(req, res, next) {
   // 8. Still within the trial window.
   if (status === 'trialing' && trialEndsAt && now < trialEndsAt) return next();
 
-  // 9. Trial has just crossed its end — transition to 'expired' and 402.
+  // 9. Trial has just crossed its end - transition to 'expired' and 402.
   //
   //    The UPDATE is conditional on `subscription_status = 'trialing'` so
   //    that two simultaneous requests crossing the boundary together don't
   //    both try to flip the row. The first UPDATE matches the row; the
   //    second's WHERE clause filters it out (the status is no longer
   //    'trialing') and affects zero rows. Both requests still return 402
-  //    — the response isn't about "did I win the race", it's about "is
+  //    - the response isn't about "did I win the race", it's about "is
   //    the trial over", which is true for both.
   if (status === 'trialing' && trialEndsAt && now >= trialEndsAt) {
     try {
@@ -158,7 +158,7 @@ async function requireActiveSubscription(req, res, next) {
         .eq('id', householdId)
         .eq('subscription_status', 'trialing');
     } catch (err) {
-      // The UPDATE is best-effort — even if it fails the trial IS over, so
+      // The UPDATE is best-effort - even if it fails the trial IS over, so
       // still 402. A later request (or the daily cron we'll add in a
       // future phase) will sync the row.
       console.error('[subscriptionStatus] trial-expiry UPDATE failed:', err);
@@ -169,7 +169,7 @@ async function requireActiveSubscription(req, res, next) {
     });
   }
 
-  // 10. Already-expired or cancelled — no entitlement.
+  // 10. Already-expired or cancelled - no entitlement.
   if (status === 'expired' || status === 'cancelled') {
     return res.status(402).json({
       status: 'expired',
@@ -182,7 +182,7 @@ async function requireActiveSubscription(req, res, next) {
   //     updating this middleware, fail open (log) rather than lock every
   //     household out of the app.
   console.warn(
-    `[subscriptionStatus] unrecognised subscription_status "${status}" for household ${householdId} — failing open`
+    `[subscriptionStatus] unrecognised subscription_status "${status}" for household ${householdId} - failing open`
   );
   return next();
 }

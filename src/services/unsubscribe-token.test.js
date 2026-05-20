@@ -2,7 +2,7 @@
  * Unit tests for the unsubscribe token helpers (Phase 7).
  *
  * Exercises the sign→verify round trip, tampering resistance, and
- * expiry handling. JWT library is real — we're testing our wrapping.
+ * expiry handling. JWT library is real - we're testing our wrapping.
  */
 
 process.env.UNSUBSCRIBE_TOKEN_SECRET = 'test-unsub-secret-phase-7';

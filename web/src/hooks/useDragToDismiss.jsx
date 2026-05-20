@@ -1,10 +1,10 @@
 /**
- * useDragToDismiss — native-feel drag-down-to-dismiss for bottom-
+ * useDragToDismiss - native-feel drag-down-to-dismiss for bottom-
  * anchored sheets. Mimics the iOS Mail compose / Music playlist /
  * Maps search behaviour: pull the sheet downwards, release past
  * the threshold and it slides off-screen + fires onDismiss.
  *
- * Web is no-op — desktop modals don't need this affordance.
+ * Web is no-op - desktop modals don't need this affordance.
  *
  * Usage in a modal component:
  *
@@ -21,11 +21,11 @@
  *   );
  *
  * The `handleBindings` should go on the area that's draggable
- * (typically the top 40-60px of the sheet — header / drag handle).
+ * (typically the top 40-60px of the sheet - header / drag handle).
  * The `sheetBindings` + `sheetStyle` go on the actual sheet element
  * (the rounded-top container).
  *
- * Threshold: 120px or 35% of sheet height — whichever is smaller —
+ * Threshold: 120px or 35% of sheet height - whichever is smaller -
  * triggers dismissal. Below threshold, the sheet snaps back.
  */
 
@@ -60,7 +60,7 @@ export function useDragToDismiss({ onDismiss, enabled = true } = {}) {
     const y = e.touches?.[0]?.clientY ?? 0;
     const delta = y - startYRef.current;
     if (delta <= 0) {
-      // Dragging up — don't fight scrolling; bail.
+      // Dragging up - don't fight scrolling; bail.
       setOffset(0);
       return;
     }
@@ -125,7 +125,7 @@ export function useDragToDismiss({ onDismiss, enabled = true } = {}) {
 }
 
 /**
- * Small visual handle/grabber bar — drop near the top of a bottom
+ * Small visual handle/grabber bar - drop near the top of a bottom
  * sheet to advertise that it's draggable. iOS-native sheets have one.
  */
 export function SheetHandle({ className = '' }) {

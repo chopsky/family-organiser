@@ -1,10 +1,10 @@
 /**
- * usePullToRefresh — native-feel pull-to-refresh for the iOS Capacitor
+ * usePullToRefresh - native-feel pull-to-refresh for the iOS Capacitor
  * WebView. Activates only when scrolled to the very top, captures the
  * subsequent vertical drag, animates a small spinner into view, and
  * fires the callback when the user releases past the threshold.
  *
- * Web is no-op — leaves the browser's own native PTR behaviour alone.
+ * Web is no-op - leaves the browser's own native PTR behaviour alone.
  *
  * Returns props you spread onto the scroll container's outermost
  * element + a "pull state" object you can use to render whatever
@@ -21,7 +21,7 @@
  *   );
  *
  * Implementation notes:
- *   • Only iOS native — browsers already have their own PTR.
+ *   • Only iOS native - browsers already have their own PTR.
  *   • Uses passive: false on touchmove so we can preventDefault during
  *     the drag (stops the WebView's own overscroll bounce).
  *   • Threshold: 80px to trigger. Pull beyond that and the indicator
@@ -70,13 +70,13 @@ export function usePullToRefresh(onRefresh) {
     const y = e.touches?.[0]?.clientY ?? 0;
     const delta = y - startYRef.current;
     if (delta <= 0) {
-      // Finger moved up — user is just scrolling, not pulling. Bail.
+      // Finger moved up - user is just scrolling, not pulling. Bail.
       setPull(0);
       startYRef.current = null;
       armedRef.current = false;
       return;
     }
-    // We're pulling down at the top of the scroll — prevent the
+    // We're pulling down at the top of the scroll - prevent the
     // WebView's own bounce, render our indicator instead.
     e.preventDefault();
     const damped = Math.min(delta * DAMPING, MAX_PULL_PX);
@@ -104,7 +104,7 @@ export function usePullToRefresh(onRefresh) {
         setPull(0);
       }
     } else {
-      // Release without triggering — animate back to zero.
+      // Release without triggering - animate back to zero.
       setPull(0);
     }
     startYRef.current = null;

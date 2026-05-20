@@ -3,13 +3,13 @@
  *
  * Two real-world attacks that the previous `length >= 8` rule didn't cover:
  *
- *   1. Reused / leaked passwords — 'password123', 'qwerty12345' etc. If a
+ *   1. Reused / leaked passwords - 'password123', 'qwerty12345' etc. If a
  *      user's chosen password has appeared in any public breach, stuffing
  *      attacks will find it within hours. Checked via HaveIBeenPwned's
  *      Pwned Passwords API using k-anonymity (only the first 5 chars of
  *      the SHA-1 hash leave the server).
  *
- *   2. Personal-info passwords — the user's own name or email prefix. Easy
+ *   2. Personal-info passwords - the user's own name or email prefix. Easy
  *      to guess from any social engineering and commonly reused.
  *
  * Design notes:
@@ -17,7 +17,7 @@
  *     block someone from creating an account. We log the miss and allow
  *     the password through.
  *   - No "contains uppercase / digit / symbol" rules. NIST 800-63B
- *     specifically advises against these — they push users toward
+ *     specifically advises against these - they push users toward
  *     predictable variations (Password1!) and don't actually raise entropy.
  *     Length + breach-check is the modern recommendation.
  */
@@ -58,7 +58,7 @@ async function hibpBreachCount(password) {
     }
     return 0;
   } catch (err) {
-    // Fail open — never block signup on a flaky third-party API.
+    // Fail open - never block signup on a flaky third-party API.
     // Worst case: a breached password slips through, but HIBP takes
     // meaningful checks up a massive notch on the happy path.
     console.warn('[password] HIBP check failed, allowing password through:', err.message);
@@ -70,7 +70,7 @@ async function hibpBreachCount(password) {
  * Validate a password. Returns { valid: true } on pass, or
  * { valid: false, error: 'user-facing message' } on fail.
  *
- * `context` carries fields for personal-info checks. Both optional — if
+ * `context` carries fields for personal-info checks. Both optional - if
  * omitted, those checks are skipped (useful for password reset where the
  * user's email might not be trivially available to the caller).
  */

@@ -109,17 +109,17 @@ export default function ChatWidget() {
   const pendingMessageRef = useRef(null);
   const initializedRef = useRef(false);
 
-  const WELCOME_MESSAGE = `Hey there! Welcome to Housemait — I'm your AI assistant, here to help your household stay organised.
+  const WELCOME_MESSAGE = `Hey there! Welcome to Housemait - I'm your AI assistant, here to help your household stay organised.
 
 Here are a few things to get you started:
 
-**1. Set up your family** — Head to the **Family** page to add your household members.
+**1. Set up your family** - Head to the **Family** page to add your household members.
 
-**2. Connect your calendars** — Go to **Settings** to link your Google, Apple, or Outlook calendar so everything syncs automatically.
+**2. Connect your calendars** - Go to **Settings** to link your Google, Apple, or Outlook calendar so everything syncs automatically.
 
-**3. Connect WhatsApp** — Also in **Settings**, link your WhatsApp so I can send you reminders and you can message me directly.
+**3. Connect WhatsApp** - Also in **Settings**, link your WhatsApp so I can send you reminders and you can message me directly.
 
-**4. Just ask me anything!** — I can create events, add to your shopping list, suggest recipes, manage tasks, and much more.
+**4. Just ask me anything!** - I can create events, add to your shopping list, suggest recipes, manage tasks, and much more.
 
 I'm always here if you need me!`;
 
@@ -139,14 +139,14 @@ I'm always here if you need me!`;
           setMessages(histRes.data.messages || []);
           setActiveConversationId(latest.id);
         } else {
-          // First-time user — show welcome bubble after a short delay
+          // First-time user - show welcome bubble after a short delay
           const dismissed = safeGetItem('housemait_welcome_dismissed');
           if (!dismissed) {
             setTimeout(() => setShowWelcomeBubble(true), 1500);
           }
         }
       } catch {
-        // API failed — still show welcome for new users
+        // API failed - still show welcome for new users
         const dismissed = safeGetItem('housemait_welcome_dismissed');
         if (!dismissed) {
           setTimeout(() => setShowWelcomeBubble(true), 1500);

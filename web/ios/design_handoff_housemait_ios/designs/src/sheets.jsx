@@ -1,4 +1,4 @@
-// Modal sheets — AI composer fullscreen + Add task
+// Modal sheets - AI composer fullscreen + Add task
 function Sheet({ open, onClose, children, title }) {
   const [show, setShow] = useState(false);
   useEffect(()=>{ if(open) requestAnimationFrame(()=>setShow(true)); else setShow(false); }, [open]);
@@ -49,7 +49,7 @@ function AISheet({ open, onClose }) {
     setVal('');
     setTimeout(()=>{
       let resp = "Done. I've added that for you.";
-      if (/recital|tennis|ballet|event/i.test(v)) resp = "Added to the calendar — I've blocked travel time too.";
+      if (/recital|tennis|ballet|event/i.test(v)) resp = "Added to the calendar - I've blocked travel time too.";
       else if (/grocery|shop|carrot|milk|buy/i.test(v)) resp = "Added to the grocery list under the right category.";
       else if (/meal|dinner|lunch|recipe|plan/i.test(v)) resp = "I've drafted three meal options. Tap one to add it to the plan.";
       else if (/receipt|scan/i.test(v)) resp = "Open the camera and I'll extract everything line by line.";
@@ -215,7 +215,7 @@ function AddSheet({ open, onClose, kind='task', onSave }) {
           display:'flex', alignItems:'center', gap:10,
         }}>
           <I.sparkle size={16} color="var(--brand)"/>
-          <span style={{ fontSize:12, color:'var(--brand-deep)' }}>Tip: just describe it — AI fills in the details.</span>
+          <span style={{ fontSize:12, color:'var(--brand-deep)' }}>Tip: just describe it - AI fills in the details.</span>
         </div>
 
         <button onClick={()=>{ if(title.trim()) { onSave({ title, who, cat }); onClose(); }}} style={{

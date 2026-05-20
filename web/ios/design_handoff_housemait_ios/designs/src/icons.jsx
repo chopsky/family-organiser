@@ -1,4 +1,4 @@
-// Icon set — minimalist line + filled variants. 24px viewBox.
+// Icon set - minimalist line + filled variants. 24px viewBox.
 const I = {
   home: (p={}) => (
     <svg width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||'currentColor'} strokeWidth={p.w||1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -112,7 +112,7 @@ const I = {
       <circle cx="4" cy="4" r="4"/>
     </svg>
   ),
-  // Logo mark — simplified house with two figures
+  // Logo mark - simplified house with two figures
   logo: (p={}) => (
     <svg width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill={p.color||'#6C3DD9'}>
       <path d="M12 2L2 11h2v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V11h2L12 2z"/>

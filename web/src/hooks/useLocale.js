@@ -1,5 +1,5 @@
 /**
- * useLocale() — small hook that maps the current pathname to a locale
+ * useLocale() - small hook that maps the current pathname to a locale
  * config from /lib/locales.js. Marketing components (LandingPage,
  * Subscribe, etc.) call this instead of reading prices/feature flags
  * from hardcoded literals.
@@ -41,14 +41,14 @@ export function readLocaleCookie() {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** Resolve the marketing-homepage path for the visitor's saved locale —
+/** Resolve the marketing-homepage path for the visitor's saved locale -
  *  e.g. '/gb' if they came in from the UK marketing page, '/' if no
  *  locale cookie has been set yet. Used by logo links on /login and
  *  /signup so clicking "home" sends the visitor back to the country
  *  marketing page they came from, not the international default.
  *
  *  This is a CLIENT-side equivalent of the edge middleware's
- *  pathForCountry() — needed because React Router's <Link> doesn't go
+ *  pathForCountry() - needed because React Router's <Link> doesn't go
  *  through Vercel's edge, so the geo redirect never fires for in-app
  *  navigation. */
 export function localeHomePath() {

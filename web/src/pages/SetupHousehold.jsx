@@ -14,7 +14,7 @@ export default function SetupHousehold() {
   const { login, logout }     = useAuth();
   const navigate              = useNavigate();
 
-  // Escape hatch — without this users with a half-finished signup are
+  // Escape hatch - without this users with a half-finished signup are
   // stuck: visiting housemait.com bounces them right back here via
   // RequireAuth's needsHousehold redirect. Logging out clears the token
   // so the landing page renders normally. Hard redirect (vs navigate)
@@ -33,17 +33,17 @@ export default function SetupHousehold() {
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
       // Country detection cascade:
-      //   1. App Store storefront (iOS only) — the user's Apple ID
+      //   1. App Store storefront (iOS only) - the user's Apple ID
       //      Country/Region. This is the single most authoritative
       //      signal for App Store installs because it's the same
       //      country Apple uses for IAP pricing, so what we store
       //      always matches what they're paying. Travellers and
       //      expats classified correctly without us having to guess.
-      //   2. Locale cookie (housemait-locale) — set by Vercel edge
+      //   2. Locale cookie (housemait-locale) - set by Vercel edge
       //      middleware when the web visitor lands on a country-
       //      specific marketing page (/gb, /us, /za, etc.). Reflects
       //      what we KNOW from their IP at landing time.
-      //   3. Browser timezone — last-resort fallback for direct
+      //   3. Browser timezone - last-resort fallback for direct
       //      /signup visits with no cookie (and not on iOS).
       //
       // Storefront wins over cookie because the App Store country is
@@ -70,7 +70,7 @@ export default function SetupHousehold() {
 
   return (
     <div
-      // Concierge stage — same shell as Login/Signup/Onboarding so the
+      // Concierge stage - same shell as Login/Signup/Onboarding so the
       // path from sign-up → household creation → wizard is one
       // continuous visual experience.
       className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
@@ -79,7 +79,7 @@ export default function SetupHousehold() {
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
       }}
     >
-      {/* Decorative ambient blobs — identical to Login.jsx. */}
+      {/* Decorative ambient blobs - identical to Login.jsx. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute"
@@ -101,7 +101,7 @@ export default function SetupHousehold() {
         }}
       />
 
-      {/* Sign-out — floats top-right above the card. */}
+      {/* Sign-out - floats top-right above the card. */}
       <button
         type="button"
         onClick={handleSignOut}
@@ -111,7 +111,7 @@ export default function SetupHousehold() {
         Sign out
       </button>
 
-      {/* Glass card — Login/Signup width (420px) so a brand-new user
+      {/* Glass card - Login/Signup width (420px) so a brand-new user
           coming from /signup sees the same card-shape persist. */}
       <div
         className="relative w-full max-w-[420px]"
@@ -125,7 +125,7 @@ export default function SetupHousehold() {
           padding: '40px 36px 32px',
         }}
       >
-        {/* Logomark chip — same composition as Login. */}
+        {/* Logomark chip - same composition as Login. */}
         <div
           className="mx-auto mb-[18px]"
           style={{
@@ -156,7 +156,7 @@ export default function SetupHousehold() {
         </h1>
 
         <p className="text-center text-sm text-cocoa mt-3">
-          Give it a name — you can change it later.
+          Give it a name - you can change it later.
         </p>
 
         <div style={{ marginTop: 24 }}>

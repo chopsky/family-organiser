@@ -27,7 +27,7 @@ api.interceptors.request.use((config) => {
 // ── Token refresh state ──────────────────────────────────────────
 // When a 401 arrives, attempt a silent refresh using the stored
 // refresh token. Multiple concurrent 401s share a single refresh
-// call — failed requests queue up and replay once the refresh lands.
+// call - failed requests queue up and replay once the refresh lands.
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -67,7 +67,7 @@ api.interceptors.response.use(
 
     // ── Handle 401: attempt silent token refresh ──
     if (err.response?.status === 401 && !originalRequest._retry) {
-      // Public auth endpoints return 401 on bad credentials — that's
+      // Public auth endpoints return 401 on bad credentials - that's
       // semantic ("wrong password"), not a session-expiry signal. Don't
       // force-logout or silently refresh; let the caller's catch block
       // surface the real error. Before this guard, a bad-password login
@@ -84,7 +84,7 @@ api.interceptors.response.use(
       }
 
       if (isRefreshing) {
-        // Another refresh is already in-flight — queue this request
+        // Another refresh is already in-flight - queue this request
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((newToken) => {
@@ -136,13 +136,13 @@ api.interceptors.response.use(
     // entitlement".
     //
     // We dispatch a custom event rather than calling window.location
-    // directly — SubscriptionContext listens for it and performs a proper
+    // directly - SubscriptionContext listens for it and performs a proper
     // SPA navigation + refresh of its state. Keeping the logic out of the
     // interceptor avoids a circular import on SubscriptionContext (which
     // imports this file).
     //
     // The /subscription/* URL check prevents loops if /checkout or
-    // /portal ever returns 402 (they shouldn't — they're gate-excluded —
+    // /portal ever returns 402 (they shouldn't - they're gate-excluded -
     // but belt-and-braces).
     if (err.response?.status === 402) {
       const isSubscriptionRoute = originalRequest.url?.includes('/subscription/');

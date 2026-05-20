@@ -1,5 +1,5 @@
 /**
- * IosSubscribe — IAP Phase 2d.
+ * IosSubscribe - IAP Phase 2d.
  *
  * The native-IAP paywall, rendered when the iOS app needs to show
  * subscription options. Mirrors web/src/pages/Subscribe.jsx visually
@@ -13,13 +13,13 @@
  *     /subscribe.
  *
  * App Review compliance notes (Guideline 3.1.1):
- *   - Pricing strings come from `pkg.product.priceString` — Apple's
+ *   - Pricing strings come from `pkg.product.priceString` - Apple's
  *     localised, currency-correct string. We never display a
  *     hard-coded price; the App Review machine WILL flag mismatches
  *     between displayed price and Store Connect price.
  *   - No "subscribe at housemait.com" or any reference to web.
  *   - "Restore Purchases" button required and prominently placed.
- *   - Terms & Privacy links open in-app — App Review requires both
+ *   - Terms & Privacy links open in-app - App Review requires both
  *     to be reachable from any paid screen.
  *
  * Purchase race:
@@ -89,16 +89,16 @@ export default function IosSubscribe() {
     try {
       const result = await purchasePackage(pkg);
       // result.customerInfo carries the new entitlement state directly
-      // from Apple/RevenueCat — usable as fast-path UI confirmation
+      // from Apple/RevenueCat - usable as fast-path UI confirmation
       // even before our webhook lands.
       if (!hasActivePremium(result?.customerInfo)) {
         // Apple reported success but RevenueCat didn't see the
-        // entitlement attached — rare, but worth surfacing rather
+        // entitlement attached - rare, but worth surfacing rather
         // than silently sending the user to a dashboard that will
         // immediately 402.
         throw new Error('Purchase completed but entitlement not active. Try Restore Purchases.');
       }
-      // Server sync — wait briefly for the webhook to flip our DB.
+      // Server sync - wait briefly for the webhook to flip our DB.
       setConfirming(true);
       await waitForServerSync(refresh);
       navigate('/dashboard', { replace: true });
@@ -220,7 +220,7 @@ export default function IosSubscribe() {
               <IapPricingCard
                 pkg={annualPkg}
                 planLabel="Annual"
-                tagline="Best value — two months free."
+                tagline="Best value - two months free."
                 badge="Best value"
                 highlighted={true}
                 submitting={submitting === annualPkg.identifier}
@@ -231,7 +231,7 @@ export default function IosSubscribe() {
           </div>
         )}
 
-        {/* Restore Purchases — required by App Review Guideline 3.1.1.
+        {/* Restore Purchases - required by App Review Guideline 3.1.1.
             Always present, even before offerings load (a returning user
             with a previous purchase needs this to recover access). */}
         <div className="mt-8 text-center">
@@ -245,7 +245,7 @@ export default function IosSubscribe() {
           </button>
         </div>
 
-        {/* Footer — short reassurance text. Per-card disclosure blocks
+        {/* Footer - short reassurance text. Per-card disclosure blocks
             above carry the full Apple-required Terms + Privacy + auto-
             renew language; this is just the consolidated "managed by
             Apple" line for users who scrolled past the cards.        */}
@@ -301,7 +301,7 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining }) {
 // ─── Pricing card ────────────────────────────────────────────────
 
 function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submitting, disabled, onPurchase }) {
-  // Use Apple's localised price string — never hardcode. App Review
+  // Use Apple's localised price string - never hardcode. App Review
   // checks for parity between displayed price and StoreConnect.
   const priceString = pkg?.product?.priceString || '';
   const isAnnual = pkg?.packageType === 'ANNUAL';
@@ -311,13 +311,13 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
   const lengthDisclosure = isAnnual
     ? '1 year subscription, auto-renewing'
     : '1 month subscription, auto-renewing';
-  // Per-unit price for annual — Apple specifically calls out price-per-
+  // Per-unit price for annual - Apple specifically calls out price-per-
   // unit "if appropriate", and annual subscriptions where it differs from
   // the headline price are the canonical case.
   // Computes from the localized price (defensive: returns null if Apple's
   // pricing object is unexpected so we never hardcode).
   const perUnitDisplay = isAnnual ? computeAnnualPerMonth(pkg) : null;
-  // Subscription title — Apple wants the EXACT product title visible.
+  // Subscription title - Apple wants the EXACT product title visible.
   // Falls back to a sensible default if the SDK doesn't surface it.
   const subscriptionTitle =
     pkg?.product?.title?.replace(/\s*\(.*\)\s*$/, '').trim() ||
@@ -352,7 +352,7 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
             className="text-[36px] font-semibold text-charcoal leading-none"
             style={{ fontFamily: '"Instrument Serif", Georgia, serif' }}
           >
-            {priceString || '—'}
+            {priceString || '-'}
           </span>
           <span className="text-sm text-warm-grey">{periodDisplay}</span>
         </div>
@@ -363,7 +363,7 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
         )}
       </div>
 
-      {/* Subscription length disclosure — Apple Guideline 3.1.2(c). */}
+      {/* Subscription length disclosure - Apple Guideline 3.1.2(c). */}
       <p className="text-xs text-warm-grey mb-5">
         {lengthDisclosure}
       </p>
@@ -393,11 +393,11 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
         {submitting
           ? 'Processing…'
           : priceString
-            ? `Subscribe — ${priceString}`
+            ? `Subscribe - ${priceString}`
             : 'Unavailable'}
       </button>
 
-      {/* Per-card disclosure block — Apple Guideline 3.1.2(c) requires
+      {/* Per-card disclosure block - Apple Guideline 3.1.2(c) requires
           the auto-renew disclaimer + Terms + Privacy links to be near
           the purchase button, not buried in a footer.                 */}
       <p className="text-[11px] text-warm-grey mt-3 leading-snug">
@@ -415,7 +415,7 @@ function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submittin
 /**
  * Compute "per month" string from an annual package's localized price.
  * Returns null if the SDK doesn't expose a numeric price + currency we
- * can format — never falls back to hardcoded values (App Review verifies
+ * can format - never falls back to hardcoded values (App Review verifies
  * displayed price matches StoreConnect).
  */
 function computeAnnualPerMonth(pkg) {
@@ -441,7 +441,7 @@ function computeAnnualPerMonth(pkg) {
 /**
  * Refresh subscription status until it reflects the new purchase,
  * or until 8 seconds elapse. The webhook normally lands in <2s in
- * production. We don't BLOCK on this — failure to sync means the
+ * production. We don't BLOCK on this - failure to sync means the
  * user lands on /dashboard and the next mutation either succeeds
  * (server caught up) or 402s and re-routes to /subscribe (which
  * won't happen here because Apple already confirmed the purchase
@@ -453,7 +453,7 @@ async function waitForServerSync(refresh) {
     try {
       await refresh();
     } catch {
-      // Don't break the loop on transient errors — just retry.
+      // Don't break the loop on transient errors - just retry.
     }
   }
 }

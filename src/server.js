@@ -21,7 +21,7 @@ async function start() {
     if (whatsappService.isConfigured()) {
       console.log('✓ WhatsApp (Twilio) configured');
     } else {
-      console.log('ℹ WhatsApp not configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER to enable');
+      console.log('ℹ WhatsApp not configured - set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER to enable');
     }
 
     // Start Express API

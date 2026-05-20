@@ -84,7 +84,7 @@ BEGIN
             WHERE connection_id = ANY(v_conn_ids)
          );
 
-  -- 4. Delete subscriptions (fast now — nothing to cascade to).
+  -- 4. Delete subscriptions (fast now - nothing to cascade to).
   WITH deleted AS (
     DELETE FROM calendar_subscriptions
      WHERE connection_id = ANY(v_conn_ids)

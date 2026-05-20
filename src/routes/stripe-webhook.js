@@ -1,12 +1,12 @@
 /**
- * Stripe webhook handler — Phase 3.
+ * Stripe webhook handler - Phase 3.
  *
  * Security model:
  *   • NO bearer-token auth. Stripe doesn't send one.
  *   • Authenticity verified via Stripe's HMAC signature (STRIPE_WEBHOOK_SECRET).
  *   • subscriptionStatus gate also excludes /webhooks/* so expired
  *     households' subscribe-to-renew flow works.
- *   • Mounted in app.js BEFORE express.json() — the signature check
+ *   • Mounted in app.js BEFORE express.json() - the signature check
  *     needs the exact raw request bytes.
  *
  * Idempotency:
@@ -18,7 +18,7 @@
  *   idempotent on the database side (UPSERT-style updates) so double-
  *   processing is harmless.
  *
- * NOT a true ACID transaction — Supabase's client doesn't expose
+ * NOT a true ACID transaction - Supabase's client doesn't expose
  * cross-call transactions. The spec's "wrap in a transaction" line is
  * approximated by: (a) atomic insert via unique PK race, (b) rollback
  * of the insert on handler failure, (c) idempotent handlers so replay
@@ -48,7 +48,7 @@ router.post('/', async (req, res) => {
   try {
     event = stripeService.constructWebhookEvent(req.body, sig);
   } catch (err) {
-    // Don't leak details — bad signatures usually mean hostile or
+    // Don't leak details - bad signatures usually mean hostile or
     // misconfigured sender. Log for ops, return 400.
     console.error('[stripe webhook] signature verification failed:', err.message);
     return res.status(400).json({ error: 'Signature verification failed' });
@@ -60,12 +60,12 @@ router.post('/', async (req, res) => {
     isNew = await db.recordStripeEventIfNew(event.id, event.type);
   } catch (err) {
     console.error('[stripe webhook] idempotency write failed:', err);
-    // Can't reason about whether this is a dup — fail loud so Stripe retries.
+    // Can't reason about whether this is a dup - fail loud so Stripe retries.
     return res.status(500).json({ error: 'Idempotency check failed' });
   }
 
   if (!isNew) {
-    // Already processed — ack so Stripe stops retrying.
+    // Already processed - ack so Stripe stops retrying.
     return res.status(200).json({ received: true, duplicate: true });
   }
 
@@ -89,7 +89,7 @@ router.post('/', async (req, res) => {
       // If rollback fails, the event is stuck until a human intervenes
       // (Stripe will retry, but our dedupe will reject it). Log loudly.
       console.error(
-        `[stripe webhook] CRITICAL: rollback of idempotency row ${event.id} failed — ` +
+        `[stripe webhook] CRITICAL: rollback of idempotency row ${event.id} failed - ` +
         `manual intervention may be needed to reprocess:`,
         delErr
       );
@@ -120,7 +120,7 @@ router.post('/', async (req, res) => {
  * subscription directly from Stripe (which carries the household_id we
  * set in subscription_data.metadata at checkout) and resolves cleanly.
  *
- * Returns null only when ALL five paths fail — genuinely orphan events
+ * Returns null only when ALL five paths fail - genuinely orphan events
  * (e.g. test fires with fake IDs) log + 200 ack (returning 500 would
  * cause Stripe to retry forever).
  */
@@ -137,7 +137,7 @@ async function resolveHouseholdId({ metadata, clientReferenceId, customerId, sub
 
     // Last-ditch: fetch the subscription from Stripe. Covers the
     // first-invoice-before-checkout-completion race. Swallow fetch
-    // errors — this is a best-effort resolution, not a hard dependency.
+    // errors - this is a best-effort resolution, not a hard dependency.
     try {
       const stripe = stripeService.getStripe();
       const sub = await stripe.subscriptions.retrieve(subscriptionId);
@@ -152,7 +152,7 @@ async function resolveHouseholdId({ metadata, clientReferenceId, customerId, sub
   return null;
 }
 
-// Narrow helper — Stripe sometimes returns an ID string, sometimes a
+// Narrow helper - Stripe sometimes returns an ID string, sometimes a
 // full expanded object. Normalise to the ID.
 function idOf(val) {
   if (!val) return null;
@@ -174,7 +174,7 @@ async function handleEvent(event) {
       return handleSubscriptionDeleted(event.data.object);
     default:
       // Acknowledged but ignored. Stripe sends many event types we don't
-      // subscribe to — logging at info level is enough.
+      // subscribe to - logging at info level is enough.
       console.log(`[stripe webhook] ignoring unhandled event type: ${event.type}`);
   }
 }
@@ -196,7 +196,7 @@ async function handleCheckoutCompleted(session) {
     return;
   }
 
-  // The session only carries the subscription ID — fetch the full
+  // The session only carries the subscription ID - fetch the full
   // subscription to get the price + current_period_end for our DB.
   let plan = null;
   let currency = null;
@@ -215,10 +215,10 @@ async function handleCheckoutCompleted(session) {
   }
 
   // Active status overrides any remaining trial time (spec §3). We don't
-  // touch trial_started_at / trial_ends_at — the gate middleware
+  // touch trial_started_at / trial_ends_at - the gate middleware
   // short-circuits on subscription_status='active' before looking at them.
   //
-  // inactive_since is cleared on every successful checkout — covers the
+  // inactive_since is cleared on every successful checkout - covers the
   // "resubscribed after trial expiry" case where the 12-month retention
   // clock was already ticking. The household is active again, so reset.
   await db.updateHouseholdSubscription(householdId, {
@@ -247,7 +247,7 @@ async function handleInvoicePaid(invoice) {
     return;
   }
 
-  // Clear inactive_since on every successful payment — if a household
+  // Clear inactive_since on every successful payment - if a household
   // was cancelled-but-still-in-period and the user resubscribed, the
   // retention clock must stop. Idempotent for households that were
   // never inactive (UPDATE to null-from-null is a no-op).
@@ -271,7 +271,7 @@ async function handleInvoicePaymentFailed(invoice) {
   const customerId = idOf(invoice.customer);
   console.warn(
     `[stripe webhook] invoice.payment_failed (${invoice.id}) subscription=${subscriptionId} ` +
-    `customer=${customerId} — no DB change; Stripe will retry and eventually cancel if unrecoverable`
+    `customer=${customerId} - no DB change; Stripe will retry and eventually cancel if unrecoverable`
   );
 }
 
@@ -294,7 +294,7 @@ async function handleSubscriptionUpdated(subscription) {
   // Map Stripe's subscription statuses onto our enum. Stripe values:
   //   active, trialing, canceled, incomplete, incomplete_expired,
   //   past_due, unpaid, paused.
-  // We bucket conservatively — incomplete / past_due / unpaid leave our
+  // We bucket conservatively - incomplete / past_due / unpaid leave our
   // status untouched (the invoice events carry the authoritative signal).
   if (subscription.status === 'active' || subscription.status === 'trialing') {
     update.subscription_status = 'active';
@@ -328,13 +328,13 @@ async function handleSubscriptionDeleted(subscription) {
   }
 
   // Start the 12-month retention clock (spec §9 / Phase 8). Stripe's
-  // cancelled subscription carries its period end — we use whichever
+  // cancelled subscription carries its period end - we use whichever
   // field is populated. `ended_at` is set on immediate cancellation;
   // `current_period_end` is the end of the paid-up window for
   // cancel-at-period-end. Either way, that's when the household
   // becomes inactive for our purposes.
   //
-  // Fall back to "now" if neither timestamp is present — better to
+  // Fall back to "now" if neither timestamp is present - better to
   // start the clock today than leave it null and never retain-clean.
   const endUnix = subscription.ended_at || subscription.current_period_end;
   const inactiveSince = endUnix

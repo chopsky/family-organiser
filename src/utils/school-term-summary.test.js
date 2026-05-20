@@ -14,7 +14,7 @@ describe('summariseSchoolTermDates', () => {
     { school_id: 'school-h', event_type: 'term_start', date: '2026-09-30', label: 'Fourth Term Starts' },
     { school_id: 'school-h', event_type: 'term_end',   date: '2026-12-03', label: 'Fourth Term Ends' },
     { school_id: 'school-h', event_type: 'bank_holiday', date: '2026-05-15', label: 'Yom Yerushalayim' },
-    { school_id: 'school-h', event_type: 'bank_holiday', date: '2026-05-22', label: 'Shavuot — School Closed' },
+    { school_id: 'school-h', event_type: 'bank_holiday', date: '2026-05-22', label: 'Shavuot - School Closed' },
     { school_id: 'school-h', event_type: 'bank_holiday', date: '2026-04-22', label: 'Yom Ha\'atzmaut' }, // past
   ];
 
@@ -31,7 +31,7 @@ describe('summariseSchoolTermDates', () => {
     const out = summariseSchoolTermDates([herzlia], dates, today);
     expect(out).toContain('Herzlia');
     expect(out).toContain('First Term: 14 Jan 2026 – 27 Mar 2026 (past)');
-    expect(out).toContain('Second Term: 14 Apr 2026 – 26 Jun 2026 (CURRENT — ends in 43 days)');
+    expect(out).toContain('Second Term: 14 Apr 2026 – 26 Jun 2026 (CURRENT - ends in 43 days)');
     expect(out).toContain('Third Term: 21 Jul 2026 – 18 Sept 2026');
   });
 
@@ -39,7 +39,7 @@ describe('summariseSchoolTermDates', () => {
     const today = new Date('2026-05-14T12:00:00Z');
     const out = summariseSchoolTermDates([herzlia], dates, today);
     expect(out).toContain('15 May 2026: Yom Yerushalayim');
-    expect(out).toContain('22 May 2026: Shavuot — School Closed');
+    expect(out).toContain('22 May 2026: Shavuot - School Closed');
     // Past holiday should NOT appear
     expect(out).not.toContain('Yom Ha\'atzmaut');
   });

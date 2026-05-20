@@ -1,5 +1,5 @@
 /**
- * Broadcast service — sends notifications to other household members
+ * Broadcast service - sends notifications to other household members
  * when someone makes a change via the bot or web app.
  *
  * Fire-and-forget: errors are logged but never block the caller.

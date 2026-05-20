@@ -48,7 +48,7 @@ function formatPhone(phone) {
 
 /**
  * Return the bot's own WhatsApp number (E.164, without the 'whatsapp:' prefix
- * and without the + sign — suitable for building a wa.me/<number> deep link).
+ * and without the + sign - suitable for building a wa.me/<number> deep link).
  * Returns null if not configured.
  */
 function getBotNumberForWaLink() {
@@ -116,7 +116,7 @@ async function sendMessage(phone, body) {
  *
  * Requires a MessagingServiceSid to be configured (Content Templates are
  * owned by a Messaging Service, not a raw From number). If only
- * TWILIO_WHATSAPP_NUMBER is set, we fall back to sendMessage — which will
+ * TWILIO_WHATSAPP_NUMBER is set, we fall back to sendMessage - which will
  * fail with 63016 outside the window, but that's no worse than before.
  *
  * @param {string} phone        - Recipient phone number (e.g. "+447700900000")
@@ -136,7 +136,7 @@ async function sendTemplate(phone, contentSidOrBody, contentVars = {}) {
   // specified." for months.
   //
   // Detect a real Content SID by its shape (always "HX" + 32 hex chars).
-  // Anything else falls back to the old stub behaviour — sendMessage
+  // Anything else falls back to the old stub behaviour - sendMessage
   // with the second arg as a free-form body. Net effect: the pre-
   // refactor behaviour is restored for legacy callers, and the new
   // Content-Template path still works for callers that pass a real
@@ -156,9 +156,9 @@ async function sendTemplate(phone, contentSidOrBody, contentVars = {}) {
   const msid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   if (!msid) {
     // Content Templates need a Messaging Service. Without one we can't
-    // reach out-of-window recipients at all — log loudly and fall back
+    // reach out-of-window recipients at all - log loudly and fall back
     // so the caller isn't throwing on every broadcast.
-    console.warn('[WhatsApp] sendTemplate called without TWILIO_MESSAGING_SERVICE_SID — falling back to sendMessage (likely 63016)');
+    console.warn('[WhatsApp] sendTemplate called without TWILIO_MESSAGING_SERVICE_SID - falling back to sendMessage (likely 63016)');
     // Reconstitute an approximate body from {{1}} for the fallback.
     return sendMessage(phone, contentVars['1'] || contentVars[1] || '');
   }
@@ -230,7 +230,7 @@ async function downloadMedia(mediaUrl) {
  * the bot, so the 24-hour customer-service window isn't open and
  * sendMessage's freeform path will be rejected by Twilio with code 63016.
  * To deliver the code outside that window we need a pre-approved Content
- * Template (Authentication category) — the SID lives in
+ * Template (Authentication category) - the SID lives in
  * TWILIO_TEMPLATE_VERIFICATION_CODE.
  *
  * Behaviour:
@@ -238,7 +238,7 @@ async function downloadMedia(mediaUrl) {
  *     send via sendTemplate (works regardless of the messaging window).
  *   • Otherwise fall back to the freeform path. Logs a warning so the
  *     misconfiguration is visible. The fallback only succeeds if the
- *     user has messaged the bot in the last 24h — useful for re-verify
+ *     user has messaged the bot in the last 24h - useful for re-verify
  *     flows but useless for first-time connects.
  *
  * @param {string} phone - Phone number to verify
@@ -253,7 +253,7 @@ async function sendVerificationCode(phone, code) {
   }
 
   console.warn(
-    '[WhatsApp] TWILIO_TEMPLATE_VERIFICATION_CODE not set — falling back to freeform send. ' +
+    '[WhatsApp] TWILIO_TEMPLATE_VERIFICATION_CODE not set - falling back to freeform send. ' +
     'First-time WhatsApp connects will fail with Twilio 63016 until an Authentication-category ' +
     'Content Template is approved and its SID is configured.'
   );

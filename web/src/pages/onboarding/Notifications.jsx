@@ -1,5 +1,5 @@
 /**
- * Step 5 (iOS only) — request push notification permission.
+ * Step 5 (iOS only) - request push notification permission.
  *
  * Triggers the same Capacitor PushNotifications flow the app-wide
  * usePushNotifications hook uses, but does it in response to a deliberate
@@ -88,7 +88,7 @@ export default function Notifications({ next, setError }) {
       }, 6000);
     } catch (err) {
       console.warn('[onboarding] enable push failed:', err);
-      setError('Could not enable notifications — you can turn them on later in Settings.');
+      setError('Could not enable notifications - you can turn them on later in Settings.');
       setStatus('denied');
       setRequesting(false);
     }
@@ -98,7 +98,7 @@ export default function Notifications({ next, setError }) {
     <div>
       <div className="text-center">
         <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-          Step 3 — notifications
+          Step 3 - notifications
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
           Gentle <i>nudges</i>, when they matter.

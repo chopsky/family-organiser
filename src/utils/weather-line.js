@@ -7,7 +7,7 @@
  *     beats "🌧 Bristol: 18°C, 60% rain".
  *   • Interpret the forecast into one actionable nudge ("worth a
  *     brolly", "plenty of water").
- *   • Return null when there's nothing useful to say — better to omit
+ *   • Return null when there's nothing useful to say - better to omit
  *     than to pad with a generic "mild" line every day.
  *
  * Pure function; all weather fetching happens elsewhere. Easy to test.
@@ -32,53 +32,53 @@ function buildDigestWeatherLine(forecast) {
 
   // 1. Thunderstorms / heavy stuff first
   if (code === 95 || code === 96 || code === 99) {
-    return `⛈ Thunderstorms in ${city} today — keep an eye on it. ${hi}° / ${lo}°.`;
+    return `⛈ Thunderstorms in ${city} today - keep an eye on it. ${hi}° / ${lo}°.`;
   }
 
   // 2. Snow
   if (code === 71 || code === 73 || code === 75 || code === 85 || code === 86) {
-    return `❄️ Snow in ${city} today — wrap up warm. ${hi}° / ${lo}°.`;
+    return `❄️ Snow in ${city} today - wrap up warm. ${hi}° / ${lo}°.`;
   }
 
   // 3. Heavy rain
   if (code === 65 || code === 82 || code === 55) {
-    return `🌧 Heavy rain in ${city} — worth a brolly all day. ${hi}° / ${lo}°.`;
+    return `🌧 Heavy rain in ${city} - worth a brolly all day. ${hi}° / ${lo}°.`;
   }
 
-  // 4. Light/moderate rain — chance-of-rain matters
+  // 4. Light/moderate rain - chance-of-rain matters
   if (code === 61 || code === 63 || code === 80 || code === 81 || code === 51 || code === 53) {
     const chance = precipProbability && precipProbability >= 20 ? ` (${precipProbability}% chance)` : '';
-    return `🌦 Wet day in ${city} — rain on and off${chance}. Worth a brolly. ${hi}°C high.`;
+    return `🌦 Wet day in ${city} - rain on and off${chance}. Worth a brolly. ${hi}°C high.`;
   }
 
   // 5. Fog
   if (code === 45 || code === 48) {
-    return `🌫 Foggy start in ${city} — should clear later. ${hi}°C high.`;
+    return `🌫 Foggy start in ${city} - should clear later. ${hi}°C high.`;
   }
 
   // 6. Temperature extremes (only if we got past the wet codes)
   if (hi >= 28) {
-    return `☀️ Hot one in ${city} — ${hi}°C and sunny. Plenty of water.`;
+    return `☀️ Hot one in ${city} - ${hi}°C and sunny. Plenty of water.`;
   }
   if (hi <= 3) {
-    return `🥶 Cold day in ${city} — ${hi}°C high. Layers.`;
+    return `🥶 Cold day in ${city} - ${hi}°C high. Layers.`;
   }
 
   // 7. Pleasant clear/sunny
   if (code === 0 || code === 1) {
-    return `☀️ Sunny in ${city} today — ${hi}°C high.`;
+    return `☀️ Sunny in ${city} today - ${hi}°C high.`;
   }
 
-  // 8. Partly cloudy / overcast — always include so users know what
+  // 8. Partly cloudy / overcast - always include so users know what
   //    to expect on the way out. Phrasing splits by warmth.
   if (code === 2 || code === 3) {
     const adj = code === 2 ? 'partly cloudy' : 'cloudy';
-    if (hi >= 20) return `🌤 Mild and ${adj} in ${city} — ${hi}°C high.`;
-    if (hi >= 12) return `🌤 ${adj.charAt(0).toUpperCase()}${adj.slice(1)} in ${city} — ${hi}°C high.`;
-    return `🌤 Cool and ${adj} in ${city} — ${hi}°C high.`;
+    if (hi >= 20) return `🌤 Mild and ${adj} in ${city} - ${hi}°C high.`;
+    if (hi >= 12) return `🌤 ${adj.charAt(0).toUpperCase()}${adj.slice(1)} in ${city} - ${hi}°C high.`;
+    return `🌤 Cool and ${adj} in ${city} - ${hi}°C high.`;
   }
 
-  // 9. Catch-all — never omit, even for unknown WMO codes. People
+  // 9. Catch-all - never omit, even for unknown WMO codes. People
   //    want to glance at the digest and know what to wear.
   return `🌤 ${hi}°C high in ${city} today (low ${lo}°).`;
 }

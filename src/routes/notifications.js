@@ -12,7 +12,7 @@ const DEFAULT_PREFERENCES = {
   shopping_updated: true,
   meal_plan_updated: true,
   family_activity: true,
-  // WhatsApp bot — each gates its respective cron job. See
+  // WhatsApp bot - each gates its respective cron job. See
   // /supabase/migration-whatsapp-notif-prefs.sql and the matching
   // jobs in /src/jobs/. Default true so users see no behaviour
   // change until they opt out.
@@ -40,7 +40,7 @@ router.post('/register-device', requireAuth, requireHousehold, async (req, res) 
     // requireHousehold sets req.householdId (the string), not req.household
     // (an object). Previous code did req.household.id which threw 'Cannot
     // read properties of undefined', surfacing as a 500 to the client and
-    // an empty device_tokens table — the only reason push notifications
+    // an empty device_tokens table - the only reason push notifications
     // didn't work for any iOS user since this endpoint was added.
     await db.registerDeviceToken(req.user.id, req.householdId, token, platform);
     return res.json({ ok: true });

@@ -22,7 +22,7 @@ function generateToken() {
 
 /**
  * Helper to extract session metadata (user-agent, client IP) from the
- * inbound request. Safe to call with a falsy req — returns an empty
+ * inbound request. Safe to call with a falsy req - returns an empty
  * object so callers without a request object still work.
  */
 function sessionMetaFromReq(req) {
@@ -37,7 +37,7 @@ function sessionMetaFromReq(req) {
 }
 
 // Helper: build the standard auth response (includes refresh token)
-// `req` is optional — when provided we record session metadata against
+// `req` is optional - when provided we record session metadata against
 // the newly-issued refresh token so Settings → Active sessions can show
 // device + IP + last-used for it.
 async function authResponse(user, req = null) {
@@ -59,7 +59,7 @@ async function authResponse(user, req = null) {
     token,
     refreshToken,
     // created_at + whatsapp_linked are surfaced for the trial-week
-    // activation experience (web/src/components/WelcomeChecklist.jsx) —
+    // activation experience (web/src/components/WelcomeChecklist.jsx) -
     // the checklist needs to know whether to render at all (within
     // 7 days of signup) and whether to tick "Connect WhatsApp"
     // automatically. Both are cheap reads, both already on the row.
@@ -70,7 +70,7 @@ async function authResponse(user, req = null) {
       // The user's own email + auth provider are surfaced to the
       // frontend (Settings → Account card uses these to show "Signed
       // in with Google" / "Signed in with email" etc.). Other users'
-      // emails stay private — see the comment in /api/household for
+      // emails stay private - see the comment in /api/household for
       // the strict member-only redaction we apply there.
       email: user.email || null,
       auth_provider: user.auth_provider || null,
@@ -84,7 +84,7 @@ async function authResponse(user, req = null) {
     // Return the full household row. The previous version returned only
     // 5 enumerated fields, which silently stripped avatar_url / address /
     // email_alias / inbound_email_token from the auth-context household
-    // on every refresh-token rotation — making freshly-uploaded
+    // on every refresh-token rotation - making freshly-uploaded
     // household photos and saved addresses "disappear" on next sync.
     // The household table has no fields that need redacting (all
     // contents are household-internal); shipping the full row also
@@ -153,7 +153,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
       return res.status(201).json(response);
     }
 
-    // Normal registration — needs email verification
+    // Normal registration - needs email verification
     const user = await db.createUserWithEmail({
       email: emailLower,
       passwordHash,
@@ -236,7 +236,7 @@ router.get('/verify-email', async (req, res) => {
 
     await db.markEmailVerificationTokenUsed(record.id);
     await db.updateUser(record.user_id, { email_verified: true });
-    // Redirect to a dedicated confirmation page (not /login) — if the user
+    // Redirect to a dedicated confirmation page (not /login) - if the user
     // clicked the verify link in a browser where another session is already
     // active, bouncing via /login would trigger the logged-in redirect to
     // /dashboard and they'd never see the confirmation.
@@ -260,7 +260,7 @@ router.get('/verify-email', async (req, res) => {
 //
 // Same single-use token rules as the GET endpoint above. If the user
 // already verified via the browser GET (e.g. they tapped the link on
-// desktop), the token is consumed so this POST returns 'invalid' — the
+// desktop), the token is consumed so this POST returns 'invalid' - the
 // client then prompts them to log in normally.
 router.post('/verify-email-and-login', async (req, res) => {
   const { token } = req.body || {};
@@ -335,7 +335,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
 
   // Validate country against the same allow-list the DB CHECK constraint
   // uses. If the client sends something unrecognised, fall through to DB
-  // default 'GB' rather than rejecting — being lenient on creation matters
+  // default 'GB' rather than rejecting - being lenient on creation matters
   // more than rejecting an odd value (the user can fix it in Settings).
   const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'ZA', 'OTHER'];
   const safeCountry = ALLOWED_COUNTRIES.includes(country) ? country : undefined;
@@ -352,7 +352,7 @@ router.post('/create-household', requireAuth, async (req, res) => {
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id, household.country)
       .catch((err) => console.error('Failed to seed public holidays:', err));
 
-    // Send the welcome email — fire-and-forget. Dedupes via
+    // Send the welcome email - fire-and-forget. Dedupes via
     // sent_emails.(household_id, email_type) so if the user somehow
     // triggers this twice (double-click, rollback + retry) only one
     // welcome lands. Household creation = day 1 of the trial by
@@ -427,7 +427,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Invalid or expired reset token' });
     }
 
-    // Strength gate — we know the user's email + name from the lookup
+    // Strength gate - we know the user's email + name from the lookup
     // above, so we pass them in for the personal-info check.
     const owner = await db.getUserById(record.user_id);
     const strength = await validatePassword(password, {
@@ -481,7 +481,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // ─── POST /api/auth/mark-onboarded ─────────────────────────────────────────
 // Called by the frontend when the user finishes the onboarding wizard.
-// Idempotent — if the column is already populated it leaves the original
+// Idempotent - if the column is already populated it leaves the original
 // timestamp intact. Returns the updated user fields the AuthContext cares
 // about so the client can refresh its local copy without another round-trip.
 
@@ -506,20 +506,20 @@ router.post('/mark-onboarded', requireAuth, async (req, res) => {
 });
 
 // ─── GET /api/auth/export ──────────────────────────────────────────────────
-// GDPR Article 20 — right to data portability. Returns a JSON bundle of
+// GDPR Article 20 - right to data portability. Returns a JSON bundle of
 // every row Housemait holds about the requester + their household, in a
 // structured machine-readable format.
 //
 // What's included
 //   - The user's own row (password_hash and all auth-credential fields
-//     redacted — those are session tokens, not personal data).
+//     redacted - those are session tokens, not personal data).
 //   - The household row they belong to.
 //   - Other household members: basic fields the user can already see in
-//     Family Setup (name, role, colour theme, etc.) — NOT other members'
+//     Family Setup (name, role, colour theme, etc.) - NOT other members'
 //     private fields like email or phone.
 //   - Every household-scoped table the user has access to via the app:
 //     tasks, calendar events, shopping lists + items, notes, meal plan,
-//     documents metadata (not the file bytes — those live in R2 and are
+//     documents metadata (not the file bytes - those live in R2 and are
 //     too big to inline), invites, school dates, child schedules.
 //   - The user's own activity logs: chat messages, AI usage, WhatsApp
 //     message log.
@@ -527,8 +527,8 @@ router.post('/mark-onboarded', requireAuth, async (req, res) => {
 // What's redacted / skipped
 //   - password_hash, refresh_tokens, email_verification_tokens,
 //     password_reset_tokens, device_tokens, OAuth credentials on
-//     calendar_connections — all session/auth material, not personal data.
-//   - Other members' email / phone / password_hash — belongs to them.
+//     calendar_connections - all session/auth material, not personal data.
+//   - Other members' email / phone / password_hash - belongs to them.
 //
 // Rate limiting is already handled by the /api/auth path limiter
 // (20 req/hour per IP), which is fine for a download-my-data flow.
@@ -582,7 +582,7 @@ router.get('/export', requireAuth, async (req, res) => {
       householdId ? safeSingle('household',
         supabaseAdmin.from('households').select().eq('id', householdId).single()
       ) : null,
-      // Members — only fields the requester already sees in Family Setup.
+      // Members - only fields the requester already sees in Family Setup.
       // Other members' email / phone / password_hash intentionally omitted.
       householdId ? safe('members',
         supabaseAdmin.from('users')
@@ -595,7 +595,7 @@ router.get('/export', requireAuth, async (req, res) => {
       householdId ? safe('shopping_items', supabaseAdmin.from('shopping_items').select().eq('household_id', householdId)) : Promise.resolve([]),
       householdId ? safe('household_notes', supabaseAdmin.from('household_notes').select().eq('household_id', householdId)) : Promise.resolve([]),
       householdId ? safe('meal_plan', supabaseAdmin.from('meal_plan').select().eq('household_id', householdId)) : Promise.resolve([]),
-      // Documents: metadata only — the file bytes live in Cloudflare R2.
+      // Documents: metadata only - the file bytes live in Cloudflare R2.
       householdId ? safe('documents',
         supabaseAdmin.from('documents')
           .select('id, folder_id, name, size_bytes, mime_type, uploaded_by, created_at')
@@ -626,7 +626,7 @@ router.get('/export', requireAuth, async (req, res) => {
       generated_at: new Date().toISOString(),
       notice:
         'This export contains every row Housemait holds about you and your household. ' +
-        'Document file contents are stored in Cloudflare R2 and are available on request — ' +
+        'Document file contents are stored in Cloudflare R2 and are available on request - ' +
         'only metadata (name, size, folder, created-at) is inlined here to keep the file ' +
         'readable. Secrets such as password hashes and OAuth tokens are intentionally omitted.',
       data_subject: user ? { id: user.id, name: user.name, email: user.email } : null,
@@ -666,7 +666,7 @@ router.get('/export', requireAuth, async (req, res) => {
 
 // ─── DELETE /api/auth/account ──────────────────────────────────────────────
 // Self-service account deletion. Requires the user to re-enter their
-// password — the access token alone isn't enough for a destructive action
+// password - the access token alone isn't enough for a destructive action
 // like this.
 //
 // Behaviour based on household membership:
@@ -732,7 +732,7 @@ router.delete('/account', requireAuth, async (req, res) => {
     // ── Stripe: cancel the subscription BEFORE we nuke the row ──
     // Only relevant when the whole household is going away. When it's
     // user_only the household (and its Stripe customer) survives, so we
-    // leave the subscription alone. Failure to cancel is non-fatal —
+    // leave the subscription alone. Failure to cancel is non-fatal -
     // the deletion proceeds and we record stripe_cancelled=false in
     // the audit row so support can remediate if needed.
     let stripeCancelled = false;
@@ -743,14 +743,14 @@ router.delete('/account', requireAuth, async (req, res) => {
         stripeCancelled = true;
       } catch (err) {
         // Common 404 here means the subscription was already cancelled
-        // in the Stripe dashboard — treat as success.
+        // in the Stripe dashboard - treat as success.
         if (err?.code === 'resource_missing') {
           stripeCancelled = true;
         } else {
           console.error(
             '[delete-account] Stripe subscription cancel failed for household',
             household.id,
-            '— proceeding with deletion:',
+            '- proceeding with deletion:',
             err.message
           );
         }
@@ -759,7 +759,7 @@ router.delete('/account', requireAuth, async (req, res) => {
 
     // ── Audit log: write BEFORE the deletion so the row survives ──
     // Intentionally best-effort. If the audit write fails we log loudly
-    // but don't block the deletion — GDPR's right-to-erasure beats our
+    // but don't block the deletion - GDPR's right-to-erasure beats our
     // internal logging. Support can cross-reference Railway logs if the
     // audit row is missing.
     try {
@@ -777,7 +777,7 @@ router.delete('/account', requireAuth, async (req, res) => {
         user_agent: req.headers['user-agent'] || null,
       });
     } catch (err) {
-      console.error('[delete-account] audit log insert failed — continuing with deletion:', err.message);
+      console.error('[delete-account] audit log insert failed - continuing with deletion:', err.message);
     }
 
     // ── Actual deletion ──
@@ -789,7 +789,7 @@ router.delete('/account', requireAuth, async (req, res) => {
       // supabase/migration-event-reminders-cascade-fix.sql fixes the FK
       // for new installs, but we clean them up explicitly here too so
       // deletion works even on databases that haven't applied the
-      // migration yet. Safe to run unconditionally — if the FK is
+      // migration yet. Safe to run unconditionally - if the FK is
       // already CASCADE, this just removes the rows slightly earlier.
       try {
         const { supabaseAdmin } = require('../db/client');
@@ -820,7 +820,7 @@ router.delete('/account', requireAuth, async (req, res) => {
     // Log the full Supabase/Postgres error so next time we hit this we can
     // see the actual cause in Railway logs instead of a generic 500.
     // Supabase errors expose .code (Postgres SQLSTATE), .details, .hint,
-    // .message — all useful for FK-violation debugging.
+    // .message - all useful for FK-violation debugging.
     console.error('DELETE /api/auth/account error:', {
       code: err.code,
       message: err.message,
@@ -882,7 +882,7 @@ router.post('/logout', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('POST /api/auth/logout error:', err);
-    // Still return 200 — the client should clear local state regardless
+    // Still return 200 - the client should clear local state regardless
     return res.json({ success: true });
   }
 });
@@ -899,7 +899,7 @@ router.post('/logout', async (req, res) => {
 
 /**
  * Resolve the session ID of the caller's CURRENT refresh token. The client
- * sends its refresh token as a header (X-Refresh-Token) or in the body —
+ * sends its refresh token as a header (X-Refresh-Token) or in the body -
  * the server looks up its ID so the UI can mark the current row. Returns
  * null if no valid refresh token matches (the user's session is access-
  * token-only right now, which happens when they're within the 1h access
@@ -938,7 +938,7 @@ router.delete('/sessions/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     // Confirm the session belongs to the caller before revoking. Prevents
-    // id-guessing / horizontal privilege escalation — someone with a valid
+    // id-guessing / horizontal privilege escalation - someone with a valid
     // auth token for user A shouldn't be able to revoke user B's sessions.
     const mine = await db.getActiveSessionsForUser(req.user.id);
     if (!mine.some((s) => s.id === id)) {
@@ -956,7 +956,7 @@ router.delete('/sessions', requireAuth, async (req, res) => {
   try {
     // The client opts in to preserving the current session via the
     // ?except=current query flag. Without it, every active session
-    // (including the caller's) is revoked — which is what you want from
+    // (including the caller's) is revoked - which is what you want from
     // a "sign out everywhere" button.
     const keepCurrent = req.query.except === 'current';
     const currentId = keepCurrent ? await resolveCurrentSessionId(req) : null;
@@ -981,11 +981,11 @@ router.post('/google', async (req, res) => {
     const { OAuth2Client } = require('google-auth-library');
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     // Accept tokens issued by EITHER the web client OR the iOS native client.
-    // Google issues different idTokens for each (different `aud` claim) — same
+    // Google issues different idTokens for each (different `aud` claim) - same
     // user, same email, but the audience differs. Passing an array tells the
     // verifier to accept any of these. The token's signature must still be
     // valid Google-signed, so allowing two audiences doesn't open an attack
-    // surface — it just lets the same backend handle both surfaces.
+    // surface - it just lets the same backend handle both surfaces.
     const validAudiences = [process.env.GOOGLE_CLIENT_ID];
     if (process.env.GOOGLE_IOS_CLIENT_ID) {
       validAudiences.push(process.env.GOOGLE_IOS_CLIENT_ID);
@@ -1001,7 +1001,7 @@ router.post('/google', async (req, res) => {
     let user = await db.getUserByEmail(googleEmail);
 
     if (!user) {
-      // Handle invite — hold the invite reference so we can copy its pre-fill
+      // Handle invite - hold the invite reference so we can copy its pre-fill
       // fields onto the new user after createUserWithEmail returns. Mirrors
       // the email/password flow above (~line 122-130). Without this, family
       // role / birthday / colour theme / school_id set by the inviter are
@@ -1038,7 +1038,7 @@ router.post('/google', async (req, res) => {
         user = { ...user, ...profileUpdates };
       }
     } else if (user.auth_provider !== 'google') {
-      // Existing user signing in via Google — stamp the latest method
+      // Existing user signing in via Google - stamp the latest method
       // so Settings reflects the credential they actually used. A user
       // who originally signed up with email and now signs in with
       // Google sees "Signed in with Google" after this.
@@ -1076,13 +1076,13 @@ router.post('/apple', async (req, res) => {
     // Accept tokens from EITHER the web Services ID OR the iOS bundle ID.
     // Apple Sign-In on web uses a Services ID (something like
     // 'com.housemait.app.signin'), whereas iOS native uses the app's bundle
-    // ID directly via the com.apple.developer.applesignin entitlement —
+    // ID directly via the com.apple.developer.applesignin entitlement -
     // Apple signs each token with the corresponding `aud` claim. Same as
     // the Google flow, allowing two audiences doesn't open an attack
     // surface because the signature is still verified against Apple's
     // public keys.
     //
-    // APPLE_NATIVE_BUNDLE_ID defaults to 'com.housemait.app' — same value
+    // APPLE_NATIVE_BUNDLE_ID defaults to 'com.housemait.app' - same value
     // hardcoded in capacitor.config.json's appId. Override via env if you
     // ever ship a second bundle (TestFlight-only build, dev variant, etc.).
     const validAudiences = [];
@@ -1137,7 +1137,7 @@ router.post('/apple', async (req, res) => {
         user = { ...user, ...profileUpdates };
       }
     } else if (user.auth_provider !== 'apple') {
-      // Existing user signing in via Apple — re-stamp to reflect the
+      // Existing user signing in via Apple - re-stamp to reflect the
       // latest credential used. See the Google block above for the
       // rationale.
       try { await db.updateUser(user.id, { auth_provider: 'apple' }); user.auth_provider = 'apple'; } catch {}
@@ -1228,16 +1228,16 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     await db.markWhatsAppVerificationCodeUsed(record.id);
     if (req.householdId) cache.invalidate(`members:${req.householdId}`);
 
-    // Send a welcome / onboarding message. Fire-and-forget — a WhatsApp
+    // Send a welcome / onboarding message. Fire-and-forget - a WhatsApp
     // hiccup must not break the connect flow since the DB is already updated.
     //
     // The welcome stays deliberately tight (only the headline use cases
     // + a "more to come" line). Feature discovery is dripped via a
     // "💡 Did you know…" footer on the morning digest for the first 14
-    // days — see src/utils/whatsapp-tips.js + src/jobs/reminders.js.
+    // days - see src/utils/whatsapp-tips.js + src/jobs/reminders.js.
     const whatsapp = require('../services/whatsapp');
     const welcome = [
-      `👋 Hey ${req.user.name} — Housemait here.`,
+      `👋 Hey ${req.user.name} - Housemait here.`,
       '',
       `I'm your family's calm second brain. Just message me like a friend:`,
       '',
@@ -1245,7 +1245,7 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
       `  📋 "Remind me to book the dentist"`,
       `  📅 "Sofia football Saturday 10am"`,
       '',
-      `I can also help with recipes, weather, school dates, receipts, and lots more — but no rush. I'll show you new tricks over the next few days.`,
+      `I can also help with recipes, weather, school dates, receipts, and lots more - but no rush. I'll show you new tricks over the next few days.`,
       '',
       `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
     ].join('\n');
@@ -1279,7 +1279,7 @@ router.get('/whatsapp-bot-info', requireAuth, (req, res) => {
 // ─── Pull-push pairing flow ──────────────────────────────────────────────────
 // /whatsapp-init-pairing: app asks the server for a short code, server
 // stashes it with the user_id and 10-min TTL. UI then asks the user to
-// open WhatsApp and message the bot with that code — the inbound
+// open WhatsApp and message the bot with that code - the inbound
 // webhook (src/routes/whatsapp.js) consumes it and links the phone.
 // /whatsapp-pairing-status: the app polls this while the user is in
 // WhatsApp; when the code's row has been marked used we know the
@@ -1287,12 +1287,12 @@ router.get('/whatsapp-bot-info', requireAuth, (req, res) => {
 //
 // Why this exists: the old /whatsapp-send-code flow needed a Twilio
 // Authentication-category Content Template (Meta-approved), which
-// requires Business Verification — out of reach for sole traders
+// requires Business Verification - out of reach for sole traders
 // without a registered company. Pull-push doesn't need any template.
 
 // Alphabet excludes 0/O/1/I/L/U to reduce mis-typing on a phone
 // keypad. 6 chars gives ~1 in a billion collision odds within the
-// 10-minute TTL — fine.
+// 10-minute TTL - fine.
 const PAIRING_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 function generatePairingCode(len = 6) {
   let out = '';
@@ -1364,7 +1364,7 @@ router.post('/whatsapp-disconnect', requireAuth, async (req, res) => {
   }
 });
 
-// ─── POST /api/auth/join (legacy — kept for backwards compatibility) ────────
+// ─── POST /api/auth/join (legacy - kept for backwards compatibility) ────────
 
 router.post('/join', async (req, res) => {
   const { code, name } = req.body;

@@ -119,7 +119,7 @@ export default function AdminWhatsApp() {
                 </tr>
               ))}
               {timeline.length === 0 && (
-                <tr><td colSpan="3" className="px-4 py-6 text-center text-warm-grey">No data yet — WhatsApp messages will appear here automatically</td></tr>
+                <tr><td colSpan="3" className="px-4 py-6 text-center text-warm-grey">No data yet - WhatsApp messages will appear here automatically</td></tr>
               )}
             </tbody>
           </table>

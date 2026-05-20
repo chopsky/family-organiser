@@ -102,13 +102,13 @@ export default function AdminUsers() {
                       <Link to={`/admin/users/${u.id}`} className="font-medium text-charcoal hover:text-plum">
                         {u.name}
                       </Link>
-                      <p className="text-xs text-warm-grey sm:hidden">{u.email || '—'}</p>
+                      <p className="text-xs text-warm-grey sm:hidden">{u.email || '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-warm-grey hidden sm:table-cell">{u.email || '—'}</td>
+                    <td className="px-4 py-3 text-warm-grey hidden sm:table-cell">{u.email || '-'}</td>
                     <td className="px-4 py-3">{statusBadge(u)}</td>
                     <td className="px-4 py-3 text-warm-grey capitalize hidden md:table-cell">{u.role}</td>
                     <td className="px-4 py-3 text-warm-grey hidden lg:table-cell">
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
                     </td>
                   </tr>
                 ))}

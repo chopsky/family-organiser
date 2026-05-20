@@ -14,7 +14,7 @@ const db = require('../db/queries');
 async function isSchoolInSession(schoolId, dateStr) {
   try {
     const termDates = await db.getSchoolTermDates(schoolId);
-    if (!termDates || termDates.length === 0) return true; // No term data — assume in session
+    if (!termDates || termDates.length === 0) return true; // No term data - assume in session
 
     // Check inset days and bank holidays
     const isInsetOrHoliday = termDates.some(td =>

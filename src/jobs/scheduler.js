@@ -29,7 +29,7 @@ function currentHHMMInTZ(timezone) {
     });
     return formatter.format(now);
   } catch {
-    // Invalid timezone string — fall back
+    // Invalid timezone string - fall back
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Europe/London',
@@ -42,7 +42,7 @@ function currentHHMMInTZ(timezone) {
 }
 
 /**
- * Run daily reminders — checks each member's personal reminder_time,
+ * Run daily reminders - checks each member's personal reminder_time,
  * falling back to the household default. Called every minute by cron.
  * Uses DB lock to prevent duplicate sends during rolling deploys.
  */
@@ -74,7 +74,7 @@ async function runDailyReminderCheck() {
 }
 
 /**
- * Daily 09:00 (per household timezone) — nudge each household about
+ * Daily 09:00 (per household timezone) - nudge each household about
  * any tracked subscription renewing in the next 3 days. Called every
  * minute by cron and gated to fire once per household per day.
  */
@@ -186,7 +186,7 @@ async function runEveningSchoolPrepCheck() {
         // Skip if the child's school is NOT in session tomorrow (holidays, inset days, half terms)
         const inSession = await isSchoolInSession(child.school_id, tomorrowStr);
         if (!inSession) {
-          console.log(`[scheduler] Skipping ${child.name}'s activities — school not in session on ${tomorrowStr}`);
+          console.log(`[scheduler] Skipping ${child.name}'s activities - school not in session on ${tomorrowStr}`);
           continue;
         }
 
@@ -195,7 +195,7 @@ async function runEveningSchoolPrepCheck() {
         for (const act of tomorrowActivities) {
           hasActivities = true;
           const timeStr = act.time_end ? ` until ${act.time_end.substring(0, 5)}` : '';
-          lines.push(`• ${child.name} — ${act.activity}${timeStr}`);
+          lines.push(`• ${child.name} - ${act.activity}${timeStr}`);
           if (act.reminder_text) lines.push(`  _${act.reminder_text}_`);
         }
       }
@@ -270,7 +270,7 @@ async function runTaskNotificationCheck() {
       if (diffMs > 60000) continue; // Not yet or already past
 
       // Atomic claim BEFORE we dispatch. Stamping notification_sent_at now
-      // (conditional on it still being null) is a race-free claim — only
+      // (conditional on it still being null) is a race-free claim - only
       // one parallel cron run wins, the loser skips. Trade-off: a transient
       // send error after this point won't be retried, but that's better
       // than the previous behaviour of double-sending under multiple
@@ -307,13 +307,13 @@ async function runTaskNotificationCheck() {
 
 /**
  * Refresh every user-subscribed external iCal feed (the per-household
- * "Subscribed calendars" — Apple/Google/Outlook/sports calendars users
+ * "Subscribed calendars" - Apple/Google/Outlook/sports calendars users
  * paste into Calendar settings).
  *
  * Distinct from syncAllIcalFeeds() below, which is the SCHOOL-only iCal
  * sync. This one covers the user-managed external_calendar_feeds table.
  *
- * The feature shipped without a scheduled refresher — feeds got their
+ * The feature shipped without a scheduled refresher - feeds got their
  * last_synced_at stamp from the manual subscribe-time fetch and then
  * went stale forever, until a user noticed and complained. This is the
  * fix.
@@ -352,7 +352,7 @@ async function refreshAllExternalFeeds() {
         );
       } catch (err) {
         // refreshFeed itself called recordExternalFeedFailure before
-        // re-throwing — the row's consecutive_failures + last_error
+        // re-throwing - the row's consecutive_failures + last_error
         // are already updated. Just log here and continue with the
         // next feed; one bad URL must not stop the rest.
         failed += 1;
@@ -374,7 +374,7 @@ async function refreshAllExternalFeeds() {
 }
 
 /**
- * Daily iCal sync — re-fetch and replace all ical_import dates for every
+ * Daily iCal sync - re-fetch and replace all ical_import dates for every
  * school that has an ical_url configured.
  */
 async function syncAllIcalFeeds() {
@@ -538,7 +538,7 @@ function startScheduler() {
   console.log('✓ Scheduler lock cleanup scheduled (03:00 UTC daily)');
 
   // ── Data retention cleanup: daily at 04:00 UTC ─────────────────────────────
-  // Implements the retention commitments in /privacy Section 8 — trims
+  // Implements the retention commitments in /privacy Section 8 - trims
   // operational logs past 90 days and purges expired auth tokens.
   cron.schedule('0 4 * * *', () => runRetentionCleanup());
   console.log('✓ Data retention cleanup scheduled (04:00 UTC daily)');
@@ -551,7 +551,7 @@ function startScheduler() {
   // Refreshes user-subscribed iCal feeds (Apple/Google/Outlook/sports
   // calendars from the Calendar settings page). 6h gives users a max
   // ~6h delay between adding an event in their source calendar and seeing
-  // it in Housemait — generous enough to be polite to upstream hosts
+  // it in Housemait - generous enough to be polite to upstream hosts
   // (Apple iCloud feeds are notoriously slow + heavy), tight enough that
   // "I added it yesterday and it's still not here" stops being a thing.
   // Runs at :15 to dodge the top-of-hour reminder ticks.
@@ -579,7 +579,7 @@ function startScheduler() {
   // NOTE: the 12-month inactive-household retention cleanup + orphan
   // cleanup are both handled by runRetentionCleanup() above (04:00 UTC).
   // See src/jobs/retention.js. The 11-month pre-deletion warning email
-  // is not yet built — when needed, add a new src/jobs/retention-warning.js
+  // is not yet built - when needed, add a new src/jobs/retention-warning.js
   // that runs daily at 09:00 Europe/London, finds households between 11
   // and 12 months of inactive_since, and sends a "your data will be
   // deleted in 30 days" email (dedupe via sent_emails with

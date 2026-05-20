@@ -109,7 +109,7 @@ const AI_CHIPS = [
 ];
 
 const APRIL_2026 = (() => {
-  // April 2026 — 1st is a Wednesday
+  // April 2026 - 1st is a Wednesday
   const offset = 3; // Sun=0; Wed = 3
   const days = [];
   for (let i=0; i<offset; i++) days.push(null);

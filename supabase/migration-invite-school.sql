@@ -7,12 +7,12 @@
 -- invites table already supported). Mirrors the same pre-fill mechanism, just
 -- two more columns.
 --
--- Both columns are nullable — the toggle defaults off, so most invites won't
+-- Both columns are nullable - the toggle defaults off, so most invites won't
 -- carry school info.
 --
 -- Foreign key: school_id references household_schools(id). ON DELETE SET NULL
 -- so deleting a household_schools row (or letting orphan-cleanup remove it)
--- doesn't break pending invites — the invitee just lands without a school
+-- doesn't break pending invites - the invitee just lands without a school
 -- pre-filled, same as if the toggle had been off.
 
 ALTER TABLE invites

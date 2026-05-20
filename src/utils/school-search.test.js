@@ -3,7 +3,7 @@
  *
  * The pure helpers (tokenise / OR-filter builder / JS ranker) live here so we
  * can exercise the full matrix of query shapes without a live Supabase DB.
- * The integration — DB query + helpers — lives in queries.js and isn't
+ * The integration - DB query + helpers - lives in queries.js and isn't
  * covered by a test; the helpers are where all the logic actually is.
  *
  * Regression anchor: the "Queen Elizabeth's School in Barnet" case that
@@ -74,7 +74,7 @@ describe('tokenize()', () => {
   });
 
   test('returns empty distinctive when the whole query is stopwords', () => {
-    // We deliberately return nothing here — a query of pure stopwords has
+    // We deliberately return nothing here - a query of pure stopwords has
     // no signal. The route layer can surface a helpful error if needed.
     const { distinctive } = tokenize('primary school');
     expect(distinctive).toEqual([]);
@@ -105,14 +105,14 @@ describe('buildOrFilter()', () => {
 
   test('strips commas, parens, and asterisks that would break or() syntax', () => {
     // Commas are clause separators, parens are grouping, `*` is the wildcard
-    // — letting any of these through a user token could corrupt the filter
+    // - letting any of these through a user token could corrupt the filter
     // string or create unintended wildcards.
     const filter = buildOrFilter(['a,b(c)d*e']);
     expect(filter).toBe('name.ilike.*abcde*,local_authority.ilike.*abcde*,address.ilike.*abcde*');
   });
 
   test('skips tokens that are empty after stripping', () => {
-    // A token of pure punctuation would normalise to empty — that should
+    // A token of pure punctuation would normalise to empty - that should
     // produce no clauses rather than a malformed "name.ilike.**".
     expect(buildOrFilter([',*()'])).toBe('');
   });
@@ -134,7 +134,7 @@ describe('filterAndRank()', () => {
       address: "Queen's Road, Barnet, Hertfordshire",
       postcode: 'EN5 4DQ',
     },
-    // Another Queen Elizabeth's — different town. Should be filtered out
+    // Another Queen Elizabeth's - different town. Should be filtered out
     // when the query includes "Barnet".
     {
       urn: '100000',
@@ -143,7 +143,7 @@ describe('filterAndRank()', () => {
       address: 'Some Street, Wakefield',
       postcode: 'WF1 1AA',
     },
-    // An unrelated Barnet school — matches via LA only, not via the other
+    // An unrelated Barnet school - matches via LA only, not via the other
     // tokens. Should be filtered out when the query is a full name.
     {
       urn: '200000',
@@ -162,7 +162,7 @@ describe('filterAndRank()', () => {
   });
 
   test('matches tokens across name OR local_authority OR address (case-insensitive)', () => {
-    // "Barnet" hits local_authority, "oakwood" hits name — both must match.
+    // "Barnet" hits local_authority, "oakwood" hits name - both must match.
     const tokens = ['oakwood', 'barnet'];
     const result = filterAndRank(rows, tokens);
     expect(result).toHaveLength(1);
@@ -261,7 +261,7 @@ describe('pipeline (tokenize + filterAndRank)', () => {
   });
 
   test('"Primary school" (all stopwords) returns nothing because no distinctive tokens', () => {
-    // This is intentional — the tokeniser refuses to run a search with no
+    // This is intentional - the tokeniser refuses to run a search with no
     // signal rather than returning the first 10 schools alphabetically.
     const { distinctive } = tokenize('Primary school');
     expect(distinctive).toEqual([]);

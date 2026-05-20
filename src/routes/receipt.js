@@ -6,7 +6,7 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
-// Store uploads in memory (max 10 MB) — no disk writes needed
+// Store uploads in memory (max 10 MB) - no disk writes needed
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },

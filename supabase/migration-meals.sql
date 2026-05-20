@@ -1,7 +1,7 @@
 -- Meals Feature Migration
 -- Run this in the Supabase SQL editor
 
--- 1. recipes — household recipe library
+-- 1. recipes - household recipe library
 CREATE TABLE IF NOT EXISTS recipes (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id     UUID REFERENCES households(id) ON DELETE CASCADE,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   updated_at       TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- 2. meal_plan — weekly/daily meal assignments
+-- 2. meal_plan - weekly/daily meal assignments
 CREATE TABLE IF NOT EXISTS meal_plan (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id     UUID REFERENCES households(id) ON DELETE CASCADE,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS meal_plan (
   created_at       TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- 3. meal_categories — customisable meal slots per household
+-- 3. meal_categories - customisable meal slots per household
 CREATE TABLE IF NOT EXISTS meal_categories (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id     UUID REFERENCES households(id) ON DELETE CASCADE,

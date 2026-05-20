@@ -4,7 +4,7 @@ const cache = require('./cache');
 const { parseVEvent, expandRecurrence } = require('./providers/apple');
 
 const FETCH_TIMEOUT_MS = 30_000;
-const MAX_RESPONSE_BYTES = 25 * 1024 * 1024; // 25 MB — sane upper bound for iCal feeds
+const MAX_RESPONSE_BYTES = 25 * 1024 * 1024; // 25 MB - sane upper bound for iCal feeds
 
 /**
  * Normalise a user-pasted feed URL.
@@ -27,7 +27,7 @@ function normaliseFeedUrl(raw) {
  *
  * Bounded by a 30s timeout and a 25MB max-content-length so a malicious
  * or runaway feed can't tie up a worker or blow memory. The Accept
- * header advertises text/calendar but we don't reject other types —
+ * header advertises text/calendar but we don't reject other types -
  * some servers serve text/plain or octet-stream for .ics files.
  */
 async function fetchFeed(feedUrl) {
@@ -104,7 +104,7 @@ function vEventToRecords(vevent) {
  *   3. Upsert anything in the new set
  *   4. Soft-delete anything in the old set that's no longer in the feed,
  *      with the same 7-day guard processChange already uses (events
- *      ending less than 7 days ago survive — protects against feed
+ *      ending less than 7 days ago survive - protects against feed
  *      providers that occasionally serve a partial response).
  *
  * Returns a stats object the caller can show / log.
@@ -130,7 +130,7 @@ async function refreshFeed(feed) {
     }
   }
 
-  // Dedupe by external_uid — feeds occasionally contain the same UID
+  // Dedupe by external_uid - feeds occasionally contain the same UID
   // more than once (EXCEPTION events, duplicate VEVENTs from poorly-
   // behaved exporters). Without this, two records with the same UID
   // would race the upsert and double-count in stats. Last-write-wins:
@@ -144,13 +144,13 @@ async function refreshFeed(feed) {
   stats.fetched = records.length;
 
   // Load existing events keyed by external_uid so we can tell what's
-  // an update vs a create (purely for the stats counters — the actual
+  // an update vs a create (purely for the stats counters - the actual
   // write uses batched upsert and doesn't care).
   const existing = await db.getExternalFeedEvents(feed.id);
   const existingByUid = new Map(existing.map((e) => [e.external_uid, e]));
 
   // Build the row payload up-front so the batched upsert is a single
-  // round-trip. Doing this per-row used to be the bottleneck — Apple
+  // round-trip. Doing this per-row used to be the bottleneck - Apple
   // iCloud Family calendars expand into 5k–20k rows once recurrence is
   // applied across the 18-month window, and one HTTP call per row made
   // refreshes take minutes. One bulk call brings it back to seconds.
@@ -179,7 +179,7 @@ async function refreshFeed(feed) {
 
   // Defensive: duplicate-uid pairs within a single INSERT batch make
   // Postgres throw "duplicate key violates unique constraint" rather
-  // than letting ON CONFLICT resolve them — ON CONFLICT only handles
+  // than letting ON CONFLICT resolve them - ON CONFLICT only handles
   // row-vs-table conflicts, not row-vs-row within the same statement.
   // The dedup-by-uid step above should make this impossible, but guard
   // anyway and surface a useful error if a quirky feed slips through.
@@ -187,7 +187,7 @@ async function refreshFeed(feed) {
   for (const r of rows) {
     if (seenUids.has(r.external_uid)) {
       throw new Error(
-        `Internal: duplicate external_uid "${r.external_uid}" in upsert batch — ` +
+        `Internal: duplicate external_uid "${r.external_uid}" in upsert batch - ` +
         `dedup logic missed it. Feed=${feed.id}`
       );
     }
@@ -200,7 +200,7 @@ async function refreshFeed(feed) {
   );
 
   // Chunk to stay well under Supabase's request payload cap. 500 rows
-  // per chunk is a comfortable default — well below the ~10MB ceiling
+  // per chunk is a comfortable default - well below the ~10MB ceiling
   // even with verbose descriptions, and small enough that retries are
   // cheap if a chunk fails.
   const CHUNK = 500;
@@ -210,7 +210,7 @@ async function refreshFeed(feed) {
 
   // Anything still in existingByUid wasn't in this pull = candidate
   // delete. Apply the 7-day guard: if the event ended less than 7 days
-  // ago (or is in the future), skip — protects against a feed provider
+  // ago (or is in the future), skip - protects against a feed provider
   // serving a partial response. Then batch-soft-delete the rest in one
   // round-trip.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -236,7 +236,7 @@ async function refreshFeed(feed) {
   // Invalidate the month-of-events cache so the calendar view picks up
   // newly-pulled events on the next read. Without this, the local API's
   // in-memory cache happily serves the pre-feed-pull view for up to its
-  // TTL — meaning users hit Refresh, the count goes up, but the calendar
+  // TTL - meaning users hit Refresh, the count goes up, but the calendar
   // still looks empty until restart. Mirrors the pattern used by the
   // calendar mutation routes (create/update/delete event).
   cache.invalidatePattern(`cal-month:${feed.household_id}:`);

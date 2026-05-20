@@ -4,7 +4,7 @@
 -- them in JS. PostgREST silently caps every SELECT at the project's max-rows
 -- (default 1000), so once daily volume crossed that threshold the chart
 -- returned the OLDEST 1000 rows in the window and dropped the most recent
--- ones — making the admin dashboard chart cut off ~6 days before "now".
+-- ones - making the admin dashboard chart cut off ~6 days before "now".
 --
 -- Aggregating in SQL returns ~30 days × 3 providers = ~90 rows max,
 -- comfortably under any cap, and is much faster (one indexed scan + group by
@@ -33,7 +33,7 @@ as $$
   order by created_at::date asc, provider asc
 $$;
 
--- Allow the service role to call it. Anon/authenticated don't need it —
+-- Allow the service role to call it. Anon/authenticated don't need it -
 -- only the admin dashboard hits this, via the API server using the service
 -- key. security definer keeps it locked down regardless of caller RLS.
 grant execute on function get_ai_usage_timeline(int) to service_role;

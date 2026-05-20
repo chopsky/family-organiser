@@ -14,7 +14,7 @@ export default function Signup() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [turnstileToken, setTurnstileToken] = useState(null);
-  // Email form is hidden by default — Continue with Email button reveals it.
+  // Email form is hidden by default - Continue with Email button reveals it.
   // SSO-first surface matches Login.jsx and reduces visual clutter.
   const [showEmailForm, setShowEmailForm] = useState(false);
   const turnstileRef            = useRef(null);
@@ -49,17 +49,17 @@ export default function Signup() {
       });
 
       if (data.token) {
-        // Invite flow — auto-joined
+        // Invite flow - auto-joined
         login(data);
         navigate('/dashboard');
       } else {
-        // Normal flow — needs email verification
+        // Normal flow - needs email verification
         navigate('/check-email');
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong.');
       // Turnstile tokens are single-use. The backend already consumed
-      // ours validating this submission — even though the request
+      // ours validating this submission - even though the request
       // ultimately failed (weak password, email taken, etc), the token
       // is dead and re-submitting with it would trip "Bot verification
       // failed". Clear and reset so the next submit gets a fresh one.
@@ -83,7 +83,7 @@ export default function Signup() {
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
       }}
     >
-      {/* Decorative ambient blobs — same as Login.jsx. Kept inline rather
+      {/* Decorative ambient blobs - same as Login.jsx. Kept inline rather
           than extracted so each page can live as a single file. */}
       <div
         aria-hidden="true"
@@ -354,7 +354,7 @@ export default function Signup() {
       </div>
 
       {/* Same scoped SocialButtons re-skin as Login.jsx. See that file
-          for rationale — primary purple Google button + ghost Apple. */}
+          for rationale - primary purple Google button + ghost Apple. */}
       <style>{`
         .signup-concierge-auth > div.space-y-3 > * + * { margin-top: 10px !important; }
         .signup-concierge-auth button[disabled] { cursor: wait; }

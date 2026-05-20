@@ -1,22 +1,22 @@
 /**
- * Unsubscribe tokens — Phase 7.
+ * Unsubscribe tokens - Phase 7.
  *
  * One-click unsubscribe links in broadcast-stream emails ride on a
  * signed JWT carrying just the household_id. Verifying the token is
  * how we trust "yes, this request really did originate from our own
- * email" — without it, anyone who could guess a household id could
+ * email" - without it, anyone who could guess a household id could
  * disable another household's trial nudges.
  *
  * We use JWT (rather than a bare HMAC) for three reasons:
  *   1. `jsonwebtoken` is already a project dep; no new crypto code.
- *   2. Built-in expiry — 90 days matches the useful life of an email
+ *   2. Built-in expiry - 90 days matches the useful life of an email
  *      (after which the trial has long finished and nudges no longer
  *      apply anyway).
  *   3. `aud` + `iss` claims let us reject a token intended for a
  *      different purpose (e.g. someone pasting a session JWT into the
  *      unsubscribe URL).
  *
- * Signed with UNSUBSCRIBE_TOKEN_SECRET — a SEPARATE secret from
+ * Signed with UNSUBSCRIBE_TOKEN_SECRET - a SEPARATE secret from
  * JWT_SECRET. Splitting secrets limits blast radius: a leaked
  * unsubscribe secret lets attackers toggle trial_emails_enabled but
  * NOT impersonate session users.
@@ -32,7 +32,7 @@ const EXPIRY = '90d';
 function requireSecret() {
   if (!TOKEN_SECRET) {
     throw new Error(
-      'UNSUBSCRIBE_TOKEN_SECRET is not set — cannot sign or verify ' +
+      'UNSUBSCRIBE_TOKEN_SECRET is not set - cannot sign or verify ' +
       'unsubscribe tokens. Generate one with: openssl rand -base64 48'
     );
   }
@@ -41,7 +41,7 @@ function requireSecret() {
 /**
  * Sign a one-click unsubscribe token for a household.
  *
- * The token encodes only the household_id — no user identity. This is
+ * The token encodes only the household_id - no user identity. This is
  * deliberate: the preference (`trial_emails_enabled`) is a per-household
  * flag, so the token doesn't need to know which user clicked.
  */
@@ -57,7 +57,7 @@ function signToken(householdId) {
 
 /**
  * Verify a token and return the household_id. Throws with a descriptive
- * error on any failure mode — callers should catch broadly and show a
+ * error on any failure mode - callers should catch broadly and show a
  * generic "invalid or expired link" page to the user rather than
  * leaking which specific check failed.
  */

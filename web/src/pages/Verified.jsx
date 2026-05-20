@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { localeHomePath } from '../hooks/useLocale';
 
 // Landed on after clicking the "Verify email" link in a welcome email.
-// Renders regardless of auth state — the user may be on a browser where
+// Renders regardless of auth state - the user may be on a browser where
 // another account is already logged in (especially admins testing new
 // signups), and we want them to see the confirmation before any route
 // guard bounces them off to a dashboard.
@@ -14,7 +14,7 @@ export default function Verified() {
 
   return (
     <div
-      // Concierge stage — matches the rest of the auth flow.
+      // Concierge stage - matches the rest of the auth flow.
       className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
       style={{
         background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',

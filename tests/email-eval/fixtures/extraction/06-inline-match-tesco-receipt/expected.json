@@ -1,5 +1,5 @@
 {
-  "description": "Tier 2.5 inline matching: receipt contains 5 items, 5 of them are on the household's shopping list (milk, butter, bread, loo roll, beef mince). Eggs is on the list but not on the receipt. The AI should populate list_item_id + match_confidence for each receipt item that matches a list entry — eliminating the need for a separate matchReceiptToList call.",
+  "description": "Tier 2.5 inline matching: receipt contains 5 items, 5 of them are on the household's shopping list (milk, butter, bread, loo roll, beef mince). Eggs is on the list but not on the receipt. The AI should populate list_item_id + match_confidence for each receipt item that matches a list entry - eliminating the need for a separate matchReceiptToList call.",
   "email_type": "receipt",
   "shopping_items": {
     "count_min": 5,

@@ -1,5 +1,5 @@
 {
-  "description": "Itemised Tesco receipt — should extract shopping items as 'butter', 'milk', 'bread', etc. (normalised), with zero events even though there's a delivery slot. The 'delivery charge' line should be filtered out per the prompt's IGNORE rules.",
+  "description": "Itemised Tesco receipt - should extract shopping items as 'butter', 'milk', 'bread', etc. (normalised), with zero events even though there's a delivery slot. The 'delivery charge' line should be filtered out per the prompt's IGNORE rules.",
   "email_type": "receipt",
   "shopping_items": {
     "count_min": 5,

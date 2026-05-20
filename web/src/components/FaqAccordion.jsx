@@ -1,18 +1,18 @@
 /**
- * FaqAccordion — a stateless wrapper around native <details>/<summary>.
+ * FaqAccordion - a stateless wrapper around native <details>/<summary>.
  *
  * Why native <details>:
  *   • Browsers automatically open a <details> whose id matches the URL
- *     hash on load — so /help#bot-not-replying both scrolls to and
+ *     hash on load - so /help#bot-not-replying both scrolls to and
  *     expands that question, no JS required.
- *   • <summary> is a button by default — keyboard, focus ring, and
+ *   • <summary> is a button by default - keyboard, focus ring, and
  *     screen-reader expanded/collapsed state all work out of the box.
  *   • Zero state to manage in React, zero library to add.
  *
  * Styling note: the default disclosure triangle is suppressed via a
  * global rule in index.css (`summary::-webkit-details-marker { display:
  * none }` + `summary { list-style: none }`), so the only visible
- * affordance is our own chevron — which rotates on `[open]` via the
+ * affordance is our own chevron - which rotates on `[open]` via the
  * `group-open:` Tailwind variant.
  */
 

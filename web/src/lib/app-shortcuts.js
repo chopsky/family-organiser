@@ -6,7 +6,7 @@
  * app directly to the relevant route.
  *
  * Registered once at app boot (main.jsx → native-shell.js). The
- * actions are static — we don't change them per-user state because
+ * actions are static - we don't change them per-user state because
  * iOS caches the shortcut list from before the app launched and
  * dynamic updates would feel inconsistent.
  *
@@ -48,7 +48,7 @@ const SHORTCUTS = [
   },
 ];
 
-/** Set the home-screen shortcuts. Idempotent — calling repeatedly is fine. */
+/** Set the home-screen shortcuts. Idempotent - calling repeatedly is fine. */
 export async function registerShortcuts() {
   if (!isNative()) return;
   try {

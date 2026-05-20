@@ -710,9 +710,9 @@ export default function Tasks() {
 
   /* ─ Render ─ */
 
-  // Pull-to-refresh — re-runs the same load() the page uses on mount. No-op on web.
+  // Pull-to-refresh - re-runs the same load() the page uses on mount. No-op on web.
   const ptr = usePullToRefresh(async () => { await load(); });
-  // Foreground refresh — re-pulls when the app comes back from background.
+  // Foreground refresh - re-pulls when the app comes back from background.
   useAppForegroundRefresh(load);
 
   return (
@@ -859,7 +859,7 @@ export default function Tasks() {
               />
             </div>
 
-            {/* min-w-0 on each grid child is critical — without it, native iOS
+            {/* min-w-0 on each grid child is critical - without it, native iOS
                 <input type="date"> and <input type="time"> report an intrinsic
                 min-width that exceeds the grid track on narrow phones, causing
                 the right column to overflow the modal. Grid items default to

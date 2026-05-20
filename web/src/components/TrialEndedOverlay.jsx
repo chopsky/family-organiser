@@ -1,14 +1,14 @@
 /**
- * Trial ended overlay — Phase 6.
+ * Trial ended overlay - Phase 6.
  *
  * The modal that greets expired users on login. Non-dismissible in the
- * sense that it has no "X" button — the user must consciously click
+ * sense that it has no "X" button - the user must consciously click
  * either "Subscribe" or "Just browsing". Per the spec (§8) this is a
  * conversion lever: we remind them of the data they've built up, make
  * subscribing one click, and keep the "Just browsing" escape hatch as
  * a muted text link.
  *
- * Dismissal scope — the current browser session.
+ * Dismissal scope - the current browser session.
  *   • Keyed on a sessionStorage flag, so a fresh tab / new login shows
  *     the overlay again (matches "On login, show an overlay" in §8).
  *   • Reloads within the same tab keep the dismissal so users don't get
@@ -16,7 +16,7 @@
  *
  * Mounted from Layout so it covers every authenticated in-app page (the
  * Subscribe / SubscribeSuccess / SubscribeCancel pages aren't wrapped
- * in Layout, so the overlay naturally doesn't appear there — exactly
+ * in Layout, so the overlay naturally doesn't appear there - exactly
  * what we want).
  */
 
@@ -52,7 +52,7 @@ export default function TrialEndedOverlay() {
         const { data } = await api.get('/household/usage-summary');
         if (!cancelled) setUsage(data);
       } catch {
-        // Non-fatal — the overlay renders without personalised numbers
+        // Non-fatal - the overlay renders without personalised numbers
         // if the fetch fails.
       }
     })();
@@ -66,7 +66,7 @@ export default function TrialEndedOverlay() {
   }
   // App Store guideline 3.1.1: never surface a "trial has ended" prompt
   // on iOS. The SubscriptionContext already forces isExpired=false on
-  // iOS so this guard is defence-in-depth — explicitly block here in
+  // iOS so this guard is defence-in-depth - explicitly block here in
   // case any future change to the context regresses that.
   if (isIos()) return null;
   if (!isExpired || dismissed) return null;
@@ -83,7 +83,7 @@ export default function TrialEndedOverlay() {
       aria-modal="true"
       aria-labelledby="trial-ended-heading"
     >
-      {/* Backdrop — slightly darker than the usual modal tint because
+      {/* Backdrop - slightly darker than the usual modal tint because
           this is a conversion moment, not a casual overlay. */}
       <div className="absolute inset-0 bg-charcoal/60 backdrop-blur-sm" aria-hidden="true" />
 
@@ -100,12 +100,12 @@ export default function TrialEndedOverlay() {
 
         <p className="text-cocoa text-base mt-5">
           {isIos()
-            ? 'Your data is safe — subscribe on housemait.com to pick up right where you left off.'
-            : 'Your data is safe — subscribe anytime to pick up right where you left off.'}
+            ? 'Your data is safe - subscribe on housemait.com to pick up right where you left off.'
+            : 'Your data is safe - subscribe anytime to pick up right where you left off.'}
         </p>
 
         <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
-          {/* iOS renders only the "Just browsing" dismiss — the Subscribe
+          {/* iOS renders only the "Just browsing" dismiss - the Subscribe
               button linked to an external payment flow which breaks App
               Store rules. The URL is mentioned in the copy above as
               plain text so users know where to go. */}

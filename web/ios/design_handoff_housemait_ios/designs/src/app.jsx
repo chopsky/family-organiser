@@ -1,4 +1,4 @@
-// Main app — wires screens, tabs, sheets, tweaks
+// Main app - wires screens, tabs, sheets, tweaks
 const { useState: useS, useEffect: useE } = React;
 
 function useTweaks() {

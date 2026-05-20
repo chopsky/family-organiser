@@ -50,7 +50,7 @@ describe('buildDailyReminderMessage()', () => {
   });
 
   test('does NOT include a tasks section', () => {
-    // Tasks moved to the later-in-day nudge — morning message should
+    // Tasks moved to the later-in-day nudge - morning message should
     // never mention them.
     const ev = makeEvent({ title: 'Anything' });
     const msg = buildDailyReminderMessage(SARAH, [ev], 0, []);

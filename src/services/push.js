@@ -1,5 +1,5 @@
 /**
- * Apple Push Notification service (APNs) — sends push notifications
+ * Apple Push Notification service (APNs) - sends push notifications
  * to iOS devices using Node's built-in http2 module (no third-party deps).
  *
  * Fire-and-forget: errors are logged but never block the caller.
@@ -42,7 +42,7 @@ if (APN_KEY_ID && APN_TEAM_ID && (APN_KEY || APN_KEY_PATH)) {
     console.warn('[push] Failed to load APNs key:', err.message);
   }
 } else {
-  console.warn('[push] APNs not configured — need APN_KEY_ID, APN_TEAM_ID, and APN_KEY (or APN_KEY_PATH). Push notifications disabled.');
+  console.warn('[push] APNs not configured - need APN_KEY_ID, APN_TEAM_ID, and APN_KEY (or APN_KEY_PATH). Push notifications disabled.');
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ function sendOne(deviceToken, payload) {
         if (status === 200) {
           resolve({ success: true });
         } else {
-          console.error('[push] APNs error for token', deviceToken.substring(0, 8) + '...', '— status:', status, responseBody);
+          console.error('[push] APNs error for token', deviceToken.substring(0, 8) + '...', '- status:', status, responseBody);
           resolve({ success: false, status, reason: responseBody });
         }
       });

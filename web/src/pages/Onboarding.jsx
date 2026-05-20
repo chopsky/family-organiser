@@ -4,7 +4,7 @@
  * completes, and Login.jsx + SetupHousehold.jsx + RequireAuth all route
  * around that flag.
  *
- * Step list adapts to the platform — iOS gets a native push-permission
+ * Step list adapts to the platform - iOS gets a native push-permission
  * step; web doesn't. Every step is self-contained and receives the same
  * props so the shell can stay dumb.
  */
@@ -26,7 +26,7 @@ export default function Onboarding() {
   const { user, household, updateUser, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Escape hatch — without this users with a half-finished signup are
+  // Escape hatch - without this users with a half-finished signup are
   // stuck: visiting housemait.com bounces them right back here via
   // RequireAuth's needsOnboarding redirect. Logging out clears the token
   // so the landing page renders normally. Hard redirect (vs navigate)
@@ -44,7 +44,7 @@ export default function Onboarding() {
 
   // Push-permission status drives whether we include the Notifications
   // step. null = still checking (show a skeleton), 'granted' means the
-  // step would be a pointless "✓ already on, click Continue" page — so
+  // step would be a pointless "✓ already on, click Continue" page - so
   // we skip it entirely. 'prompt' / 'denied' means there's a real ask
   // or message to deliver, step stays in.
   const [pushStatus, setPushStatus] = useState(isIOS ? null : 'skip');
@@ -57,7 +57,7 @@ export default function Onboarding() {
         const perm = await PushNotifications.checkPermissions();
         if (!cancelled) setPushStatus(perm.receive || 'prompt');
       } catch {
-        // If the check itself fails (rare — Capacitor plugin not ready),
+        // If the check itself fails (rare - Capacitor plugin not ready),
         // include the step so the user can still attempt to enable.
         if (!cancelled) setPushStatus('prompt');
       }
@@ -73,7 +73,7 @@ export default function Onboarding() {
     { id: 'welcome',           Component: Welcome },
     { id: 'invite-family',     Component: InviteFamily },
     { id: 'connect-whatsapp',  Component: ConnectWhatsApp },
-    // Calendar sync intentionally isn't a wizard step — OAuth redirects
+    // Calendar sync intentionally isn't a wizard step - OAuth redirects
     // away from the app for Google/Microsoft, and there's no good way to
     // inline that without risking wizard progress. Users discover it from
     // Settings once they reach the dashboard.
@@ -98,7 +98,7 @@ export default function Onboarding() {
       const { data } = await api.post('/auth/mark-onboarded');
       if (data?.user) updateUser(data.user);
     } catch (err) {
-      // Log but don't trap the user — they should still reach the dashboard
+      // Log but don't trap the user - they should still reach the dashboard
       // even if the server call hiccups. On next login they'd get bumped
       // back here, which isn't ideal but isn't broken either.
       console.error('[onboarding] mark-onboarded failed:', err?.response?.data?.error || err.message);
@@ -117,7 +117,7 @@ export default function Onboarding() {
 
   return (
     <div
-      // Concierge stage — matches Login.jsx + Signup.jsx so the visual
+      // Concierge stage - matches Login.jsx + Signup.jsx so the visual
       // language stays consistent from sign-up through to the wizard's
       // final step. Radial gradient + two ambient blobs fill the
       // viewport, the card holds each step's content.
@@ -126,7 +126,7 @@ export default function Onboarding() {
         background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
       }}
     >
-      {/* Decorative ambient blobs — aria-hidden because they're
+      {/* Decorative ambient blobs - aria-hidden because they're
           decorative-only, identical to the Login/Signup treatment. */}
       <div
         aria-hidden="true"
@@ -149,7 +149,7 @@ export default function Onboarding() {
         }}
       />
 
-      {/* Progress bar — thin strip at the very top of the stage,
+      {/* Progress bar - thin strip at the very top of the stage,
           animates as the user advances. Sits above the blobs in
           stacking order so it stays crisp. */}
       <div
@@ -165,7 +165,7 @@ export default function Onboarding() {
         />
       </div>
 
-      {/* Main content — glass card with the same look as the Login
+      {/* Main content - glass card with the same look as the Login
           card. max-w-[420px] matches the Login/Signup card width so
           everything looks like one product. */}
       <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-10 pb-8 md:pt-12 md:pb-10">
@@ -182,7 +182,7 @@ export default function Onboarding() {
           }}
         >
           {/* Logomark in the same purple-tinted chip used by Login /
-              Signup — kept here so every step inherits the same
+              Signup - kept here so every step inherits the same
               header without each step having to render its own. */}
           <div
             className="mx-auto mb-5"
@@ -218,7 +218,7 @@ export default function Onboarding() {
         </div>
       </main>
 
-      {/* Footer nav — Back / step counter / sign-out. Transparent
+      {/* Footer nav - Back / step counter / sign-out. Transparent
           over the stage; sits flush with the safe-area bottom. */}
       <footer className="relative z-10 safe-bottom">
         <div className="max-w-[480px] mx-auto px-5 py-4 flex items-center justify-between text-sm">

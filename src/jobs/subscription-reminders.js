@@ -1,7 +1,7 @@
 /**
  * Daily subscription-renewal nudge job.
  *
- * Runs once a day at 09:00 (household timezone — gated by scheduler.js).
+ * Runs once a day at 09:00 (household timezone - gated by scheduler.js).
  * Picks every household_subscriptions row whose `next_renewal_at` is
  * in the next 3 days, sends a WhatsApp nudge to every linked member,
  * marks the row as reminded for that date, and after the renewal day
@@ -65,7 +65,7 @@ async function runSubscriptionRemindersForHousehold(householdId) {
   let sent = 0;
   let advanced = 0;
   for (const sub of householdSubs) {
-    // Has the renewal already passed? Advance forward and skip — we
+    // Has the renewal already passed? Advance forward and skip - we
     // don't want to nudge for a past date. The reminder for this
     // cycle has either already gone out or got missed for some reason.
     if (sub.next_renewal_at < ymd(today)) {

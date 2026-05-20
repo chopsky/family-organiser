@@ -2,10 +2,10 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  throw new Error('Missing JWT_SECRET environment variable — refusing to start with insecure defaults');
+  throw new Error('Missing JWT_SECRET environment variable - refusing to start with insecure defaults');
 }
 
-// Short-lived access token — paired with a 7-day rotating refresh token
+// Short-lived access token - paired with a 7-day rotating refresh token
 // in routes/auth.js. Active users refresh silently; inactive sessions
 // expire after 7 days of no activity.
 const JWT_EXPIRES_IN = '1h';

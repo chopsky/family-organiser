@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Font stacks — system fonts only, no external loads */
+  /* Font stacks - system fonts only, no external loads */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
@@ -91,7 +91,7 @@
     overscroll-behavior: contain;
   }
 
-  /* Disable tap-highlight on iOS — that grey/black flash on tap reads
+  /* Disable tap-highlight on iOS - that grey/black flash on tap reads
      as web-y. Components define their own :active feedback (now also
      via haptics) where wanted. */
   * {
@@ -100,7 +100,7 @@
 
   /* Kill the iOS long-press text-selection callout on UI chrome.
      Long-pressing a button or label currently pops "Copy / Select All"
-     — a giveaway that this is a WebView. Disable selection by default
+     - a giveaway that this is a WebView. Disable selection by default
      on the app root; re-enable only on actual text content (paragraphs,
      headings, list items) + any input/editable surface.
      Inputs explicitly re-enable selection so users can copy/paste text
@@ -126,9 +126,9 @@
     padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
   }
 
-  /* Page transition — fires on every route change. Pure opacity
+  /* Page transition - fires on every route change. Pure opacity
      fade (no transform). A previous version used translateX for a
-     subtle slide, but ANY transform — even translateX(0) — on a
+     subtle slide, but ANY transform - even translateX(0) - on a
      parent creates a "containing block" that breaks position:fixed
      descendants. The mobile bottom nav (fixed bottom-0 inside
      Layout, inside this wrapper) started positioning against the
@@ -152,7 +152,7 @@
   }
   .safe-bottom {
     /* Guarantees at least 12px of bottom padding even on contexts where
-       env(safe-area-inset-bottom) resolves to 0 — e.g. a desktop browser
+       env(safe-area-inset-bottom) resolves to 0 - e.g. a desktop browser
        with the viewport narrowed to mobile width, or Android devices in
        portrait without a home indicator. On iPhones with a home bar the
        real ~34px safe-area value wins, so nothing changes there. */

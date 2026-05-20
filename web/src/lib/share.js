@@ -30,7 +30,7 @@ function isNative() {
 export async function share({ title, text, url, dialogTitle } = {}) {
   if (!text && !url) return false;
 
-  // 1. iOS native share sheet — preferred path
+  // 1. iOS native share sheet - preferred path
   if (isNative()) {
     try {
       const { Share } = await import('@capacitor/share');
@@ -49,7 +49,7 @@ export async function share({ title, text, url, dialogTitle } = {}) {
     }
   }
 
-  // 2. Web Share API — supported on iOS Safari + Chrome Android
+  // 2. Web Share API - supported on iOS Safari + Chrome Android
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
       await navigator.share({ title, text, url });
@@ -61,7 +61,7 @@ export async function share({ title, text, url, dialogTitle } = {}) {
     }
   }
 
-  // 3. Clipboard fallback — works on every desktop browser
+  // 3. Clipboard fallback - works on every desktop browser
   try {
     const body = [title, text, url].filter(Boolean).join('\n');
     if (typeof navigator !== 'undefined' && navigator.clipboard) {

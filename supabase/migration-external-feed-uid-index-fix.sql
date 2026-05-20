@@ -4,16 +4,16 @@
 -- Why this exists: the original migration declared the unique index as
 -- PARTIAL (WHERE external_feed_id IS NOT NULL) to keep it small.
 -- Postgres allows ON CONFLICT against a partial index, but only when
--- the inserted row's WHERE clause matches the partial predicate — and
+-- the inserted row's WHERE clause matches the partial predicate - and
 -- Supabase JS's `.upsert(... { onConflict: ... })` doesn't expose that
 -- machinery. Result: every refresh threw
 --   "there is no unique or exclusion constraint matching the ON
 --   CONFLICT specification"
 -- and the inbound feed couldn't reconcile its events.
 --
--- The fix: drop the partial clause. The index gets slightly wider —
+-- The fix: drop the partial clause. The index gets slightly wider -
 -- it now also covers rows where external_feed_id IS NULL (i.e.
--- Housemait-originated events) — but those rows have external_uid
+-- Housemait-originated events) - but those rows have external_uid
 -- IS NULL too, and Postgres treats (NULL, NULL) as distinct under
 -- default NULLS DISTINCT semantics, so multiple Housemait-originated
 -- events coexist fine in the index without conflict.

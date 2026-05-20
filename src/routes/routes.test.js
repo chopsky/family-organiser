@@ -1,6 +1,6 @@
 /**
  * API route integration tests.
- * DB and AI services are mocked — no real database or API calls.
+ * DB and AI services are mocked - no real database or API calls.
  */
 
 jest.mock('../db/queries');
@@ -30,11 +30,11 @@ jest.mock('bcrypt', () => ({
 }));
 
 // Stub global fetch so the password-strength validator's HIBP check is a
-// no-op during tests — always reports "not breached". Tests aren't about
+// no-op during tests - always reports "not breached". Tests aren't about
 // HaveIBeenPwned; the dedicated password-strength test suite covers the
 // breach-detection behaviour. Without this, 'password123' in test
 // fixtures would trip the real HIBP API (if reachable) and reject the
-// request with a 400 — which is correct production behaviour but breaks
+// request with a 400 - which is correct production behaviour but breaks
 // every register/reset route test.
 global.fetch = jest.fn().mockResolvedValue({
   ok: true,
@@ -268,7 +268,7 @@ describe('POST /api/tasks', () => {
 describe('POST /api/classify', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // classify route loads notes + calendar events with .catch() — the automock
+    // classify route loads notes + calendar events with .catch() - the automock
     // returns undefined by default, so give them real resolved promises.
     db.getHouseholdNotes.mockResolvedValue([]);
     db.getCalendarEvents.mockResolvedValue([]);
@@ -739,7 +739,7 @@ describe('GET /api/auth/export', () => {
       lte: jest.fn().mockReturnThis(),
       order: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
-      // For non-.single() queries, the chain is awaited directly — make it
+      // For non-.single() queries, the chain is awaited directly - make it
       // thenable so it resolves to { data: [], error: null }.
       then: (resolve) => resolve({ data: [], error: null }),
     };

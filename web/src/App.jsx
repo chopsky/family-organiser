@@ -7,7 +7,7 @@ import { localeHomePath } from './hooks/useLocale';
 import { useUniversalLinks } from './hooks/useUniversalLinks';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
-// File renamed from CookieConsent.jsx — many ad-blocker rules match on
+// File renamed from CookieConsent.jsx - many ad-blocker rules match on
 // the substring "CookieConsent" in URLs and `net::ERR_BLOCKED_BY_CLIENT`
 // the dev request. ConsentBanner is functionally identical.
 import ConsentBanner from './components/ConsentBanner';
@@ -16,7 +16,7 @@ import ConsentBanner from './components/ConsentBanner';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 
-// Lazy load everything else — only downloaded when the route is visited
+// Lazy load everything else - only downloaded when the route is visited
 const Signup          = lazy(() => import('./pages/Signup'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
@@ -42,7 +42,7 @@ const Subscribe       = lazy(() => import('./pages/Subscribe'));
 const SubscribeSuccess = lazy(() => import('./pages/SubscribeSuccess'));
 const SubscribeCancel  = lazy(() => import('./pages/SubscribeCancel'));
 
-// Admin pages — only downloaded if user is a platform admin
+// Admin pages - only downloaded if user is a platform admin
 const AdminDashboard       = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsers           = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminUserDetail      = lazy(() => import('./pages/admin/AdminUserDetail'));
@@ -76,7 +76,7 @@ function PageLoader() {
  * Layout/Settings, the 401 handler in api.js, the catch-all path="*"
  * fallback, and any future `to="/"` we forget to convert). If the
  * visitor previously interacted with a locale-specific marketing page,
- * a `housemait-locale` cookie was set — we send them back to that
+ * a `housemait-locale` cookie was set - we send them back to that
  * country's landing page instead of dropping them on the international
  * default.
  *
@@ -118,7 +118,7 @@ function RequirePlatformAdmin({ children }) {
 /**
  * Wraps Routes in a div keyed by pathname so a CSS animation fires on
  * every route change. Pairs with the `.page-transition` keyframe in
- * index.css. On iOS this gives a subtle slide-fade between pages —
+ * index.css. On iOS this gives a subtle slide-fade between pages -
  * closer to UIKit's push transition than the previous instant swap.
  * On reduced-motion settings the animation auto-disables (see CSS).
  */
@@ -153,7 +153,7 @@ function AppRoutes() {
             per region in search results. Auth'd users always bounce to
             /dashboard regardless of which locale path they hit. */}
         <Route path="/gb" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-        {/* Legacy /uk URL — kept until search engines and bookmarks have
+        {/* Legacy /uk URL - kept until search engines and bookmarks have
             migrated to /gb. Bounces to /gb so old inbound links keep
             working; vercel.json also issues a 301 at the edge for the
             same path so non-React traffic (crawlers, social previewers)
@@ -165,7 +165,7 @@ function AppRoutes() {
         <Route path="/ca" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/za" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
-        {/* /signup must be unreachable while a session is live — otherwise a
+        {/* /signup must be unreachable while a session is live - otherwise a
             logged-in user creating a "new" account carries their token into
             the flow, every API call inside onboarding acts as the original
             user, and the new account row ends up half-created (no verification
@@ -180,7 +180,7 @@ function AppRoutes() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/support" element={<Support />} />
         <Route path="/setup" element={<RequireAuthOnly><SetupHousehold /></RequireAuthOnly>} />
-        {/* Onboarding wizard — requires auth + a household, but deliberately
+        {/* Onboarding wizard - requires auth + a household, but deliberately
             NOT a completed onboarding (that's what it sets). Renders without
             the regular Layout so the wizard owns the full viewport. */}
         <Route path="/onboarding" element={<RequireAuthOnly><Onboarding /></RequireAuthOnly>} />
@@ -194,7 +194,7 @@ function AppRoutes() {
         <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
         <Route path="/help" element={<RequireAuth><Layout><Help /></Layout></RequireAuth>} />
-        {/* Subscribe flow — Subscribe page is reachable by anyone logged in
+        {/* Subscribe flow - Subscribe page is reachable by anyone logged in
             (including expired users, so they can reactivate). Success and
             Cancel pages are hit by Stripe redirects so they need to work
             without any route guards beyond auth. */}

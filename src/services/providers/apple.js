@@ -1,4 +1,4 @@
-// Apple/CalDAV provider — reduced to read-only utilities + cleanup helper.
+// Apple/CalDAV provider - reduced to read-only utilities + cleanup helper.
 //
 // Two-way sync was removed in favour of read-only inbound iCal feeds
 // (see src/services/externalFeed.js + the external_calendar_feeds
@@ -13,7 +13,7 @@
 //     sync_mappings pointing at events Housemait once pushed into their
 //     Apple Calendar.
 
-// Lazy-load tsdav via dynamic import — it's ESM-only and can't use require()
+// Lazy-load tsdav via dynamic import - it's ESM-only and can't use require()
 let _DAVClient = null;
 async function getDAVClient() {
   if (!_DAVClient) {
@@ -140,7 +140,7 @@ function parseVEvent(icalData) {
     if (tzid) {
       return localToUtc(value, tzid);
     }
-    // No Z and no TZID — treat as UTC (legacy fallback)
+    // No Z and no TZID - treat as UTC (legacy fallback)
     const year = value.substring(0, 4);
     const month = value.substring(4, 6);
     const day = value.substring(6, 8);
@@ -154,9 +154,9 @@ function parseVEvent(icalData) {
 
   // iCalendar all-day events use an exclusive end date (DTEND is the day AFTER the event).
   // Subtract one day so the app doesn't show the event bleeding into the next day.
-  // Defensive: if DTEND was actually inclusive (a non-compliant source — including
+  // Defensive: if DTEND was actually inclusive (a non-compliant source - including
   // our own historical pushes before the buildVEvent fix), subtracting would land
-  // BEFORE start_time. In that case the source clearly wasn't using exclusive end —
+  // BEFORE start_time. In that case the source clearly wasn't using exclusive end -
   // fall back to treating DTEND as the same day as start (single-day event). Keeps
   // the pull idempotent for legacy Apple-stored events that still have the old
   // non-compliant DTEND. Multi-day non-compliant events are still off by one and
@@ -245,7 +245,7 @@ function expandRecurrence(eventData, externalEventId) {
     const tzid = eventData._startTzid;
 
     if (eventData.all_day || rawDt.length === 8) {
-      // All-day event — expand with raw date, no timezone conversion needed
+      // All-day event - expand with raw date, no timezone conversion needed
       const rule = rrulestr(`DTSTART:${rawDt}\nRRULE:${eventData.rrule}`);
       const occurrences = rule.between(windowStart, windowEnd, true);
 
@@ -262,14 +262,14 @@ function expandRecurrence(eventData, externalEventId) {
       }));
     }
 
-    // Timed event — calculate duration from the already-converted UTC times
+    // Timed event - calculate duration from the already-converted UTC times
     const startMs = new Date(eventData.start_time).getTime();
     const endMs = new Date(eventData.end_time).getTime();
     const durationMs = endMs - startMs;
 
     if (tzid && !rawDt.endsWith('Z')) {
       // ── DST-aware expansion ──
-      // Expand WITHOUT a tzid option — passing tzid to rrule produces
+      // Expand WITHOUT a tzid option - passing tzid to rrule produces
       // Date objects whose UTC interpretation depends on the system TZ
       // env var (Node's V8 quirk). With TZ=Europe/London the dates come
       // back as wall-time-treated-as-UTC; with TZ=UTC (Railway's default)
@@ -285,7 +285,7 @@ function expandRecurrence(eventData, externalEventId) {
       const occurrences = rule.between(windowStart, windowEnd, true);
 
       return occurrences.map((occDate) => {
-        // rrule gives us a Date object — extract the local time components it represents
+        // rrule gives us a Date object - extract the local time components it represents
         // For rrule with tzid, the occurrence dates represent local times
         const occYear = occDate.getUTCFullYear();
         const occMonth = occDate.getUTCMonth();
@@ -314,7 +314,7 @@ function expandRecurrence(eventData, externalEventId) {
       });
     }
 
-    // ── No timezone (already UTC) — use existing approach ──
+    // ── No timezone (already UTC) - use existing approach ──
     const dtStartStr = rawDt.endsWith('Z') ? rawDt : eventData.start_time.replace(/[-:]/g, '');
     const rule = rrulestr(`DTSTART:${dtStartStr}\nRRULE:${eventData.rrule}`);
     const occurrences = rule.between(windowStart, windowEnd, true);
@@ -378,7 +378,7 @@ function findCalendar(calendars, connection) {
  * Called from the disconnect-with-cleanup flow. Connects once, fetches
  * the target calendar once, then issues a DELETE per sync mapping.
  *
- * 404 from the server means the event is already gone — counted as a
+ * 404 from the server means the event is already gone - counted as a
  * success because the end state is what the user wanted. Other errors
  * count as failures and are reported back so the UI can warn the user
  * that some orphans may remain.
@@ -418,7 +418,7 @@ async function deleteEventsBatch(connection, syncMappings) {
     } catch (err) {
       const status = err?.response?.status || err?.status;
       if (status === 404) {
-        // Already gone on the server — desired state achieved.
+        // Already gone on the server - desired state achieved.
         result.succeeded++;
       } else {
         result.failed++;

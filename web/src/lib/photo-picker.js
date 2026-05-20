@@ -7,7 +7,7 @@
  * apps prompt for an image.
  *
  * On web: falls back to a hidden `<input type="file" accept="image/*">`
- * click — same browser file picker we had before.
+ * click - same browser file picker we had before.
  *
  * Returns a Blob in both cases so the caller can hand it to the same
  * FormData / upload path it already uses for `<input>` selections.
@@ -73,7 +73,7 @@ export async function pickPhoto({
       // Fall through to the web input fallback
     }
   }
-  // Web fallback — synthesize a hidden file input + wait for change.
+  // Web fallback - synthesize a hidden file input + wait for change.
   return pickViaHiddenInput();
 }
 
@@ -94,7 +94,7 @@ function pickViaHiddenInput() {
       resolve(file || null);
     }
     input.addEventListener('change', () => settle(input.files?.[0] || null));
-    // No reliable "cancel" event in browsers — settle on focus return.
+    // No reliable "cancel" event in browsers - settle on focus return.
     // (Edge case: user opens picker, never picks, never returns. We
     // accept the unresolved promise; the picker can be re-opened.)
     document.body.appendChild(input);

@@ -44,13 +44,13 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       db.getHouseholdMembers(req.householdId),
     ]);
 
-    // These may fail if migrations haven't been run — fallback gracefully
+    // These may fail if migrations haven't been run - fallback gracefully
     let shoppingItems = [];
     let todayEvents = [];
     let weekMeals = [];
     try { shoppingItems = await db.getShoppingList(req.householdId) || []; } catch (e) { console.warn('digest: shopping list fetch failed:', e.message); }
     try {
-      // Fetch a wide window then filter by date string — this matches how the Calendar page works
+      // Fetch a wide window then filter by date string - this matches how the Calendar page works
       // and avoids timezone mismatches between the DB (timestamptz/UTC) and the household TZ
       const windowStart = todayStr + 'T00:00:00';
       const windowEnd = todayStr + 'T23:59:59';
@@ -66,7 +66,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
         const isToday = start === todayStr || (start <= todayStr && end >= todayStr);
         return isToday && e.category !== 'public_holiday' && e.category !== 'birthday';
       });
-      // Deduplicate events — calendar sync can create duplicate rows with same title + start_time
+      // Deduplicate events - calendar sync can create duplicate rows with same title + start_time
       const seen = new Set();
       todayEvents = filtered.filter(e => {
         const key = `${e.title}|${e.start_time}`;

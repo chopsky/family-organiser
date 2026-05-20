@@ -8,14 +8,14 @@ if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
   throw new Error('Missing SUPABASE_URL, SUPABASE_SERVICE_KEY, or SUPABASE_ANON_KEY environment variables');
 }
 
-// Admin client — bypasses RLS. Use ONLY for:
+// Admin client - bypasses RLS. Use ONLY for:
 //   - User registration (before a JWT exists)
 //   - Admin dashboard queries
 //   - Background jobs (reminders, cleanup)
 //   - Any operation that intentionally needs cross-household access
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-// User client factory — respects RLS. Call this in route handlers,
+// User client factory - respects RLS. Call this in route handlers,
 // passing the user's JWT so Supabase knows which household to scope to.
 //
 // Usage in a route:

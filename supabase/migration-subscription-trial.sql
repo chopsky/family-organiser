@@ -1,7 +1,7 @@
--- Subscription & 30-day free trial — Phase 1 (schema only).
+-- Subscription & 30-day free trial - Phase 1 (schema only).
 --
 -- Adds billing/trial state to households, plus a Stripe webhook idempotency
--- table. No backend or frontend changes in this migration — those land in
+-- table. No backend or frontend changes in this migration - those land in
 -- later phases.
 --
 -- Design notes
@@ -14,7 +14,7 @@
 -- • RLS: all reads/writes from the app go through the Node backend using
 --   the Supabase service_role key, which bypasses RLS (see
 --   migration-enable-rls-all.sql for the pattern). We therefore do NOT
---   create "household member can SELECT" policies — there is no Supabase
+--   create "household member can SELECT" policies - there is no Supabase
 --   Auth session on the client to evaluate auth.uid() against, so such
 --   policies would never fire. RLS stays enabled with no policies, which
 --   means: anon/authenticated keys see nothing, service_role sees
@@ -39,7 +39,7 @@ ALTER TABLE households
   ADD COLUMN IF NOT EXISTS subscription_plan                text,
   ADD COLUMN IF NOT EXISTS subscription_current_period_end  timestamptz,
   -- Internal/beta accounts that bypass all subscription checks (founders,
-  -- family, testers). Set manually in the DB or via admin tools — never
+  -- family, testers). Set manually in the DB or via admin tools - never
   -- expose as a user-facing setting.
   ADD COLUMN IF NOT EXISTS is_internal                      boolean     DEFAULT false NOT NULL,
   -- User preference for marketing-ish trial nudge emails (days 20/25/28).
@@ -47,7 +47,7 @@ ALTER TABLE households
   -- and ignore this flag.
   ADD COLUMN IF NOT EXISTS trial_emails_enabled             boolean     DEFAULT true  NOT NULL;
 
--- Check constraints — split out so they can be added idempotently. Postgres
+-- Check constraints - split out so they can be added idempotently. Postgres
 -- doesn't support IF NOT EXISTS on ADD CONSTRAINT directly, so we guard
 -- with a catalog check.
 DO $$
@@ -69,7 +69,7 @@ BEGIN
   END IF;
 END$$;
 
--- Unique indexes on Stripe IDs — prevents two household rows ever pointing
+-- Unique indexes on Stripe IDs - prevents two household rows ever pointing
 -- at the same Stripe customer or subscription, which would be a data bug.
 -- Nullable columns + UNIQUE is fine in Postgres (multiple NULLs allowed).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_households_stripe_customer
@@ -80,7 +80,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_households_stripe_subscription
   ON households (stripe_subscription_id)
   WHERE stripe_subscription_id IS NOT NULL;
 
--- Used by the daily nudge cron — "find all trialing households whose
+-- Used by the daily nudge cron - "find all trialing households whose
 -- trial_ends_at falls in the target window".
 CREATE INDEX IF NOT EXISTS idx_households_trial_ends_at
   ON households (trial_ends_at)
@@ -110,7 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_processed_stripe_events_processed_at
 -- ──────────────────────────────────────────────────────────────────────
 -- `households` already has RLS enabled (see migration-enable-rls-all.sql)
 -- with no policies, which means only service_role can read/write. The new
--- columns inherit that automatically — no policy work needed for reads
+-- columns inherit that automatically - no policy work needed for reads
 -- (backend uses service_role) and writes are already denied to anon/auth.
 --
 -- Do the same for processed_stripe_events: RLS on, no policies.
@@ -118,4 +118,4 @@ CREATE INDEX IF NOT EXISTS idx_processed_stripe_events_processed_at
 ALTER TABLE processed_stripe_events ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE processed_stripe_events IS
-  'Stripe webhook idempotency ledger. RLS enabled with no policies — only accessible via service_role key.';
+  'Stripe webhook idempotency ledger. RLS enabled with no policies - only accessible via service_role key.';

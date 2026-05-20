@@ -3,7 +3,7 @@
  *
  * Derives a household's default subscription currency from its country
  * code so the bot doesn't have to ask. The user can always override by
- * being explicit ("$9.99 a month") — see the classifier prompt.
+ * being explicit ("$9.99 a month") - see the classifier prompt.
  *
  * Returns { code, symbol } for the supported markets, or a generic
  * GBP fallback for OTHER. Codes are ISO 4217.
@@ -44,7 +44,7 @@ function parseMoneyString(text) {
   };
 }
 
-/** Format amount with symbol — for bot replies. £15.99, R199, $9.99. */
+/** Format amount with symbol - for bot replies. £15.99, R199, $9.99. */
 function formatMoney(amount, currencyCode) {
   if (amount == null) return '';
   const entry = Object.values(CURRENCY_BY_COUNTRY).find((c) => c.code === currencyCode);

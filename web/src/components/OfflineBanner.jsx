@@ -1,5 +1,5 @@
 /**
- * Slim "You're offline" banner — only renders on native iOS when
+ * Slim "You're offline" banner - only renders on native iOS when
  * the WebView reports no network. On web it never shows (the web
  * bundle's data layer doesn't cache offline, so the banner would
  * just be noise during a transient blip).

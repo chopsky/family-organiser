@@ -9,7 +9,7 @@
 -- Implementation: a PL/pgSQL DO block that loops over each overdue
 -- recurring task and advances its due_date one period at a time until
 -- it lands >= CURRENT_DATE. This mirrors the JS implementation rather
--- than trying to compute the new date in a single expression — months
+-- than trying to compute the new date in a single expression - months
 -- and years aren't fixed-length, so the per-task loop is both correct
 -- and easy to reason about.
 --
@@ -19,7 +19,7 @@
 -- Run in Supabase SQL editor.
 
 -- ── Step 1: preview what will change ────────────────────────────────
--- Read-only — shows the rows that will be touched and (per recurrence
+-- Read-only - shows the rows that will be touched and (per recurrence
 -- type) what the next single advance would produce. The actual UPDATE
 -- below loops until >= today, which may advance further than this
 -- preview shows for very-overdue tasks. Run the full DO block to commit.
@@ -61,7 +61,7 @@ BEGIN
 
     -- Advance one period at a time until new_due >= today.
     -- Cap at 1000 iterations as a safety belt against runaway loops
-    -- (would only matter for badly-formed data — even a daily task
+    -- (would only matter for badly-formed data - even a daily task
     -- 5 years overdue is just ~1825 advances).
     WHILE new_due < CURRENT_DATE AND iterations < 1000 LOOP
       iterations := iterations + 1;

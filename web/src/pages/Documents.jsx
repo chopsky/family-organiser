@@ -90,7 +90,7 @@ export default function Documents() {
       setUsage(usageRes.status === 'fulfilled' ? usageRes.value.data : null);
 
       // Only show an error if ALL three calls failed with a real error
-      // (not 404 — 404 usually means the backend hasn't finished deploying)
+      // (not 404 - 404 usually means the backend hasn't finished deploying)
       const failures = [foldersRes, docsRes, usageRes].filter(r => r.status === 'rejected');
       const allFailed = failures.length === 3;
       const nonNotFoundFailure = failures.find(f => f.reason?.response?.status !== 404);
@@ -288,7 +288,7 @@ export default function Documents() {
         {/*
           The `accept` list MUST stay in sync with the server-side allowlist
           in src/utils/fileValidation.js. The browser uses this to filter
-          the picker — it's UX, not security; the server rejects anything
+          the picker - it's UX, not security; the server rejects anything
           off-list regardless. If you add a type here, add it there too.
         */}
         <input
@@ -781,7 +781,7 @@ function FilePreviewModal({ doc, url, onClose, onDownload }) {
             // (e.g. one carrying embedded JavaScript via OpenAction) can't
             // exfiltrate, navigate the parent, submit forms, or pop dialogs.
             // `allow-popups` lets the user click links inside the PDF that
-            // open in a new tab — common UX, low risk. We deliberately do
+            // open in a new tab - common UX, low risk. We deliberately do
             // NOT include allow-scripts or allow-same-origin.
             <iframe
               src={url}

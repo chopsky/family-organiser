@@ -57,7 +57,7 @@ describe('isAllowedOrigin', () => {
   });
 
   test('rejects other vercel.app subdomains (different project, different scope)', () => {
-    // We must NOT accept every *.vercel.app — that would let any Vercel
+    // We must NOT accept every *.vercel.app - that would let any Vercel
     // user spin up a malicious preview and hit our API. The allowlist only
     // matches deployments whose name starts with family-organiser-.
     const isAllowed = load();
@@ -77,13 +77,13 @@ describe('isAllowedOrigin', () => {
     const isAllowed = load();
     // Different protocol must be rejected.
     expect(isAllowed('http://www.housmait.com')).toBe(false);
-    // Substring spoof must be rejected — exact hostname match (after
+    // Substring spoof must be rejected - exact hostname match (after
     // stripping leading www.) is required.
     expect(isAllowed('https://www.housmait.com.evil.com')).toBe(false);
   });
 
   test('accepts www and bare-domain variants of WEB_URL', () => {
-    // WEB_URL is set to https://www.housmait.com in beforeEach — both
+    // WEB_URL is set to https://www.housmait.com in beforeEach - both
     // forms of the production hostname must be allowed because the iOS
     // app's WebView origin can be either depending on capacitor.config
     // (server.hostname). Without this, switching between forms silently

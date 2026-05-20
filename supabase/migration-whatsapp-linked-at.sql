@@ -6,7 +6,7 @@
 -- That gives new users feature discovery cadence without overloading
 -- the welcome message itself.
 --
--- Existing linked users are backfilled with created_at — they're
+-- Existing linked users are backfilled with created_at - they're
 -- almost all well past 14 days anyway, so they immediately get the
 -- standard footer and don't see the tip series.
 

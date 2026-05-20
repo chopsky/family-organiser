@@ -61,7 +61,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // can answer location-aware AND school-term-aware questions from
     // real household data instead of training-set guesses. Each fetch
     // is wrapped in try/await to tolerate unmocked db functions in
-    // tests (and any genuine DB hiccups in prod — these are
+    // tests (and any genuine DB hiccups in prod - these are
     // nice-to-have context, not blockers).
     let householdRow = null;
     try { householdRow = await db.getHouseholdById(req.householdId); } catch {}
@@ -79,14 +79,14 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       result.response_message = stripActionBlocks(result.response_message);
     }
 
-    // Handle weather intent — fetch weather before responding.
-    // Explicit-location only — see the equivalent block in bot/handlers.js
+    // Handle weather intent - fetch weather before responding.
+    // Explicit-location only - see the equivalent block in bot/handlers.js
     // for why we don't fall back to stored user location anymore.
     if (result.intent === 'weather') {
       try {
         const locationName = extractLocationFromMessage(text);
         if (!locationName) {
-          result.response_message = "I can't tell where you are — Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍";
+          result.response_message = "I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍";
         } else {
           const geo = await geocodeLocation(locationName);
           if (!geo) {
@@ -103,7 +103,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       return res.json({ result });
     }
 
-    // Send the AI response immediately — don't wait for DB saves
+    // Send the AI response immediately - don't wait for DB saves
     res.json({ result });
 
     // Fire-and-forget: save items to DB in the background

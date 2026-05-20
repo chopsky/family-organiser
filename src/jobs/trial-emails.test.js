@@ -53,7 +53,7 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-describe('runTrialEmailCheck — per-day dispatch', () => {
+describe('runTrialEmailCheck - per-day dispatch', () => {
   test('day 20 households get the day-20 email', async () => {
     db.findHouseholdsAtTrialDay.mockImplementation(async (day) => {
       return day === 20 ? [TRIALING()] : [];
@@ -102,7 +102,7 @@ describe('runTrialEmailCheck — per-day dispatch', () => {
   });
 });
 
-describe('runTrialEmailCheck — trial_emails_enabled opt-out', () => {
+describe('runTrialEmailCheck - trial_emails_enabled opt-out', () => {
   test('day 20 respects trial_emails_enabled=false (skips send)', async () => {
     db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
       day === 20 ? [TRIALING({ trial_emails_enabled: false })] : []
@@ -115,7 +115,7 @@ describe('runTrialEmailCheck — trial_emails_enabled opt-out', () => {
   });
 
   test('day 30 trial_expired ALWAYS sends, even if emails disabled', async () => {
-    // The expired query returns a household that explicitly opted out —
+    // The expired query returns a household that explicitly opted out -
     // the sender should still fire because trial_expired is transactional.
     db.findHouseholdsWithExpiredTrial.mockResolvedValue([
       TRIALING({ trial_emails_enabled: false, subscription_status: 'expired' }),
@@ -127,7 +127,7 @@ describe('runTrialEmailCheck — trial_emails_enabled opt-out', () => {
   });
 });
 
-describe('runTrialEmailCheck — idempotency', () => {
+describe('runTrialEmailCheck - idempotency', () => {
   test('if markEmailSentIfNew returns false, no send fires', async () => {
     db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
       day === 25 ? [TRIALING()] : []
@@ -157,7 +157,7 @@ describe('runTrialEmailCheck — idempotency', () => {
   });
 });
 
-describe('runTrialEmailCheck — missing recipient', () => {
+describe('runTrialEmailCheck - missing recipient', () => {
   test('household with no contactable admin is skipped without throwing', async () => {
     db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
       day === 20 ? [TRIALING()] : []

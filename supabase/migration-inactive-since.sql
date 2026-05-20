@@ -1,14 +1,14 @@
--- Data retention foundations — Phase 8.
+-- Data retention foundations - Phase 8.
 --
 -- Two small additions:
---   1. households.inactive_since — the earliest timestamp from which the
+--   1. households.inactive_since - the earliest timestamp from which the
 --      12-month retention clock starts. Set when a trial expires or a
 --      subscription's current period ends, cleared when the user
---      resubscribes. The spec's 12-month cleanup cron (NOT yet built —
+--      resubscribes. The spec's 12-month cleanup cron (NOT yet built -
 --      see TODO in src/jobs/scheduler.js) will look at this column to
 --      decide which households to purge.
 --
---   2. deletion_audit_log — append-only record of self-service account
+--   2. deletion_audit_log - append-only record of self-service account
 --      deletions. Needed for GDPR compliance ("logs the deletion for
 --      audit purposes"), for support cases ("did a real deletion
 --      actually happen?") and for post-mortem if a user claims their
@@ -52,14 +52,14 @@ CREATE INDEX IF NOT EXISTS idx_households_inactive_since
 CREATE TABLE IF NOT EXISTS deletion_audit_log (
   id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   deleted_at     timestamptz NOT NULL DEFAULT now(),
-  user_id        uuid        NOT NULL,     -- NOT a FK — user row is gone
+  user_id        uuid        NOT NULL,     -- NOT a FK - user row is gone
   user_email     text,                     -- preserved for support lookups
-  household_id   uuid,                     -- NOT a FK — household row may be gone
+  household_id   uuid,                     -- NOT a FK - household row may be gone
   household_name text,                     -- preserved for support lookups
-  -- 'household_deleted' — sole member, whole household cascade-deleted
-  -- 'user_only'         — multi-member household, only this user removed
+  -- 'household_deleted' - sole member, whole household cascade-deleted
+  -- 'user_only'         - multi-member household, only this user removed
   deletion_mode  text        NOT NULL CHECK (deletion_mode IN ('household_deleted', 'user_only')),
-  -- Stripe state at deletion — null if they never subscribed.
+  -- Stripe state at deletion - null if they never subscribed.
   stripe_customer_id      text,
   stripe_subscription_id  text,
   -- True if we cancelled an active Stripe subscription as part of the
@@ -85,4 +85,4 @@ CREATE INDEX IF NOT EXISTS idx_deletion_audit_log_household_id
 ALTER TABLE deletion_audit_log ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE deletion_audit_log IS
-  'Append-only log of self-service account deletions. Written by the backend before the actual deletion runs. No FKs back to users/households — those rows are gone by the time this is queried. RLS enabled with no policies — service_role only.';
+  'Append-only log of self-service account deletions. Written by the backend before the actual deletion runs. No FKs back to users/households - those rows are gone by the time this is queried. RLS enabled with no policies - service_role only.';

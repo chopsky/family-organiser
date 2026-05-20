@@ -1,17 +1,17 @@
 /**
- * ContactForm — the email-the-team form, lifted out of Support.jsx so it
+ * ContactForm - the email-the-team form, lifted out of Support.jsx so it
  * can be reused on /help (authenticated, embedded inside a Layout) and
  * /support (public, for users who can't log in to reach /help).
  *
  * Behaviour preserved verbatim from the original Support page:
  *   • Pre-fills name + email from useAuth() once, never overrides typing
- *   • Honeypot field (`website`) hidden off-screen — bots fill it, humans don't
+ *   • Honeypot field (`website`) hidden off-screen - bots fill it, humans don't
  *   • Cloudflare Turnstile widget (CAPTCHA) gates submit
- *   • POSTs to /contact with the same body shape — backend untouched
+ *   • POSTs to /contact with the same body shape - backend untouched
  *   • Success state replaces the form ("Message received.")
  *
  * Props:
- *   compact  — drops the outer card padding when the parent already
+ *   compact  - drops the outer card padding when the parent already
  *              provides chrome (Help.jsx renders the form inside its own
  *              section card; Support.jsx does not).
  */
@@ -29,7 +29,7 @@ export default function ContactForm({ compact = false }) {
   const [email, setEmail]     = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [website, setWebsite] = useState(''); // honeypot — must stay empty
+  const [website, setWebsite] = useState(''); // honeypot - must stay empty
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [sent, setSent]       = useState(false);
@@ -75,7 +75,7 @@ export default function ContactForm({ compact = false }) {
     }
   }
 
-  // Success card — same visual as the original Support.jsx version, just
+  // Success card - same visual as the original Support.jsx version, just
   // without the page-level outer wrapper so it can sit inside any container.
   if (sent) {
     return (
@@ -103,7 +103,7 @@ export default function ContactForm({ compact = false }) {
             Message received.
           </h3>
           <p className="text-cocoa mt-2 text-sm">
-            Thanks {name.split(' ')[0] || 'there'} — we'll be in touch at <strong>{email}</strong> soon.
+            Thanks {name.split(' ')[0] || 'there'} - we'll be in touch at <strong>{email}</strong> soon.
           </p>
         </div>
       </div>
@@ -115,7 +115,7 @@ export default function ContactForm({ compact = false }) {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
-        {/* Honeypot — visually hidden, but a real input. Bots fill it; humans don't. */}
+        {/* Honeypot - visually hidden, but a real input. Bots fill it; humans don't. */}
         <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}>
           <label htmlFor="contact-website">Website</label>
           <input

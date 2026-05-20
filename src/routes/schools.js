@@ -212,12 +212,12 @@ router.delete('/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin
  * Bulk-remove every term date for the school. Also clears the
  * source/last-updated metadata so the UI doesn't keep advertising
  * "Source: SA national, last updated yesterday" after the user has
- * binned the lot. The school row itself is untouched — children
+ * binned the lot. The school row itself is untouched - children
  * remain linked, and the user can re-import from any source.
  */
 router.delete('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    // Ownership check — the schoolId in the URL must belong to the
+    // Ownership check - the schoolId in the URL must belong to the
     // caller's household. Without this, an admin in household A could
     // wipe household B's dates by guessing UUIDs.
     const schools = await db.getHouseholdSchools(req.householdId);
@@ -420,7 +420,7 @@ Only return valid JSON array, nothing else.`;
  * Import the unified South African national school term dates onto this
  * school. From 2026 onwards SA has a single national calendar that
  * applies to every public school across all 9 provinces, so there's no
- * per-LA / per-province / per-school logic to negotiate — one tap copies
+ * per-LA / per-province / per-school logic to negotiate - one tap copies
  * the national dates onto the household school.
  *
  * Body: { years?: number[] }  defaults to [current year].
@@ -446,7 +446,7 @@ router.post('/:schoolId/import-sa-term-dates', requireAuth, requireHousehold, re
       });
     }
 
-    // Invalidate same caches as the other school-mutation endpoints —
+    // Invalidate same caches as the other school-mutation endpoints -
     // notably schools:<id>, which /api/schools reads and the calendar
     // page pulls from. Without this the calendar would keep showing
     // the stale "no term dates" snapshot for up to 30 minutes (cache
@@ -485,7 +485,7 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     const now = new Date();
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
 
-    // Check shared cache first — another family may have already imported this LA's dates
+    // Check shared cache first - another family may have already imported this LA's dates
     const cached = await db.getCachedLATermDates(school.local_authority, academicYear);
     let dates;
     let fromCache = false;
@@ -495,7 +495,7 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
       fromCache = true;
       console.log(`[import-la] Cache hit for ${school.local_authority} ${academicYear}`);
     } else {
-      console.log(`[import-la] Cache miss for ${school.local_authority} ${academicYear} — calling AI`);
+      console.log(`[import-la] Cache miss for ${school.local_authority} ${academicYear} - calling AI`);
 
       // Use AI to find and extract LA term dates
       const { text } = await callWithFailover({
@@ -582,7 +582,7 @@ Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
  * POST /api/schools/:schoolId/import-website/preview
  *
  * Fetches the school's website / PDF, runs the AI extractor, and
- * runs a deterministic validation pass — but does NOT touch the
+ * runs a deterministic validation pass - but does NOT touch the
  * database. The admin sees the proposed dates in a preview UI, edits
  * any that look wrong, then POSTs the approved list to /confirm.
  *
@@ -643,14 +643,14 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
         const pdfData = await pdfParse(pdfBuffer);
         pageText = (pdfData.text || '').trim().substring(0, 16000);
         if (pageText.length < 50) {
-          return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image — try a different URL or add dates manually.' });
+          return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image - try a different URL or add dates manually.' });
         }
-        console.log('[import-website] Direct PDF — extracted', pageText.length, 'chars from', trimmedUrl);
+        console.log('[import-website] Direct PDF - extracted', pageText.length, 'chars from', trimmedUrl);
       } catch (pdfErr) {
         return res.status(400).json({ error: `Could not parse the PDF: ${pdfErr.message}` });
       }
     } else {
-      // HTML path — the original flow.
+      // HTML path - the original flow.
       try {
         const response = await fetch(trimmedUrl, {
           headers: {
@@ -670,9 +670,9 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
           const pdfData = await pdfParse(pdfBuffer);
           pageText = (pdfData.text || '').trim().substring(0, 16000);
           if (pageText.length < 50) {
-            return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image — try a different URL or add dates manually.' });
+            return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image - try a different URL or add dates manually.' });
           }
-          console.log('[import-website] Content-Type PDF — extracted', pageText.length, 'chars from', trimmedUrl);
+          console.log('[import-website] Content-Type PDF - extracted', pageText.length, 'chars from', trimmedUrl);
         } else {
           rawHtml = await response.text();
           // Strip HTML but try to preserve table/list structure for better AI parsing
@@ -769,27 +769,27 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
     // term names to recognise and which AY format to emit.
     const promptByCountry = {
       ZA: {
-        intro: `You are an expert at extracting South African school term dates from website or PDF content. South African schools run on the calendar year (January–December) with four terms. From 2026, a unified national calendar applies to every public school. Extract ALL term dates you can find — for both ${currentAY} and ${nextAY} if available.
+        intro: `You are an expert at extracting South African school term dates from website or PDF content. South African schools run on the calendar year (January–December) with four terms. From 2026, a unified national calendar applies to every public school. Extract ALL term dates you can find - for both ${currentAY} and ${nextAY} if available.
 
-The source may label terms as "Term 1", "Term 2" or as "FIRST TERM", "SECOND TERM", "THIRD TERM", "FOURTH TERM" — treat both labelings identically.
+The source may label terms as "Term 1", "Term 2" or as "FIRST TERM", "SECOND TERM", "THIRD TERM", "FOURTH TERM" - treat both labelings identically.
 
-CRITICAL: South African schools do NOT have "half-terms" (that's UK terminology). DO NOT emit half_term_start or half_term_end events. South Africa's school year is four discrete terms with breaks BETWEEN terms, not WITHIN them. Anything labelled as a "break" inside a term is either (a) a named religious / public holiday, or (b) a brief multi-day school closure — both go in as bank_holiday with end_date if multi-day.
+CRITICAL: South African schools do NOT have "half-terms" (that's UK terminology). DO NOT emit half_term_start or half_term_end events. South Africa's school year is four discrete terms with breaks BETWEEN terms, not WITHIN them. Anything labelled as a "break" inside a term is either (a) a named religious / public holiday, or (b) a brief multi-day school closure - both go in as bank_holiday with end_date if multi-day.
 
 Use only these event_types for SA:
-• term_start, term_end — for term boundaries
-• bank_holiday — for everything else: public holidays, religious holidays (Chanukah, Pesach, Rosh Hashanah, Yom Kippur, Sukkot, Shavuot, etc.), any "BREAK" inside a term. Use end_date for multi-day entries.`,
+• term_start, term_end - for term boundaries
+• bank_holiday - for everything else: public holidays, religious holidays (Chanukah, Pesach, Rosh Hashanah, Yom Kippur, Sukkot, Shavuot, etc.), any "BREAK" inside a term. Use end_date for multi-day entries.`,
         lookFor: [
           'Dates in any common format ("3 January 2026", "03/01/2026", "2026-01-03")',
-          'Term boundaries — when "FIRST TERM" / "TERM 1" says e.g. "Wednesday 14 January - Friday 27 March", emit one term_start and one term_end',
+          'Term boundaries - when "FIRST TERM" / "TERM 1" says e.g. "Wednesday 14 January - Friday 27 March", emit one term_start and one term_end',
           'Named religious holidays (Chanukah, Pesach, Rosh Hashanah, Yom Kippur, Sukkot, Shavuot, etc.) → bank_holiday, with end_date if multi-day',
           'South African public holidays (Human Rights Day, Freedom Day, Workers Day, Youth Day, Heritage Day, Day of Reconciliation, etc.) → bank_holiday',
           'Any "BREAK" entries within a term (e.g. "PESACH BREAK") → bank_holiday with end_date',
         ],
         ayFormat: `"${currentAY}" or "${nextAY}"`,
-        userIntro: 'Extract all school term dates and closures from this South African school year planner. Emit one JSON entry per date you find — terms, holidays, and closures all go into the same array. Do not emit half_term_start or half_term_end events:',
+        userIntro: 'Extract all school term dates and closures from this South African school year planner. Emit one JSON entry per date you find - terms, holidays, and closures all go into the same array. Do not emit half_term_start or half_term_end events:',
       },
       GB: {
-        intro: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find — for both the ${currentAY} academic year and the ${nextAY} academic year if available.`,
+        intro: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find - for both the ${currentAY} academic year and the ${nextAY} academic year if available.`,
         lookFor: [
           'Dates in any UK format (e.g. "3rd September 2025", "3 Sep 2025", "03/09/2025")',
           'Term names (Autumn, Spring, Summer)',
@@ -823,9 +823,9 @@ For half terms / mid-term breaks, use half_term_start with an end_date spanning 
 For school-specific closures (religious holidays etc), use bank_holiday with a descriptive label.
 Include the academic_year field (${cfg.ayFormat}) for each entry.
 
-CRITICAL — source_quote field:
+CRITICAL - source_quote field:
 - For every entry, include a "source_quote" field with the EXACT substring from the source text (10–80 characters) that contains this date.
-- Copy verbatim — do not paraphrase, reformat, or invent text.
+- Copy verbatim - do not paraphrase, reformat, or invent text.
 - If a weekday name appears next to the date in the source (e.g. "Monday 6 January"), include it. This helps us spot off-by-one mistakes.
 - If you genuinely cannot find a clean snippet for an entry, set source_quote to null.
 
@@ -856,7 +856,7 @@ Do NOT wrap in markdown code fences.`,
     //     regex) or in plain ``` (now also handled).
     //   • Prefix prose like "Here are the term dates I found:" before
     //     the JSON. We dig out the first `[` … last `]` substring.
-    //   • Return "I cannot find any term dates" prose — caught when
+    //   • Return "I cannot find any term dates" prose - caught when
     //     the slice still fails to parse.
     let dates;
     try {
@@ -916,7 +916,7 @@ Do NOT wrap in markdown code fences.`,
  * POST /api/schools/:schoolId/import-website/confirm
  *
  * Writes the admin-approved list of term dates to the database. This
- * is the only path that mutates state — /preview is read-only AI work.
+ * is the only path that mutates state - /preview is read-only AI work.
  *
  * Body: { dates: [{event_type, date, end_date?, label, academic_year, ...}] }
  * The client is allowed to edit any field before sending. We re-validate
@@ -928,7 +928,7 @@ router.post('/:schoolId/import-website/confirm', requireAuth, requireHousehold, 
     return res.status(400).json({ error: 'No dates to save.' });
   }
 
-  // Server-side sanity check — the preview client can edit anything,
+  // Server-side sanity check - the preview client can edit anything,
   // so don't trust the shape blindly.
   const errors = [];
   const cleaned = [];
@@ -1026,7 +1026,7 @@ router.patch('/:schoolId/term-dates/:dateId', requireAuth, requireHousehold, req
 
 /**
  * POST /api/schools/:schoolId/sync-ical
- * Manual iCal sync — re-fetch and replace all ical_import dates for this school.
+ * Manual iCal sync - re-fetch and replace all ical_import dates for this school.
  */
 router.post('/:schoolId/sync-ical', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {

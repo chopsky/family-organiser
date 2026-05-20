@@ -28,7 +28,7 @@ async function run() {
     try {
       const t0 = Date.now();
       const { text } = await callGemini(testOpts);
-      console.log(`✅  ${Date.now() - t0}ms — "${text.trim().slice(0, 40)}"`);
+      console.log(`✅  ${Date.now() - t0}ms - "${text.trim().slice(0, 40)}"`);
     } catch (err) {
       console.log(`❌  ${err.status || ''} ${err.message}`);
     }
@@ -42,7 +42,7 @@ async function run() {
     try {
       const t0 = Date.now();
       const { text } = await callClaude(testOpts);
-      console.log(`✅  ${Date.now() - t0}ms — "${text.trim().slice(0, 40)}"`);
+      console.log(`✅  ${Date.now() - t0}ms - "${text.trim().slice(0, 40)}"`);
     } catch (err) {
       console.log(`❌  ${err.status || ''} ${err.message}`);
     }

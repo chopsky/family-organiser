@@ -3,15 +3,15 @@
  * Email AI eval suite.
  *
  * Replays a fixture corpus through the inbound-email pipeline's two AI
- * stages — `extractFromEmail` (classification + structured extraction)
- * and `matchReceiptToList` (fuzzy matching) — and asserts each output
+ * stages - `extractFromEmail` (classification + structured extraction)
+ * and `matchReceiptToList` (fuzzy matching) - and asserts each output
  * against an expectation file.
  *
  * This is NOT a unit test suite. It calls the live AI providers
  * (Gemini / Claude / GPT) which means:
  *   • Real money per run (~$0.001–$0.005 per fixture call).
- *   • Slow — each call is 2-15 seconds.
- *   • Slightly non-deterministic — outputs vary run-to-run, so the
+ *   • Slow - each call is 2-15 seconds.
+ *   • Slightly non-deterministic - outputs vary run-to-run, so the
  *     expectation format below is intentionally loose (structural
  *     assertions + substring matches, not byte-equality).
  *

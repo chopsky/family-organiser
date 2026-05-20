@@ -1,5 +1,5 @@
 /**
- * Final step — celebrates completion and hands control back to the wizard
+ * Final step - celebrates completion and hands control back to the wizard
  * shell. The shell's `next` prop is wired to its `finish` function on the
  * last step, which POSTs to /api/auth/mark-onboarded and navigates to the
  * dashboard. This component just renders the confirmation screen.
@@ -32,7 +32,7 @@ export default function Done({ user, household, next, finishing }) {
       </h1>
       <p className="text-cocoa mt-5 max-w-md mx-auto">
         {household?.name ? <><strong>{household.name}</strong> is ready to go.</> : <>Your household is ready to go.</>}{' '}
-        Add your first shopping item, task, or calendar event from the dashboard —
+        Add your first shopping item, task, or calendar event from the dashboard -
         everyone you invited will see it as soon as they sign in.
       </p>
       <button type="button" onClick={next} disabled={finishing} className={primaryBtn + ' mt-8'}>

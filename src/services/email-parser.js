@@ -1,6 +1,6 @@
 /**
  * Email content extraction for inbound receipt forwarding.
- * Handles Postmark inbound webhook payloads — extracts text, images, and PDFs.
+ * Handles Postmark inbound webhook payloads - extracts text, images, and PDFs.
  */
 
 const pdfParse = require('pdf-parse');

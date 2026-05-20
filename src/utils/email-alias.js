@@ -6,14 +6,14 @@
  *
  * Rules:
  *   • Lowercase a-z, digits 0-9, hyphens only. No dots / pluses / case
- *     differences — keeps matching trivial in the webhook (lower-case
+ *     differences - keeps matching trivial in the webhook (lower-case
  *     comparison) and the alias unambiguous to dictate over the phone.
  *   • 3-32 characters total. 3 because shorter is too easy to guess /
  *     squat. 32 because longer than that and you've lost the
  *     "memorable" reason for switching off the hex token.
  *   • Must start and end with an alphanumeric (no leading/trailing
  *     hyphen).
- *   • Cannot match any RESERVED slug — these are addresses that could
+ *   • Cannot match any RESERVED slug - these are addresses that could
  *     conflict with system mail (postmaster, abuse, etc.) or with our
  *     own product surfaces (admin, support, …).
  */

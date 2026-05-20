@@ -1,11 +1,11 @@
 /**
- * Public /support page — the contact form for users who can't (or
+ * Public /support page - the contact form for users who can't (or
  * haven't yet) signed in. Logged-in users get a richer experience at
  * /help (FAQ + the same form embedded).
  *
  * Kept deliberately as a thin chrome wrapper around <ContactForm /> so
  * both routes share the form's behaviour exactly. If the form ever
- * changes, edit ContactForm.jsx — this file should rarely need touching.
+ * changes, edit ContactForm.jsx - this file should rarely need touching.
  */
 
 import { useEffect } from 'react';

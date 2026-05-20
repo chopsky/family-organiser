@@ -12,7 +12,7 @@
 --     still in browser cache later isn't the same thing.
 --   - We don't sit between the browser and R2 (it's a direct fetch),
 --     so we'd need bucket-level access logging from Cloudflare to see
---     R2 hits — heavyweight + cross-system.
+--     R2 hits - heavyweight + cross-system.
 --   - The per-fetch log captures the user's intent at the moment of
 --     access, which is what households want to see.
 --
@@ -23,7 +23,7 @@
 --
 -- Retention: rows persist until the parent document is deleted (FK
 -- cascade) or the household is deleted (FK cascade). We don't auto-
--- prune old log rows yet — could be a P2 housekeeping job if volume
+-- prune old log rows yet - could be a P2 housekeeping job if volume
 -- becomes an issue.
 
 CREATE TABLE IF NOT EXISTS document_access_log (
@@ -49,5 +49,5 @@ CREATE INDEX IF NOT EXISTS idx_doc_access_log_document_created
 
 -- RLS: this table is server-only, just like refresh_tokens etc. The
 -- API uses the service-role key which bypasses RLS. Anon must never
--- reach this table — it would leak per-user document access patterns.
+-- reach this table - it would leak per-user document access patterns.
 ALTER TABLE document_access_log ENABLE ROW LEVEL SECURITY;

@@ -2,7 +2,7 @@
 --
 -- The Settings → Account card needs to surface this so users can see
 -- "you're signed in with Google" vs just their email. Before this
--- migration we had no way to tell — Google/Apple SSO users were
+-- migration we had no way to tell - Google/Apple SSO users were
 -- written to the `users` table indistinguishably from password
 -- accounts.
 --
@@ -15,7 +15,7 @@
 -- Stamped on every successful authentication so it always reflects
 -- the LATEST credential the user used. If a user signed up with
 -- Google and later sets a password, the column would re-stamp to
--- 'email' on their next email/password login — which matches what
+-- 'email' on their next email/password login - which matches what
 -- the user would consider their "current way of signing in".
 --
 -- Backfill heuristic: users with a password_hash are very likely

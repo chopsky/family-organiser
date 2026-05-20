@@ -4,22 +4,22 @@
 -- Problem the original function had: step 1 soft-deleted every event
 -- that had a sync_mapping for the disconnected connection. That set
 -- includes BOTH inbound mirrors (events the user created in Apple/
--- Google/Outlook, mirrored into Housemait — fine to remove) AND
+-- Google/Outlook, mirrored into Housemait - fine to remove) AND
 -- Housemait-originated events that we'd merely pushed outward (events
 -- the user created IN Housemait, where the mapping is just so we can
--- update/delete the external copy later — must NOT be removed). On
+-- update/delete the external copy later - must NOT be removed). On
 -- disconnect, those Housemait-originated events were getting
 -- soft-deleted along with the inbound ones, costing the user data on
 -- the Housemait side as well as the external side.
 --
 -- The fix: scope step 1 to events whose `subscription_id` belongs to a
--- subscription on one of the disconnected connections — same filter
+-- subscription on one of the disconnected connections - same filter
 -- step 3 already uses to break the FK link. That cleanly identifies
 -- inbound mirrors (subscription_id NOT NULL) and leaves
 -- Housemait-originated events (subscription_id IS NULL) untouched.
 --
 -- The other steps (delete sync_mappings, break subscription_id link,
--- delete subscriptions, delete connection) are unchanged — they were
+-- delete subscriptions, delete connection) are unchanged - they were
 -- already correct.
 
 CREATE OR REPLACE FUNCTION public.disconnect_calendar_connection(
@@ -55,7 +55,7 @@ BEGIN
 
   -- 1. Soft-delete inbound-mirrored events (events that originated in
   --    the external calendar and were pulled into Housemait). Filter
-  --    by subscription_id, NOT by sync_mappings — sync_mappings exist
+  --    by subscription_id, NOT by sync_mappings - sync_mappings exist
   --    for outbound Housemait-originated events too, and those must
   --    survive disconnect (the user's own Housemait data).
   WITH updated AS (
@@ -80,7 +80,7 @@ BEGIN
 
   -- 3. Break the subscription_id → subscriptions link on any events that
   --    still point at these subs (only matters if step 1's soft-delete
-  --    didn't catch them — e.g. legacy events whose subscription_id was
+  --    didn't catch them - e.g. legacy events whose subscription_id was
   --    already cleared but mapping survived).
   UPDATE calendar_events
      SET subscription_id = NULL
@@ -89,7 +89,7 @@ BEGIN
             WHERE connection_id = ANY(v_conn_ids)
          );
 
-  -- 4. Delete subscriptions (fast now — nothing to cascade to).
+  -- 4. Delete subscriptions (fast now - nothing to cascade to).
   WITH deleted AS (
     DELETE FROM calendar_subscriptions
      WHERE connection_id = ANY(v_conn_ids)

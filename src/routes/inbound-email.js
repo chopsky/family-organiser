@@ -28,7 +28,7 @@ const inboundLimiter = rateLimit({
  * Parse the local part of the To address. Could be either:
  *   - A 12-char hex token (legacy/backup): "74e142d0586a@inbound.housemait.com"
  *   - A memorable alias: "shapiro@inbound.housemait.com"
- * We don't decide here which one it is — return both candidates and
+ * We don't decide here which one it is - return both candidates and
  * let the household lookup try each. (No alias-format check at parse
  * time so a typo'd alias still resolves to "household not found"
  * instead of "couldn't parse address".)
@@ -56,11 +56,11 @@ function parseFromAddress(rawFrom) {
 /**
  * POST /api/inbound-email/webhook
  * Postmark inbound webhook handler.
- * No auth middleware — this is a webhook.
+ * No auth middleware - this is a webhook.
  * Always returns 200 to avoid Postmark retries.
  */
 router.post('/webhook', inboundLimiter, async (req, res) => {
-  // Always return 200 immediately — don't leak info about valid/invalid tokens
+  // Always return 200 immediately - don't leak info about valid/invalid tokens
   res.status(200).json({ ok: true });
 
   // Process in background (fire-and-forget)
@@ -100,12 +100,12 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       // SENDER ALLOWLIST. Mail is only processed when the From address
       // is on the household's allowlist. This stops accidental
       // disclosure of either address (alias or long token) from
-      // turning into a spam vector — strangers can knock but only
+      // turning into a spam vector - strangers can knock but only
       // configured family inboxes get through. We still create a
       // log row so admins can see rejected attempts.
       const allowed = await db.isInboundSenderAllowed(householdId, fromAddress);
       if (!allowed) {
-        console.warn('[inbound-email] Rejected: sender not on allowlist —', fromAddress, 'for household', householdId);
+        console.warn('[inbound-email] Rejected: sender not on allowlist -', fromAddress, 'for household', householdId);
         try {
           const rejectedLog = await db.createInboundEmailLog(householdId, from, subject);
           await db.updateInboundEmailLog(rejectedLog.id, {
@@ -218,13 +218,13 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       };
 
       // Handle receipt/shopping items via TWO paths:
-      //   1. Email-extracted items (emailResult.shopping_items) — the AI
+      //   1. Email-extracted items (emailResult.shopping_items) - the AI
       //      saw the household's shopping list in its context and
       //      populated list_item_id + match_confidence inline. We just
       //      check off any item with confidence >= 0.7. No second AI
-      //      call needed (Tier 2.5 — eliminates the old separate
+      //      call needed (Tier 2.5 - eliminates the old separate
       //      matchReceiptToList call from this branch).
-      //   2. Photo-attached items (receiptItems from scanReceipt) — the
+      //   2. Photo-attached items (receiptItems from scanReceipt) - the
       //      receipt OCR pipeline runs separately and DOESN'T see the
       //      shopping list. For these we still need matchReceiptToList
       //      to do the fuzzy match.
@@ -235,7 +235,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       const checkedOffSet = new Set();
       async function checkOffListItem(listItemId, listItemName) {
         if (!listItemId || checkedOffSet.has(listItemId)) return;
-        if (!listItemsById[listItemId]) return; // hallucinated UUID — skip
+        if (!listItemsById[listItemId]) return; // hallucinated UUID - skip
         await db.completeShoppingItemById(listItemId);
         checkedOffSet.add(listItemId);
         itemsCheckedOff++;
@@ -266,7 +266,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         console.warn('[inbound-email] Shopping items failed:', err.message);
       }
 
-      // Unmatched receipt items are deliberately discarded — receipts
+      // Unmatched receipt items are deliberately discarded - receipts
       // are records of purchases, not list-building events. If the
       // matcher missed a fuzzy variant, the user can manually add it
       // later. The previous "add as completed" behaviour created
@@ -282,7 +282,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               ? members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
               : null;
 
-            // AI extracts local times — store without Z suffix so the app
+            // AI extracts local times - store without Z suffix so the app
             // interprets them in the user's timezone (same as manually created events)
             const startTime = ev.all_day
               ? `${ev.date}T00:00:00`
@@ -339,7 +339,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
 
       // Update log + persist the action IDs the undo endpoint will need.
       // `items_added` keeps its semantic of "new rows inserted on the
-      // shopping list" — checked-off items aren't new rows, so they're
+      // shopping list" - checked-off items aren't new rows, so they're
       // reported separately in the console log but don't bump items_added.
       const totalActions = itemsAdded + itemsCheckedOff + eventsCreated + tasksCreated;
       const undoToken = totalActions > 0 ? crypto.randomBytes(16).toString('hex') : null;
@@ -411,7 +411,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
  *   • Deletes tasks that were created
  *
  * Returns a tiny HTML response so the user gets a confirmation page
- * when they tap the link from their inbox. No auth — the token is
+ * when they tap the link from their inbox. No auth - the token is
  * the auth, and the link is sent only to the original forwarder.
  */
 router.get('/undo/:token', async (req, res) => {
@@ -425,7 +425,7 @@ router.get('/undo/:token', async (req, res) => {
       return res.status(404).send(undoHtml('Link not found', 'This undo link is invalid or has already been used.'));
     }
     if (log.undone_at) {
-      return res.status(409).send(undoHtml('Already undone', "We've already reverted this email — nothing more to do."));
+      return res.status(409).send(undoHtml('Already undone', "We've already reverted this email - nothing more to do."));
     }
 
     const actions = log.actions_taken || {};
@@ -499,7 +499,7 @@ router.get('/undo/:token', async (req, res) => {
 function undoHtml(heading, body) {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${heading} — Housemait</title>
+<title>${heading} - Housemait</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;margin:0;padding:48px 24px;background:#FBF8F3;color:#2D2A33;}
   .card{max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 16px rgba(107,63,160,0.08);}

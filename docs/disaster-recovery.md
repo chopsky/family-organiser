@@ -1,4 +1,4 @@
-# Disaster recovery — Housemait
+# Disaster recovery - Housemait
 
 The runbook for "the database is gone, what do I do" and the setup
 steps for the off-site backup pipeline that prevents that question from
@@ -8,25 +8,25 @@ becoming an emergency.
 
 ## What's backed up (and what isn't)
 
-### In scope — daily
+### In scope - daily
 
 The `public` schema of the production Postgres database, encrypted and
 shipped to Cloudflare R2 every day at 03:00 UTC. This includes:
 
 - All household data: `users`, `households`, `calendar_events`, `tasks`,
   `shopping_items`, `shopping_lists`, `meals`, `recipes`, `documents`
-  metadata (file pointers — see "out of scope" below for actual files),
+  metadata (file pointers - see "out of scope" below for actual files),
   `notes`, `whatsapp_messages`, etc.
 - Audit logs: `document_access_log`, refresh tokens, etc.
 - All migrations applied to the schema as of dump time.
 
-### Out of scope — backed up separately or not at all
+### Out of scope - backed up separately or not at all
 
 | Surface | Where it lives | Backup strategy |
 |---|---|---|
 | Document files (PDFs/images) | Cloudflare R2 (`housemait-documents` bucket) | Already off-Supabase; R2 has its own redundancy. Could enable R2 cross-region replication later if paranoid. |
 | Supabase Auth users | Supabase-managed `auth.users` schema | Recoverable: each user is also in `public.users` with their email. On a fresh project, send everyone a password-reset link. |
-| Supabase Storage objects | Supabase Storage (we don't actively use it — files go to R2) | N/A |
+| Supabase Storage objects | Supabase Storage (we don't actively use it - files go to R2) | N/A |
 | Postmark templates | Postmark dashboard | Source of truth: `docs/email-templates.md` in this repo. |
 | Vercel env vars | Vercel dashboard | Manual; written down in 1Password. |
 | Railway env vars | Railway dashboard | Manual; written down in 1Password. |
@@ -49,8 +49,8 @@ backed up; configuration that's been set up once gets documented.
   The CI runner never sees the private key.
 - **Retention** (R2 lifecycle policy):
     - Daily backups kept for **7 days** (`daily/` prefix, expire 7d)
-    - Weekly snapshots — Sunday's daily backup kept for **4 weeks**
-    - Monthly snapshots — 1st of month's daily backup kept for **12 months**
+    - Weekly snapshots - Sunday's daily backup kept for **4 weeks**
+    - Monthly snapshots - 1st of month's daily backup kept for **12 months**
 
 ---
 
@@ -73,7 +73,7 @@ Expire-Date: 0
 EOF
 ```
 
-`%no-protection` means no passphrase — required because the daily job
+`%no-protection` means no passphrase - required because the daily job
 needs to encrypt non-interactively. Security comes from the private
 key never leaving Grant's laptop, not from a passphrase.
 
@@ -97,16 +97,16 @@ backups@housemait.com
 
 ### 2. Create the Supabase backup role
 
-Already done — see the SQL block at the top of this DR doc's commit
+Already done - see the SQL block at the top of this DR doc's commit
 history. Connection string lives in 1Password as
-"Housemait — Supabase backup_user".
+"Housemait - Supabase backup_user".
 
 The role has:
 - `pg_read_all_data` (SELECT on all current + future tables)
 - `BYPASSRLS` (sees all rows regardless of RLS policies)
 - `CONNECTION LIMIT 3` (sanity cap)
 
-Use the **Session pooler** endpoint (`*.pooler.supabase.com:5432`) —
+Use the **Session pooler** endpoint (`*.pooler.supabase.com:5432`) -
 the Direct connection is IPv6-only and won't work from GitHub Actions.
 
 ### 3. Create the R2 bucket
@@ -121,7 +121,7 @@ In the Cloudflare dashboard:
    - Rule 1: prefix `daily/`, expire after **7 days**
    - Rule 2: prefix `weekly/`, expire after **28 days**
    - Rule 3: prefix `monthly/`, expire after **365 days**
-   *Note: implementing the weekly/monthly tiering is a TODO — current
+   *Note: implementing the weekly/monthly tiering is a TODO - current
    workflow only writes to `daily/`. To add tiering, extend
    `dump-and-upload.sh` to also `aws s3 cp` to `weekly/` on Sundays
    and `monthly/` on the 1st.*
@@ -173,13 +173,13 @@ CREATE TABLE statements. If you do, end-to-end is working.
 
 ---
 
-## Restore procedure — for a real DR event
+## Restore procedure - for a real DR event
 
 You're here because production Postgres is gone, corrupt, or
 compromised. Steps assume you're on Grant's laptop with the GPG
 private key available.
 
-### Path A — restore into a fresh Supabase project (recommended)
+### Path A - restore into a fresh Supabase project (recommended)
 
 1. **Create a fresh Supabase project** in the dashboard. Same region
    as the original. Note the project ref + DB password.
@@ -226,14 +226,14 @@ private key available.
    restored DB within a couple of minutes.
 
 7. **Send password-reset emails** to all users (the `auth.users` table
-   in the new Supabase project is empty — they need to set new
+   in the new Supabase project is empty - they need to set new
    passwords via Supabase Auth's email flow). The user records in
    `public.users` are intact, so this is just re-establishing auth
    credentials for them.
 
-### Path B — restore into the same project (in-place rewind)
+### Path B - restore into the same project (in-place rewind)
 
-Riskier — if production data is corrupt, you don't want to leave
+Riskier - if production data is corrupt, you don't want to leave
 half of it around. Only do this if you specifically need to keep the
 project ref (e.g. to avoid updating a hard-coded `SUPABASE_URL` in
 mobile clients that are already shipped).
@@ -247,7 +247,7 @@ mobile clients that are already shipped).
 
 ---
 
-## Restore drill — do this monthly
+## Restore drill - do this monthly
 
 Backups that haven't been tested aren't backups; they're hopeful files
 in a bucket. Calendar reminder for the 1st of every month:
@@ -284,7 +284,7 @@ Based on the current ~30–80 MB compressed dump size:
 
 - **R2 storage**: ~$0.50–$2/month at the 7-daily + 4-weekly + 12-monthly
   retention. Trivial.
-- **R2 egress**: $0/GB (free) — you can pull a backup to test-restore
+- **R2 egress**: $0/GB (free) - you can pull a backup to test-restore
   any time without cost penalty.
 - **GitHub Actions**: ~3 min/run × 30 days = 90 min/month. Free tier
   is 2,000 min/month; backup uses ~5%.
@@ -297,7 +297,7 @@ Based on the current ~30–80 MB compressed dump size:
    *fails* (GH email). Worth adding a weekly "all backups still going"
    ping to Postmark so silent failures (e.g. cron paused after 60 days
    of repo inactivity) get caught.
-2. **Weekly/monthly tiering is currently aspirational** — the workflow
+2. **Weekly/monthly tiering is currently aspirational** - the workflow
    only writes to `daily/` and the lifecycle rule expires everything at
    7 days. Real tiering needs the dump script to also `aws s3 cp` to
    `weekly/` on Sundays and `monthly/` on the 1st. Easy follow-up.

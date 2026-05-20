@@ -13,7 +13,7 @@ async function createHousehold(name, timezone, country, db = supabase) {
   const row = { name, join_code, inbound_email_token };
   if (timezone) row.timezone = timezone;
   // Country is validated by the route layer (allowed values from a fixed
-  // list). Only set if provided — otherwise the DB default 'GB' applies,
+  // list). Only set if provided - otherwise the DB default 'GB' applies,
   // which is the right fallback for the dominant tenant.
   if (country) row.country = country;
   const { data, error } = await db
@@ -60,7 +60,7 @@ async function updateHouseholdSettings(id, settings, db = supabase) {
 
 /**
  * The 16 colour themes shown in the Settings → Edit Profile picker
- * and on every avatar in the app. Order is deliberate — earlier
+ * and on every avatar in the app. Order is deliberate - earlier
  * colours are picked first when auto-assigning to new members of a
  * household so two members never share a colour until the household
  * grows past 16 people.
@@ -82,7 +82,7 @@ const COLOR_THEMES = [
  *
  * Walks the canonical 16-colour list in order and returns the first
  * one not yet used by anyone else in the household. Stable: the first
- * member always gets red, the second burnt-orange, etc. — so the
+ * member always gets red, the second burnt-orange, etc. - so the
  * "who's who" colour-coding in the calendar and avatars stays
  * predictable.
  *
@@ -178,7 +178,7 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
     email_verified: emailVerified,
     role,
   };
-  // Stamp how this user joined — read in Settings to show "Signed in
+  // Stamp how this user joined - read in Settings to show "Signed in
   // with Google" / "Signed in with Apple" / "Signed in with email".
   // Optional: callers from older code paths pass nothing and we leave
   // the column NULL.
@@ -296,7 +296,7 @@ async function revokeAllUserRefreshTokens(userId, db = supabase) {
  * Return the caller's active (non-revoked, non-expired) refresh tokens
  * with their session metadata. Used by Settings → Active sessions.
  *
- * The token string itself is deliberately NOT returned — only enough to
+ * The token string itself is deliberately NOT returned - only enough to
  * identify the session in the UI (id, device, location, timestamps).
  * `current_token_id` parameter lets the UI flag "this is the one you're
  * using right now" and show a distinct button label.
@@ -316,7 +316,7 @@ async function getActiveSessionsForUser(userId, db = supabase) {
 /**
  * Revoke every active refresh token for this user EXCEPT one (typically
  * the caller's current session, identified by the token string they hold).
- * Safe if keepTokenId is null — revokes everything.
+ * Safe if keepTokenId is null - revokes everything.
  */
 async function revokeOtherUserRefreshTokens(userId, keepTokenId, db = supabase) {
   let query = db
@@ -405,7 +405,7 @@ async function deleteDependent(id, householdId, db = supabase) {
   // shopping_items.added_by, calendar_events.created_by, audit logs, etc.).
   // On real households with weeks/months of activity that cascade exceeds
   // Supabase's default ~30s statement_timeout and the delete fails with
-  // 57014 — same failure mode the admin user-delete had before we wrapped
+  // 57014 - same failure mode the admin user-delete had before we wrapped
   // it in delete_user_cascade(). So we route dependent deletes through
   // the same RPC for the same reason.
   //
@@ -427,7 +427,7 @@ async function deleteDependent(id, householdId, db = supabase) {
     throw err;
   }
 
-  // Call delete_user_cascade (5-min timeout) — same as admin user delete.
+  // Call delete_user_cascade (5-min timeout) - same as admin user delete.
   const { error: rpcErr } = await db.rpc('delete_user_cascade', { p_user_id: id });
   if (!rpcErr) return;
 
@@ -435,7 +435,7 @@ async function deleteDependent(id, householdId, db = supabase) {
   // DELETE; will still hit the 30s timeout on big households but at
   // least small ones can be deleted before the migration is run.
   if (rpcErr.code === '42883' || /function .*does not exist/i.test(rpcErr.message || '')) {
-    console.warn('[db] delete_user_cascade() not installed — falling back to direct DELETE. Run migration-user-delete-fix.sql.');
+    console.warn('[db] delete_user_cascade() not installed - falling back to direct DELETE. Run migration-user-delete-fix.sql.');
     const { error } = await db.from('users').delete().eq('id', id);
     if (error) throw error;
     return;
@@ -528,7 +528,7 @@ const { tokenize, buildOrFilter, filterAndRank } = require('../utils/school-sear
  * Search the GIAS schools directory.
  *
  * The old version ILIKE'd the raw query against the `name` column only, which
- * missed a whole class of multi-word queries — e.g. "Queen Elizabeth's School
+ * missed a whole class of multi-word queries - e.g. "Queen Elizabeth's School
  * in Barnet" returned nothing because "in Barnet" is not in the name (the DB
  * row is stored as "Queen Elizabeth's School, Barnet" with a comma, and the
  * town lives in the `local_authority` column anyway).
@@ -553,7 +553,7 @@ async function searchSchools(query, postcode, db = supabase) {
     .select('urn, name, type, phase, local_authority, address, postcode')
     .eq('status', 'open')
     .or(orFilter)
-    .limit(200); // generous — JS filter below tightens this to 10
+    .limit(200); // generous - JS filter below tightens this to 10
 
   if (postcode) {
     q = q.ilike('postcode', `${postcode}%`);
@@ -964,7 +964,7 @@ async function getPairingCodeStatus(userId, code, db = supabase) {
  * broadcast.js knows when free-form outbound is allowed vs when we must
  * fall back to a pre-approved Content Template.
  *
- * Fire-and-forget from the caller's perspective — the webhook has already
+ * Fire-and-forget from the caller's perspective - the webhook has already
  * returned 200 to Twilio before this runs, and a write failure here must
  * never affect the user's reply. Errors are logged and swallowed.
  */
@@ -978,7 +978,7 @@ async function touchWhatsAppInbound(userId, db = supabase) {
 
 /**
  * Mark a user as having completed the onboarding wizard.
- * Idempotent — a subsequent call keeps the original timestamp so we don't
+ * Idempotent - a subsequent call keeps the original timestamp so we don't
  * overwrite when-did-you-onboard data if the client accidentally posts twice.
  * Returns the updated row so the frontend can refresh its auth state.
  */
@@ -1076,7 +1076,7 @@ async function deleteUser(userId, householdId, db = supabase) {
 
 // ─── Shopping Items ───────────────────────────────────────────────────────────
 
-// Coarse-grained shopping category — shopping_items.category has a CHECK
+// Coarse-grained shopping category - shopping_items.category has a CHECK
 // constraint limiting it to this set (see migration-shopping-categories.sql).
 // Keep in sync with that migration.
 const VALID_SHOPPING_CATEGORIES = new Set([
@@ -1134,7 +1134,7 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
   const existingByKey = new Map();
   for (const row of existing || []) {
     const k = indexKey(row.list_id, normalizeItemName(row.item));
-    // Keep the OLDEST one if there are already duplicates lurking — the
+    // Keep the OLDEST one if there are already duplicates lurking - the
     // newer ones we'll either delete via a separate cleanup or leave
     // alone. Dedupe-on-write is forward-looking, not retroactive.
     if (!existingByKey.has(k)) existingByKey.set(k, row);
@@ -1147,7 +1147,7 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
   for (const item of items) {
     const normalized = normalizeItemName(item.item);
     if (!normalized) {
-      // Defensive — shouldn't happen given upstream validation, but
+      // Defensive - shouldn't happen given upstream validation, but
       // an empty name shouldn't match every other empty key.
       toInsert.push(item);
       continue;
@@ -1163,7 +1163,7 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
     const existingQty = match.quantity ? String(match.quantity).trim() : '';
     if (incomingQty && incomingQty !== existingQty) {
       // User supplied a specific quantity that differs from what's
-      // stored — update the existing row rather than creating a dup.
+      // stored - update the existing row rather than creating a dup.
       toBumpQuantity.push({ id: match.id, quantity: incomingQty });
     } else {
       duplicates.push({ submitted: item, existing: match });
@@ -1197,8 +1197,8 @@ async function addShoppingItems(householdId, items, addedByUserId, db = supabase
   if (!items.length) return [];
   const rows = items.map((i) => {
     // Two columns that sound alike but aren't:
-    //   `category`        — coarse DB enum (groceries/clothing/household/…)
-    //   `aisle_category`  — grocery-aisle enum the classifier returns
+    //   `category`        - coarse DB enum (groceries/clothing/household/…)
+    //   `aisle_category`  - grocery-aisle enum the classifier returns
     //                       (Dairy & Eggs / Produce / Meat & Seafood / …)
     //
     // The AI paths (classifier, chat, image-scan, inbound email) give us an
@@ -1215,7 +1215,7 @@ async function addShoppingItems(householdId, items, addedByUserId, db = supabase
     return {
       household_id: householdId,
       item: i.item,
-      // Default to 'groceries' for AI-classified rows — they're almost
+      // Default to 'groceries' for AI-classified rows - they're almost
       // always groceries, and the old 'other' default silently stripped
       // every aisle-categorised item's category signal.
       category: isValidDbCategory ? rawCategory : 'groceries',
@@ -1225,7 +1225,7 @@ async function addShoppingItems(householdId, items, addedByUserId, db = supabase
       aisle_category: i.aisle_category || aisleFromCategory || 'Other',
       // Optional: callers can insert items pre-completed (e.g. a
       // forwarded receipt with items the user has already bought but
-      // never had on the active list — those land in "Previously
+      // never had on the active list - those land in "Previously
       // purchased" rather than as new pending rows).
       ...(i.completed === true ? { completed: true } : {}),
     };
@@ -1362,10 +1362,10 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
 
   // Fetch ALL incomplete household tasks and match client-side. The AI's
   // paraphrasing + potential assignee mis-guessing makes DB-side filters
-  // too strict — "CREO website done" said by Grant should match "Do CREO
+  // too strict - "CREO website done" said by Grant should match "Do CREO
   // website updates" whether that task is assigned to Grant, Everyone
   // (null), or someone else. Assignee is a soft disambiguator, not a
-  // hard filter — see bottom of the function.
+  // hard filter - see bottom of the function.
   const { data: tasks, error: fetchErr } = await db
     .from('tasks')
     .select()
@@ -1373,7 +1373,7 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
     .eq('completed', false);
   if (fetchErr) throw fetchErr;
 
-  // Match tasks using fuzzy word overlap — the AI often paraphrases task titles
+  // Match tasks using fuzzy word overlap - the AI often paraphrases task titles
   // (e.g. "Mason's party planning" for "Plan Mason's party")
   function extractWords(str) {
     return str.toLowerCase().replace(/['']/g, '').split(/\s+/).filter(w => w.length > 2);
@@ -1399,7 +1399,7 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
   // Soft assignee preference: when the AI provides an assignee AND the
   // fuzzy title matched multiple candidates, prefer the ones assigned
   // to that person. If none of the candidates match the assignee, we
-  // keep the full matched set rather than returning empty — assignee
+  // keep the full matched set rather than returning empty - assignee
   // was a hint, not a gate. This stops "tasks assigned to Everyone"
   // from being invisible just because the AI guessed a person's name.
   if (assigneeName && matched.length > 1) {
@@ -1418,7 +1418,7 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
 /**
  * Advance a date by one recurrence period. Pure helper, returns a NEW
  * Date object (input not mutated). Returns null for unknown recurrence
- * strings — caller should treat as "not recurring".
+ * strings - caller should treat as "not recurring".
  */
 function advancePeriod(date, recurrence) {
   const d = new Date(date);
@@ -1433,7 +1433,7 @@ function advancePeriod(date, recurrence) {
 }
 
 /**
- * Compute the next valid due date for a recurring task — the earliest
+ * Compute the next valid due date for a recurring task - the earliest
  * scheduled instance that's >= today. Used by both completion-time
  * regeneration and the daily auto-advance cron.
  *
@@ -1460,7 +1460,7 @@ function nextValidDueDate(currentDueISO, recurrence, todayISO = null) {
 async function generateNextRecurrence(task, db = supabase) {
   // Compute the next due date, advancing past any "still in the past"
   // instances. Without this, completing a 3-week-overdue weekly task
-  // would create a NEW instance also in the past — that's the original
+  // would create a NEW instance also in the past - that's the original
   // bug that left "Take the bins out (weekly)" stuck at "overdue 22 days".
   let due = advancePeriod(task.due_date, task.recurrence);
   if (!due) return null;
@@ -1472,7 +1472,7 @@ async function generateNextRecurrence(task, db = supabase) {
   }
 
   // Delete any previous uncompleted instances of this recurring task.
-  // A recurring task should only ever have one active instance — if the user
+  // A recurring task should only ever have one active instance - if the user
   // didn't complete the old one before the new one is due, remove it.
   await db
     .from('tasks')
@@ -1514,7 +1514,7 @@ async function generateNextRecurrence(task, db = supabase) {
  *   • The user never completed it, so there's no history to preserve.
  *   • A second row would cause confusion + stale-row cleanup.
  *   • Matches user expectation: "by the time it's the next week, it
- *     should reset" — same task, fresh due date.
+ *     should reset" - same task, fresh due date.
  *
  * Called by scheduler.js at 00:30 local time daily, after midnight has
  * crossed every UK timezone but before reminder crons fire (07:00).
@@ -1543,7 +1543,7 @@ async function advanceOverdueRecurringTasks(db = supabase) {
       .update({ due_date: newDue })
       .eq('id', task.id);
     if (updateErr) {
-      // Don't abort the batch on one failure — log and continue so
+      // Don't abort the batch on one failure - log and continue so
       // a single bad row doesn't block the rest of the cleanup.
       console.error(`[advanceOverdueRecurringTasks] failed to advance ${task.id}:`, updateErr.message);
       continue;
@@ -1719,20 +1719,20 @@ async function deleteShoppingItem(itemId, householdId, db = supabase) {
  *
  * Called from the PATCH /shopping/:id route when an item is freshly
  * checked off. The intent: "Previously purchased" should show one entry
- * per item, dated to the most recent purchase — not three rows of "milk".
+ * per item, dated to the most recent purchase - not three rows of "milk".
  *
  * Match semantics:
  *   • Same household + same list (Tesco list and Sainsbury's list are
  *     deliberately separate scopes).
- *   • `completed = true` only — never touches open/active items.
+ *   • `completed = true` only - never touches open/active items.
  *   • Case-insensitive exact-string match on `item`. Postgres ILIKE
  *     without wildcards is a literal case-folded equality. Whitespace
- *     differences in stored values aren't normalised — addItem already
+ *     differences in stored values aren't normalised - addItem already
  *     trims on insert (src/routes/shopping.js), so this matters only
  *     for legacy rows. The follow-up backfill migration handles those.
  *
  * Returns the count of rows deleted. Errors are surfaced to the caller
- * (the route logs and continues — purge failure shouldn't block the
+ * (the route logs and continues - purge failure shouldn't block the
  * primary check-off flow).
  */
 async function purgePriorPurchases(keepItemId, listId, householdId, itemName, db = supabase) {
@@ -1826,7 +1826,7 @@ async function findEventsByFuzzyTitle(householdId, title, { dateHint, limit = 10
   if (primaryErr) throw primaryErr;
   if ((primary || []).length > 0) return primary;
 
-  // Fallback — no upcoming match, scan all (including past).
+  // Fallback - no upcoming match, scan all (including past).
   const { data: anyData, error: anyErr } = await db
     .from('calendar_events')
     .select()
@@ -1840,7 +1840,7 @@ async function findEventsByFuzzyTitle(householdId, title, { dateHint, limit = 10
 }
 
 /**
- * Generic task update — applies whichever fields are present in `updates`.
+ * Generic task update - applies whichever fields are present in `updates`.
  */
 async function updateTask(taskId, householdId, updates, db = supabase) {
   const { data, error } = await db
@@ -1903,7 +1903,7 @@ async function getShoppingLists(householdId, db = supabase) {
   // never sees an empty state. Before this, the lists were only created on
   // the first write (adding an item), which left the Shopping page with an
   // empty lists array, a null activeListId, and a loadItems() that early-
-  // returned without ever clearing its loading=true initial state — i.e. an
+  // returned without ever clearing its loading=true initial state - i.e. an
   // infinite spinner for first-time users.
   if (!data || data.length === 0) {
     // Look up the household's country so we can seed locale-appropriate
@@ -1959,7 +1959,7 @@ async function getDefaultShoppingList(householdId, db = supabase) {
   if (!data) {
     // Create all default lists for this household. The preset set is
     // locale-aware (UK gets Tesco/M&S/etc., SA gets Pick n Pay/Woolies,
-    // everywhere else gets just "Default") — see DEFAULT_LISTS_BY_COUNTRY
+    // everywhere else gets just "Default") - see DEFAULT_LISTS_BY_COUNTRY
     // above getShoppingLists for the rationale.
     const { data: hh } = await db
       .from('households')
@@ -2018,7 +2018,7 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
     .lte('start_time', endDate)
     .gte('end_time', startDate);
 
-  // category/visibility columns may not exist until migration is run — try filtered
+  // category/visibility columns may not exist until migration is run - try filtered
   // query first, fall back to unfiltered if it fails
   if (category) {
     query = query.eq('category', category);
@@ -2076,7 +2076,7 @@ async function getTasksByDateRange(householdId, startDate, endDate, db = supabas
 /**
  * Substring search across calendar_events + tasks for a household.
  *
- * Powers the calendar page's search bar without a date filter — so
+ * Powers the calendar page's search bar without a date filter - so
  * searching "wedding" finds an event two years out, not just events
  * in the currently-rendered month. Replaces the prior client-side
  * filter, which was bounded by whatever ±1-month window had been
@@ -2088,7 +2088,7 @@ async function getTasksByDateRange(householdId, startDate, endDate, db = supabas
  *   • Tasks: title ILIKE %q% (the tasks table has no description column,
  *     so the prior client-side check on t.description was always falsy).
  *   • deleted_at IS NULL on events; tasks have no soft-delete.
- *   • Both completed and incomplete tasks are returned — search history
+ *   • Both completed and incomplete tasks are returned - search history
  *     is useful ("when did we book the photographer?") even for things
  *     that have already happened.
  *
@@ -2103,13 +2103,13 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
   const cap = Math.min(Math.max(1, limit), 100);
   // ILIKE pattern: surround in % so it matches the term anywhere in
   // the field. PostgREST passes the raw value through to Postgres so
-  // % and _ act as wildcards — fine for our use case (a stray %
+  // % and _ act as wildcards - fine for our use case (a stray %
   // someone typed just over-matches; not a security concern).
   const pattern = `%${trimmed}%`;
 
   // school_term_dates is joined to household_schools to filter by
   // household. We embed the parent so we can return the school name
-  // alongside each match — both for context in the search UI and so
+  // alongside each match - both for context in the search UI and so
   // clicking a result can route to the right place.
   const [eventsRes, tasksRes, schoolDatesRes] = await Promise.all([
     db
@@ -2191,7 +2191,7 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
  * same day are legitimately different events and must not collide.
  *
  * For ALL-DAY events (start_time at 00:00Z): matches anywhere in the same
- * UTC day — a second all-day event with the same title is almost always
+ * UTC day - a second all-day event with the same title is almost always
  * an actual duplicate.
  *
  * Case-insensitive exact title match.
@@ -2207,7 +2207,7 @@ async function findSimilarEvent(householdId, title, startTime, db = supabase) {
 
   // Treat a 00:00:00 UTC start_time as all-day. Not perfect (a deliberately-
   // scheduled midnight event would be treated as all-day) but close enough
-  // for duplicate detection — and all-day events in our system are stored
+  // for duplicate detection - and all-day events in our system are stored
   // this way anyway.
   const timePart = String(startTime).slice(11, 16);
   const isAllDayLike = timePart === '00:00';
@@ -2353,7 +2353,7 @@ async function getFeedTokenData(token, db = supabase) {
 // external_calendar_feeds points at an iCal URL the user pasted; events
 // pulled from that URL live in calendar_events with external_feed_id set
 // and a non-null external_uid. The pull/dedup logic lives in
-// services/externalFeed.js — these helpers are thin DB wrappers.
+// services/externalFeed.js - these helpers are thin DB wrappers.
 
 async function getExternalFeedsByHousehold(householdId, db = supabase) {
   const { data, error } = await db
@@ -2371,7 +2371,7 @@ async function getExternalFeedsByHousehold(householdId, db = supabase) {
  *   - Feeds with sync_enabled=false (user-paused)
  *   - Feeds with consecutive_failures >= MAX_FAILURES (auto-skipped
  *     after a streak of errors, so a permanently-broken URL doesn't
- *     hammer the failing host every cron tick — the user will need to
+ *     hammer the failing host every cron tick - the user will need to
  *     edit-or-delete the feed for it to come back, or we can reset the
  *     counter by hand).
  *
@@ -2477,7 +2477,7 @@ async function createExternalFeedEvent(row, db = supabase) {
 /**
  * Idempotent upsert of a feed-sourced event keyed by
  * (external_feed_id, external_uid). Use this from the refresh path
- * instead of insert/update — it removes the race between "is this UID
+ * instead of insert/update - it removes the race between "is this UID
  * already in DB?" and the actual write, and quietly handles edge cases
  * the diff-then-write approach can't:
  *   - same UID appearing multiple times in one pull (EXCEPTION events,
@@ -2503,7 +2503,7 @@ async function upsertExternalFeedEvent(row, db = supabase) {
 }
 
 /**
- * Batched upsert — sends N rows in a single HTTP round-trip rather
+ * Batched upsert - sends N rows in a single HTTP round-trip rather
  * than N round-trips. With recurring series expanded across an 18-month
  * window, an Apple iCloud Family calendar can easily produce 5–20k
  * event rows; one round-trip per row makes a refresh take minutes
@@ -2525,7 +2525,7 @@ async function batchUpsertExternalFeedEvents(rows, db = supabase) {
 }
 
 /**
- * Batched soft-delete by id — used by the refresh's 7-day-guard pass
+ * Batched soft-delete by id - used by the refresh's 7-day-guard pass
  * to remove events that disappeared from the feed. Same N+1
  * motivation as batchUpsert.
  */
@@ -2555,7 +2555,7 @@ async function updateExternalFeedEvent(eventId, householdId, fields, db = supaba
  * Look up the feed token for a user without creating one.
  * Used by the Settings page to detect whether a feed is already enabled
  * (so we can show a mutual-exclusivity warning when a two-way sync is
- * also active). Returns the row or null — never inserts.
+ * also active). Returns the row or null - never inserts.
  */
 async function getFeedTokenIfExists(userId, householdId, db = supabase) {
   const { data, error } = await db
@@ -2593,7 +2593,7 @@ async function getAllEventsForFeed(householdId, db = supabase) {
     // this filter, a user who subscribes to (a) an external calendar IN
     // Housemait via the inbound iCal feed feature AND (b) the Housemait
     // outbound feed in their external calendar app sees every external
-    // event TWICE in their external calendar — once as the native
+    // event TWICE in their external calendar - once as the native
     // original, once re-broadcast through Housemait. Outbound should
     // only ever ship events that originated in Housemait.
     db
@@ -2620,30 +2620,30 @@ async function getAllEventsForFeed(householdId, db = supabase) {
 
 /**
  * Return only sync_mappings whose underlying calendar_event originated
- * IN Housemait — i.e. events the user created via app/bot/WhatsApp that
+ * IN Housemait - i.e. events the user created via app/bot/WhatsApp that
  * Housemait pushed outward. These are the only mappings that should be
  * passed to deleteEventsBatch on disconnect: they identify the orphan
  * events the user wants removed from their external calendar.
  *
  * Mappings that point at INBOUND-mirrored events (subscription_id NOT
- * NULL) MUST be excluded — those represent the user's own native events
+ * NULL) MUST be excluded - those represent the user's own native events
  * in Apple/Google/Outlook, which they obviously don't want Housemait to
  * delete on disconnect. Without this filter, a user with N events in
  * their external calendar plus 6 events Housemait pushed would lose ALL
  * N+6 to a "Disconnect and remove events" click. (Confirmed via Grant's
- * data: 8869 mappings total, only 6 outbound — the other 8863 reference
+ * data: 8869 mappings total, only 6 outbound - the other 8863 reference
  * events Housemait should never touch.)
  */
 
 /**
  * Remove every sync mapping an event has for a given connection. Called
- * when we push a local delete to the provider — the event itself is
+ * when we push a local delete to the provider - the event itself is
  * being removed, so all of its remote tracking should go too.
  */
 
 /**
  * Remove a single mapping identified by the external UID. Called when an
- * INCOMING delete arrives from the provider — Apple says "this UID is
+ * INCOMING delete arrives from the provider - Apple says "this UID is
  * gone", we remove the mapping for THAT UID only. Other mappings for
  * the same event (other UIDs, other calendar subscriptions, shared-
  * calendar mirrors) stay intact. Caller is responsible for soft-deleting
@@ -2654,11 +2654,11 @@ async function getAllEventsForFeed(householdId, db = supabase) {
  * Count how many mappings reference this event, across every connection.
  * Used after processing an incoming delete: if zero mappings remain, the
  * event has no external source left and can be safely soft-deleted.
- * If any remain, we leave the event alone — another sync could have it
+ * If any remain, we leave the event alone - another sync could have it
  * mirrored.
  */
 
-// (Two-way sync helpers removed — see src/services/externalFeed.js for the
+// (Two-way sync helpers removed - see src/services/externalFeed.js for the
 // current read-only inbound flow.)
 
 async function createCalendarEventFromSync(householdId, eventData, sourceUserId, subscriptionId, category, visibility, db = supabase) {
@@ -2975,7 +2975,7 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
     query = query.ilike('name', `%${search}%`);
   }
 
-  // Plan filter — matches what SubscriptionBadge displays. Internal takes
+  // Plan filter - matches what SubscriptionBadge displays. Internal takes
   // priority over subscription_status, so non-internal filters must also
   // exclude internal households.
   if (plan === 'internal') {
@@ -3011,7 +3011,7 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
       h.member_count = countMap[h.id] || 0;
     }
 
-    // Attach document counts + total bytes (single bulk fetch — same pattern as members)
+    // Attach document counts + total bytes (single bulk fetch - same pattern as members)
     const { data: docs } = await db
       .from('documents')
       .select('household_id, file_size')
@@ -3108,7 +3108,7 @@ async function getSubscriptionStats(db = supabase) {
 
 /**
  * Whitelisted subscription update for admin dashboard. Only `is_internal` and
- * `trial_ends_at` are accepted — everything else (Stripe IDs, status,
+ * `trial_ends_at` are accepted - everything else (Stripe IDs, status,
  * customer IDs) must flow through Stripe webhooks to stay consistent.
  */
 async function updateHouseholdSubscriptionAdmin(householdId, updates, db = supabase) {
@@ -3162,14 +3162,14 @@ async function deleteUserAdmin(userId, db = supabase) {
   // chat_messages, audit logs, etc.) doesn't hit Supabase's default
   // ~30s timeout. Real accounts hit this even on relatively light usage.
   //
-  // Falls back to a plain DELETE if the function isn't installed yet —
+  // Falls back to a plain DELETE if the function isn't installed yet -
   // covers the brief window between code deploy and migration run.
   const { error: rpcErr } = await db.rpc('delete_user_cascade', { p_user_id: userId });
   if (!rpcErr) return;
 
-  // 42883 = undefined_function — function isn't deployed yet.
+  // 42883 = undefined_function - function isn't deployed yet.
   if (rpcErr.code === '42883' || /function .*does not exist/i.test(rpcErr.message || '')) {
-    console.warn('[db] delete_user_cascade() not installed — falling back to direct DELETE. Run migration-user-delete-fix.sql.');
+    console.warn('[db] delete_user_cascade() not installed - falling back to direct DELETE. Run migration-user-delete-fix.sql.');
     const { error } = await db
       .from('users')
       .delete()
@@ -3186,14 +3186,14 @@ async function deleteHouseholdCascade(householdId, db = supabase) {
   // SET statement_timeout = '5min' so the cascade across a fully-loaded
   // household doesn't hit Supabase's default ~30s timeout.
   //
-  // Falls back to a plain DELETE if the function isn't installed yet —
+  // Falls back to a plain DELETE if the function isn't installed yet -
   // covers the brief window between code deploy and migration run.
   const { error: rpcErr } = await db.rpc('delete_household_cascade', { p_household_id: householdId });
   if (!rpcErr) return;
 
-  // 42883 = undefined_function — function isn't deployed yet.
+  // 42883 = undefined_function - function isn't deployed yet.
   if (rpcErr.code === '42883' || /function .*does not exist/i.test(rpcErr.message || '')) {
-    console.warn('[db] delete_household_cascade() not installed — falling back to direct DELETE. Run migration-household-delete-fix.sql.');
+    console.warn('[db] delete_household_cascade() not installed - falling back to direct DELETE. Run migration-household-delete-fix.sql.');
     const { error } = await db.from('households').delete().eq('id', householdId);
     if (error) throw error;
     return;
@@ -3319,7 +3319,7 @@ async function getRecentWhatsAppTurns(userId, { limit = 10, windowMinutes = 30 }
   const rows = (data || []).filter((r) => !r.error);
   if (!rows.length) return [];
 
-  // Only include rows from the same "conversation window" — i.e. within
+  // Only include rows from the same "conversation window" - i.e. within
   // `windowMinutes` of the most recent row.
   const mostRecentMs = new Date(rows[0].created_at).getTime();
   const cutoffMs = mostRecentMs - windowMinutes * 60 * 1000;
@@ -3568,7 +3568,7 @@ async function getHouseholdAiUsage(householdId, { days = 30 } = {}, db = supabas
     if (date) byDate[date] = (byDate[date] || 0) + 1;
   }
 
-  // Daily — last 10 days with zero-fill for continuous axis
+  // Daily - last 10 days with zero-fill for continuous axis
   const daily = [];
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -3617,7 +3617,7 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
     if (date) aiByDate[date] = (aiByDate[date] || 0) + 1;
   }
 
-  // Daily AI usage — last 10 days, including zero-call days for a continuous axis
+  // Daily AI usage - last 10 days, including zero-call days for a continuous axis
   const dailyAi = [];
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -3717,7 +3717,7 @@ async function isEmailAliasAvailable(alias, householdId = null, db = supabase) {
   return (data || []).length === 0;
 }
 
-// Inbound senders allowlist — only emails on this list can have their
+// Inbound senders allowlist - only emails on this list can have their
 // forwarded mail processed for the household. Backfill populated this
 // from existing member emails at migration time; new entries are
 // added via the Settings UI.
@@ -4069,7 +4069,7 @@ async function acquireSchedulerLock(lockKey, lockDate) {
   if (error) {
     // Unique constraint violation means another instance already sent
     if (error.code === '23505') return false;
-    // Table doesn't exist yet — allow sending (don't block notifications)
+    // Table doesn't exist yet - allow sending (don't block notifications)
     if (error.code === '42P01') return true;
     console.error('[scheduler-lock] Error:', error.message);
     return true; // On unknown errors, allow sending (fail open)
@@ -4244,7 +4244,7 @@ async function getDocumentsByFolderIds(folderIds) {
 /**
  * Append one row to the document audit log.
  *
- * Called from the route that issues signed download URLs — every time a
+ * Called from the route that issues signed download URLs - every time a
  * user actively requests a document, we record who, what, when, and from
  * where. Failures are swallowed by the caller (logging shouldn't block
  * the actual download), but we still throw on real DB errors so they
@@ -4422,7 +4422,7 @@ async function upsertNotificationPreferences(userId, prefs) {
  * whitelisted here so a buggy or malicious caller can't reach outside
  * billing state (e.g. set `role` or `email`). All five writable
  * subscription columns defined in migration-subscription-trial.sql are
- * accepted — trial_started_at / trial_ends_at are deliberately excluded
+ * accepted - trial_started_at / trial_ends_at are deliberately excluded
  * (only the signup flow or admin tools should touch those).
  */
 async function updateHouseholdSubscription(householdId, fields, db = supabase) {
@@ -4431,20 +4431,20 @@ async function updateHouseholdSubscription(householdId, fields, db = supabase) {
     'stripe_customer_id',
     'stripe_subscription_id',
     'subscription_plan',
-    // Multi-currency Tier 1 — written by the Stripe webhook handler from
+    // Multi-currency Tier 1 - written by the Stripe webhook handler from
     // the Price object's currency (lowercase ISO-4217). Drives the in-app
     // Settings → Plan card so non-GBP subscribers see their actual
     // currency rather than a hardcoded £ figure.
     'subscription_currency',
     'subscription_current_period_end',
-    // Phase 8 — retention clock. Set on trial-expiry / subscription-cancel;
+    // Phase 8 - retention clock. Set on trial-expiry / subscription-cancel;
     // cleared (to null) on resubscription. The cleanup cron (not yet
     // built) queries this column.
     'inactive_since',
     // IAP / RevenueCat (Phase 1 of the iOS IAP rebuild). 'stripe' on every
     // pre-IAP household; flips to 'apple' the first time we see a
     // RevenueCat webhook for that household. The app_user_id is what
-    // RevenueCat echoes in every webhook payload — gives us O(1) lookup
+    // RevenueCat echoes in every webhook payload - gives us O(1) lookup
     // when the app_user_id ≠ household_id (alias merges, etc).
     'subscription_provider',
     'revenuecat_app_user_id',
@@ -4489,10 +4489,10 @@ async function findHouseholdByStripeSubscriptionId(subscriptionId, db = supabase
 /**
  * Record that an email of the given type has been sent to a household.
  * Returns true if the INSERT succeeded (first time we've sent this),
- * false if it conflicted (already sent — caller should skip the send).
+ * false if it conflicted (already sent - caller should skip the send).
  *
  * The unique (household_id, email_type) constraint on sent_emails
- * makes this a race-safe idempotency gate — two concurrent scheduler
+ * makes this a race-safe idempotency gate - two concurrent scheduler
  * runs attempting the same send can't both INSERT, so they can't both
  * proceed.
  */
@@ -4501,7 +4501,7 @@ async function markEmailSentIfNew(householdId, emailType, db = supabase) {
     .from('sent_emails')
     .insert({ household_id: householdId, email_type: emailType });
   if (error) {
-    if (error.code === '23505') return false; // unique_violation — already sent
+    if (error.code === '23505') return false; // unique_violation - already sent
     throw error;
   }
   return true;
@@ -4512,7 +4512,7 @@ async function markEmailSentIfNew(householdId, emailType, db = supabase) {
  * "Day N of a 30-day trial" means NOW() is in the 24-hour window
  * starting at `trial_started_at + (N-1) days`. Boundaries are half-open
  * so [day 20, day 21) covers exactly one calendar day's worth of
- * households — matches once-per-day cron semantics.
+ * households - matches once-per-day cron semantics.
  *
  * Filters:
  *   • subscription_status = 'trialing' (day 20/25/28 only fire while
@@ -4521,7 +4521,7 @@ async function markEmailSentIfNew(householdId, emailType, db = supabase) {
  *   • is_internal = false (internal accounts never get nudges)
  *   • subscription_provider != 'apple' (Apple subscribers get Apple's
  *     own renewal/expiry emails, and our nudge emails point at the
- *     web subscribe page which has different pricing — sending both
+ *     web subscribe page which has different pricing - sending both
  *     creates conflicting messages. By design, an Apple subscriber
  *     would never be 'trialing' anyway, but the filter is defensive
  *     against any future state where the two could co-exist).
@@ -4551,16 +4551,16 @@ async function findHouseholdsAtTrialDay(dayNumber, db = supabase) {
 /**
  * Find households whose trial has just expired. Used by the day-30
  * expired email. Unlike the nudges, this one fires AFTER the trial
- * ends — we look for households whose trial_ends_at crossed into the
+ * ends - we look for households whose trial_ends_at crossed into the
  * past within the last 24 hours.
  *
  * Covers both statuses:
- *   • 'expired' — the subscription gate has already flipped them
- *   • 'trialing' — trial_ends_at is past but no mutation has touched
+ *   • 'expired' - the subscription gate has already flipped them
+ *   • 'trialing' - trial_ends_at is past but no mutation has touched
  *     the gate yet, so status hasn't been flipped. We still email them.
  *
  * Excludes 'active' (they subscribed) and 'cancelled' (they had a
- * subscription that was later cancelled — different email).
+ * subscription that was later cancelled - different email).
  */
 async function findHouseholdsWithExpiredTrial(db = supabase) {
   const now = new Date();
@@ -4584,7 +4584,7 @@ async function findHouseholdsWithExpiredTrial(db = supabase) {
 }
 
 /**
- * Get the admin user's email for a household — the default recipient
+ * Get the admin user's email for a household - the default recipient
  * for subscription lifecycle emails. Prefers the first admin (typically
  * the household creator) and falls back to any account member with an
  * email set. Returns null if the household has no reachable members
@@ -4605,7 +4605,7 @@ async function getHouseholdPrimaryContact(householdId, db = supabase) {
 
 /**
  * Fetch the usage counts the nudge emails personalise on. Parallel
- * count-head queries — identical pattern to the usage-summary
+ * count-head queries - identical pattern to the usage-summary
  * endpoint on /api/household/usage-summary.
  */
 async function getHouseholdUsageCounts(householdId, db = supabase) {
@@ -4652,7 +4652,7 @@ async function setTrialEmailsEnabled(householdId, enabled, db = supabase) {
  * returns true if this is a new event we should process, false if we've
  * already handled it.
  *
- * The unique PRIMARY KEY on event_id gives us atomic dedup — two parallel
+ * The unique PRIMARY KEY on event_id gives us atomic dedup - two parallel
  * deliveries of the same event_id race on INSERT and exactly one wins.
  */
 async function recordStripeEventIfNew(eventId, eventType, db = supabase) {
@@ -4660,7 +4660,7 @@ async function recordStripeEventIfNew(eventId, eventType, db = supabase) {
     .from('processed_stripe_events')
     .insert({ event_id: eventId, event_type: eventType });
   if (error) {
-    // 23505 = unique_violation — this event has already been processed.
+    // 23505 = unique_violation - this event has already been processed.
     if (error.code === '23505') return false;
     throw error;
   }
@@ -4686,7 +4686,7 @@ async function deleteProcessedStripeEvent(eventId, db = supabase) {
  * Idempotency gate for RevenueCat webhooks. Mirrors recordStripeEventIfNew.
  * RevenueCat retries non-2xx events for 72h with exponential backoff, so
  * dedup is essential. The unique PRIMARY KEY on event_id gives us atomic
- * dedup — two parallel deliveries race on INSERT and exactly one wins.
+ * dedup - two parallel deliveries race on INSERT and exactly one wins.
  */
 async function recordRevenuecatEventIfNew(eventId, eventType, appUserId, db = supabase) {
   const { error } = await db
@@ -4713,7 +4713,7 @@ async function deleteProcessedRevenuecatEvent(eventId, db = supabase) {
 
 /**
  * Find a household by its RevenueCat app_user_id. Used by the webhook
- * handler when app_user_id isn't a valid household UUID — happens when:
+ * handler when app_user_id isn't a valid household UUID - happens when:
  *   • RevenueCat anonymous IDs ($RCAnonymousID:...) were issued before
  *     the app called Purchases.logIn(householdId).
  *   • A SUBSCRIBER_ALIAS event remapped one user_id to another.
@@ -4735,7 +4735,7 @@ async function findHouseholdByRevenuecatAppUserId(appUserId, db = supabase) {
 // ─── Household subscriptions (Netflix, Spotify, etc.) ────────────────────────
 //
 // Tracked so the bot can nudge a few days before each renewal. All
-// chat-managed — no Settings UI in v1.
+// chat-managed - no Settings UI in v1.
 
 async function listSubscriptions(householdId, db = supabase) {
   const { data, error } = await db

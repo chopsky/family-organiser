@@ -32,7 +32,7 @@ export default function ForgotPassword() {
 
   return (
     <div
-      // Concierge stage — matches Login / Signup / CheckEmail.
+      // Concierge stage - matches Login / Signup / CheckEmail.
       className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
       style={{
         background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',

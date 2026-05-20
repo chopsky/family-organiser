@@ -21,15 +21,15 @@
  *   Herzlia
  *     Terms:
  *       - Term 1: 14 Jan 2026 – 27 Mar 2026 (past)
- *       - Term 2: 14 Apr 2026 – 26 Jun 2026 (CURRENT — ends in 43 days)
+ *       - Term 2: 14 Apr 2026 – 26 Jun 2026 (CURRENT - ends in 43 days)
  *       - Term 3: 21 Jul 2026 – 18 Sep 2026
  *       - Term 4: 30 Sep 2026 – 3 Dec 2026
  *     Upcoming closures:
  *       - 15 May 2026: Yom Yerushalayim
- *       - 22 May 2026: Shavuot — School Closed
+ *       - 22 May 2026: Shavuot - School Closed
  *       - 23 May 2026: Shavuot
  *
- * Deliberately omits closures in the past — the AI only needs them
+ * Deliberately omits closures in the past - the AI only needs them
  * for future-facing answers. Caps closures at 12 entries to keep
  * the prompt compact.
  */
@@ -122,7 +122,7 @@ function computeTermStatus(startIso, endIso, todayIso) {
     return ` (starts in ${days} day${days === 1 ? '' : 's'})`;
   }
   const daysLeft = daysBetween(todayIso, endIso);
-  return ` (CURRENT — ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'})`;
+  return ` (CURRENT - ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'})`;
 }
 
 function daysBetween(fromIso, toIso) {

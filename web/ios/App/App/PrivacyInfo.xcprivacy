@@ -2,7 +2,7 @@
 <!--
   App privacy manifest (Apple requires this from 1 May 2024 for any
   app that accesses certain "required reason" APIs). At present we
-  only need one declaration — Calendar access for the EventKit
+  only need one declaration - Calendar access for the EventKit
   integration shipped in 1.4.0+ (HousemaitCalendarPlugin.swift). The
   reason code here matches Apple's published taxonomy for displaying
   the user's calendar events inline.

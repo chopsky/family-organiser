@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
-// Lazy-load ical-generator via dynamic import — it's ESM-only
+// Lazy-load ical-generator via dynamic import - it's ESM-only
 let _ical = null;
 async function getIcal() {
   if (!_ical) {
@@ -37,7 +37,7 @@ function parseMonth(month) {
   if (!year || !mon || mon < 1 || mon > 12) return null;
   const startDate = `${year}-${String(mon).padStart(2, '0')}-01`;
   const lastDay = new Date(year, mon, 0).getDate();
-  // End of the last day, inclusive — without the time, PostgREST casts
+  // End of the last day, inclusive - without the time, PostgREST casts
   // the date string to a timestamp at midnight, which silently excludes
   // any event with a non-midnight start_time on the last day of the
   // month. (Latent bug discovered when an inbound-feed event at 13:30
@@ -49,7 +49,7 @@ function parseMonth(month) {
 }
 
 // ---------------------------------------------------------------------------
-// Public feed endpoint (no auth) — must be defined before router.use(requireAuth)
+// Public feed endpoint (no auth) - must be defined before router.use(requireAuth)
 // ---------------------------------------------------------------------------
 
 const feedLimiter = rateLimit({
@@ -62,7 +62,7 @@ const feedLimiter = rateLimit({
 
 /**
  * GET /api/calendar/feed/:token.ics
- * Public iCal feed — no authentication required.
+ * Public iCal feed - no authentication required.
  */
 router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
   try {
@@ -196,15 +196,15 @@ router.get('/tasks', async (req, res) => {
 /**
  * GET /api/calendar/search
  * Substring search across events + tasks for the household, with NO
- * date filter. Powers the calendar page's search dropdown — the prior
+ * date filter. Powers the calendar page's search dropdown - the prior
  * client-side filter only saw events in the currently-loaded ~3-month
  * window, which made it useless for finding anything older or further
  * out than that.
  *
  * Query params:
- *   q     — required, ≥2 chars (single letters waste DB time on giant
+ *   q     - required, ≥2 chars (single letters waste DB time on giant
  *           result sets; the frontend doesn't fire below 2 chars either)
- *   limit — optional, default 50, capped at 100 by the query helper
+ *   limit - optional, default 50, capped at 100 by the query helper
  *
  * Returns: { events: Event[], tasks: Task[] } sorted most-recent-first.
  */
@@ -226,7 +226,7 @@ router.get('/search', async (req, res) => {
 
 /**
  * GET /api/calendar/month
- * Combined endpoint — returns events + tasks for a month in a single request.
+ * Combined endpoint - returns events + tasks for a month in a single request.
  * Query params: month (e.g. "2026-03"), category? (optional)
  */
 router.get('/month', async (req, res) => {
@@ -357,7 +357,7 @@ router.post('/events', async (req, res) => {
 
     // Notify household via BOTH channels so we reach members regardless of
     // whether they've registered for iOS push, have WhatsApp linked, or both.
-    // Fire-and-forget — a failure in either channel must not block the response.
+    // Fire-and-forget - a failure in either channel must not block the response.
     (async () => {
       try {
         const members = await db.getHouseholdMembers(req.householdId);
@@ -525,7 +525,7 @@ router.get('/feed-token', async (req, res) => {
  * Check whether a feed token already exists for the current user, without
  * creating one. The Settings page calls this on mount so it can surface a
  * mutual-exclusivity warning when a feed and a two-way sync are both
- * active — without auto-creating a feed token just by visiting the page.
+ * active - without auto-creating a feed token just by visiting the page.
  */
 router.get('/feed-token/status', async (req, res) => {
   try {
@@ -561,7 +561,7 @@ router.post('/feed-token', async (req, res) => {
 /**
  * DELETE /api/calendar/feed-token
  * Revoke the user's feed token. Used when switching from feed to two-way
- * sync, or from the mutual-exclusivity warning. Idempotent — succeeds
+ * sync, or from the mutual-exclusivity warning. Idempotent - succeeds
  * even if no token exists.
  */
 router.delete('/feed-token', async (req, res) => {
@@ -626,7 +626,7 @@ router.post('/external-feeds', async (req, res) => {
       color: color || 'sky',
     });
   } catch (err) {
-    // Unique violation on (household_id, feed_url) — friendlier message.
+    // Unique violation on (household_id, feed_url) - friendlier message.
     if (err?.code === '23505') {
       return res.status(409).json({ error: 'Someone in your household has already subscribed to this URL.' });
     }
@@ -635,7 +635,7 @@ router.post('/external-feeds', async (req, res) => {
   }
 
   // Initial pull. If it fails, we still return the feed so the user can
-  // see it in their list and retry later — they shouldn't lose the URL
+  // see it in their list and retry later - they shouldn't lose the URL
   // they pasted just because the source is temporarily down.
   let refresh = null;
   let refreshError = null;
@@ -681,7 +681,7 @@ router.post('/external-feeds/:id/refresh', async (req, res) => {
 /**
  * DELETE /api/calendar/external-feeds/:id
  * Remove a feed. Events created by this feed are hard-deleted via the
- * ON DELETE CASCADE on calendar_events.external_feed_id — they re-appear
+ * ON DELETE CASCADE on calendar_events.external_feed_id - they re-appear
  * if the user re-subscribes.
  */
 router.delete('/external-feeds/:id', async (req, res) => {
@@ -699,7 +699,7 @@ router.delete('/external-feeds/:id', async (req, res) => {
 });
 
 // ─── POST /api/calendar/seed-holidays ─────────────────────────────────────────
-// Seed public holidays for the current household (idempotent — skips duplicates)
+// Seed public holidays for the current household (idempotent - skips duplicates)
 router.post('/seed-holidays', requireAuth, async (req, res) => {
   if (!req.householdId) {
     return res.status(400).json({ error: 'No household' });

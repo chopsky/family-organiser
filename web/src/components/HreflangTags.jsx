@@ -1,7 +1,7 @@
 /**
  * Per-page hreflang + canonical injector.
  *
- * Renders nothing visible — purely manipulates the document <head> via
+ * Renders nothing visible - purely manipulates the document <head> via
  * an effect so React Router page transitions update the alternate-link
  * set correctly. Tells search engines:
  *
@@ -37,7 +37,7 @@ export default function HreflangTags({ locale }) {
     canonical.setAttribute(MARKER_ATTR, 'canonical');
     document.head.appendChild(canonical);
 
-    // Alternates for every locale (including this one — Google requires
+    // Alternates for every locale (including this one - Google requires
     // reciprocal references, where each page in the set names itself).
     for (const alt of allLocales()) {
       const link = document.createElement('link');

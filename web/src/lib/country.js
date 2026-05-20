@@ -58,8 +58,8 @@ export function getWhatsAppPlaceholder(countryCode) {
  *
  * The locale cookie is set when a visitor lands on one of the
  * country-specific marketing pages (/gb, /us, /za, etc.), driven by
- * Vercel's edge geo-routing. Using this as the primary signal — over
- * browser timezone — fixes two real cases:
+ * Vercel's edge geo-routing. Using this as the primary signal - over
+ * browser timezone - fixes two real cases:
  *
  *   • Canadians (timezone = America/Toronto) who would otherwise be
  *     classified as US by timezone alone, now correctly land as CA.
@@ -67,7 +67,7 @@ export function getWhatsAppPlaceholder(countryCode) {
  *     the /za page deliberately.
  *
  * Returns null for the 'eu' (covers multiple countries) and 'default'
- * (unknown) locales — caller should fall back to timezone detection
+ * (unknown) locales - caller should fall back to timezone detection
  * in those cases.
  */
 export function detectCountryFromLocaleCookie(localeCode) {

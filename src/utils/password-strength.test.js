@@ -1,7 +1,7 @@
 /**
  * Unit tests for the password strength validator.
  *
- * fetch() is mocked — we don't hit the real HaveIBeenPwned API from tests.
+ * fetch() is mocked - we don't hit the real HaveIBeenPwned API from tests.
  * Regression anchors:
  *   - Minimum-length rule (the old `>= 8` check got tightened to >= 10)
  *   - Breached-password rejection with the count rendered in the message
@@ -85,7 +85,7 @@ describe('validatePassword()', () => {
   test('rejects a password that HIBP says has been breached', async () => {
     // Simulate HIBP returning the suffix of our test password's SHA-1
     // with a breach count of 3,730,471 (the real count for 'password'
-    // as of writing — guards against anyone accidentally treating this
+    // as of writing - guards against anyone accidentally treating this
     // test's expected number as authoritative).
     const crypto = require('crypto');
     const sha1 = crypto.createHash('sha1').update('password123').digest('hex').toUpperCase();
@@ -127,7 +127,7 @@ describe('hibpBreachCount()', () => {
     global.fetch.mockResolvedValue({ ok: true, text: async () => '' });
     await hibpBreachCount('mypassword');
     const url = global.fetch.mock.calls[0][0];
-    // The URL must carry only a 5-char hex prefix — the full plaintext
+    // The URL must carry only a 5-char hex prefix - the full plaintext
     // or a full hash would mean we'd leaked the password.
     expect(url).toMatch(/^https:\/\/api\.pwnedpasswords\.com\/range\/[A-F0-9]{5}$/);
   });

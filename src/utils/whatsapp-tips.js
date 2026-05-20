@@ -1,7 +1,7 @@
 /**
  * "Did you know…" tips appended to the morning digest for the first
  * 14 days after a user links WhatsApp. One tip per day, rotating
- * through the pool below — designed so users discover the breadth
+ * through the pool below - designed so users discover the breadth
  * of what the bot can do without the welcome message having to list
  * every feature on day one.
  *
@@ -10,7 +10,7 @@
  * footer so long-term users aren't trained to ignore a line that
  * always says the same thing.
  *
- * Add new tips by appending to the array. Order doesn't matter —
+ * Add new tips by appending to the array. Order doesn't matter -
  * day-since-linked is hashed into an index so the order is stable
  * per-user even if the array reshuffles. Keep each tip < 90 chars
  * so it doesn't dominate the digest visually.
@@ -21,12 +21,12 @@ const TIPS = [
   '💡 _Did you know:_ snap a shopping receipt and I\'ll check off the items on your shopping list.',
   '💡 _Did you know:_ say "remember the wifi password is XYZ" and I\'ll keep it safe for you.',
   '💡 _Did you know:_ ask "what\'s on this Saturday?" and I\'ll check all family calendars at once.',
-  '💡 _Did you know:_ voice notes work — talk to me hands-free while driving.',
+  '💡 _Did you know:_ voice notes work - talk to me hands-free while driving.',
   '💡 _Did you know:_ say "I need a restaurant for date night" and I\'ll suggest some great nearby options',
   '💡 _Did you know:_ reply /tasks to see what\'s pending across the whole household.',
   '💡 _Did you know:_ ask "when are we all free next week?" and I\'ll find a shared slot.',
-  '💡 _Did you know:_ snap the school newsletter — I\'ll pull dates straight into the calendar.',
-  '💡 _Did you know:_ tell me "I have mince, onions and tomatoes" — I\'ll suggest a dinner.',
+  '💡 _Did you know:_ snap the school newsletter - I\'ll pull dates straight into the calendar.',
+  '💡 _Did you know:_ tell me "I have mince, onions and tomatoes" - I\'ll suggest a dinner.',
   '💡 _Did you know:_ forward me an email by sending it on to your personal Housemait inbox.',
   '💡 _Did you know:_ ask "what did I have for dinner last Friday?" and I\'ll check the meal plan.',
   '💡 _Did you know:_ /shopping shows your current list in one tap, no scrolling needed.',

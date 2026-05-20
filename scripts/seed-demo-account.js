@@ -25,7 +25,7 @@ const { supabaseAdmin: db } = require('../src/db/client');
 const DEMO_PASSWORD = 'DemoHousemait2026!';
 const DEMO_TZ       = 'Europe/London';
 
-// Today anchor — all dates are offsets from this
+// Today anchor - all dates are offsets from this
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
 
@@ -71,9 +71,9 @@ async function wipeExisting() {
     return;
   }
 
-  console.log(`→ Found existing demo (household ${sarah.household_id}) — wiping…`);
+  console.log(`→ Found existing demo (household ${sarah.household_id}) - wiping…`);
 
-  // Delete the household — ON DELETE CASCADE handles users, tasks, events, etc.
+  // Delete the household - ON DELETE CASCADE handles users, tasks, events, etc.
   if (sarah.household_id) {
     const { error } = await db.from('households').delete().eq('id', sarah.household_id);
     if (error) throw new Error(`Failed to delete household: ${error.message}`);
@@ -194,7 +194,7 @@ async function seed() {
   ]);
   const r = Object.fromEntries(recipes.map((x) => [x.name, x.id]));
 
-  // 6. Meal plan — full current week (Mon–Sun) with breakfast, lunch, dinner
+  // 6. Meal plan - full current week (Mon–Sun) with breakfast, lunch, dinner
   // Figure out Monday of this week
   const dayOfWeek = (TODAY.getDay() + 6) % 7; // 0 = Mon
   const monday = dateOffset(-dayOfWeek);
@@ -214,7 +214,7 @@ async function seed() {
   await insertMany('meal_plan', mealRows);
   console.log(`✓ Meal plan: 7 days × 3 meals`);
 
-  // 7. Shopping items — mix of categories, some completed
+  // 7. Shopping items - mix of categories, some completed
   await insertMany('shopping_items', [
     { household_id: household.id, list_id: shoppingList.id, item: 'Milk (2 pints)',       aisle_category: 'Dairy & Eggs', category: 'groceries', added_by: sarah.id, completed: false },
     { household_id: household.id, list_id: shoppingList.id, item: 'Free-range eggs',      aisle_category: 'Dairy & Eggs', category: 'groceries', added_by: james.id, completed: false },
@@ -234,14 +234,14 @@ async function seed() {
   ]);
   console.log(`✓ Shopping list: 15 items (3 completed)`);
 
-  // 8. Tasks — mix of overdue, today, upcoming, recurring, assigned & household
+  // 8. Tasks - mix of overdue, today, upcoming, recurring, assigned & household
   const tasks = [
     // Overdue (so dashboard shows something urgent)
     { title: 'Pay council tax',             due_date: ymd(dateOffset(-3)), due_time: '17:00:00', assigned_to: sarah.id, assigned_to_name: 'Sarah Bennett', priority: 'high' },
     { title: 'Book dentist for Olivia',     due_date: ymd(dateOffset(-2)), assigned_to: sarah.id, assigned_to_name: 'Sarah Bennett', priority: 'medium' },
 
     // Due today
-    { title: 'School reading — sign form',  due_date: ymd(TODAY), due_time: '18:00:00', assigned_to: james.id, assigned_to_name: 'James Bennett', priority: 'medium' },
+    { title: 'School reading - sign form',  due_date: ymd(TODAY), due_time: '18:00:00', assigned_to: james.id, assigned_to_name: 'James Bennett', priority: 'medium' },
     { title: 'Put bins out',                due_date: ymd(TODAY), assigned_to: null,     recurrence: 'weekly', priority: 'low' },
     { title: 'Water the plants',            due_date: ymd(TODAY), assigned_to: null,     recurrence: 'weekly', priority: 'low' },
 
@@ -264,16 +264,16 @@ async function seed() {
   })));
   console.log(`✓ Tasks: ${tasks.length} (mix of overdue/today/upcoming/completed)`);
 
-  // 9. Calendar events — populate this week with colourful, varied events
+  // 9. Calendar events - populate this week with colourful, varied events
   const events = [
     // Today
     { title: 'School drop-off',        start: iso(TODAY, 8, 30),  end: iso(TODAY, 9, 0),   assigned: sarah,  color: 'plum',  recurrence: 'weekly' },
     { title: 'Team standup',           start: iso(TODAY, 9, 30),  end: iso(TODAY, 10, 0),  assigned: james,  color: 'sage' },
-    { title: 'Olivia — ballet class',  start: iso(TODAY, 16, 30), end: iso(TODAY, 17, 30), assigned: olivia, color: 'coral', location: 'Dance studio' },
+    { title: 'Olivia - ballet class',  start: iso(TODAY, 16, 30), end: iso(TODAY, 17, 30), assigned: olivia, color: 'coral', location: 'Dance studio' },
     { title: 'Dinner with the Taylors',start: iso(TODAY, 19, 30), end: iso(TODAY, 22, 0),  assigned: sarah,  color: 'plum',  location: '27 Ashford Rd' },
 
     // Tomorrow
-    { title: 'Henry — playdate w/ Leo',start: iso(dateOffset(1), 10, 0),  end: iso(dateOffset(1), 12, 0),  assigned: henry,  color: 'amber', location: 'Our house' },
+    { title: 'Henry - playdate w/ Leo',start: iso(dateOffset(1), 10, 0),  end: iso(dateOffset(1), 12, 0),  assigned: henry,  color: 'amber', location: 'Our house' },
     { title: 'Yoga class',             start: iso(dateOffset(1), 18, 30), end: iso(dateOffset(1), 19, 30), assigned: sarah,  color: 'plum' },
     { title: 'Football training',      start: iso(dateOffset(1), 17, 0),  end: iso(dateOffset(1), 18, 30), assigned: james,  color: 'sage', recurrence: 'weekly' },
 
@@ -288,8 +288,8 @@ async function seed() {
     { title: 'Brunch at Riverside',    start: iso(dateOffset(6), 11, 0),  end: iso(dateOffset(6), 13, 0),  assigned: null,   color: 'sage', location: 'Riverside Café' },
 
     // Next week
-    { title: 'Dentist — Olivia',       start: iso(dateOffset(8), 15, 30), end: iso(dateOffset(8), 16, 15), assigned: olivia, color: 'coral', location: 'Smile Dental, Hampstead' },
-    { title: 'Work trip — Manchester', start: iso(dateOffset(10), 8, 0),  end: iso(dateOffset(11), 18, 0), assigned: james,  color: 'sage' },
+    { title: 'Dentist - Olivia',       start: iso(dateOffset(8), 15, 30), end: iso(dateOffset(8), 16, 15), assigned: olivia, color: 'coral', location: 'Smile Dental, Hampstead' },
+    { title: 'Work trip - Manchester', start: iso(dateOffset(10), 8, 0),  end: iso(dateOffset(11), 18, 0), assigned: james,  color: 'sage' },
   ];
   await insertMany('calendar_events', events.map((e) => ({
     household_id: household.id,

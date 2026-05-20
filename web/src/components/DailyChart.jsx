@@ -1,7 +1,7 @@
 /**
  * Tiny inline bar chart for daily counts. Bars are proportional to the
  * busiest day in the supplied window; zero-count days show a faint
- * placeholder so the axis stays continuous. Pure CSS — no chart library.
+ * placeholder so the axis stays continuous. Pure CSS - no chart library.
  *
  * Each datum: { date: 'YYYY-MM-DD', calls: number }
  */

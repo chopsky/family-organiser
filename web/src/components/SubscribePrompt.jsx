@@ -1,21 +1,21 @@
 /**
- * SubscribePrompt + WriteGate — Phase 6.
+ * SubscribePrompt + WriteGate - Phase 6.
  *
  * Drop-in UI for the read-only expired state. Two public exports:
  *
- *   <SubscribePrompt />     — inline "Subscribe to unlock this feature"
+ *   <SubscribePrompt />     - inline "Subscribe to unlock this feature"
  *                             message with a CTA. Use when you want to
  *                             replace a specific interactive element
  *                             (e.g. an "Add item" form).
  *
  *   <WriteGate>...</WriteGate>
- *                           — wrapper that renders its children when the
+ *                           - wrapper that renders its children when the
  *                             household can write (active / trialing /
  *                             internal) or a SubscribePrompt when they
  *                             can't. Use when wrapping a component is
  *                             simpler than replacing it.
  *
- * Both reach into SubscriptionContext via useCanWrite() — no per-page
+ * Both reach into SubscriptionContext via useCanWrite() - no per-page
  * status logic required.
  *
  * Size variants so the prompt can slot into chunky empty states OR into
@@ -27,15 +27,15 @@ import { useCanWrite } from '../context/SubscriptionContext';
 import { isIos } from '../lib/platform';
 
 /**
- * Inline prompt. Renders regardless of subscription state — the caller
+ * Inline prompt. Renders regardless of subscription state - the caller
  * decides when to show it (via `{canWrite ? <Form /> : <SubscribePrompt />}`
  * or by using <WriteGate>).
  *
  * Props:
- *   size    — 'sm' | 'md' | 'lg' (default 'md')
- *   message — override the default "Subscribe to unlock this feature" copy
- *   ctaLabel — override the default "Subscribe" button label
- *   className — extra tailwind classes on the outer wrapper
+ *   size    - 'sm' | 'md' | 'lg' (default 'md')
+ *   message - override the default "Subscribe to unlock this feature" copy
+ *   ctaLabel - override the default "Subscribe" button label
+ *   className - extra tailwind classes on the outer wrapper
  */
 export default function SubscribePrompt({
   size = 'md',
@@ -44,7 +44,7 @@ export default function SubscribePrompt({
   className = '',
 }) {
   // App Store guideline 3.1.1: never surface a "Subscribe" CTA on iOS.
-  // Defence-in-depth — the SubscriptionContext already forces
+  // Defence-in-depth - the SubscriptionContext already forces
   // canWrite=true on iOS so callers' `{!canWrite && <SubscribePrompt/>}`
   // patterns won't render this, but any caller that renders us
   // unconditionally would still get blocked here.
@@ -63,7 +63,7 @@ export default function SubscribePrompt({
       aria-label="Subscribe prompt"
     >
       <div className="flex items-center gap-2 min-w-0">
-        {/* Lock icon — signals the action is gated without being scary.
+        {/* Lock icon - signals the action is gated without being scary.
             Using a stroke icon inline so we don't pull in a new icon dep. */}
         <svg
           className="text-plum shrink-0"

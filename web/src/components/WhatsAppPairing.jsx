@@ -1,5 +1,5 @@
 /**
- * WhatsAppPairing — pull-push linking widget.
+ * WhatsAppPairing - pull-push linking widget.
  *
  * The previous "send me a code by SMS-to-WhatsApp" flow needed a
  * Meta-approved Authentication Content Template, which requires Meta
@@ -16,10 +16,10 @@
  *   • Settings → Notifications → Connect WhatsApp accordion
  *
  * Props:
- *   onSuccess(linkedPhone) — called once the bot has linked the number
- *   onError(msg)           — surface API failures to the parent
- *   autoStart=true         — if false, render only the "Connect" button
- *   compact=false          — denser layout (used inside Settings)
+ *   onSuccess(linkedPhone) - called once the bot has linked the number
+ *   onError(msg)           - surface API failures to the parent
+ *   autoStart=true         - if false, render only the "Connect" button
+ *   compact=false          - denser layout (used inside Settings)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -86,7 +86,7 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
         onErrorRef.current?.('Pairing code expired. Tap Generate a new code to try again.');
       }
     } catch {
-      /* transient — caller will retry on next tick */
+      /* transient - caller will retry on next tick */
     }
   }, [pairing?.code]);
 
@@ -103,7 +103,7 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
   // When the app/tab returns to the foreground (user came back from
   // WhatsApp), poll immediately. iOS suspends the JS engine while in
   // the background so the next setInterval tick can take ~2.5s to fire
-  // — without this, the user sees the "waiting" state for an awkward
+  // - without this, the user sees the "waiting" state for an awkward
   // moment after their WhatsApp message has already been linked.
   useAppForegroundRefresh(() => {
     if (stage === 'waiting') pollOnce();
@@ -148,7 +148,7 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
     );
   }
 
-  // stage === 'waiting' — show the code + tap-to-open button.
+  // stage === 'waiting' - show the code + tap-to-open button.
   return (
     <div className="space-y-3">
       <p className="text-sm text-cocoa">

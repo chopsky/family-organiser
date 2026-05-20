@@ -192,7 +192,7 @@ export default function AdminAiUsage() {
                 </tr>
               ))}
               {timeline.length === 0 && (
-                <tr><td colSpan="5" className="px-4 py-6 text-center text-warm-grey">No data yet — AI calls will appear here automatically</td></tr>
+                <tr><td colSpan="5" className="px-4 py-6 text-center text-warm-grey">No data yet - AI calls will appear here automatically</td></tr>
               )}
             </tbody>
           </table>

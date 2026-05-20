@@ -7,7 +7,7 @@ import { configure as configureRevenueCat } from './lib/revenuecat.js'
 import { initAnalytics } from './lib/analytics.js'
 import { setupNativeShell } from './lib/native-shell.js'
 
-// Initialise RevenueCat (no-op on web/Android — see lib/revenuecat.js).
+// Initialise RevenueCat (no-op on web/Android - see lib/revenuecat.js).
 // Fire-and-forget: the SDK buffers logIn / getOfferings calls until
 // configure resolves, so we don't need to await this before rendering.
 configureRevenueCat();

@@ -3,7 +3,7 @@
  *
  * These functions process incoming messages (text, voice, photos) and return
  * response strings. They don't depend on any specific messaging
- * platform — the WhatsApp webhook calls them.
+ * platform - the WhatsApp webhook calls them.
  */
 
 const db = require('../db/queries');
@@ -19,7 +19,7 @@ const broadcast = require('../services/broadcast');
 //
 // Saves the 1–2 second AI round-trip + token cost on messages that don't
 // actually need classification (greetings, thanks, emoji-only). Only covers
-// patterns that can't plausibly be answering a bot question — "yes"/"no"/"ok"
+// patterns that can't plausibly be answering a bot question - "yes"/"no"/"ok"
 // are deliberately NOT matched here because they might be disambiguation
 // replies, dupe-confirm answers, etc.
 function matchTrivialMessage(text) {
@@ -35,9 +35,9 @@ function matchTrivialMessage(text) {
   if (/^(thanks|thank you|thankyou|ty|thx|cheers|ta|appreciate it|much appreciated|thanks so much|thanks a lot)$/i.test(lower)) {
     return { response: 'Anytime! 😊' };
   }
-  // Emoji-only up to a short length — reply in kind. Strip whitespace +
+  // Emoji-only up to a short length - reply in kind. Strip whitespace +
   // simple punctuation, require the remainder to be entirely pictographs.
-  // Does NOT match complex ZWJ sequences (e.g. 👨‍👩‍👧) — they fall through
+  // Does NOT match complex ZWJ sequences (e.g. 👨‍👩‍👧) - they fall through
   // to the AI path, which is fine; the short-circuit is an optimisation,
   // not a correctness requirement.
   const stripped = t.replace(/[\s!?.]/g, '');
@@ -52,7 +52,7 @@ function matchTrivialMessage(text) {
 // Tracks the last add so the user can reverse it with 'undo' / 'scrap that'
 // within a short window. In-memory is fine for v1: Railway rarely restarts,
 // and if it does, the undo window expires within minutes anyway. Only ADDs
-// are tracked — deletes/updates get their own undo story later (need to
+// are tracked - deletes/updates get their own undo story later (need to
 // store the prior state to revert).
 const recentAdds = new Map(); // userId → { kind, ids: uuid[], label: string, timestamp }
 const UNDO_WINDOW_MS = 2 * 60 * 1000;
@@ -81,7 +81,7 @@ function isUndoRequest(text) {
 /**
  * Recognise simple slash commands like "/shopping". These are documented
  * shortcuts shown in the daily reminder ("Reply /shopping to see it…")
- * and must NEVER reach the AI — letting the LLM "interpret" something
+ * and must NEVER reach the AI - letting the LLM "interpret" something
  * as terse and ambiguous as "/shopping" got us a real-world bug where
  * it fabricated a complete_task action against an unrelated task.
  *
@@ -104,26 +104,26 @@ function matchSlashCommand(text) {
   const t = String(text || '').trim().toLowerCase();
   if (!t.startsWith('/')) return null;
   // Take the first whitespace-separated token, drop the slash. Ignore
-  // anything after — "/shopping please" still resolves cleanly.
+  // anything after - "/shopping please" still resolves cleanly.
   const cmd = t.slice(1).split(/\s+/)[0];
   return SLASH_COMMANDS[cmd] || null;
 }
 
 const SLASH_HELP_TEXT =
   '*Quick commands:*\n' +
-  '• `/shopping` — show the shopping list\n' +
-  '• `/tasks` — show today\'s + overdue tasks\n' +
-  '• `/mytasks` — show only tasks assigned to you\n' +
-  '• `/subscriptions` — show tracked subscriptions + monthly total\n' +
-  '• `/help` — this message\n\n' +
-  'You can also chat to me normally — _"add milk to the list"_, _"weather in Brighton tomorrow"_, _"what\'s on this Saturday?"_.';
+  '• `/shopping` - show the shopping list\n' +
+  '• `/tasks` - show today\'s + overdue tasks\n' +
+  '• `/mytasks` - show only tasks assigned to you\n' +
+  '• `/subscriptions` - show tracked subscriptions + monthly total\n' +
+  '• `/help` - this message\n\n' +
+  'You can also chat to me normally - _"add milk to the list"_, _"weather in Brighton tomorrow"_, _"what\'s on this Saturday?"_.';
 
 // ─── Pending disambiguation store (in-memory, per user, 5-minute TTL) ─────────
 //
 // When handleModifyIntent finds multiple candidates it sends a "which one?"
 // prompt. We stash the candidate list + the original intent here so the
 // user's follow-up ("1", "the second one", or a candidate title) can be
-// resolved without going through the LLM — which has no concept of "this
+// resolved without going through the LLM - which has no concept of "this
 // is option N from the list I just showed".
 //
 // In-memory matches the recentAdds precedent above. 5-minute TTL is well
@@ -178,7 +178,7 @@ function resolveDisambiguationChoice(text, entry) {
   }
 
   // Substring match against the formatted candidate line (title + date/qty/etc).
-  // Only match if exactly one candidate's formatted string contains the text —
+  // Only match if exactly one candidate's formatted string contains the text -
   // ambiguous substrings fall through and re-trigger the disambiguation prompt.
   const matches = entry.candidates.filter((c) => {
     const formatted = formatCandidate(entry.kind, c).toLowerCase();
@@ -192,7 +192,7 @@ async function runUndo(user, household) {
   const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
   const entry = popRecentAdd(user.id);
   if (!entry) {
-    return { response: "Nothing to undo — either I haven't added anything recently, or the 2-minute window passed. You can still remove it from the app.", actions };
+    return { response: "Nothing to undo - either I haven't added anything recently, or the 2-minute window passed. You can still remove it from the app.", actions };
   }
   try {
     if (entry.kind === 'event') {
@@ -202,10 +202,10 @@ async function runUndo(user, household) {
     } else if (entry.kind === 'shopping') {
       for (const id of entry.ids) await db.deleteShoppingItem(id, household.id);
     }
-    return { response: `↩️ Undone — removed ${entry.label}.`, actions };
+    return { response: `↩️ Undone - removed ${entry.label}.`, actions };
   } catch (err) {
     console.error('[handlers] undo failed:', err.message);
-    return { response: "⚠️ I couldn't undo that — please remove it from the app.", actions };
+    return { response: "⚠️ I couldn't undo that - please remove it from the app.", actions };
   }
 }
 
@@ -287,7 +287,7 @@ function formatTaskList(tasks, heading = 'Tasks') {
     const overdue = t.due_date < today;
     const dueToday = t.due_date === today;
     const statusIcon = overdue ? '🔴' : dueToday ? '🟡' : '⚪';
-    const who = t.assigned_to_name ? ` — ${t.assigned_to_name}` : ' — Everyone';
+    const who = t.assigned_to_name ? ` - ${t.assigned_to_name}` : ' - Everyone';
     const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
     const dateLabel = overdue
       ? ` _(overdue: ${t.due_date})_`
@@ -325,7 +325,7 @@ function formatCandidate(kind, row) {
   }
   if (kind === 'task') {
     const due = row.due_date ? ` (due ${row.due_date})` : '';
-    const who = row.assigned_to_name ? ` — ${row.assigned_to_name}` : '';
+    const who = row.assigned_to_name ? ` - ${row.assigned_to_name}` : '';
     return `${row.title}${due}${who}`;
   }
   // shopping
@@ -348,7 +348,7 @@ async function handleModifyIntent(result, user, household) {
   const updates = result.updates || {};
   const title = (target.title || '').trim();
   if (!title) {
-    return { response: "I couldn't work out which item you meant — try again with a title.", actions };
+    return { response: "I couldn't work out which item you meant - try again with a title.", actions };
   }
 
   const isEvent   = result.intent === 'update_event' || result.intent === 'delete_event';
@@ -382,7 +382,7 @@ async function handleModifyIntent(result, user, household) {
     };
   }
 
-  // 3. Multiple matches — disambiguate. Stash the candidates + intent so the
+  // 3. Multiple matches - disambiguate. Stash the candidates + intent so the
   // user's number reply can be resolved without going back through the LLM.
   if (candidates.length > 1) {
     const lines = candidates.slice(0, 5).map((c, i) => `${i + 1}. ${formatCandidate(kind, c)}`);
@@ -396,12 +396,12 @@ async function handleModifyIntent(result, user, household) {
       householdId: household.id,
     });
     return {
-      response: `I found a few matches — which one do you want to ${verb}?\n\n${lines.join('\n')}${more}\n\nReply with the number or a more specific detail.`,
+      response: `I found a few matches - which one do you want to ${verb}?\n\n${lines.join('\n')}${more}\n\nReply with the number or a more specific detail.`,
       actions,
     };
   }
 
-  // 4. One match — act
+  // 4. One match - act
   return await executeModifyAction({
     intent: result.intent,
     kind,
@@ -428,7 +428,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       if (isDelete) {
         await db.softDeleteCalendarEvent(hit.id, household.id);
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
-        return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance — reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
+        return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
       }
       const eventUpdates = buildEventUpdates(updates, hit, household, user);
       // Reminders are stored in a separate table (event_reminders), so they
@@ -500,7 +500,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
  * The classifier prompt invites natural-language dates ("28 April",
  * "Tuesday", "tomorrow") so this needs to handle more than ISO. Anything
  * unrecognised returns null and the lookup falls back to "all upcoming",
- * which is fine — the LLM just provides a hint, not a hard filter.
+ * which is fine - the LLM just provides a hint, not a hard filter.
  *
  * Year resolution: a date with no year defaults to the next future
  * occurrence (this year if it hasn't passed in the household's timezone,
@@ -548,7 +548,7 @@ function extractDateFromContext(context, household) {
     return formatYmd(year, month, day);
   }
 
-  // 5. "next monday" / "monday" / "this friday" — next occurrence of weekday
+  // 5. "next monday" / "monday" / "this friday" - next occurrence of weekday
   const weekdays = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
   const wd = lower.match(/\b(?:next\s+|this\s+|on\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
   if (wd) {
@@ -607,9 +607,9 @@ function buildEventUpdates(updates, existing, household, user) {
   }
 
   // Date/time changes. Three flavours:
-  //   updates.date       — shift the whole event to a new day (single-day intent)
-  //   updates.start_date — change only the start day (multi-day events)
-  //   updates.end_date   — change only the end day (multi-day events)
+  //   updates.date       - shift the whole event to a new day (single-day intent)
+  //   updates.start_date - change only the start day (multi-day events)
+  //   updates.end_date   - change only the end day (multi-day events)
   // Plus updates.start_time / end_time for the time-of-day part.
   //
   // Each side (start vs end) is rebuilt independently from the existing
@@ -703,9 +703,9 @@ function buildShoppingUpdates(updates) {
  *      confirmation still gets through.
  *
  * Returns one of:
- *   { kind: 'created', created }           — event saved, actions updated
- *   { kind: 'duplicate', existing }        — similar event found, nothing saved
- *   { kind: 'error', message }             — DB/network error, nothing saved
+ *   { kind: 'created', created }           - event saved, actions updated
+ *   { kind: 'duplicate', existing }        - similar event found, nothing saved
+ *   { kind: 'error', message }             - DB/network error, nothing saved
  */
 async function createCalendarEventFromResult(ev, user, household, actions) {
   try {
@@ -723,7 +723,7 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
       ? `${ev.date}T23:59:59Z`
       : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
-    // Dupe detection — skipped when classifier set force:true (user
+    // Dupe detection - skipped when classifier set force:true (user
     // affirmatively confirmed a duplicate in a prior turn).
     if (!ev.force) {
       const existing = await db.findSimilarEvent(household.id, ev.title, startTime);
@@ -746,7 +746,7 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
       await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
     }
 
-    // Reminders are off by default — only created when the LLM populates
+    // Reminders are off by default - only created when the LLM populates
     // ev.reminders in response to an explicit user ask ("remind me 30 mins
     // before"). The classifier prompt at services/prompts.js spells out the
     // shape: [{time: number, unit: "minutes"|"hours"|"days"}]. saveEventReminders
@@ -755,7 +755,7 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
       try {
         await db.saveEventReminders(created.id, household.id, ev.reminders, created.start_time);
       } catch (err) {
-        // Don't fail the event create over a reminder save error — log and move on.
+        // Don't fail the event create over a reminder save error - log and move on.
         console.error('[handlers] saveEventReminders failed for new event:', err.message);
       }
     }
@@ -784,21 +784,21 @@ async function handleTextMessage(text, user, household) {
 
   // ── Cheap regex pre-classifiers (no AI call) ──
 
-  // Undo recent add — must come before the trivial check because "scrap that"
+  // Undo recent add - must come before the trivial check because "scrap that"
   // and similar phrases wouldn't match a greeting/thanks/emoji pattern anyway.
   if (isUndoRequest(text)) {
     console.log('[handlers] Pre-classified as undo for:', text.slice(0, 50));
     return await runUndo(user, household);
   }
 
-  // Pending disambiguation reply — if we just asked "which one?", a number /
+  // Pending disambiguation reply - if we just asked "which one?", a number /
   // ordinal / specific-detail answer should be resolved deterministically
   // here, NOT sent through the LLM (which has no concept of "this is option N
   // from the list I just showed" and would re-trigger the same disambiguation).
   const pendingDisamb = popPendingDisambiguation(user.id);
   if (pendingDisamb) {
     if (pendingDisamb.householdId !== household.id) {
-      // Stale entry from a household switch — drop and fall through.
+      // Stale entry from a household switch - drop and fall through.
       console.log('[handlers] Dropping disambiguation entry (household mismatch)');
     } else {
       const chosen = resolveDisambiguationChoice(text, pendingDisamb);
@@ -814,14 +814,14 @@ async function handleTextMessage(text, user, household) {
           actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] },
         });
       }
-      // Couldn't map to a candidate — drop the entry (we've already popped
+      // Couldn't map to a candidate - drop the entry (we've already popped
       // it) and let the message classify normally. Better to lose the
       // disambiguation context than have a stale "1" trigger an old action
       // minutes later when the user's intent has moved on.
     }
   }
 
-  // Trivial messages — greetings, thanks, emoji-only — get canned replies.
+  // Trivial messages - greetings, thanks, emoji-only - get canned replies.
   const trivial = matchTrivialMessage(text);
   if (trivial) {
     console.log('[handlers] Short-circuit trivial reply for:', text.slice(0, 50));
@@ -831,9 +831,9 @@ async function handleTextMessage(text, user, household) {
     };
   }
 
-  // Slash commands — deterministic, never sent to the AI. See SLASH_COMMANDS
+  // Slash commands - deterministic, never sent to the AI. See SLASH_COMMANDS
   // above for the list. These exist primarily because the daily reminder
-  // tells users to reply "/shopping" to see the list — letting the AI
+  // tells users to reply "/shopping" to see the list - letting the AI
   // "interpret" that resulted in a real bug where it fabricated a task
   // completion against an unrelated task.
   const slashCmd = matchSlashCommand(text);
@@ -864,7 +864,7 @@ async function handleTextMessage(text, user, household) {
   // ("weather in Cape Town", "what's the weather like in Brighton tomorrow").
   // The previous fallback-to-stored-location path was removed: Housemait
   // doesn't ship location services, so the only "location" we have for a
-  // user is their household timezone — too coarse to be useful, and
+  // user is their household timezone - too coarse to be useful, and
   // misleading for anyone away from home or in a non-UK household whose
   // timezone has been left at the default.
   const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
@@ -875,7 +875,7 @@ async function handleTextMessage(text, user, household) {
       const locationName = extractLocationFromMessage(text);
       if (!locationName) {
         return {
-          response: "I can't tell where you are — Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
+          response: "I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
           actions,
         };
       }
@@ -912,7 +912,7 @@ async function handleTextMessage(text, user, household) {
   const fullUserForTz = household.members.find(m => m.id === user.id);
   const userTz = fullUserForTz?.timezone || household.timezone || 'Europe/London';
 
-  // School term dates for the household — so "when does the current
+  // School term dates for the household - so "when does the current
   // term end?" gets a real answer instead of UK May-half-term guesses.
   // Wrapped in try/await so an undefined return (test mocks, prod
   // hiccup) degrades to "no schools data" rather than crashing the
@@ -946,7 +946,7 @@ async function handleTextMessage(text, user, household) {
     // "Show me my tasks" / "what are my tasks" → scope to the asker
     // plus anything assigned to Everyone (null assigned_to). A plain
     // "show tasks" stays household-wide. The classifier doesn't emit a
-    // separate intent for this, so we check the raw text — word-bounded
+    // separate intent for this, so we check the raw text - word-bounded
     // so "family's tasks" / "mason's tasks" don't false-match.
     const asksForMine = /\bmy\s+(tasks?|to[- ]?dos?|list)\b/i.test(text);
     const taskResponse = asksForMine
@@ -955,19 +955,19 @@ async function handleTextMessage(text, user, household) {
     return { response: taskResponse, actions };
   }
 
-  // Handle calendar queries — AI already has calendar context and answered in response_message
+  // Handle calendar queries - AI already has calendar context and answered in response_message
   if (result.intent === 'query_calendar') {
     return { response: result.response_message || "I couldn't find that event. Try checking the calendar in the app.", actions };
   }
 
-  // Handle weather request — explicit-location only (see the pre-classifier
+  // Handle weather request - explicit-location only (see the pre-classifier
   // block above for the rationale).
   if (result.intent === 'weather') {
     try {
       const locationName = extractLocationFromMessage(text);
       if (!locationName) {
         return {
-          response: "I can't tell where you are — Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
+          response: "I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_. 📍",
           actions,
         };
       }
@@ -997,7 +997,7 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || 'Noted! ✅', actions };
   }
 
-  // Handle note recall — AI already included the answer in response_message
+  // Handle note recall - AI already included the answer in response_message
   if (result.intent === 'note_recall') {
     return { response: result.response_message || "I couldn't find that in my notes.", actions };
   }
@@ -1035,9 +1035,9 @@ async function handleTextMessage(text, user, household) {
       return null;
     });
     if (!created) {
-      return { response: "⚠️ I couldn't save that subscription — please try again.", actions };
+      return { response: "⚠️ I couldn't save that subscription - please try again.", actions };
     }
-    const moneyStr = created.amount != null ? ` — ${formatMoney(created.amount, currency)}` : '';
+    const moneyStr = created.amount != null ? ` - ${formatMoney(created.amount, currency)}` : '';
     const cadence = created.recurrence === 'yearly' ? 'yearly' : 'monthly';
     const renewLabel = new Date(nextRenewal).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
     return {
@@ -1075,22 +1075,22 @@ async function handleTextMessage(text, user, household) {
       const price = s.amount != null ? formatMoney(s.amount, s.currency) : '?';
       const cad = s.recurrence === 'yearly' ? '/yr' : '/mo';
       const next = new Date(s.next_renewal_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      lines.push(`• *${s.name}* — ${price}${cad} · next ${next}`);
+      lines.push(`• *${s.name}* - ${price}${cad} · next ${next}`);
     }
     if (monthlyTotal > 0) {
-      // Display total in whichever currency the first subscription used (close enough — v1 doesn't FX-convert).
+      // Display total in whichever currency the first subscription used (close enough - v1 doesn't FX-convert).
       lines.push('');
       lines.push(`_Approx. ${formatMoney(monthlyTotal, subs[0].currency)} / month total._`);
     }
     return { response: lines.join('\n'), actions };
   }
 
-  // Handle calendar event creation (primary path — intent explicitly create_event)
+  // Handle calendar event creation (primary path - intent explicitly create_event)
   if (result.intent === 'create_event' && result.calendar_event) {
     const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions);
     if (outcome.kind === 'duplicate') {
       // Surface the dupe prompt so the user can confirm with a follow-up "yes"
-      // (FORCE-ADD path) — this behaviour is specific to the create_event
+      // (FORCE-ADD path) - this behaviour is specific to the create_event
       // intent where adding the event is the user's primary goal.
       const existing = outcome.existing;
       const existingCreator = existing.created_by
@@ -1099,7 +1099,7 @@ async function handleTextMessage(text, user, household) {
       const who = existingCreator?.name || 'someone';
       const dateLabel = new Date(existing.start_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
       return {
-        response: `📅 ${who} already added "${existing.title}" for ${dateLabel} — I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
+        response: `📅 ${who} already added "${existing.title}" for ${dateLabel} - I haven't added a duplicate. Let me know if you'd like me to add a second one anyway.`,
         actions,
       };
     }
@@ -1157,7 +1157,7 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || '🏫 Activity updated! ✅', actions };
   }
 
-  // Handle school event (one-off trip, INSET day, etc.) — create as calendar event
+  // Handle school event (one-off trip, INSET day, etc.) - create as calendar event
   if (result.intent === 'school_event' && result.calendar_event) {
     try {
       const ev = result.calendar_event;
@@ -1193,7 +1193,7 @@ async function handleTextMessage(text, user, household) {
     return { response: result.response_message || '🏫 School event added! ✅', actions };
   }
 
-  // Handle recipe request — generate, save to Recipe Box, format nicely
+  // Handle recipe request - generate, save to Recipe Box, format nicely
   if (result.intent === 'recipe') {
     try {
       // Extract description from recipe_request or infer from the original message
@@ -1210,7 +1210,7 @@ async function handleTextMessage(text, user, household) {
     }
   }
 
-  // Handle recipe follow-up — add ingredients to shopping list
+  // Handle recipe follow-up - add ingredients to shopping list
   if (result.intent === 'recipe_followup') {
     try {
       // Get the most recently created recipe for this household
@@ -1222,7 +1222,7 @@ async function handleTextMessage(text, user, household) {
         return { response: "That recipe doesn't have any ingredients listed. Try asking me for a new recipe!", actions };
       }
       // Add ingredients to shopping list. Needs list_id (NOT NULL) + the
-      // DB column is aisle_category (not category) — same enrichment
+      // DB column is aisle_category (not category) - same enrichment
       // pattern as the main shopping-add branch above.
       const defaultList = await db.getDefaultShoppingList(household.id);
       const ingredientItems = recipe.ingredients
@@ -1251,7 +1251,7 @@ async function handleTextMessage(text, user, household) {
     }
   }
 
-  // Handle general chat — just return the AI's conversational response
+  // Handle general chat - just return the AI's conversational response
   if (result.intent === 'chat') {
     return { response: result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!", actions };
   }
@@ -1261,7 +1261,7 @@ async function handleTextMessage(text, user, household) {
     const toAdd = result.shopping_items.filter((i) => i.action === 'add');
     const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
     if (toAdd.length) {
-      // Every shopping_items row needs a list_id — the column has a NOT
+      // Every shopping_items row needs a list_id - the column has a NOT
       // NULL constraint added with multi-list support. The in-app classify
       // route enriches items with the default list before save; the
       // WhatsApp bot path previously didn't, so classifier-produced items
@@ -1274,7 +1274,7 @@ async function handleTextMessage(text, user, household) {
         list_id: defaultList.id,
         aisle_category: i.category || 'Other',
       }));
-      // Detect override hint from the user's original message — words
+      // Detect override hint from the user's original message - words
       // like "another"/"more"/"extra" mean the user wants the duplicate
       // even if the item is already on the list.
       const { detectOverrideHint } = require('../utils/shoppingDedupe');
@@ -1322,7 +1322,7 @@ async function handleTextMessage(text, user, household) {
         unmatchedCompletions.push(t.title);
         continue;
       }
-      // Push the ACTUAL matched titles so actions mirror reality —
+      // Push the ACTUAL matched titles so actions mirror reality -
       // important for the broadcast notification other members see.
       actions.tasksCompleted.push(...done.map((d) => d.title));
       for (const completedTask of done) {
@@ -1336,13 +1336,13 @@ async function handleTextMessage(text, user, household) {
   // morning"-style messages where the classifier detected a completion AND a
   // scheduling detail in one turn. The primary intent handled the completion
   // above; now also persist the event so the user doesn't have to ask twice.
-  // Skip the duplicate-prompt path from the create_event branch — it's a
+  // Skip the duplicate-prompt path from the create_event branch - it's a
   // secondary action, not the user's main request, so a silent dupe skip is
   // better UX than hijacking the confirmation flow.
   if (result.calendar_event && result.intent !== 'create_event') {
     const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions);
     if (outcome.kind === 'duplicate') {
-      console.log('[handlers] Skipped fall-through event create — duplicate:', outcome.existing.title);
+      console.log('[handlers] Skipped fall-through event create - duplicate:', outcome.existing.title);
     }
   }
 
@@ -1354,13 +1354,13 @@ async function handleTextMessage(text, user, household) {
   let response = result.response_message || 'Done! ✅';
   const unmatched = actions.tasksUnmatched || [];
   if (unmatched.length > 0 && actions.tasksCompleted.length === 0) {
-    // Every attempted completion missed — be honest.
+    // Every attempted completion missed - be honest.
     const list = unmatched.map((t) => `"${t}"`).join(', ');
     response = unmatched.length === 1
       ? `I couldn't find a task matching ${list} in your open tasks. Try checking the exact name with "show my tasks".`
       : `I couldn't find tasks matching ${list}. Try checking names with "show my tasks".`;
   } else if (unmatched.length > 0) {
-    // Partial success — at least one matched, at least one didn't.
+    // Partial success - at least one matched, at least one didn't.
     const list = unmatched.map((t) => `"${t}"`).join(', ');
     response += `\n\n(I couldn't find ${list} in your open tasks.)`;
   }
@@ -1370,7 +1370,7 @@ async function handleTextMessage(text, user, household) {
   const dups = actions.shoppingDuplicates || [];
   if (dups.length > 0) {
     const list = dups.map((n) => `*${n}*`).join(', ');
-    response += `\n\n(${list} ${dups.length === 1 ? 'was' : 'were'} already on your list — skipped. Reply "another ${dups[0]}" if you want a second.)`;
+    response += `\n\n(${list} ${dups.length === 1 ? 'was' : 'were'} already on your list - skipped. Reply "another ${dups[0]}" if you want a second.)`;
   }
 
   return {
@@ -1435,7 +1435,7 @@ async function handleVoiceNote(audioBuffer, filename, user, household) {
 }
 
 /**
- * Handle a photo — smart image scanning.
+ * Handle a photo - smart image scanning.
  * First classifies the image (receipt vs event/invitation vs unknown),
  * then routes to the appropriate handler.
  *
@@ -1556,7 +1556,7 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
 }
 
 /**
- * Handle a "list" command — show shopping list.
+ * Handle a "list" command - show shopping list.
  */
 async function handleList(user, household) {
   const items = await db.getShoppingList(household.id);
@@ -1599,7 +1599,7 @@ async function handleSubscriptionsList(household) {
     const price = s.amount != null ? formatMoney(s.amount, s.currency) : '?';
     const cad = s.recurrence === 'yearly' ? '/yr' : '/mo';
     const next = new Date(s.next_renewal_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    lines.push(`• *${s.name}* — ${price}${cad} · next ${next}`);
+    lines.push(`• *${s.name}* - ${price}${cad} · next ${next}`);
   }
   if (monthlyTotal > 0) {
     lines.push('');
@@ -1618,7 +1618,7 @@ async function generateAndSaveRecipe(householdId, description, dietary, servings
 ${dietary ? `Dietary requirements: ${dietary}` : ''}
 ${servings ? `Servings: ${servings}` : 'Servings: 4'}
 
-Keep it simple — families are busy. Use common British supermarket ingredients.
+Keep it simple - families are busy. Use common British supermarket ingredients.
 
 Return ONLY valid JSON:
 {
@@ -1669,7 +1669,7 @@ Rules:
 }
 
 /**
- * Format a recipe for WhatsApp — concise, family-friendly, actionable.
+ * Format a recipe for WhatsApp - concise, family-friendly, actionable.
  */
 function formatRecipeResponse(recipe) {
   const parsed = recipe._parsed || {};
@@ -1707,7 +1707,7 @@ function formatRecipeResponse(recipe) {
     lines.push('*Quick steps:*');
     const steps = method.slice(0, 4);
     steps.forEach((step, i) => {
-      // Clean up step text — remove "Step X:" prefix if present
+      // Clean up step text - remove "Step X:" prefix if present
       const clean = step.replace(/^step\s*\d+[:.]\s*/i, '').trim();
       lines.push(`${i + 1}. ${clean}`);
     });

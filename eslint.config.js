@@ -65,7 +65,7 @@ module.exports = [
       'no-useless-return': 'warn',
       'prefer-promise-reject-errors': 'warn',
 
-      // Style — keep it relaxed, just catch the obvious stuff
+      // Style - keep it relaxed, just catch the obvious stuff
       'no-var': 'warn',
       'prefer-const': ['warn', { destructuring: 'all' }],
     },

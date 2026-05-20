@@ -1,4 +1,4 @@
--- Subscription tracker — Household members tell the bot about
+-- Subscription tracker - Household members tell the bot about
 -- recurring paid subscriptions (Netflix, Spotify, Disney+, gym, etc.)
 -- and Housemait nudges 3 days before each renewal so they can cancel
 -- if they want.
@@ -8,7 +8,7 @@
 -- Renewal cadence is captured as (recurrence, renewal_day_of_month,
 -- renewal_month) so the cron can advance next_renewal_at without
 -- re-parsing user text. next_renewal_at is denormalised for the daily
--- "renewing in the next N days" query — the cron updates it after
+-- "renewing in the next N days" query - the cron updates it after
 -- each cycle.
 
 CREATE TABLE IF NOT EXISTS household_subscriptions (
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS household_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_household_subscriptions_household
   ON household_subscriptions (household_id);
 
--- Cron pulls "renewing in the next 3 days" — narrow the scan by date.
+-- Cron pulls "renewing in the next 3 days" - narrow the scan by date.
 CREATE INDEX IF NOT EXISTS idx_household_subscriptions_next_renewal
   ON household_subscriptions (next_renewal_at);
 

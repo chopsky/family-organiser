@@ -1,15 +1,15 @@
 /**
- * useUniversalLinks — turn iOS Universal Link opens into in-app navigations.
+ * useUniversalLinks - turn iOS Universal Link opens into in-app navigations.
  *
  * When the user taps an https://housemait.com/verify?token=… link in
  * their Mail app on iOS, the Housemait app launches (or comes to
  * foreground) with the URL. Capacitor's App.appUrlOpen event fires
- * with that URL — we strip the host and feed the path + query into
+ * with that URL - we strip the host and feed the path + query into
  * React Router so the user lands on /verify and the verification
  * runs automatically.
  *
  * Web-safe: registers nothing on browsers (where Universal Links
- * don't apply — the link just navigates normally).
+ * don't apply - the link just navigates normally).
  *
  * Both cold-start and warm-resume launches go through appUrlOpen in
  * Capacitor 8, so we don't need a separate getLaunchUrl handler.

@@ -1,33 +1,33 @@
 /**
  * Help & support page (`/help`)
  *
- * Authenticated-only — wrapped in <RequireAuth><Layout> at the App.jsx
+ * Authenticated-only - wrapped in <RequireAuth><Layout> at the App.jsx
  * level, so it inherits the desktop sidebar and the mobile bottom-tab
  * bar + More sheet automatically. Reached from the More sheet's
  * "Help & support" row.
  *
  * Structure:
  *   1. Hero ("How can we help?")
- *   2. FAQ — 4 grouped sections with deep-link-friendly ids
+ *   2. FAQ - 4 grouped sections with deep-link-friendly ids
  *      • #getting-started          Getting started + WhatsApp bot
  *      • #calendar-documents       Calendar + documents
  *      • #billing                  Subscription + billing
  *      • #account-troubleshooting  Account, data + troubleshooting
- *   3. "Still need help?" — embedded ContactForm
- *   4. Footer — direct email, brand links, app version
+ *   3. "Still need help?" - embedded ContactForm
+ *   4. Footer - direct email, brand links, app version
  *
  * App Store anti-steering (Guideline 3.1.3): the billing section is
  * present on both web and iOS, but the Cancel and Refund answers
- * branch on isIos() so iOS users see Apple-appropriate guidance —
+ * branch on isIos() so iOS users see Apple-appropriate guidance -
  * cancel via iOS Settings → Apple ID → Subscriptions, refund via
  * reportaproblem.apple.com (the canonical Apple refund URL, explicitly
  * permitted to link). The Stripe portal handler from earlier drafts is
- * intentionally NOT included — iOS users are never directed to an
+ * intentionally NOT included - iOS users are never directed to an
  * external billing surface.
  *
  * Copy is intentionally short and links to authoritative sources
  * where possible (Settings, Privacy page) rather than restating
- * numbers — keeps the page honest as features evolve.
+ * numbers - keeps the page honest as features evolve.
  */
 
 import { useEffect } from 'react';
@@ -64,7 +64,7 @@ export default function Help() {
           <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>help?</em>
         </h1>
         <p className="text-warm-grey mt-3 text-[15px] leading-relaxed">
-          Quick answers to common questions below — and a way to reach us if
+          Quick answers to common questions below - and a way to reach us if
           you're still stuck.
         </p>
       </div>
@@ -81,7 +81,7 @@ export default function Help() {
             <Link to="/family" className="text-plum hover:underline">
               Family
             </Link>{' '}
-            and use "Invite a member" — we'll send them a link they can open
+            and use "Invite a member" - we'll send them a link they can open
             on their phone to join.
           </p>
           <p>
@@ -105,7 +105,7 @@ export default function Help() {
             message to our WhatsApp number to complete the link.
           </p>
           <p>
-            From then on you can chat with the bot like any other contact —
+            From then on you can chat with the bot like any other contact -
             ask it to add events, tasks, shopping items, or to summarise
             what's on this week.
           </p>
@@ -119,22 +119,22 @@ export default function Help() {
           <ul className="list-disc pl-5 space-y-1">
             <li>
               <code className="text-charcoal bg-plum-light/40 px-1 rounded">/shopping</code>{' '}
-              — show the shopping list
+              - show the shopping list
             </li>
             <li>
               <code className="text-charcoal bg-plum-light/40 px-1 rounded">/tasks</code>{' '}
-              — show today's and overdue tasks
+              - show today's and overdue tasks
             </li>
             <li>
               <code className="text-charcoal bg-plum-light/40 px-1 rounded">/mytasks</code>{' '}
-              — show only tasks assigned to you
+              - show only tasks assigned to you
             </li>
             <li>
               <code className="text-charcoal bg-plum-light/40 px-1 rounded">/help</code>{' '}
-              — the same reference, in WhatsApp
+              - the same reference, in WhatsApp
             </li>
           </ul>
-          <p>Or just talk to it normally — it understands things like:</p>
+          <p>Or just talk to it normally - it understands things like:</p>
           <ul className="list-disc pl-5 space-y-1 italic">
             <li>"Add milk and eggs to the list"</li>
             <li>"Remind Sarah to book the dentist on Tuesday"</li>
@@ -148,7 +148,7 @@ export default function Help() {
         >
           <p>
             The most common cause is that your WhatsApp number isn't linked
-            to a household yet — open{' '}
+            to a household yet - open{' '}
             <Link to="/settings" className="text-plum hover:underline">
               Settings
             </Link>{' '}
@@ -172,7 +172,7 @@ export default function Help() {
             </Link>{' '}
             page, use "Add feed" and paste the public iCal/.ics URL from
             Apple Calendar, Google Calendar, or your child's school calendar
-            page. We refresh feeds in the background — events typically
+            page. We refresh feeds in the background - events typically
             appear within a few minutes.
           </p>
         </FaqAccordion>
@@ -185,7 +185,7 @@ export default function Help() {
             Calendar fetches events for the visible month plus a small
             buffer either side. If you scroll forward, the next month
             loads on demand. External-feed events refresh on a schedule
-            (currently every few hours) — pull the page to refresh, or
+            (currently every few hours) - pull the page to refresh, or
             wait for the next sync.
           </p>
         </FaqAccordion>
@@ -197,7 +197,7 @@ export default function Help() {
           <p>
             We support PDFs, common image formats (PNG, JPEG, GIF, WebP,
             HEIC), Word documents (.docx) and plain text/CSV. Each
-            household gets several gigabytes of shared storage — plenty
+            household gets several gigabytes of shared storage - plenty
             for school letters, insurance documents, and warranty cards.
           </p>
         </FaqAccordion>
@@ -225,7 +225,7 @@ export default function Help() {
           question="How long is the free trial?"
         >
           <p>
-            30 days from when you sign up — no card or payment details
+            30 days from when you sign up - no card or payment details
             required to start. We'll only ask for payment if you choose
             to keep using Housemait at the end of the trial.
           </p>
@@ -236,8 +236,8 @@ export default function Help() {
           question="What happens when my trial ends?"
         >
           <p>
-            Your account stays read-only — you can still log in and see
-            everything you've built — but you can't add new items or use
+            Your account stays read-only - you can still log in and see
+            everything you've built - but you can't add new items or use
             the WhatsApp bot until you subscribe. Your data stays exactly
             where it is.
           </p>
@@ -276,7 +276,7 @@ export default function Help() {
               </ol>
               <p>
                 Cancellations take effect at the end of your current
-                billing period — you'll keep Premium access until then.
+                billing period - you'll keep Premium access until then.
               </p>
             </>
           ) : (
@@ -285,7 +285,7 @@ export default function Help() {
               <Link to="/settings" className="text-plum hover:underline">
                 Settings → Plan
               </Link>{' '}
-              and use the manage-subscription button — that opens the
+              and use the manage-subscription button - that opens the
               customer portal where you can update your card, change
               plans, or cancel. Cancellations take effect at the end of
               your current billing period.
@@ -321,7 +321,7 @@ export default function Help() {
             <Link to="/family" className="text-plum hover:underline">
               Family
             </Link>
-            . Regular members can leave from there too — just bear in
+            . Regular members can leave from there too - just bear in
             mind you'll lose access to shared lists and documents until
             re-invited.
           </p>
@@ -348,7 +348,7 @@ export default function Help() {
         >
           <p>
             We use Cloudflare Turnstile to keep bots out of the login
-            form — occasionally it asks you to complete a quick
+            form - occasionally it asks you to complete a quick
             verification. If you're stuck on that, try refreshing the
             page or switching browsers. If you can't reach your account
             at all, email us directly at{' '}
@@ -358,12 +358,12 @@ export default function Help() {
             >
               hello@housemait.com
             </a>{' '}
-            — we'll sort it.
+            - we'll sort it.
           </p>
         </FaqAccordion>
       </FaqSection>
 
-      {/* ── Still need help? — embedded ContactForm ──────────── */}
+      {/* ── Still need help? - embedded ContactForm ──────────── */}
       <section
         id="contact"
         className="bg-white rounded-2xl border border-cream-border p-6 md:p-8 mt-10"
@@ -415,7 +415,7 @@ export default function Help() {
 }
 
 /**
- * Section wrapper — large display title + a card-style container for
+ * Section wrapper - large display title + a card-style container for
  * the accordion items inside. Each section has an `id` so the More
  * sheet (or anywhere else) can deep-link to it.
  */

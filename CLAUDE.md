@@ -1,4 +1,4 @@
-# Housemait — Family Organiser
+# Housemait - Family Organiser
 
 ## Project overview
 
@@ -13,7 +13,7 @@ Always reference these files when making UI changes. The HTML mockup is the sour
 
 ### Brand personality
 
-Warm but not twee. Organised but not rigid. Modern but not cold. The UI should feel like a calm, capable friend — not a corporate productivity tool. Celebrate the beautiful chaos of family life.
+Warm but not twee. Organised but not rigid. Modern but not cold. The UI should feel like a calm, capable friend - not a corporate productivity tool. Celebrate the beautiful chaos of family life.
 
 ### Colour palette
 
@@ -110,7 +110,7 @@ Use warm-toned shadows, never cool grey.
 
 #### Mobile (<768px)
 
-- No sidebar — use bottom tab bar instead
+- No sidebar - use bottom tab bar instead
 - Tab bar: 82px height, frosted glass (`background: rgba(255,255,255,0.92)`, `backdrop-filter: blur(20px)`), `border-top: 1px solid --light-grey`
 - 5 tabs: Home, Calendar, Lists, Meals, Family
 - Active tab: filled icon in `--plum`, label in `--plum`
@@ -162,7 +162,7 @@ Use Lucide icon set (already in the mockup). Rounded, 1.5px stroke weight. 20px 
 
 | Section  | Icon    | Description                                              |
 | -------- | ------- | -------------------------------------------------------- |
-| Home     | House   | Dashboard — today's events, tasks, quick actions, feed   |
+| Home     | House   | Dashboard - today's events, tasks, quick actions, feed   |
 | Calendar | Calendar | Shared family calendar, week/month views, colour-coded members |
 | Lists    | Checkbox | Grocery lists, to-do lists, custom lists, real-time collab |
 | Meals    | Utensils | Weekly meal planner, recipe library, ingredient-to-list flow |

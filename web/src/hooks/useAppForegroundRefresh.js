@@ -1,5 +1,5 @@
 /**
- * useAppForegroundRefresh — fire a callback whenever the app/tab
+ * useAppForegroundRefresh - fire a callback whenever the app/tab
  * returns to the foreground.
  *
  * Native apps always feel current because they re-fetch on foreground;

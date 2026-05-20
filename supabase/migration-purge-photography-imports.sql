@@ -7,7 +7,7 @@
 --   The sync code is gone; the column that distinguished imports
 --   (calendar_events.subscription_id) was nulled out by the
 --   migration-drop-two-way-sync.sql cleanup. We can no longer tell
---   "where this row came from" from schema alone — but Photography
+--   "where this row came from" from schema alone - but Photography
 --   events have a distinctive title shape: they all contain either
 --   "Wedding/Engagement" or "Destination Wedding".
 --
@@ -16,7 +16,7 @@
 --   Reasons:
 --     1. The codebase already filters out deleted_at IS NOT NULL rows
 --        from every read path, so the user-visible result is identical
---        to a hard delete — but recoverable.
+--        to a hard delete - but recoverable.
 --     2. Matches the pattern established by the existing
 --        migration-soft-delete.sql + migration-purge-old-soft-deletes
 --        infrastructure. Soft-deleted rows age out via the scheduled
@@ -26,12 +26,12 @@
 --        90-day window and recover it without DBA help.
 --
 -- ── Run order ──────────────────────────────────────────────────────────
--- 1. Preview (read-only) — confirm the row count + sample titles match
+-- 1. Preview (read-only) - confirm the row count + sample titles match
 --    what you expect before committing.
--- 2. Soft-delete (BEGIN/COMMIT) — flip deleted_at = now() on the matched
+-- 2. Soft-delete (BEGIN/COMMIT) - flip deleted_at = now() on the matched
 --    rows. Wrapped in a transaction so you can ROLLBACK on staging.
--- 3. Verify — should return 0 LIVE rows matching the title filter.
--- 4. Recovery (commented) — copy + paste with the right cutoff timestamp
+-- 3. Verify - should return 0 LIVE rows matching the title filter.
+-- 4. Recovery (commented) - copy + paste with the right cutoff timestamp
 --    if you ever need to restore.
 
 -- ── 1. Preview ────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ WHERE deleted_at IS NULL
     OR title ILIKE '%Destination Wedding%'
   )
   -- Uncomment + paste your household id for extra safety. Without
-  -- this, the migration applies across every household in the DB —
+  -- this, the migration applies across every household in the DB -
   -- which is fine for "Wedding/Engagement" since it's a phrase
   -- specific to your photography business, but the scope guard is
   -- cheap belt-and-braces.
@@ -92,7 +92,7 @@ COMMIT;
 
 -- ── 3. Verify ─────────────────────────────────────────────────────────
 -- Should return 0 rows. Anything still here means the title filter
--- missed it — investigate before assuming the purge held.
+-- missed it - investigate before assuming the purge held.
 
 SELECT
   id,
@@ -126,6 +126,6 @@ WHERE deleted_at IS NULL
 --     OR title ILIKE '%Destination Wedding%'
 --   );
 --
--- Restoring after the purge job has run is harder — the rows would have
+-- Restoring after the purge job has run is harder - the rows would have
 -- been hard-deleted. The August 2026 purge run is your effective
 -- "point of no return" deadline for this rollback path.

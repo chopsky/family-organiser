@@ -1,15 +1,15 @@
 /**
- * Locale configuration — single source of truth for region-specific marketing.
+ * Locale configuration - single source of truth for region-specific marketing.
  *
  * Every locale entry maps to:
  *   • a unique URL path (/gb, /us, …) used by both routing and hreflang.
  *     We use ISO 3166-1 alpha-2 country codes (gb, us, eu, au, ca, za)
  *     because that's exactly what Vercel returns in x-vercel-ip-country,
  *     so the middleware's path-for-country mapping stays trivial
- *   • a Stripe currency code (GBP, USD, …) — combined with the billing
+ *   • a Stripe currency code (GBP, USD, …) - combined with the billing
  *     interval, this resolves to a Stripe Price via lookup_key, e.g.
  *     `monthly_gbp`, `annual_usd`. The matching Price objects live in
- *     Stripe — DON'T duplicate the underlying prices here, only their
+ *     Stripe - DON'T duplicate the underlying prices here, only their
  *     human-readable display values
  *   • feature flags so we can hide UK-only surfaces (school term dates)
  *     on other markets without forking the page
@@ -25,7 +25,7 @@
  *      via hreflang as `en-IE` (Ireland is the most populous EU country
  *      with English as an official language post-Brexit). Search Console
  *      can be told to also surface `/eu` for other EU country codes via
- *      the additionalHreflang field — see SEO Tier 2 work.
+ *      the additionalHreflang field - see SEO Tier 2 work.
  */
 
 export const LOCALES = {
@@ -73,7 +73,7 @@ export const LOCALES = {
       ],
       mock: {
         schoolName: "Queen Elizabeth's School",
-        // yearLabel / yearValue intentionally omitted — the app doesn't
+        // yearLabel / yearValue intentionally omitted - the app doesn't
         // ask the user to pick a year.
         academicYear: '2025–2026',
         terms: [
@@ -121,7 +121,7 @@ export const LOCALES = {
   eu: {
     code: 'eu',
     path: '/eu',
-    hreflang: 'en-IE', // representative — see file header
+    hreflang: 'en-IE', // representative - see file header
     name: 'Europe',
     flag: '🇪🇺',
     currency: 'EUR',
@@ -138,7 +138,7 @@ export const LOCALES = {
     audienceTagline: 'modern European families',
     footerNote: 'Made with ❤️ for modern families',
     demo: {
-      // Deliberately non-specific — the /eu page serves visitors from
+      // Deliberately non-specific - the /eu page serves visitors from
       // 27+ countries, no single city would feel local to all of them.
       dentistLocation: 'Happy Smiles Dental',
       milkSize: '2L',
@@ -178,7 +178,7 @@ export const LOCALES = {
       dentistLocation: 'Newtown Family Dental, Sydney',
       milkSize: '2L',
       chickenSize: '1kg',
-      // "rego" = Aussie shorthand for annual vehicle registration —
+      // "rego" = Aussie shorthand for annual vehicle registration -
       // the closest cultural analogue to the UK MOT.
       recurringTasksExample: 'bins, vet, rego',
       completedTaskExample: 'Book rego inspection',
@@ -271,7 +271,7 @@ export const LOCALES = {
       ],
       mock: {
         schoolName: 'Westville Primary School',
-        // yearLabel / yearValue intentionally omitted — the app doesn't
+        // yearLabel / yearValue intentionally omitted - the app doesn't
         // ask the user to pick a grade.
         academicYear: '2026',
         terms: [
@@ -304,7 +304,7 @@ export const LOCALES = {
     audienceTagline: 'modern families',
     footerNote: 'Made with ❤️ for modern families',
     demo: {
-      // Match the EU page's neutral framing — no city, no national
+      // Match the EU page's neutral framing - no city, no national
       // associations for the rest-of-world fallback audience.
       dentistLocation: 'Happy Smiles Dental',
       milkSize: '2L',
@@ -313,7 +313,7 @@ export const LOCALES = {
       completedTaskExample: 'Book service for the car',
       parentTerm: 'Mum',
     },
-    // No city on reviewers — the default page serves visitors whose
+    // No city on reviewers - the default page serves visitors whose
     // country we don't have a dedicated page for, so attaching a city
     // would feel arbitrary. Mum (not Mom) for the broader English
     // convention; American visitors land on /us anyway.
@@ -325,21 +325,21 @@ export const LOCALES = {
   },
 };
 
-/** Canonical site origin — used to build absolute URLs in hreflang and canonical tags. */
+/** Canonical site origin - used to build absolute URLs in hreflang and canonical tags. */
 export const SITE_URL = 'https://housemait.com';
 
 /** Cookie that records the locale a visitor last engaged with. Read by
  *  the checkout flow so we charge the right currency. */
 export const LOCALE_COOKIE = 'housemait-locale';
 
-/** Stable iteration order — matters for sitemap generation and hreflang
+/** Stable iteration order - matters for sitemap generation and hreflang
  *  rendering so the alt tags appear in a consistent sequence. */
 export const LOCALE_ORDER = ['gb', 'us', 'eu', 'au', 'ca', 'za'];
 
 /** Resolve a locale config from a URL pathname. Anything that doesn't
  *  match a known prefix falls back to `default`. The lookup is prefix-
  *  based so deep links like `/gb/anything` still resolve to the UK
- *  locale — useful if we ever add localised sub-pages. */
+ *  locale - useful if we ever add localised sub-pages. */
 export function getLocaleByPath(pathname) {
   for (const code of LOCALE_ORDER) {
     const locale = LOCALES[code];
@@ -350,13 +350,13 @@ export function getLocaleByPath(pathname) {
   return LOCALES.default;
 }
 
-/** All locales as an array, including default — used by sitemap + hreflang. */
+/** All locales as an array, including default - used by sitemap + hreflang. */
 export function allLocales() {
   return [...LOCALE_ORDER.map((c) => LOCALES[c]), LOCALES.default];
 }
 
 /**
- * Map a household.country code (ISO 3166-1 alpha-2 — 'GB', 'ZA' etc.)
+ * Map a household.country code (ISO 3166-1 alpha-2 - 'GB', 'ZA' etc.)
  * back to a marketing locale config.
  *
  * Used by Subscribe.jsx so that a signed-in user's PRICING is driven by
@@ -366,11 +366,11 @@ export function allLocales() {
  * signed up via /za with ZAR pricing, but logging back in via my UK IP
  * now shows me GBP'.
  *
- * Returns null when there's no exact locale match — caller falls back
+ * Returns null when there's no exact locale match - caller falls back
  * to the cookie or the default locale. Cases where this returns null:
- *   • country='OTHER' — visitor outside our supported markets
- *   • country='NZ'   — no dedicated /nz marketing page (yet)
- *   • country='IE'   — collapsed under /eu since both use EUR
+ *   • country='OTHER' - visitor outside our supported markets
+ *   • country='NZ'   - no dedicated /nz marketing page (yet)
+ *   • country='IE'   - collapsed under /eu since both use EUR
  */
 const COUNTRY_TO_LOCALE = {
   GB: 'gb',

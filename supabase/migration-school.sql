@@ -1,4 +1,4 @@
--- School Life Integration — Phase 1
+-- School Life Integration - Phase 1
 -- Creates tables for school management, term dates, weekly activities, and school events
 
 -- 1. GIAS school directory (imported from GOV.UK CSV, ~25k rows)
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS school_term_dates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- 4. Link children (dependents) to schools — add columns to existing users table
+-- 4. Link children (dependents) to schools - add columns to existing users table
 ALTER TABLE users ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES household_schools(id) ON DELETE SET NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS year_group TEXT;
 

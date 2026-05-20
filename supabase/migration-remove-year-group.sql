@@ -5,11 +5,11 @@
 -- a specific school in a known catchment area). The functional value year
 -- group provided was minimal:
 --
---   • AI chat context — but age is already derivable from the existing
+--   • AI chat context - but age is already derivable from the existing
 --     `birthday` column, which the AI already has access to.
---   • UI badges — purely cosmetic ("Y3, Wolfson Hillel" vs just the
+--   • UI badges - purely cosmetic ("Y3, Wolfson Hillel" vs just the
 --     school name).
---   • applies_to_year_groups on school_term_dates — schema-only; no code
+--   • applies_to_year_groups on school_term_dates - schema-only; no code
 --     ever filtered term dates by year group.
 --
 -- Net: minimal product win, real child-safety risk. Removed entirely.

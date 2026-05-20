@@ -1,5 +1,5 @@
 /**
- * Unsubscribe endpoint — Phase 7.
+ * Unsubscribe endpoint - Phase 7.
  *
  * Handles two things:
  *   1. One-click clicks from the footer link in broadcast emails.
@@ -11,10 +11,10 @@
  * Both shapes land on the same route. GET shows a friendly HTML page;
  * POST returns a bare 200 (Gmail doesn't render a response to the user).
  *
- * No bearer auth — the URL itself IS the credential (JWT signed with
+ * No bearer auth - the URL itself IS the credential (JWT signed with
  * UNSUBSCRIBE_TOKEN_SECRET, 90-day expiry). The app-level
  * subscriptionStatus gate already excludes /api/webhooks but NOT
- * /api/unsubscribe — we need to mount this router BEFORE the gate in
+ * /api/unsubscribe - we need to mount this router BEFORE the gate in
  * app.js so expired households (who would naturally be the ones
  * clicking an unsubscribe link) can still reach it on a POST from a
  * mail client.
@@ -36,7 +36,7 @@ function confirmationPage({ success, householdName }) {
           We won't send ${householdName ? `<strong>${householdName}</strong>` : 'your household'} any more trial reminder emails.
         </p>
         <p style="color:#6B6774;line-height:1.6;font-size:14px;margin:0 0 20px;">
-          You'll still get important account emails (like your trial ending notice) — those aren't optional.
+          You'll still get important account emails (like your trial ending notice) - those aren't optional.
           To turn reminders back on later, open Settings in Housemait and flip the
           <em>"Trial reminder emails"</em> toggle.
         </p>
@@ -88,7 +88,7 @@ router.get('/', async (req, res) => {
 /**
  * POST /api/unsubscribe?token=...
  * Spec-compliant endpoint for RFC 8058 one-click unsubscribe (Gmail,
- * Apple Mail). Returns 200 with no body on success — the email client
+ * Apple Mail). Returns 200 with no body on success - the email client
  * doesn't render a response.
  */
 router.post('/', async (req, res) => {

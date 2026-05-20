@@ -156,7 +156,7 @@ export default function AdminUserDetail() {
           )}
           <Detail label="WhatsApp" value={user.whatsapp_linked ? user.whatsapp_phone : 'Not linked'} />
           <Detail label="Timezone" value={user.timezone} />
-          <Detail label="Joined" value={user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'} />
+          <Detail label="Joined" value={user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'} />
           <Detail label="Color Theme" value={user.color_theme} />
         </div>
 
@@ -366,7 +366,7 @@ function Detail({ label, value, noCapitalize }) {
   return (
     <div>
       <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider">{label}</p>
-      <p className={`text-sm text-charcoal mt-0.5 ${noCapitalize ? '' : 'capitalize'}`}>{value || '—'}</p>
+      <p className={`text-sm text-charcoal mt-0.5 ${noCapitalize ? '' : 'capitalize'}`}>{value || '-'}</p>
     </div>
   );
 }

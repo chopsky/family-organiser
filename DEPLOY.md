@@ -11,7 +11,7 @@
 
 ---
 
-## Step 1 — Deploy the backend to Railway
+## Step 1 - Deploy the backend to Railway
 
 1. Push your code to GitHub.
 2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**.
@@ -26,7 +26,7 @@
 
 ---
 
-## Step 2 — Deploy the frontend to Vercel
+## Step 2 - Deploy the frontend to Vercel
 
 1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import your GitHub repo.
 2. Set **Root Directory** to `web`.
@@ -38,7 +38,7 @@
 
 ---
 
-## Step 3 — Restrict CORS (optional but recommended)
+## Step 3 - Restrict CORS (optional but recommended)
 
 Back in Railway, add:
 ```

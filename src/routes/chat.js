@@ -92,7 +92,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   // Location prompt: gated entirely on whether the current message
   // looks location-relevant. If it does and we have a home address,
   // send the full address. If it does but we only have a timezone,
-  // send the coarse city. If it doesn't, send NOTHING — the AI
+  // send the coarse city. If it doesn't, send NOTHING - the AI
   // doesn't need to know where the household is to mark milk as
   // bought. See utils/location-relevance.js for the matcher.
   const homeAddress = household?.address?.trim();
@@ -100,9 +100,9 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const wantsLocation = messageMentionsLocation(currentMessage);
   let locationStr = '';
   if (wantsLocation && homeAddress) {
-    locationStr = `The family's home address is **${homeAddress}**. Use this for proximity-aware recommendations — suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than echoing the full street address back to the user. Treat the exact address as confidential.`;
+    locationStr = `The family's home address is **${homeAddress}**. Use this for proximity-aware recommendations - suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than echoing the full street address back to the user. Treat the exact address as confidential.`;
   } else if (wantsLocation && userCity) {
-    locationStr = `The family is based in **${userCity}**. Use this for local recommendations — suggest specific places, neighbourhoods, and services in this area.`;
+    locationStr = `The family is based in **${userCity}**. Use this for local recommendations - suggest specific places, neighbourhoods, and services in this area.`;
   }
 
   const membersStr = members.map(m => `${m.name}${m.family_role ? ` (${m.family_role})` : ''}`).join(', ') || 'none';
@@ -138,7 +138,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   // upcoming closures) so questions like "when does the current term
   // end?" resolve from household data, not the model's training set.
   if (termDatesSummary) {
-    schoolsStr = `${schoolsStr === '(none)' ? '' : `${schoolsStr}\n\n`}TERM DATES & CLOSURES (use these for any question about school term, break, or holiday timing — do NOT guess from general knowledge):\n${termDatesSummary}`;
+    schoolsStr = `${schoolsStr === '(none)' ? '' : `${schoolsStr}\n\n`}TERM DATES & CLOSURES (use these for any question about school term, break, or holiday timing - do NOT guess from general knowledge):\n${termDatesSummary}`;
   }
 
   let prompt = CHAT_ASSISTANT_SYSTEM
@@ -363,7 +363,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
         } else if (act.action === 'add_shopping' && act.items?.length) {
           // shopping_items.list_id is NOT NULL since multi-list support
-          // landed — attach the default list + aisle_category before
+          // landed - attach the default list + aisle_category before
           // insert, matching the classify.js / shopping.js pattern.
           const defaultList = await db.getDefaultShoppingList(req.householdId);
           const enriched = act.items.map((i) => ({
@@ -377,12 +377,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
-          // Explicit-location only — Housemait doesn't ship location services,
+          // Explicit-location only - Housemait doesn't ship location services,
           // so we won't pretend to know where the user is. See bot/handlers.js
           // for the full rationale.
           const locationName = extractLocationFromMessage(message);
           if (!locationName) {
-            cleanContent += "\n\n📍 I can't tell where you are — Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_.";
+            cleanContent += "\n\n📍 I can't tell where you are - Housemait doesn't track your location. Try asking with a city, e.g. _\"weather in Brighton tomorrow\"_.";
           } else {
             const geo = await geocodeLocation(locationName);
             if (!geo) {

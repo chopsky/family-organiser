@@ -1,4 +1,4 @@
-// Home screen — two variations
+// Home screen - two variations
 const { FAMILY: HM_FAMILY, TODAY: HM_TODAY, SCHEDULE: HM_SCHEDULE, AI_CHIPS: HM_AI_CHIPS } = window.HM_DATA;
 
 function memberById(id) { return HM_FAMILY.members.find(m=>m.id===id); }
@@ -51,7 +51,7 @@ function HomeDashboard({ tasks, onToggleTask, groceries, meals, onOpenAI, onTab,
         placeholder="Ask, plan, or scan…"
       />
 
-      {/* Up next — featured */}
+      {/* Up next - featured */}
       <Card padding={0} style={{ overflow:'hidden' }}>
         <div style={{ padding:'16px 18px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
@@ -85,7 +85,7 @@ function HomeDashboard({ tasks, onToggleTask, groceries, meals, onOpenAI, onTab,
         </div>
       </Card>
 
-      {/* Tasks — full width */}
+      {/* Tasks - full width */}
       <Card>
         <CardHeader title="Tasks" eyebrow={`${openTasks} open`} action="View all" onAction={()=>onTab('tasks')}/>
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -108,7 +108,7 @@ function HomeDashboard({ tasks, onToggleTask, groceries, meals, onOpenAI, onTab,
         </div>
       </Card>
 
-      {/* Groceries — full width */}
+      {/* Groceries - full width */}
       <Card>
         <CardHeader title="Grocery list" eyebrow={`${openGroc} items`} action="Open list" onAction={()=>onTab('shop')}/>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>

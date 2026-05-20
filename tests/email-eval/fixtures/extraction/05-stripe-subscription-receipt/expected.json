@@ -1,5 +1,5 @@
 {
-  "description": "Stripe receipt for an ongoing subscription. Not a grocery receipt — must NOT extract 'Spotify Premium' as a shopping item. Optionally extracts a task for the next billing date.",
+  "description": "Stripe receipt for an ongoing subscription. Not a grocery receipt - must NOT extract 'Spotify Premium' as a shopping item. Optionally extracts a task for the next billing date.",
   "email_type": ["bill", "receipt", "other"],
   "shopping_items": {
     "exact_count": 0,

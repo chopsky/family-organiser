@@ -1,5 +1,5 @@
 /**
- * RevenueCat webhook handler — IAP Phase 1b.
+ * RevenueCat webhook handler - IAP Phase 1b.
  *
  * Receives subscription state change events from RevenueCat for iOS IAP
  * subscribers and projects them onto households.subscription_status /

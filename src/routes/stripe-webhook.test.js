@@ -6,7 +6,7 @@
  *     verification and feed the route fully-formed event objects.
  *   • Mock db/queries so we can observe the subscription updates the
  *     handler issues without touching Supabase.
- *   • Use supertest so we exercise the real Express pipeline — that way
+ *   • Use supertest so we exercise the real Express pipeline - that way
  *     the raw-body mounting order in app.js is covered too.
  *
  * What's verified:
@@ -47,7 +47,7 @@ jest.mock('../services/stripe', () => {
   // calls. Only the pieces the route actually invokes need mocking.
   //
   // planFromPriceId is async in production (it reaches into Stripe's
-  // lookup_key cache) and returns { plan, currency } — kept consistent
+  // lookup_key cache) and returns { plan, currency } - kept consistent
   // here so the handler's awaited destructure works identically in tests.
   return {
     constructWebhookEvent: jest.fn(),
@@ -104,7 +104,7 @@ afterEach(() => {
 
 // ── Signature verification ─────────────────────────────────────────
 
-describe('POST /api/webhooks/stripe — signature verification', () => {
+describe('POST /api/webhooks/stripe - signature verification', () => {
   test('400 when Stripe-Signature header is missing', async () => {
     const res = await request(app)
       .post('/api/webhooks/stripe')
@@ -131,7 +131,7 @@ describe('POST /api/webhooks/stripe — signature verification', () => {
 
 // ── Idempotency / duplicate delivery ───────────────────────────────
 
-describe('POST /api/webhooks/stripe — idempotency', () => {
+describe('POST /api/webhooks/stripe - idempotency', () => {
   test('first delivery processes; second delivery of same event_id is a no-op', async () => {
     // First call: recordStripeEventIfNew returns true (new event).
     // Second call: returns false (already processed).
@@ -159,7 +159,7 @@ describe('POST /api/webhooks/stripe — idempotency', () => {
     const second = await postWebhook(event);
     expect(second.status).toBe(200);
     expect(second.body).toEqual({ received: true, duplicate: true });
-    // Still just the one call from the first delivery — the duplicate
+    // Still just the one call from the first delivery - the duplicate
     // delivery did not re-run the handler.
     expect(db.updateHouseholdSubscription).toHaveBeenCalledTimes(1);
   });
@@ -185,7 +185,7 @@ describe('POST /api/webhooks/stripe — idempotency', () => {
 
 // ── checkout.session.completed ─────────────────────────────────────
 
-describe('POST /api/webhooks/stripe — checkout.session.completed', () => {
+describe('POST /api/webhooks/stripe - checkout.session.completed', () => {
   test('sets status=active and stores customer/subscription + plan + period end', async () => {
     const retrieve = jest.fn().mockResolvedValue({
       id: 'sub_1',
@@ -258,7 +258,7 @@ describe('POST /api/webhooks/stripe — checkout.session.completed', () => {
 
 // ── invoice.paid ───────────────────────────────────────────────────
 
-describe('POST /api/webhooks/stripe — invoice.paid', () => {
+describe('POST /api/webhooks/stripe - invoice.paid', () => {
   test('rolls subscription_current_period_end forward and sets status=active', async () => {
     db.findHouseholdByStripeCustomerId.mockResolvedValue({ id: HOUSEHOLD_ID });
     const res = await postWebhook({
@@ -276,7 +276,7 @@ describe('POST /api/webhooks/stripe — invoice.paid', () => {
     expect(res.status).toBe(200);
     expect(db.updateHouseholdSubscription).toHaveBeenCalledWith(HOUSEHOLD_ID, {
       subscription_status: 'active',
-      inactive_since: null, // Phase 8 — clear retention clock on renewal
+      inactive_since: null, // Phase 8 - clear retention clock on renewal
       subscription_current_period_end: new Date(1_850_000_000 * 1000).toISOString(),
     });
   });
@@ -298,7 +298,7 @@ describe('POST /api/webhooks/stripe — invoice.paid', () => {
 
 // ── invoice.payment_failed ─────────────────────────────────────────
 
-describe('POST /api/webhooks/stripe — invoice.payment_failed', () => {
+describe('POST /api/webhooks/stripe - invoice.payment_failed', () => {
   test('logs but does NOT mutate subscription state (Stripe dunning handles retries)', async () => {
     const res = await postWebhook({
       id: 'evt_if_1',
@@ -321,7 +321,7 @@ describe('POST /api/webhooks/stripe — invoice.payment_failed', () => {
 
 // ── customer.subscription.updated ──────────────────────────────────
 
-describe('POST /api/webhooks/stripe — customer.subscription.updated', () => {
+describe('POST /api/webhooks/stripe - customer.subscription.updated', () => {
   test('syncs plan + period end + status when Stripe reports active', async () => {
     db.findHouseholdByStripeSubscriptionId.mockResolvedValue({ id: HOUSEHOLD_ID });
     const res = await postWebhook({
@@ -373,7 +373,7 @@ describe('POST /api/webhooks/stripe — customer.subscription.updated', () => {
 
 // ── customer.subscription.deleted ──────────────────────────────────
 
-describe('POST /api/webhooks/stripe — customer.subscription.deleted', () => {
+describe('POST /api/webhooks/stripe - customer.subscription.deleted', () => {
   test('sets subscription_status=cancelled and starts the retention clock', async () => {
     const endUnix = 1_750_000_000;
     const res = await postWebhook({
@@ -420,7 +420,7 @@ describe('POST /api/webhooks/stripe — customer.subscription.deleted', () => {
 
 // ── Unhandled event types ──────────────────────────────────────────
 
-describe('POST /api/webhooks/stripe — unhandled event types', () => {
+describe('POST /api/webhooks/stripe - unhandled event types', () => {
   test('acks with 200 and leaves state untouched', async () => {
     const res = await postWebhook({
       id: 'evt_unhandled',

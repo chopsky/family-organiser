@@ -13,7 +13,7 @@ import SubscribePrompt from '../components/SubscribePrompt';
 // ── Constants ─────────────────────────────────────────────────────
 
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack'];
-// Meal plan shows only the daily meal slots — desserts stay in the Recipes library
+// Meal plan shows only the daily meal slots - desserts stay in the Recipes library
 const PLAN_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const CATEGORY_COLOURS_MAP = {
   breakfast: { bg: 'bg-[#F5CBA7]', text: 'text-[#8B5E2B]', light: 'bg-[#F5CBA7]/20', border: 'border-[#F5CBA7]' },
@@ -253,7 +253,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
   // Shopping list summary modal
   const [shoppingListSummary, setShoppingListSummary] = useState(null); // { added, skipped, summary }
 
-  // Suggest meals (AI) — shows a modal with suggestions for empty dinner slots
+  // Suggest meals (AI) - shows a modal with suggestions for empty dinner slots
   const [suggestResults, setSuggestResults] = useState(null); // { suggestions: [...], emptySlots: [...] }
 
   async function suggestMeals() {
@@ -363,7 +363,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
 
   return (
     <>
-      {/* Week navigation — hidden on print (the print-only heading below
+      {/* Week navigation - hidden on print (the print-only heading below
           replaces it with a clean "Weekly Meal Plan · Week of X" title). */}
       <div className="flex items-center justify-between bg-linen rounded-2xl  border border-cream-border px-4 py-3 no-print">
         <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-oat text-cocoa transition-colors">
@@ -384,11 +384,11 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
         </button>
       </div>
 
-      {/* Print styles — scoped to @media print so they don't touch the
+      {/* Print styles - scoped to @media print so they don't touch the
           normal UI. visibility-based hiding keeps layout stable and
           avoids cascading `display:none` up through Layout/Main parents.
           @page sets landscape as the browser's default orientation for
-          this print — user can still change it in the dialog if they
+          this print - user can still change it in the dialog if they
           really want portrait. */}
       <style>{`
         @media print {
@@ -421,7 +421,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
         // div moved them a level deeper, so the spacing has to be
         // reapplied here.
         <div className="meal-plan-printable space-y-5">
-          {/* Print-only heading — replaces the on-screen nav at print time
+          {/* Print-only heading - replaces the on-screen nav at print time
               so the printed sheet shows which week it covers. Logo at the
               top for a branded print-out. */}
           <div className="print-only text-center" style={{ marginBottom: '24px' }}>
@@ -496,7 +496,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                           </button>
                         );
                       }
-                      // Empty slot — tap to open the picker for this cell.
+                      // Empty slot - tap to open the picker for this cell.
                       return (
                         <button
                           key={category}
@@ -516,7 +516,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
             })}
           </div>
 
-          {/* Weekly grid — desktop only on screen, always visible in print */}
+          {/* Weekly grid - desktop only on screen, always visible in print */}
           <div className="hidden md:block print:block bg-linen rounded-2xl  border border-cream-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] border-collapse">
@@ -582,7 +582,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
             </div>
           </div>
 
-          {/* Action buttons — left group stays on the left, Print sits
+          {/* Action buttons - left group stays on the left, Print sits
               to the right via justify-between. Wraps cleanly on narrow
               screens (Print drops onto its own line). All hidden from
               the printed sheet via no-print. */}
@@ -899,7 +899,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
 
   const colors = getCatColours(cell.category);
 
-  // Load all recipes (not filtered by slot category — any recipe can go in any slot)
+  // Load all recipes (not filtered by slot category - any recipe can go in any slot)
   useEffect(() => {
     async function load() {
       setLoadingRecipes(true);
@@ -1385,7 +1385,7 @@ function RecipeBoxView({ setError }) {
         </>
       )}
 
-      {/* Add recipe FAB — sits just above the AI chat FAB. Shape and
+      {/* Add recipe FAB - sits just above the AI chat FAB. Shape and
           colour match the chat button (same 56px circle, same shadow,
           same hover-scale animation) but inverts the palette so the two
           buttons read as a pair without competing for attention: chat

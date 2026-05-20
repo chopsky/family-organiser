@@ -17,7 +17,7 @@ function isNative() {
 export async function setupNativeShell() {
   if (!isNative()) return;
 
-  // Status bar — Capacitor's Style naming is the opposite of intuition:
+  // Status bar - Capacitor's Style naming is the opposite of intuition:
   //   Style.Light = "light theme" = DARK text/icons (for light backgrounds)
   //   Style.Dark  = "dark theme"  = LIGHT/WHITE text/icons (for dark backgrounds)
   // We want black system text against our cream #FBF8F3 background,
@@ -33,20 +33,20 @@ export async function setupNativeShell() {
     console.warn('[native-shell] status bar setup failed:', err?.message || err);
   }
 
-  // Splash screen — hide as soon as JS is alive. Capacitor by default
+  // Splash screen - hide as soon as JS is alive. Capacitor by default
   // waits 2-3s before fading; we'd rather the UI appear the moment
   // it's mounted. Auto-hide is configured in capacitor.config too;
   // this is the belt-and-braces explicit call.
   try {
     const { SplashScreen } = await import('@capacitor/splash-screen');
-    // Small delay so the React tree has a frame to mount — otherwise
+    // Small delay so the React tree has a frame to mount - otherwise
     // we briefly flash white between splash and first render.
     setTimeout(() => SplashScreen.hide().catch(() => {}), 80);
   } catch (err) {
     console.warn('[native-shell] splash hide failed:', err?.message || err);
   }
 
-  // Keyboard — resize the WebView instead of overlaying, so bottom-
+  // Keyboard - resize the WebView instead of overlaying, so bottom-
   // anchored inputs stay visible when the keyboard appears. Also
   // smooths the animation; default 'native' style is fine, just
   // tuning resize mode.
@@ -60,7 +60,7 @@ export async function setupNativeShell() {
 
   // Home-screen quick actions (long-press the app icon for "Add
   // Task" / "Add to Shopping" / "View Calendar" / "Open Shopping
-  // List" shortcuts). Registered once per launch — idempotent.
+  // List" shortcuts). Registered once per launch - idempotent.
   try {
     const { registerShortcuts } = await import('./app-shortcuts.js');
     await registerShortcuts();

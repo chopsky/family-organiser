@@ -20,8 +20,8 @@ const BRAND = {
   inkLight:   '#9CA3AF', // tertiary text (footer, expiry notes)
   cream:      '#FBF8F3', // page and footer background
   sand:       '#E8E5EC', // hairline separators
-  overdueBg:  '#FEE2E2', overdueFg: '#DC2626', // semantic red — kept
-  dueTodayBg: '#FEF3C7', dueTodayFg: '#D97706', // semantic amber — kept
+  overdueBg:  '#FEE2E2', overdueFg: '#DC2626', // semantic red - kept
+  dueTodayBg: '#FEF3C7', dueTodayFg: '#D97706', // semantic amber - kept
 };
 
 function emailTemplate(title, body) {
@@ -47,7 +47,7 @@ function emailTemplate(title, body) {
       ${body}
     </div>
     <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;border-radius:0 0 16px 16px;">
-      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait — shopping lists, tasks &amp; reminders, together.</p>
+      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait - shopping lists, tasks &amp; reminders, together.</p>
     </div>
   </div>
 </body>
@@ -60,7 +60,7 @@ function button(text, url) {
 
 async function sendEmail(to, subject, html, options = {}) {
   if (!client) {
-    console.warn('Postmark not configured — skipping email to', to);
+    console.warn('Postmark not configured - skipping email to', to);
     return;
   }
   const payload = { From: FROM, To: to, Subject: subject, HtmlBody: html };
@@ -73,7 +73,7 @@ async function sendVerificationEmail(to, name, token) {
   // Housemait directly (see web/public/.well-known/apple-app-site-association),
   // while web visitors just see the React /verify page. Either way the
   // page POSTs to /api/auth/verify-email-and-login, which verifies the
-  // token + issues a session JWT — the user lands inside the app already
+  // token + issues a session JWT - the user lands inside the app already
   // logged-in. The old API URL (/api/auth/verify-email) is kept around
   // for any in-flight emails sent before this change; new emails point
   // at the frontend route so iOS deep-links work.
@@ -91,14 +91,14 @@ async function sendVerificationEmail(to, name, token) {
  * Confirmation reply for an inbound (forwarded) email after the AI has
  * processed it. Summarises what got done + offers a one-tap UNDO link
  * so users can revert mistakes without contacting support. The link is
- * a single-use token-protected URL — see `inbound_email_log.undo_token`.
+ * a single-use token-protected URL - see `inbound_email_log.undo_token`.
  *
  * The `summary` arg is the human-readable body, e.g.:
  *   "Ticked 3 items off your shopping list (milk, bread, eggs)
  *    and added 2 to Previously purchased."
  *
  * Plain-text only because we send to whatever the forwarder's address
- * is — they may be on a strict client (Outlook on iOS, etc.) that
+ * is - they may be on a strict client (Outlook on iOS, etc.) that
  * mangles HTML, and the link survives plain text fine.
  */
 async function sendInboundEmailConfirmation(to, summary, undoUrl, originalSubject) {
@@ -107,7 +107,7 @@ async function sendInboundEmailConfirmation(to, summary, undoUrl, originalSubjec
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;white-space:pre-line;">${summary}</p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:14px;">If anything looks wrong, tap below to revert everything:</p>
     <div style="text-align:center;">${button('Undo everything', undoUrl)}</div>
-    <p style="color:${BRAND.inkLight};font-size:13px;">The undo link works once — after you tap it, your data is restored to before this email was processed.</p>
+    <p style="color:${BRAND.inkLight};font-size:13px;">The undo link works once - after you tap it, your data is restored to before this email was processed.</p>
   `);
   await sendEmail(to, 'Housemait: processed your forwarded email', html);
 }
@@ -135,20 +135,20 @@ async function sendPasswordResetEmail(to, name, token) {
 }
 
 /**
- * Send an internal admin/operator alert email — for things like "Gemini
+ * Send an internal admin/operator alert email - for things like "Gemini
  * stopped being called", "scheduler lock failed", etc. Plain styling, goes
  * to ADMIN_ALERT_EMAIL (env var) or falls back to SUPPORT_EMAIL. If neither
  * is set or Postmark isn't configured, sendEmail logs and no-ops; the alert
  * job should treat that as best-effort.
  *
- * @param {string} subject — short imperative subject line
- * @param {string} body    — plain text or simple HTML; rendered inline in
+ * @param {string} subject - short imperative subject line
+ * @param {string} body    - plain text or simple HTML; rendered inline in
  *                            the email shell. No outbound CTAs.
  */
 async function sendAdminAlert(subject, body) {
   const to = process.env.ADMIN_ALERT_EMAIL || process.env.SUPPORT_EMAIL;
   if (!to) {
-    console.warn('[admin-alert] No ADMIN_ALERT_EMAIL or SUPPORT_EMAIL configured — skipping:', subject);
+    console.warn('[admin-alert] No ADMIN_ALERT_EMAIL or SUPPORT_EMAIL configured - skipping:', subject);
     return;
   }
   const html = emailTemplate(subject, `
@@ -184,7 +184,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
   const outstandingRows = outstandingTasks.slice(0, 10).map((t) => {
     const who = t.assigned_to_name || 'Everyone';
     const daysOverdue = Math.max(0, Math.floor((new Date(today) - new Date(t.due_date)) / 86400000));
-    // Overdue = red, due today = amber — semantic colours, deliberately not
+    // Overdue = red, due today = amber - semantic colours, deliberately not
     // brand plum. Users should recognise urgency regardless of brand.
     const badge = daysOverdue > 0
       ? `<span style="background:${BRAND.overdueBg};color:${BRAND.overdueFg};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">${daysOverdue}d overdue</span>`
@@ -232,7 +232,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
         </div>
         <div style="background:${BRAND.plumLight};border-radius:12px;padding:16px;">
           <p style="color:${BRAND.plum};font-size:24px;font-weight:700;margin:0 0 4px;">${completedTasks.length} task${completedTasks.length !== 1 ? 's' : ''} + ${completedShopping.length} shopping item${completedShopping.length !== 1 ? 's' : ''}</p>
-          ${completedRows ? `<table style="margin-top:8px;font-size:13px;">${completedRows}</table>` : `<p style="color:${BRAND.inkMuted};font-size:13px;margin:4px 0 0;">Nothing completed yet — next week is a fresh start!</p>`}
+          ${completedRows ? `<table style="margin-top:8px;font-size:13px;">${completedRows}</table>` : `<p style="color:${BRAND.inkMuted};font-size:13px;margin:4px 0 0;">Nothing completed yet - next week is a fresh start!</p>`}
         </div>
       </div>
 
@@ -257,7 +257,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
         </div>
         ${upcomingTasks.length
           ? `<table style="width:100%;font-size:14px;">${upcomingRows}</table>${upcomingTasks.length > 8 ? `<p style="color:${BRAND.inkLight};font-size:13px;margin:8px 0 0;">… and ${upcomingTasks.length - 8} more</p>` : ''}`
-          : `<div style="background:${BRAND.cream};border-radius:12px;padding:16px;text-align:center;"><p style="color:${BRAND.inkMuted};font-size:14px;margin:0;">Nothing scheduled — enjoy the week! ☀️</p></div>`
+          : `<div style="background:${BRAND.cream};border-radius:12px;padding:16px;text-align:center;"><p style="color:${BRAND.inkMuted};font-size:14px;margin:0;">Nothing scheduled - enjoy the week! ☀️</p></div>`
         }
       </div>
 
@@ -269,19 +269,19 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 
     <!-- Footer -->
     <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;border-radius:0 0 16px 16px;">
-      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait — shopping lists, tasks &amp; reminders, together.</p>
+      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait - shopping lists, tasks &amp; reminders, together.</p>
     </div>
   </div>
 </body>
 </html>`;
 
-  await sendEmail(to, `Weekly Digest — ${householdName}`, html);
+  await sendEmail(to, `Weekly Digest - ${householdName}`, html);
 }
 
 // ─── Subscription lifecycle emails (Phase 7) ────────────────────────────────
 // These use Postmark's Template feature (not the inline emailTemplate above)
 // so copy can be edited in the Postmark dashboard without a code deploy.
-// Template aliases are hardcoded below — they must match the aliases you
+// Template aliases are hardcoded below - they must match the aliases you
 // create in the Postmark dashboard for the templates to resolve.
 
 const { unsubscribeUrl } = require('./unsubscribe-token');
@@ -294,7 +294,7 @@ const TEMPLATE_ALIASES = {
   trialExpired:   'housemait-trial-expired',
 };
 
-// Message streams — Postmark splits transactional (user-initiated,
+// Message streams - Postmark splits transactional (user-initiated,
 // always-delivered) from broadcast (marketing-ish, must honour opt-out
 // and carry List-Unsubscribe headers). The `broadcast` stream ID must
 // match what you created in the Postmark dashboard.
@@ -329,7 +329,7 @@ function formatTrialEndDate(when) {
  */
 async function sendTemplate({ to, templateAlias, model, stream, listUnsubscribeHeaders }) {
   if (!client) {
-    console.warn(`[email] Postmark not configured — skipping "${templateAlias}" to ${to}`);
+    console.warn(`[email] Postmark not configured - skipping "${templateAlias}" to ${to}`);
     return;
   }
   const payload = {
@@ -346,7 +346,7 @@ async function sendTemplate({ to, templateAlias, model, stream, listUnsubscribeH
     await client.sendEmailWithTemplate(payload);
   } catch (err) {
     // Postmark errors carry a numeric `code` on the exception.
-    // 1101 = template not found (alias mismatch) — log extra-loudly so a
+    // 1101 = template not found (alias mismatch) - log extra-loudly so a
     // dashboard typo surfaces before the cron silently drops every send.
     if (err.code === 1101) {
       console.error(
@@ -390,15 +390,15 @@ function usageToTemplateModel(usage) {
   };
 }
 
-// ── Day 1 — Welcome ────────────────────────────────────────────────
+// ── Day 1 - Welcome ────────────────────────────────────────────────
 // Transactional. Always sends on household creation (ignores the
-// trial_emails_enabled flag — the spec carves out welcome + expiry as
+// trial_emails_enabled flag - the spec carves out welcome + expiry as
 // transactional).
 async function sendWelcomeEmail({ to, firstName, trialEndsAt }) {
-  // The welcome email is transactional — the template doesn't render
+  // The welcome email is transactional - the template doesn't render
   // an unsubscribe link, so we don't compute one. Earlier revisions
   // computed unsubscribeUrl() "for consistency" which created an
-  // accidental hard dependency on UNSUBSCRIBE_TOKEN_SECRET — a missing
+  // accidental hard dependency on UNSUBSCRIBE_TOKEN_SECRET - a missing
   // env var there would take out the welcome email even though it
   // never displays the link. Keep the model lean.
   return sendTemplate({
@@ -413,7 +413,7 @@ async function sendWelcomeEmail({ to, firstName, trialEndsAt }) {
   });
 }
 
-// ── Day 20 — Gentle reminder ───────────────────────────────────────
+// ── Day 20 - Gentle reminder ───────────────────────────────────────
 // Broadcast. Skipped if trial_emails_enabled=false. Carries usage stats
 // so the message is "here's what you've built up" not "you're about to
 // lose access".
@@ -435,7 +435,7 @@ async function sendTrialDay20Email({ to, firstName, trialEndsAt, householdId, us
   });
 }
 
-// ── Day 25 — Stronger nudge ────────────────────────────────────────
+// ── Day 25 - Stronger nudge ────────────────────────────────────────
 async function sendTrialDay25Email({ to, firstName, trialEndsAt, householdId, usage }) {
   return sendTemplate({
     to,
@@ -454,7 +454,7 @@ async function sendTrialDay25Email({ to, firstName, trialEndsAt, householdId, us
   });
 }
 
-// ── Day 28 — Final push ────────────────────────────────────────────
+// ── Day 28 - Final push ────────────────────────────────────────────
 async function sendTrialDay28Email({ to, firstName, trialEndsAt, householdId, usage }) {
   return sendTemplate({
     to,
@@ -473,8 +473,8 @@ async function sendTrialDay28Email({ to, firstName, trialEndsAt, householdId, us
   });
 }
 
-// ── Day 30 — Trial expired ─────────────────────────────────────────
-// Transactional. Always sends — the spec carves this out as "account-
+// ── Day 30 - Trial expired ─────────────────────────────────────────
+// Transactional. Always sends - the spec carves this out as "account-
 // related, not promotional". Users who opted out of nudges still need
 // to know their trial ended.
 async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId: _householdId }) {
@@ -487,7 +487,7 @@ async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId: 
       trial_end_date: formatTrialEndDate(trialEndsAt),
       app_url: BASE_URL,
       subscribe_url: `${BASE_URL}/subscribe`,
-      // Unsubscribe link deliberately omitted — this email is transactional.
+      // Unsubscribe link deliberately omitted - this email is transactional.
     },
   });
 }
@@ -499,7 +499,7 @@ module.exports = {
   sendPasswordResetEmail,
   sendWeeklyDigestEmail,
   sendAdminAlert,
-  // Phase 7 — subscription lifecycle
+  // Phase 7 - subscription lifecycle
   sendWelcomeEmail,
   sendTrialDay20Email,
   sendTrialDay25Email,

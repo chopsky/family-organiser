@@ -4,7 +4,7 @@ import { localeHomePath } from '../hooks/useLocale';
 export default function CheckEmail() {
   return (
     <div
-      // Concierge stage — matches Login, Signup, SetupHousehold and the
+      // Concierge stage - matches Login, Signup, SetupHousehold and the
       // Onboarding wizard, so a brand-new user who just signed up and
       // got bounced here sees the same continuous visual language.
       className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
@@ -13,7 +13,7 @@ export default function CheckEmail() {
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
       }}
     >
-      {/* Decorative ambient blobs — identical to Login.jsx. */}
+      {/* Decorative ambient blobs - identical to Login.jsx. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute"
@@ -35,7 +35,7 @@ export default function CheckEmail() {
         }}
       />
 
-      {/* Glass card — Login width (420px) for visual continuity. */}
+      {/* Glass card - Login width (420px) for visual continuity. */}
       <div
         className="relative w-full max-w-[420px]"
         style={{
@@ -48,7 +48,7 @@ export default function CheckEmail() {
           padding: '40px 36px 32px',
         }}
       >
-        {/* Logomark chip — keeps the visitor anchored to the brand
+        {/* Logomark chip - keeps the visitor anchored to the brand
             even on a transactional/transitional page like this. */}
         <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
           <div
@@ -90,7 +90,7 @@ export default function CheckEmail() {
           }}
         >
           We&apos;ve sent you a verification link. Open the email and tap the
-          button — we&apos;ll bring you straight back here to finish setting up.
+          button - we&apos;ll bring you straight back here to finish setting up.
         </p>
 
         <p
@@ -107,7 +107,7 @@ export default function CheckEmail() {
         </p>
 
         {/* Tiny escape hatch for users who've already verified on
-            another device or whose Universal Link didn't fire — they
+            another device or whose Universal Link didn't fire - they
             can still get to login manually. Demoted from a big purple
             CTA because the verify-link flow handles 99% of cases. */}
         <p

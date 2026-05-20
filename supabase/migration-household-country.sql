@@ -20,7 +20,7 @@
 ALTER TABLE households
   ADD COLUMN IF NOT EXISTS country text NOT NULL DEFAULT 'GB';
 
--- Drop the constraint if it exists, then add — makes the migration re-runnable
+-- Drop the constraint if it exists, then add - makes the migration re-runnable
 -- and lets us extend the allow-list (e.g. adding ZA later) by re-running.
 ALTER TABLE households DROP CONSTRAINT IF EXISTS households_country_check;
 ALTER TABLE households

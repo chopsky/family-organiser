@@ -4,7 +4,7 @@
  * The AI in `/import-website` (src/routes/schools.js) drafts a list
  * of dates from a school's website or PDF. Before showing them to the
  * admin, we run this pass to annotate each row with `warnings: string[]`
- * — non-blocking hints that surface as yellow chips in the preview UI.
+ * - non-blocking hints that surface as yellow chips in the preview UI.
  *
  * The biggest single class of AI mistake here is an off-by-one date
  * (a weekday name in the source text doesn't match the date the model
@@ -84,7 +84,7 @@ function checkSaneWindow(row, now) {
   }
   const months = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
   if (months < -18 || months > 18) {
-    row.warnings.push('Date is more than 18 months from today — double-check it');
+    row.warnings.push('Date is more than 18 months from today - double-check it');
   }
 }
 
@@ -94,7 +94,7 @@ function checkSourceQuotePresent(row, sourceText) {
   const needle = normaliseWhitespace(row.source_quote);
   if (needle.length < 5) return;
   if (!haystack.includes(needle)) {
-    row.warnings.push('Quote not found in source — possible hallucination');
+    row.warnings.push('Quote not found in source - possible hallucination');
   }
 }
 

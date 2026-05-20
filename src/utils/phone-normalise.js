@@ -8,21 +8,21 @@
  *   • US    "(555) 123-4567"    (national, no leading 0)
  *   • Any   "+27 83 358 6883"   (already E.164, formatted)
  *
- * Twilio only accepts E.164 — anything else gets rejected with code
+ * Twilio only accepts E.164 - anything else gets rejected with code
  * 21211. Previously this route just did `phone.startsWith('+') ?? '+' +
  * phone`, which turned "0833586883" into "+0833586883" and Twilio
  * (rightly) refused it.
  *
  * Rules, in order:
  *   1. Strip everything except digits and a single leading '+'.
- *   2. If starts with '+', it's already E.164 — return as-is (cleaned).
+ *   2. If starts with '+', it's already E.164 - return as-is (cleaned).
  *   3. If starts with '00', that's the international dial-out prefix
- *      used in much of the world — replace with '+'.
- *   4. If starts with '0', it's a national-format trunk prefix —
+ *      used in much of the world - replace with '+'.
+ *   4. If starts with '0', it's a national-format trunk prefix -
  *      strip the 0 and prepend the household's country dial code.
  *   5. If starts with the household's dial code already (no +), just
  *      prepend '+'. Catches users who typed "27833586883" without +.
- *   6. Otherwise prepend '+' + dial code. Last resort — treat as
+ *   6. Otherwise prepend '+' + dial code. Last resort - treat as
  *      a local number with no trunk prefix.
  *
  * Returns the normalised string. Caller is responsible for validating

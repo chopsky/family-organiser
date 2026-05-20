@@ -8,11 +8,11 @@ import DailyChart from '../../components/DailyChart';
 import { formatBytes } from '../../lib/formatBytes';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
-const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB — mirrors src/routes/documents.js
+const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB - mirrors src/routes/documents.js
 const FILE_QUOTA_COUNT = 500;
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   return new Date(value).toLocaleString();
 }
 
@@ -75,7 +75,7 @@ export default function AdminHouseholdDetail() {
 
   async function handleExtendTrial() {
     if (!household) return;
-    // Extend from whichever is later — current trial end or now
+    // Extend from whichever is later - current trial end or now
     const base = household.trial_ends_at && new Date(household.trial_ends_at) > new Date()
       ? new Date(household.trial_ends_at)
       : new Date();
@@ -101,7 +101,7 @@ export default function AdminHouseholdDetail() {
           <Detail label="Join Code" value={household.join_code} mono />
           <Detail label="Members" value={household.members?.length ?? 0} />
           <Detail label="Timezone" value={household.timezone} />
-          <Detail label="Created" value={household.created_at ? new Date(household.created_at).toLocaleDateString() : '—'} />
+          <Detail label="Created" value={household.created_at ? new Date(household.created_at).toLocaleDateString() : '-'} />
         </div>
       </div>
 
@@ -122,12 +122,12 @@ export default function AdminHouseholdDetail() {
             <Detail label="Period Ends" value={formatDate(household.subscription_current_period_end)} />
             <Detail
               label="Stripe Customer"
-              value={household.stripe_customer_id ? `${household.stripe_customer_id.slice(0, 18)}…` : '—'}
+              value={household.stripe_customer_id ? `${household.stripe_customer_id.slice(0, 18)}…` : '-'}
               mono
             />
             <Detail
               label="Stripe Subscription"
-              value={household.stripe_subscription_id ? `${household.stripe_subscription_id.slice(0, 18)}…` : '—'}
+              value={household.stripe_subscription_id ? `${household.stripe_subscription_id.slice(0, 18)}…` : '-'}
               mono
             />
             <Detail label="Internal" value={household.is_internal ? 'Yes' : 'No'} />
@@ -235,7 +235,7 @@ function Detail({ label, value, mono }) {
   return (
     <div>
       <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider">{label}</p>
-      <p className={`text-sm text-charcoal mt-0.5 ${mono ? 'font-mono' : ''}`}>{value || '—'}</p>
+      <p className={`text-sm text-charcoal mt-0.5 ${mono ? 'font-mono' : ''}`}>{value || '-'}</p>
     </div>
   );
 }

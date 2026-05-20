@@ -9,7 +9,7 @@
  * The hardcoded seed in migration-sa-national-term-dates.sql covers 2026.
  * Adding 2027 dates: append the rows to that migration (or a new
  * migration) and re-run. The yearly scraper that auto-updates this from
- * gov.za is a 1.2.1+ follow-up — for now it's manual.
+ * gov.za is a 1.2.1+ follow-up - for now it's manual.
  */
 
 const { supabaseAdmin } = require('../db/client');
@@ -34,7 +34,7 @@ async function getNationalTermDates(year) {
  * Inserts rows into school_term_dates using the same event-type vocabulary
  * (so they render identically to UK-imported term dates on the calendar).
  * Uses the academic_year string format 'YYYY/YYYY+1' that matches what UK
- * LA imports use. Idempotent — duplicates (same school + date + event)
+ * LA imports use. Idempotent - duplicates (same school + date + event)
  * are silently skipped via the school's own dedup logic.
  *
  * @param {string} schoolId   household_schools.id

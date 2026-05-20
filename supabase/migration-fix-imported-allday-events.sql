@@ -13,7 +13,7 @@
 --     end_time   = 2026-05-02 00:00:00+00   -- exactly 24h later
 --     all_day    = false                    -- never set
 --
---   In BST (UTC+1, March–October), 00:00 UTC renders as 01:00 local — hence
+--   In BST (UTC+1, March–October), 00:00 UTC renders as 01:00 local - hence
 --   the "1 AM" the user reported. The frontend's eventsForDate filter
 --   compares UTC-date strings: an event with end_date_str = day+1 qualifies
 --   for both day and day+1, so each wedding occupies two calendar days.
@@ -22,23 +22,23 @@
 --   surfaced once the clocks sprang forward.
 --
 -- Forward fix:
---   None needed — the two-way sync code was removed before this migration.
+--   None needed - the two-way sync code was removed before this migration.
 --   New all-day events created via the in-app calendar set all_day=true and
 --   stable timestamps (see src/routes/calendar.js POST handler).
 --
 -- ── Run order ──────────────────────────────────────────────────────────
 -- 1. Run section 1 (preview) and confirm the row count + a few sample
 --    titles look right (weddings, etc).
--- 2. Run section 2 (backup) — creates a snapshot table for safety.
--- 3. Run section 3 (fix) — wrapped in a transaction so you can BEGIN; …
+-- 2. Run section 2 (backup) - creates a snapshot table for safety.
+-- 3. Run section 3 (fix) - wrapped in a transaction so you can BEGIN; …
 --    ROLLBACK; on staging if you want a dry run.
--- 4. Run section 4 (verify) — should return 0 rows.
+-- 4. Run section 4 (verify) - should return 0 rows.
 -- 5. Drop the backup table once you've confirmed the fix held (section 5,
 --    commented). Keep it around for at least a few days first.
 
 -- ── 1. Preview ────────────────────────────────────────────────────────
 -- How many rows match the fingerprint, and what do they look like?
--- Read-only — safe to run anytime.
+-- Read-only - safe to run anytime.
 
 SELECT
   id,
@@ -101,7 +101,7 @@ COMMIT;
 
 -- ── 4. Verify ─────────────────────────────────────────────────────────
 -- Should return 0 rows. Any hits indicate the fingerprint missed
--- something — investigate before assuming the fix held.
+-- something - investigate before assuming the fix held.
 
 SELECT
   id,

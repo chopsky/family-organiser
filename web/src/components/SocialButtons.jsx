@@ -15,10 +15,10 @@ const isNativeIos = () => {
 // error shapes. Treat as a silent no-op rather than an error toast.
 //
 // Variants seen in the wild:
-//   - Apple ASAuthorizationError.canceled = code 1001 — surfaces as
+//   - Apple ASAuthorizationError.canceled = code 1001 - surfaces as
 //     "The operation couldn't be completed.
 //      (com.apple.AuthenticationServices.AuthorizationError error 1001.)"
-//   - Google's iOS SDK: GIDSignInErrorCode.canceled = -5 — message
+//   - Google's iOS SDK: GIDSignInErrorCode.canceled = -5 - message
 //     "The user canceled the sign-in flow."
 //   - Capgo plugin's normalised codes: 'CANCELED' / 'CANCELLED'
 //   - Apple's web JS SDK: { error: 'popup_closed_by_user' }
@@ -30,7 +30,7 @@ function isCancelError(err) {
   // Apple wraps the underlying NSError as "(...AuthorizationError error 1001.)"
   const msg = String(err.message ?? '').toLowerCase();
   if (msg.includes('authorizationerror') && msg.includes('1001')) return true;
-  // Google iOS SDK uses 'the user canceled the sign-in flow.' — narrow
+  // Google iOS SDK uses 'the user canceled the sign-in flow.' - narrow
   // match to avoid swallowing real errors that incidentally contain
   // 'cancel' (e.g. 'request was cancelled mid-flight by ...').
   if (/the user canceled/i.test(msg) || /user cancelled/i.test(msg)) return true;
@@ -68,7 +68,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         try {
           const { SocialLogin } = await import('@capgo/capacitor-social-login');
           // Apple side: on iOS native, the SDK authenticates via the
-          // com.apple.developer.applesignin entitlement + bundle ID — no
+          // com.apple.developer.applesignin entitlement + bundle ID - no
           // clientId/redirectUrl are needed (those are web-only Services ID
           // concerns). Initialising with `apple: {}` is the documented way
           // to enable the provider without configuring web fallbacks.
@@ -95,7 +95,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
     document.head.appendChild(script);
   }, []);
 
-  // Click handler — branches on platform:
+  // Click handler - branches on platform:
   //   • iOS native: invoke the Capgo plugin which uses Google's iOS SDK
   //     and ASWebAuthenticationSession to authenticate. Returns an idToken
   //     in the same JWT format the server already verifies.
@@ -109,13 +109,13 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
       try {
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
         // Force the account chooser. Google's iOS SDK caches the last-used
-        // account by default and silently signs you back in — fine for
+        // account by default and silently signs you back in - fine for
         // password-manager-like flows, wrong for an explicit
         // 'Continue with Google' button where the user expects to pick
         // which account. logout() clears the cached credential without
         // affecting the user's logged-in state in our app.
         try { await SocialLogin.logout({ provider: 'google' }); }
-        catch { /* nothing cached — first sign-in, ignore */ }
+        catch { /* nothing cached - first sign-in, ignore */ }
         const result = await SocialLogin.login({ provider: 'google', options: {} });
         // Plugin returns { provider, result: { idToken, ...profile } } on iOS.
         // Defensive: also try a couple of other shapes Capgo has used across
@@ -161,7 +161,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
   async function handleApple() {
     // iOS native: use ASAuthorizationController via the Capgo plugin.
     // The com.apple.developer.applesignin entitlement on this app's bundle
-    // ID handles the credential issuance — no Services ID, no redirect URL.
+    // ID handles the credential issuance - no Services ID, no redirect URL.
     // Plugin returns { provider, result: { identityToken, user, email,
     // givenName, familyName } } on iOS.
     if (isNativeIos()) {
@@ -200,7 +200,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
       return;
     }
 
-    // Web flow — Apple's JS SDK with Services ID.
+    // Web flow - Apple's JS SDK with Services ID.
     if (!APPLE_CLIENT_ID) return;
     try {
       if (!window.AppleID) {
@@ -240,7 +240,7 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
   // key + 4-5 env vars working in concert. iOS native uses
   // ASAuthorizationController via the entitlement and needs none of that.
   // Until the web setup is fully done, only render the button on iOS where
-  // it actually works — showing a broken button on web is worse than
+  // it actually works - showing a broken button on web is worse than
   // showing nothing.
   const showApple = isNativeIos();
 

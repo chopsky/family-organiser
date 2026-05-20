@@ -1,14 +1,14 @@
 /**
- * App-icon badge wrapper — iOS only.
+ * App-icon badge wrapper - iOS only.
  *
  * Sets or clears the red number badge on the Housemait home-screen
  * icon. Use to surface "stuff needing attention" without nagging:
  *
  *   • Overdue tasks count
- *   • Today's upcoming events (optional — usually noisy)
+ *   • Today's upcoming events (optional - usually noisy)
  *
  * Calls are gated by isNative() so the web bundle is unchanged. The
- * native plugin handles permission internally — if the user hasn't
+ * native plugin handles permission internally - if the user hasn't
  * granted notification permission, setting a badge silently does
  * nothing rather than erroring.
  *

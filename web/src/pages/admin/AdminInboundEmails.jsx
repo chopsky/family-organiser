@@ -1,17 +1,17 @@
 /**
- * AdminInboundEmails — observability for forwarded-email processing.
+ * AdminInboundEmails - observability for forwarded-email processing.
  *
  * Lists the most recent ~100 forwarded emails the inbound webhook
  * handled, with status, AI classification, and per-action counts.
- * Without this page we'd be blind to failure modes — the only signal
+ * Without this page we'd be blind to failure modes - the only signal
  * for AI mistakes was a user complaining. Now you can scan a day's
  * worth of forwarded emails and spot patterns (e.g. "all Stripe
  * receipts are mis-extracted as shopping items").
  *
  * Each row is expandable to show:
  *   • the AI's actions_taken JSON (IDs of checked-off / added /
- *     created rows) — useful for understanding what got changed.
- *   • undone_at timestamp — see how often users hit UNDO.
+ *     created rows) - useful for understanding what got changed.
+ *   • undone_at timestamp - see how often users hit UNDO.
  *
  * No edits / actions from this page. It's read-only diagnostics.
  */
@@ -111,7 +111,7 @@ export default function AdminInboundEmails() {
                     <td className="px-4 py-3 text-charcoal text-xs truncate" style={{ maxWidth: 300 }}>{row.subject || '(no subject)'}</td>
                     <td className="px-4 py-3"><StatusPill status={row.status} /></td>
                     <td className="px-4 py-3 text-right text-xs text-warm-grey whitespace-nowrap">
-                      {total === 0 ? '—' : [
+                      {total === 0 ? '-' : [
                         counts.checked && `${counts.checked} ✓`,
                         counts.added && `${counts.added} +`,
                         counts.events && `${counts.events} 📅`,
@@ -119,7 +119,7 @@ export default function AdminInboundEmails() {
                       ].filter(Boolean).join(' · ')}
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      {row.undone_at ? <span className="text-coral font-medium">Undone</span> : '—'}
+                      {row.undone_at ? <span className="text-coral font-medium">Undone</span> : '-'}
                     </td>
                   </tr>
                   {expanded && (

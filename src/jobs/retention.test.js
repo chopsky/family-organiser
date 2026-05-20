@@ -9,7 +9,7 @@
  */
 
 jest.mock('../db/queries');
-// Explicit factory — plain `jest.mock('../db/client')` auto-reads the real
+// Explicit factory - plain `jest.mock('../db/client')` auto-reads the real
 // module first and trips the SUPABASE_* env check.
 jest.mock('../db/client', () => ({
   supabaseAdmin: { from: jest.fn() },
@@ -41,7 +41,7 @@ function makeChain(overrides = {}) {
     or:     jest.fn().mockReturnThis(),
     is:     jest.fn().mockReturnThis(),
     not:    jest.fn().mockReturnThis(),
-    // Terminal thenable — most queries await the chain directly.
+    // Terminal thenable - most queries await the chain directly.
     then: (resolve) => resolve({ data: overrides.data ?? [], error: overrides.error ?? null, count: overrides.count ?? 0 }),
   };
   return chain;
@@ -171,7 +171,7 @@ describe('runHouseholdRetentionCleanup', () => {
 
 describe('runOrphanHouseholdCleanup', () => {
   test('deletes households with zero account-type members, keeps ones with members', async () => {
-    // First call: SELECT from households — returns 2 candidates.
+    // First call: SELECT from households - returns 2 candidates.
     // Subsequent calls: SELECT count from users for each candidate.
     const candidatesChain = makeChain({
       data: [

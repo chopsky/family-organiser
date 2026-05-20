@@ -1,9 +1,9 @@
 /**
- * Platform-detection helpers — Phase 8.5 / iOS App Store submission.
+ * Platform-detection helpers - Phase 8.5 / iOS App Store submission.
  *
  * Centralising these so there's one place to flip if the Capacitor
  * isNativePlatform() contract ever changes. Used to gate iOS-only UI
- * behaviour around subscription billing — Apple Review Guideline 3.1.1
+ * behaviour around subscription billing - Apple Review Guideline 3.1.1
  * prohibits selling digital subscriptions inside the app without using
  * Apple's IAP, and Apple's Anti-Steering rule prohibits linking to an
  * external payment page from inside the app.
@@ -26,9 +26,9 @@ export function isIos() {
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
   } catch {
-    // Defensive — Capacitor should always be available, but if this
+    // Defensive - Capacitor should always be available, but if this
     // helper is used during SSR or in a test that doesn't shim it,
-    // treat as "not iOS" (safer default — shows full subscribe flow).
+    // treat as "not iOS" (safer default - shows full subscribe flow).
     return false;
   }
 }

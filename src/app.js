@@ -29,12 +29,12 @@ app.options(/.*/, cors(corsOptions)); // explicitly handle preflight for all rou
 // Security headers (after CORS so helmet doesn't block preflight)
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
-// ── Stripe webhook — MUST be mounted before express.json() ──────────
+// ── Stripe webhook - MUST be mounted before express.json() ──────────
 // Stripe signs the exact request body, so we can't let the global JSON
 // parser touch it first (re-serialising changes the bytes → signature
 // mismatch). The webhook router attaches its own express.raw() parser
 // scoped just to its own routes. Mounting this early also places it
-// BEFORE the /api rate limiter added below, which is correct — Stripe
+// BEFORE the /api rate limiter added below, which is correct - Stripe
 // can burst retries and must never be throttled.
 //
 // Mounted at /api/webhooks/stripe (not /api/webhooks) so the raw-body
@@ -43,7 +43,7 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 // would break if the raw parser intercepted them.
 app.use('/api/webhooks/stripe', require('./routes/stripe-webhook'));
 
-// Body parsing — 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
+// Body parsing - 10 MB to accommodate receipt images if sent as base64 (normally multer handles binary)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false })); // Twilio sends webhooks as URL-encoded form data
 
@@ -58,7 +58,7 @@ if (process.env.NODE_ENV !== 'test') {
   });
   app.use('/api', limiter);
 
-  // Stricter limiter for SENSITIVE auth endpoints — register, login, the
+  // Stricter limiter for SENSITIVE auth endpoints - register, login, the
   // password-reset trio, and resend-verification. These are the real
   // brute-force / credential-stuffing surfaces, and Turnstile already
   // gates most of them; this is a backstop for distributed attempts that
@@ -66,14 +66,14 @@ if (process.env.NODE_ENV !== 'test') {
   //
   // We deliberately do NOT cover /api/auth as a whole. Silent endpoints
   // (refresh, me, sessions, logout, mark-onboarded) get called passively
-  // — every tab-focus fires /refresh, every page load fires /me — so a
+  // - every tab-focus fires /refresh, every page load fires /me - so a
   // single user across a long browsing session can rack up dozens of
   // /api/auth calls without ever doing anything attack-worthy. Mixing
   // those in with the strict budget caused legitimate users to see
   // "Too many join attempts" mid-session. The global 300/min limiter
   // above still covers them as a sanity backstop.
   //
-  // 50/hour/IP — generous enough that families on shared WiFi don't
+  // 50/hour/IP - generous enough that families on shared WiFi don't
   // collide, password-managers retrying don't trip, dev/QA testing has
   // headroom; tight enough that no realistic brute-force fits.
   const sensitiveAuthLimiter = rateLimit({
@@ -103,33 +103,33 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Inbound webhooks (no auth — must be before authenticated routes)
+// Inbound webhooks (no auth - must be before authenticated routes)
 app.use('/api/inbound-email', require('./routes/inbound-email'));
 
-// RevenueCat webhook (Bearer-token auth, JSON body — safe to mount after
+// RevenueCat webhook (Bearer-token auth, JSON body - safe to mount after
 // the global JSON parser because RevenueCat doesn't sign body bytes).
 // Must be reachable without an authenticated user session, so mount
 // before the subscriptionStatus gate (handled by routing, not middleware
-// here — webhooks live under /api/webhooks which is gate-excluded).
+// here - webhooks live under /api/webhooks which is gate-excluded).
 app.use('/api/webhooks/revenuecat', require('./routes/revenuecat-webhook'));
 
-// Subscription endpoints — mounted BEFORE the gate so that expired users
+// Subscription endpoints - mounted BEFORE the gate so that expired users
 // can still reach /status (to drive the frontend's subscribe modal) and,
 // in later phases, /checkout and /portal. Defence-in-depth: the gate's
 // own path exclusion list also covers /subscription.
 app.use('/api/subscription', require('./routes/subscription'));
 
-// Unsubscribe endpoint — no bearer auth (the URL's signed JWT is the
+// Unsubscribe endpoint - no bearer auth (the URL's signed JWT is the
 // credential). Mounted BEFORE the gate so expired users whose inbox
 // still has a trial nudge email can click the link and reach it.
 app.use('/api/unsubscribe', require('./routes/unsubscribe'));
 
-// Contact form endpoint — public, no auth required.
+// Contact form endpoint - public, no auth required.
 app.use('/api/contact', require('./routes/contact'));
 
 // Trial / subscription gate. Returns 402 for households whose trial has
 // expired or whose subscription has lapsed. Excludes /auth, /subscription,
-// /admin, /inbound-email, /webhooks via an internal allowlist — see
+// /admin, /inbound-email, /webhooks via an internal allowlist - see
 // middleware/subscriptionStatus.js for the full decision table.
 const { requireActiveSubscription } = require('./middleware/subscriptionStatus');
 app.use('/api', requireActiveSubscription);

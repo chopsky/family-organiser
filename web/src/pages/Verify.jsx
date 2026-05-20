@@ -1,5 +1,5 @@
 /**
- * /verify — landing page for the email-verification link.
+ * /verify - landing page for the email-verification link.
  *
  * The verification email points at https://housemait.com/verify?token=…
  * which is registered as a Universal Link in apple-app-site-association,
@@ -8,7 +8,7 @@
  * flips email_verified + issues a session JWT, then we drop the user
  * into the right next step (household setup or the onboarding wizard).
  *
- * No "click here to continue" button — this is purely a handoff page;
+ * No "click here to continue" button - this is purely a handoff page;
  * the user has already expressed intent by clicking the email link.
  */
 
@@ -25,7 +25,7 @@ export default function Verify() {
   const { login } = useAuth();
   const [error, setError] = useState('');
   // React 18 StrictMode mounts effects twice in dev. The verify endpoint
-  // is single-use — second call returns "Invalid link" and the user
+  // is single-use - second call returns "Invalid link" and the user
   // sees an error even though the first call succeeded. Guard with a ref.
   const firedRef = useRef(false);
 
@@ -159,7 +159,7 @@ export default function Verify() {
           </>
         ) : (
           <p className="text-center" style={{ marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#4A4453', lineHeight: 1.5 }}>
-            One moment — signing you in.
+            One moment - signing you in.
           </p>
         )}
       </div>

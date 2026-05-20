@@ -1,21 +1,21 @@
 -- South African national school term dates.
 --
--- From 2026 onwards SA uses a unified national calendar — every public
+-- From 2026 onwards SA uses a unified national calendar - every public
 -- school across all 9 provinces runs on the same term dates (replacing the
 -- previous Coastal vs Inland split). This table is the single source of
 -- truth for those national dates; ZA users can import them onto their
 -- household_schools rows with one tap.
 --
 -- Schema:
---   year         — calendar year, e.g. 2026
---   event_type   — same vocabulary as school_term_dates.event_type so
+--   year         - calendar year, e.g. 2026
+--   event_type   - same vocabulary as school_term_dates.event_type so
 --                  imports map 1:1: term_start, term_end, half_term_start,
 --                  half_term_end. inset_day and bank_holiday are not used
 --                  here (bank holidays seed separately via Nager.Date).
---   date         — date of the event
---   end_date     — for half-term breaks that span multiple days
---   label        — human-readable, e.g. 'Term 1 starts'
---   source       — 'manual' (hardcoded seed) or 'scraped' (future cron job).
+--   date         - date of the event
+--   end_date     - for half-term breaks that span multiple days
+--   label        - human-readable, e.g. 'Term 1 starts'
+--   source       - 'manual' (hardcoded seed) or 'scraped' (future cron job).
 --                  Manual seeds are authoritative until a scraper lands
 --                  (see TODO at the bottom).
 --
@@ -74,7 +74,7 @@ ON CONFLICT (year, event_type, date) DO NOTHING;
 
 COMMENT ON TABLE sa_national_term_dates IS
   'South African national school term dates. From 2026 onwards SA uses a '
-  'unified national calendar — these rows are the canonical source for '
+  'unified national calendar - these rows are the canonical source for '
   'every ZA household, copied onto household_schools.school_term_dates on '
   'import. 1.2.0 ships with hardcoded 2026 dates; a yearly scraper against '
   'gov.za/about-sa/school-calendar is a 1.2.1+ follow-up.';

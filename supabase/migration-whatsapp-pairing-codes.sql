@@ -10,7 +10,7 @@
 --   2. User opens WhatsApp and messages the bot with that code
 --   3. Inbound webhook consumes the code, links the phone to the user
 --
--- The existing whatsapp_verification_codes table is reused — but `phone`
+-- The existing whatsapp_verification_codes table is reused - but `phone`
 -- is no longer known up-front (we learn it from the inbound webhook),
 -- so it has to be nullable. This migration just relaxes the NOT NULL.
 --

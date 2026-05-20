@@ -16,7 +16,7 @@ export default function Privacy() {
   return (
     <div className="landing-page min-h-screen bg-cream font-sans antialiased text-charcoal">
       {/* ═══ Top bar ═══ */}
-      {/* paddingTop pushes the nav content below the iOS status bar — without
+      {/* paddingTop pushes the nav content below the iOS status bar - without
           this, the logo and Back link sit under the status bar on iPhone.
           Apple reviewers tap the Privacy link from the IAP paywall and would
           hit this same issue. */}
@@ -61,7 +61,7 @@ export default function Privacy() {
             <strong className="font-semibold">In short:</strong> Housemait helps households coordinate shopping,
             tasks, meals, calendars, and documents. We only collect the data we need to run the Service.
             We never sell your data or share it for advertising. We use reputable third-party services to
-            deliver the Service — they process data strictly on our behalf.
+            deliver the Service - they process data strictly on our behalf.
           </div>
 
           <Section title="1. Who we are">
@@ -81,7 +81,7 @@ export default function Privacy() {
             <SubHeading>2.1 Account &amp; profile data</SubHeading>
             <ul className="list-disc pl-6 space-y-1.5">
               <li>Name and email address</li>
-              <li>Password (stored only as a hashed value using bcrypt — we never see or store your password in plain text)</li>
+              <li>Password (stored only as a hashed value using bcrypt - we never see or store your password in plain text)</li>
               <li>Apple ID or Google account identifier, if you choose to sign in with Apple or Google</li>
               <li>Profile photo or avatar (optional)</li>
               <li>Birthday, family role (e.g. “Mum”, “Son”), colour theme, and allergies (optional profile fields)</li>
@@ -138,7 +138,7 @@ export default function Privacy() {
             </ul>
             <p>
               We do <strong>not</strong> use Google Analytics inside the authenticated Housemait
-              app itself — only on the public marketing website. You can withdraw consent at any
+              app itself - only on the public marketing website. You can withdraw consent at any
               time by clearing site data for housemait.com in your browser, which removes the
               cookies and reshows the banner on your next visit.
             </p>
@@ -148,7 +148,7 @@ export default function Privacy() {
               <li>We do <strong>not</strong> use advertising identifiers or advertising/profiling SDKs.</li>
               <li>We do <strong>not</strong> collect precise location in the background. Location is requested only when you ask for weather or set a location-based reminder.</li>
               <li>We do <strong>not</strong> sell personal data. We do <strong>not</strong> share data with advertisers or data brokers.</li>
-              <li>We do <strong>not</strong> run any analytics inside the authenticated Housemait app — only on the public marketing website, and only with consent.</li>
+              <li>We do <strong>not</strong> run any analytics inside the authenticated Housemait app - only on the public marketing website, and only with consent.</li>
             </ul>
           </Section>
 
@@ -162,15 +162,15 @@ export default function Privacy() {
                   </tr>
                 </thead>
                 <tbody>
-                  <Row c1="Provide the core Service — account management, lists, tasks, calendar, meals, reminders" c2="Performance of contract (Art. 6(1)(b))" />
+                  <Row c1="Provide the core Service - account management, lists, tasks, calendar, meals, reminders" c2="Performance of contract (Art. 6(1)(b))" />
                   <Row c1="Send transactional emails (verification, password reset, digest, reminders)" c2="Performance of contract (Art. 6(1)(b))" />
-                  <Row c1="Send push notifications you have opted into" c2="Consent (Art. 6(1)(a)) — revocable in Settings" />
+                  <Row c1="Send push notifications you have opted into" c2="Consent (Art. 6(1)(a)) - revocable in Settings" />
                   <Row c1="Process WhatsApp messages, voice notes, and receipt photos you send to the bot" c2="Performance of contract (Art. 6(1)(b))" />
                   <Row c1="Process data through AI providers to classify messages, extract tasks/shopping items, parse receipts, and answer questions" c2="Performance of contract (Art. 6(1)(b))" />
-                  <Row c1="Keep the Service secure — rate limiting, abuse prevention, fraud detection" c2="Legitimate interests (Art. 6(1)(f)) — running a secure service" />
+                  <Row c1="Keep the Service secure - rate limiting, abuse prevention, fraud detection" c2="Legitimate interests (Art. 6(1)(f)) - running a secure service" />
                   <Row c1="Diagnose errors and improve the Service" c2="Legitimate interests (Art. 6(1)(f))" />
-                  <Row c1="Aggregate, cookieless measurement of marketing-website traffic (Google Analytics Consent Mode pings — no cookies, no identifiers, anonymised IP)" c2="Legitimate interests (Art. 6(1)(f))" />
-                  <Row c1="Full marketing-website analytics with cookies (Google Analytics)" c2="Consent (Art. 6(1)(a)) — only after you accept the cookie banner; revocable at any time" />
+                  <Row c1="Aggregate, cookieless measurement of marketing-website traffic (Google Analytics Consent Mode pings - no cookies, no identifiers, anonymised IP)" c2="Legitimate interests (Art. 6(1)(f))" />
+                  <Row c1="Full marketing-website analytics with cookies (Google Analytics)" c2="Consent (Art. 6(1)(a)) - only after you accept the cookie banner; revocable at any time" />
                   <Row c1="Comply with legal obligations (e.g. respond to lawful requests, tax and accounting records)" c2="Legal obligation (Art. 6(1)(c))" />
                 </tbody>
               </table>
@@ -179,7 +179,7 @@ export default function Privacy() {
 
           <Section title="4. How AI is used">
             <p>
-              Housemait uses large-language-model AI providers to deliver several features — for example,
+              Housemait uses large-language-model AI providers to deliver several features - for example,
               classifying your WhatsApp messages into tasks or shopping items, answering chat questions,
               extracting items from receipt photos, and importing recipes from URLs. When these features
               are used, the relevant message text, photo, or document you submit is sent to our AI providers
@@ -226,7 +226,7 @@ export default function Privacy() {
                   <Row c1="Google Sign-In & Google Calendar" c2="Optional authentication and calendar sync" c3="Global" />
                   <Row c1="Microsoft Graph (Microsoft 365)" c2="Optional calendar sync" c3="Global" />
                   <Row c1="Open-Meteo / equivalent weather API" c2="Weather data (requires only coarse lat/lon)" c3="EU" />
-                  <Row c1="Google Analytics 4" c2="Marketing-website analytics (housemait.com only; Consent Mode v2 — cookieless until you accept, full analytics after)" c3="US / EU" />
+                  <Row c1="Google Analytics 4" c2="Marketing-website analytics (housemait.com only; Consent Mode v2 - cookieless until you accept, full analytics after)" c3="US / EU" />
                 </tbody>
               </table>
             </TableWrap>
@@ -285,7 +285,7 @@ export default function Privacy() {
               <strong>12 months</strong> from the date you became inactive. During this window:
             </p>
             <ul className="list-disc pl-6 space-y-1.5">
-              <li>You can resubscribe at any time and everything picks up exactly where you left off — lists, calendars, meals, tasks, family profiles, all of it.</li>
+              <li>You can resubscribe at any time and everything picks up exactly where you left off - lists, calendars, meals, tasks, family profiles, all of it.</li>
               <li>You can still log in to view your data in read-only mode.</li>
               <li>You can export your data to a JSON file from <strong>Settings → Your data → Export my data</strong> at any time.</li>
               <li>You can permanently delete your account and data from <strong>Settings → Delete account</strong> at any time.</li>
@@ -298,13 +298,13 @@ export default function Privacy() {
             <p>Some records are kept longer where UK law requires us to:</p>
             <ul className="list-disc pl-6 space-y-1.5">
               <li>
-                <strong>Transaction records</strong> (payments, refunds, invoices) — kept for{' '}
+                <strong>Transaction records</strong> (payments, refunds, invoices) - kept for{' '}
                 <strong>7 years</strong> after the relevant tax year, per HMRC requirements.
                 These are held by our payment processor (Stripe) and in our own financial
                 records; they do not contain household content.
               </li>
               <li>
-                <strong>Deletion audit log</strong> — we keep a minimal record of account
+                <strong>Deletion audit log</strong> - we keep a minimal record of account
                 deletions (user ID, email, deletion date, IP address, whether a Stripe
                 subscription was cancelled) for <strong>6 years</strong>. This supports
                 fraud-prevention and lets us respond to disputes such as “my account was deleted
@@ -324,17 +324,17 @@ export default function Privacy() {
             <p>Under the UK GDPR and EU GDPR you have the following rights:</p>
             <ul className="list-disc pl-6 space-y-1.5">
               <li>
-                <strong>Access</strong> — obtain a copy of the personal data we hold about you.
+                <strong>Access</strong> - obtain a copy of the personal data we hold about you.
                 Self-service in-app from <strong>Settings → Your data → Export my data</strong>,
                 which downloads a machine-readable JSON file with every row we hold about you
                 and your household.
               </li>
               <li>
-                <strong>Rectification</strong> — ask us to correct inaccurate data. Self-service
+                <strong>Rectification</strong> - ask us to correct inaccurate data. Self-service
                 from <strong>Settings → Edit profile</strong> and <strong>Family Setup</strong>.
               </li>
               <li>
-                <strong>Erasure</strong> (“right to be forgotten”) — ask us to delete your data.
+                <strong>Erasure</strong> (“right to be forgotten”) - ask us to delete your data.
                 Self-service from <strong>Settings → Delete account</strong>. If you're the only
                 member of your household, deleting your account also deletes the household and
                 everything in it.
@@ -342,12 +342,12 @@ export default function Privacy() {
               <li><strong>Restriction</strong> of processing in certain circumstances.</li>
               <li><strong>Objection</strong> to processing based on legitimate interests.</li>
               <li>
-                <strong>Data portability</strong> — receive your data in a structured,
+                <strong>Data portability</strong> - receive your data in a structured,
                 machine-readable format. Same flow as Access above.
               </li>
               <li><strong>Withdraw consent</strong> at any time where consent is the legal basis (e.g. disabling push notifications in Settings).</li>
               <li>
-                <strong>Lodge a complaint</strong> with a supervisory authority — in the UK, the{' '}
+                <strong>Lodge a complaint</strong> with a supervisory authority - in the UK, the{' '}
                 <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" className="text-plum hover:underline">
                   Information Commissioner's Office (ICO)
                 </a>{' '}
@@ -365,13 +365,13 @@ export default function Privacy() {
             <p>We send two kinds of email:</p>
             <ol className="list-decimal pl-6 space-y-1.5">
               <li>
-                <strong>Transactional emails</strong> — account-related and always sent:
+                <strong>Transactional emails</strong> - account-related and always sent:
                 verification, password resets, household invites, welcome email, trial-ended
                 notice, subscription receipts, and the 30-day pre-deletion warning. You cannot
                 opt out of these while you have an active account.
               </li>
               <li>
-                <strong>Trial reminder emails</strong> — sent at days 20, 25 and 28 of your
+                <strong>Trial reminder emails</strong> - sent at days 20, 25 and 28 of your
                 30-day free trial. You can opt out in two ways:
                 <ul className="list-disc pl-6 space-y-1.5 mt-1.5">
                   <li>Click the unsubscribe link in the email footer.</li>
@@ -417,7 +417,7 @@ export default function Privacy() {
           <Section title="14. Contact">
             <p>Questions, requests, or complaints can be sent to:</p>
             <p>
-              <strong>Housemait — Privacy</strong><br />
+              <strong>Housemait - Privacy</strong><br />
               Email: <a href="mailto:privacy@housemait.com" className="text-plum hover:underline">privacy@housemait.com</a><br />
               Address: Housemait, 124 City Road, London, EC1V 2NX, United Kingdom
             </p>

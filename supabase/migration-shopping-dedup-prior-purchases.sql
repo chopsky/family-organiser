@@ -2,7 +2,7 @@
 --
 -- Problem: until the route-level dedup landed (PATCH /shopping/:id), every
 -- re-purchase of an item stacked another completed row on the list. The
--- "Previously purchased" UI surfaces all of them — so a household that's
+-- "Previously purchased" UI surfaces all of them - so a household that's
 -- bought milk three times sees three "milk" rows in the history.
 --
 -- Forward fix: src/routes/shopping.js + src/db/queries.js#purgePriorPurchases
@@ -11,7 +11,7 @@
 -- This migration is the one-time backfill for households that already have
 -- duplicate completed rows. It groups completed shopping_items by
 -- (household_id, list_id, lower(trim(item))) and keeps only the row with
--- the most recent completed_at — every other row in each group is hard-
+-- the most recent completed_at - every other row in each group is hard-
 -- deleted.
 --
 -- ── Run order ──
@@ -21,7 +21,7 @@
 --    BEGIN; ... ROLLBACK; on staging if you want a dry run.
 -- 3. Run section 3 (verify) to confirm zero duplicate groups remain.
 --
--- Safe to run multiple times — section 2 is idempotent (re-running on a
+-- Safe to run multiple times - section 2 is idempotent (re-running on a
 -- clean dataset deletes zero rows).
 
 -- ── 1. Preview: how many rows will be removed? ────────────────────────
@@ -68,7 +68,7 @@ COMMIT;
 
 -- ── 3. Verify: should return 0 rows ────────────────────────────────────
 -- Any (household_id, list_id, item_key) group that still has more than
--- one completed row indicates the dedupe didn't fire — investigate.
+-- one completed row indicates the dedupe didn't fire - investigate.
 --
 -- SELECT household_id, list_id, lower(trim(item)) AS item_key, COUNT(*)
 -- FROM shopping_items

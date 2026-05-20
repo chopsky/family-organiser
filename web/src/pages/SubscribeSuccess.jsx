@@ -1,5 +1,5 @@
 /**
- * Subscribe success page — Phase 5.
+ * Subscribe success page - Phase 5.
  *
  * Stripe Checkout redirects here on successful payment:
  *   /subscription/success?session_id=cs_test_...
@@ -8,11 +8,11 @@
  *   1. Immediately call refresh() to pull the new subscription_status
  *      from the backend. The Stripe webhook usually lands before the
  *      user's redirect does, but there's a small window where it hasn't
- *      — we retry the refresh a few times to cover the gap.
+ *      - we retry the refresh a few times to cover the gap.
  *   2. Show a confirmation + auto-redirect to /dashboard after 3 seconds.
  *      Users can click "Go to dashboard now" to skip the wait.
  *
- * session_id is kept in the URL but not sent to the backend — the
+ * session_id is kept in the URL but not sent to the backend - the
  * webhook already carries the session id and handles it end-to-end.
  * The query param is only for future analytics / debugging.
  */
@@ -36,7 +36,7 @@ export default function SubscribeSuccess() {
   const sessionId = searchParams.get('session_id');
   const [countdown, setCountdown] = useState(AUTO_REDIRECT_MS / 1000);
 
-  // Refresh the subscription context — retry until we see isActive=true
+  // Refresh the subscription context - retry until we see isActive=true
   // or the retry budget is exhausted (webhook may have been delayed).
   useEffect(() => {
     let cancelled = false;
@@ -50,13 +50,13 @@ export default function SubscribeSuccess() {
       }
     })();
     return () => { cancelled = true; };
-    // Intentionally empty deps — run once on mount. refresh is stable
+    // Intentionally empty deps - run once on mount. refresh is stable
     // from context; isActive is read fresh inside the loop via closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // App Store guideline 3.1.1: this page is a Stripe-return URL and
-  // mentions "subscription" / "Stripe" — neither should ever be visible
+  // mentions "subscription" / "Stripe" - neither should ever be visible
   // to an iOS reviewer. The /subscribe redirect on iOS already prevents
   // the user from getting here organically, but a manually-typed deep
   // link could still hit this route. Bounce to /dashboard.
@@ -79,7 +79,7 @@ export default function SubscribeSuccess() {
     return () => clearInterval(interval);
   }, [navigate]);
 
-  // Don't even render the success UI on iOS — the redirect above will
+  // Don't even render the success UI on iOS - the redirect above will
   // navigate away on next tick, but flashing the subscription confirmation
   // for that tick is undesirable.
   if (isIos()) return null;
@@ -105,7 +105,7 @@ export default function SubscribeSuccess() {
 
           {!isActive && (
             <p className="text-xs text-warm-grey mb-5 italic">
-              Confirming payment with Stripe — this only takes a moment.
+              Confirming payment with Stripe - this only takes a moment.
             </p>
           )}
 

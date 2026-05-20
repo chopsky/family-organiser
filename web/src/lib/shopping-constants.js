@@ -19,7 +19,7 @@ export const AISLE_CONFIG = {
   'Other':                { bg: '#FBF8F3', stroke: '#6B6774', emoji: '📦', pillBg: '#FBF8F3', pillText: '#6B6774' },
 };
 
-// Item name to emoji lookup — first regex that matches wins. Items
+// Item name to emoji lookup - first regex that matches wins. Items
 // further down are matched only if everything above failed, so this
 // list is ordered specific → general.
 //
@@ -29,7 +29,7 @@ export const AISLE_CONFIG = {
 // listed first or they'd be intercepted by the generic match. If you
 // add a new mapping somewhere mid-file and notice it never wins, the
 // answer is almost always "a shorter pattern earlier in the array
-// catches a substring of your input" — surface the new mapping here.
+// catches a substring of your input" - surface the new mapping here.
 const ITEM_EMOJI_MAP = [
   [/peanut butter|nutella/i, '🥜'],
   [/peanut/i, '🥜'],
@@ -55,7 +55,7 @@ const ITEM_EMOJI_MAP = [
   [/pepper|capsicum/i, '🌶️'], [/lettuce|salad leaves/i, '🥬'],
   [/spinach|kale/i, '🥬'], [/cabbage/i, '🥬'], [/celery/i, '🥬'],
   // /\bpeas?\b/ deliberately avoids matching substrings like "peanut",
-  // "peach", "pear" — those have their own (or are caught by earlier)
+  // "peach", "pear" - those have their own (or are caught by earlier)
   // patterns. Without the \b, "smooth peanut butter" gets the pea-pod
   // emoji because /pea/ hits before the /peanut butter/ pattern below.
   [/asparagus/i, '🥬'], [/\bpeas?\b/i, '🫛'], [/bean|lentil/i, '🫘'],
@@ -89,13 +89,13 @@ const ITEM_EMOJI_MAP = [
   [/rice/i, '🍚'], [/pasta|spaghetti|penne|fusilli|macaroni|lasagne|noodle/i, '🍝'],
   [/cereal|oat|granola|muesli/i, '🥣'], [/honey/i, '🍯'],
   // /\boils?\b/ keeps "oil" / "olive oil" / "vegetable oil" mapping to
-  // an olive while refusing to match "t-oil-et" — without the \b
+  // an olive while refusing to match "t-oil-et" - without the \b
   // boundary, "toilet paper" picked up the olive emoji before reaching
   // the /toilet paper/ pattern in the Household section.
   [/flour/i, '🌾'], [/sugar/i, '🌾'], [/\boils?\b/i, '🫒'],
   [/sauce|ketchup|mustard|mayo/i, '🫙'], [/vinegar/i, '🫙'],
   [/jam|marmalade/i, '🫙'],
-  // /\bnuts?\b/ avoids matching substrings — "doughnut", "coconut" all
+  // /\bnuts?\b/ avoids matching substrings - "doughnut", "coconut" all
   // contain "nut" but should hit their own patterns instead. The
   // named-nut alternatives stay greedy because "almond milk" etc.
   // should still match. Peanut and peanut butter are handled in the

@@ -1,10 +1,10 @@
 /**
- * Subscribe page — Phase 5.
+ * Subscribe page - Phase 5.
  *
  * Shows monthly + annual pricing cards and kicks off Stripe Checkout for
  * the chosen plan. Annual is visually highlighted as the recommendation
  * per the spec ("Pre-selects the Annual option" / "Best value"); Monthly
- * uses a secondary button. Each card has its own Subscribe button — no
+ * uses a secondary button. Each card has its own Subscribe button - no
  * separate "confirm selection" step.
  *
  * Reachable three ways:
@@ -13,9 +13,9 @@
  *      to mutate (see web/src/lib/api.js + SubscriptionContext)
  *   3. The TrialIndicatorCard's "Subscribe" button on the Dashboard
  *
- * Does NOT require the user to be expired — active users can still see
+ * Does NOT require the user to be expired - active users can still see
  * it (e.g. if they want to switch plans, though the Customer Portal is
- * the right tool for that — we nudge them there via a text link).
+ * the right tool for that - we nudge them there via a text link).
  */
 
 import { useState } from 'react';
@@ -32,13 +32,13 @@ import { readLocaleCookie } from '../hooks/useLocale';
 // Resolve which locale (and therefore which currency) to charge in.
 //
 // Priority cascade:
-//   1. household.country — canonical record set at signup. A user who
+//   1. household.country - canonical record set at signup. A user who
 //      signed up via /za must keep seeing ZAR even when they log back
 //      in from a UK IP. Locale cookies get overwritten every time the
 //      user visits a marketing page; the household.country doesn't.
-//   2. Locale cookie — set during the visitor's marketing journey, used
+//   2. Locale cookie - set during the visitor's marketing journey, used
 //      for unsigned-in or pre-signup visits to /subscribe.
-//   3. Default international locale — last-resort fallback.
+//   3. Default international locale - last-resort fallback.
 //
 // The backend re-validates the currency against Stripe's price lookup,
 // so a tampered cookie can't smuggle a cheaper price through.
@@ -82,7 +82,7 @@ export default function Subscribe() {
   const [submitting, setSubmitting] = useState(null); // 'monthly' | 'annual' | null
   const [error, setError] = useState('');
 
-  // Platform dispatch — iOS sees the Apple-IAP paywall, web sees the
+  // Platform dispatch - iOS sees the Apple-IAP paywall, web sees the
   // Stripe Checkout paywall below. Both are App-Review-compliant under
   // Guideline 3.1.1: native IAP on iOS, no anti-steering on web.
   if (isIos()) return <IosSubscribe />;
@@ -299,7 +299,7 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
           ? 'Current plan'
           : submitting
             ? 'Starting checkout…'
-            : `Subscribe — ${p.priceDisplay}/${plan === 'monthly' ? 'mo' : 'yr'}`}
+            : `Subscribe - ${p.priceDisplay}/${plan === 'monthly' ? 'mo' : 'yr'}`}
       </button>
     </div>
   );

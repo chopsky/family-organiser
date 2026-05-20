@@ -2,7 +2,7 @@
  * Simple in-memory cache with TTL expiry.
  *
  * Keys are typically scoped by household ID, e.g. `members:${householdId}`.
- * No external dependencies — just a Map with timestamps.
+ * No external dependencies - just a Map with timestamps.
  */
 
 const store = new Map();
@@ -28,7 +28,7 @@ function get(key) {
  * Store a value with a TTL.
  * @param {string} key
  * @param {*} value
- * @param {number} ttlSeconds — time-to-live in seconds
+ * @param {number} ttlSeconds - time-to-live in seconds
  */
 function set(key, value, ttlSeconds) {
   store.set(key, {
@@ -51,7 +51,7 @@ function invalidate(key) {
  *   invalidatePattern(householdId)
  * will clear `members:<id>`, `digest:<id>`, `schools:<id>`, etc.
  *
- * @param {string} pattern — substring to match against cache keys
+ * @param {string} pattern - substring to match against cache keys
  */
 function invalidatePattern(pattern) {
   for (const key of store.keys()) {

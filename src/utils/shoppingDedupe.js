@@ -11,7 +11,7 @@
  *   • "Gluten-Free Nugets"    → typo → NOT caught (different spelling)
  *
  * The normaliser purely strips common punctuation, lowercases, and
- * collapses whitespace. It never touches the stored `item` string —
+ * collapses whitespace. It never touches the stored `item` string -
  * that's preserved as the user typed it for display. Normalisation
  * is used only for the dedupe key.
  *
@@ -34,7 +34,7 @@ function normalizeItemName(name) {
 }
 
 // Word boundaries match override phrases that indicate the user
-// explicitly wants the duplicate. Single-word triggers are enough —
+// explicitly wants the duplicate. Single-word triggers are enough -
 // people don't usually say "I want an additional fourth carton of"
 // without one of these words appearing.
 const OVERRIDE_RE = /\b(another|more|additional|extra|second|third|fourth|anyway|again|also|too)\b/i;

@@ -49,14 +49,14 @@ ALTER TABLE calendar_events
   ADD COLUMN IF NOT EXISTS external_feed_id uuid REFERENCES external_calendar_feeds(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS external_uid     text;
 
--- Speed up "give me all events from this feed" — used at poll time and
+-- Speed up "give me all events from this feed" - used at poll time and
 -- when removing a feed.
 CREATE INDEX IF NOT EXISTS idx_calendar_events_external_feed
   ON calendar_events(external_feed_id)
   WHERE external_feed_id IS NOT NULL;
 
 -- Upsert key for the pull: (feed, UID) must be unique per feed.
--- Deliberately NON-partial — a partial unique index can't be used by
+-- Deliberately NON-partial - a partial unique index can't be used by
 -- Postgres' ON CONFLICT inference unless the INSERT's WHERE clause
 -- matches the predicate, which Supabase JS's upsert doesn't expose.
 -- Housemait-originated rows (both columns NULL) coexist fine because
@@ -66,10 +66,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_events_feed_uid
 
 -- Enable Row Level Security to satisfy Supabase's "tables without RLS"
 -- linter. Backend access uses the service_role key (which bypasses RLS),
--- so no policies are defined — RLS-enabled with zero policies means
+-- so no policies are defined - RLS-enabled with zero policies means
 -- "deny all" to anon/authenticated keys, which is the correct default
 -- for tables only the API should touch. Matches the pattern used by
 -- migration-rls-security.sql for ai_usage_log etc.
 ALTER TABLE public.external_calendar_feeds ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.external_calendar_feeds IS
-  'Read-only inbound calendar feed subscriptions. RLS enabled with no policies — only accessible via service_role key.';
+  'Read-only inbound calendar feed subscriptions. RLS enabled with no policies - only accessible via service_role key.';

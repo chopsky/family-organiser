@@ -1,5 +1,5 @@
 /**
- * BottomSheet — a bottom-anchored modal with native iOS feel.
+ * BottomSheet - a bottom-anchored modal with native iOS feel.
  *
  * Wraps the existing "fixed inset-0 ... items-end" pattern we'd been
  * writing inline across Dashboard / Meals / etc. so every sheet
@@ -17,7 +17,7 @@
  *     ...your sheet content...
  *   </BottomSheet>
  *
- * Renders nothing when `open` is false — caller doesn't have to gate.
+ * Renders nothing when `open` is false - caller doesn't have to gate.
  */
 
 import React from 'react';

@@ -160,10 +160,10 @@ export default function Shopping() {
     loadItems();
   }, [loadItems]);
 
-  // Pull-to-refresh + foreground refresh — must sit AFTER loadLists +
+  // Pull-to-refresh + foreground refresh - must sit AFTER loadLists +
   // loadItems are declared because the dep array reads them at the
   // moment useCallback runs. Putting this block above either declaration
-  // hits the TDZ ("Cannot access 'loadItems' before initialization" —
+  // hits the TDZ ("Cannot access 'loadItems' before initialization" -
   // minified to a one-letter name on iOS). No-op on web.
   const refreshAll = useCallback(async () => {
     await Promise.all([loadLists(), loadItems()].map(p => p?.catch?.(() => {})));
@@ -189,7 +189,7 @@ export default function Shopping() {
       const payload = { item: addText.trim(), list_id: activeListId };
       if (addAisle !== 'auto') payload.aisle_category = addAisle;
       const { data } = await api.post('/shopping', payload);
-      // Surface dedupe hits — the server skipped because an active row
+      // Surface dedupe hits - the server skipped because an active row
       // already exists. Show the EXISTING item name so the user sees
       // exactly what they were duplicating, in their original casing.
       const dups = Array.isArray(data?.duplicates) ? data.duplicates : [];
@@ -212,7 +212,7 @@ export default function Shopping() {
   // failure, we revert to the snapshot taken before the change.
   //
   // Trade-off accepted: a network failure briefly shows the new state
-  // before reverting. Worth it — the alternative (await the API, then
+  // before reverting. Worth it - the alternative (await the API, then
   // setState, then re-render) is what was making every check-off feel
   // like a page reload.
 
@@ -376,7 +376,7 @@ export default function Shopping() {
               return;
             }
             const activeList = lists.find((l) => l.id === activeListId);
-            const title = `Housemait shopping list${activeList?.name ? ` — ${activeList.name}` : ''}`;
+            const title = `Housemait shopping list${activeList?.name ? ` - ${activeList.name}` : ''}`;
             const body = `${title}\n\n${lines.join('\n')}`;
             await share({ title, text: body, dialogTitle: 'Share shopping list' });
           }}
@@ -444,7 +444,7 @@ export default function Shopping() {
         )}
       </div>
 
-      {/* Add item bar — swapped for a Subscribe prompt for expired
+      {/* Add item bar - swapped for a Subscribe prompt for expired
           households. We wrap the whole row so the aisle dropdown and
           the add button also disappear together, rather than showing a
           half-working form. */}
@@ -551,7 +551,7 @@ export default function Shopping() {
                           </span>
                         )}
 
-                        {/* Delete button — always visible on touch, hover-reveal on desktop */}
+                        {/* Delete button - always visible on touch, hover-reveal on desktop */}
                         <button
                           onClick={e => { e.stopPropagation(); deleteItem(item.id); }}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-warm-grey hover:bg-coral-light hover:text-coral transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
@@ -575,7 +575,7 @@ export default function Shopping() {
               <p className="text-[13px] text-cocoa mt-2 leading-relaxed">
                 Add something using the input above, or message{' '}
                 <span className="italic">"add bread, milk and bananas to the list"</span>{' '}
-                to the WhatsApp bot — items get sorted by aisle automatically.
+                to the WhatsApp bot - items get sorted by aisle automatically.
               </p>
             </div>
           )}
@@ -660,7 +660,7 @@ export default function Shopping() {
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-bark mb-1">Unit</label>
                   <select value={editFields.unit || ''} onChange={e => setEditFields(f => ({...f, unit: e.target.value}))} className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent">
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {['g', 'kg', 'ml', 'l', 'pcs', 'pack', 'tin', 'bunch', 'loaf'].map(u => <option key={u} value={u}>{u}</option>)}
                   </select>
                 </div>

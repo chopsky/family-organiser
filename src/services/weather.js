@@ -41,7 +41,7 @@ function parseTargetDay(message, referenceDate) {
   const msg = message.toLowerCase().trim();
   const ref = referenceDate || new Date();
 
-  // "today" or general weather question — return null (show default)
+  // "today" or general weather question - return null (show default)
   if (/\btoday\b/.test(msg) || !/\b(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week|weekend)\b/.test(msg)) {
     return null;
   }
@@ -144,7 +144,7 @@ async function getWeatherReport(lat, lon, timezone = 'auto', options = {}) {
 
       return lines.join('\n');
     }
-    // Target day not in forecast range — fall through to default
+    // Target day not in forecast range - fall through to default
   }
 
   // Default: current conditions + 3-day forecast

@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS la_term_dates_cache (
 ALTER TABLE la_term_dates_cache ENABLE ROW LEVEL SECURITY;
 
 -- Allow service role full access (backend uses service role key)
--- No user-facing RLS policies needed — this table is only accessed server-side
+-- No user-facing RLS policies needed - this table is only accessed server-side
 CREATE INDEX IF NOT EXISTS idx_la_cache_lookup ON la_term_dates_cache (local_authority, academic_year);

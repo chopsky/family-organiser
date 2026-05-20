@@ -60,18 +60,18 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   if (reminder_time !== undefined) updates.reminder_time = reminder_time;
   if (timezone !== undefined) updates.timezone = timezone;
   if (allergies !== undefined) updates.allergies = allergies;
-  // trial_emails_enabled — admin-only (matches the rest of this endpoint).
+  // trial_emails_enabled - admin-only (matches the rest of this endpoint).
   // The unsubscribe route flips this to false via a signed token; this
   // endpoint lets admins flip it either way from Settings.
   if (trial_emails_enabled !== undefined) updates.trial_emails_enabled = !!trial_emails_enabled;
-  // Country — validated against the same allow-list the DB CHECK uses.
+  // Country - validated against the same allow-list the DB CHECK uses.
   // Silently dropped if invalid (admin Settings dropdown enforces valid
   // values; protects against direct API calls).
   if (country !== undefined) {
     const ALLOWED_COUNTRIES = ['GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'ZA', 'OTHER'];
     if (ALLOWED_COUNTRIES.includes(country)) updates.country = country;
   }
-  // Street address — free-text, typically populated via the Photon
+  // Street address - free-text, typically populated via the Photon
   // autocomplete on the edit modal. Trimmed; empty string treated as null.
   if (address !== undefined) {
     const trimmed = (address || '').trim();
@@ -100,7 +100,7 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
   const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id } = req.body;
 
-  // Determine target user — admins can edit others, members only themselves
+  // Determine target user - admins can edit others, members only themselves
   let targetUserId = req.user.id;
   if (user_id && user_id !== req.user.id) {
     if (req.user.role !== 'admin') {
@@ -162,21 +162,21 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
 
     const updated = await db.updateUser(targetUserId, updates);
 
-    // Clean up orphaned schools — if this was the last child at the old school, delete it
+    // Clean up orphaned schools - if this was the last child at the old school, delete it
     if (oldSchoolId && oldSchoolId !== (school_id || null)) {
       try {
         const members = await db.getHouseholdMembers(req.householdId);
         const stillLinked = members.some(m => m.school_id === oldSchoolId);
         if (!stillLinked) {
           await db.deleteHouseholdSchool(oldSchoolId, req.householdId);
-          console.log(`[orphan-cleanup] Deleted orphaned school ${oldSchoolId} — no children remaining`);
+          console.log(`[orphan-cleanup] Deleted orphaned school ${oldSchoolId} - no children remaining`);
         }
       } catch (cleanupErr) {
         console.error('School orphan cleanup failed (non-fatal):', cleanupErr.message);
       }
     }
 
-    // Handle birthday calendar event — only when birthday field is explicitly sent and changed
+    // Handle birthday calendar event - only when birthday field is explicitly sent and changed
     if (birthday !== undefined && fullUser) {
       try {
         const currentBirthday = fullUser.birthday || null;
@@ -283,7 +283,7 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
  */
 router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res) => {
   try {
-    // Try to remove files from storage (best effort — may not exist or may have different ext)
+    // Try to remove files from storage (best effort - may not exist or may have different ext)
     const userDb = supabaseAdmin;
     const { data: files } = await userDb.storage.from('avatars').list(req.householdId, {
       prefix: req.user.id,
@@ -410,7 +410,7 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
     // school_id, if supplied, must be a household_schools row owned by THIS
-    // household — never trust a UUID from the client without a check.
+    // household - never trust a UUID from the client without a check.
     let safeSchoolId = null;
     if (school_id) {
       const schools = await db.getHouseholdSchools(req.householdId);
@@ -481,13 +481,13 @@ router.delete('/invites/:inviteId', requireAuth, requireHousehold, requireAdmin,
  *   "You've got X shopping lists, X meals saved, X tasks…"
  *
  * The spec asks for "a single SQL query with COUNTs". Supabase's REST
- * API doesn't support cross-table aggregates in one call — each count
+ * API doesn't support cross-table aggregates in one call - each count
  * is its own HTTP round trip. We fire them in parallel via Promise.all
  * so wall-clock latency is one query's worth, not N. If this ever
- * becomes a bottleneck (unlikely — these are indexed scans over small
+ * becomes a bottleneck (unlikely - these are indexed scans over small
  * per-household tables) swap to a plpgsql function + supabase.rpc().
  *
- * Cached 5 minutes — the user doesn't need real-time numbers on a
+ * Cached 5 minutes - the user doesn't need real-time numbers on a
  * marketing banner, and the endpoint fires on every nav back to
  * Dashboard when trial is in warning window.
  */
@@ -505,7 +505,7 @@ router.get('/usage-summary', requireAuth, requireHousehold, async (req, res) => 
       if (extraFilter) q = extraFilter(q);
       const { count, error } = await q;
       if (error) {
-        // Log and return 0 rather than failing the whole summary — a
+        // Log and return 0 rather than failing the whole summary - a
         // missing-table error on one dimension shouldn't break the card.
         console.warn(`[usage-summary] count(${table}) failed:`, error.message);
         return 0;
@@ -526,7 +526,7 @@ router.get('/usage-summary', requireAuth, requireHousehold, async (req, res) => 
       countRows('shopping_items'),
       countRows('shopping_lists'),
       countRows('tasks'),
-      // calendar_events is the only table using soft-delete — exclude
+      // calendar_events is the only table using soft-delete - exclude
       // tombstoned rows so the count matches what the user actually sees.
       countRows('calendar_events', (q) => q.is('deleted_at', null)),
       countRows('meal_plan'),
@@ -578,7 +578,7 @@ router.post('/regenerate-email-address', requireAuth, requireHousehold, requireA
 // The alias replaces the hard-to-remember hex token with a memorable
 // "<slug>@inbound.housemait.com" address. The sender allowlist gates
 // who is allowed to send mail to that address (or to the long token)
-// — prevents the inbound channel becoming a spam vector if either
+// - prevents the inbound channel becoming a spam vector if either
 // address leaks. See migration-inbound-email-alias-senders.sql for
 // schema notes.
 
@@ -624,7 +624,7 @@ router.patch('/email-alias', requireAuth, requireHousehold, requireAdmin, async 
     const updated = await db.setHouseholdEmailAlias(req.householdId, v.normalised);
     return res.json({ household: updated });
   } catch (err) {
-    // 23505 is Postgres unique_violation — race between availability
+    // 23505 is Postgres unique_violation - race between availability
     // check and update. Surface as 409 same as a direct collision.
     if (err.code === '23505') return res.status(409).json({ error: 'That alias was just claimed by someone else. Try another.' });
     console.error('PATCH /api/household/email-alias error:', err);
@@ -689,7 +689,7 @@ router.delete('/inbound-senders/:id', requireAuth, requireHousehold, requireAdmi
  * Upload a household profile photo. Stored in the same `avatars`
  * Supabase Storage bucket as user avatars, but at a household-scoped
  * path (`<householdId>/household.<ext>`) so it doesn't clash with
- * individual member avatars. Admin only — household identity is a
+ * individual member avatars. Admin only - household identity is a
  * household-level concern, not personal.
  */
 router.post('/avatar', requireAuth, requireHousehold, requireAdmin, avatarUpload.single('avatar'), async (req, res) => {
@@ -781,7 +781,7 @@ router.get('/address-search', requireAuth, requireHousehold, async (req, res) =>
     const suggestions = (data.features || []).map((f) => {
       const p = f.properties || {};
       // Build a "Street, City, Country"-ish label from whatever Photon returned.
-      // Photon's properties vary by result type — name (place name), street,
+      // Photon's properties vary by result type - name (place name), street,
       // housenumber, city, postcode, country. Format gracefully.
       const lineParts = [];
       if (p.name) lineParts.push(p.housenumber ? `${p.housenumber} ${p.name}` : p.name);

@@ -4,7 +4,7 @@
 
 Meta enforces a **24-hour customer-service window** on every WhatsApp Business account. You can only send a **free-form** message to a user who has sent you a message in the last 24 hours. Outside that window, every send from Twilio fails with error `63016 – Outside the allowed window. Please use a Message Template.`
 
-Before template support, that meant passive household members — people who read notifications but rarely reply — silently stopped receiving broadcasts after 24 hours. No warning on our side; the errors just went to Railway logs.
+Before template support, that meant passive household members - people who read notifications but rarely reply - silently stopped receiving broadcasts after 24 hours. No warning on our side; the errors just went to Railway logs.
 
 Now the broadcast code checks a `whatsapp_last_inbound_at` column on each user and routes sends down one of two paths:
 
@@ -32,7 +32,7 @@ Reply here to manage your lists, tasks and calendar.
 ```
 
 **Variable:**
-- `{{1}}` — the full pre-formatted broadcast line (e.g. `✅ Grant completed: Book car service`)
+- `{{1}}` - the full pre-formatted broadcast line (e.g. `✅ Grant completed: Book car service`)
 
 **Why one template, not several**
 
@@ -40,11 +40,11 @@ Meta approves every template individually. A single generic-notification templat
 
 **Why the "Reply here…" line**
 
-Two reasons. First, it justifies the UTILITY category to Meta reviewers: this is a functional notification, not a marketing blast. Second, it nudges the recipient to reply — which re-opens their 24h window, so subsequent notifications can be free-form again.
+Two reasons. First, it justifies the UTILITY category to Meta reviewers: this is a functional notification, not a marketing blast. Second, it nudges the recipient to reply - which re-opens their 24h window, so subsequent notifications can be free-form again.
 
 ## Registering the template
 
-### Option A — Twilio Console (easiest)
+### Option A - Twilio Console (easiest)
 
 1. Log in to Twilio Console.
 2. Navigate to **Messaging → Content Template Builder → Create new**.
@@ -55,7 +55,7 @@ Two reasons. First, it justifies the UTILITY category to Meta reviewers: this is
 7. Wait 1–3 business days for Meta to approve. You'll see the status change from `Pending` to `Approved` in the Console.
 8. Copy the **Content SID** (starts with `HX`, 34 characters) from the approved template.
 
-### Option B — Twilio Content API
+### Option B - Twilio Content API
 
 ```bash
 curl -X POST https://content.twilio.com/v1/Content \
@@ -85,7 +85,7 @@ curl -X POST https://content.twilio.com/v1/Content/<ContentSid>/ApprovalRequests
   }'
 ```
 
-## Once approved — configure Railway
+## Once approved - configure Railway
 
 Set **one new env var** on Railway:
 
@@ -98,11 +98,11 @@ Also make sure these three are already set (unchanged from before):
 ```
 TWILIO_ACCOUNT_SID=AC...
 TWILIO_AUTH_TOKEN=...
-TWILIO_MESSAGING_SERVICE_SID=MG...      # required — Content Templates belong to a Messaging Service
+TWILIO_MESSAGING_SERVICE_SID=MG...      # required - Content Templates belong to a Messaging Service
 TWILIO_WHATSAPP_NUMBER=+...             # optional fallback for sendMessage when no MSID
 ```
 
-**Content Templates require a Messaging Service**, not a raw `From` number. If `TWILIO_MESSAGING_SERVICE_SID` isn't set, `sendTemplate` logs a warning and falls back to `sendMessage` (which will then fail with 63016 for out-of-window recipients — same as before the change).
+**Content Templates require a Messaging Service**, not a raw `From` number. If `TWILIO_MESSAGING_SERVICE_SID` isn't set, `sendTemplate` logs a warning and falls back to `sendMessage` (which will then fail with 63016 for out-of-window recipients - same as before the change).
 
 ## Verifying it works
 
@@ -114,7 +114,7 @@ TWILIO_WHATSAPP_NUMBER=+...             # optional fallback for sendMessage when
    - Within a minute, the recipient sees: *"Housemait update / ✅ Grant completed: … / Reply here to manage your lists, tasks and calendar."*
 4. The recipient replies "hi" → `whatsapp_last_inbound_at` updates → subsequent broadcasts go the free-form route.
 
-If instead you see `[broadcast] Skipped Lynn — window closed and TWILIO_TEMPLATE_HOUSEHOLD_UPDATE not configured`, the env var isn't set yet.
+If instead you see `[broadcast] Skipped Lynn - window closed and TWILIO_TEMPLATE_HOUSEHOLD_UPDATE not configured`, the env var isn't set yet.
 
 If you see `[WhatsApp] Template REST API error: {"code":63018, ...}`, the template is still pending approval or the SID is wrong. `63018` in particular means "template doesn't exist / not approved for this recipient's region".
 
@@ -124,12 +124,12 @@ Meta charges per **conversation**, not per message. A conversation is opened by 
 
 | Category | UK | US | Typical use |
 |---|---|---|---|
-| Utility | ~£0.012 | ~$0.015 | Transactional — this is us |
+| Utility | ~£0.012 | ~$0.015 | Transactional - this is us |
 | Authentication | similar | similar | OTPs |
 | Marketing | higher | higher | Promotions |
 | User-initiated | FREE | FREE | Inside the 24h window |
 
-For a household of four with one passive member receiving ~5 template-initiated conversations per week, that's ~£0.30/month — well under Meta's 1,000-conversation free tier per account.
+For a household of four with one passive member receiving ~5 template-initiated conversations per week, that's ~£0.30/month - well under Meta's 1,000-conversation free tier per account.
 
 ## Rollback
 

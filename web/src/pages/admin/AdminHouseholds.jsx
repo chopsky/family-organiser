@@ -135,9 +135,9 @@ export default function AdminHouseholds() {
                       {(h.documents_count ?? 0)} files · {formatBytes(h.documents_bytes ?? 0)}
                     </td>
                     <td className="px-4 py-3 text-warm-grey font-mono text-xs hidden md:table-cell">{h.join_code}</td>
-                    <td className="px-4 py-3 text-warm-grey text-xs hidden md:table-cell">{h.timezone || '—'}</td>
+                    <td className="px-4 py-3 text-warm-grey text-xs hidden md:table-cell">{h.timezone || '-'}</td>
                     <td className="px-4 py-3 text-warm-grey hidden lg:table-cell">
-                      {h.created_at ? new Date(h.created_at).toLocaleDateString() : '—'}
+                      {h.created_at ? new Date(h.created_at).toLocaleDateString() : '-'}
                     </td>
                   </tr>
                 ))}

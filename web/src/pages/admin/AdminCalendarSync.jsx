@@ -90,11 +90,11 @@ export default function AdminCalendarSync() {
                   <td className="px-4 py-3 capitalize text-charcoal">{conn.provider}</td>
                   <td className="px-4 py-3">{syncStatus(conn)}</td>
                   <td className="px-4 py-3 text-warm-grey hidden md:table-cell">
-                    {conn.last_synced_at ? new Date(conn.last_synced_at).toLocaleString() : '—'}
+                    {conn.last_synced_at ? new Date(conn.last_synced_at).toLocaleString() : '-'}
                   </td>
                   <td className="px-4 py-3 text-charcoal hidden lg:table-cell">{conn.synced_events}</td>
                   <td className="px-4 py-3 text-warm-grey text-xs hidden lg:table-cell">
-                    {conn.token_expires_at ? new Date(conn.token_expires_at).toLocaleString() : '—'}
+                    {conn.token_expires_at ? new Date(conn.token_expires_at).toLocaleString() : '-'}
                   </td>
                 </tr>
               ))}

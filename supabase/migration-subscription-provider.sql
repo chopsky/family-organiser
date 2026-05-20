@@ -1,7 +1,7 @@
--- IAP Phase 1a — schema migration for dual-provider subscriptions.
+-- IAP Phase 1a - schema migration for dual-provider subscriptions.
 --
 -- Adds the columns + idempotency table needed to track Apple-IAP subscribers
--- alongside the existing Stripe ones. No code or behaviour changes here —
+-- alongside the existing Stripe ones. No code or behaviour changes here -
 -- this just lets the schema represent who's billed via what.
 --
 -- Design notes
@@ -13,7 +13,7 @@
 --   can rely on it being populated.
 --
 --   Down the line if Google Play / web-only tiers appear, the CHECK
---   widens — single column is intentional so queries like "all Apple
+--   widens - single column is intentional so queries like "all Apple
 --   subscribers" stay one predicate.
 --
 -- • `revenuecat_app_user_id` is RevenueCat's external identifier for a
@@ -24,7 +24,7 @@
 --   because Stripe-only households never set it. Unique to prevent two
 --   households accidentally sharing one RevenueCat identity.
 --
--- • `processed_revenuecat_events` mirrors `processed_stripe_events` —
+-- • `processed_revenuecat_events` mirrors `processed_stripe_events` -
 --   RevenueCat retries webhooks for 72h on non-2xx responses, so we
 --   need idempotency on the event UUID before applying state changes.
 --
@@ -60,7 +60,7 @@ BEGIN
 END$$;
 
 -- O(1) lookup from a RevenueCat webhook payload to a household row.
--- Nullable + UNIQUE is fine — Postgres allows multiple NULLs.
+-- Nullable + UNIQUE is fine - Postgres allows multiple NULLs.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_households_revenuecat_app_user_id
   ON households (revenuecat_app_user_id)
   WHERE revenuecat_app_user_id IS NOT NULL;
@@ -88,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_processed_revenuecat_events_processed_at
 ALTER TABLE processed_revenuecat_events ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE processed_revenuecat_events IS
-  'RevenueCat webhook idempotency ledger. RLS enabled with no policies — only accessible via service_role key.';
+  'RevenueCat webhook idempotency ledger. RLS enabled with no policies - only accessible via service_role key.';
 
 COMMENT ON COLUMN households.subscription_provider IS
   'Which payment platform this household is billed through. ''stripe'' = web, ''apple'' = iOS IAP via RevenueCat. Default ''stripe'' covers all pre-IAP households.';

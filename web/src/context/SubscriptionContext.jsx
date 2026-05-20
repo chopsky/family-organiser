@@ -1,17 +1,17 @@
 /**
- * Subscription / trial state — Phase 4.
+ * Subscription / trial state - Phase 4.
  *
  * Fetches GET /api/subscription/status on mount and exposes the shape
  * the rest of the app needs to render trial indicators, the (coming
  * in Phase 5) subscribe modal, and the (Phase 6) read-only expired
  * overlay.
  *
- * Depends on AuthContext — we only fetch when there's a token AND a
+ * Depends on AuthContext - we only fetch when there's a token AND a
  * household. On logout or when the user hasn't finished onboarding,
  * we hold state as loading:false, status:null so UI components can
  * short-circuit without waiting on a request that'll never fire.
  *
- * Refetches when the tab becomes visible again — covers the common
+ * Refetches when the tab becomes visible again - covers the common
  * "user redirects to Stripe, pays, comes back" flow without needing
  * the frontend to know anything about Stripe lifecycle.
  */
@@ -36,14 +36,14 @@ export function SubscriptionProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Last fetched household id — lets us clear state cleanly on logout
+  // Last fetched household id - lets us clear state cleanly on logout
   // / household switch so stale values from the previous session don't
   // leak into a new one.
   const loadedHouseholdRef = useRef(null);
 
   const fetchStatus = useCallback(async () => {
     if (!token || !household?.id) {
-      // Nothing to fetch — reset to "unknown but not loading".
+      // Nothing to fetch - reset to "unknown but not loading".
       setStatus(null);
       setDaysRemaining(null);
       setTrialEndsAt(null);
@@ -61,7 +61,7 @@ export function SubscriptionProvider({ children }) {
     // here while we had no in-app payment path is gone. iOS now goes
     // through the real /api/subscription/status flow and sees the real
     // trial countdown / expired state, with the IosSubscribe paywall
-    // (Apple IAP) as the day-30 destination — see Subscribe.jsx and
+    // (Apple IAP) as the day-30 destination - see Subscribe.jsx and
     // IosSubscribe.jsx. App Review 3.1.1 compliance comes from the
     // paywall being native IAP, not from hiding subscription state.
 
@@ -78,7 +78,7 @@ export function SubscriptionProvider({ children }) {
       setIsInternal(data.is_internal === true);
       loadedHouseholdRef.current = household.id;
     } catch (err) {
-      // Don't blow up the app if this fails — the trial indicators
+      // Don't blow up the app if this fails - the trial indicators
       // will simply not render. 401s are handled by the axios
       // interceptor (refresh or logout).
       console.error('[SubscriptionContext] status fetch failed:', err);
@@ -97,7 +97,7 @@ export function SubscriptionProvider({ children }) {
   // When a mutation is rejected because the household's entitlement has
   // expired, we bounce them to the subscribe page and refresh the context
   // so the UI reflects their current billing state. Skip if we're already
-  // on /subscribe or any /subscription/* page — otherwise a 402 from the
+  // on /subscribe or any /subscription/* page - otherwise a 402 from the
   // subscribe page's own checkout call would cause a redirect loop back
   // to itself.
   useEffect(() => {
@@ -134,7 +134,7 @@ export function SubscriptionProvider({ children }) {
     };
   }, [fetchStatus]);
 
-  // Derived flags — computed once per render so consumers can reference
+  // Derived flags - computed once per render so consumers can reference
   // them without reimplementing the logic everywhere.
   //
   // Internal accounts are treated as always-active: the backend already
@@ -148,12 +148,12 @@ export function SubscriptionProvider({ children }) {
   return (
     <SubscriptionContext.Provider value={{
       status: effectiveStatus,
-      rawStatus: status, // unfiltered — useful for admin views
+      rawStatus: status, // unfiltered - useful for admin views
       daysRemaining: isInternal ? null : daysRemaining,
       trialEndsAt,
       plan,
       currency, // 'gbp' | 'usd' | 'eur' | 'aud' | 'cad' | 'zar' | null
-      provider, // 'stripe' | 'apple' | null — drives Manage-button routing
+      provider, // 'stripe' | 'apple' | null - drives Manage-button routing
       isInternal,
       isActive,
       isTrialing,
@@ -184,7 +184,7 @@ export function useSubscription() {
 
 /**
  * Returns true when the current household can perform mutating actions.
- * Single source of truth for the read-only UI gating across the app —
+ * Single source of truth for the read-only UI gating across the app -
  * pages call this instead of re-implementing the "active || trialing ||
  * internal" check.
  *

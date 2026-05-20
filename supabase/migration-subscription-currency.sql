@@ -1,4 +1,4 @@
--- Multi-currency Tier 1 — schema migration for the currency a household
+-- Multi-currency Tier 1 - schema migration for the currency a household
 -- is billed in.
 --
 -- Adds the column the Stripe webhook handler writes when a subscription
@@ -11,16 +11,16 @@
 -- • `subscription_currency` mirrors the Stripe Price's currency code in
 --   lowercase ISO-4217 (`gbp`, `usd`, `eur`, `aud`, `cad`, `zar`).
 --   Lowercase because that's exactly what Stripe returns in its API
---   responses — keeping the same casing avoids a normalisation step in
+--   responses - keeping the same casing avoids a normalisation step in
 --   both directions.
 --
 -- • Nullable, no default. Existing households haven't been billed in any
---   specific currency until they checked out — leaving NULL is more
+--   specific currency until they checked out - leaving NULL is more
 --   honest than backfilling to 'gbp'. The webhook handler populates it
 --   on checkout.session.completed and customer.subscription.updated.
 --
 -- • CHECK constraint guards against typos / unexpected currencies.
---   Update the IN list when adding new locales — Tier 1 ships with six.
+--   Update the IN list when adding new locales - Tier 1 ships with six.
 --
 -- • Idempotent: every statement uses IF NOT EXISTS / DO block guards.
 --
