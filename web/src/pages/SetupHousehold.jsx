@@ -167,7 +167,7 @@ export default function SetupHousehold() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. The Shapiros"
+              placeholder="e.g. Smith"
               autoFocus
               style={{
                 width: '100%',
