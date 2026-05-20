@@ -1180,11 +1180,28 @@ export default function Settings() {
                 onChange={(e) => setNewFeedUrl(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="text-xs text-cocoa">
-                <span className="font-medium">Apple:</span> sign in at <a href="https://www.icloud.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">iCloud.com</a> &rarr; Calendar &rarr; click the share icon next to your calendar &rarr; tick &ldquo;Public Calendar&rdquo; &rarr; copy URL.<br />
-                <span className="font-medium">Google:</span> <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> &rarr; Settings for my calendars &rarr; pick a calendar &rarr; Integrate calendar &rarr; copy &ldquo;Secret address in iCal format&rdquo;.<br />
-                <span className="font-medium">Outlook:</span> <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> &rarr; Settings &rarr; Shared calendars &rarr; Publish a calendar &rarr; pick &ldquo;Can view all details&rdquo; &rarr; copy ICS URL.
-              </p>
+              {/* Instructions adapt to platform — the desktop iCloud.com /
+                  Google Calendar / Outlook publish flows are completely
+                  different (and mostly impossible) on a phone. iOS users
+                  get a much simpler Apple path via the Calendar app;
+                  Google + Outlook honestly tell them they need a desktop
+                  for those two. Web users see the desktop instructions. */}
+              {Capacitor.isNativePlatform() ? (
+                <div className="text-xs text-cocoa space-y-2">
+                  <p>
+                    <span className="font-medium">Apple:</span> open the iPhone <span className="font-medium">Calendar</span> app &rarr; tap <span className="font-medium">Calendars</span> at the bottom &rarr; tap <span className="font-medium">(i)</span> next to a calendar &rarr; turn on <span className="font-medium">Public Calendar</span> &rarr; tap <span className="font-medium">Share Link…</span> &rarr; <span className="font-medium">Copy</span>.
+                  </p>
+                  <p>
+                    <span className="font-medium">Google or Outlook:</span> you&apos;ll need a desktop browser to get the iCal URL — open <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> or <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> on a computer, follow their publish-calendar flow, then paste the URL back here.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-cocoa">
+                  <span className="font-medium">Apple:</span> sign in at <a href="https://www.icloud.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">iCloud.com</a> &rarr; Calendar &rarr; click the share icon next to your calendar &rarr; tick &ldquo;Public Calendar&rdquo; &rarr; copy URL.<br />
+                  <span className="font-medium">Google:</span> <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> &rarr; Settings for my calendars &rarr; pick a calendar &rarr; Integrate calendar &rarr; copy &ldquo;Secret address in iCal format&rdquo;.<br />
+                  <span className="font-medium">Outlook:</span> <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> &rarr; Settings &rarr; Shared calendars &rarr; Publish a calendar &rarr; pick &ldquo;Can view all details&rdquo; &rarr; copy ICS URL.
+                </p>
+              )}
               <div className="flex gap-2">
                 <button
                   type="submit"
