@@ -1171,7 +1171,7 @@ export default function Settings() {
             )}
           </div>
           <p className="text-xs text-cocoa mb-3">
-            Show events from another calendar (Apple, Google, Outlook, school, sports) inside Housemait. Read-only — edits happen in the source calendar.
+            Show external calendars not already on your phone — school timetables, sports fixtures, shared family calendars from a URL. Visible to everyone in your household. Read-only — edits happen in the source calendar.
           </p>
 
           {showAddFeed && (

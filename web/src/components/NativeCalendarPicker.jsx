@@ -100,7 +100,10 @@ export default function NativeCalendarPicker() {
     <div>
       <h3 className="text-sm font-semibold text-bark mb-1">iPhone Calendar</h3>
       <p className="text-xs text-cocoa mb-3">
-        Show events from your phone&apos;s Calendar app inside Housemait. Read-only — edits happen in Apple Calendar.
+        Show your personal calendars from this iPhone (Apple, Google, Outlook — anything you&apos;ve added to iOS Calendar). Visible only to you on this device. Read-only.
+      </p>
+      <p className="text-xs text-cocoa mb-3" style={{ fontStyle: 'italic' }}>
+        Heads-up: if you&apos;ve already added a calendar in &ldquo;Subscribed calendars&rdquo; below, don&apos;t enable it here too — you&apos;ll see duplicates.
       </p>
 
       {status === 'not_determined' && (
