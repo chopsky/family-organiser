@@ -287,7 +287,10 @@ function formatTaskList(tasks, heading = 'Tasks') {
     const overdue = t.due_date < today;
     const dueToday = t.due_date === today;
     const statusIcon = overdue ? '🔴' : dueToday ? '🟡' : '⚪';
-    const who = t.assigned_to_name ? ` - ${t.assigned_to_name}` : ' - Everyone';
+    const names = Array.isArray(t.assigned_to_names) ? t.assigned_to_names.filter(Boolean) : [];
+    const who = names.length === 0 ? ' - Everyone'
+      : names.length === 1 ? ` - ${names[0]}`
+      : ` - ${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
     const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
     const dateLabel = overdue
       ? ` _(overdue: ${t.due_date})_`
@@ -325,7 +328,10 @@ function formatCandidate(kind, row) {
   }
   if (kind === 'task') {
     const due = row.due_date ? ` (due ${row.due_date})` : '';
-    const who = row.assigned_to_name ? ` - ${row.assigned_to_name}` : '';
+    const names = Array.isArray(row.assigned_to_names) ? row.assigned_to_names.filter(Boolean) : [];
+    const who = names.length === 0 ? ''
+      : names.length === 1 ? ` - ${names[0]}`
+      : ` - ${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
     return `${row.title}${due}${who}`;
   }
   // shopping
@@ -364,6 +370,11 @@ async function handleModifyIntent(result, user, household) {
       candidates = await db.findEventsByFuzzyTitle(household.id, title, { dateHint: extractDateFromContext(target.context, household) });
     } else if (isTask) {
       kind = 'task';
+      // The classifier still emits a singular target.assigned_to_name as a
+      // disambiguator when the user names a specific person on update/
+      // delete intents ("delete Lynn's eye-drop task"). Multi-assignee
+      // tasks are matched if ANY of their assignees match that name -
+      // handled inside findTasksByFuzzyTitle.
       candidates = await db.findTasksByFuzzyTitle(household.id, title, { assignedToName: target.assigned_to_name });
     } else {
       kind = 'shopping';
@@ -597,13 +608,13 @@ function buildEventUpdates(updates, existing, household, user) {
   if (updates.description !== undefined && updates.description !== null) patch.description = updates.description;
   if (updates.all_day !== undefined && updates.all_day !== null) patch.all_day = !!updates.all_day;
 
-  // Reassign via names → ids
-  if (Array.isArray(updates.assigned_to_names) && updates.assigned_to_names.length > 0) {
-    const first = household.members.find(m => m.name.toLowerCase() === String(updates.assigned_to_names[0]).toLowerCase());
-    if (first) {
-      patch.assigned_to = first.id;
-      patch.assigned_to_name = first.name;
-    }
+  // Reassign via names → parallel id + name arrays. The classifier emits
+  // the full list of names the user mentioned; we resolve each against
+  // the household roster and drop anything that doesn't match.
+  if (Array.isArray(updates.assigned_to_names)) {
+    const { ids, names } = db.resolveAssignees(updates.assigned_to_names, household.members);
+    patch.assigned_to_ids = ids;
+    patch.assigned_to_names = names;
   }
 
   // Date/time changes. Three flavours:
@@ -671,12 +682,10 @@ function buildTaskUpdates(updates, existing, household) {
   if (updates.priority) patch.priority = updates.priority;
   if (updates.recurrence !== undefined) patch.recurrence = updates.recurrence;
 
-  if (Array.isArray(updates.assigned_to_names) && updates.assigned_to_names.length > 0) {
-    const first = household.members.find(m => m.name.toLowerCase() === String(updates.assigned_to_names[0]).toLowerCase());
-    if (first) {
-      patch.assigned_to = first.id;
-      patch.assigned_to_name = first.name;
-    }
+  if (Array.isArray(updates.assigned_to_names)) {
+    const { ids, names } = db.resolveAssignees(updates.assigned_to_names, household.members);
+    patch.assigned_to_ids = ids;
+    patch.assigned_to_names = names;
   }
   return patch;
 }
@@ -709,10 +718,13 @@ function buildShoppingUpdates(updates) {
  */
 async function createCalendarEventFromResult(ev, user, household, actions) {
   try {
-    // Support both assigned_to_names (array) and legacy assigned_to_name (string)
-    const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
-    const firstAssignee = assigneeNames.length > 0
-      ? household.members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
+    // Resolve every name the classifier emitted, dropping any that don't
+    // match the household roster. Pick the first matched member to drive
+    // the event chip colour (still one colour per chip).
+    const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+    const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, household.members);
+    const firstAssignee = assigneeIds.length > 0
+      ? household.members.find(m => m.id === assigneeIds[0])
       : null;
 
     const userTz = user.timezone || household.timezone || 'Europe/London';
@@ -735,8 +747,8 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
       start_time: startTime,
       end_time: endTime,
       all_day: !!ev.all_day,
-      assigned_to: firstAssignee?.id || null,
-      assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+      assigned_to_ids: assigneeIds,
+      assigned_to_names: assigneeNames,
       color: firstAssignee?.color_theme || 'lavender',
       location: ev.location || null,
       description: ev.description || null,
@@ -1161,9 +1173,10 @@ async function handleTextMessage(text, user, household) {
   if (result.intent === 'school_event' && result.calendar_event) {
     try {
       const ev = result.calendar_event;
-      const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
-      const firstAssignee = assigneeNames.length > 0
-        ? household.members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
+      const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+      const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, household.members);
+      const firstAssignee = assigneeIds.length > 0
+        ? household.members.find(m => m.id === assigneeIds[0])
         : null;
 
       const userTz = user.timezone || household.timezone || 'Europe/London';
@@ -1175,8 +1188,8 @@ async function handleTextMessage(text, user, household) {
         start_time: startTime,
         end_time: endTime,
         all_day: !!ev.all_day,
-        assigned_to: firstAssignee?.id || null,
-        assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+        assigned_to_ids: assigneeIds,
+        assigned_to_names: assigneeNames,
         color: firstAssignee?.color_theme || 'sky',
         location: ev.location || null,
         description: ev.description || null,
@@ -1315,7 +1328,14 @@ async function handleTextMessage(text, user, household) {
     }
     const unmatchedCompletions = [];
     for (const t of toComplete) {
-      const done = await db.completeTasksByName(household.id, [t.title], t.assigned_to_name);
+      // The classifier may emit either the new assigned_to_names (array)
+      // or the legacy singular assigned_to_name. Take the first name in
+      // the array as the disambiguator since completeTasksByName accepts
+      // a single name.
+      const completionAssignee = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length > 0
+        ? t.assigned_to_names[0]
+        : t.assigned_to_name;
+      const done = await db.completeTasksByName(household.id, [t.title], completionAssignee);
       if (done.length === 0) {
         // Nothing actually got ticked. Track the requested title so we
         // can correct the AI's (overconfident) response message below.
@@ -1501,9 +1521,10 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
     const created = [];
     for (const ev of scan.events) {
       try {
-        const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
-        const firstAssignee = assigneeNames.length > 0
-          ? members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
+        const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+        const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
+        const firstAssignee = assigneeIds.length > 0
+          ? members.find(m => m.id === assigneeIds[0])
           : null;
 
         const startTime = ev.all_day
@@ -1518,8 +1539,8 @@ async function handlePhoto(imageBuffer, mimeType, user, household) {
           start_time: startTime,
           end_time: endTime,
           all_day: !!ev.all_day,
-          assigned_to: firstAssignee?.id || null,
-          assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+          assigned_to_ids: assigneeIds,
+          assigned_to_names: assigneeNames,
           color: firstAssignee?.color_theme || 'lavender',
           location: ev.location || null,
           description: ev.description || null,

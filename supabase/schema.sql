@@ -114,19 +114,20 @@ create table if not exists shopping_items (
 
 -- tasks
 create table if not exists tasks (
-  id                uuid primary key default gen_random_uuid(),
-  household_id      uuid references households(id) on delete cascade,
-  title             text not null,
-  assigned_to       uuid references users(id) on delete set null,
-  assigned_to_name  text,
-  due_date          date not null default current_date,
-  recurrence        text check (recurrence in ('daily', 'weekly', 'biweekly', 'monthly', 'yearly')),
-  priority          text not null default 'medium' check (priority in ('low', 'medium', 'high')),
-  completed         boolean not null default false,
-  completed_at      timestamp with time zone,
-  added_by          uuid references users(id) on delete set null,
-  created_at        timestamp with time zone default now()
+  id                 uuid primary key default gen_random_uuid(),
+  household_id       uuid references households(id) on delete cascade,
+  title              text not null,
+  assigned_to_ids    uuid[] not null default '{}',
+  assigned_to_names  text[] not null default '{}',
+  due_date           date not null default current_date,
+  recurrence         text check (recurrence in ('daily', 'weekly', 'biweekly', 'monthly', 'yearly')),
+  priority           text not null default 'medium' check (priority in ('low', 'medium', 'high')),
+  completed          boolean not null default false,
+  completed_at       timestamp with time zone,
+  added_by           uuid references users(id) on delete set null,
+  created_at         timestamp with time zone default now()
 );
+create index if not exists tasks_assigned_to_ids_idx on tasks using gin (assigned_to_ids);
 
 -- invites
 create table if not exists invites (
@@ -173,11 +174,12 @@ create table if not exists calendar_events (
   color            text not null default 'sage'
                      check (color in ('sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate')),
   recurrence       text check (recurrence in ('daily', 'weekly', 'biweekly', 'monthly', 'yearly')),
-  assigned_to      uuid references users(id) on delete set null,
-  assigned_to_name text,
+  assigned_to_ids   uuid[] not null default '{}',
+  assigned_to_names text[] not null default '{}',
   created_by       uuid references users(id) on delete set null,
   created_at       timestamp with time zone default now()
 );
+create index if not exists calendar_events_assigned_to_ids_idx on calendar_events using gin (assigned_to_ids);
 
 -- calendar_feed_tokens
 create table if not exists calendar_feed_tokens (

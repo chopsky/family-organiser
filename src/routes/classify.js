@@ -142,7 +142,10 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           if (toComplete.length) {
             ops.push((async () => {
               for (const t of toComplete) {
-                const done = await db.completeTasksByName(req.householdId, [t.title], t.assigned_to_name);
+                const completionAssignee = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length > 0
+                  ? t.assigned_to_names[0]
+                  : t.assigned_to_name;
+                const done = await db.completeTasksByName(req.householdId, [t.title], completionAssignee);
                 for (const completedTask of done) {
                   if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
                 }
@@ -171,15 +174,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             category: ev.category || 'general',
             recurrence: ev.recurrence || null,
           };
-          // Support both assigned_to_names (array) and legacy assigned_to_name (string)
-          const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
-          if (assigneeNames.length > 0) {
-            const firstMatch = members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase());
-            if (firstMatch) {
-              eventData.assigned_to = firstMatch.id;
-              eventData.assigned_to_name = firstMatch.name;
-            }
-          }
+          // Resolve every name the classifier emitted into parallel
+          // id/name arrays. Names not in the household are silently
+          // dropped by resolveAssignees.
+          const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+          const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
+          eventData.assigned_to_ids = assigneeIds;
+          eventData.assigned_to_names = assigneeNames;
           ops.push((async () => {
             const created = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
             if (created && assigneeNames.length > 0) {

@@ -21,15 +21,19 @@ function formatEventTime(iso, tz) {
 }
 
 /**
- * Render the assignee bracket for an event. Multi-assignee events
- * (events with an `assignees` array) are comma-joined; legacy single-
- * assignee events fall back to `assigned_to_name`.
+ * Render the assignee bracket for an event. Prefers the join-table
+ * `assignees` list (per-event reminder fanout, populated by the routes
+ * layer); falls back to the event row's `assigned_to_names` array if
+ * the join table wasn't queried.
  */
 function formatEventAssignee(ev) {
   if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
     return ev.assignees.map(a => a.member_name).filter(Boolean).join(', ');
   }
-  return ev.assigned_to_name || '';
+  if (Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0) {
+    return ev.assigned_to_names.filter(Boolean).join(', ');
+  }
+  return '';
 }
 
 /**

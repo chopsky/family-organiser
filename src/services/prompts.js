@@ -12,9 +12,10 @@ The current user (sender of this message) is: {{SENDER}}.
 
 SENDER RESOLUTION:
 - When the sender uses "me", "I", "my", "mine", or "myself", resolve it to their own name ({{SENDER}}).
-- Example: "Remind me to book car service" → assigned_to_name: "{{SENDER}}".
+- "me AND X" / "X and me" / "us" with named people → include {{SENDER}} in the array, e.g. "remind Lynn and me" → ["Lynn", "{{SENDER}}"].
+- Example: "Remind me to book car service" → assigned_to_names: ["{{SENDER}}"].
 - Example: "Add my dentist appointment on Monday" → assigned_to_names: ["{{SENDER}}"].
-- Only assign to null ("everyone") when the message genuinely has no specific owner, e.g. "we need milk" or "remind us to lock the door".
+- Only emit an empty array [] ("everyone") when the message genuinely has no specific owner, e.g. "we need milk" or "remind us to lock the door".
 
 SAVED HOUSEHOLD NOTES:
 {{NOTES}}
@@ -105,7 +106,7 @@ ALLERGY & DIETARY RULES:
 CALENDAR EVENT RULES:
 - Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), assigned_to_names, location, and description
 - Resolve relative dates: "Monday", "next Saturday", "tomorrow" → actual YYYY-MM-DD
-- assigned_to_names: array of exact names from member list who are involved in this event, e.g. ["Grant", "Mason"]. If only one person, still use an array: ["Mason"]. Use null if no one specific is mentioned.
+- assigned_to_names: array of EVERY name the user mentioned, e.g. ["Grant", "Mason"]. If only one person, still use an array: ["Mason"]. If multiple ("Lynn AND Grant", "the parents", "us"), include ALL of them - never drop the second name. Empty array [] means no one specific (a family-wide event).
 - location: venue or address if mentioned, or null
 - description: any extra details, or null
 - For events with no specific time, set all_day to true
@@ -133,8 +134,13 @@ TASK RULES:
 - "Next week same day" / "same day next week" / "this day next week" means today's weekday + 7 days. Use the weekday from the "Today's date is" line above - do NOT infer the weekday from an unrelated existing task in the OPEN TASKS list. The user is anchoring to TODAY, not to any other task.
 - CRITICAL: when computing a relative due_date ("next week", "in a week", "this day next week"), the ONLY anchor is today's date (from the "Today's date is" line). Do NOT copy a date or weekday from a same-titled task in OPEN TASKS - even if the topic matches. OPEN TASKS is reference for completion-matching only, never a date source for new tasks. If today is Wednesday 2026-05-20 and the user says "remind me next week same day", the answer is 2026-05-27 (Wednesday), regardless of whether OPEN TASKS contains a Tuesday or Friday task with the same topic.
 - "Every week after" / "every week" / "weekly" → recurrence: "weekly". When combined with "next week same day", the first due_date is (today + 7 days) and recurrence is weekly. Do not also emit a separate non-recurring task for the same series - one task with recurrence covers all future occurrences.
-- Resolve person references: "remind Dad", "Jake needs to" → use exact member name from the list, or null if unclear
-- assigned_to_name: exact name from member list, or null (meaning everyone)
+- Resolve person references: "remind Dad", "Jake needs to" → use exact member name from the list
+- assigned_to_names: ARRAY of exact names from member list. Examples:
+  • "remind Lynn to feed the cat" → ["Lynn"]
+  • "remind Lynn AND Grant to give Logan eye drops" → ["Lynn", "Grant"] (BOTH names - never drop the second)
+  • "we need to take the bins out" → [] (no specific person = everyone)
+  • "remind me" → ["{{SENDER}}"]
+  Always emit an array. Empty array [] means "everyone in the household". Never use a singular assigned_to_name field for tasks.
 - recurrence: daily | weekly | biweekly | monthly | yearly | null
 - priority: low | medium | high - infer from urgency language; default is medium
 - action must be "add" or "complete"
@@ -277,7 +283,7 @@ Respond only with valid JSON matching this schema:
   "tasks": [
     {
       "title": string,
-      "assigned_to_name": string | null,
+      "assigned_to_names": string[],
       "due_date": string,
       "recurrence": "daily" | "weekly" | "biweekly" | "monthly" | "yearly" | null,
       "priority": "low" | "medium" | "high",
@@ -452,9 +458,9 @@ When the user asks you to DO something (add an event, add to shopping list, crea
 
 ### Calendar Events
 \`\`\`json
-{"action": "create_event", "title": "Event title", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "all_day": false, "assigned_to": "member name or null", "location": "venue or null", "description": "extra details or null"}
+{"action": "create_event", "title": "Event title", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "all_day": false, "assigned_to_names": ["member name", ...], "location": "venue or null", "description": "extra details or null"}
 \`\`\`
-For all-day events, set all_day to true and omit start_time/end_time. assigned_to should match a family member name exactly, or be null. location and description are optional.
+For all-day events, set all_day to true and omit start_time/end_time. The assigned_to_names field is an array of exact family-member names; pass [] for a family-wide event. If the user mentions more than one person ("Lynn and me", "the parents"), include ALL of them.
 
 ### Shopping Items
 \`\`\`json
@@ -464,8 +470,9 @@ Valid categories: Dairy & Eggs, Produce, Meat & Seafood, Pantry & Grains, Bakery
 
 ### Tasks
 \`\`\`json
-{"action": "create_task", "title": "Task title", "assigned_to": "member name or null", "due_date": "YYYY-MM-DD or null"}
+{"action": "create_task", "title": "Task title", "assigned_to_names": ["member name", ...], "due_date": "YYYY-MM-DD or null"}
 \`\`\`
+The assigned_to_names field is an array; pass [] for an unassigned (everyone) task. Include every named person.
 
 ### Recipes
 When a user asks for a recipe, meal idea, or cooking help, ALWAYS create a recipe action to save it to their Recipe Box. Keep recipes simple and family-friendly - busy families need practical meals, not restaurant-quality complexity.
@@ -642,7 +649,7 @@ Respond only with valid JSON matching this schema:
     {
       "title": string,
       "due_date": "YYYY-MM-DD" | null,
-      "assigned_to_name": string | null,
+      "assigned_to_names": string[],
       "priority": "low" | "medium" | "high"
     }
   ]

@@ -169,11 +169,26 @@ async function sendAdminAlert(subject, body) {
 async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
   const { completedTasks, completedShopping, outstandingTasks, upcomingTasks } = data;
 
+  // Render the assignee list for a task row: "Lynn", "Lynn & Grant", or
+  // "Everyone" for an empty array. Used by every section below.
+  function formatAssignees(t) {
+    const names = Array.isArray(t.assigned_to_names) ? t.assigned_to_names.filter(Boolean) : [];
+    if (names.length === 0) return 'Everyone';
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+  }
+
   // ── Completed section ─────────────────────────────────────────────────────
+  // Per-person tally counts a multi-assignee task once for each named
+  // person (matches the jobs/digest.js behaviour).
   const byPerson = {};
   for (const t of completedTasks) {
-    const key = t.assigned_to_name || 'Everyone';
-    byPerson[key] = (byPerson[key] || 0) + 1;
+    const names = Array.isArray(t.assigned_to_names) ? t.assigned_to_names.filter(Boolean) : [];
+    if (names.length === 0) {
+      byPerson['Everyone'] = (byPerson['Everyone'] || 0) + 1;
+    } else {
+      for (const n of names) byPerson[n] = (byPerson[n] || 0) + 1;
+    }
   }
   const completedRows = Object.entries(byPerson)
     .map(([name, count]) => `<tr><td style="padding:4px 12px 4px 0;color:${BRAND.ink};">${name}</td><td style="padding:4px 0;color:${BRAND.plum};font-weight:600;">${count} task${count !== 1 ? 's' : ''}</td></tr>`)
@@ -182,7 +197,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
   // ── Outstanding / carrying over ───────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
   const outstandingRows = outstandingTasks.slice(0, 10).map((t) => {
-    const who = t.assigned_to_name || 'Everyone';
+    const who = formatAssignees(t);
     const daysOverdue = Math.max(0, Math.floor((new Date(today) - new Date(t.due_date)) / 86400000));
     // Overdue = red, due today = amber - semantic colours, deliberately not
     // brand plum. Users should recognise urgency regardless of brand.
@@ -198,7 +213,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 
   // ── Upcoming next week ────────────────────────────────────────────────────
   const upcomingRows = upcomingTasks.slice(0, 8).map((t) => {
-    const who = t.assigned_to_name || 'Everyone';
+    const who = formatAssignees(t);
     const dayName = new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     const rec = t.recurrence ? ` <span style="color:${BRAND.inkLight};font-size:11px;">(${t.recurrence})</span>` : '';
     return `<tr>

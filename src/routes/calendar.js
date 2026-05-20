@@ -277,10 +277,15 @@ router.get('/month', async (req, res) => {
 
 /**
  * POST /api/calendar/events
- * Body: { title, start_time, end_time, all_day?, description?, location?, color?, recurrence?, assigned_to_name?, reminders?, assigned_to_names? }
+ * Body: { title, start_time, end_time, all_day?, description?, location?,
+ *         color?, recurrence?, assigned_to_names?: string[], reminders? }
+ *
+ * `assigned_to_names` is an array of household member names. Names not
+ * in the household are dropped silently. Empty array (or omitted) means
+ * "no specific person" - shown as a household event.
  */
 router.post('/events', async (req, res) => {
-  const { title, start_time, end_time, all_day, description, location, color, recurrence, assigned_to_name, reminders, assigned_to_names, force } = req.body;
+  const { title, start_time, end_time, all_day, description, location, color, recurrence, reminders, assigned_to_names, force } = req.body;
 
   if (!title?.trim()) {
     return res.status(400).json({ error: '"title" is required' });
@@ -333,17 +338,20 @@ router.post('/events', async (req, res) => {
     if (color) eventData.color = color;
     if (recurrence) eventData.recurrence = recurrence;
 
-    if (assigned_to_name) {
-      const user = await db.findUserByName(req.householdId, assigned_to_name);
-      if (user) {
-        eventData.assigned_to = user.id;
-        eventData.assigned_to_name = user.name;
-      }
+    // Resolve assignee names → parallel id + name arrays. createCalendarEvent
+    // writes both arrays to the calendar_events row.
+    if (Array.isArray(assigned_to_names) && assigned_to_names.length > 0) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      const { ids, names } = db.resolveAssignees(assigned_to_names, members);
+      eventData.assigned_to_ids = ids;
+      eventData.assigned_to_names = names;
     }
 
     const event = await db.createCalendarEvent(req.householdId, eventData, req.user.id);
 
-    // Save reminders and assignees (fire-and-forget errors to avoid blocking response)
+    // Save reminders + event_assignees (the separate per-person reminder
+    // system - independent of the calendar_events.assigned_to_ids
+    // column, which drives the calendar chip + dashboard filter).
     try {
       if (reminders && Array.isArray(reminders) && reminders.length > 0) {
         await db.saveEventReminders(event.id, req.householdId, reminders, event.start_time);
@@ -396,7 +404,7 @@ router.post('/events', async (req, res) => {
  * Body: any subset of event fields
  */
 router.patch('/events/:id', async (req, res) => {
-  const { color, recurrence, assigned_to_name, reminders, assigned_to_names, ...rest } = req.body;
+  const { color, recurrence, reminders, assigned_to_names, ...rest } = req.body;
 
   if (color && !VALID_COLORS.includes(color)) {
     return res.status(400).json({ error: `Invalid color "${color}". Must be one of: ${VALID_COLORS.join(', ')}` });
@@ -410,16 +418,13 @@ router.patch('/events/:id', async (req, res) => {
     if (color) updates.color = color;
     if (recurrence !== undefined) updates.recurrence = recurrence;
 
-    if (assigned_to_name) {
-      const user = await db.findUserByName(req.householdId, assigned_to_name);
-      if (user) {
-        updates.assigned_to = user.id;
-        updates.assigned_to_name = user.name;
-      }
-    } else if (assigned_to_name === null) {
-      // Explicitly unassign
-      updates.assigned_to = null;
-      updates.assigned_to_name = null;
+    // Replace the full assignee list. Passing [] clears it (= no specific
+    // person). undefined means "don't touch".
+    if (assigned_to_names !== undefined) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      const { ids, names } = db.resolveAssignees(assigned_to_names || [], members);
+      updates.assigned_to_ids = ids;
+      updates.assigned_to_names = names;
     }
 
     const event = await db.updateCalendarEvent(req.params.id, req.householdId, updates);

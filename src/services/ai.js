@@ -44,13 +44,23 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   // event is at 1PM. Both date and time need the override because events
   // near midnight can flip dates across timezones too.
   const userTz = timezone || 'UTC';
+  // Format a list of assignee names as " (Lynn & Grant)" / " (Lynn)" /
+  // empty. Drops nulls and falls back to empty string for the
+  // no-specific-person ("Everyone") case so the AI doesn't see a literal
+  // "Everyone" token that could be confused for a member name.
+  function formatWho(row) {
+    const names = Array.isArray(row.assigned_to_names) ? row.assigned_to_names.filter(Boolean) : [];
+    if (names.length === 0) return '';
+    if (names.length === 1) return ` (${names[0]})`;
+    return ` (${names.slice(0, -1).join(', ')} & ${names[names.length - 1]})`;
+  }
+
   const cappedEvents = calendarEvents.slice(0, 100);
   const calendarStr = cappedEvents.length > 0
     ? cappedEvents.map(e => {
         const date = new Date(e.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: userTz });
         const time = e.all_day ? 'All day' : new Date(e.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: userTz });
-        const who = e.assigned_to_name ? ` (${e.assigned_to_name})` : '';
-        return `- ${date} ${time}: ${e.title}${who}${e.location ? ` @ ${e.location}` : ''}`;
+        return `- ${date} ${time}: ${e.title}${formatWho(e)}${e.location ? ` @ ${e.location}` : ''}`;
       }).join('\n') + (calendarEvents.length > 100 ? `\n... and ${calendarEvents.length - 100} more events` : '')
     : '(no upcoming events)';
 
@@ -63,9 +73,8 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
         const due = t.due_date
           ? new Date(`${t.due_date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: userTz })
           : 'no due date';
-        const who = t.assigned_to_name ? ` (${t.assigned_to_name})` : '';
         const priority = t.priority && t.priority !== 'medium' ? ` [${t.priority}]` : '';
-        return `- "${t.title}"${who} - due ${due}${priority}`;
+        return `- "${t.title}"${formatWho(t)} - due ${due}${priority}`;
       }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
     : '(no open tasks)';
 

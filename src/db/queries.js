@@ -1284,20 +1284,46 @@ async function completeShoppingItemById(id, db = supabase) {
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
+// Resolve a list of member names to a parallel { ids, names } pair using
+// the supplied household members list. Names that don't match a member
+// are dropped silently (the classifier sometimes hallucinates a name that
+// isn't in the household). Returns canonical-cased names so the stored
+// row matches how the member is listed elsewhere.
+function resolveAssignees(rawNames, members = []) {
+  const ids = [];
+  const names = [];
+  if (!Array.isArray(rawNames)) return { ids, names };
+  for (const raw of rawNames) {
+    if (!raw || typeof raw !== 'string') continue;
+    const member = members.find((m) => m.name.toLowerCase() === raw.toLowerCase());
+    if (!member) continue;
+    if (ids.includes(member.id)) continue;
+    ids.push(member.id);
+    names.push(member.name);
+  }
+  return { ids, names };
+}
+
+// Accept either the new assigned_to_names: string[] field or the legacy
+// singular assigned_to_name: string field on the input task. Callers in
+// the bot and routes may still pass the singular form during the
+// transition window.
+function pickAssigneeNames(t) {
+  if (Array.isArray(t.assigned_to_names)) return t.assigned_to_names;
+  if (t.assigned_to_name) return [t.assigned_to_name];
+  return [];
+}
+
 async function addTasks(householdId, tasks, addedByUserId, members = [], db = supabase) {
   if (!tasks.length) return [];
 
-  const rows = await Promise.all(tasks.map(async (t) => {
-    let assignedToId = null;
-    if (t.assigned_to_name) {
-      const member = members.find((m) => m.name.toLowerCase() === t.assigned_to_name.toLowerCase());
-      assignedToId = member ? member.id : null;
-    }
+  const rows = tasks.map((t) => {
+    const { ids, names } = resolveAssignees(pickAssigneeNames(t), members);
     return {
       household_id: householdId,
       title: t.title,
-      assigned_to: assignedToId,
-      assigned_to_name: t.assigned_to_name || null,
+      assigned_to_ids: ids,
+      assigned_to_names: names,
       due_date: t.due_date || new Date().toISOString().split('T')[0],
       due_time: t.due_time || null,
       recurrence: t.recurrence || null,
@@ -1306,7 +1332,7 @@ async function addTasks(householdId, tasks, addedByUserId, members = [], db = su
       notification: t.notification || null,
       added_by: addedByUserId,
     };
-  }));
+  });
 
   const { data, error } = await db.from('tasks').insert(rows).select();
   if (error) throw error;
@@ -1322,7 +1348,12 @@ async function getTasks(householdId, { assignedToId = null, includeCompleted = f
     .order('created_at');
 
   if (!includeCompleted) query = query.eq('completed', false);
-  if (assignedToId) query = query.or(`assigned_to.eq.${assignedToId},assigned_to.is.null`);
+  // assignedToId filter: include tasks where the user is in the array
+  // OR the array is empty (= "everyone"). Postgres array contains uses
+  // the PostgREST `cs` operator with the {value} literal syntax.
+  if (assignedToId) {
+    query = query.or(`assigned_to_ids.cs.{${assignedToId}},assigned_to_ids.eq.{}`);
+  }
   if (!all) {
     // Default: today + overdue only
     const today = new Date().toISOString().split('T')[0];
@@ -1397,14 +1428,17 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
   );
 
   // Soft assignee preference: when the AI provides an assignee AND the
-  // fuzzy title matched multiple candidates, prefer the ones assigned
-  // to that person. If none of the candidates match the assignee, we
-  // keep the full matched set rather than returning empty - assignee
-  // was a hint, not a gate. This stops "tasks assigned to Everyone"
-  // from being invisible just because the AI guessed a person's name.
+  // fuzzy title matched multiple candidates, prefer the ones whose
+  // assignee array includes that person. If none of the candidates
+  // match the assignee, we keep the full matched set rather than
+  // returning empty - assignee was a hint, not a gate. This stops
+  // "tasks assigned to Everyone" from being invisible just because the
+  // AI guessed a person's name.
   if (assigneeName && matched.length > 1) {
+    const target = assigneeName.toLowerCase();
     const preferred = matched.filter((t) =>
-      t.assigned_to_name && t.assigned_to_name.toLowerCase() === assigneeName.toLowerCase()
+      Array.isArray(t.assigned_to_names) &&
+      t.assigned_to_names.some((n) => n && n.toLowerCase() === target)
     );
     if (preferred.length > 0) matched = preferred;
   }
@@ -1488,8 +1522,8 @@ async function generateNextRecurrence(task, db = supabase) {
     .insert({
       household_id: task.household_id,
       title: task.title,
-      assigned_to: task.assigned_to,
-      assigned_to_name: task.assigned_to_name,
+      assigned_to_ids: task.assigned_to_ids || [],
+      assigned_to_names: task.assigned_to_names || [],
       due_date: due.toISOString().split('T')[0],
       recurrence: task.recurrence,
       priority: task.priority,
@@ -1771,7 +1805,15 @@ async function findTasksByFuzzyTitle(householdId, title, { assignedToName, limit
     .ilike('title', `%${title.trim()}%`)
     .order('due_date', { ascending: true, nullsFirst: false })
     .limit(limit);
-  if (assignedToName) query = query.ilike('assigned_to_name', assignedToName.trim());
+  // assignedToName filter: array contains the name. PostgREST array
+  // contains uses {value} literal syntax with the `cs` operator. Note
+  // this is case-sensitive on Postgres array equality, so callers should
+  // pass the canonical member name (resolveAssignees output) where
+  // possible. We keep this as a soft filter - fuzzy match still wins.
+  if (assignedToName) {
+    const trimmed = assignedToName.trim();
+    query = query.contains('assigned_to_names', [trimmed]);
+  }
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
@@ -1982,12 +2024,16 @@ async function getDefaultShoppingList(householdId, db = supabase) {
 
 async function getOverdueTasksForUser(householdId, userId, db = supabase) {
   const today = new Date().toISOString().split('T')[0];
+  // Match tasks whose assignee array contains the user. We do not also
+  // include empty-array "everyone" tasks here because the overdue digest
+  // would otherwise hammer every linked member for an unowned task -
+  // historically the single-FK version also required an explicit match.
   const { data, error } = await db
     .from('tasks')
     .select()
     .eq('household_id', householdId)
     .eq('completed', false)
-    .eq('assigned_to', userId)
+    .contains('assigned_to_ids', [userId])
     .lt('due_date', today)
     .order('due_date');
   if (error) throw error;
@@ -2000,7 +2046,7 @@ async function getTasksForUser(householdId, userId, db = supabase) {
     .select()
     .eq('household_id', householdId)
     .eq('completed', false)
-    .eq('assigned_to', userId)
+    .contains('assigned_to_ids', [userId])
     .order('due_date')
     .order('created_at');
   if (error) throw error;
@@ -2114,7 +2160,7 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
   const [eventsRes, tasksRes, schoolDatesRes] = await Promise.all([
     db
       .from('calendar_events')
-      .select('id, title, description, location, start_time, end_time, all_day, color, assigned_to_name, category')
+      .select('id, title, description, location, start_time, end_time, all_day, color, assigned_to_names, category')
       .eq('household_id', householdId)
       .is('deleted_at', null)
       .or(`title.ilike.${pattern},description.ilike.${pattern},location.ilike.${pattern}`)
@@ -2122,7 +2168,7 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
       .limit(cap),
     db
       .from('tasks')
-      .select('id, title, due_date, completed, assigned_to_name')
+      .select('id, title, due_date, completed, assigned_to_names')
       .eq('household_id', householdId)
       .ilike('title', pattern)
       .order('due_date', { ascending: false })
@@ -2158,6 +2204,14 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
 }
 
 async function createCalendarEvent(householdId, eventData, createdByUserId, db = supabase) {
+  // Accept either the new arrays or the legacy singular fields. Callers
+  // in transitional code paths may still pass assigned_to / assigned_to_name.
+  const ids = Array.isArray(eventData.assigned_to_ids)
+    ? eventData.assigned_to_ids
+    : (eventData.assigned_to ? [eventData.assigned_to] : []);
+  const names = Array.isArray(eventData.assigned_to_names)
+    ? eventData.assigned_to_names
+    : (eventData.assigned_to_name ? [eventData.assigned_to_name] : []);
   const { data, error } = await db
     .from('calendar_events')
     .insert({
@@ -2171,8 +2225,8 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
       color: eventData.color || 'sage',
       category: eventData.category || 'general',
       recurrence: eventData.recurrence || null,
-      assigned_to: eventData.assigned_to || null,
-      assigned_to_name: eventData.assigned_to_name || null,
+      assigned_to_ids: ids,
+      assigned_to_names: names,
       created_by: createdByUserId,
     })
     .select()
@@ -2224,7 +2278,7 @@ async function findSimilarEvent(householdId, title, startTime, db = supabase) {
 
   const { data, error } = await db
     .from('calendar_events')
-    .select('id, title, start_time, created_by, assigned_to_name, all_day')
+    .select('id, title, start_time, created_by, assigned_to_names, all_day')
     .eq('household_id', householdId)
     .is('deleted_at', null) // soft-deleted events shouldn't block recreation
     .ilike('title', title.trim()) // case-insensitive exact match (no wildcards)
@@ -5079,6 +5133,9 @@ module.exports = {
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,
+  // Multi-assignee helpers (shared between tasks + events + bot handlers)
+  resolveAssignees,
+  pickAssigneeNames,
   // Household subscriptions (Netflix, Spotify, etc.)
   listSubscriptions,
   createSubscription,

@@ -277,9 +277,10 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       if (emailResult?.events?.length) {
         for (const ev of emailResult.events) {
           try {
-            const assigneeNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
-            const firstAssignee = assigneeNames.length > 0
-              ? members.find(m => m.name.toLowerCase() === assigneeNames[0].toLowerCase())
+            const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+            const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
+            const firstAssignee = assigneeIds.length > 0
+              ? members.find(m => m.id === assigneeIds[0])
               : null;
 
             // AI extracts local times - store without Z suffix so the app
@@ -296,8 +297,8 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               start_time: startTime,
               end_time: endTime,
               all_day: !!ev.all_day,
-              assigned_to: firstAssignee?.id || null,
-              assigned_to_name: firstAssignee?.name || assigneeNames[0] || null,
+              assigned_to_ids: assigneeIds,
+              assigned_to_names: assigneeNames,
               color: firstAssignee?.color_theme || 'sage',
               location: ev.location || null,
               description: ev.description || null,

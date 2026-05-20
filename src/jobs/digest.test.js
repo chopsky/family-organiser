@@ -7,16 +7,29 @@ const { buildWeeklyDigestMessage } = require('./digest');
 const TODAY = new Date().toISOString().split('T')[0];
 const YESTERDAY = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
+// Translate the old singular fixture shape into the new multi-assignee
+// shape (assigned_to_names: string[]). Tests can still pass either
+// assigned_to_name (legacy) or assigned_to_names directly.
 function makeTask(overrides = {}) {
+  let names;
+  if ('assigned_to_names' in overrides) {
+    names = overrides.assigned_to_names || [];
+  } else if ('assigned_to_name' in overrides) {
+    names = overrides.assigned_to_name ? [overrides.assigned_to_name] : [];
+  } else {
+    names = ['Jake'];
+  }
+  const { assigned_to_name: _ignoredName, ...rest } = overrides;
   return {
     id: 'task-1',
     title: 'Homework',
-    assigned_to_name: 'Jake',
+    assigned_to_names: names,
     due_date: TODAY,
     recurrence: 'weekly',
     priority: 'medium',
     completed: false,
-    ...overrides,
+    ...rest,
+    assigned_to_names: names,
   };
 }
 

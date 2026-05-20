@@ -54,7 +54,7 @@ describe('classify()', () => {
       tasks: [
         {
           title: 'Do homework',
-          assigned_to_name: 'Jake',
+          assigned_to_names: ['Jake'],
           due_date: new Date().toISOString().split('T')[0],
           recurrence: 'weekly',
           priority: 'medium',
@@ -78,7 +78,7 @@ describe('classify()', () => {
     expect(result.tasks).toHaveLength(1);
     expect(result.tasks[0]).toMatchObject({
       title: 'Do homework',
-      assigned_to_name: 'Jake',
+      assigned_to_names: ['Jake'],
       recurrence: 'weekly',
       action: 'add',
     });
@@ -110,7 +110,7 @@ describe('classify()', () => {
       tasks: [
         {
           title: 'Do homework',
-          assigned_to_name: 'Jake',
+          assigned_to_names: ['Jake'],
           due_date: new Date().toISOString().split('T')[0],
           recurrence: null,
           priority: 'medium',
@@ -124,7 +124,7 @@ describe('classify()', () => {
 
     const result = await classify("Jake finished his homework", ['Sarah', 'Jake']);
     expect(result.tasks[0].action).toBe('complete');
-    expect(result.tasks[0].assigned_to_name).toBe('Jake');
+    expect(result.tasks[0].assigned_to_names).toEqual(['Jake']);
   });
 
   test('passes correct date and member names to the prompt', async () => {
@@ -150,7 +150,10 @@ describe('classify()', () => {
     // Both the "current user" line and the example inside the sender-resolution
     // block should reference the sender by name.
     expect(call.system).toContain('The current user (sender of this message) is: Grant');
-    expect(call.system).toContain('assigned_to_name: "Grant"');
+    // The sender-resolution example in the prompt was updated to the
+    // new multi-assignee shape (array of names). Confirm both that the
+    // example reflects the array form and that the sender's name is in it.
+    expect(call.system).toContain('assigned_to_names: ["Grant"]');
   });
 
   test('prompt requires an explicit date for calendar events (no silent "today")', async () => {
@@ -274,8 +277,8 @@ describe('classify()', () => {
       sender: 'Grant',
       timezone: 'Europe/London',
       tasks: [
-        { title: 'Pay Elementor', due_date: '2026-04-20', priority: 'medium', assigned_to_name: 'Grant' },
-        { title: 'Book car service', due_date: '2026-04-25', priority: 'high', assigned_to_name: 'Lynn' },
+        { title: 'Pay Elementor', due_date: '2026-04-20', priority: 'medium', assigned_to_names: ['Grant'] },
+        { title: 'Book car service', due_date: '2026-04-25', priority: 'high', assigned_to_names: ['Lynn'] },
       ],
     });
 
@@ -356,7 +359,7 @@ describe('classify()', () => {
       title: `Task ${i + 1}`,
       due_date: '2026-04-20',
       priority: 'medium',
-      assigned_to_name: null,
+      assigned_to_names: [],
     }));
 
     await classify('hi', ['Grant'], [], { sender: 'Grant', tasks: manyTasks });

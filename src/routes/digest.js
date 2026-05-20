@@ -74,11 +74,12 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
         seen.add(key);
         return true;
       });
-      // Attach the multi-assignee list (event_assignees rows) so the
-      // Dashboard can render stacked avatars + "A, B +N" name labels.
-      // Single-assignee events still surface via the legacy
-      // assigned_to_name column; only events created with the
-      // multi-select "Select members" UI populate event_assignees.
+      // Attach the multi-assignee list (event_assignees rows, the
+      // separate per-event reminder fanout table) so the Dashboard can
+      // render stacked avatars + "A, B +N" name labels. The
+      // calendar_events.assigned_to_ids/_names arrays on the row itself
+      // already carry the same data for the calendar chip; this batch
+      // join surfaces names for the dashboard summary specifically.
       try {
         const eventIds = todayEvents.map(e => e.id).filter(Boolean);
         const rows = await db.getEventAssigneesBatch(eventIds);

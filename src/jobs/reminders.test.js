@@ -6,17 +6,31 @@ const { buildDailyReminderMessage } = require('./reminders');
 
 const SARAH = { id: 'u1', name: 'Sarah' };
 
+// Normalise the singular-assignee fixture shape (legacy) into the new
+// assigned_to_names array. Tests that pass assigned_to_name: 'Ben' are
+// transparently upgraded so the reminder renderer (which reads the new
+// field) still sees the expected name.
 function makeEvent(overrides = {}) {
+  let names;
+  if ('assigned_to_names' in overrides) {
+    names = overrides.assigned_to_names || [];
+  } else if ('assigned_to_name' in overrides) {
+    names = overrides.assigned_to_name ? [overrides.assigned_to_name] : [];
+  } else {
+    names = [];
+  }
+  const { assigned_to_name: _ignored, ...rest } = overrides;
   return {
     id: 'ev-1',
     title: 'Yoram Strength Training',
     start_time: '2026-05-15T09:30:00.000Z',
     end_time: '2026-05-15T10:30:00.000Z',
     all_day: false,
-    assigned_to_name: null,
+    assigned_to_names: names,
     assignees: null,
     category: 'general',
-    ...overrides,
+    ...rest,
+    assigned_to_names: names,
   };
 }
 

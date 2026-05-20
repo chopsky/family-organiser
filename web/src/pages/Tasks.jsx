@@ -466,7 +466,9 @@ export default function Tasks() {
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState(today());
   const [dueTime, setDueTime] = useState('');
-  const [assignee, setAssignee] = useState('');
+  // Multi-assignee: an array of canonical member names. Empty array means
+  // "everyone" (the existing semantic - shown as the Unassigned column).
+  const [assignees, setAssignees] = useState([]);
   const [recurrence, setRecurrence] = useState('');
   const [description, setDescription] = useState('');
   const [notification, setNotification] = useState('');
@@ -484,7 +486,7 @@ export default function Tasks() {
     setTitle('');
     setDueDate(today());
     setDueTime('');
-    setAssignee('');
+    setAssignees([]);
     setRecurrence('');
     setDescription('');
     setNotification('');
@@ -494,7 +496,7 @@ export default function Tasks() {
 
   function openAddForm(preAssignee = '') {
     resetForm();
-    if (preAssignee) setAssignee(preAssignee);
+    if (preAssignee) setAssignees([preAssignee]);
     setShowForm(true);
   }
 
@@ -502,7 +504,16 @@ export default function Tasks() {
     setTitle(task.title);
     setDueDate(task.due_date || today());
     setDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
-    setAssignee(task.assigned_to_name || '');
+    // Accept both the new array column and the legacy single-name field
+    // so this still works during the transition (and against any cached
+    // older task rows the client may still hold).
+    setAssignees(
+      Array.isArray(task.assigned_to_names) && task.assigned_to_names.length > 0
+        ? task.assigned_to_names.filter(Boolean)
+        : task.assigned_to_name
+          ? [task.assigned_to_name]
+          : []
+    );
     setRecurrence(task.recurrence || '');
     setDescription(task.description || '');
     setNotification(task.notification || '');
@@ -602,19 +613,28 @@ export default function Tasks() {
       return 0;
     });
 
-    // Build groups: all tasks (incomplete + recently done) by assigned_to_name
+    // Build groups: a task with multiple assignees appears in each
+    // assignee's column. The single shared row drives the checkbox state,
+    // so ticking it complete in one column visually completes it in every
+    // other column on the next refresh (which is the intended shared-
+    // completion behaviour).
     const allTasks = [...tasks, ...recentDone];
     const groups = {};
     for (const name of sorted) groups[name] = { incomplete: [], completed: [] };
     groups['Unassigned'] = { incomplete: [], completed: [] };
 
     for (const task of allTasks) {
-      const key = task.assigned_to_name || 'Unassigned';
-      if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
-      if (task.completed) {
-        groups[key].completed.push(task);
-      } else {
-        groups[key].incomplete.push(task);
+      const names = Array.isArray(task.assigned_to_names) && task.assigned_to_names.length > 0
+        ? task.assigned_to_names.filter(Boolean)
+        : task.assigned_to_name ? [task.assigned_to_name] : [];
+      const keys = names.length > 0 ? names : ['Unassigned'];
+      for (const key of keys) {
+        if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
+        if (task.completed) {
+          groups[key].completed.push(task);
+        } else {
+          groups[key].incomplete.push(task);
+        }
       }
     }
 
@@ -644,7 +664,7 @@ export default function Tasks() {
           title: title.trim(),
           due_date: dueDate,
           due_time: dueTime || null,
-          assigned_to_name: assignee || null,
+          assigned_to_names: assignees,
           recurrence: recurrence || null,
           description: description || null,
           notification: notification || null,
@@ -654,7 +674,7 @@ export default function Tasks() {
       } else {
         const payload = { title: title.trim(), due_date: dueDate };
         if (dueTime) payload.due_time = dueTime;
-        if (assignee) payload.assigned_to_name = assignee;
+        if (assignees.length > 0) payload.assigned_to_names = assignees;
         if (recurrence) payload.recurrence = recurrence;
         if (description) payload.description = description;
         if (notification) payload.notification = notification;
@@ -920,22 +940,54 @@ export default function Tasks() {
               </div>
               <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Assign to</label>
-                <select
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  className="w-full focus:outline-none"
+                {/* Multi-select chip picker. Tap a name to toggle; empty
+                    selection = "everyone" (shows in the Unassigned column). */}
+                <div
+                  className="flex flex-wrap gap-2"
                   style={{
                     border: '1.5px solid var(--light-grey, #E8E5EC)',
                     borderRadius: 10,
-                    height: 48,
-                    padding: '0 14px',
-                    fontSize: 14,
+                    minHeight: 48,
+                    padding: '8px 10px',
                     background: '#fff',
                   }}
                 >
-                  <option value="">Everyone</option>
-                  {members.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
-                </select>
+                  {members.length === 0 && (
+                    <span style={{ fontSize: 13, color: 'var(--warm-grey, #6B6774)', alignSelf: 'center' }}>No members yet</span>
+                  )}
+                  {members.map((m) => {
+                    const selected = assignees.includes(m.name);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setAssignees((prev) =>
+                            prev.includes(m.name)
+                              ? prev.filter((n) => n !== m.name)
+                              : [...prev, m.name]
+                          );
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          border: selected ? '1.5px solid var(--plum, #6B3FA0)' : '1.5px solid var(--light-grey, #E8E5EC)',
+                          background: selected ? 'var(--plum-light, #F3EDFC)' : '#fff',
+                          color: selected ? 'var(--plum, #6B3FA0)' : 'var(--charcoal, #2D2A33)',
+                          cursor: 'pointer',
+                          transition: 'all 150ms ease-out',
+                        }}
+                      >
+                        {m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)', marginTop: 4 }}>
+                  {assignees.length === 0 ? 'Leave empty for everyone.' : `Assigned to ${assignees.length} ${assignees.length === 1 ? 'person' : 'people'}.`}
+                </p>
               </div>
               <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Priority</label>

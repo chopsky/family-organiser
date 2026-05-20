@@ -69,8 +69,12 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * POST /api/tasks
  * Add one or more tasks manually.
  *
- * Body: { tasks: [{ title, assigned_to_name?, due_date?, recurrence?, priority? }] }
+ * Body: { tasks: [{ title, assigned_to_names?: string[], due_date?, recurrence?, priority? }] }
  *    or: { title, ... } (single task shorthand)
+ *
+ * `assigned_to_names` is an array of household member names. Empty array
+ * (or omitted) means "everyone". Names not in the household are dropped
+ * silently by addTasks.
  */
 router.post('/', requireAuth, requireHousehold, async (req, res) => {
   let tasksInput = req.body.tasks;
@@ -99,10 +103,18 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     const members = await db.getHouseholdMembers(req.householdId);
     const saved = await db.addTasks(req.householdId, tasksInput, req.user.id, members);
 
-    // Push notifications for assigned tasks
+    // Push notifications: fan out to every assignee on every saved task.
+    // Skip the creator so they don't get pinged about their own action.
+    // Empty array (everyone) gets no targeted push - the home dashboard
+    // and digest cover that case.
     for (const task of saved) {
-      if (task.assigned_to && task.assigned_to !== req.user.id) {
-        push.sendToUser(task.assigned_to, { title: 'New task assigned', body: task.title, category: 'task_assigned' }).catch(() => {});
+      for (const uid of (task.assigned_to_ids || [])) {
+        if (uid === req.user.id) continue;
+        push.sendToUser(uid, {
+          title: 'New task assigned',
+          body: task.title,
+          category: 'task_assigned',
+        }).catch(() => {});
       }
     }
 
@@ -126,13 +138,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
  * PATCH /api/tasks/:id
  * Update task fields: any editable field.
  *
- * Body: { title?, completed?, priority?, due_date?, due_time?, assigned_to_name?,
+ * Body: { title?, completed?, priority?, due_date?, due_time?, assigned_to_names?: string[],
  *         recurrence?, description?, notification? }
+ *
+ * `assigned_to_names` replaces the entire assignee list. Pass [] to
+ * reset to "everyone".
  */
 router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   const {
     completed, priority, title, due_date, due_time,
-    assigned_to_name, recurrence, description, notification,
+    assigned_to_names, recurrence, description, notification,
   } = req.body;
 
   if (priority && !VALID_PRIORITIES.includes(priority)) {
@@ -173,16 +188,12 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       updateData.notification_sent_at = null; // Reset so notification fires again
     }
 
-    // Resolve assigned_to_name to user ID
-    if (assigned_to_name !== undefined) {
-      updateData.assigned_to_name = assigned_to_name || null;
-      if (assigned_to_name) {
-        const members = await db.getHouseholdMembers(req.householdId);
-        const member = members.find((m) => m.name.toLowerCase() === assigned_to_name.toLowerCase());
-        updateData.assigned_to = member ? member.id : null;
-      } else {
-        updateData.assigned_to = null;
-      }
+    // Resolve assigned_to_names (string[]) → parallel arrays of ids + names.
+    if (assigned_to_names !== undefined) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      const { ids, names } = db.resolveAssignees(assigned_to_names || [], members);
+      updateData.assigned_to_ids = ids;
+      updateData.assigned_to_names = names;
     }
 
     // Reset notification_sent_at if due_date or due_time changed

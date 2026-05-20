@@ -23,12 +23,27 @@ function buildWeeklyDigestMessage(user, householdName, completedTasks, completed
   // ── Completed this week ──
   lines.push(`✅ *COMPLETED THIS WEEK:* ${completedTasks.length} task${completedTasks.length !== 1 ? 's' : ''}, ${completedShopping.length} shopping item${completedShopping.length !== 1 ? 's' : ''}`);
 
+  // Format the assignee list for a task: "Lynn", "Lynn & Grant",
+  // "Lynn, Grant & Mason", or "Everyone" if empty.
+  function formatAssignees(t) {
+    const names = Array.isArray(t.assigned_to_names) ? t.assigned_to_names.filter(Boolean) : [];
+    if (names.length === 0) return 'Everyone';
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+  }
+
   if (completedTasks.length) {
-    // Summarise per person
+    // Count completions per person. A multi-assignee task counts once for
+    // each name in its assignee array so the per-person tally still adds
+    // up to a meaningful "how much did each person contribute" view.
     const byPerson = {};
     for (const t of completedTasks) {
-      const key = t.assigned_to_name || 'Everyone';
-      byPerson[key] = (byPerson[key] || 0) + 1;
+      const names = Array.isArray(t.assigned_to_names) ? t.assigned_to_names.filter(Boolean) : [];
+      if (names.length === 0) {
+        byPerson['Everyone'] = (byPerson['Everyone'] || 0) + 1;
+      } else {
+        for (const n of names) byPerson[n] = (byPerson[n] || 0) + 1;
+      }
     }
     for (const [name, count] of Object.entries(byPerson)) {
       lines.push(`  • ${name}: ${count} task${count !== 1 ? 's' : ''}`);
@@ -40,7 +55,7 @@ function buildWeeklyDigestMessage(user, householdName, completedTasks, completed
   if (outstandingTasks.length) {
     lines.push(`⏳ *CARRYING OVER:* ${outstandingTasks.length} task${outstandingTasks.length !== 1 ? 's' : ''} still outstanding`);
     for (const t of outstandingTasks.slice(0, 8)) {
-      const who = t.assigned_to_name || 'Everyone';
+      const who = formatAssignees(t);
       const overdue = t.due_date < today;
       const label = overdue ? ` _(overdue, was due ${t.due_date})_` : '';
       lines.push(`  🔴 ${who} - ${t.title}${label}`);
@@ -55,7 +70,7 @@ function buildWeeklyDigestMessage(user, householdName, completedTasks, completed
   if (upcomingTasks.length) {
     lines.push(`📅 *COMING UP NEXT WEEK:* ${upcomingTasks.length} task${upcomingTasks.length !== 1 ? 's' : ''} due`);
     for (const t of upcomingTasks.slice(0, 8)) {
-      const who = t.assigned_to_name || 'Everyone';
+      const who = formatAssignees(t);
       const dayName = new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
       const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
       lines.push(`  📌 ${dayName}: ${who} - ${t.title}${rec}`);

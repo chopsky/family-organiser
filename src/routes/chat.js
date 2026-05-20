@@ -114,11 +114,20 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const shoppingStr = shopping.filter(i => !i.completed).length > 0
     ? shopping.filter(i => !i.completed).map(i => `- ${i.item}${i.category ? ` [${i.category}]` : ''}`).join('\n')
     : '(empty)';
+  // Render the assignee list for a task/event row. Multi-assignee rows
+  // (the new model) come through as assigned_to_names[]; we display
+  // "Lynn", "Lynn & Grant" etc. Empty array shows no bracket.
+  const formatWho = (row) => {
+    const names = Array.isArray(row.assigned_to_names) ? row.assigned_to_names.filter(Boolean) : [];
+    if (names.length === 0) return '';
+    if (names.length === 1) return ` (${names[0]})`;
+    return ` (${names.slice(0, -1).join(', ')} & ${names[names.length - 1]})`;
+  };
   const tasksStr = tasks.length > 0
-    ? tasks.map(t => `- ${t.title}${t.assigned_to_name ? ` (${t.assigned_to_name})` : ''}${t.due_date ? ` due ${t.due_date}` : ''}`).join('\n')
+    ? tasks.map(t => `- ${t.title}${formatWho(t)}${t.due_date ? ` due ${t.due_date}` : ''}`).join('\n')
     : '(none)';
   const eventsStr = events.length > 0
-    ? events.map(e => `- ${e.title} on ${e.start_time?.split('T')[0] || 'TBD'}${e.assigned_to_name ? ` (${e.assigned_to_name})` : ''}`).join('\n')
+    ? events.map(e => `- ${e.title} on ${e.start_time?.split('T')[0] || 'TBD'}${formatWho(e)}`).join('\n')
     : '(none)';
 
   // Build school context
@@ -340,7 +349,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'delete_note', key: act.key });
 
         } else if (act.action === 'create_event') {
-          const assignee = act.assigned_to ? members.find(m => m.name.toLowerCase() === act.assigned_to.toLowerCase()) : null;
+          // The chat-assistant prompt still emits act.assigned_to as a
+          // single name string; treat it as a one-element array for the
+          // new multi-assignee schema and resolve via the shared helper.
+          const rawNames = Array.isArray(act.assigned_to_names)
+            ? act.assigned_to_names
+            : (act.assigned_to ? [act.assigned_to] : []);
+          const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
+          const firstAssignee = assigneeIds.length > 0
+            ? members.find(m => m.id === assigneeIds[0])
+            : null;
           const startTime = act.all_day
             ? `${act.date}T00:00:00Z`
             : localToUTC(act.date, act.start_time || '09:00', userTz);
@@ -353,9 +371,9 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             start_time: startTime,
             end_time: endTime,
             all_day: !!act.all_day,
-            assigned_to: assignee?.id || null,
-            assigned_to_name: assignee?.name || null,
-            color: assignee?.color_theme || 'lavender',
+            assigned_to_ids: assigneeIds,
+            assigned_to_names: assigneeNames,
+            color: firstAssignee?.color_theme || 'lavender',
             location: act.location || null,
             description: act.description || null,
           }, req.user.id);
@@ -395,9 +413,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           }
 
         } else if (act.action === 'create_task') {
+          const rawNames = Array.isArray(act.assigned_to_names)
+            ? act.assigned_to_names
+            : (act.assigned_to ? [act.assigned_to] : []);
           await db.addTasks(req.householdId, [{
             title: act.title,
-            assigned_to_name: act.assigned_to || null,
+            assigned_to_names: rawNames,
             due_date: act.due_date || null,
           }], req.user.id, members);
           executedActions.push({ type: 'create_task', title: act.title });
@@ -509,8 +530,15 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
       const created = [];
       for (const ev of scan.events) {
         try {
-          const assignee = ev.assigned_to_name
-            ? members.find(m => m.name.toLowerCase() === ev.assigned_to_name.toLowerCase())
+          // Image-scan output uses assigned_to_names[] in the prompt
+          // schema; fall back to legacy singular for safety. Resolve to
+          // parallel id/name arrays for the new event columns.
+          const rawNames = Array.isArray(ev.assigned_to_names)
+            ? ev.assigned_to_names
+            : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+          const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
+          const firstAssignee = assigneeIds.length > 0
+            ? members.find(m => m.id === assigneeIds[0])
             : null;
 
           const startTime = ev.all_day
@@ -525,9 +553,9 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
             start_time: startTime,
             end_time: endTime,
             all_day: !!ev.all_day,
-            assigned_to: assignee?.id || null,
-            assigned_to_name: assignee?.name || null,
-            color: assignee?.color_theme || 'lavender',
+            assigned_to_ids: assigneeIds,
+            assigned_to_names: assigneeNames,
+            color: firstAssignee?.color_theme || 'lavender',
             location: ev.location || null,
             description: ev.description || null,
           }, req.user.id);

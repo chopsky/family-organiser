@@ -278,10 +278,15 @@ async function runTaskNotificationCheck() {
       const claimed = await db.claimTaskNotification(task.id, now.toISOString());
       if (!claimed) continue;
 
-      // Send notification
+      // Send notification. Fan out to every assignee on the task. Empty
+      // array = "everyone" → broadcast to the whole household (matches the
+      // old assigned_to IS NULL fallback). Members without WhatsApp
+      // linked are silently skipped; their iOS push is handled in a
+      // separate pass.
       const members = await db.getHouseholdMembers(task.household_id);
-      const recipients = task.assigned_to
-        ? members.filter((m) => m.id === task.assigned_to && m.whatsapp_linked && m.whatsapp_phone)
+      const ids = Array.isArray(task.assigned_to_ids) ? task.assigned_to_ids : [];
+      const recipients = ids.length > 0
+        ? members.filter((m) => ids.includes(m.id) && m.whatsapp_linked && m.whatsapp_phone)
         : members.filter((m) => m.whatsapp_linked && m.whatsapp_phone);
 
       const timeStr = task.due_time.substring(0, 5);

@@ -329,7 +329,8 @@ export default function Calendar() {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskDueTime, setTaskDueTime] = useState('');
-  const [taskAssignee, setTaskAssignee] = useState('');
+  // Calendar's inline task-edit modal: multi-assignee names.
+  const [taskAssignees, setTaskAssignees] = useState([]);
   const [taskRecurrence, setTaskRecurrence] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskNotification, setTaskNotification] = useState('');
@@ -499,7 +500,7 @@ export default function Calendar() {
                   end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
                   all_day: !act.time_start,
                   category: 'school',
-                  assigned_to_name: child.name,
+                  assigned_to_names: [child.name],
                   color: child.color_theme || 'sky',
                   _school: true,
                   _activity: true,
@@ -655,8 +656,16 @@ export default function Calendar() {
       if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
       if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
       if (cat === 'school' && !activeFilters.has('school')) return false;
-      // Apply member filter
-      if (activeMemberFilters && e.assigned_to_name && !activeMemberFilters.has(e.assigned_to_name)) return false;
+      // Apply member filter. An item passes if ANY of its assignees are
+      // in the active filter set (e.g. a task assigned to {Lynn, Grant}
+      // shows when filtering to either Lynn or Grant). Items with no
+      // assignee always pass - they belong to the household at large.
+      if (activeMemberFilters) {
+        const names = Array.isArray(e.assigned_to_names) && e.assigned_to_names.length > 0
+          ? e.assigned_to_names
+          : (e.assigned_to_name ? [e.assigned_to_name] : []);
+        if (names.length > 0 && !names.some((n) => activeMemberFilters.has(n))) return false;
+      }
       return true;
     });
   }
@@ -666,7 +675,12 @@ export default function Calendar() {
     const ds = toDateStr(date);
     return tasks.filter(t => {
       if (t.due_date !== ds) return false;
-      if (activeMemberFilters && t.assigned_to_name && !activeMemberFilters.has(t.assigned_to_name)) return false;
+      if (activeMemberFilters) {
+        const names = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length > 0
+          ? t.assigned_to_names
+          : (t.assigned_to_name ? [t.assigned_to_name] : []);
+        if (names.length > 0 && !names.some((n) => activeMemberFilters.has(n))) return false;
+      }
       return true;
     });
   }
@@ -722,17 +736,20 @@ export default function Calendar() {
     setFormEnd(ev.end_time ? formatTime(ev.end_time) : '10:00');
     setFormDesc(ev.description || '');
     setFormLocation(ev.location || '');
-    const assignedMember = members.find(m => m.name === ev.assigned_to_name);
-    setFormColor(assignedMember?.color_theme || ev.color || 'lavender');
-    setFormAssignee(ev.assigned_to_name || '');
-    // Populate multi-select assignees from assignees array or fallback to single name
-    if (ev.assignees && Array.isArray(ev.assignees) && ev.assignees.length > 0) {
-      setFormAssignees(ev.assignees.map(a => a.member_name));
-    } else if (ev.assigned_to_name) {
-      setFormAssignees([ev.assigned_to_name]);
-    } else {
-      setFormAssignees([]);
-    }
+    // Pick the chip colour from the first assignee. Multi-assignee events
+    // still get one colour on the calendar; the multi-avatar stack covers
+    // the "who" disambiguation in the UI.
+    const initialNames = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0
+      ? ev.assigned_to_names.filter(Boolean)
+      : (ev.assignees && Array.isArray(ev.assignees) && ev.assignees.length > 0)
+        ? ev.assignees.map(a => a.member_name).filter(Boolean)
+        : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+    const firstAssignedMember = initialNames.length > 0
+      ? members.find(m => m.name === initialNames[0])
+      : null;
+    setFormColor(firstAssignedMember?.color_theme || ev.color || 'lavender');
+    setFormAssignee(initialNames[0] || '');
+    setFormAssignees(initialNames);
     setFormRecurrence(ev.recurrence || '');
     setFormReminders(ev.reminders && Array.isArray(ev.reminders) ? ev.reminders : []);
     setShowMoreOptions(false);
@@ -751,8 +768,10 @@ export default function Calendar() {
         location: formLocation.trim() || null,
         color: formColor,
         recurrence: formRecurrence || null,
-        assigned_to_name: formAssignees.length > 0 ? formAssignees[0] : (formAssignee || null),
-        assigned_to_names: formAssignees.length > 0 ? formAssignees : null,
+        // The backend now stores assignees as parallel id + name arrays.
+        // We send only the names; the route resolves them and writes
+        // both columns.
+        assigned_to_names: formAssignees,
         reminders: formReminders.length > 0 ? formReminders : null,
       };
       if (formAllDay) {
@@ -806,10 +825,15 @@ export default function Calendar() {
     }
   }
 
-  // Resolve event colour: prefer assigned member's theme, then category, fallback to plum
+  // Resolve event colour: prefer the first assigned member's theme, then
+  // category, fallback to plum. Multi-assignee events still get one
+  // colour - the avatar stack carries the multi-person signal.
   function getEventColor(ev) {
-    if (ev.assigned_to_name) {
-      const m = members.find(member => member.name === ev.assigned_to_name);
+    const names = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0
+      ? ev.assigned_to_names
+      : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+    if (names.length > 0) {
+      const m = members.find(member => member.name === names[0]);
       if (m?.color_theme) return m.color_theme;
     }
     if (ev.category === 'public_holiday') return 'sage';
@@ -887,7 +911,11 @@ export default function Calendar() {
     setTaskTitle(task.title);
     setTaskDueDate(task.due_date);
     setTaskDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
-    setTaskAssignee(task.assigned_to_name || '');
+    setTaskAssignees(
+      Array.isArray(task.assigned_to_names) && task.assigned_to_names.length > 0
+        ? task.assigned_to_names.filter(Boolean)
+        : task.assigned_to_name ? [task.assigned_to_name] : []
+    );
     setTaskRecurrence(task.recurrence || '');
     setTaskDescription(task.description || '');
     setTaskNotification(task.notification || '');
@@ -910,7 +938,7 @@ export default function Calendar() {
         title: taskTitle.trim(),
         due_date: taskDueDate,
         due_time: taskDueTime || null,
-        assigned_to_name: taskAssignee || null,
+        assigned_to_names: taskAssignees,
         recurrence: taskRecurrence || null,
         description: taskDescription || null,
         notification: taskNotification || null,
@@ -1054,13 +1082,29 @@ export default function Calendar() {
   }
 
   /**
-   * Multi-assignee aware. Returns an array of { name, hex, initial, avatar_url }
-   * for an event. Prefers `ev.assignees` (populated by /calendar/month for
-   * events created via the multi-select UI) and falls back to the legacy
-   * single-assignee `assigned_to_name` for older rows.
+   * Returns an array of { name, hex, initial, avatar_url } for an event.
+   * Source preference: the row's own `assigned_to_names[]` (the source
+   * of truth post-migration), then the event_assignees join table
+   * (still populated for reminder fanout), then the legacy single name.
    */
   function getEventMembers(ev) {
     const list = [];
+    const fromArray = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0
+      ? ev.assigned_to_names.filter(Boolean)
+      : null;
+    if (fromArray) {
+      for (const name of fromArray) {
+        const m = members.find(x => x.name === name) || null;
+        const info = getMemberInfo(name);
+        list.push({
+          name,
+          initial: info.initial,
+          hex: info.hex,
+          avatar_url: m?.avatar_url || null,
+        });
+      }
+      return list;
+    }
     if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
       for (const a of ev.assignees) {
         const m = members.find(x => x.name === a.member_name) || null;
@@ -1535,9 +1579,13 @@ export default function Calendar() {
                 {[...eventsForDate(selectedDate).map(e => ({ ...e, _type: 'event' })), ...tasksForDate(selectedDate).map(t => ({ ...t, _type: 'task' }))].map(item => {
                   const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
                   const badge = getTypeBadge(item);
-                  const eventMembers = item._type === 'task'
-                    ? (item.assigned_to_name ? [{ name: item.assigned_to_name, initial: item.assigned_to_name[0]?.toUpperCase() || '?', hex: getMemberInfo(item.assigned_to_name).hex, avatar_url: members.find(x => x.name === item.assigned_to_name)?.avatar_url || null }] : [])
-                    : getEventMembers(item);
+                  // Tasks and events share the same multi-assignee model
+                  // now, so getEventMembers covers both. It picks up the
+                  // assigned_to_names[] column (post-migration), the
+                  // event_assignees join table (still populated for
+                  // reminder fanout), or the legacy single name as
+                  // fallback.
+                  const eventMembers = getEventMembers(item);
                   return (
                     <div
                       key={item.id}
@@ -1850,9 +1898,9 @@ export default function Calendar() {
             {todayEvents.map(item => {
               const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
               const badge = getTypeBadge(item);
-              const eventMembers = item._type === 'task'
-                ? (item.assigned_to_name ? [{ name: item.assigned_to_name, initial: item.assigned_to_name[0]?.toUpperCase() || '?', hex: getMemberInfo(item.assigned_to_name).hex, avatar_url: members.find(x => x.name === item.assigned_to_name)?.avatar_url || null }] : [])
-                : getEventMembers(item);
+              // Tasks and events share the multi-assignee model; the
+              // shared helper handles both shapes.
+              const eventMembers = getEventMembers(item);
 
               return (
                 <div
@@ -2271,14 +2319,45 @@ export default function Calendar() {
                 </div>
                 <div className="min-w-0">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Assign to</label>
-                  <select
-                    value={taskAssignee}
-                    onChange={e => setTaskAssignee(e.target.value)}
-                    className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-white focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                  <div
+                    className="flex flex-wrap gap-2 border-[1.5px] border-light-grey rounded-[10px] bg-white"
+                    style={{ minHeight: 48, padding: '8px 10px' }}
                   >
-                    <option value="">Everyone</option>
-                    {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                  </select>
+                    {members.length === 0 && (
+                      <span style={{ fontSize: 13, color: 'var(--warm-grey, #6B6774)', alignSelf: 'center' }}>No members yet</span>
+                    )}
+                    {members.map((m) => {
+                      const selected = taskAssignees.includes(m.name);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setTaskAssignees((prev) =>
+                              prev.includes(m.name)
+                                ? prev.filter((n) => n !== m.name)
+                                : [...prev, m.name]
+                            );
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            border: selected ? '1.5px solid var(--plum, #6B3FA0)' : '1.5px solid var(--light-grey, #E8E5EC)',
+                            background: selected ? 'var(--plum-light, #F3EDFC)' : '#fff',
+                            color: selected ? 'var(--plum, #6B3FA0)' : 'var(--charcoal, #2D2A33)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)', marginTop: 4 }}>
+                    {taskAssignees.length === 0 ? 'Leave empty for everyone.' : `Assigned to ${taskAssignees.length} ${taskAssignees.length === 1 ? 'person' : 'people'}.`}
+                  </p>
                 </div>
                 <div className="min-w-0">
                   <label className="text-[13px] font-medium text-charcoal mb-1 block">Repeats</label>
