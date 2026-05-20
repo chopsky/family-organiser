@@ -359,11 +359,16 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
   }
 
   try {
+    // Fall back to the auto-picker (not 'sage') when the client doesn't
+    // send a colour. Matches the rest of the new-member flows so the
+    // first dependent is red, the second burnt-orange, etc., instead
+    // of every child landing on sage.
+    const finalColor = color_theme || await db.pickColorForNewMember(req.householdId);
     const dependent = await db.createDependent(req.householdId, {
       name: name.trim(),
       family_role: family_role?.trim() || null,
       birthday: birthday || null,
-      color_theme: color_theme || 'sage',
+      color_theme: finalColor,
       school_id: school_id || null,
     });
     cache.invalidate(`members:${req.householdId}`);

@@ -55,6 +55,36 @@ const AVATAR_COLOURS = {
   lavender: 'bg-indigo text-white',
 };
 
+// Canonical 16-colour palette used for auto-assigning a unique colour
+// to each new household member. Order matches the backend's
+// COLOR_THEMES (src/db/queries.js) so the picker on both sides agrees
+// on which colour is "next" — keeps invitee-side auto-pick in sync
+// with admin-side auto-pick.
+const COLOR_THEMES = [
+  'red', 'burnt-orange', 'amber', 'gold',
+  'leaf', 'emerald', 'teal', 'sky',
+  'cobalt', 'indigo', 'purple', 'magenta',
+  'rose', 'terracotta', 'moss', 'slate',
+];
+
+/**
+ * Pick the first colour in the 16-palette not already used by anyone
+ * in the household. Same algorithm as the server-side
+ * db.pickColorForNewMember — kept in the frontend too so when the
+ * admin opens the Add-member / Add-dependent form, the colour swatch
+ * is already pointing at a sensible default instead of always defaulting
+ * to teal (which collided with the first member's teal default and
+ * left every household looking like a wall of teal avatars).
+ */
+function pickNextAvatarColor(existingMembers) {
+  const used = new Set((existingMembers || []).map(m => m?.color_theme).filter(Boolean));
+  for (const c of COLOR_THEMES) {
+    if (!used.has(c)) return c;
+  }
+  // All 16 in use — round-robin past the limit. Rare.
+  return COLOR_THEMES[(existingMembers?.length || 0) % COLOR_THEMES.length];
+}
+
 export default function FamilySetup() {
   const { household, user, isAdmin, login, token } = useAuth();
   const canWrite = useCanWrite();
@@ -281,7 +311,10 @@ export default function FamilySetup() {
     setDepName('');
     setDepRole('');
     setDepBirthday('');
-    setDepColor('sage');
+    // Pre-pick the next colour not yet used in this household so a
+    // newly-added child gets a distinct avatar by default. Admin can
+    // still override before saving.
+    setDepColor(pickNextAvatarColor(members));
     setDepAttendsSchool(false);
     setDepSchoolSearch('');
     setDepSelectedSchool(null);
@@ -1334,7 +1367,12 @@ export default function FamilySetup() {
     setNewName('');
     setNewRole('');
     setNewBirthday('');
-    setNewColor('sage');
+    // Pre-pick the next unused colour from the 16-palette so the
+    // invitee defaults to a distinct avatar instead of always landing
+    // on teal. Same logic the backend uses when an invite has no
+    // explicit colour — keeps the swatch the admin sees in sync with
+    // the colour the invitee ends up with.
+    setNewColor(pickNextAvatarColor(members));
     setNewEmail('');
     setShowAddMember(true);
   }
