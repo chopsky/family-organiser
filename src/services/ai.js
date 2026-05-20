@@ -14,7 +14,21 @@ const {
  * Parse a text message into structured shopping items and tasks.
  */
 async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '' } = {}) {
-  const today = new Date().toISOString().split('T')[0];
+  // "Today" needs to be computed in the user's timezone, not UTC, or
+  // we drift on either side of midnight (a 23:30 BST message gets
+  // tagged "tomorrow" by a UTC-only Railway). Also include the weekday
+  // name: without it the model has to do mental day-of-week math from
+  // the ISO date and gets it wrong - e.g. tagged "next week same day"
+  // as Tuesday when today was a Wednesday.
+  const tzForToday = timezone || 'UTC';
+  const nowDate = new Date();
+  const todayYmd = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tzForToday, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(nowDate);
+  const todayWeekday = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tzForToday, weekday: 'long',
+  }).format(nowDate);
+  const today = `${todayWeekday}, ${todayYmd}`;
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   // Sender is used so the model can resolve "me/I/my" to the actual person.
   // Fall back to a neutral value when unknown - the prompt still works, it just
