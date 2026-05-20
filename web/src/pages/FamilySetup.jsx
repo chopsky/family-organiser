@@ -3264,26 +3264,42 @@ export default function FamilySetup() {
                   {showAddTermDate ? (
                     <div className="bg-white rounded-lg border border-cream-border p-3 space-y-2">
                       <div className="flex gap-2">
-                        <select value={termDateType} onChange={(e) => setTermDateType(e.target.value)} className="border border-cream-border rounded-lg px-2 py-2 text-xs bg-white">
+                        <select value={termDateType} onChange={(e) => { setTermDateType(e.target.value); if (e.target.value !== 'half_term_start' && e.target.value !== 'bank_holiday') setTermDateEndDate(''); }} className="border border-cream-border rounded-lg px-2 py-2 text-xs bg-white">
                           <option value="term_start">Term start</option>
                           <option value="term_end">Term end</option>
-                          <option value="half_term_start">Half term start</option>
-                          <option value="half_term_end">Half term end</option>
+                          <option value="half_term_start">Half term</option>
                           <option value="inset_day">INSET day</option>
-                          <option value="bank_holiday">Bank holiday</option>
+                          <option value="bank_holiday">Bank holiday / closure</option>
                         </select>
                         <input type="text" value={termDateLabel} onChange={(e) => setTermDateLabel(e.target.value)} placeholder="Label (optional)" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white" />
                       </div>
-                      <div className="flex gap-2 items-center">
-                        <input type="date" value={termDateDate} onChange={(e) => setTermDateDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
-                        <span className="text-xs text-cocoa">to</span>
-                        <input type="date" value={termDateEndDate} onChange={(e) => setTermDateEndDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
-                        <div className="flex-1" />
-                        <button onClick={() => setShowAddTermDate(false)} className="text-xs text-cocoa">Cancel</button>
-                        <button onClick={handleAddTermDate} disabled={savingTermDate || !termDateDate} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
-                          {savingTermDate ? 'Adding...' : 'Add'}
-                        </button>
-                      </div>
+                      {/* Half term and bank holidays can span multiple
+                          days; everything else is single-date. Showing
+                          the end-date field only for the range types
+                          avoids the "what does 'to' mean for Term
+                          start?" confusion. */}
+                      {(() => {
+                        const isRange = termDateType === 'half_term_start' || termDateType === 'bank_holiday';
+                        return (
+                          <div className="flex gap-2 items-center">
+                            <div className="flex flex-col">
+                              <label className="text-[10px] text-cocoa mb-0.5">{isRange ? 'From' : 'Date'}</label>
+                              <input type="date" value={termDateDate} onChange={(e) => setTermDateDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
+                            </div>
+                            {isRange && (
+                              <div className="flex flex-col">
+                                <label className="text-[10px] text-cocoa mb-0.5">To (optional)</label>
+                                <input type="date" value={termDateEndDate} onChange={(e) => setTermDateEndDate(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-xs bg-white" />
+                              </div>
+                            )}
+                            <div className="flex-1" />
+                            <button onClick={() => { setShowAddTermDate(false); setTermDateEndDate(''); }} className="text-xs text-cocoa self-end pb-1.5">Cancel</button>
+                            <button onClick={handleAddTermDate} disabled={savingTermDate || !termDateDate} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 self-end">
+                              {savingTermDate ? 'Adding...' : 'Add'}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <button onClick={() => setShowAddTermDate(true)} className="w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors">
