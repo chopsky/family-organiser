@@ -148,6 +148,11 @@ export default function FamilySetup() {
   const [newSchoolResults, setNewSchoolResults] = useState([]);
   const [newSelectedSchool, setNewSelectedSchool] = useState(null);
   const [searchingNewSchools, setSearchingNewSchools] = useState(false);
+  // UK custom-school fallback for the invite modal — mirrors the
+  // dep* equivalents on the add-dependent flow.
+  const [newCustomSchoolMode, setNewCustomSchoolMode] = useState(false);
+  const [newCustomSchoolName, setNewCustomSchoolName] = useState('');
+  const [newCustomSchoolPostcode, setNewCustomSchoolPostcode] = useState('');
   // SA path for the invite-member modal: free-text school name plus an
   // optional pointer to an already-linked household school (when the
   // user clicks a chip to reuse a sibling's school). When existingId is
@@ -173,6 +178,13 @@ export default function FamilySetup() {
   // above for the same pattern.
   const [depSaSchoolName, setDepSaSchoolName] = useState('');
   const [depSaSchoolExistingId, setDepSaSchoolExistingId] = useState(null);
+  // UK custom-school fallback — when GIAS doesn't have the school
+  // (private, alternative provision, very new, etc.), the user enters
+  // it manually. school_name is required; postcode optional. school_urn
+  // stays null so the LA-dates import doesn't try to resolve.
+  const [depCustomSchoolMode, setDepCustomSchoolMode] = useState(false);
+  const [depCustomSchoolName, setDepCustomSchoolName] = useState('');
+  const [depCustomSchoolPostcode, setDepCustomSchoolPostcode] = useState('');
   const [householdSchools, setHouseholdSchools] = useState([]);
   const [childActivities, setChildActivities] = useState({}); // { childId: [activities] }
 
@@ -319,6 +331,9 @@ export default function FamilySetup() {
     setDepSchoolSearch('');
     setDepSelectedSchool(null);
     setDepSchoolResults([]);
+    setDepCustomSchoolMode(false);
+    setDepCustomSchoolName('');
+    setDepCustomSchoolPostcode('');
     setShowAddDependent(true);
   }
 
@@ -338,6 +353,23 @@ export default function FamilySetup() {
         } else {
           const { data: schoolData } = await api.post('/schools', {
             school_name: depSaSchoolName.trim(),
+          });
+          schoolId = schoolData.school.id;
+        }
+      } else if (depAttendsSchool && depCustomSchoolMode && depCustomSchoolName.trim()) {
+        // UK custom-school fallback — GIAS didn't have it. No URN, no
+        // LA. LA-dates import will be disabled for this school (the
+        // import modal already gates on local_authority); user uses
+        // website / PDF / iCal / manual instead.
+        const existingCustom = householdSchools.find(
+          s => !s.school_urn && s.school_name.toLowerCase() === depCustomSchoolName.trim().toLowerCase()
+        );
+        if (existingCustom) {
+          schoolId = existingCustom.id;
+        } else {
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: depCustomSchoolName.trim(),
+            postcode: depCustomSchoolPostcode.trim() || null,
           });
           schoolId = schoolData.school.id;
         }
@@ -1374,6 +1406,9 @@ export default function FamilySetup() {
     // the colour the invitee ends up with.
     setNewColor(pickNextAvatarColor(members));
     setNewEmail('');
+    setNewCustomSchoolMode(false);
+    setNewCustomSchoolName('');
+    setNewCustomSchoolPostcode('');
     setShowAddMember(true);
   }
 
@@ -1414,6 +1449,20 @@ export default function FamilySetup() {
         } else {
           const { data: schoolData } = await api.post('/schools', {
             school_name: newSaSchoolName.trim(),
+          });
+          schoolId = schoolData.school.id;
+        }
+      } else if (newAttendsSchool && newCustomSchoolMode && newCustomSchoolName.trim()) {
+        // UK custom-school fallback (GIAS doesn't list this school).
+        const existingCustom = householdSchools.find(
+          s => !s.school_urn && s.school_name.toLowerCase() === newCustomSchoolName.trim().toLowerCase()
+        );
+        if (existingCustom) {
+          schoolId = existingCustom.id;
+        } else {
+          const { data: schoolData } = await api.post('/schools', {
+            school_name: newCustomSchoolName.trim(),
+            postcode: newCustomSchoolPostcode.trim() || null,
           });
           schoolId = schoolData.school.id;
         }
@@ -2078,43 +2127,110 @@ export default function FamilySetup() {
               </div>
               )}
 
-              {/* UK: GIAS school search */}
+              {/* UK: GIAS school search (with custom-school fallback) */}
               {isUk && depAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-bark mb-1">School</label>
-                      <div className="relative">
+                  {depCustomSchoolMode ? (
+                    // Custom-school manual entry. Shown when the user
+                    // hits "Can't find your school?" because GIAS
+                    // doesn't list them (independent / online /
+                    // alternative provision / very new schools).
+                    // school_urn stays null so the LA-dates import is
+                    // correctly gated off and the user is steered to
+                    // website / PDF / iCal / manual import.
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-bark mb-1">School name</label>
                         <input
                           type="text"
-                          value={depSchoolSearch}
-                          onChange={(e) => handleSchoolSearch(e.target.value)}
+                          value={depCustomSchoolName}
+                          onChange={(e) => setDepCustomSchoolName(e.target.value)}
                           className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="Search by name or postcode..."
+                          placeholder="e.g. The Sunshine Academy"
+                          autoFocus
                         />
-                        {searchingSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
-                        {depSchoolResults.length > 0 && (
-                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                            {depSchoolResults.map(s => (
-                              <li key={s.urn}>
-                                <button type="button" onClick={() => selectSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                  <span className="font-medium text-bark">{s.name}</span>
-                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
                       </div>
-                      {/* Same-school detection */}
-                      {depSelectedSchool && householdSchools.find(s => s.school_urn === depSelectedSchool.urn) && (
-                        <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
-                          <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === depSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
-                          <p className="text-xs text-plum/70">Term dates already set up - just add {depName || 'their'} activities below.</p>
-                        </div>
-                      )}
+                      <div>
+                        <label className="block text-sm font-medium text-bark mb-1">Postcode <span className="text-xs text-cocoa font-normal">(optional)</span></label>
+                        <input
+                          type="text"
+                          value={depCustomSchoolPostcode}
+                          onChange={(e) => setDepCustomSchoolPostcode(e.target.value)}
+                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                          placeholder="SW1A 1AA"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepCustomSchoolMode(false);
+                          setDepCustomSchoolName('');
+                          setDepCustomSchoolPostcode('');
+                        }}
+                        className="text-xs text-cocoa hover:text-bark underline"
+                      >
+                        ← Back to search
+                      </button>
+                      <p className="text-xs text-cocoa">
+                        We&apos;ll set this up as a custom school. You can import term dates from the school&apos;s website or PDF afterwards.
+                      </p>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-bark mb-1">School</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={depSchoolSearch}
+                              onChange={(e) => handleSchoolSearch(e.target.value)}
+                              className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                              placeholder="Search by name or postcode..."
+                            />
+                            {searchingSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
+                            {depSchoolResults.length > 0 && (
+                              <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                                {depSchoolResults.map(s => (
+                                  <li key={s.urn}>
+                                    <button type="button" onClick={() => selectSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                      <span className="font-medium text-bark">{s.name}</span>
+                                      <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          {/* Same-school detection */}
+                          {depSelectedSchool && householdSchools.find(s => s.school_urn === depSelectedSchool.urn) && (
+                            <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
+                              <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === depSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
+                              <p className="text-xs text-plum/70">Term dates already set up - just add {depName || 'their'} activities below.</p>
+                            </div>
+                          )}
+                          {/* Fallback: "Can't find your school?" — shown
+                              once the user has typed enough to expect
+                              results but nothing matches, OR
+                              persistently as a small link so they can
+                              always reach it. */}
+                          {!depSelectedSchool && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDepCustomSchoolMode(true);
+                                setDepCustomSchoolName(depSchoolSearch.trim());
+                                setDepSchoolResults([]);
+                              }}
+                              className="mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
+                            >
+                              Can&apos;t find your school? Add it manually →
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -2284,40 +2400,94 @@ export default function FamilySetup() {
 
               {isUk && newAttendsSchool && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-bark mb-1">School</label>
-                      <div className="relative">
+                  {newCustomSchoolMode ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-bark mb-1">School name</label>
                         <input
                           type="text"
-                          value={newSchoolSearch}
-                          onChange={(e) => handleNewMemberSchoolSearch(e.target.value)}
+                          value={newCustomSchoolName}
+                          onChange={(e) => setNewCustomSchoolName(e.target.value)}
                           className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="Search by name or postcode..."
+                          placeholder="e.g. The Sunshine Academy"
+                          autoFocus
                         />
-                        {searchingNewSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
-                        {newSchoolResults.length > 0 && (
-                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                            {newSchoolResults.map(s => (
-                              <li key={s.urn}>
-                                <button type="button" onClick={() => selectNewMemberSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                  <span className="font-medium text-bark">{s.name}</span>
-                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-bark mb-1">Postcode <span className="text-xs text-cocoa font-normal">(optional)</span></label>
+                        <input
+                          type="text"
+                          value={newCustomSchoolPostcode}
+                          onChange={(e) => setNewCustomSchoolPostcode(e.target.value)}
+                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                          placeholder="SW1A 1AA"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCustomSchoolMode(false);
+                          setNewCustomSchoolName('');
+                          setNewCustomSchoolPostcode('');
+                        }}
+                        className="text-xs text-cocoa hover:text-bark underline"
+                      >
+                        ← Back to search
+                      </button>
+                      <p className="text-xs text-cocoa">
+                        We&apos;ll set this up as a custom school. You can import term dates from the school&apos;s website or PDF afterwards.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-bark mb-1">School</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={newSchoolSearch}
+                            onChange={(e) => handleNewMemberSchoolSearch(e.target.value)}
+                            className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                            placeholder="Search by name or postcode..."
+                          />
+                          {searchingNewSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
+                          {newSchoolResults.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                              {newSchoolResults.map(s => (
+                                <li key={s.urn}>
+                                  <button type="button" onClick={() => selectNewMemberSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
+                                    <span className="font-medium text-bark">{s.name}</span>
+                                    <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        {/* Surface 'same school as Tom' hint when relevant */}
+                        {newSelectedSchool && householdSchools.find(s => s.school_urn === newSelectedSchool.urn) && (
+                          <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
+                            <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === newSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
+                            <p className="text-xs text-plum/70">Term dates already set up.</p>
+                          </div>
+                        )}
+                        {/* Fallback — see dep-flow equivalent. */}
+                        {!newSelectedSchool && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewCustomSchoolMode(true);
+                              setNewCustomSchoolName(newSchoolSearch.trim());
+                              setNewSchoolResults([]);
+                            }}
+                            className="mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
+                          >
+                            Can&apos;t find your school? Add it manually →
+                          </button>
                         )}
                       </div>
-                      {/* Surface 'same school as Tom' hint when relevant */}
-                      {newSelectedSchool && householdSchools.find(s => s.school_urn === newSelectedSchool.urn) && (
-                        <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
-                          <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === newSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
-                          <p className="text-xs text-plum/70">Term dates already set up.</p>
-                        </div>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
