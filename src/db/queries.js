@@ -1505,17 +1505,51 @@ async function generateNextRecurrence(task, db = supabase) {
     if (!due) return null;
   }
 
-  // Delete any previous uncompleted instances of this recurring task.
-  // A recurring task should only ever have one active instance - if the user
-  // didn't complete the old one before the new one is due, remove it.
-  await db
+  // Look at any other uncompleted instances of this recurring task in
+  // the household. We split them into:
+  //   - NEWER: created after the task we just completed. These are
+  //     explicit replacements - e.g. the bot just created a new task
+  //     with a different assignee list in the same turn ("remind Lynn
+  //     AND me to give Logan eye drops weekly"). Honour the user's
+  //     intent: don't delete, don't insert.
+  //   - OLDER: stale leftovers from a previous auto-regen cycle that
+  //     the user never ticked off. These are duplicates we want to
+  //     clean up before inserting a fresh instance.
+  const { data: otherInstances } = await db
     .from('tasks')
-    .delete()
+    .select('id, created_at')
     .eq('household_id', task.household_id)
     .eq('title', task.title)
     .eq('recurrence', task.recurrence)
     .eq('completed', false)
     .neq('id', task.id);
+
+  const completedCreatedAt = task.created_at ? new Date(task.created_at).getTime() : 0;
+  const newer = [];
+  const older = [];
+  for (const row of (otherInstances || [])) {
+    const t = row.created_at ? new Date(row.created_at).getTime() : 0;
+    if (t > completedCreatedAt) newer.push(row);
+    else older.push(row);
+  }
+
+  if (newer.length > 0) {
+    // User (or another flow) has already added a fresh future instance
+    // since this one was created. Skip regeneration - that newer task
+    // is the user's intended next iteration.
+    return null;
+  }
+
+  // Delete any older stale uncompleted instances before inserting the
+  // fresh one. Keeps the "one active instance per recurring task"
+  // invariant on the happy path.
+  if (older.length > 0) {
+    const olderIds = older.map(r => r.id);
+    await db
+      .from('tasks')
+      .delete()
+      .in('id', olderIds);
+  }
 
   const { data, error } = await db
     .from('tasks')
