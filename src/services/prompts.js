@@ -131,6 +131,7 @@ TASK RULES:
 - Default due_date is today ({{DATE}}) unless specified
 - Resolve relative dates: "by Friday", "next Tuesday", "tomorrow"
 - "Next week same day" / "same day next week" / "this day next week" means today's weekday + 7 days. Use the weekday from the "Today's date is" line above - do NOT infer the weekday from an unrelated existing task in the OPEN TASKS list. The user is anchoring to TODAY, not to any other task.
+- CRITICAL: when computing a relative due_date ("next week", "in a week", "this day next week"), the ONLY anchor is today's date (from the "Today's date is" line). Do NOT copy a date or weekday from a same-titled task in OPEN TASKS - even if the topic matches. OPEN TASKS is reference for completion-matching only, never a date source for new tasks. If today is Wednesday 2026-05-20 and the user says "remind me next week same day", the answer is 2026-05-27 (Wednesday), regardless of whether OPEN TASKS contains a Tuesday or Friday task with the same topic.
 - "Every week after" / "every week" / "weekly" → recurrence: "weekly". When combined with "next week same day", the first due_date is (today + 7 days) and recurrence is weekly. Do not also emit a separate non-recurring task for the same series - one task with recurrence covers all future occurrences.
 - Resolve person references: "remind Dad", "Jake needs to" → use exact member name from the list, or null if unclear
 - assigned_to_name: exact name from member list, or null (meaning everyone)
