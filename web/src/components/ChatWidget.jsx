@@ -101,6 +101,163 @@ function safeSetItem(key, value) {
   try { localStorage.setItem(key, value); } catch { /* Safari private browsing */ }
 }
 
+// Member colour palette - canonical hex values mirroring the 16-theme
+// system the rest of the app uses (Calendar.jsx is the source of truth).
+// Kept inline so the chat widget has no extra dependencies; if a theme
+// name is missing we fall back to plum so something always renders.
+const COLOR_HEX = {
+  red: '#E25555', 'burnt-orange': '#E07A3A', amber: '#E8A040', gold: '#C5A833',
+  leaf: '#7BAE4E', emerald: '#3A9E6E', teal: '#3AADA0', sky: '#4A9FCC',
+  cobalt: '#3A6FD4', indigo: '#6558C7', purple: '#9050B5', magenta: '#C74E95',
+  rose: '#E06888', terracotta: '#C47A5E', moss: '#7C8A6E', slate: '#7A8694',
+  sage: '#7DAE82', plum: '#6B3FA0', coral: '#E8724A', pink: '#D4537E',
+  lavender: '#6558C7', orange: '#E8A040', blue: '#4A9FCC', green: '#7DAE82', gray: '#7A8694',
+};
+
+function memberColor(member) {
+  return (member?.color_theme && COLOR_HEX[member.color_theme]) || COLOR_HEX.plum;
+}
+
+// Format a date string (YYYY-MM-DD) into "Wednesday 27 May" for human
+// reading. Falls back to the raw string if it can't be parsed.
+function formatHumanDate(ymd) {
+  if (!ymd) return '';
+  try {
+    const d = new Date(`${ymd}T12:00:00`);
+    if (isNaN(d.getTime())) return ymd;
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  } catch { return ymd; }
+}
+
+function formatHumanDateTime(iso, allDay) {
+  if (!iso) return '';
+  if (allDay) {
+    const datePart = String(iso).slice(0, 10);
+    return formatHumanDate(datePart);
+  }
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const date = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return `${date} at ${time}`;
+  } catch { return iso; }
+}
+
+// One row of stacked, coloured avatar chips - mirrors the visual the
+// user is comparing us against. Each chip is a small filled circle with
+// the member's initial; the colour comes from their canonical theme.
+function AssigneeAvatars({ names, members }) {
+  if (!Array.isArray(names) || names.length === 0) return null;
+  return (
+    <div className="flex items-center -space-x-1.5 ml-1">
+      {names.map((name, i) => {
+        const m = members.find(x => x.name === name);
+        const hex = memberColor(m);
+        const initial = name?.[0]?.toUpperCase() || '?';
+        return (
+          <span
+            key={`${name}-${i}`}
+            title={name}
+            className="inline-flex items-center justify-center"
+            style={{
+              width: 22, height: 22, borderRadius: '50%',
+              background: hex, color: '#fff', fontSize: 11, fontWeight: 600,
+              border: '1.5px solid #fff',
+            }}
+          >
+            {initial}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function TaskCreatedCard({ task, members }) {
+  if (!task) return null;
+  const due = formatHumanDate(task.due_date);
+  const time = task.due_time ? String(task.due_time).slice(0, 5) : null;
+  const recurrence = task.recurrence
+    ? task.recurrence.charAt(0).toUpperCase() + task.recurrence.slice(1)
+    : null;
+  return (
+    <div
+      className="rounded-xl px-3.5 py-3 mb-2"
+      style={{
+        background: 'var(--sage-light, #EDF5EE)',
+        border: '1px solid rgba(125, 174, 130, 0.25)',
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-1.5" style={{ fontSize: 11, fontWeight: 600, color: 'var(--sage, #7DAE82)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+        Task created
+      </div>
+      <div className="flex items-start gap-2.5">
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-charcoal" style={{ fontSize: 14 }}>{task.title}</div>
+          <div className="flex items-center gap-2 mt-1" style={{ fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
+            {due && <span>{due}{time ? ` at ${time}` : ''}</span>}
+            {recurrence && <span>· {recurrence}</span>}
+          </div>
+        </div>
+        <AssigneeAvatars names={task.assigned_to_names} members={members} />
+      </div>
+    </div>
+  );
+}
+
+function EventCreatedCard({ event, members }) {
+  if (!event) return null;
+  const when = formatHumanDateTime(event.start_time, event.all_day);
+  const recurrence = event.recurrence
+    ? event.recurrence.charAt(0).toUpperCase() + event.recurrence.slice(1)
+    : null;
+  return (
+    <div
+      className="rounded-xl px-3.5 py-3 mb-2"
+      style={{
+        background: 'var(--plum-light, #F3EDFC)',
+        border: '1px solid rgba(107, 63, 160, 0.18)',
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-1.5" style={{ fontSize: 11, fontWeight: 600, color: 'var(--plum, #6B3FA0)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+        Event added
+      </div>
+      <div className="flex items-start gap-2.5">
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-charcoal" style={{ fontSize: 14 }}>{event.title}</div>
+          <div className="flex flex-wrap items-center gap-x-2 mt-1" style={{ fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
+            {when && <span>{when}</span>}
+            {recurrence && <span>· {recurrence}</span>}
+            {event.location && <span>· {event.location}</span>}
+          </div>
+        </div>
+        <AssigneeAvatars names={event.assigned_to_names} members={members} />
+      </div>
+    </div>
+  );
+}
+
+function ActionCards({ actions, members }) {
+  if (!Array.isArray(actions) || actions.length === 0) return null;
+  return (
+    <>
+      {actions.map((a, i) => {
+        if (a.type === 'task_created') return <TaskCreatedCard key={i} task={a.task} members={members} />;
+        if (a.type === 'event_created') return <EventCreatedCard key={i} event={a.event} members={members} />;
+        return null;
+      })}
+    </>
+  );
+}
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -111,6 +268,9 @@ export default function ChatWidget() {
   const [showHistory, setShowHistory] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showWelcomeBubble, setShowWelcomeBubble] = useState(false);
+  // Household members - loaded once on widget open so the confirmation
+  // cards can render the right colour avatar per assignee.
+  const [members, setMembers] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const pendingMessageRef = useRef(null);
@@ -135,6 +295,13 @@ I'm always here if you need me!`;
     if (initializedRef.current) return;
     initializedRef.current = true;
     (async () => {
+      // Load household members in parallel with chat history. Members
+      // drive the colour + initial on each assignee avatar in the
+      // confirmation cards. Silent-fail because the chat still works
+      // (just shows a plum fallback) if this errors.
+      api.get('/household')
+        .then((r) => setMembers(Array.isArray(r.data?.members) ? r.data.members : []))
+        .catch(() => {});
       try {
         const { data } = await api.get('/chat/conversations');
         const convs = data.conversations || [];
@@ -247,7 +414,18 @@ I'm always here if you need me!`;
         setActiveConversationId(data.conversation_id);
       }
 
-      const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
+      // Carry `actions` through to the message so the renderer can
+      // show a confirmation card above the text (task_created /
+      // event_created). The actions live only in-session - chat
+      // history reload from DB returns text only - which is fine for
+      // now: the user can find the actual task/event in the Tasks or
+      // Calendar pages anyway.
+      const assistantMsg = {
+        role: 'assistant',
+        content: data.message,
+        actions: data.actions || null,
+        created_at: new Date().toISOString(),
+      };
       setMessages(prev => [...prev, assistantMsg]);
     } catch {
       const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble responding. Please try again.', created_at: new Date().toISOString() };
@@ -494,7 +672,17 @@ I'm always here if you need me!`;
                   )}
 
                   {messages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      {/* When the assistant created tasks/events in
+                          response to this turn, render confirmation
+                          cards stacked above the text reply. Only
+                          present on freshly-returned messages - chat
+                          history reload returns text only. */}
+                      {msg.role === 'assistant' && Array.isArray(msg.actions) && msg.actions.length > 0 && (
+                        <div className="max-w-[85%] w-full">
+                          <ActionCards actions={msg.actions} members={members} />
+                        </div>
+                      )}
                       <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                         msg.role === 'user'
                           ? 'bg-plum text-white rounded-br-md'

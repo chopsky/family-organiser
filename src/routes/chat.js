@@ -381,7 +381,22 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             location: act.location || null,
             description: act.description || null,
           }, req.user.id);
-          executedActions.push({ type: 'create_event', title: act.title });
+          // Rich card payload: the frontend renders a confirmation card
+          // from this. Names + colours are resolved client-side from the
+          // household roster so we only ship the canonical fields.
+          executedActions.push({
+            type: 'event_created',
+            event: {
+              id: createdActEvent?.id || null,
+              title: act.title,
+              start_time: startTime,
+              end_time: endTime,
+              all_day: !!act.all_day,
+              location: act.location || null,
+              recurrence: act.recurrence || null,
+              assigned_to_names: assigneeNames,
+            },
+          });
 
         } else if (act.action === 'add_shopping' && act.items?.length) {
           // shopping_items.list_id is NOT NULL since multi-list support
@@ -428,12 +443,27 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           const rawNames = Array.isArray(act.assigned_to_names)
             ? act.assigned_to_names
             : (act.assigned_to ? [act.assigned_to] : []);
-          await db.addTasks(req.householdId, [{
+          const saved = await db.addTasks(req.householdId, [{
             title: act.title,
             assigned_to_names: rawNames,
             due_date: act.due_date || null,
+            due_time: act.due_time || null,
+            recurrence: act.recurrence || null,
           }], req.user.id, members);
-          executedActions.push({ type: 'create_task', title: act.title });
+          const savedRow = Array.isArray(saved) && saved[0] ? saved[0] : null;
+          // Rich card payload for the frontend. Same shape pattern as
+          // event_created above so the renderer can switch on .type.
+          executedActions.push({
+            type: 'task_created',
+            task: {
+              id: savedRow?.id || null,
+              title: act.title,
+              due_date: savedRow?.due_date || act.due_date || null,
+              due_time: savedRow?.due_time || act.due_time || null,
+              recurrence: savedRow?.recurrence || act.recurrence || null,
+              assigned_to_names: savedRow?.assigned_to_names || [],
+            },
+          });
 
         } else if (act.action === 'create_recipe') {
           // Generate and save recipe to Recipe Box
