@@ -1,22 +1,26 @@
 const { Router } = require('express');
 const multer = require('multer');
+const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
-const { scanImage, scanReceipt, matchReceiptToList } = require('../services/ai');
+const { scanImage, scanReceipt, matchReceiptToList, classify } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 
-// Multer config for chat image uploads (10 MB, images only)
-const chatImageUpload = multer({
+// Multer config for chat attachments. Accepts both images (receipts,
+// event invitations, screenshots) and PDFs (school newsletters, party
+// invites that came as attachments). 10 MB is enough for either: a
+// typical scanned receipt photo is 1-3 MB and a long-form school PDF is
+// usually 2-5 MB.
+const chatAttachmentUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files are accepted'));
-    }
+    const ok = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    if (!ok) return cb(new Error('Only image and PDF files are accepted'));
     cb(null, true);
   },
 });
@@ -457,24 +461,120 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
 /**
  * POST /api/chat/image
- * Upload an image for the AI to scan (receipts, invitations, flight confirmations, etc.)
+ *
+ * Upload an image or PDF for the AI to scan. Images go through the
+ * vision-based extractor (scanImage); PDFs are text-extracted via
+ * pdf-parse and then run through the classifier, which already knows
+ * how to pull events, tasks, and shopping items out of free-form text.
+ *
+ * Endpoint kept under /image for backwards compatibility with the
+ * existing frontend caller (and the field name is still "image" in the
+ * multipart form so old clients keep working). The multer config now
+ * accepts application/pdf in addition to image/*.
  */
-router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('image'), async (req, res) => {
+router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single('image'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No image uploaded.' });
+    return res.status(400).json({ error: 'No file uploaded.' });
   }
 
   try {
     // Resolve or create conversation
     let conversationId = req.body.conversation_id;
     if (!conversationId) {
-      const conv = await db.createConversation(req.householdId, req.user.id, 'Image scan');
+      const conv = await db.createConversation(req.householdId, req.user.id, 'Attachment');
       conversationId = conv.id;
     }
 
     const members = await db.getHouseholdMembers(req.householdId);
     const memberNames = members.map(m => m.name);
     const aiCtx = { householdId: req.householdId, userId: req.user.id };
+
+    // ── PDF branch ─────────────────────────────────────────────────────────
+    // Extract text, then hand it to the classifier. We treat the PDF
+    // content as if it were a long user message asking us to extract
+    // events / tasks / shopping items. The classifier returns the same
+    // shape the text-chat endpoint above already knows how to act on.
+    if (req.file.mimetype === 'application/pdf') {
+      let pdfText = '';
+      try {
+        const parsed = await pdfParse(req.file.buffer);
+        pdfText = (parsed.text || '').trim();
+      } catch (err) {
+        console.error('[chat/image] pdfParse failed:', err.message);
+        const errorMsg = "📄 I couldn't read that PDF. The file might be scanned or password-protected — try saving it as a normal PDF (File → Save As → PDF) and re-attaching.";
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📄 [Sent a PDF]', conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', errorMsg, conversationId);
+        await db.touchConversation(conversationId);
+        return res.json({ message: errorMsg, conversation_id: conversationId });
+      }
+      if (!pdfText) {
+        const emptyMsg = "📄 That PDF didn't have any readable text. If it's a scanned document, try opening it on your phone and using the camera to scan it as a photo instead — I can read images directly.";
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📄 [Sent a PDF]', conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', emptyMsg, conversationId);
+        await db.touchConversation(conversationId);
+        return res.json({ message: emptyMsg, conversation_id: conversationId });
+      }
+
+      const currentUser = members.find(m => m.id === req.user.id);
+      const household = await db.getHouseholdById(req.householdId);
+      const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
+      const prompt = `I'm attaching the text content of a PDF document. Please extract any calendar events, tasks, or shopping items you can find in it and add them. If it's a newsletter or invitation, focus on dates and times. Here is the PDF content:\n\n${pdfText}`;
+
+      const result = await classify(prompt, memberNames, [], {
+        ...aiCtx,
+        sender: currentUser?.name,
+        timezone: userTz,
+      });
+
+      // Persist anything actionable + build a short summary for the chat.
+      const summaryLines = [];
+      if (Array.isArray(result.tasks) && result.tasks.length > 0) {
+        const toAdd = result.tasks.filter(t => t.action !== 'complete');
+        if (toAdd.length > 0) {
+          await db.addTasks(req.householdId, toAdd, req.user.id, members);
+          summaryLines.push(`📋 Added ${toAdd.length} task${toAdd.length === 1 ? '' : 's'}: ${toAdd.map(t => t.title).join(', ')}`);
+        }
+      }
+      if (result.calendar_event) {
+        try {
+          const ev = result.calendar_event;
+          const rawNames = Array.isArray(ev.assigned_to_names) ? ev.assigned_to_names : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
+          const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
+          const firstAssignee = assigneeIds.length > 0 ? members.find(m => m.id === assigneeIds[0]) : null;
+          const startTime = ev.all_day
+            ? `${ev.date}T00:00:00Z`
+            : localToUTC(ev.date, ev.start_time || '09:00', userTz);
+          const endTime = ev.all_day
+            ? `${ev.date}T23:59:59Z`
+            : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
+          await db.createCalendarEvent(req.householdId, {
+            title: ev.title,
+            start_time: startTime,
+            end_time: endTime,
+            all_day: !!ev.all_day,
+            assigned_to_ids: assigneeIds,
+            assigned_to_names: assigneeNames,
+            color: firstAssignee?.color_theme || 'lavender',
+            location: ev.location || null,
+            description: ev.description || null,
+          }, req.user.id);
+          summaryLines.push(`📅 Added event: ${ev.title}${ev.date ? ` on ${ev.date}` : ''}`);
+        } catch (err) {
+          console.error('[chat/image] PDF event create failed:', err.message);
+        }
+      }
+
+      const msg = summaryLines.length > 0
+        ? `📄 Read your PDF.\n\n${summaryLines.join('\n')}`
+        : (result.response_message || "📄 I read the PDF but didn't find anything actionable to add (no clear events, tasks, or items).");
+
+      await db.saveChatMessage(req.householdId, req.user.id, 'user', '📄 [Sent a PDF]', conversationId);
+      await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
+      await db.touchConversation(conversationId);
+      return res.json({ message: msg, conversation_id: conversationId });
+    }
+
+    // ── Image branch (existing flow) ───────────────────────────────────────
     const scan = await scanImage(req.file.buffer, req.file.mimetype, memberNames, aiCtx);
 
     const currentUser = members.find(m => m.id === req.user.id);
@@ -588,7 +688,7 @@ router.post('/image', requireAuth, requireHousehold, chatImageUpload.single('ima
 
   } catch (err) {
     console.error('POST /api/chat/image error:', err);
-    return res.status(500).json({ error: 'Failed to process image. Please try again.' });
+    return res.status(500).json({ error: 'Failed to process the attachment. Please try again.' });
   }
 });
 

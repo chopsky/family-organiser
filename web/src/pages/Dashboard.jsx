@@ -210,7 +210,7 @@ function DashboardAiInput() {
           className="flex-1 px-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
         <div className="flex items-center gap-1 pr-3">
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileSelect} />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}

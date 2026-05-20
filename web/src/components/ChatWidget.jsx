@@ -77,13 +77,20 @@ const TrashIcon = ({ className }) => (
   </svg>
 );
 const SendIcon = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
-    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+  // Paper-plane / send glyph that matches the design mockup. Outline
+  // style so it sits cleanly on a coloured (coral) circle background.
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3.5 11.5L20 5l-6.5 16-3-7-7-2.5z" />
+    <path d="M20 5l-9.5 9.5" />
   </svg>
 );
-const ImageIcon = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+const MicIcon = ({ className }) => (
+  // Visual-parity with the design mockup. No voice-input wiring yet -
+  // we surface the icon disabled so the layout matches and so we have
+  // a stable spot to wire transcription into later.
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="3" width="6" height="12" rx="3" />
+    <path d="M5 11a7 7 0 0014 0M12 18v3" />
   </svg>
 );
 
@@ -262,24 +269,31 @@ I'm always here if you need me!`;
     const items = e.clipboardData?.items;
     if (!items) return;
     for (const item of items) {
-      if (item.type.startsWith('image/')) {
+      // Images and PDFs both come through as application/pdf or
+      // image/<x>. Files dragged from a file-system pasteboard arrive
+      // as item.kind === 'file' too.
+      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
         e.preventDefault();
         const file = item.getAsFile();
-        if (file) uploadImageFile(file);
+        if (file) uploadAttachment(file);
         return;
       }
     }
   }
 
-  async function uploadImageFile(file) {
+  async function uploadAttachment(file) {
     if (!file || loading) return;
 
-    const userMsg = { role: 'user', content: '📷 Scanning image...', created_at: new Date().toISOString() };
+    const isPdf = file.type === 'application/pdf';
+    const placeholder = isPdf ? '📄 Reading PDF...' : '📷 Scanning image...';
+    const userMsg = { role: 'user', content: placeholder, created_at: new Date().toISOString() };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
     try {
       const formData = new FormData();
+      // Field name stays "image" so the backend route doesn't have to
+      // care which it received - the mime-type branch handles routing.
       formData.append('image', file);
       if (activeConversationId) formData.append('conversation_id', activeConversationId);
 
@@ -294,7 +308,13 @@ I'm always here if you need me!`;
       const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
     } catch {
-      const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble processing that image. Please try again.', created_at: new Date().toISOString() };
+      const errorMsg = {
+        role: 'assistant',
+        content: isPdf
+          ? 'Sorry, I had trouble processing that PDF. Please try again.'
+          : 'Sorry, I had trouble processing that image. Please try again.',
+        created_at: new Date().toISOString(),
+      };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setLoading(false);
@@ -305,7 +325,7 @@ I'm always here if you need me!`;
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    uploadImageFile(file);
+    uploadAttachment(file);
   }
 
   // Listen for external "open chat with message" events (from dashboard AI input)
@@ -496,30 +516,87 @@ I'm always here if you need me!`;
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
-                <form onSubmit={handleSend} className="px-4 py-3 border-t border-light-grey shrink-0">
-                  <div className="flex items-center gap-2">
-                    <label className={`w-10 h-10 rounded-full border border-light-grey flex items-center justify-center transition-colors shrink-0 ${loading ? 'opacity-50' : 'hover:bg-cream cursor-pointer text-warm-grey hover:text-plum'}`}>
-                      <ImageIcon className="h-5 w-5" />
-                      <input type="file" accept="image/*" onChange={handleImageUpload} disabled={loading} className="hidden" data-chat-file-input />
-                    </label>
-                    <input
+                {/* Compose box. Layout mirrors the design mockup:
+                    multi-line textarea on top, attach (+) bottom-left,
+                    mic and coral send button bottom-right, all inside a
+                    single rounded container. */}
+                <form
+                  onSubmit={handleSend}
+                  className="px-4 py-3 border-t border-light-grey shrink-0"
+                >
+                  <div className="rounded-2xl border border-light-grey bg-white px-4 pt-3 pb-2 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/15 transition">
+                    <textarea
                       ref={inputRef}
-                      type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onPaste={handlePaste}
+                      onKeyDown={(e) => {
+                        // Plain Enter sends; Shift+Enter inserts a new
+                        // line. Matches the convention of every modern
+                        // chat compose box (WhatsApp, iMessage on Mac,
+                        // Slack, etc.) so muscle memory transfers.
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
                       placeholder="Ask me anything..."
+                      rows={1}
                       disabled={loading}
-                      className="flex-1 border border-light-grey rounded-full px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-plum/30 focus:border-plum bg-cream disabled:opacity-50"
+                      className="w-full resize-none bg-transparent text-base leading-relaxed placeholder:text-warm-grey/70 focus:outline-none disabled:opacity-50 max-h-40 overflow-y-auto"
+                      style={{
+                        // Auto-grow up to ~6 lines. The max-h above caps
+                        // it and the overflow becomes scrollable.
+                        height: 'auto',
+                        minHeight: '24px',
+                      }}
+                      onInput={(e) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                      }}
                     />
-                    <button
-                      type="submit"
-                      disabled={!input.trim() || loading}
-                      className="w-10 h-10 rounded-full bg-plum hover:bg-plum/90 disabled:bg-light-grey text-white flex items-center justify-center transition-colors shrink-0"
-                    >
-                      <SendIcon className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-between mt-2">
+                      <label
+                        className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                          loading
+                            ? 'opacity-50 cursor-not-allowed text-warm-grey'
+                            : 'cursor-pointer text-warm-grey hover:text-plum hover:bg-cream'
+                        }`}
+                        title="Attach image or PDF"
+                      >
+                        <PlusIcon className="h-5 w-5" />
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleImageUpload}
+                          disabled={loading}
+                          className="hidden"
+                          data-chat-file-input
+                        />
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {/* Mic icon is here for visual parity with the
+                            design - voice input isn't wired up yet, so
+                            we render it disabled with a tooltip. */}
+                        <button
+                          type="button"
+                          disabled
+                          aria-label="Voice input (coming soon)"
+                          title="Voice input coming soon"
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-warm-grey/60 cursor-not-allowed"
+                        >
+                          <MicIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!input.trim() || loading}
+                          className="w-9 h-9 rounded-full bg-coral hover:bg-coral/90 disabled:bg-light-grey disabled:text-warm-grey text-white flex items-center justify-center transition-colors shrink-0"
+                          aria-label="Send"
+                        >
+                          <SendIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </form>
               </>
