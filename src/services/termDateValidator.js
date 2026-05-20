@@ -42,27 +42,80 @@ function normaliseWhitespace(s) {
   return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-function findWeekdayInQuote(quote) {
-  if (typeof quote !== 'string') return null;
+/**
+ * Find all weekday mentions in the quote, with their position.
+ * A "match" is a {name, dow, position} triple. Longest-name keys are
+ * tried first so "tuesday" wins over "tues" when both appear (we don't
+ * want to double-count the same word).
+ */
+function findAllWeekdaysInQuote(quote) {
+  if (typeof quote !== 'string') return [];
   const lower = quote.toLowerCase();
   const keys = Object.keys(WEEKDAY_NAMES).sort((a, b) => b.length - a.length);
+  // Track positions already consumed by a longer match so "tuesday" at
+  // position 5 doesn't also fire "tues" at position 5.
+  const taken = new Set();
+  const matches = [];
   for (const key of keys) {
-    const re = new RegExp(`\\b${key}\\b`, 'i');
-    if (re.test(lower)) return { name: key, dow: WEEKDAY_NAMES[key] };
+    const re = new RegExp(`\\b${key}\\b`, 'gi');
+    let m;
+    while ((m = re.exec(lower)) !== null) {
+      const start = m.index;
+      let collides = false;
+      for (let i = start; i < start + key.length; i++) {
+        if (taken.has(i)) { collides = true; break; }
+      }
+      if (collides) continue;
+      for (let i = start; i < start + key.length; i++) taken.add(i);
+      matches.push({ name: key, dow: WEEKDAY_NAMES[key], position: start });
+    }
   }
-  return null;
+  return matches;
 }
 
 function checkDayOfWeek(row) {
   const d = parseISODate(row.date);
   if (!d || !row.source_quote) return;
-  const found = findWeekdayInQuote(row.source_quote);
-  if (!found) return;
+  const matches = findAllWeekdaysInQuote(row.source_quote);
+  if (matches.length === 0) return;
+
+  // Single weekday in the quote: simple case, just compare.
+  // Multiple weekdays: the quote probably contains a date range like
+  // "Monday 13 April – Thursday 25 June" — pick the weekday closest in
+  // the string to the row's day-of-month number, since that's the one
+  // that applies to THIS date. Without this disambiguation we'd
+  // false-flag the Monday term-start as "source says Thursday".
+  let chosen;
+  if (matches.length === 1) {
+    chosen = matches[0];
+  } else {
+    const dayNum = String(d.getUTCDate());
+    const lower = row.source_quote.toLowerCase();
+    // Find every standalone occurrence of the day number in the quote;
+    // pick the weekday whose start-position is nearest one of them.
+    // `\b` so we match "13" but not "131" inside another number.
+    const numRe = new RegExp(`\\b${dayNum}\\b`, 'g');
+    const dayPositions = [];
+    let nm;
+    while ((nm = numRe.exec(lower)) !== null) dayPositions.push(nm.index);
+    if (dayPositions.length === 0) {
+      // No day-of-month in the quote — fall back to first weekday.
+      chosen = matches[0];
+    } else {
+      let bestDist = Infinity;
+      for (const wd of matches) {
+        for (const dp of dayPositions) {
+          const dist = Math.abs(wd.position - dp);
+          if (dist < bestDist) { bestDist = dist; chosen = wd; }
+        }
+      }
+    }
+  }
+
   const actual = dayOfWeekUTC(d);
-  if (actual !== found.dow) {
-    // Friendlier framing: lead with the conflict, suggest the likely fix.
+  if (actual !== chosen.dow) {
     row.warnings.push(
-      `${row.date} is a ${WEEKDAY_LABEL[actual]} but the source says ${WEEKDAY_LABEL[found.dow]}. The date might be off by a day — check before saving.`
+      `${row.date} is a ${WEEKDAY_LABEL[actual]} but the source says ${WEEKDAY_LABEL[chosen.dow]}. The date might be off by a day — check before saving.`
     );
   }
 }

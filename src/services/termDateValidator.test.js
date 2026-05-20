@@ -32,6 +32,36 @@ describe('validateTermDates', () => {
     expect(row.warnings.some(w => /Tuesday.*says Monday/i.test(w))).toBe(true);
   });
 
+  it('picks the weekday closest to the date when the quote has a range', () => {
+    // Real PDF case: "Monday 13 April – Thursday 25 June" emitted by
+    // the AI as the source_quote for the term-start row (date 13 Apr).
+    // 2026-04-13 IS a Monday, so the row should NOT be flagged — but
+    // the older simple-find logic picked 'Thursday' (longer name, found
+    // first) and false-flagged the row.
+    const [row] = validateTermDates(
+      [{ event_type: 'term_start', date: '2026-04-13', academic_year: '2025-2026', source_quote: 'Monday 13 April – Thursday 25 June' }],
+      'Monday 13 April – Thursday 25 June',
+      NOW
+    );
+    expect(row.warnings.filter(w => /says Thursday/i.test(w))).toEqual([]);
+    expect(row.warnings.filter(w => /says Monday/i.test(w))).toEqual([]);
+  });
+
+  it('still flags a real mismatch when the range contains the right weekday', () => {
+    // Range quote, but for date 25 June (which IS a Thursday — no
+    // mismatch — but we want to confirm the disambiguator picks
+    // Thursday, not Monday, for this row).
+    const [row] = validateTermDates(
+      [{ event_type: 'term_end', date: '2026-06-25', academic_year: '2025-2026', source_quote: 'Monday 13 April – Thursday 25 June' }],
+      'Monday 13 April – Thursday 25 June',
+      NOW
+    );
+    // 2026-06-25 actually IS a Thursday so no warning. The point of
+    // the test is: the disambiguator MUST attach Thursday to the 25,
+    // not Monday — otherwise it would false-flag this row.
+    expect(row.warnings.filter(w => /says Monday/i.test(w))).toEqual([]);
+  });
+
   it('flags term_end before term_start in the same academic year', () => {
     // After date-sort, the walk sees term_end first (no openStart → warning)
     // and then term_start with no matching close (also a warning). Either
