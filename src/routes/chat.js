@@ -380,6 +380,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             color: firstAssignee?.color_theme || 'lavender',
             location: act.location || null,
             description: act.description || null,
+            recurrence: act.recurrence || null,
           }, req.user.id);
           // Rich card payload: the frontend renders a confirmation card
           // from this. Names + colours are resolved client-side from the

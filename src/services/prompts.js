@@ -482,9 +482,9 @@ When the user asks you to DO something (add an event, add to shopping list, crea
 
 ### Calendar Events
 \`\`\`json
-{"action": "create_event", "title": "Event title", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "all_day": false, "assigned_to_names": ["member name", ...], "location": "venue or null", "description": "extra details or null"}
+{"action": "create_event", "title": "Event title", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "all_day": false, "assigned_to_names": ["member name", ...], "location": "venue or null", "description": "extra details or null", "recurrence": "daily" | "weekly" | "biweekly" | "monthly" | "yearly" | null}
 \`\`\`
-For all-day events, set all_day to true and omit start_time/end_time. The assigned_to_names field is an array of exact family-member names; pass [] for a family-wide event. If the user mentions more than one person ("Lynn and me", "the parents"), include ALL of them.
+For all-day events, set all_day to true and omit start_time/end_time. The assigned_to_names field is an array of exact family-member names; pass [] for a family-wide event. If the user mentions more than one person ("Lynn and me", "the parents"), include ALL of them. The recurrence field IS supported - set it to "daily" / "weekly" / "biweekly" / "monthly" / "yearly" when the user wants the event to repeat (e.g. "every Wednesday", "weekly", "monthly on the 1st"); use null for one-off events. NEVER tell the user that recurring events aren't supported - they are.
 
 ### Shopping Items
 \`\`\`json
@@ -494,9 +494,9 @@ Valid categories: Dairy & Eggs, Produce, Meat & Seafood, Pantry & Grains, Bakery
 
 ### Tasks
 \`\`\`json
-{"action": "create_task", "title": "Task title", "assigned_to_names": ["member name", ...], "due_date": "YYYY-MM-DD or null"}
+{"action": "create_task", "title": "Task title", "assigned_to_names": ["member name", ...], "due_date": "YYYY-MM-DD or null", "due_time": "HH:MM or null", "recurrence": "daily" | "weekly" | "biweekly" | "monthly" | "yearly" | null}
 \`\`\`
-The assigned_to_names field is an array; pass [] for an unassigned (everyone) task. Include every named person.
+The assigned_to_names field is an array; pass [] for an unassigned (everyone) task. Include every named person. The recurrence field IS supported - set it to "daily" / "weekly" / "biweekly" / "monthly" / "yearly" when the user wants the task to repeat (e.g. "every Wednesday", "weekly", "every morning"); use null for one-off tasks. NEVER tell the user that recurring tasks aren't supported - they are. When the user says "remind X every Wednesday starting next week", set due_date to next Wednesday's YYYY-MM-DD and recurrence to "weekly".
 
 ### Recipes
 When a user asks for a recipe, meal idea, or cooking help, ALWAYS create a recipe action to save it to their Recipe Box. Keep recipes simple and family-friendly - busy families need practical meals, not restaurant-quality complexity.
