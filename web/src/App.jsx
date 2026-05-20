@@ -4,6 +4,7 @@ import { SubscriptionProvider } from './context/SubscriptionContext';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { localeHomePath } from './hooks/useLocale';
+import { useUniversalLinks } from './hooks/useUniversalLinks';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 // File renamed from CookieConsent.jsx — many ad-blocker rules match on
@@ -21,6 +22,7 @@ const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
 const CheckEmail      = lazy(() => import('./pages/CheckEmail'));
 const Verified        = lazy(() => import('./pages/Verified'));
+const Verify          = lazy(() => import('./pages/Verify'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
@@ -131,6 +133,10 @@ function RouteTransition({ children }) {
 
 function AppRoutes() {
   const { token, needsHousehold } = useAuth();
+  // On iOS, intercept Universal Link opens (e.g. https://housemait.com/verify?token=…
+  // tapped from Mail) and route to the corresponding in-app path so the
+  // user doesn't bounce out to a browser.
+  useUniversalLinks();
   return (
     <Suspense fallback={<PageLoader />}>
       <RouteTransition>
@@ -168,6 +174,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />
+        <Route path="/verify" element={<Verify />} />
         <Route path="/verified" element={<Verified />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />

@@ -246,6 +246,46 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/verify-email-and-login ──────────────────────────────────
+//
+// Called by the in-app /verify React route when the user taps the verify
+// link from their email. The link itself is now a Universal Link
+// (https://housemait.com/verify?token=…) so on iOS it opens the
+// Housemait app directly; on web it just renders /verify in the browser.
+// Either way, the React /verify page POSTs the token here, we verify +
+// flip email_verified, and issue a JWT so the user lands back inside the
+// app already logged-in. They continue straight into the onboarding
+// wizard with no manual log-in step.
+//
+// Same single-use token rules as the GET endpoint above. If the user
+// already verified via the browser GET (e.g. they tapped the link on
+// desktop), the token is consumed so this POST returns 'invalid' — the
+// client then prompts them to log in normally.
+router.post('/verify-email-and-login', async (req, res) => {
+  const { token } = req.body || {};
+  if (!token) {
+    return res.status(400).json({ error: 'Verification token required.' });
+  }
+  try {
+    const record = await db.getEmailVerificationToken(token);
+    if (!record) {
+      return res.status(400).json({ error: 'Invalid or expired link. Please log in instead.' });
+    }
+    await db.markEmailVerificationTokenUsed(record.id);
+    await db.updateUser(record.user_id, { email_verified: true });
+
+    const user = await db.getUserById(record.user_id);
+    if (!user) {
+      return res.status(500).json({ error: 'User not found after verification.' });
+    }
+    const response = await authResponse(user, req);
+    return res.json(response);
+  } catch (err) {
+    console.error('POST /api/auth/verify-email-and-login error:', err);
+    return res.status(500).json({ error: 'Verification failed. Please try logging in.' });
+  }
+});
+
 // ─── POST /api/auth/resend-verification ─────────────────────────────────────
 
 router.post('/resend-verification', async (req, res) => {

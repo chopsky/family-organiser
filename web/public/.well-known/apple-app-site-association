@@ -1,7 +1,16 @@
 {
-  "webcredentials": {
-    "apps": [
-      "G37VHKH43S.com.housemait.app"
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["G37VHKH43S.com.housemait.app"],
+        "components": [
+          { "/": "/verify", "?": { "token": "?*" } },
+          { "/": "/verified" }
+        ]
+      }
     ]
+  },
+  "webcredentials": {
+    "apps": ["G37VHKH43S.com.housemait.app"]
   }
 }

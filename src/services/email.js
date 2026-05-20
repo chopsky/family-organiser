@@ -6,7 +6,6 @@ const client = process.env.POSTMARK_SERVER_TOKEN
 
 const FROM = process.env.POSTMARK_FROM_EMAIL || 'noreply@housemait.com';
 const BASE_URL = process.env.WEB_URL || 'http://localhost:5173';
-const API_URL = process.env.API_URL || process.env.WEB_URL || 'http://localhost:3000';
 
 // ── Housemait brand palette (kept in sync with web/src/index.css) ──────────
 // Inline-styled emails can't reference CSS custom properties, so the hex
@@ -70,7 +69,15 @@ async function sendEmail(to, subject, html, options = {}) {
 }
 
 async function sendVerificationEmail(to, name, token) {
-  const url = `${API_URL}/api/auth/verify-email?token=${token}`;
+  // Universal Link target: hitting this URL from the iOS app opens
+  // Housemait directly (see web/public/.well-known/apple-app-site-association),
+  // while web visitors just see the React /verify page. Either way the
+  // page POSTs to /api/auth/verify-email-and-login, which verifies the
+  // token + issues a session JWT — the user lands inside the app already
+  // logged-in. The old API URL (/api/auth/verify-email) is kept around
+  // for any in-flight emails sent before this change; new emails point
+  // at the frontend route so iOS deep-links work.
+  const url = `${BASE_URL}/verify?token=${token}`;
   const html = emailTemplate('Verify your email', `
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Hi ${name},</p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click the button below to verify your email address and get started with Housemait.</p>
