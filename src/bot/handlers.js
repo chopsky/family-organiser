@@ -1518,6 +1518,43 @@ async function handleTextMessage(text, user, household) {
     response += `\n\n(I'll nudge you **${chosenLabel}** before — closest to the ${requestedLabel} you asked for. Reply with "make it 30 min" or "make it 1 hour" to change.)`;
   }
 
+  // ── Follow-up consistency reconciliation ───────────────────────────────
+  // The classifier prompt asks the model to offer one useful follow-up
+  // question on add/create turns ("Want me to set a reminder?", "Want
+  // me to add Lynn too?"). It SOMETIMES does - but drops it as often
+  // as it includes it, making the assistant feel less conversational
+  // than competitor AIs that always offer a next step. This deterministic
+  // backstop appends a contextually-relevant question when:
+  //   1. Something was actually added (task or event), AND
+  //   2. The response doesn't already end with a question mark.
+  //
+  // We deliberately only fire when we have a GENUINELY useful follow-up
+  // (reminders that weren't set, single-assignee tasks that sound shared)
+  // - not "anything else?" filler, which the prompt forbids anyway.
+  const eventAdded = actions.eventsAdded?.length > 0;
+  const taskAdded = actions.tasksAdded.length > 0;
+  const reminderSaved = (actions.remindersSaved || 0) > 0 || actions.notificationSnap;
+  // Strip trailing markdown / whitespace / closing parens / periods to
+  // get at the actual final character. A response ending in "...time?)"
+  // should count as already-asking, even though the literal last char
+  // is a paren.
+  const trailingTrim = response.replace(/[\s)*_~`.!]+$/g, '');
+  const alreadyAsks = /\?$/.test(trailingTrim);
+  if (!alreadyAsks && (eventAdded || taskAdded)) {
+    let followUp = null;
+    // Priority order: reminder offer (most useful) → assignee-broadening
+    // → none. We never add a generic "anything else?".
+    if ((eventAdded || taskAdded) && !reminderSaved) {
+      followUp = eventAdded
+        ? 'Want me to add a reminder for it?'
+        : 'Want me to set a reminder time?';
+    }
+    if (followUp) {
+      response += `\n\n${followUp}`;
+      actions.followUpAppended = true;
+    }
+  }
+
   return {
     response,
     actions,
