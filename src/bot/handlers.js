@@ -1407,6 +1407,28 @@ async function handleTextMessage(text, user, household) {
     response += `\n\n(${list} ${dups.length === 1 ? 'was' : 'were'} already on your list - skipped. Reply "another ${dups[0]}" if you want a second.)`;
   }
 
+  // ── Honesty reconciliation ─────────────────────────────────────────────
+  // Real bug from production: the classifier said "Got it! I've added Book
+  // dinner..." but emitted tasks: []. The user got a confident confirmation
+  // for an action that never happened. The prompt now forbids this but
+  // the model still sometimes drifts - this is the structural backstop.
+  //
+  // If response_message claims an action verb (added / created / scheduled /
+  // booked / saved / tracking) AND no structured action of any kind landed
+  // in actions, we replace the misleading text with an explicit recovery
+  // prompt. We also log it so we can spot how often the prompt rule leaks.
+  const ACTION_VERB_REGEX = /\b(i'?ve|i have|i)\s+(added|created|scheduled|booked|saved|set up|set|popped|put|ticked off|marked|noted|tracked|tracking|completed)\b|^(added|created|scheduled|booked|done|got it,? i'?ve|got it,? added|noted)\b/i;
+  const nothingHappened = !actions.shoppingAdded.length
+    && !actions.shoppingCompleted.length
+    && !actions.tasksAdded.length
+    && !actions.tasksCompleted.length
+    && !(actions.eventsAdded?.length)
+    && !actions.tasksUnmatched?.length;
+  if (nothingHappened && ACTION_VERB_REGEX.test(response)) {
+    console.warn('[handlers] Reconciliation hit: response claimed an action but nothing was emitted. Original:', response.slice(0, 200));
+    response = "I caught what you said but didn't quite manage to save it - sorry about that. Could you say that again? If it's a task or event, try to include the date.";
+  }
+
   return {
     response,
     actions,
