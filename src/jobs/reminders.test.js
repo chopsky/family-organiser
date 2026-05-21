@@ -61,13 +61,24 @@ describe('buildDailyReminderMessage()', () => {
     expect(msg).toContain('Ben');
   });
 
-  test('all-day events are dropped from Today\'s Schedule', () => {
-    // Per the redesign, all-day calendar events don't clutter the
-    // schedule view - only timed events with a real start time appear.
+  test('all-day events render with "All day -" prefix', () => {
+    // Per the user's follow-up: every event should appear, all-day or
+    // not. All-day rows lead with "All day -" instead of a time.
     const allDay = makeEvent({ title: 'Class photos', all_day: true, start_time: '2026-05-15T00:00:00.000Z' });
     const msg = buildDailyReminderMessage(SARAH, { todayEvents: [allDay] });
-    expect(msg).not.toContain('Class photos');
-    expect(msg).not.toContain('All day');
+    expect(msg).toContain("Today's Schedule:");
+    expect(msg).toContain('All day - Class photos');
+  });
+
+  test('all-day events render before timed events in the schedule', () => {
+    const allDay = makeEvent({ title: 'Class photos', all_day: true, start_time: '2026-05-15T00:00:00.000Z' });
+    const timed = makeEvent({ id: 'ev-2', title: 'Logan OT', start_time: '2026-05-15T08:00:00.000Z', all_day: false });
+    const msg = buildDailyReminderMessage(SARAH, { todayEvents: [allDay, timed], tz: 'UTC' });
+    const allDayIdx = msg.indexOf('Class photos');
+    const timedIdx = msg.indexOf('Logan OT');
+    expect(allDayIdx).toBeGreaterThan(-1);
+    expect(timedIdx).toBeGreaterThan(-1);
+    expect(allDayIdx).toBeLessThan(timedIdx);
   });
 
   test('does NOT include a tasks section header', () => {

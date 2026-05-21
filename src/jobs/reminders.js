@@ -100,12 +100,18 @@ function buildDailyReminderMessage(user, opts = {}) {
     lines.push('');
   }
 
-  // Today's Schedule - timed events only. All-day events are dropped
-  // here per the redesign; surface them through tasks/reminders if
-  // they're actionable.
-  const timedEvents = (Array.isArray(todayEvents) ? todayEvents : []).filter(e => !e.all_day);
-  if (timedEvents.length > 0) {
+  // Today's Schedule - both all-day and timed events. All-day events
+  // render first (they bracket the whole day) labelled "All day -",
+  // then timed events in chronological order.
+  const eventsArr = Array.isArray(todayEvents) ? todayEvents : [];
+  const allDayEvents = eventsArr.filter(e => e.all_day);
+  const timedEvents = eventsArr.filter(e => !e.all_day);
+  if (allDayEvents.length > 0 || timedEvents.length > 0) {
     lines.push("📅 Today's Schedule:");
+    for (const ev of allDayEvents) {
+      const who = formatEventAssignee(ev);
+      lines.push(`All day - ${ev.title}${who ? ` _(${who})_` : ''}`);
+    }
     for (const ev of timedEvents) {
       const startStr = formatEventTime(ev.start_time, tz);
       const who = formatEventAssignee(ev);
@@ -114,10 +120,10 @@ function buildDailyReminderMessage(user, opts = {}) {
     lines.push('');
   }
 
-  // "Nothing scheduled" only when BOTH kids activities and timed
-  // events are empty. Bills/tasks/meals don't count as schedule items.
+  // "Nothing scheduled" only when BOTH kids activities and the events
+  // list are empty. Bills/tasks/meals don't count as schedule items.
   const hasSchool = Array.isArray(schoolActivities) && schoolActivities.length > 0;
-  if (!hasSchool && timedEvents.length === 0) {
+  if (!hasSchool && eventsArr.length === 0) {
     lines.push('✨ Nothing scheduled today.');
     lines.push('');
   }
