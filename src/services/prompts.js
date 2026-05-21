@@ -134,6 +134,7 @@ TASK RULES:
 - "Next week same day" / "same day next week" / "this day next week" means today's weekday + 7 days. Use the weekday from the "Today's date is" line above - do NOT infer the weekday from an unrelated existing task in the OPEN TASKS list. The user is anchoring to TODAY, not to any other task.
 - CRITICAL: when computing a relative due_date ("next week", "in a week", "this day next week"), the ONLY anchor is today's date (from the "Today's date is" line). Do NOT copy a date or weekday from a same-titled task in OPEN TASKS - even if the topic matches. OPEN TASKS is reference for completion-matching only, never a date source for new tasks. If today is Wednesday 2026-05-20 and the user says "remind me next week same day", the answer is 2026-05-27 (Wednesday), regardless of whether OPEN TASKS contains a Tuesday or Friday task with the same topic.
 - "Every week after" / "every week" / "weekly" → recurrence: "weekly". When combined with "next week same day", the first due_date is (today + 7 days) and recurrence is weekly. Do not also emit a separate non-recurring task for the same series - one task with recurrence covers all future occurrences.
+- DUE TIME vs REMINDER LEAD (same trap as events above): due_time is when the task is actually due. NEVER subtract a reminder offset from due_time. "Pay bill at 5pm, nudge me 30 min before" → due_time: "17:00", notification: "30_min". It does NOT mean due_time: "16:30".
 
 DUPLICATE RECURRING TASKS (CRITICAL - real bug this prevents):
 - Before emitting a new task with recurrence set, scan OPEN TASKS for an existing recurring task on the same topic. Match by FUZZY topic, not exact title - "Give Logan eye drops", "Do Logan's eye drops", and "Logan eye drops" are all the same series. If the user says "remind me to give Logan eye drops weekly" and an existing weekly task on Logan's eye drops already exists, DO NOT create a new series.
@@ -197,18 +198,31 @@ DATE-REQUIRED FOR CALENDAR EVENTS:
   to ask: "Sure - when is the {title}? (Tell me a date.)"
 - "Today" or context like "this morning/afternoon/evening/tonight" counts as
   a date - use today's date.
-- REMINDERS for a create_event: leave calendar_event.reminders as null
-  UNLESS the user explicitly asked for one (e.g. "remind me 30 mins before",
-  "with a 1 hour alert", "remind me an hour before", "5 min reminder").
-  Default behaviour is NO reminder. When the user does ask:
-    • Parse the offset to {time: number, unit: "minutes"|"hours"|"days"}.
-    • "remind me 30 mins before" → [{"time": 30, "unit": "minutes"}]
-    • "with a 1 hour reminder" → [{"time": 1, "unit": "hours"}]
-    • "remind me a day before" → [{"time": 1, "unit": "days"}]
-    • Multiple reminders are allowed: "remind me 1 day and 1 hour before"
-      → [{"time": 1, "unit": "days"}, {"time": 1, "unit": "hours"}]
-  If the user asks to add a reminder TO AN EXISTING event, that's an
-  update_event intent - populate updates.reminders with the same shape.
+- REMINDERS for a create_event (CRITICAL - common failure point):
+  - The event's start_time is ALWAYS the time the thing actually happens. NEVER
+    subtract a reminder offset from start_time. "Remind me 10 minutes before
+    the 8AM call" means start_time = 08:00, reminders = [{"time": 10, "unit":
+    "minutes"}]. It does NOT mean start_time = 07:50.
+  - When the user uses any reminder phrasing - "remind me N before",
+    "N before", "with an N reminder", "N alert", "nudge me N before",
+    "ping me N before" - you MUST populate calendar_event.reminders with the
+    parsed offset(s). Do not skip this field while ALSO claiming a reminder
+    in response_message; that's the HONESTY RULE from above firing.
+  - Offset → {time: number, unit: "minutes"|"hours"|"days"}:
+      "10 mins before" / "10 minutes before" → [{"time": 10, "unit": "minutes"}]
+      "30 mins before"                       → [{"time": 30, "unit": "minutes"}]
+      "1 hour before" / "an hour before"     → [{"time": 1,  "unit": "hours"}]
+      "a day before"                         → [{"time": 1,  "unit": "days"}]
+      "1 day and 1 hour before"              → [{"time": 1,  "unit": "days"}, {"time": 1, "unit": "hours"}]
+  - Default is NO reminder. Only populate when the user explicitly asked.
+  - Worked counter-example (real production failure):
+      User: "Bookings open for Foxhills padel at 8AM on Sat morning. Please remind me 10 minutes before."
+      WRONG: calendar_event: {title: "Book Foxhills Padel", start_time: "07:50", reminders: null, ...}
+             (Two mistakes in one turn: start_time shifted, reminders dropped.)
+      RIGHT: calendar_event: {title: "Book Foxhills Padel", start_time: "08:00", end_time: "09:00",
+             reminders: [{"time": 10, "unit": "minutes"}], description: "pavilion@foxhills.co.uk", ...}
+  - Adding a reminder to an EXISTING event is an update_event intent - same
+    {time, unit} shape lives in updates.reminders.
 
 UPDATE & DELETE (events, tasks, shopping) - BE CONSERVATIVE:
 - Only use update_* or delete_* intents when the user's message contains an
