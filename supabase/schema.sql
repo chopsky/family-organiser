@@ -230,6 +230,29 @@ create table if not exists household_notes (
   unique(household_id, key)
 );
 
+-- household_preferences (structured AI-consulted facts: dietary,
+-- allergies, member-specific dislikes/loves, schedule anchors). See
+-- migration-household-preferences.sql for the rationale.
+create table if not exists household_preferences (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references households(id) on delete cascade,
+  member_id    uuid references users(id) on delete cascade,
+  key          text not null,
+  value        text not null,
+  source       text not null default 'inferred' check (source in ('explicit', 'inferred', 'manual')),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists household_preferences_household_member_idx
+  on household_preferences (household_id, member_id);
+create unique index if not exists household_preferences_unique_idx
+  on household_preferences (
+    household_id,
+    coalesce(member_id, '00000000-0000-0000-0000-000000000000'),
+    key,
+    value
+  );
+
 -- chat_messages (AI assistant conversation history)
 create table if not exists chat_messages (
   id            uuid primary key default gen_random_uuid(),

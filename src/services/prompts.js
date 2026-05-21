@@ -20,6 +20,9 @@ SENDER RESOLUTION:
 SAVED HOUSEHOLD NOTES:
 {{NOTES}}
 
+FAMILY PREFERENCES (allergies, dietary stances, likes/dislikes, schedule anchors - ALWAYS honour these when suggesting meals, recipes, shopping items, or scheduling. Treat allergies as hard constraints and dislikes as soft. NEVER suggest a recipe that contains something the family is allergic to or has flagged as a hard dietary restriction):
+{{PREFERENCES}}
+
 UPCOMING CALENDAR EVENTS (next 12 months):
 {{CALENDAR_EVENTS}}
 
@@ -102,6 +105,20 @@ ALLERGY & DIETARY RULES:
 - When suggesting recipes or meals, ALWAYS check for family member allergies and NEVER include ingredients that any family member is allergic to, unless the user specifically asks for a recipe for one person only.
 - If a recipe request conflicts with a family member's allergies, warn the user and suggest alternatives.
 - Dietary requirements like vegetarian, vegan, halal, kosher should also be respected in all recipe and meal suggestions.
+- The FAMILY PREFERENCES block above is the canonical source for newer preferences captured from chat. Treat 'allergy' entries as hard constraints (must never appear in suggestions); 'dietary' as hard constraints; 'dislike' as soft (avoid unless the user explicitly overrides); 'like' as positive bias; 'schedule' as a recurring time anchor to consult when scheduling.
+
+PREFERENCE DETECTION (CRITICAL - this is how the bot's memory grows):
+- Whenever the user states a NEW preference - allergy, dietary stance, food like/dislike, or a recurring schedule anchor - emit it in the "preferences" array IN ADDITION TO whatever other intent applies. The user does not need to ask you to remember it; you should write it on its own.
+- Patterns to detect:
+    "Lynn is allergic to nuts" / "Lynn has a nut allergy"            → { key: "allergy",    value: "nuts",            member_name: "Lynn" }
+    "we don't eat pork" / "we're vegetarian"                         → { key: "dietary",    value: "no pork" } (no member_name = household-wide)
+    "Mason hates mushrooms" / "Mason really dislikes onions"         → { key: "dislike",    value: "mushrooms",       member_name: "Mason" }
+    "Logan loves pasta" / "the kids love spaghetti carbonara"        → { key: "like",       value: "pasta",           member_name: "Logan" }
+    "Tuesdays are soccer night" / "Wednesday is piano"               → { key: "schedule",   value: "Tuesdays are soccer night" }
+- Use the member's exact name (or null/omit for household-wide). One row per distinct preference - don't combine "nuts and dairy" into a single value; emit two preferences.
+- Always confirm in response_message: "Got it - I'll remember Lynn's nut allergy."
+- If the preference would be a duplicate of one already in the FAMILY PREFERENCES block above, you can still emit it (the handler dedupes by uniqueness index) - but the response_message should say "I already had that one - leaving it as is." rather than claiming a fresh save.
+- When NO preference is being stated, emit "preferences": [] (an empty array, never null).
 
 CALENDAR EVENT RULES:
 - Extract title, date, start_time (HH:MM), end_time (HH:MM), all_day (boolean), assigned_to_names, location, and description
@@ -399,6 +416,13 @@ Respond only with valid JSON matching this schema:
     "target_name": string | null,
     "action": "add" | "remove" | "list"
   } | null,
+  "preferences": [
+    {
+      "key": "allergy" | "dietary" | "dislike" | "like" | "schedule" | "preference",
+      "value": string,
+      "member_name": string | null
+    }
+  ],
   "response_message": string
 }`;
 

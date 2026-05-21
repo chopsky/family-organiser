@@ -376,6 +376,85 @@ async function deleteHouseholdNote(householdId, key, db = supabase) {
   if (error) throw error;
 }
 
+// ─── Household preferences ────────────────────────────────────────────────
+// Structured AI-consulted facts (dietary, allergies, member-specific
+// quirks, schedule anchors). Distinct from household_notes (free-form,
+// recall-on-demand KV) - preferences are auto-surfaced into every
+// classifier prompt so the model considers them on every relevant
+// turn without being asked.
+
+// Whitelisted preference keys. Keeping this short on purpose: the
+// classifier needs a constrained vocabulary or it'll invent its own
+// keys (e.g. "food_preference", "person_dislikes") and the auto-surface
+// becomes noisy. Anything outside this set gets coerced to 'preference'.
+const PREFERENCE_KEYS = new Set([
+  'allergy',     // hard medical constraint - "Lynn is allergic to nuts"
+  'dietary',     // dietary stance - "we're vegetarian", "we don't eat pork"
+  'dislike',     // soft food/topic aversion - "Mason hates mushrooms"
+  'like',        // positive preference - "Logan loves pasta"
+  'schedule',    // recurring time anchor - "Tuesdays are soccer night"
+  'preference',  // generic catch-all when none of the above fits
+]);
+
+async function addHouseholdPreference(householdId, { memberId, key, value, source = 'inferred' }, db = supabase) {
+  if (!householdId || !key || !value) return null;
+  const safeKey = PREFERENCE_KEYS.has(key) ? key : 'preference';
+  const safeValue = String(value).trim();
+  if (!safeValue) return null;
+  // Upsert behaviour: if the same (household, member, key, value) tuple
+  // already exists, touch updated_at via the trigger; otherwise insert.
+  // The unique index uses COALESCE(member_id, zero-uuid) so null
+  // member_id collides with null member_id correctly.
+  const { data, error } = await db
+    .from('household_preferences')
+    .upsert(
+      {
+        household_id: householdId,
+        member_id: memberId || null,
+        key: safeKey,
+        value: safeValue,
+        source,
+      },
+      { onConflict: 'household_id,member_id,key,value', ignoreDuplicates: false },
+    )
+    .select()
+    .single();
+  if (error) {
+    // The COALESCE-based unique index isn't a true conflict target for
+    // PostgREST when member_id is null; fall back to a select-then-decide
+    // pattern so duplicate inserts don't crash the bot.
+    if (error.code === '23505') {
+      console.log('[preferences] duplicate prevented by unique index:', safeKey, '=', safeValue);
+      return null;
+    }
+    throw error;
+  }
+  return data;
+}
+
+async function getHouseholdPreferences(householdId, db = supabase) {
+  if (!householdId) return [];
+  const { data, error } = await db
+    .from('household_preferences')
+    .select('id, member_id, key, value, source, created_at')
+    .eq('household_id', householdId)
+    .order('key')
+    .order('value');
+  if (error) throw error;
+  return data || [];
+}
+
+async function deleteHouseholdPreference(id, householdId, db = supabase) {
+  if (!id || !householdId) return false;
+  const { error } = await db
+    .from('household_preferences')
+    .delete()
+    .eq('id', id)
+    .eq('household_id', householdId);
+  if (error) throw error;
+  return true;
+}
+
 // ─── Dependent helpers ───────────────────────────────────────────────────────
 
 async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id }, db = supabase) {
@@ -5008,6 +5087,9 @@ module.exports = {
   getHouseholdNotes,
   upsertHouseholdNote,
   deleteHouseholdNote,
+  addHouseholdPreference,
+  getHouseholdPreferences,
+  deleteHouseholdPreference,
   // WhatsApp
   getUserByWhatsAppPhone,
   createWhatsAppVerificationCode,

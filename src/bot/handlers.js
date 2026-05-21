@@ -99,6 +99,8 @@ const SLASH_COMMANDS = {
   'my-tasks': 'mytasks',
   subscriptions: 'subscriptions',
   subs:     'subscriptions',
+  preferences: 'preferences',
+  prefs:    'preferences',
   help:     'help',
 };
 function matchSlashCommand(text) {
@@ -116,6 +118,7 @@ const SLASH_HELP_TEXT =
   '• `/tasks` - show today\'s + overdue tasks\n' +
   '• `/mytasks` - show only tasks assigned to you\n' +
   '• `/subscriptions` - show tracked subscriptions + monthly total\n' +
+  '• `/preferences` - show saved family preferences (allergies, dislikes, schedule anchors)\n' +
   '• `/help` - this message\n\n' +
   'You can also chat to me normally - _"add milk to the list"_, _"weather in Brighton tomorrow"_, _"what\'s on this Saturday?"_.';
 
@@ -880,6 +883,8 @@ async function handleTextMessage(text, user, household) {
         return { response: await handleMyTasks(user, household), actions };
       case 'subscriptions':
         return { response: await handleSubscriptionsList(household), actions };
+      case 'preferences':
+        return { response: await handlePreferencesList(user, household), actions };
       case 'help':
         return { response: SLASH_HELP_TEXT, actions };
     }
@@ -933,8 +938,18 @@ async function handleTextMessage(text, user, household) {
     }
   }
 
-  // Fetch saved notes and upcoming calendar events for context
+  // Fetch saved notes, household preferences, and upcoming calendar
+  // events for context. Preferences auto-surface allergies/dietary/
+  // likes/dislikes/schedule anchors into the classifier prompt so the
+  // bot considers them on every relevant turn without being asked.
+  // Member name is resolved here so the prompt can show "Lynn:
+  // allergic to nuts" rather than a raw uuid.
   const notes = await db.getHouseholdNotes(household.id);
+  const rawPreferences = await db.getHouseholdPreferences(household.id).catch(() => []);
+  const preferences = rawPreferences.map((p) => {
+    const member = p.member_id ? household.members.find((m) => m.id === p.member_id) : null;
+    return { ...p, member_name: member?.name || null };
+  });
   const now = new Date();
   const futureDate = new Date(now);
   futureDate.setDate(futureDate.getDate() + 365);
@@ -964,7 +979,7 @@ async function handleTextMessage(text, user, household) {
   const schoolTermDates = summariseSchoolTermDates(householdSchools, termDates);
 
   console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${openTasks.length} open tasks, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates });
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 
@@ -1029,6 +1044,38 @@ async function handleTextMessage(text, user, household) {
     } catch (err) {
       console.error('[handlers] Weather fetch failed (post-classify):', err.message);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
+    }
+  }
+
+  // Handle preference learning. This block runs alongside ANY intent
+  // (the classifier emits preferences as an extra field, not as the
+  // primary intent), so a turn like "remind Lynn to pick up Logan -
+  // she's allergic to nuts btw" both creates the task AND saves the
+  // allergy. Soft-fails so a write hiccup never blocks the reply.
+  if (Array.isArray(result.preferences) && result.preferences.length > 0) {
+    const savedPreferenceTitles = [];
+    for (const p of result.preferences) {
+      if (!p || !p.value || !p.key) continue;
+      try {
+        const memberId = p.member_name
+          ? household.members.find((m) => m.name.toLowerCase() === String(p.member_name).toLowerCase())?.id || null
+          : null;
+        const saved = await db.addHouseholdPreference(household.id, {
+          memberId,
+          key: p.key,
+          value: p.value,
+          source: 'inferred',
+        });
+        if (saved) {
+          savedPreferenceTitles.push(`${p.member_name || 'family'}: ${p.value}`);
+        }
+      } catch (err) {
+        console.warn('[handlers] preference save failed:', err.message);
+      }
+    }
+    if (savedPreferenceTitles.length > 0) {
+      actions.preferencesSaved = savedPreferenceTitles;
+      console.log('[handlers] Preferences saved:', savedPreferenceTitles.join(' | '));
     }
   }
 
@@ -1765,6 +1812,56 @@ async function handleMyTasks(user, household) {
   const tasks = await db.getTasks(household.id, { assignedToId: user.id });
   const heading = `${user.name}'s Tasks`;
   return formatTaskList(tasks, heading);
+}
+
+async function handlePreferencesList(user, household) {
+  const prefs = await db.getHouseholdPreferences(household.id).catch(() => []);
+  if (!prefs.length) {
+    return "I haven't learned any family preferences yet. Just mention them in chat - _\"Lynn is allergic to nuts\"_, _\"we don't eat pork\"_, _\"Mason hates mushrooms\"_ - and I'll remember.";
+  }
+  // Group by member name (Everyone first, then alphabetical). Allergies
+  // and dietary stances render before softer dislikes/likes so the most
+  // load-bearing constraints lead.
+  const KEY_LABEL = {
+    allergy: '🚫 Allergy',
+    dietary: '🥗 Dietary',
+    dislike: '🙅 Dislike',
+    like: '❤️ Like',
+    schedule: '🗓 Schedule',
+    preference: '💡 Note',
+  };
+  const KEY_PRIORITY = { allergy: 0, dietary: 1, dislike: 2, like: 3, schedule: 4, preference: 5 };
+  // Resolve member_id -> name once.
+  const memberById = new Map(household.members.map(m => [m.id, m.name]));
+  const groups = new Map();
+  for (const p of prefs) {
+    const owner = p.member_id ? (memberById.get(p.member_id) || 'A family member') : 'Everyone';
+    if (!groups.has(owner)) groups.set(owner, []);
+    groups.get(owner).push(p);
+  }
+  // Sort owners: Everyone first, then alphabetical
+  const sortedOwners = [...groups.keys()].sort((a, b) => {
+    if (a === 'Everyone') return -1;
+    if (b === 'Everyone') return 1;
+    return a.localeCompare(b);
+  });
+  const lines = ['*Saved family preferences:*'];
+  for (const owner of sortedOwners) {
+    const rows = groups.get(owner).slice().sort((a, b) => {
+      const ap = KEY_PRIORITY[a.key] ?? 99;
+      const bp = KEY_PRIORITY[b.key] ?? 99;
+      if (ap !== bp) return ap - bp;
+      return (a.value || '').localeCompare(b.value || '');
+    });
+    lines.push('');
+    lines.push(`*${owner}*`);
+    for (const r of rows) {
+      lines.push(`${KEY_LABEL[r.key] || '•'}: ${r.value}`);
+    }
+  }
+  lines.push('');
+  lines.push('_To remove one, just tell me - e.g. "forget that Mason hates mushrooms"._');
+  return lines.join('\n');
 }
 
 async function handleSubscriptionsList(household) {

@@ -13,7 +13,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '' } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [] } = {}) {
   // "Today" needs to be computed in the user's timezone, not UTC, or
   // we drift on either side of midnight (a 23:30 BST message gets
   // tagged "tomorrow" by a UTC-only Railway). Also include the weekday
@@ -36,6 +36,30 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   const senderStr = sender || 'Unknown';
   const notesStr = notes.length > 0
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
+    : '(none saved yet)';
+
+  // Family preferences - structured AI-consulted facts (allergies,
+  // dietary stances, member-specific likes/dislikes, schedule anchors).
+  // Format groups by member so the model can see at a glance what
+  // belongs to whom. Allergies and dietary rules render first because
+  // they're hard constraints.
+  const KEY_PRIORITY = { allergy: 0, dietary: 1, dislike: 2, like: 3, schedule: 4, preference: 5 };
+  const sortedPrefs = (preferences || []).slice().sort((a, b) => {
+    const ap = KEY_PRIORITY[a.key] ?? 99;
+    const bp = KEY_PRIORITY[b.key] ?? 99;
+    if (ap !== bp) return ap - bp;
+    return (a.value || '').localeCompare(b.value || '');
+  });
+  // Helper to look up member name from id (uses memberNames + a parallel
+  // id list would be cleaner; caller hands us already-resolved member
+  // info via the preference rows below if needed).
+  function preferenceLine(p) {
+    const who = p.member_name || (p.member_id ? '(member)' : 'Everyone');
+    const tag = p.key.toUpperCase();
+    return `- [${tag}] ${who}: ${p.value}`;
+  }
+  const preferencesStr = sortedPrefs.length > 0
+    ? sortedPrefs.map(preferenceLine).join('\n')
     : '(none saved yet)';
   // Cap at 100 events to keep the prompt size reasonable.
   // CRITICAL: format in the user's timezone, not the server's. Railway runs
@@ -100,6 +124,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{SENDER}}/g, senderStr)
     .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{NOTES}}/g, notesStr)
+    .replace(/{{PREFERENCES}}/g, preferencesStr)
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr)
     .replace(/{{TASKS}}/g, tasksStr)
     .replace(/{{SCHOOL_TERM_DATES}}/g, schoolTermDates || '(none)');
