@@ -47,6 +47,28 @@ function formatPhone(phone) {
 }
 
 /**
+ * Convert any leaked markdown emphasis in outbound text to WhatsApp's
+ * native formatting. The LLM occasionally drifts into markdown-style
+ * **bold** and __bold__ (Gemini and Claude both do this on chat-style
+ * replies despite the prompt asking for plain text). WhatsApp renders
+ * those as literal asterisks/underscores - users see the punctuation,
+ * not the emphasis. Single-asterisk *bold* and single-underscore
+ * _italic_ are correct WhatsApp syntax and are left alone.
+ *
+ * Exported so tests can lock the conversions; called by sendMessage
+ * just before the Twilio POST so EVERY outbound free-form message
+ * benefits, regardless of which handler produced the text.
+ */
+function normalizeWhatsAppMarkdown(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    // **bold** -> *bold*  (lazy match, single line so we don't span paragraphs)
+    .replace(/\*\*([^\n*]+?)\*\*/g, '*$1*')
+    // __bold__ -> *bold*  (rarer but Gemini does emit it occasionally)
+    .replace(/__([^\n_]+?)__/g, '*$1*');
+}
+
+/**
  * Return the bot's own WhatsApp number (E.164, without the 'whatsapp:' prefix
  * and without the + sign - suitable for building a wa.me/<number> deep link).
  * Returns null if not configured.
@@ -73,7 +95,12 @@ async function sendMessage(phone, body) {
   const to = formatPhone(phone);
   const msid = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
-  const params = { To: to, Body: body };
+  // Normalise leaked markdown (**bold** / __bold__) into WhatsApp's
+  // native *bold* before sending - centralised here so every caller
+  // benefits, regardless of which handler produced the text.
+  const normalisedBody = normalizeWhatsAppMarkdown(body);
+
+  const params = { To: to, Body: normalisedBody };
   if (msid) {
     params.MessagingServiceSid = msid;
   } else {
@@ -269,4 +296,5 @@ module.exports = {
   formatPhone,
   getBotNumberForWaLink,
   getClient,
+  normalizeWhatsAppMarkdown,
 };
