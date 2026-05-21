@@ -19,11 +19,25 @@ const publicHolidays = require('../services/publicHolidays');
 
 const router = Router();
 
+// All colours that may appear as an event's `color`. The full surface
+// area is union of three sources:
+//   1. Original built-in event colours (sage, plum, ...).
+//   2. The 16-colour member-theme palette defined in db/queries.js
+//      COLOR_THEMES (so an event coloured by its first assignee's theme
+//      can store any of those values).
+//   3. Legacy profile-theme names kept for back-compat with rows
+//      created before the palette was unified.
+// Keep this in sync with the calendar_events.color CHECK constraint
+// in migration-color-palette-unify.sql - the route validator and the
+// DB constraint MUST accept the same set or we get a sneaky "Invalid
+// color X" 400 on edit + the dishonest "Could not save event" banner.
 const VALID_COLORS = [
-  // Calendar event colors
+  // Original event colours
   'sage', 'plum', 'coral', 'amber', 'sky', 'rose', 'teal', 'lavender', 'terracotta', 'slate',
-  // Profile/member color themes
-  'red', 'sunset', 'tangerine', 'gold', 'leaf', 'ocean', 'steel', 'denim', 'iris', 'grape',
+  // 16-colour canonical member palette (matches db/queries.js COLOR_THEMES)
+  'red', 'burnt-orange', 'gold', 'leaf', 'emerald', 'cobalt', 'indigo', 'purple', 'magenta', 'moss',
+  // Legacy profile theme names retained for back-compat
+  'sunset', 'tangerine', 'ocean', 'steel', 'denim', 'iris', 'grape',
   'blush', 'bubblegum', 'cocoa', 'stone', 'charcoal', 'midnight',
 ];
 const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
