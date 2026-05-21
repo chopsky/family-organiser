@@ -818,8 +818,19 @@ export default function Calendar() {
       resetForm();
       invalidateMonthCache();
       await load();
-    } catch {
-      setError('Could not save event.');
+    } catch (err) {
+      // Surface the server's actual error message instead of swallowing
+      // it behind a generic banner - previously a failing PATCH said
+      // only "Could not save event." with no hint of why. The backend
+      // returns { error: "..." } for known issues, so prefer that;
+      // otherwise fall back to the request error message.
+      const serverMsg = err?.response?.data?.error || err?.response?.data?.message;
+      const fallback = err?.message;
+      setError(serverMsg
+        ? `Could not save event: ${serverMsg}`
+        : fallback
+          ? `Could not save event: ${fallback}`
+          : 'Could not save event.');
     } finally {
       setSaving(false);
     }
