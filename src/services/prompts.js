@@ -65,7 +65,9 @@ INTENT DETECTION:
 - "school_event": User is adding a one-off school event (e.g. "Jake has a school trip next Thursday", "non-uniform day Friday £1", "INSET day on the 14th"). Extract into "calendar_event" field with school context.
 - "recipe": User is asking for a recipe, meal idea, or cooking help (e.g. "give me a peri peri chicken recipe", "what can I make with chicken?", "recipe for shepherd's pie", "quick dinner ideas", "something easy for tonight"). Extract the description into "recipe_request" field. Keep response_message SHORT - just confirm you're creating it (e.g. "I'm adding a Peri Peri Chicken recipe to your recipe box!"). Do NOT include ingredients or method steps in the response_message.
 - "recipe_followup": User is responding to a recipe the bot just gave them, wanting to add ingredients to shopping list (e.g. "yes", "add to shopping list", "add the ingredients", "yes please"). Only use this if the previous message was a recipe.
-- "chat": Any general question, conversation, or request that doesn't match the above. This includes: advice, general knowledge, greetings, local recommendations, things to do, or questions about things NOT in the saved notes. Answer helpfully and conversationally using your own knowledge. When the family's location is known, give locally relevant suggestions (specific restaurants, services, activities in their area).
+- "web_search": User is asking for CURRENT, EXTERNAL, time-sensitive information that you cannot answer reliably from training data: opening hours, current prices, today's news, business addresses/phone numbers, sports fixtures, public-event schedules, recent product releases, etc. The handler will run a real web search and return a fresh synthesised answer. Set web_search_query to a short, focused search query string ("Foxhills padel club opening hours Saturday", "Tesco Hampstead Heath opening hours bank holiday"). Use this intent ONLY when (a) the answer changes over time / depends on real-world current state, AND (b) you don't already have the answer in the household notes / calendar / saved preferences. For static knowledge (recipes, general advice, geography) use "chat" instead - don't burn a web search on questions you can answer well from training data. Leave response_message EMPTY for this intent; the handler builds the reply from the search results.
+
+- "chat": Any general question, conversation, or request that doesn't match the above. This includes: advice, general knowledge, greetings, local recommendations from your training knowledge, things to do. Answer helpfully and conversationally using your own knowledge. When the family's location is known, give locally relevant suggestions (specific restaurants, services, activities in their area). If the question genuinely requires CURRENT real-world data (opening hours today, current prices, fresh news) prefer "web_search" instead.
 
   DO NOT ask clarifying questions for obvious follow-ups. If the prior turn was a recommendation (restaurants, activities, places, etc.) and the user asks "what about X?" or names a specific place/thing, assume they want to know whether X fits the same criteria (e.g. kid-friendly, in the same area) and answer with what you know about X. Only ask for clarification when the request is genuinely ambiguous and you truly cannot make a reasonable guess from context.
 
@@ -335,7 +337,7 @@ CRITICAL OUTPUT FORMAT:
 
 Respond only with valid JSON matching this schema:
 {
-  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "chat",
+  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "web_search" | "chat",
   "shopping_items": [
     {
       "item": string,
@@ -423,6 +425,7 @@ Respond only with valid JSON matching this schema:
       "member_name": string | null
     }
   ],
+  "web_search_query": string | null,
   "response_message": string
 }`;
 

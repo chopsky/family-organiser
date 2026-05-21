@@ -132,8 +132,13 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
 
 /**
  * Call Claude with a timeout. Returns { text, provider }.
+ *
+ * Optional `tools` accepts Anthropic tool definitions - currently used
+ * for the native web_search tool (web_search_20250305). When tools are
+ * enabled the model can invoke them server-side; the response still
+ * contains a final text block which is what we extract here.
  */
-async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false }) {
+async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false, tools }) {
   const client = getAnthropicClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
@@ -150,15 +155,24 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
       params.thinking = { type: 'adaptive' };
     }
 
+    if (Array.isArray(tools) && tools.length > 0) {
+      params.tools = tools;
+    }
+
     const stream = client.messages.stream(params, { signal: controller.signal });
 
     const response = await stream.finalMessage();
     clearTimeout(timer);
 
-    const textBlock = response.content.find((b) => b.type === 'text');
-    if (!textBlock) throw new Error('No text in Claude response');
+    // Concatenate ALL text blocks. With tools enabled the model can
+    // produce multiple text blocks interleaved with server_tool_use
+    // and web_search_tool_result blocks; the visible answer can be
+    // split across them. Joining preserves the full synthesis.
+    const textBlocks = response.content.filter((b) => b.type === 'text');
+    if (textBlocks.length === 0) throw new Error('No text in Claude response');
+    const text = textBlocks.map(b => b.text).join('\n').trim();
 
-    return { text: textBlock.text, provider: 'claude' };
+    return { text, provider: 'claude' };
   } catch (err) {
     clearTimeout(timer);
     throw err;

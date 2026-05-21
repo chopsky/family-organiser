@@ -7,7 +7,7 @@
  */
 
 const db = require('../db/queries');
-const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../services/ai');
+const { classify, scanReceipt, matchReceiptToList, scanImage, runWebSearch } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
@@ -1011,6 +1011,36 @@ async function handleTextMessage(text, user, household) {
   // Handle calendar queries - AI already has calendar context and answered in response_message
   if (result.intent === 'query_calendar') {
     return { response: result.response_message || "I couldn't find that event. Try checking the calendar in the app.", actions };
+  }
+
+  // Handle web search - real-time questions the classifier can't
+  // answer from context (opening hours, business addresses, current
+  // prices, news). Uses Claude's native web_search tool which runs
+  // the search server-side and returns a synthesised answer.
+  if (result.intent === 'web_search') {
+    const query = result.web_search_query || text;
+    console.log('[handlers] Routing to web_search for query:', query.slice(0, 100));
+    try {
+      const answer = await runWebSearch(query, {
+        householdId: household.id,
+        userId: user.id,
+        address: household?.address || null,
+        timezone: userTz,
+      });
+      if (answer && answer.trim()) {
+        return { response: `🔎 ${answer.trim()}`, actions };
+      }
+      return {
+        response: "I tried to look that up but didn't find anything reliable. Could you give me a bit more detail or check it directly?",
+        actions,
+      };
+    } catch (err) {
+      console.error('[handlers] web_search failed:', err.message);
+      return {
+        response: "Sorry, I couldn't run that search right now. Please try again in a moment.",
+        actions,
+      };
+    }
   }
 
   // Handle weather request - explicit-location only (see the pre-classifier

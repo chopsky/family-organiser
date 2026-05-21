@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { callWithFailover } = require('./ai-client');
+const { callWithFailover, callClaude, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { getCityFromTimezone } = require('./weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const {
@@ -460,4 +460,37 @@ async function extractFromEmail(emailText, subject, memberNames = [], context = 
   });
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext };
+/**
+ * Run a web search via Claude's native web_search tool. Used by the
+ * bot when the user asks something current/external the classifier
+ * can't answer from context (opening hours, business addresses, prices,
+ * news, etc.). Anthropic handles the actual search server-side - no
+ * external API key needed. Cost: ~$0.01 per search.
+ *
+ * Returns a friendly, concise synthesised answer or null on failure.
+ * Address is woven in so "is the dentist open Saturday?" gets local
+ * results without the user having to specify a city.
+ */
+async function runWebSearch(query, { householdId, userId, address, timezone } = {}) {
+  if (!query || typeof query !== 'string') return null;
+  const localContext = address
+    ? `The family's home is at ${address}. Prefer local UK results when relevant - opening hours, businesses, services nearby. Mention rough distance or neighbourhood rather than echoing the full address back to the user.`
+    : 'The family is in the UK. Prefer UK results when relevant.';
+  const tzContext = timezone ? `Their timezone is ${timezone}.` : '';
+  const system = `You are a family assistant looking up real-time information. Use the web_search tool to find current facts, then synthesise a concise, friendly answer in 2-4 sentences. Cite specific facts (opening hours, addresses, prices, distances) - never vague phrases like "varies". If the search returns nothing useful, say so honestly. Use British spelling. ${localContext} ${tzContext}`;
+  try {
+    const { text } = await callClaude({
+      system,
+      messages: [{ role: 'user', content: query }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      maxTokens: 1024,
+      timeoutMs: REASONING_TIMEOUT_MS,
+    });
+    return text || null;
+  } catch (err) {
+    console.warn('[web_search] failed:', err.message);
+    return null;
+  }
+}
+
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch };
