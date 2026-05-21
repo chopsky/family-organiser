@@ -252,18 +252,29 @@ router.get('/month', async (req, res) => {
       db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate),
     ]);
 
-    // Attach assignees to events
+    // Attach assignees + reminders to events. Both are stored in
+    // separate tables so we batch-fetch them by event_id and group
+    // client-side. The Edit Event modal reads ev.reminders to populate
+    // the notification dropdown - without this join the modal opened
+    // empty even when a reminder was saved (real bug from prod).
     const eventIds = events.map((e) => e.id);
-    const allAssignees = eventIds.length > 0
-      ? await db.getEventAssigneesBatch(eventIds)
-      : [];
+    const [allAssignees, allReminders] = await Promise.all([
+      eventIds.length > 0 ? db.getEventAssigneesBatch(eventIds) : Promise.resolve([]),
+      eventIds.length > 0 ? db.getEventRemindersBatch(eventIds) : Promise.resolve([]),
+    ]);
     const assigneesByEvent = {};
     for (const a of allAssignees) {
       if (!assigneesByEvent[a.event_id]) assigneesByEvent[a.event_id] = [];
       assigneesByEvent[a.event_id].push(a);
     }
+    const remindersByEvent = {};
+    for (const r of allReminders) {
+      if (!remindersByEvent[r.event_id]) remindersByEvent[r.event_id] = [];
+      remindersByEvent[r.event_id].push({ time: r.time, unit: r.unit });
+    }
     for (const event of events) {
       event.assignees = assigneesByEvent[event.id] || [];
+      event.reminders = remindersByEvent[event.id] || [];
     }
 
     const result = { events, tasks };

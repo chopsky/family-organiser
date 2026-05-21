@@ -4145,6 +4145,61 @@ async function getEventAssigneesBatch(eventIds, db = supabase) {
 }
 
 /**
+ * Batch-fetch reminders for the given event IDs and return them in the
+ * shape the frontend uses ({time, unit}). The DB stores reminder_offset
+ * as a label like "10 minutes" - we parse it back so the Edit Event
+ * modal can match the value against its preset dropdown.
+ *
+ * Real bug this exists to fix: saveEventReminders writes the row fine,
+ * but the /month endpoint never joined reminders onto the events, so
+ * the modal opened with formReminders = [] regardless of what was
+ * actually saved. Users saw "+ Add notification" on an event that
+ * already HAS a notification.
+ */
+async function getEventRemindersBatch(eventIds, db = supabase) {
+  if (!eventIds || eventIds.length === 0) return [];
+  const { data, error } = await db
+    .from('event_reminders')
+    .select('id, event_id, reminder_offset, remind_at, sent')
+    .in('event_id', eventIds);
+  if (error) throw error;
+  // Parse "10 minutes" -> {time: 10, unit: "minutes"}. reminder_offset
+  // is the source of truth (set by saveEventReminders via offsetLabel).
+  // Anything we can't parse, we skip - the row still fires on schedule
+  // because the scheduler uses remind_at, but the UI just won't show it.
+  return (data || []).map((row) => {
+    const parsed = parseReminderOffsetLabel(row.reminder_offset);
+    if (!parsed) return null;
+    return {
+      id: row.id,
+      event_id: row.event_id,
+      time: parsed.time,
+      unit: parsed.unit,
+      remind_at: row.remind_at,
+      sent: row.sent,
+    };
+  }).filter(Boolean);
+}
+
+// "10 minutes" -> {time: 10, unit: "minutes"}. Mirror of the labelling
+// done by saveEventReminders. Accepts singular and plural unit words.
+function parseReminderOffsetLabel(label) {
+  if (typeof label !== 'string') return null;
+  const m = label.trim().match(/^(\d+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|week|weeks)$/i);
+  if (!m) return null;
+  const time = parseInt(m[1], 10);
+  if (!Number.isFinite(time) || time <= 0) return null;
+  const unitWord = m[2].toLowerCase();
+  let unit;
+  if (unitWord.startsWith('min')) unit = 'minutes';
+  else if (unitWord.startsWith('hr') || unitWord.startsWith('hour')) unit = 'hours';
+  else if (unitWord.startsWith('day')) unit = 'days';
+  else if (unitWord.startsWith('week')) unit = 'weeks';
+  else return null;
+  return { time, unit };
+}
+
+/**
  * Attempt to acquire a scheduler lock for a given key and date.
  * Returns true if the lock was acquired (i.e. first caller), false if it already existed.
  * Uses INSERT ... ON CONFLICT DO NOTHING to ensure only one instance sends.
@@ -5140,6 +5195,7 @@ module.exports = {
   claimTaskNotification,
   getEventAssignees,
   getEventAssigneesBatch,
+  getEventRemindersBatch,
   // Scheduler locks
   acquireSchedulerLock,
   cleanupSchedulerLocks,
