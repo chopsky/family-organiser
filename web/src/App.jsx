@@ -11,6 +11,7 @@ import AdminLayout from './components/AdminLayout';
 // the substring "CookieConsent" in URLs and `net::ERR_BLOCKED_BY_CLIENT`
 // the dev request. ConsentBanner is functionally identical.
 import ConsentBanner from './components/ConsentBanner';
+import { UpdateBannerSafe } from './components/UpdateBanner';
 
 // Eagerly load pages that are always needed on first paint
 import LandingPage from './pages/LandingPage';
@@ -139,6 +140,10 @@ function AppRoutes() {
   useUniversalLinks();
   return (
     <Suspense fallback={<PageLoader />}>
+      {/* iOS-only "new version available" banner. No-ops on web and on
+          unsupported platforms. Mounted at the route-level so the
+          notice appears on every screen the user lands on. */}
+      <UpdateBannerSafe />
       <RouteTransition>
       <Routes>
         {/* On iOS / native: a fresh install almost always means a brand-new
