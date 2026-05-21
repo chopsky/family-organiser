@@ -718,6 +718,7 @@ function buildShoppingUpdates(updates) {
  *   { kind: 'error', message }             - DB/network error, nothing saved
  */
 async function createCalendarEventFromResult(ev, user, household, actions, originalUserText = '') {
+  console.log('[handlers] createCalendarEventFromResult called, originalUserText length:', originalUserText.length, 'ev.reminders:', JSON.stringify(ev.reminders));
   try {
     // Resolve every name the classifier emitted, dropping any that don't
     // match the household roster. Pick the first matched member to drive
@@ -1203,6 +1204,7 @@ async function handleTextMessage(text, user, household) {
 
   // Handle school event (one-off trip, INSET day, etc.) - create as calendar event
   if (result.intent === 'school_event' && result.calendar_event) {
+    console.log('[handlers] Routing through school_event branch for text:', text.slice(0, 120));
     try {
       const ev = result.calendar_event;
       const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
@@ -1230,6 +1232,27 @@ async function handleTextMessage(text, user, household) {
 
       if (created && assigneeNames.length > 0) {
         await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
+      }
+
+      // Reminder save: mirror the createCalendarEventFromResult path so
+      // this branch isn't a silent dead-end for "remind me N before".
+      // Honour ev.reminders from the classifier first, then fall back to
+      // the deterministic regex over the user's raw text.
+      let remindersToSave = Array.isArray(ev.reminders) ? ev.reminders.filter(Boolean) : [];
+      if (remindersToSave.length === 0 && text && messageMentionsReminder(text)) {
+        const parsed = parseRemindersFromMessage(text);
+        if (parsed.length > 0) {
+          remindersToSave = parsed;
+          console.log('[handlers] Reminder fallback parsed (school_event branch)', JSON.stringify(parsed));
+        }
+      }
+      if (created && remindersToSave.length > 0) {
+        try {
+          await db.saveEventReminders(created.id, household.id, remindersToSave, created.start_time);
+          actions.remindersSaved = (actions.remindersSaved || 0) + remindersToSave.length;
+        } catch (err) {
+          console.error('[handlers] saveEventReminders failed for school event:', err.message);
+        }
       }
     } catch (err) {
       console.error('School event creation failed:', err.message);
