@@ -11,6 +11,7 @@ const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../ser
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
+const { parseRemindersFromMessage, messageMentionsReminder } = require('../utils/reminder-parser');
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -716,7 +717,7 @@ function buildShoppingUpdates(updates) {
  *   { kind: 'duplicate', existing }        - similar event found, nothing saved
  *   { kind: 'error', message }             - DB/network error, nothing saved
  */
-async function createCalendarEventFromResult(ev, user, household, actions) {
+async function createCalendarEventFromResult(ev, user, household, actions, originalUserText = '') {
   try {
     // Resolve every name the classifier emitted, dropping any that don't
     // match the household roster. Pick the first matched member to drive
@@ -763,9 +764,26 @@ async function createCalendarEventFromResult(ev, user, household, actions) {
     // before"). The classifier prompt at services/prompts.js spells out the
     // shape: [{time: number, unit: "minutes"|"hours"|"days"}]. saveEventReminders
     // turns each into an event_reminders row via reminderOffsetToMs.
-    if (created && Array.isArray(ev.reminders) && ev.reminders.length > 0) {
+    //
+    // Deterministic fallback: if the LLM forgot to populate ev.reminders but
+    // the user's original message contained an unambiguous reminder phrase
+    // ("remind me 10 minutes before", "with a 30 min alert", etc.), parse
+    // the offset server-side and use that. This is the structural backstop
+    // for the failure mode where the model claims "I'll nudge you 10 mins
+    // before" in response_message but leaves the structured array null.
+    let remindersToSave = Array.isArray(ev.reminders) ? ev.reminders.filter(Boolean) : [];
+    if (remindersToSave.length === 0 && originalUserText && messageMentionsReminder(originalUserText)) {
+      const parsed = parseRemindersFromMessage(originalUserText);
+      if (parsed.length > 0) {
+        remindersToSave = parsed;
+        console.log('[handlers] Reminder fallback parsed', JSON.stringify(parsed), 'from user text (LLM emitted reminders: null)');
+        actions.remindersFromFallback = true;
+      }
+    }
+    if (created && remindersToSave.length > 0) {
       try {
-        await db.saveEventReminders(created.id, household.id, ev.reminders, created.start_time);
+        await db.saveEventReminders(created.id, household.id, remindersToSave, created.start_time);
+        actions.remindersSaved = (actions.remindersSaved || 0) + remindersToSave.length;
       } catch (err) {
         // Don't fail the event create over a reminder save error - log and move on.
         console.error('[handlers] saveEventReminders failed for new event:', err.message);
@@ -1113,7 +1131,7 @@ async function handleTextMessage(text, user, household) {
 
   // Handle calendar event creation (primary path - intent explicitly create_event)
   if (result.intent === 'create_event' && result.calendar_event) {
-    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions);
+    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions, text);
     if (outcome.kind === 'duplicate') {
       // Surface the dupe prompt so the user can confirm with a follow-up "yes"
       // (FORCE-ADD path) - this behaviour is specific to the create_event
@@ -1374,7 +1392,7 @@ async function handleTextMessage(text, user, household) {
   // secondary action, not the user's main request, so a silent dupe skip is
   // better UX than hijacking the confirmation flow.
   if (result.calendar_event && result.intent !== 'create_event') {
-    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions);
+    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions, text);
     if (outcome.kind === 'duplicate') {
       console.log('[handlers] Skipped fall-through event create - duplicate:', outcome.existing.title);
     }
@@ -1427,6 +1445,22 @@ async function handleTextMessage(text, user, household) {
   if (nothingHappened && ACTION_VERB_REGEX.test(response)) {
     console.warn('[handlers] Reconciliation hit: response claimed an action but nothing was emitted. Original:', response.slice(0, 200));
     response = "I caught what you said but didn't quite manage to save it - sorry about that. Could you say that again? If it's a task or event, try to include the date.";
+  }
+
+  // ── Reminder claim reconciliation ──────────────────────────────────────
+  // Partial-dishonesty case: an event WAS added (so the broad reconcile
+  // above passes) but the response claims a reminder/notification that
+  // never landed in event_reminders. The deterministic parser above
+  // catches most of these at save-time; this is the last-line backstop
+  // for phrasings the parser missed. We append a corrective addendum
+  // rather than rewriting the message so the user still sees the event
+  // confirmation - just with an honest caveat.
+  const REMINDER_CLAIM_REGEX = /\b(?:remind(?:er)?|nudge|alert|notify|notification|ping)\b/i;
+  const reminderWasSaved = (actions.remindersSaved || 0) > 0;
+  const claimedAReminder = REMINDER_CLAIM_REGEX.test(response);
+  if (claimedAReminder && !reminderWasSaved && actions.eventsAdded?.length) {
+    console.warn('[handlers] Reminder reconciliation hit: response mentioned a reminder but none was saved. Response:', response.slice(0, 200));
+    response += "\n\n(I couldn't quite catch the reminder timing — could you tell me again how many minutes/hours before you want the nudge?)";
   }
 
   return {

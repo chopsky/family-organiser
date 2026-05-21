@@ -5,6 +5,7 @@ const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
+const { parseRemindersFromMessage, messageMentionsReminder } = require('../utils/reminder-parser');
 
 const router = Router();
 
@@ -187,11 +188,22 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
               await db.saveEventAssignees(created.id, req.householdId, assigneeNames, members);
             }
             // Reminders only when the user explicitly asked. The classifier
-            // prompt leaves ev.reminders null otherwise. See bot/handlers.js
-            // for the matching WhatsApp-side wiring.
-            if (created && Array.isArray(ev.reminders) && ev.reminders.length > 0) {
+            // prompt leaves ev.reminders null otherwise. Deterministic
+            // fallback: if the LLM forgot to populate reminders but the
+            // user's raw message has an unambiguous reminder phrase
+            // ("remind me 10 min before"), parse it server-side. Same
+            // structural backstop as bot/handlers.js.
+            let remindersToSave = Array.isArray(ev.reminders) ? ev.reminders.filter(Boolean) : [];
+            if (remindersToSave.length === 0 && messageMentionsReminder(text)) {
+              const parsed = parseRemindersFromMessage(text);
+              if (parsed.length > 0) {
+                remindersToSave = parsed;
+                console.log('[classify] Reminder fallback parsed', JSON.stringify(parsed), 'from user text');
+              }
+            }
+            if (created && remindersToSave.length > 0) {
               try {
-                await db.saveEventReminders(created.id, req.householdId, ev.reminders, created.start_time);
+                await db.saveEventReminders(created.id, req.householdId, remindersToSave, created.start_time);
               } catch (err) {
                 console.error('[classify] saveEventReminders failed:', err.message);
               }
