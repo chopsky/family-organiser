@@ -154,7 +154,7 @@ function buildDailyReminderMessage(user, opts = {}) {
 
   // Shopping summary - one line, no bullets.
   if (shoppingCount > 0) {
-    lines.push(`🛒 ${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the shopping list. Reply /shopping to see it.`);
+    lines.push(`🛒 ${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the shopping list.`);
   }
 
   // Discovery footer - rotates through "💡 Did you know…" tips for

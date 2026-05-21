@@ -93,8 +93,10 @@ describe('buildDailyReminderMessage()', () => {
 
   test('shows shopping count when items exist', () => {
     const msg = buildDailyReminderMessage(SARAH, { shoppingCount: 7 });
-    expect(msg).toContain('7 items');
-    expect(msg).toContain('/shopping');
+    expect(msg).toContain('7 items on the shopping list');
+    // The "Reply /shopping to see it." CTA was removed per user feedback -
+    // the count alone is the whole message.
+    expect(msg).not.toContain('/shopping');
   });
 
   test('shows singular "item" for count of 1', () => {
