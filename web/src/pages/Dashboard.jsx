@@ -494,7 +494,7 @@ export default function Dashboard() {
                           formatted start_time - otherwise a midnight-UTC
                           row shows up as "01:00" in BST. Widened the
                           column to fit either label without truncating. */}
-                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-14">
+                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-12">
                         {ev.all_day ? 'All day' : formatTime(ev.start_time)}
                       </span>
                       <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
