@@ -131,8 +131,17 @@ router.post('/webhook', async (req, res) => {
     // even null in the unlikely case of a missing row) fall through. Only
     // subscription_status === 'expired' | 'cancelled' triggers the
     // canned reply.
+    // Fetch the full household row once and reuse it: the subscription
+    // check below needs is_internal + subscription_status, and the bot
+    // handlers downstream need address + timezone + name + etc. for
+    // weather, classifier context, and digest grouping. Previously this
+    // row was discarded after the subscription check and downstream
+    // code got a stub { id, members } object - which made household.
+    // address undefined and broke the "fall back to household address
+    // when no city was named" weather flow shipped in d99b877.
+    let householdRow = null;
     try {
-      const householdRow = await db.getHouseholdById(user.household_id);
+      householdRow = await db.getHouseholdById(user.household_id);
       const expired = householdRow
         && !householdRow.is_internal
         && (householdRow.subscription_status === 'expired'
@@ -167,9 +176,16 @@ router.post('/webhook', async (req, res) => {
     // window it falls back to a pre-approved Content Template.
     db.touchWhatsAppInbound(user.id);
 
-    // Load household context
+    // Load household context. Reuse the householdRow fetched above for
+    // the subscription check - the full row carries address, timezone,
+    // name, country, etc. that downstream handlers (weather, classifier
+    // prompts, digest grouping) all read. If the earlier fetch failed
+    // (DB blip) we fall back to a stub so the bot still answers but
+    // location-aware features will gracefully no-op.
     const members = await db.getHouseholdMembers(user.household_id);
-    const household = { id: user.household_id, members };
+    const household = householdRow
+      ? { ...householdRow, members }
+      : { id: user.household_id, members };
 
     const numMedia = parseInt(NumMedia || '0', 10);
 
