@@ -11,7 +11,7 @@ const { classify, scanReceipt, matchReceiptToList, scanImage } = require('../ser
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
-const { parseRemindersFromMessage, messageMentionsReminder } = require('../utils/reminder-parser');
+const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -1350,6 +1350,28 @@ async function handleTextMessage(text, user, household) {
     const toAdd = result.tasks.filter((t) => t.action === 'add');
     const toComplete = result.tasks.filter((t) => t.action === 'complete');
     if (toAdd.length) {
+      // Deterministic task-notification fallback. The classifier schema
+      // doesn't expose a notification field today, so a user asking
+      // "remind me 20 minutes before [task]" otherwise gets a task with
+      // no notification at all. If the user's message mentions reminder
+      // language, parse the offset and snap to the tasks.notification
+      // enum (5_min/15_min/30_min/1_hour/2_hours/1_day/2_days). Track
+      // any snap so the response reconciliation below can mention it.
+      if (messageMentionsReminder(text)) {
+        const parsed = parseRemindersFromMessage(text);
+        if (parsed.length > 0) {
+          const snap = snapToTaskNotification(parsed[0]);
+          if (snap && snap.value) {
+            for (const t of toAdd) {
+              if (!t.notification) t.notification = snap.value;
+            }
+            if (snap.snapped) {
+              console.log('[handlers] Task notification snapped:', snap.requestedLabel, '->', snap.chosenLabel);
+              actions.notificationSnap = snap;
+            }
+          }
+        }
+      }
       const saved = await db.addTasks(household.id, toAdd, user.id, household.members);
       actions.tasksAdded = toAdd.map((t) => t.title);
       const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
@@ -1461,6 +1483,16 @@ async function handleTextMessage(text, user, household) {
   if (claimedAReminder && !reminderWasSaved && actions.eventsAdded?.length) {
     console.warn('[handlers] Reminder reconciliation hit: response mentioned a reminder but none was saved. Response:', response.slice(0, 200));
     response += "\n\n(I couldn't quite catch the reminder timing — could you tell me again how many minutes/hours before you want the nudge?)";
+  }
+
+  // ── Task notification snap addendum ────────────────────────────────────
+  // Tasks have a hard enum for notification timing (5/15/30 min, 1/2 hr,
+  // 1/2 day). If the user asked for an off-enum value (e.g. 20 min) we
+  // snapped to the nearest legal one - tell them, so the timing isn't a
+  // silent surprise when the nudge fires.
+  if (actions.notificationSnap && actions.tasksAdded.length > 0) {
+    const { requestedLabel, chosenLabel } = actions.notificationSnap;
+    response += `\n\n(I'll nudge you **${chosenLabel}** before — closest to the ${requestedLabel} you asked for. Reply with "make it 30 min" or "make it 1 hour" to change.)`;
   }
 
   return {

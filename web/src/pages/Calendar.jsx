@@ -2138,31 +2138,63 @@ export default function Calendar() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                   </div>
                   <div className="flex-1 space-y-2">
-                    {formReminders.map((reminder, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <select
-                          value={`${reminder.time}_${reminder.unit}`}
-                          onChange={e => {
-                            const [time, unit] = e.target.value.split('_');
-                            const next = [...formReminders];
-                            next[idx] = { time, unit };
-                            setFormReminders(next);
-                          }}
-                          className="flex-1 h-9 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                        >
-                          {REMINDER_OPTIONS.map(opt => (
-                            <option key={`${opt.value}_${opt.unit}`} value={`${opt.value}_${opt.unit}`}>{opt.label}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setFormReminders(formReminders.filter((_, i) => i !== idx))}
-                          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-warm-grey hover:bg-cream hover:text-charcoal transition-colors"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
-                      </div>
-                    ))}
+                    {formReminders.map((reminder, idx) => {
+                      // The bot can create reminders with arbitrary offsets
+                      // (e.g. "remind me 20 minutes before") that aren't in
+                      // the preset dropdown. Detect those non-preset values
+                      // and render the actual saved value as a small chip
+                      // below the dropdown rather than silently snapping it
+                      // to whatever the <select> falls back to.
+                      const isPreset = REMINDER_OPTIONS.some(
+                        opt => String(opt.value) === String(reminder.time) && opt.unit === reminder.unit,
+                      );
+                      const customLabel = !isPreset
+                        ? `${reminder.time} ${reminder.unit} before`
+                        : null;
+                      return (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={isPreset ? `${reminder.time}_${reminder.unit}` : ''}
+                              onChange={e => {
+                                if (!e.target.value) return;
+                                const [time, unit] = e.target.value.split('_');
+                                const next = [...formReminders];
+                                next[idx] = { time, unit };
+                                setFormReminders(next);
+                              }}
+                              className="flex-1 h-9 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                            >
+                              {!isPreset && <option value="">Pick a preset…</option>}
+                              {REMINDER_OPTIONS.map(opt => (
+                                <option key={`${opt.value}_${opt.unit}`} value={`${opt.value}_${opt.unit}`}>{opt.label}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setFormReminders(formReminders.filter((_, i) => i !== idx))}
+                              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-warm-grey hover:bg-cream hover:text-charcoal transition-colors"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                          </div>
+                          {customLabel && (
+                            <div
+                              className="inline-flex items-center self-start px-2 py-0.5 rounded-full"
+                              style={{
+                                fontSize: 11,
+                                background: 'var(--cream, #FBF8F3)',
+                                color: 'var(--warm-grey, #6B6774)',
+                                border: '1px solid var(--light-grey, #E8E5EC)',
+                              }}
+                              title="The bot added this custom timing. Pick a preset above to change it."
+                            >
+                              Currently set to {customLabel}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     <button
                       type="button"
                       onClick={() => setFormReminders([...formReminders, { time: '10', unit: 'minutes' }])}

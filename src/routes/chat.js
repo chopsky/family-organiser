@@ -9,6 +9,7 @@ const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
+const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 
 // Multer config for chat attachments. Accepts both images (receipts,
 // event invitations, screenshots) and PDFs (school newsletters, party
@@ -444,12 +445,29 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           const rawNames = Array.isArray(act.assigned_to_names)
             ? act.assigned_to_names
             : (act.assigned_to ? [act.assigned_to] : []);
+          // Notification snap: if the user's chat message mentioned a
+          // reminder (e.g. "20 minutes before"), parse and snap to the
+          // tasks.notification enum. Mirrors bot/handlers.js.
+          let notification = act.notification || null;
+          if (!notification && messageMentionsReminder(message)) {
+            const parsed = parseRemindersFromMessage(message);
+            if (parsed.length > 0) {
+              const snap = snapToTaskNotification(parsed[0]);
+              if (snap && snap.value) {
+                notification = snap.value;
+                if (snap.snapped) {
+                  console.log('[chat] Task notification snapped:', snap.requestedLabel, '->', snap.chosenLabel);
+                }
+              }
+            }
+          }
           const saved = await db.addTasks(req.householdId, [{
             title: act.title,
             assigned_to_names: rawNames,
             due_date: act.due_date || null,
             due_time: act.due_time || null,
             recurrence: act.recurrence || null,
+            notification,
           }], req.user.id, members);
           const savedRow = Array.isArray(saved) && saved[0] ? saved[0] : null;
           // Rich card payload for the frontend. Same shape pattern as

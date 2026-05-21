@@ -112,7 +112,83 @@ function messageMentionsReminder(text) {
   );
 }
 
+// ── Task notification enum snapping ───────────────────────────────────────
+// The tasks table has a hard-enum `notification` column accepting only:
+//   at_time, 5_min, 15_min, 30_min, 1_hour, 2_hours, 1_day, 2_days
+// The reminder parser above produces arbitrary {time, unit} offsets.
+// snapToTaskNotification picks the legal enum value closest to the
+// requested offset (measured in minutes). On ties the longer lead time
+// wins so we don't under-nudge the user.
+//
+// Returns { value, snapped, requestedLabel, chosenLabel }:
+//   value           - the enum string ready to save (or null if input invalid)
+//   snapped         - true if the requested offset wasn't an exact enum match
+//   requestedLabel  - "20 minutes" (what the user asked for)
+//   chosenLabel     - "15 minutes" (what we'll actually save)
+const NOTIFICATION_ENUM_MINUTES = [
+  { value: 'at_time', minutes: 0,    label: 'at the time' },
+  { value: '5_min',   minutes: 5,    label: '5 minutes' },
+  { value: '15_min',  minutes: 15,   label: '15 minutes' },
+  { value: '30_min',  minutes: 30,   label: '30 minutes' },
+  { value: '1_hour',  minutes: 60,   label: '1 hour' },
+  { value: '2_hours', minutes: 120,  label: '2 hours' },
+  { value: '1_day',   minutes: 1440, label: '1 day' },
+  { value: '2_days',  minutes: 2880, label: '2 days' },
+];
+
+function offsetToMinutes(time, unit) {
+  const t = parseInt(time, 10);
+  if (!Number.isFinite(t) || t < 0) return null;
+  switch (unit) {
+    case 'minutes': return t;
+    case 'hours':   return t * 60;
+    case 'days':    return t * 24 * 60;
+    case 'weeks':   return t * 7 * 24 * 60;
+    default:        return null;
+  }
+}
+
+function snapToTaskNotification(reminder) {
+  if (!reminder || typeof reminder !== 'object') return null;
+  const minutes = offsetToMinutes(reminder.time, reminder.unit);
+  if (minutes === null) return null;
+
+  // Exact-match short-circuit: if the user's request lands on an enum
+  // value, no snap occurred.
+  const exact = NOTIFICATION_ENUM_MINUTES.find(e => e.minutes === minutes);
+  const requestedLabel = `${reminder.time} ${reminder.unit}`;
+  if (exact) {
+    return {
+      value: exact.value,
+      snapped: false,
+      requestedLabel,
+      chosenLabel: exact.label,
+    };
+  }
+
+  // Find the closest enum by absolute distance in minutes. Tie-break by
+  // preferring the LARGER lead time - if the user asks for 45 min
+  // (equidistant from 30 and 60), we'd rather nudge them earlier than
+  // later.
+  let best = NOTIFICATION_ENUM_MINUTES[0];
+  let bestDist = Math.abs(minutes - best.minutes);
+  for (const candidate of NOTIFICATION_ENUM_MINUTES) {
+    const dist = Math.abs(minutes - candidate.minutes);
+    if (dist < bestDist || (dist === bestDist && candidate.minutes > best.minutes)) {
+      best = candidate;
+      bestDist = dist;
+    }
+  }
+  return {
+    value: best.value,
+    snapped: true,
+    requestedLabel,
+    chosenLabel: best.label,
+  };
+}
+
 module.exports = {
   parseRemindersFromMessage,
   messageMentionsReminder,
+  snapToTaskNotification,
 };

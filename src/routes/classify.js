@@ -5,7 +5,7 @@ const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
-const { parseRemindersFromMessage, messageMentionsReminder } = require('../utils/reminder-parser');
+const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 
 const router = Router();
 
@@ -139,6 +139,23 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         if (result.tasks?.length) {
           const toAdd      = result.tasks.filter((t) => t.action === 'add');
           const toComplete = result.tasks.filter((t) => t.action === 'complete');
+          // Deterministic notification fallback: if the user's text
+          // mentions a reminder, parse the offset and snap to the
+          // tasks.notification enum. Mirrors bot/handlers.js.
+          if (toAdd.length && messageMentionsReminder(text)) {
+            const parsed = parseRemindersFromMessage(text);
+            if (parsed.length > 0) {
+              const snap = snapToTaskNotification(parsed[0]);
+              if (snap && snap.value) {
+                for (const t of toAdd) {
+                  if (!t.notification) t.notification = snap.value;
+                }
+                if (snap.snapped) {
+                  console.log('[classify] Task notification snapped:', snap.requestedLabel, '->', snap.chosenLabel);
+                }
+              }
+            }
+          }
           if (toAdd.length) ops.push(db.addTasks(req.householdId, toAdd, req.user.id, members));
           if (toComplete.length) {
             ops.push((async () => {

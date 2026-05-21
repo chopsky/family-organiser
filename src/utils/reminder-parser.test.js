@@ -1,4 +1,4 @@
-const { parseRemindersFromMessage, messageMentionsReminder } = require('./reminder-parser');
+const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('./reminder-parser');
 
 describe('parseRemindersFromMessage', () => {
   describe('the production failure that prompted this code', () => {
@@ -99,6 +99,91 @@ describe('parseRemindersFromMessage', () => {
     it('is case-insensitive', () => {
       expect(parseRemindersFromMessage('REMIND ME 10 MINUTES BEFORE')).toEqual([{ time: 10, unit: 'minutes' }]);
       expect(parseRemindersFromMessage('A 30 Min Reminder')).toEqual([{ time: 30, unit: 'minutes' }]);
+    });
+  });
+});
+
+describe('snapToTaskNotification', () => {
+  describe('exact enum matches return snapped: false', () => {
+    it.each([
+      [{ time: 5, unit: 'minutes' }, '5_min', '5 minutes'],
+      [{ time: 15, unit: 'minutes' }, '15_min', '15 minutes'],
+      [{ time: 30, unit: 'minutes' }, '30_min', '30 minutes'],
+      [{ time: 1, unit: 'hours' }, '1_hour', '1 hour'],
+      [{ time: 2, unit: 'hours' }, '2_hours', '2 hours'],
+      [{ time: 1, unit: 'days' }, '1_day', '1 day'],
+      [{ time: 2, unit: 'days' }, '2_days', '2 days'],
+    ])('%p -> %s', (input, expectedValue, expectedLabel) => {
+      const result = snapToTaskNotification(input);
+      expect(result.value).toBe(expectedValue);
+      expect(result.snapped).toBe(false);
+      expect(result.chosenLabel).toBe(expectedLabel);
+    });
+  });
+
+  describe('non-preset offsets snap to nearest enum', () => {
+    it('20 minutes snaps to 15_min (closer than 30)', () => {
+      const result = snapToTaskNotification({ time: 20, unit: 'minutes' });
+      expect(result.value).toBe('15_min');
+      expect(result.snapped).toBe(true);
+      expect(result.requestedLabel).toBe('20 minutes');
+      expect(result.chosenLabel).toBe('15 minutes');
+    });
+
+    it('10 minutes snaps to 15_min (closer than 5)', () => {
+      // 10-5=5, 15-10=5, tie -> longer lead time wins -> 15_min.
+      const result = snapToTaskNotification({ time: 10, unit: 'minutes' });
+      expect(result.value).toBe('15_min');
+      expect(result.snapped).toBe(true);
+    });
+
+    it('45 minutes snaps to 1_hour (tie -> longer lead time)', () => {
+      const result = snapToTaskNotification({ time: 45, unit: 'minutes' });
+      expect(result.value).toBe('1_hour');
+      expect(result.snapped).toBe(true);
+    });
+
+    it('90 minutes snaps to 2_hours (tie -> longer)', () => {
+      const result = snapToTaskNotification({ time: 90, unit: 'minutes' });
+      expect(result.value).toBe('2_hours');
+      expect(result.snapped).toBe(true);
+    });
+
+    it('25 minutes snaps to 30_min (closer than 15)', () => {
+      const result = snapToTaskNotification({ time: 25, unit: 'minutes' });
+      expect(result.value).toBe('30_min');
+      expect(result.snapped).toBe(true);
+    });
+
+    it('3 hours snaps to 2_hours (closer than 1 day)', () => {
+      const result = snapToTaskNotification({ time: 3, unit: 'hours' });
+      expect(result.value).toBe('2_hours');
+      expect(result.snapped).toBe(true);
+    });
+
+    it('0 minutes snaps to at_time', () => {
+      const result = snapToTaskNotification({ time: 0, unit: 'minutes' });
+      expect(result.value).toBe('at_time');
+      expect(result.snapped).toBe(false);
+    });
+
+    it('1 week snaps to 2_days (closest legal enum)', () => {
+      const result = snapToTaskNotification({ time: 1, unit: 'weeks' });
+      expect(result.value).toBe('2_days');
+      expect(result.snapped).toBe(true);
+    });
+  });
+
+  describe('invalid input returns null', () => {
+    it.each([
+      [null],
+      [undefined],
+      [{ time: 'abc', unit: 'minutes' }],
+      [{ time: -5, unit: 'minutes' }],
+      [{ time: 5, unit: 'fortnights' }],
+      ['not an object'],
+    ])('%p -> null', (input) => {
+      expect(snapToTaskNotification(input)).toBeNull();
     });
   });
 });
