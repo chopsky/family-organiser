@@ -199,19 +199,51 @@ function extractLocationFromMessage(message) {
  * @returns {Promise<{lat: number, lon: number, name: string, timezone: string}|null>}
  */
 async function geocodeLocation(name) {
+  // Try Open-Meteo first - it's city-focused and great for "Brighton",
+  // "Cape Town", etc. (the typical "weather in X" pattern). If it
+  // returns nothing - which it does for full UK addresses like
+  // "Cissbury Ring South, London, N12 7BE" - fall through to Photon,
+  // which handles street + postcode addresses cleanly.
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en`;
     const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results?.length) {
+        const result = data.results[0];
+        return {
+          lat: result.latitude,
+          lon: result.longitude,
+          name: result.name,
+          country: result.country,
+          timezone: result.timezone,
+        };
+      }
+    }
+  } catch {
+    // fall through to Photon
+  }
+
+  // Photon fallback - the same OSM-backed geocoder digest-weather.js
+  // uses. Free, no API key, handles full street + postcode addresses
+  // well. Returns the matched feature's city/town as the display name,
+  // matching the Open-Meteo response shape so callers don't branch.
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(name)}&limit=1`;
+    const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
-    if (!data.results?.length) return null;
-    const result = data.results[0];
+    const feature = data.features?.[0];
+    if (!feature) return null;
+    const [lon, lat] = feature.geometry.coordinates;
+    const props = feature.properties || {};
+    const cityName = props.city || props.town || props.village || props.county || props.name || 'home';
     return {
-      lat: result.latitude,
-      lon: result.longitude,
-      name: result.name,
-      country: result.country,
-      timezone: result.timezone,
+      lat,
+      lon,
+      name: cityName,
+      country: props.country || null,
+      timezone: null, // Photon doesn't expose tz; callers pass 'auto' to Open-Meteo forecast.
     };
   } catch {
     return null;
