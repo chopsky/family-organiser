@@ -35,6 +35,17 @@ router.post('/webhook', async (req, res) => {
 
     if (!From) return;
 
+    // Entry-point log so every inbound turn shows up in Railway. Previously
+    // a happy-path message produced zero logs unless the handler threw,
+    // which made debugging reminder-save failures impossible without
+    // instrumenting downstream code. Truncate Body to keep PII surface low.
+    console.log('[whatsapp] webhook', JSON.stringify({
+      from: From,
+      profile: ProfileName || null,
+      media: Number(NumMedia) || 0,
+      body: typeof Body === 'string' ? Body.slice(0, 200) : null,
+    }));
+
     // Extract the phone number (strip "whatsapp:" prefix)
     const phone = From.replace(/^whatsapp:/, '').trim();
 
