@@ -490,7 +490,13 @@ export default function Dashboard() {
                   return (
                     <div key={ev.id || i} className="flex items-center gap-2 px-3 py-2.5 bg-cream rounded-xl">
                       <span className={`w-[3px] h-7 rounded-full shrink-0 ${barColor}`} />
-                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-10">{formatTime(ev.start_time)}</span>
+                      {/* All-day events render "All day" instead of the
+                          formatted start_time - otherwise a midnight-UTC
+                          row shows up as "01:00" in BST. Widened the
+                          column to fit either label without truncating. */}
+                      <span className="text-[0.8125rem] font-bold text-bark shrink-0 tabular-nums w-14">
+                        {ev.all_day ? 'All day' : formatTime(ev.start_time)}
+                      </span>
                       <p className="text-sm text-bark truncate flex-1 min-w-0">{ev.title}</p>
                       {visibleAvatars.length > 0 && (
                         <div className="shrink-0 flex -space-x-2">
