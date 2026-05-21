@@ -35,61 +35,113 @@ function makeEvent(overrides = {}) {
 }
 
 describe('buildDailyReminderMessage()', () => {
-  test('includes the user name in the greeting', () => {
-    const msg = buildDailyReminderMessage(SARAH, [], 0, []);
+  test('includes the user name + weekday in the greeting', () => {
+    const msg = buildDailyReminderMessage(SARAH, { tz: 'UTC' });
     expect(msg).toContain('Sarah');
+    // Weekday computed from "now", so just check the prefix - the exact
+    // day depends on when the test runs, but the format is fixed.
+    expect(msg).toMatch(/Good (morning|afternoon|evening), Sarah! Here's your \w+:/);
   });
 
-  test("shows TODAY'S EVENTS section when events exist", () => {
+  test("shows Today's Schedule section when timed events exist", () => {
     const ev = makeEvent({ title: 'Garden bin', start_time: '2026-05-15T18:00:00.000Z' });
     // Force UTC so the test isn't sensitive to BST/GMT transitions
-    const msg = buildDailyReminderMessage(SARAH, [ev], 0, [], 'UTC');
-    expect(msg).toContain("TODAY'S EVENTS");
+    const msg = buildDailyReminderMessage(SARAH, { todayEvents: [ev], tz: 'UTC' });
+    expect(msg).toContain("Today's Schedule:");
     expect(msg).toContain('Garden bin');
     expect(msg).toContain('18:00');
+    // No bullets in the schedule lines per the redesign.
+    expect(msg).not.toContain('• 18:00');
   });
 
   test('shows event assignee in italics when assigned', () => {
     const ev = makeEvent({ title: 'School run', assigned_to_name: 'Ben' });
-    const msg = buildDailyReminderMessage(SARAH, [ev], 0, []);
+    const msg = buildDailyReminderMessage(SARAH, { todayEvents: [ev] });
     expect(msg).toContain('School run');
     expect(msg).toContain('Ben');
   });
 
-  test('shows "All day" for all-day events instead of a time', () => {
-    const ev = makeEvent({ title: 'Bank holiday', all_day: true, start_time: '2026-05-15T00:00:00.000Z' });
-    const msg = buildDailyReminderMessage(SARAH, [ev], 0, []);
-    expect(msg).toContain('All day');
-    expect(msg).toContain('Bank holiday');
+  test('all-day events are dropped from Today\'s Schedule', () => {
+    // Per the redesign, all-day calendar events don't clutter the
+    // schedule view - only timed events with a real start time appear.
+    const allDay = makeEvent({ title: 'Class photos', all_day: true, start_time: '2026-05-15T00:00:00.000Z' });
+    const msg = buildDailyReminderMessage(SARAH, { todayEvents: [allDay] });
+    expect(msg).not.toContain('Class photos');
+    expect(msg).not.toContain('All day');
   });
 
-  test('does NOT include a tasks section', () => {
-    // Tasks moved to the later-in-day nudge - morning message should
-    // never mention them.
+  test('does NOT include a tasks section header', () => {
+    // Tasks-due-today/tomorrow go in the new Reminders block, not a
+    // standalone "YOUR TASKS" section. Old header strings are gone.
     const ev = makeEvent({ title: 'Anything' });
-    const msg = buildDailyReminderMessage(SARAH, [ev], 0, []);
+    const msg = buildDailyReminderMessage(SARAH, { todayEvents: [ev] });
     expect(msg).not.toContain('YOUR TASKS');
     expect(msg).not.toContain('HOUSEHOLD TASKS');
+    expect(msg).not.toContain("TODAY'S EVENTS"); // old header replaced too
   });
 
   test('shows shopping count when items exist', () => {
-    const msg = buildDailyReminderMessage(SARAH, [], 7, []);
+    const msg = buildDailyReminderMessage(SARAH, { shoppingCount: 7 });
     expect(msg).toContain('7 items');
     expect(msg).toContain('/shopping');
   });
 
   test('shows singular "item" for count of 1', () => {
-    const msg = buildDailyReminderMessage(SARAH, [], 1, []);
-    expect(msg).toContain('1 item on the list');
+    const msg = buildDailyReminderMessage(SARAH, { shoppingCount: 1 });
+    expect(msg).toContain('1 item on the shopping list');
   });
 
-  test('shows all done message when shopping list is empty', () => {
-    const msg = buildDailyReminderMessage(SARAH, [], 0, []);
-    expect(msg).toContain('List is empty');
+  test('omits the shopping line entirely when count is 0', () => {
+    // Redesign: no "List is empty - all done!" filler when the
+    // shopping list is empty. Just don't say anything.
+    const msg = buildDailyReminderMessage(SARAH, { shoppingCount: 0 });
+    expect(msg).not.toContain('List is empty');
+    expect(msg).not.toContain('shopping list');
   });
 
   test('shows "nothing scheduled" when no events AND no school', () => {
-    const msg = buildDailyReminderMessage(SARAH, [], 0, []);
+    const msg = buildDailyReminderMessage(SARAH, {});
     expect(msg).toContain('Nothing scheduled today');
+  });
+
+  test('shows the dinner line when a meal plan entry is present', () => {
+    const msg = buildDailyReminderMessage(SARAH, {
+      dinner: { meal_name: 'Beef tacos', cook_time_mins: 25 },
+    });
+    expect(msg).toContain('🍽️ Dinner: Beef tacos');
+    expect(msg).toContain('25 min');
+  });
+
+  test('dinner line omits cook time when recipe has none', () => {
+    const msg = buildDailyReminderMessage(SARAH, {
+      dinner: { meal_name: 'Leftovers', cook_time_mins: null },
+    });
+    expect(msg).toContain('Dinner: Leftovers');
+    expect(msg).not.toContain('min'); // no cook-time suffix
+  });
+
+  test('omits the dinner section entirely when no meal is planned', () => {
+    const msg = buildDailyReminderMessage(SARAH, {});
+    expect(msg).not.toContain('Dinner');
+    expect(msg).not.toContain('🍽️');
+  });
+
+  test('shows Reminders block with bullets for tasks + bills', () => {
+    const msg = buildDailyReminderMessage(SARAH, {
+      taskReminders: [
+        { title: "Mason's permission slip", when: 'today' },
+      ],
+      billReminders: [
+        { name: 'Electric bill', when: 'tomorrow' },
+      ],
+    });
+    expect(msg).toContain('📋 Reminders:');
+    expect(msg).toContain("• Mason's permission slip due today");
+    expect(msg).toContain('• Electric bill due tomorrow');
+  });
+
+  test('omits the Reminders block entirely when no tasks or bills due', () => {
+    const msg = buildDailyReminderMessage(SARAH, {});
+    expect(msg).not.toContain('Reminders');
   });
 });

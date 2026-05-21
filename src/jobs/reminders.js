@@ -53,11 +53,34 @@ function formatEventAssignee(ev) {
  * @param {string} [tz='Europe/London'] - Household timezone for time formatting
  * @returns {string}
  */
-function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActivities, tz = 'Europe/London', linkedAt = null, weatherLine = null) {
+function buildDailyReminderMessage(user, opts = {}) {
+  const {
+    todayEvents = [],
+    shoppingCount = 0,
+    schoolActivities = [],
+    tz = 'Europe/London',
+    linkedAt = null,
+    weatherLine = null,
+    dinner = null,             // { meal_name, cook_time_mins }
+    taskReminders = [],        // [{ title, when: "today"|"tomorrow" }]
+    billReminders = [],        // [{ name, when: "today"|"tomorrow" }]
+  } = opts;
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const lines = [`${greeting}, ${user.name}! Here's what's on for today:\n`];
+  // Weekday in the household's local timezone so a digest fired at
+  // 07:00 BST says "Thursday" even when the server clock is UTC.
+  let weekday = '';
+  try {
+    weekday = new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz });
+  } catch { /* leave blank if tz is invalid */ }
+
+  const lines = [
+    weekday
+      ? `${greeting}, ${user.name}! Here's your ${weekday}:\n`
+      : `${greeting}, ${user.name}! Here's what's on for today:\n`,
+  ];
 
   // Weather one-liner - null on quiet days so we don't pad with filler.
   if (weatherLine) {
@@ -65,39 +88,67 @@ function buildDailyReminderMessage(user, todayEvents, shoppingCount, schoolActiv
     lines.push('');
   }
 
-  // School activities for today
+  // Kids Activities (term-time filtered upstream). No bullets per the
+  // redesign - prose-like lines under a single heading.
   if (schoolActivities && schoolActivities.length > 0) {
-    lines.push('🏫 *SCHOOL:*');
+    lines.push('🏫 Kids Activities:');
     for (const act of schoolActivities) {
       const timeStr = act.time_end ? ` until ${act.time_end.substring(0, 5)}` : '';
-      lines.push(`• ${act.child_name} - ${act.activity}${timeStr}${act.reminder_text ? ` (${act.reminder_text})` : ''}`);
+      const note = act.reminder_text ? ` (${act.reminder_text})` : '';
+      lines.push(`${act.child_name} - ${act.activity}${timeStr}${note}`);
     }
     lines.push('');
   }
 
-  // Today's calendar events
-  const hasEvents = Array.isArray(todayEvents) && todayEvents.length > 0;
-  if (hasEvents) {
-    lines.push("📅 *TODAY'S EVENTS:*");
-    for (const ev of todayEvents) {
-      const startStr = ev.all_day ? 'All day' : formatEventTime(ev.start_time, tz);
+  // Today's Schedule - timed events only. All-day events are dropped
+  // here per the redesign; surface them through tasks/reminders if
+  // they're actionable.
+  const timedEvents = (Array.isArray(todayEvents) ? todayEvents : []).filter(e => !e.all_day);
+  if (timedEvents.length > 0) {
+    lines.push("📅 Today's Schedule:");
+    for (const ev of timedEvents) {
+      const startStr = formatEventTime(ev.start_time, tz);
       const who = formatEventAssignee(ev);
-      lines.push(`• ${startStr} - ${ev.title}${who ? ` _(${who})_` : ''}`);
+      lines.push(`${startStr} - ${ev.title}${who ? ` _(${who})_` : ''}`);
     }
     lines.push('');
   }
 
+  // "Nothing scheduled" only when BOTH kids activities and timed
+  // events are empty. Bills/tasks/meals don't count as schedule items.
   const hasSchool = Array.isArray(schoolActivities) && schoolActivities.length > 0;
-  if (!hasSchool && !hasEvents) {
+  if (!hasSchool && timedEvents.length === 0) {
     lines.push('✨ Nothing scheduled today.');
     lines.push('');
   }
 
-  // Shopping summary
+  // Today's dinner from the meal plan. Cook time is included when the
+  // recipe has it; otherwise just the meal name.
+  if (dinner && dinner.meal_name) {
+    const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
+    lines.push(`🍽️ Dinner: ${dinner.meal_name}${cookTime}`);
+    lines.push('');
+  }
+
+  // Reminders block - the ONE bulleted section in the digest per the
+  // redesign. Combines tasks due today/tomorrow + subscription bills
+  // renewing today/tomorrow into a single actionable list.
+  const reminderLines = [];
+  for (const t of taskReminders) {
+    reminderLines.push(`• ${t.title} due ${t.when}`);
+  }
+  for (const b of billReminders) {
+    reminderLines.push(`• ${b.name} due ${b.when}`);
+  }
+  if (reminderLines.length > 0) {
+    lines.push('📋 Reminders:');
+    lines.push(...reminderLines);
+    lines.push('');
+  }
+
+  // Shopping summary - one line, no bullets.
   if (shoppingCount > 0) {
-    lines.push(`🛒 *SHOPPING:* ${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the list. Reply /shopping to see it.`);
-  } else {
-    lines.push('🛒 *SHOPPING:* List is empty - all done!');
+    lines.push(`🛒 ${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the shopping list. Reply /shopping to see it.`);
   }
 
   // Discovery footer - rotates through "💡 Did you know…" tips for
@@ -164,6 +215,67 @@ async function sendDailyReminders(householdId, singleMember) {
   // household (events are household-wide, not per-member).
   const todayEvents = await fetchTodayEvents(householdId, today);
 
+  // Today's dinner from the meal plan. Pulls just the current date and
+  // picks the first dinner-category row; joined recipes give us
+  // cook_time_mins for the digest line. Soft-fail so a meal lookup
+  // hiccup never blocks the digest.
+  let dinner = null;
+  try {
+    const meals = await db.getMealPlanForWeek(householdId, today, today);
+    const dinnerRow = (meals || []).find(m => m.category === 'dinner');
+    if (dinnerRow) {
+      dinner = {
+        meal_name: dinnerRow.meal_name || dinnerRow.recipes?.name || null,
+        cook_time_mins: dinnerRow.recipes?.cook_time_mins || null,
+      };
+    }
+  } catch (e) {
+    console.warn('[reminders] meal fetch failed:', e.message);
+  }
+
+  // Tomorrow's date in the household's tz for the reminders window.
+  const tomorrow = (() => {
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().split('T')[0];
+  })();
+
+  // Tasks due today or tomorrow → reminder lines. Pulled once per
+  // household run since tasks are household-scoped (we surface them to
+  // every recipient; per-assignee filtering could be a follow-up).
+  let taskReminders = [];
+  try {
+    const allTasks = await db.getAllIncompleteTasks(householdId);
+    taskReminders = (allTasks || [])
+      .filter(t => t.due_date === today || t.due_date === tomorrow)
+      .map(t => ({
+        title: t.title,
+        when: t.due_date === today ? 'today' : 'tomorrow',
+      }));
+  } catch (e) {
+    console.warn('[reminders] task fetch failed:', e.message);
+  }
+
+  // Subscription bills renewing today or tomorrow → reminder lines.
+  // listSubscriptions is the household-scoped query (the
+  // -RenewingBetween variant misses the household filter).
+  let billReminders = [];
+  try {
+    const subs = await db.listSubscriptions(householdId);
+    billReminders = (subs || [])
+      .filter(s => {
+        if (!s.next_renewal_at) return false;
+        const renewYmd = String(s.next_renewal_at).slice(0, 10);
+        return renewYmd === today || renewYmd === tomorrow;
+      })
+      .map(s => ({
+        name: s.name,
+        when: String(s.next_renewal_at).slice(0, 10) === today ? 'today' : 'tomorrow',
+      }));
+  } catch (e) {
+    console.warn('[reminders] subscription fetch failed:', e.message);
+  }
+
   // Today's weather one-liner - one fetch per household run, shared
   // across every member's digest. Cached 12h inside the helper so a
   // re-trigger / second cron tick doesn't re-fetch.
@@ -217,15 +329,17 @@ async function sendDailyReminders(householdId, singleMember) {
       }
     } catch { /* silently skip school activities on error */ }
 
-    const message = buildDailyReminderMessage(
-      member,
+    const message = buildDailyReminderMessage(member, {
       todayEvents,
       shoppingCount,
       schoolActivities,
       tz,
-      member.whatsapp_linked_at || null,
+      linkedAt: member.whatsapp_linked_at || null,
       weatherLine,
-    );
+      dinner,
+      taskReminders,
+      billReminders,
+    });
 
     // Send via WhatsApp
     if (whatsapp.isConfigured()) {
