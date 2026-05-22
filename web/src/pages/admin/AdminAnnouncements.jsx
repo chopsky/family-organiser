@@ -26,6 +26,7 @@ import { useEffect, useState } from 'react';
 import api from '../../lib/api';
 
 const AUDIENCES = [
+  { value: 'platform_admin', label: 'Platform admins only (test mode)' },
   { value: 'ios_users', label: 'iOS app installs (with verified email)' },
   { value: 'all_verified', label: 'All verified email accounts' },
   { value: 'admins_only', label: 'Household admins only' },
@@ -67,7 +68,7 @@ export default function AdminAnnouncements() {
   const [listError, setListError] = useState('');
 
   const [subject, setSubject] = useState('');
-  const [audience, setAudience] = useState('ios_users');
+  const [audience, setAudience] = useState('platform_admin');
   const [html, setHtml] = useState('');
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(null);

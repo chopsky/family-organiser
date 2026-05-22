@@ -289,7 +289,7 @@ router.get('/inbound-emails', async (req, res) => {
 // hundreds-of-users scale Housemait is at today. Throttle to ~10
 // concurrent so Postmark's rate limits never bite.
 
-const VALID_AUDIENCES = new Set(['all_verified', 'ios_users', 'admins_only']);
+const VALID_AUDIENCES = new Set(['all_verified', 'ios_users', 'admins_only', 'platform_admin']);
 
 router.get('/announcements', async (req, res) => {
   try {

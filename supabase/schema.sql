@@ -237,7 +237,7 @@ create table if not exists announcements (
   id                 uuid primary key default gen_random_uuid(),
   subject            text not null,
   html               text not null,
-  audience           text not null check (audience in ('all_verified', 'ios_users', 'admins_only')),
+  audience           text not null check (audience in ('all_verified', 'ios_users', 'admins_only', 'platform_admin')),
   created_by         uuid references users(id) on delete set null,
   created_at         timestamptz not null default now(),
   sent_started_at    timestamptz,

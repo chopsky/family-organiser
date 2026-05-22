@@ -4677,6 +4677,20 @@ async function resolveAnnouncementAudience(audience, db = supabase) {
     if (error) throw error;
     return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
   }
+  if (audience === 'platform_admin') {
+    // Self-test audience: platform admins only. Lets the operator dry-run
+    // a broadcast against their own inbox before committing to the real
+    // audience. Email-verified filter still applies so a misconfigured
+    // admin account doesn't break the send loop.
+    const { data, error } = await db
+      .from('users')
+      .select('id, email, name')
+      .eq('is_platform_admin', true)
+      .not('email', 'is', null)
+      .eq('email_verified', true);
+    if (error) throw error;
+    return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
+  }
   // Default: all_verified - every verified-email user, dependents/
   // children with no email are filtered out via the email IS NOT NULL
   // predicate.
@@ -4684,7 +4698,7 @@ async function resolveAnnouncementAudience(audience, db = supabase) {
     .from('users')
     .select('id, email, name')
     .not('email', 'is', null)
-    .not('email_verified_at', 'is', null);
+    .eq('email_verified', true);
   if (error) throw error;
   return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
 }
