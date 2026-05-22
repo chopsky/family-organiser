@@ -4663,7 +4663,7 @@ async function resolveAnnouncementAudience(audience, db = supabase) {
       .select('id, email, name')
       .in('id', userIds)
       .not('email', 'is', null)
-      .not('email_verified_at', 'is', null);
+      .eq('email_verified', true);
     if (error) throw error;
     return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
   }
@@ -4673,7 +4673,7 @@ async function resolveAnnouncementAudience(audience, db = supabase) {
       .select('id, email, name')
       .eq('role', 'admin')
       .not('email', 'is', null)
-      .not('email_verified_at', 'is', null);
+      .eq('email_verified', true);
     if (error) throw error;
     return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
   }
