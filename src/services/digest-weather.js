@@ -86,12 +86,33 @@ async function fetchTodayForecastForHousehold(household) {
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
       `&timezone=${encodeURIComponent(tz)}` +
       `&forecast_days=1`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+
+    // Retry on 5xx (Open-Meteo occasionally returns 502/503 during
+    // upstream blips). 4xx is treated as a hard fail - usually a bad
+    // lat/lon. Three attempts with 250ms / 750ms backoff catches the
+    // common transient case without making the digest job sluggish.
+    let res = null;
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, attempt === 1 ? 250 : 750));
+      }
+      try {
+        res = await fetch(url);
+        if (res.ok) break;
+        lastErr = new Error(`Open-Meteo ${res.status}`);
+        if (res.status < 500) break; // 4xx - don't retry
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!res?.ok) throw lastErr || new Error('Open-Meteo unknown failure');
+
     const data = await res.json();
     const d = data.daily;
     if (!d || !Array.isArray(d.time) || d.time.length === 0) {
       console.warn(`[digest-weather] Open-Meteo returned no daily data for household ${household.id} (lat=${loc.lat}, lon=${loc.lon})`);
+      cache.set(household.id, { data: null, ts: Date.now() });
       return null;
     }
     const forecast = {
@@ -105,6 +126,12 @@ async function fetchTodayForecastForHousehold(household) {
     return forecast;
   } catch (err) {
     console.warn(`[digest-weather] forecast fetch failed for household ${household.id}:`, err.message);
+    // Negative-cache the failure too. Without this, each member's
+    // iteration in the same digest run re-hits a flapping upstream -
+    // wastes time and pollutes logs. NEG_CACHE_TTL_MS (30 min) is
+    // short enough that a recovered upstream is picked up by the next
+    // /admin/reminders re-trigger.
+    cache.set(household.id, { data: null, ts: Date.now() });
     return null;
   }
 }
