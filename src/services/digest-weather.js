@@ -136,4 +136,8 @@ async function fetchTodayForecastForHousehold(household) {
   }
 }
 
-module.exports = { fetchTodayForecastForHousehold };
+function invalidateHouseholdWeatherCache(householdId) {
+  if (householdId) cache.delete(householdId);
+}
+
+module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache };

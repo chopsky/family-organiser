@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requirePlatformAdmin } = require('../middleware/auth');
+const { sendDailyReminders } = require('../jobs/reminders');
+const { invalidateHouseholdWeatherCache } = require('../services/digest-weather');
 
 const router = Router();
 
@@ -407,6 +409,41 @@ router.post('/announcements/:id/send', async (req, res) => {
     });
   } catch (err) {
     console.error('POST /api/admin/announcements/:id/send error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
+// ─── POST /api/admin/tools/trigger-morning-brief ────────────────────────────
+//
+// Manually fire the daily WhatsApp digest for the calling platform admin,
+// bypassing the per-member per-day lock that the cron uses to dedupe sends.
+// Built for fix-verification: when a digest-weather / dinner / school-activity
+// change ships and the operator wants to confirm it works without waiting
+// until 07:00 tomorrow. Also clears the digest-weather negative cache for
+// the household so a transient upstream blip earlier in the day doesn't
+// poison the manual re-trigger.
+//
+// Strictly platform-admin only (the whole admin router is already gated)
+// and strictly self-targeted - admin's own user_id / household, never an
+// arbitrary user, to keep blast radius zero.
+
+router.post('/tools/trigger-morning-brief', async (req, res) => {
+  try {
+    const member = await db.getUserByIdAdmin(req.user.id);
+    if (!member) return res.status(404).json({ error: 'Caller not found' });
+    if (!member.household_id) return res.status(400).json({ error: 'Caller has no household' });
+    if (!member.whatsapp_linked || !member.whatsapp_phone) {
+      return res.status(400).json({
+        error: 'Your WhatsApp is not linked. Link it from Settings → Notifications first.',
+      });
+    }
+
+    invalidateHouseholdWeatherCache(member.household_id);
+    await sendDailyReminders(member.household_id, member);
+
+    return res.json({ ok: true, sentTo: member.whatsapp_phone });
+  } catch (err) {
+    console.error('POST /api/admin/tools/trigger-morning-brief error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });
   }
 });
