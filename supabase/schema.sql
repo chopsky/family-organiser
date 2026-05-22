@@ -230,6 +230,36 @@ create table if not exists household_notes (
   unique(household_id, key)
 );
 
+-- announcements + announcement_recipients (platform admin can send
+-- branded email blasts to a user audience slice). See
+-- migration-announcements.sql for the rationale.
+create table if not exists announcements (
+  id                 uuid primary key default gen_random_uuid(),
+  subject            text not null,
+  html               text not null,
+  audience           text not null check (audience in ('all_verified', 'ios_users', 'admins_only')),
+  created_by         uuid references users(id) on delete set null,
+  created_at         timestamptz not null default now(),
+  sent_started_at    timestamptz,
+  sent_completed_at  timestamptz,
+  recipient_count    integer not null default 0,
+  success_count      integer not null default 0,
+  failure_count      integer not null default 0
+);
+create index if not exists announcements_created_at_idx on announcements (created_at desc);
+create table if not exists announcement_recipients (
+  id              uuid primary key default gen_random_uuid(),
+  announcement_id uuid not null references announcements(id) on delete cascade,
+  user_id         uuid not null references users(id) on delete cascade,
+  email           text not null,
+  sent_at         timestamptz,
+  error           text,
+  unique (announcement_id, user_id)
+);
+create index if not exists announcement_recipients_pending_idx
+  on announcement_recipients (announcement_id)
+  where sent_at is null and error is null;
+
 -- household_preferences (structured AI-consulted facts: dietary,
 -- allergies, member-specific dislikes/loves, schedule anchors). See
 -- migration-household-preferences.sql for the rationale.

@@ -4637,6 +4637,160 @@ async function upsertNotificationPreferences(userId, prefs) {
   return data;
 }
 
+// ─── Announcements (admin email broadcaster) ─────────────────────────────
+
+/**
+ * Resolve the user list for an announcement audience tag. Returns
+ * { user_id, email, name } rows ready for the recipients table. Drops
+ * users without an email or whose email hasn't been verified - both
+ * deliverability and compliance want only opted-in addresses.
+ */
+async function resolveAnnouncementAudience(audience, db = supabase) {
+  if (audience === 'ios_users') {
+    // Distinct user IDs with an active iOS device token. The join is
+    // done client-side because Supabase's JS client makes the nested
+    // PostgREST filter awkward for "users with at least one row in X".
+    const { data: tokenRows, error: tokenErr } = await db
+      .from('device_tokens')
+      .select('user_id')
+      .eq('platform', 'ios')
+      .eq('active', true);
+    if (tokenErr) throw tokenErr;
+    const userIds = [...new Set((tokenRows || []).map(r => r.user_id))];
+    if (userIds.length === 0) return [];
+    const { data, error } = await db
+      .from('users')
+      .select('id, email, name')
+      .in('id', userIds)
+      .not('email', 'is', null)
+      .not('email_verified_at', 'is', null);
+    if (error) throw error;
+    return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
+  }
+  if (audience === 'admins_only') {
+    const { data, error } = await db
+      .from('users')
+      .select('id, email, name')
+      .eq('role', 'admin')
+      .not('email', 'is', null)
+      .not('email_verified_at', 'is', null);
+    if (error) throw error;
+    return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
+  }
+  // Default: all_verified - every verified-email user, dependents/
+  // children with no email are filtered out via the email IS NOT NULL
+  // predicate.
+  const { data, error } = await db
+    .from('users')
+    .select('id, email, name')
+    .not('email', 'is', null)
+    .not('email_verified_at', 'is', null);
+  if (error) throw error;
+  return (data || []).map(u => ({ user_id: u.id, email: u.email, name: u.name || '' }));
+}
+
+/**
+ * Create a draft announcement + insert one pending recipient row per
+ * resolved audience member. Returns the announcement row with the
+ * recipient_count populated. Send is a separate step (sendAnnouncement
+ * below) so the admin can preview the audience size before committing.
+ */
+async function createAnnouncement({ subject, html, audience, createdBy }, db = supabase) {
+  const recipients = await resolveAnnouncementAudience(audience, db);
+  const { data: announcement, error: insertErr } = await db
+    .from('announcements')
+    .insert({
+      subject,
+      html,
+      audience,
+      created_by: createdBy || null,
+      recipient_count: recipients.length,
+    })
+    .select()
+    .single();
+  if (insertErr) throw insertErr;
+  if (recipients.length > 0) {
+    const rows = recipients.map(r => ({
+      announcement_id: announcement.id,
+      user_id: r.user_id,
+      email: r.email,
+    }));
+    const { error: recipErr } = await db
+      .from('announcement_recipients')
+      .insert(rows);
+    if (recipErr) throw recipErr;
+  }
+  return { ...announcement, recipientPreview: recipients.slice(0, 5) };
+}
+
+async function getAnnouncementById(id, db = supabase) {
+  const { data, error } = await db
+    .from('announcements')
+    .select()
+    .eq('id', id)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function listAnnouncements({ limit = 50 } = {}, db = supabase) {
+  const { data, error } = await db
+    .from('announcements')
+    .select()
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+async function getPendingRecipients(announcementId, db = supabase) {
+  const { data, error } = await db
+    .from('announcement_recipients')
+    .select('id, user_id, email')
+    .eq('announcement_id', announcementId)
+    .is('sent_at', null)
+    .is('error', null);
+  if (error) throw error;
+  return data || [];
+}
+
+async function markRecipientSent(recipientId, db = supabase) {
+  const { error } = await db
+    .from('announcement_recipients')
+    .update({ sent_at: new Date().toISOString(), error: null })
+    .eq('id', recipientId);
+  if (error) throw error;
+}
+
+async function markRecipientFailed(recipientId, errorMsg, db = supabase) {
+  const { error } = await db
+    .from('announcement_recipients')
+    .update({ sent_at: null, error: String(errorMsg).slice(0, 500) })
+    .eq('id', recipientId);
+  if (error) throw error;
+}
+
+async function markAnnouncementSendStarted(id, db = supabase) {
+  const { error } = await db
+    .from('announcements')
+    .update({ sent_started_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('sent_started_at', null); // only set once
+  if (error) throw error;
+}
+
+async function markAnnouncementSendCompleted(id, { successCount, failureCount }, db = supabase) {
+  const { error } = await db
+    .from('announcements')
+    .update({
+      sent_completed_at: new Date().toISOString(),
+      success_count: successCount,
+      failure_count: failureCount,
+    })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ─── Stripe / subscription ───────────────────────────────────────────────────
 
 /**
@@ -5305,6 +5459,16 @@ module.exports = {
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,
+  // Announcements (admin email broadcaster)
+  resolveAnnouncementAudience,
+  createAnnouncement,
+  getAnnouncementById,
+  listAnnouncements,
+  getPendingRecipients,
+  markRecipientSent,
+  markRecipientFailed,
+  markAnnouncementSendStarted,
+  markAnnouncementSendCompleted,
   // Multi-assignee helpers (shared between tasks + events + bot handlers)
   resolveAssignees,
   pickAssigneeNames,

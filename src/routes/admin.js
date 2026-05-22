@@ -276,4 +276,139 @@ router.get('/inbound-emails', async (req, res) => {
   }
 });
 
+// ─── Announcements (admin email broadcaster) ────────────────────────────
+//
+// Three endpoints:
+//   GET  /api/admin/announcements         - list recent (latest 50)
+//   GET  /api/admin/announcements/preview - count audience without committing
+//   POST /api/admin/announcements         - create draft + resolve recipients
+//   POST /api/admin/announcements/:id/send - actually send (idempotent;
+//                                            skips already-sent recipients)
+//
+// Send loop is synchronous within the HTTP request - fine for the
+// hundreds-of-users scale Housemait is at today. Throttle to ~10
+// concurrent so Postmark's rate limits never bite.
+
+const VALID_AUDIENCES = new Set(['all_verified', 'ios_users', 'admins_only']);
+
+router.get('/announcements', async (req, res) => {
+  try {
+    const items = await db.listAnnouncements({ limit: 50 });
+    return res.json({ announcements: items });
+  } catch (err) {
+    console.error('GET /api/admin/announcements error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/announcements/preview', async (req, res) => {
+  const { audience } = req.query;
+  if (!VALID_AUDIENCES.has(audience)) {
+    return res.status(400).json({ error: 'Invalid audience' });
+  }
+  try {
+    const recipients = await db.resolveAnnouncementAudience(audience);
+    return res.json({
+      count: recipients.length,
+      sample: recipients.slice(0, 5).map(r => ({ name: r.name, email: r.email })),
+    });
+  } catch (err) {
+    console.error('GET /api/admin/announcements/preview error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/announcements', async (req, res) => {
+  const { subject, html, audience } = req.body || {};
+  if (!subject?.trim()) return res.status(400).json({ error: 'subject is required' });
+  if (!html?.trim()) return res.status(400).json({ error: 'html is required' });
+  if (!VALID_AUDIENCES.has(audience)) return res.status(400).json({ error: 'Invalid audience' });
+  try {
+    const announcement = await db.createAnnouncement({
+      subject: subject.trim(),
+      html: html.trim(),
+      audience,
+      createdBy: req.user.id,
+    });
+    return res.status(201).json({ announcement });
+  } catch (err) {
+    console.error('POST /api/admin/announcements error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/announcements/:id/send', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const announcement = await db.getAnnouncementById(id);
+    if (!announcement) return res.status(404).json({ error: 'Announcement not found' });
+    if (announcement.sent_completed_at) {
+      return res.json({
+        announcement,
+        message: 'Already fully sent',
+        sentCount: announcement.success_count,
+        failedCount: announcement.failure_count,
+      });
+    }
+
+    await db.markAnnouncementSendStarted(id);
+
+    const pending = await db.getPendingRecipients(id);
+    if (pending.length === 0) {
+      await db.markAnnouncementSendCompleted(id, {
+        successCount: announcement.success_count,
+        failureCount: announcement.failure_count,
+      });
+      return res.json({
+        announcement: { ...announcement, sent_completed_at: new Date().toISOString() },
+        message: 'No pending recipients',
+        sentCount: 0,
+        failedCount: 0,
+      });
+    }
+
+    const { sendAnnouncementEmail } = require('../services/email');
+    let success = announcement.success_count || 0;
+    let failure = announcement.failure_count || 0;
+
+    // Send sequentially with a small delay between batches - Postmark's
+    // free tier allows 10 req/sec which is plenty, but a tight loop
+    // can still trigger soft-rate-limits. Batches of 10 with a brief
+    // pause keep us well clear.
+    const BATCH = 10;
+    for (let i = 0; i < pending.length; i += BATCH) {
+      const chunk = pending.slice(i, i + BATCH);
+      await Promise.all(chunk.map(async (recipient) => {
+        try {
+          await sendAnnouncementEmail({
+            to: recipient.email,
+            subject: announcement.subject,
+            html: announcement.html,
+          });
+          await db.markRecipientSent(recipient.id);
+          success += 1;
+        } catch (err) {
+          console.error(`[announcements] send failed for ${recipient.email}:`, err.message);
+          await db.markRecipientFailed(recipient.id, err.message);
+          failure += 1;
+        }
+      }));
+      // Tiny pause between batches.
+      if (i + BATCH < pending.length) await new Promise(r => setTimeout(r, 200));
+    }
+
+    await db.markAnnouncementSendCompleted(id, { successCount: success, failureCount: failure });
+
+    return res.json({
+      announcement: { ...announcement, sent_completed_at: new Date().toISOString() },
+      sentCount: success,
+      failedCount: failure,
+      processed: pending.length,
+    });
+  } catch (err) {
+    console.error('POST /api/admin/announcements/:id/send error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
 module.exports = router;

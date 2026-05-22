@@ -507,6 +507,30 @@ async function sendTrialExpiredEmail({ to, firstName, trialEndsAt, householdId: 
   });
 }
 
+/**
+ * Send a one-off admin announcement email. Thin wrapper around the
+ * generic sendEmail - the announcement body is already a complete HTML
+ * string (rendered by the admin compose UI) so we just pass it through.
+ * Throws if Postmark returns an error so the caller can mark the row
+ * as failed and continue.
+ */
+async function sendAnnouncementEmail({ to, subject, html }) {
+  if (!client) throw new Error('Postmark not configured');
+  if (!to) throw new Error('Recipient address required');
+  if (!subject) throw new Error('Subject required');
+  if (!html) throw new Error('HTML body required');
+  await client.sendEmail({
+    From: FROM,
+    To: to,
+    Subject: subject,
+    HtmlBody: html,
+    // 'broadcast' stream keeps marketing-style announcements out of
+    // the transactional reputation pool. Falls back to default when
+    // the env var isn't set so a fresh dev environment still works.
+    MessageStream: process.env.POSTMARK_BROADCAST_STREAM || 'broadcast',
+  });
+}
+
 module.exports = {
   sendVerificationEmail,
   sendInviteEmail,
@@ -520,6 +544,8 @@ module.exports = {
   sendTrialDay25Email,
   sendTrialDay28Email,
   sendTrialExpiredEmail,
+  // Admin announcement broadcaster
+  sendAnnouncementEmail,
   // Exposed for tests
   _internal: { formatTrialEndDate, TEMPLATE_ALIASES, STREAM },
 };
