@@ -22,3 +22,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Matter TRIAL font - only the 8 used weights are tracked (see index.css
+# @font-face declarations). The rest live in public/fonts/matter for
+# easy weight-swap during testing but stay out of git + Vercel deploys.
+public/fonts/matter/*
+!public/fonts/matter/Matter-TRIAL-Regular.otf
+!public/fonts/matter/Matter-TRIAL-RegularItalic.otf
+!public/fonts/matter/Matter-TRIAL-Medium.otf
+!public/fonts/matter/Matter-TRIAL-MediumItalic.otf
+!public/fonts/matter/Matter-TRIAL-SemiBold.otf
+!public/fonts/matter/Matter-TRIAL-SemiBoldItalic.otf
+!public/fonts/matter/Matter-TRIAL-Bold.otf
+!public/fonts/matter/Matter-TRIAL-BoldItalic.otf
