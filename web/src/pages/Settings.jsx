@@ -1428,14 +1428,6 @@ export default function Settings() {
               {senderError && <p className="text-xs text-coral mt-1">{senderError}</p>}
             </div>
 
-            <div className="text-xs text-cocoa space-y-1 pt-3 border-t border-cream-border">
-              <p className="font-medium text-cocoa">What you can forward:</p>
-              <p>🛒 <strong>Receipts & orders</strong> - items added to shopping list</p>
-              <p>✈️ <strong>Travel bookings</strong> - flights, hotels → added to calendar</p>
-              <p>🏫 <strong>School emails</strong> - newsletters, term dates → added to calendar</p>
-              <p>🏥 <strong>Appointments</strong> - dentist, doctor, vet → added to calendar</p>
-              <p>🍽️ <strong>Reservations</strong> - restaurants, events, tickets → added to calendar</p>
-            </div>
             {isAdmin && (
               <button
                 onClick={handleRegenerateReceiptEmail}
