@@ -1074,7 +1074,7 @@ export default function Settings() {
       {/* Connect Calendars */}
       <AccordionItem title="Connect Calendars" icon={IconCalendar}>
         <p className="text-sm text-cocoa mb-3">
-          Show your household events in the calendar app on your phone or laptop. One-way - events you create here appear there automatically.
+          Show the events from your Housemait calendar in your external calendars. One-way - events you create here appear there automatically.
         </p>
 
 
@@ -1161,7 +1161,7 @@ export default function Settings() {
             )}
           </div>
           <p className="text-sm text-cocoa mb-3">
-            Show external calendars not already on your phone - school timetables, sports fixtures, shared family calendars from a URL. Visible to everyone in your household. Read-only - edits happen in the source calendar.
+            Show the events from your external calendars in your Housemait calendar. Read-only - edits happen in the source calendar.
           </p>
 
           {showAddFeed && (
@@ -1271,8 +1271,8 @@ export default function Settings() {
       </AccordionItem>
 
 
-      {/* Email Forwarding */}
-      <AccordionItem title="Email Forwarding" icon={IconMail}>
+      {/* Send Emails to AI */}
+      <AccordionItem title="Send Emails to AI" icon={IconMail}>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details - receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
