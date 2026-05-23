@@ -199,37 +199,59 @@ function PlanSection() {
 }
 
 /**
- * AccordionItem - collapsible card. Uses native <details>/<summary> so
+ * AccordionItem - collapsible row. Uses native <details>/<summary> so
  * the browser owns open/close state (no React, no useState), and screen
  * readers already understand the disclosure pattern.
+ *
+ * Two visual modes:
+ *   • Default: a row with a bottom divider, meant to live inside a
+ *     shared <SettingsCard> container (mirrors the Help-page pattern
+ *     where multiple <details> share one card with internal hairlines).
+ *   • `danger`: free-standing coral-tinted card with its own border.
+ *     Used by the Delete-account section so the destructive action
+ *     stays visually separated from the rest of the panel.
  *
  * The chevron rotates via a CSS rule in index.css
  * (`details[open] > summary .acc-chevron`). Default: closed.
  *
- * `danger` flips the card to the coral-tinted destructive styling used
- * by the Delete-account section.
+ * name="settings-accordion" makes the browser treat every <details>
+ * sharing this name as an exclusive group - opening one closes the
+ * others. Native HTML feature (Safari 17.4+, Chrome 120+, Firefox
+ * 119+). Older browsers ignore the attribute and just allow
+ * multiple-open, which is the previous behaviour (graceful fallback).
  */
 function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = false, children }) {
-  const baseStyle = danger
-    ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
-    : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
-  const className = danger ? 'rounded-2xl border' : 'bg-linen rounded-2xl';
-  // name="settings-accordion" makes the browser treat all <details>
-  // sharing this name as an exclusive group - opening one closes the
-  // others. Native HTML feature (Safari 17.4+, Chrome 120+, Firefox 119+).
-  // Older browsers ignore the attribute and just allow multiple-open,
-  // which is the previous behaviour (graceful fallback).
-  const iconColor = danger ? 'text-error' : 'text-plum';
+  if (danger) {
+    return (
+      <details
+        name="settings-accordion"
+        className="rounded-2xl border"
+        style={{ background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }}
+        open={defaultOpen}
+      >
+        <summary className="flex items-center gap-3 px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
+          {IconCmp && <IconCmp className="w-5 h-5 shrink-0 text-error" />}
+          <h2 className="flex-1 text-lg font-semibold text-bark">{title}</h2>
+          <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </summary>
+        <div className="px-5 pb-5 md:px-6 md:pb-6">
+          {children}
+        </div>
+      </details>
+    );
+  }
   return (
-    <details name="settings-accordion" className={className} style={baseStyle} open={defaultOpen}>
-      <summary className="flex items-center gap-3 px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
-        {IconCmp && <IconCmp className={`w-5 h-5 shrink-0 ${iconColor}`} />}
+    <details name="settings-accordion" className="border-b border-cream-border last:border-b-0" open={defaultOpen}>
+      <summary className="flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none">
+        {IconCmp && <IconCmp className="w-5 h-5 shrink-0 text-plum" />}
         <h2 className="flex-1 text-lg font-semibold text-bark">{title}</h2>
         <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
       </summary>
-      <div className="px-5 pb-5 md:px-6 md:pb-6">
+      <div className="pb-5 md:pb-6">
         {children}
       </div>
     </details>
@@ -1024,6 +1046,14 @@ export default function Settings() {
       {/* Plan / subscription */}
       <PlanSection />
 
+      {/* Grouped accordion card - mirrors the Help-page pattern where
+          multiple <details> share one container with internal hairlines,
+          so Settings reads as a single panel of preferences rather than
+          a stack of individually-floating cards. The danger-zone
+          accordion (Delete account) sits OUTSIDE this group so the
+          destructive action keeps its visual distinction. */}
+      <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+
       {/* Connect WhatsApp */}
       <AccordionItem title="Connect WhatsApp" icon={IconMessageCircle}>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
@@ -1654,10 +1684,13 @@ export default function Settings() {
         )}
       </AccordionItem>
 
+      </div>
+
       {/* Danger zone - delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
-          a destructive action. */}
+          a destructive action. Kept OUTSIDE the grouped accordion card
+          above so the destructive action keeps its own visual frame. */}
       <AccordionItem title="Delete account" danger icon={IconTrash}>
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
