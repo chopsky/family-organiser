@@ -71,7 +71,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-  const [members, notes, shopping, tasks, events, household, schools] = await Promise.all([
+  const [members, notes, shopping, tasks, events, household, schools, recipes] = await Promise.all([
     db.getHouseholdMembers(householdId),
     db.getHouseholdNotes(householdId),
     db.getShoppingList(householdId),
@@ -79,6 +79,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     db.getCalendarEvents(householdId, today, twoWeeks),
     db.getHouseholdById(householdId),
     db.getHouseholdSchools(householdId),
+    db.getRecipes(householdId).catch(() => []),
   ]);
 
   // Fetch term dates for the household's schools so the AI can answer
@@ -155,6 +156,19 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     schoolsStr = `${schoolsStr === '(none)' ? '' : `${schoolsStr}\n\n`}TERM DATES & CLOSURES (use these for any question about school term, break, or holiday timing - do NOT guess from general knowledge):\n${termDatesSummary}`;
   }
 
+  // Surface the recipe box (id + name + dietary tags) so the AI can
+  // (a) avoid creating duplicates and (b) target a specific recipe by
+  // id for delete_recipe. Without this the model used to hallucinate
+  // deletes for recipes it had no way to identify.
+  const recipesStr = recipes.length > 0
+    ? recipes.map(r => {
+        const tags = Array.isArray(r.dietary_tags) && r.dietary_tags.length > 0
+          ? ` [${r.dietary_tags.join(', ')}]`
+          : '';
+        return `- ${r.name}${tags} (id: ${r.id})`;
+      }).join('\n')
+    : '(empty)';
+
   let prompt = CHAT_ASSISTANT_SYSTEM
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
@@ -165,7 +179,8 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     .replace(/{{TASKS}}/g, tasksStr)
     .replace(/{{EVENTS}}/g, eventsStr)
     .replace(/{{SCHOOLS}}/g, schoolsStr)
-    .replace(/{{NOTES}}/g, notesStr);
+    .replace(/{{NOTES}}/g, notesStr)
+    .replace(/{{RECIPES}}/g, recipesStr);
 
   if (allergiesStr) {
     prompt += `\n\nHOUSEHOLD ALLERGIES & DIETARY REQUIREMENTS: ${allergiesStr}\nALWAYS avoid these allergens/restrictions when suggesting recipes, meals, or food-related advice.`;
@@ -494,6 +509,25 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             act.servings || 4
           );
           executedActions.push({ type: 'create_recipe', name: recipe.name, id: recipe.id });
+
+        } else if (act.action === 'delete_recipe') {
+          // Delete a recipe by id. The AI gets the id list via the
+          // {{RECIPES}} system-prompt section, so it should always have
+          // a valid id when emitting this action. We still guard
+          // against bad ids by letting deleteRecipe's WHERE clause
+          // scope to the calling household - a stale or wrong id just
+          // results in a no-op delete, not a cross-tenant leak.
+          if (!act.recipe_id) {
+            console.warn('[chat] delete_recipe action missing recipe_id - dropping');
+          } else {
+            const target = await db.getRecipeById(act.recipe_id, req.householdId).catch(() => null);
+            if (!target) {
+              console.warn(`[chat] delete_recipe: recipe ${act.recipe_id} not found for household ${req.householdId}`);
+            } else {
+              await db.deleteRecipe(act.recipe_id, req.householdId);
+              executedActions.push({ type: 'delete_recipe', name: target.name, id: act.recipe_id });
+            }
+          }
         }
       } catch (actionErr) {
         console.error(`Action ${act.action} failed (non-fatal):`, actionErr.message);
