@@ -9,7 +9,7 @@ import WhatsAppPairing from '../components/WhatsAppPairing';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
-  IconDownload, IconShield, IconHelp, IconUser, IconTrash,
+  IconDownload, IconShield, IconUser, IconTrash,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -1624,22 +1624,6 @@ export default function Settings() {
             {revokingAllOthers ? 'Revoking…' : 'Revoke all other sessions'}
           </button>
         )}
-      </AccordionItem>
-
-      {/* Help & support - small entry point above the danger zone so users
-          who land in Settings looking for "how do I…?" find a nudge to the
-          /help page (FAQ + contact form) rather than reading on. */}
-      <AccordionItem title="Help & support" icon={IconHelp}>
-        <p className="text-sm text-cocoa">
-          Quick answers to common questions, plus a way to reach us if
-          you're stuck.
-        </p>
-        <Link
-          to="/help"
-          className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl border border-cream-border text-bark hover:bg-cream font-semibold text-sm transition-colors"
-        >
-          Visit the help centre
-        </Link>
       </AccordionItem>
 
       {/* Account card - shows name, role, and HOW the user is signed
