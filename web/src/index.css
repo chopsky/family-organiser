@@ -1,75 +1,9 @@
 @import "tailwindcss";
 
-/* ── Matter (Displaay) - TRIAL ─────────────────────────────────────────
-   Self-hosted from /public/fonts/matter. Loaded for the four weights
-   we actually use (400 / 500 / 600 / 700) plus italics; the rest of
-   the family (Light, Heavy, Black, Thin, Mono variants) is still in
-   /public/fonts/matter but not registered. font-display: swap so the
-   system fallback paints first and Matter swaps in when ready - keeps
-   first-paint fast even on cold loads. */
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-Regular.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-RegularItalic.otf') format('opentype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-Medium.otf') format('opentype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-MediumItalic.otf') format('opentype');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-SemiBold.otf') format('opentype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-SemiBoldItalic.otf') format('opentype');
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Matter';
-  src: url('/fonts/matter/Matter-TRIAL-BoldItalic.otf') format('opentype');
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
 @theme {
-  /* Font stacks - Matter (trial) leads, system fonts fall back if the
-     OTF hasn't loaded yet (font-display: swap covers the in-flight
-     window). Easy to revert: remove 'Matter' from both stacks. */
-  --font-sans: 'Matter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
-  --font-display: 'Matter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Font stacks - system fonts only, no external loads */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* ── Remapped legacy tokens (pages reference these) ── */
   --color-primary: #6B3FA0;
