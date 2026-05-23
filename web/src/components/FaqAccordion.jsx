@@ -24,7 +24,7 @@ export default function FaqAccordion({ id, question, children }) {
       id={id}
       className="group border-b border-light-grey last:border-b-0 py-4"
     >
-      <summary className="cursor-pointer flex items-center justify-between gap-3 text-charcoal font-medium list-none select-none">
+      <summary className="cursor-pointer flex items-center justify-between gap-3 text-charcoal font-medium list-none select-none text-sm md:text-base">
         <span className="flex-1">{question}</span>
         <IconChevronRight className="h-4 w-4 shrink-0 text-warm-grey transition-transform group-open:rotate-90" />
       </summary>
