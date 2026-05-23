@@ -104,7 +104,7 @@ function PlanSection() {
 
   return (
     <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-      <h2 className="text-lg font-semibold text-bark mb-2">Plan</h2>
+      <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Plan</h2>
 
       {isInternal && (
         <p className="text-sm text-cocoa">
@@ -230,9 +230,9 @@ function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = fal
         open={defaultOpen}
       >
         <summary className="flex items-center gap-3 px-5 py-4 md:px-6 md:py-5 cursor-pointer select-none">
-          {IconCmp && <IconCmp className="w-5 h-5 shrink-0 text-error" />}
-          <h2 className="flex-1 text-lg font-semibold text-bark">{title}</h2>
-          <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          {IconCmp && <IconCmp className="w-4 h-4 md:w-5 md:h-5 shrink-0 text-error" />}
+          <h2 className="flex-1 text-base md:text-lg font-semibold text-bark">{title}</h2>
+          <svg className="acc-chevron w-4 h-4 md:w-5 md:h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
           </svg>
         </summary>
@@ -245,9 +245,9 @@ function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = fal
   return (
     <details name="settings-accordion" className="border-b border-cream-border last:border-b-0" open={defaultOpen}>
       <summary className="flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none">
-        {IconCmp && <IconCmp className="w-5 h-5 shrink-0 text-plum" />}
-        <h2 className="flex-1 text-lg font-semibold text-bark">{title}</h2>
-        <svg className="acc-chevron w-5 h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        {IconCmp && <IconCmp className="w-4 h-4 md:w-5 md:h-5 shrink-0 text-plum" />}
+        <h2 className="flex-1 text-base md:text-lg font-semibold text-bark">{title}</h2>
+        <svg className="acc-chevron w-4 h-4 md:w-5 md:h-5 text-cocoa shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
       </summary>
@@ -1011,7 +1011,7 @@ export default function Settings() {
         return (
           <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
             <div className="flex items-start justify-between mb-3">
-              <h2 className="text-lg font-semibold text-bark">My profile</h2>
+              <h2 className="text-base md:text-lg font-semibold text-bark">My profile</h2>
               {/* Subtle trial indicator - renders nothing unless the household
                   is trialing. Safe to leave always-mounted; the component
                   guards its own visibility. */}
@@ -1734,7 +1734,7 @@ export default function Settings() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-bark">Delete your account?</h2>
+              <h2 className="text-base md:text-lg font-semibold text-bark">Delete your account?</h2>
               <button
                 type="button"
                 onClick={() => !deleting && setDeleteOpen(false)}
@@ -1849,7 +1849,7 @@ export default function Settings() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-bark">Edit profile</h2>
+              <h2 className="text-base md:text-lg font-semibold text-bark">Edit profile</h2>
               <button onClick={() => setEditingProfile(false)} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
