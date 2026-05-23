@@ -1478,7 +1478,7 @@ export default function Calendar() {
                           return (
                           <div
                             key={item.id}
-                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-[3px] mb-0.5 truncate"
+                            className="text-[9px] md:text-[10px] font-semibold px-1.5 py-0.5 rounded-[3px] mb-0.5 truncate"
                             style={{ background: pillStyle.bg, color: pillStyle.text }}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1495,7 +1495,7 @@ export default function Calendar() {
                         })}
                         {overflow > 0 && (
                           <div
-                            className="text-[9px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer hover:underline"
+                            className="text-[9px] md:text-[10px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer hover:underline"
                             onClick={(e) => {
                               e.stopPropagation();
                               const rect = e.currentTarget.getBoundingClientRect();
@@ -1674,7 +1674,7 @@ export default function Calendar() {
                     {dayEvs.map(ev => (
                       <div
                         key={ev.id}
-                        className="text-[9px] font-semibold px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-85"
+                        className="text-[9px] md:text-[10px] font-semibold px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-85"
                         style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
                         onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
                       >
@@ -1869,7 +1869,7 @@ export default function Calendar() {
                           </div>
                         )}
                         {ev.location && height > 56 && (
-                          <div className="text-[9px] opacity-75 mt-0.5 flex items-center gap-1 truncate">
+                          <div className="text-[9px] md:text-[10px] opacity-75 mt-0.5 flex items-center gap-1 truncate">
                             <MapPinIcon /> {ev.location}
                           </div>
                         )}
@@ -1945,7 +1945,7 @@ export default function Calendar() {
                     </div>
                   </div>
                   <span
-                    className="text-[9px] font-semibold px-2 py-0.5 rounded-md shrink-0"
+                    className="text-[9px] md:text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0"
                     style={{ background: badge.bg, color: badge.color }}
                   >
                     {badge.label}
