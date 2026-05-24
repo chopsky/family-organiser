@@ -163,6 +163,14 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
+  /* h1 keeps the tighter display tracking; h2-h6 are subheads /
+     section titles where a 0 tracking reads more openly and matches
+     the typographic direction the rest of the app has been moving
+     toward (semibold -> medium, etc.). Any heading that needs a
+     specific tracking still overrides via inline style. */
+  h2, h3, h4, h5, h6 {
+    letter-spacing: 0;
+  }
 
   /* FAQ accordion uses a custom chevron; suppress the browser default
      disclosure triangle on <summary> elements globally so we don't have
