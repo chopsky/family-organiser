@@ -1115,6 +1115,32 @@ async function getInviteByToken(token, db = supabase) {
   return data || null;
 }
 
+/**
+ * Find the most-recent non-expired, non-accepted invite matching an
+ * email address (case-insensitive). Used as a safety net on signup:
+ * if an admin invited foo@bar.com but foo signed up directly via the
+ * App Store without clicking the invite link, we still want to attach
+ * them to the inviting household instead of creating a duplicate.
+ *
+ * Returns the invite row or null. .ilike() is the case-insensitive
+ * match operator in PostgREST; the `%` wildcards are intentionally
+ * absent so we only match exact addresses (just case-insensitive).
+ */
+async function getInviteByEmail(email, db = supabase) {
+  if (!email?.trim()) return null;
+  const { data, error } = await db
+    .from('invites')
+    .select()
+    .ilike('email', email.trim())
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 async function markInviteAccepted(inviteId, db = supabase) {
   const { error } = await db
     .from('invites')
@@ -5297,6 +5323,7 @@ module.exports = {
   markUserOnboarded,
   createInvite,
   getInviteByToken,
+  getInviteByEmail,
   markInviteAccepted,
   deleteInvite,
   getPendingInvites,

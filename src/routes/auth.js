@@ -120,13 +120,29 @@ router.post('/register', requireTurnstile, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // If invite token provided, auto-verify and auto-join
+    // Invite auto-attach. Two paths feed the same branch:
+    //   1. Explicit `inviteToken` from the URL (?invite=...) - the user
+    //      clicked the link in the admin's invite email.
+    //   2. Implicit email match - the admin invited this exact email
+    //      address, but the user signed up via the App Store / direct
+    //      signup form without clicking the link. We look up a pending
+    //      invite by email and treat it the same way. This is the
+    //      safety net that stops family members from each creating a
+    //      separate household when one was already waiting for them.
+    let invite = null;
     if (inviteToken) {
-      const invite = await db.getInviteByToken(inviteToken);
+      invite = await db.getInviteByToken(inviteToken);
       if (!invite) {
         return res.status(400).json({ error: 'Invalid or expired invite' });
       }
+    } else {
+      invite = await db.getInviteByEmail(emailLower);
+      if (invite) {
+        console.log(`[auth/register] Auto-attaching ${emailLower} to household ${invite.household_id} via pending invite ${invite.id}`);
+      }
+    }
 
+    if (invite) {
       const user = await db.createUserWithEmail({
         email: emailLower,
         passwordHash,
@@ -379,6 +395,58 @@ router.post('/create-household', requireAuth, async (req, res) => {
     return res.status(201).json(response);
   } catch (err) {
     console.error('POST /api/auth/create-household error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/auth/attach-to-household ─────────────────────────────────────
+//
+// Join an existing household by code, from the /setup screen. Used by the
+// "Join an existing household" tab on SetupHousehold.jsx - the user has
+// already signed up (so we have a verified account + auth token) but
+// hasn't been assigned to a household yet. This is distinct from the
+// legacy /api/auth/join endpoint a few hundred lines below, which is
+// unauthenticated and creates a user on the fly; this endpoint is
+// authenticated and only attaches the already-existing caller.
+//
+// Refuses if the caller already belongs to a household (to keep
+// "switch households" a separate explicit feature, not an accidental
+// side-effect of someone re-entering their setup screen). Code is
+// matched case-insensitively against households.join_code.
+
+router.post('/attach-to-household', requireAuth, async (req, res) => {
+  const { code } = req.body || {};
+
+  if (!code?.trim()) {
+    return res.status(400).json({ error: 'Join code is required' });
+  }
+
+  if (req.householdId) {
+    return res.status(400).json({ error: 'You already belong to a household' });
+  }
+
+  try {
+    const household = await db.getHouseholdByCode(code.trim().toUpperCase());
+    if (!household) {
+      return res.status(404).json({ error: "That code didn't match a household. Double-check with the admin who shared it." });
+    }
+
+    // Assign as a regular member (admin is reserved for the household
+    // creator + anyone the admin promotes from the Family page). Pick
+    // the first colour not yet used by existing members so the new
+    // joiner gets a distinct avatar without admin effort - mirrors
+    // the invite-accept and create-household flows.
+    const color_theme = await db.pickColorForNewMember(household.id);
+    const user = await db.updateUser(req.user.id, {
+      household_id: household.id,
+      role: 'member',
+      color_theme,
+    });
+
+    const response = await authResponse(user, req);
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error('POST /api/auth/attach-to-household error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1009,13 +1077,24 @@ router.post('/google', async (req, res) => {
       let householdId = null;
       let acceptedInvite = null;
       const role = 'member';
+      // Same two paths as /register above: explicit invite token OR
+      // pending-invite-by-email fallback. Without the fallback, a
+      // family member who taps "Continue with Google" from the App
+      // Store - without ever clicking the admin's email invite -
+      // creates a duplicate household.
+      let invite = null;
       if (inviteToken) {
-        const invite = await db.getInviteByToken(inviteToken);
+        invite = await db.getInviteByToken(inviteToken);
+      } else {
+        invite = await db.getInviteByEmail(googleEmail);
         if (invite) {
-          householdId = invite.household_id;
-          acceptedInvite = invite;
-          await db.markInviteAccepted(invite.id);
+          console.log(`[auth/google] Auto-attaching ${googleEmail} to household ${invite.household_id} via pending invite ${invite.id}`);
         }
+      }
+      if (invite) {
+        householdId = invite.household_id;
+        acceptedInvite = invite;
+        await db.markInviteAccepted(invite.id);
       }
 
       user = await db.createUserWithEmail({
@@ -1108,13 +1187,24 @@ router.post('/apple', async (req, res) => {
       // new user. Mirrors the email/password and Google blocks above.
       let householdId = null;
       let acceptedInvite = null;
+      // Two paths feed the same attach branch: explicit token from the
+      // invite-link URL, or pending-invite-by-email fallback so a
+      // family member who taps "Continue with Apple" from the App
+      // Store - without clicking the admin's email invite - doesn't
+      // accidentally create a duplicate household.
+      let invite = null;
       if (inviteToken) {
-        const invite = await db.getInviteByToken(inviteToken);
+        invite = await db.getInviteByToken(inviteToken);
+      } else {
+        invite = await db.getInviteByEmail(appleEmail);
         if (invite) {
-          householdId = invite.household_id;
-          acceptedInvite = invite;
-          await db.markInviteAccepted(invite.id);
+          console.log(`[auth/apple] Auto-attaching ${appleEmail} to household ${invite.household_id} via pending invite ${invite.id}`);
         }
+      }
+      if (invite) {
+        householdId = invite.household_id;
+        acceptedInvite = invite;
+        await db.markInviteAccepted(invite.id);
       }
 
       user = await db.createUserWithEmail({

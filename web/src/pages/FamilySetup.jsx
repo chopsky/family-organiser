@@ -124,6 +124,7 @@ export default function FamilySetup() {
   const [hhEditAvatarPreview, setHhEditAvatarPreview] = useState(null); // data URL or existing URL
   const [hhEditAvatarFile, setHhEditAvatarFile] = useState(null); // File when user picked a new image
   const [hhEditAvatarRemove, setHhEditAvatarRemove] = useState(false); // true if user clicked "Remove photo"
+  const [joinCodeCopied, setJoinCodeCopied] = useState(false);
   const [hhAddressSuggestions, setHhAddressSuggestions] = useState([]);
   const [hhAddressSearching, setHhAddressSearching] = useState(false);
   const [hhEditSaving, setHhEditSaving] = useState(false);
@@ -297,6 +298,19 @@ export default function FamilySetup() {
         setChildActivities(actMap);
       },
     ).catch(() => {});
+  }
+
+  async function handleCopyJoinCode() {
+    if (!household?.join_code) return;
+    try {
+      await navigator.clipboard.writeText(household.join_code);
+      setJoinCodeCopied(true);
+      setTimeout(() => setJoinCodeCopied(false), 1800);
+    } catch {
+      // Clipboard API can fail in non-secure contexts / older
+      // browsers. Silent fallback: the code is already on-screen so
+      // the user can read + retype it manually.
+    }
   }
 
   async function handleSchoolSearch(query) {
@@ -1652,6 +1666,32 @@ export default function FamilySetup() {
             </button>
           )}
         </div>
+        {/* Join code - shown to every member so anyone can share it
+            verbally with a family member who's signing up. Pairs with
+            the "Join existing household" tab on /setup. Used as a
+            fallback for when the email-invite path doesn't reach the
+            joiner (e.g. they sign up via the App Store directly
+            instead of clicking the link in the invite email). */}
+        {household?.join_code && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-cocoa">Join code:</span>
+            <button
+              type="button"
+              onClick={handleCopyJoinCode}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-oat hover:bg-cream border border-cream-border transition-colors"
+              title="Copy join code"
+            >
+              <span className="text-xs font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace' }}>
+                {household.join_code}
+              </span>
+              <span className="text-[11px] text-cocoa">
+                {joinCodeCopied ? 'Copied!' : 'Copy'}
+              </span>
+            </button>
+            <span className="text-[11px] text-cocoa">Share with new family members on the setup screen.</span>
+          </div>
+        )}
+
         {!isAdmin && (
           <p className="text-xs text-cocoa mt-3">Only admins can change household details.</p>
         )}

@@ -8,7 +8,17 @@ import { getStorefrontCountry } from '../lib/revenuecat';
 import ErrorBanner from '../components/ErrorBanner';
 
 export default function SetupHousehold() {
+  // Two-mode setup. `create` runs POST /auth/create-household with a
+  // name + timezone + country (current behaviour). `join` runs the new
+  // POST /auth/attach-to-household with a join code. Default is
+  // `create` because the typical new signup is the household founder;
+  // family members already-invited-by-email don't see this screen at
+  // all (the backend auto-attaches them via getInviteByEmail), so the
+  // `join` mode is for the cold-start case where no invite was ever
+  // sent.
+  const [mode, setMode]       = useState('create');
   const [name, setName]       = useState('');
+  const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const { login, logout }     = useAuth();
@@ -66,6 +76,30 @@ export default function SetupHousehold() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleJoin(e) {
+    e.preventDefault();
+    setError('');
+    if (!joinCode.trim()) { setError('Please enter the join code.'); return; }
+    setLoading(true);
+    try {
+      const { data } = await api.post('/auth/attach-to-household', { code: joinCode.trim() });
+      login(data);
+      // Same routing as create-household above - new joiners haven't
+      // been through the wizard yet, so /onboarding is correct.
+      navigate(data.user?.onboarded_at ? '/dashboard' : '/onboarding');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function switchMode(next) {
+    if (next === mode) return;
+    setMode(next);
+    setError('');
   }
 
   return (
@@ -152,55 +186,159 @@ export default function SetupHousehold() {
             margin: 0,
           }}
         >
-          Create your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>household.</em>
+          {mode === 'create'
+            ? <>Create your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>household.</em></>
+            : <>Join your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>household.</em></>
+          }
         </h1>
 
         <p className="text-center text-sm text-cocoa mt-3">
-          Give it a name - you can change it later.
+          {mode === 'create'
+            ? 'Give it a name - you can change it later.'
+            : 'Ask the household admin for the join code.'}
         </p>
 
-        <div style={{ marginTop: 24 }}>
+        {/* Mode toggle - pill segment, same shape as the in-app tab
+            controls on Meals / Settings. Surfaces the join path
+            equally to the create path so family members who weren't
+            sent an invite (or signed up via a different email than
+            the one invited) don't accidentally start a duplicate
+            household. */}
+        <div
+          role="tablist"
+          aria-label="Setup mode"
+          style={{
+            display: 'flex',
+            gap: 4,
+            background: '#F3EEE5',
+            border: '1px solid rgba(26,22,32,0.06)',
+            borderRadius: 12,
+            padding: 4,
+            marginTop: 20,
+          }}
+        >
+          {[
+            { key: 'create', label: 'Start new' },
+            { key: 'join', label: 'Join existing' },
+          ].map(({ key, label }) => {
+            const active = mode === key;
+            return (
+              <button
+                key={key}
+                role="tab"
+                type="button"
+                aria-selected={active}
+                onClick={() => switchMode(key)}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  borderRadius: 9,
+                  background: active ? '#FFFFFF' : 'transparent',
+                  border: 'none',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: active ? '#1A1620' : '#6B6774',
+                  boxShadow: active ? '0 1px 2px rgba(26,22,32,0.08)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 18 }}>
           <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-          <form onSubmit={handleCreate} className="space-y-3">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Smith"
-              autoFocus
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: 12,
-                background: '#FFFFFF',
-                border: '1px solid rgba(26,22,32,0.10)',
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 14,
-                color: '#1A1620',
-                outline: 'none',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full transition-all disabled:opacity-60"
-              style={{
-                padding: '14px 18px',
-                borderRadius: 12,
-                background: '#6B3FA0',
-                color: '#FFFFFF',
-                border: '1px solid transparent',
-                boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 600,
-                fontSize: 14,
-                lineHeight: 1.45,
-              }}
-            >
-              {loading ? 'Creating…' : 'Create household'}
-            </button>
-          </form>
+          {mode === 'create' ? (
+            <form onSubmit={handleCreate} className="space-y-3">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Smith"
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#FFFFFF',
+                  border: '1px solid rgba(26,22,32,0.10)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 14,
+                  color: '#1A1620',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full transition-all disabled:opacity-60"
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: 12,
+                  background: '#6B3FA0',
+                  color: '#FFFFFF',
+                  border: '1px solid transparent',
+                  boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  lineHeight: 1.45,
+                }}
+              >
+                {loading ? 'Creating…' : 'Create household'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleJoin} className="space-y-3">
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="e.g. SMITH-FAM"
+                autoFocus
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#FFFFFF',
+                  border: '1px solid rgba(26,22,32,0.10)',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", "Roboto Mono", monospace',
+                  fontSize: 15,
+                  color: '#1A1620',
+                  outline: 'none',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full transition-all disabled:opacity-60"
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: 12,
+                  background: '#6B3FA0',
+                  color: '#FFFFFF',
+                  border: '1px solid transparent',
+                  boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  lineHeight: 1.45,
+                }}
+              >
+                {loading ? 'Joining…' : 'Join household'}
+              </button>
+            </form>
+          )}
         </div>
 
         <p
@@ -213,7 +351,9 @@ export default function SetupHousehold() {
             lineHeight: 1.45,
           }}
         >
-          You can invite family members on the next step.
+          {mode === 'create'
+            ? 'You can invite family members on the next step.'
+            : 'The admin can find the code on their Family page.'}
         </p>
       </div>
     </div>
