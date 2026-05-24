@@ -363,7 +363,7 @@ export default function Shopping() {
           className="text-[38px] md:text-[40px] font-normal leading-none text-bark"
           style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
         >
-          Shopping
+          Shopping List
         </h1>
         <span className="text-sm font-medium text-cocoa">{itemCount} items</span>
         <button
