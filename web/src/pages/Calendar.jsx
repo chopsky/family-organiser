@@ -1732,7 +1732,7 @@ export default function Calendar() {
                         return (
                           <div
                             key={ev.id}
-                            className="absolute rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold overflow-hidden z-[2] cursor-pointer hover:opacity-85 leading-snug"
+                            className="absolute rounded-[5px] px-1.5 py-0.5 text-[11px] font-semibold overflow-hidden z-[2] cursor-pointer hover:opacity-85 leading-snug"
                             style={{
                               top: `${pos.top}px`,
                               height: `${pos.height}px`,
