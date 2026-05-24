@@ -84,7 +84,7 @@ export default function Meals() {
         >
           <IconUtensils className="h-5 w-5 text-plum" />
         </div>
-        Meal Plan
+        Meal Planner
       </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
