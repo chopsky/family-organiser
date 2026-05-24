@@ -741,14 +741,8 @@ export default function Tasks() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1
-          className="flex items-center gap-2 text-[38px] md:text-[40px]"
-          style={{
-            fontWeight: 400,
-            lineHeight: 1,
-            fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
-            color: 'var(--charcoal, #2D2A33)',
-            letterSpacing: '-0.02em',
-          }}
+          className="flex items-center gap-2 text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-charcoal"
+          style={{ letterSpacing: '-0.02em' }}
         >
           <div
             className="hidden"
