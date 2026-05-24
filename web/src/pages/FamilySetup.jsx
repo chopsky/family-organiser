@@ -1632,7 +1632,7 @@ export default function FamilySetup() {
           </button>
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-[22px] font-medium text-bark truncate" style={{ letterSpacing: '-0.01em' }}>
+            <h2 className="text-[22px] font-medium text-bark truncate">
               {household?.name || 'Your household'}
             </h2>
             {household?.address ? (
