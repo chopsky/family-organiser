@@ -1652,6 +1652,28 @@ export default function FamilySetup() {
             ) : (
               <p className="text-xs text-cocoa mt-1">No address set.</p>
             )}
+            {/* Join code - sits inline with the household identity as a
+                third attribute under the address. Compact, no caption -
+                the label and copy affordance are self-explanatory, and
+                the matching 'Join existing' tab on /setup tells joiners
+                what to do with it. Shown to every member so anyone can
+                share it verbally with a relative signing up. */}
+            {household?.join_code && (
+              <button
+                type="button"
+                onClick={handleCopyJoinCode}
+                className="mt-1 inline-flex items-center gap-1.5 text-xs text-cocoa hover:text-bark transition-colors"
+                title="Copy join code"
+              >
+                <span>Join code</span>
+                <span className="font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace' }}>
+                  {household.join_code}
+                </span>
+                <span className="text-plum">
+                  {joinCodeCopied ? 'Copied!' : 'Copy'}
+                </span>
+              </button>
+            )}
           </div>
 
           {isAdmin && (
@@ -1666,31 +1688,6 @@ export default function FamilySetup() {
             </button>
           )}
         </div>
-        {/* Join code - shown to every member so anyone can share it
-            verbally with a family member who's signing up. Pairs with
-            the "Join existing household" tab on /setup. Used as a
-            fallback for when the email-invite path doesn't reach the
-            joiner (e.g. they sign up via the App Store directly
-            instead of clicking the link in the invite email). */}
-        {household?.join_code && (
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-cocoa">Join code:</span>
-            <button
-              type="button"
-              onClick={handleCopyJoinCode}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-oat hover:bg-cream border border-cream-border transition-colors"
-              title="Copy join code"
-            >
-              <span className="text-xs font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace' }}>
-                {household.join_code}
-              </span>
-              <span className="text-[11px] text-cocoa">
-                {joinCodeCopied ? 'Copied!' : 'Copy'}
-              </span>
-            </button>
-            <span className="text-[11px] text-cocoa">Share with new family members on the setup screen.</span>
-          </div>
-        )}
 
         {!isAdmin && (
           <p className="text-xs text-cocoa mt-3">Only admins can change household details.</p>
