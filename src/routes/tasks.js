@@ -120,9 +120,14 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     // WhatsApp broadcast - mirrors the format the bot uses when tasks are
     // added through a WhatsApp message, so in-app adds are visible to
-    // members who live in WhatsApp.
+    // members who live in WhatsApp. Includes a "(for X)" / "(for X and Y)"
+    // assignee bracket so the receiver can tell whose plate the task
+    // lands on without opening the app.
     if (saved.length) {
-      const titles = saved.map((t) => t.title).join(', ');
+      const { assigneeBracket } = require('../utils/notification-format');
+      const titles = saved
+        .map((t) => `${t.title}${assigneeBracket(t.assigned_to_names)}`)
+        .join(', ');
       broadcast.toHousehold(req.user.id, members, `📋 ${req.user.name} added task: ${titles}`);
     }
 

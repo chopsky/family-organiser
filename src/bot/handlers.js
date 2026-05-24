@@ -464,10 +464,16 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
           console.error('[handlers] saveEventReminders failed for update:', err.message);
         }
       }
-      broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}`);
+      // Describe what changed in the broadcast so receivers see, at a
+      // glance, what the update actually was - e.g. "moved to tomorrow,
+      // reassigned to Grant" - rather than an opaque "updated: X".
+      const { summariseEventChanges, summariseTaskChanges } = require('../utils/notification-format');
+      const eventDiff = summariseEventChanges(hit, eventUpdates, household.timezone || 'Europe/London');
+      const eventTail = eventDiff ? ` - ${eventDiff}` : '';
+      broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}${eventTail}`);
       push.sendToHousehold(household.id, user.id, {
         title: 'Event updated',
-        body: `${user.name} updated "${updated.title}"`,
+        body: `${user.name} updated "${updated.title}"${eventTail}`,
         category: 'calendar_reminders',
       }).catch((err) => console.error('[handlers] update_event push failed:', err.message));
       return { response: `✏️ Updated "${updated.title}".`, actions };
@@ -484,7 +490,10 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: "Got it, but I didn't see any field to change. Tell me what to update (due date, assignee, priority…).", actions };
       }
       const updated = await db.updateTask(hit.id, household.id, taskUpdates);
-      broadcast.toHousehold(user.id, household.members, `📋 ${user.name} updated task: ${updated.title}`);
+      const { summariseTaskChanges } = require('../utils/notification-format');
+      const taskDiff = summariseTaskChanges(hit, taskUpdates, household.timezone || 'Europe/London');
+      const taskTail = taskDiff ? ` - ${taskDiff}` : '';
+      broadcast.toHousehold(user.id, household.members, `📋 ${user.name} updated task: ${updated.title}${taskTail}`);
       return { response: `✏️ Updated "${updated.title}".`, actions };
     }
 
@@ -1473,7 +1482,14 @@ async function handleTextMessage(text, user, household) {
         }
       }
       const saved = await db.addTasks(household.id, toAdd, user.id, household.members);
-      actions.tasksAdded = toAdd.map((t) => t.title);
+      // Keep title + assignee names so the household summary line
+      // downstream can include a "(for X)" bracket. Previously this
+      // was titles-only and the broadcast was opaque about who the
+      // task was actually for.
+      actions.tasksAdded = toAdd.map((t) => ({
+        title: t.title,
+        assigned_to_names: Array.isArray(t.assigned_to_names) ? t.assigned_to_names : [],
+      }));
       const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
       if (savedIds.length) {
         const titles = toAdd.map((t) => t.title).join(', ');
@@ -1656,7 +1672,11 @@ function buildBroadcastMessage(userName, actions) {
     lines.push(`✅ ${userName} checked off: ${actions.shoppingCompleted.join(', ')}`);
   }
   if (actions.tasksAdded.length) {
-    lines.push(`📋 ${userName} added task: ${actions.tasksAdded.join(', ')}`);
+    const { assigneeBracket } = require('../utils/notification-format');
+    const formatted = actions.tasksAdded
+      .map((t) => `${t.title}${assigneeBracket(t.assigned_to_names)}`)
+      .join(', ');
+    lines.push(`📋 ${userName} added task: ${formatted}`);
   }
   if (actions.tasksCompleted.length) {
     lines.push(`✅ ${userName} completed: ${actions.tasksCompleted.join(', ')}`);

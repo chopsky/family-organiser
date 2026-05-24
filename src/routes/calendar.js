@@ -455,12 +455,13 @@ router.post('/events', async (req, res) => {
         const creatorName = creator?.name || 'Someone';
         const tz = household?.timezone || 'Europe/London';
         const when = formatEventWhen(event, tz);
-        // "Padel - Sat 30 May, 10:00-11:00" / "Padel - Sat 30 May, all day".
-        // Putting the date+time inline saves the recipient from having
-        // to open the app just to find out "for when?" - which was the
-        // pain point: a bare "Grant added event: Padel" is information-
-        // empty in the lock-screen / WhatsApp preview.
-        const titleWithWhen = when ? `${event.title} - ${when}` : event.title;
+        const { assigneeBracket } = require('../utils/notification-format');
+        const who = assigneeBracket(event.assigned_to_names);
+        // "Padel - Sat 30 May, 10:00-11:00 (for Grant)" - title +
+        // when + assignee bracket. Each piece is optional, so the
+        // suffix degrades gracefully: an undated everyone-event just
+        // reads "Padel".
+        const titleWithWhen = `${event.title}${when ? ` - ${when}` : ''}${who}`;
         const pushBody = `${creatorName} added "${titleWithWhen}"`;
         push.sendToHousehold(req.householdId, req.user.id, {
           title: 'New event',
