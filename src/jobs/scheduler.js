@@ -130,12 +130,28 @@ async function runOverdueNudgeCheck() {
  * Run weekly digest for all households.
  * Called once on Sunday at the configured time (default 20:00).
  * Sends via WhatsApp and email.
+ *
+ * Per-household acquireSchedulerLock prevents duplicates during a
+ * rolling Railway deploy (two app instances both ticking cron in the
+ * same minute would otherwise each call sendWeeklyDigest, and the
+ * user receives the digest twice - which is what happened this
+ * morning). Same dedup pattern that runDailyReminderCheck uses, just
+ * scoped per-household-per-day rather than per-member-per-day because
+ * sendWeeklyDigest already fans out to every linked member internally.
  */
 async function runWeeklyDigest() {
   console.log('[scheduler] Sending weekly digests to all households');
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
+      const tz = household.timezone || 'Europe/London';
+      const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
+      const lockKey = `weekly_digest:${household.id}`;
+      const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+      if (!acquired) {
+        console.log(`[scheduler] Skipping weekly digest for ${household.id} - another instance already sent it today`);
+        continue;
+      }
       await sendWeeklyDigest(household.id);
       await sendWeeklyDigestEmail(household.id);
     }
