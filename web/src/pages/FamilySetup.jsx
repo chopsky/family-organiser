@@ -1653,26 +1653,27 @@ export default function FamilySetup() {
               <p className="text-xs text-cocoa mt-1">No address set.</p>
             )}
             {/* Join code - sits inline with the household identity as a
-                third attribute under the address. Compact, no caption -
-                the label and copy affordance are self-explanatory, and
-                the matching 'Join existing' tab on /setup tells joiners
-                what to do with it. Shown to every member so anyone can
-                share it verbally with a relative signing up. */}
+                third attribute under the address. Label sits outside
+                the pill so the clickable target is just the
+                code+Copy chip, matching the visual pattern of paired
+                label/value rows elsewhere in the app. */}
             {household?.join_code && (
-              <button
-                type="button"
-                onClick={handleCopyJoinCode}
-                className="mt-1 inline-flex items-center gap-1.5 text-xs text-cocoa hover:text-bark transition-colors"
-                title="Copy join code"
-              >
+              <div className="mt-2 flex items-center gap-2 text-sm text-cocoa">
                 <span>Join code</span>
-                <span className="font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace' }}>
-                  {household.join_code}
-                </span>
-                <span className="text-plum">
-                  {joinCodeCopied ? 'Copied!' : 'Copy'}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleCopyJoinCode}
+                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-white border border-cream-border hover:border-plum/40 transition-colors"
+                  title="Copy join code"
+                >
+                  <span className="font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace' }}>
+                    {household.join_code}
+                  </span>
+                  <span className="text-cocoa text-xs">
+                    {joinCodeCopied ? 'Copied!' : 'Copy'}
+                  </span>
+                </button>
+              </div>
             )}
           </div>
 
