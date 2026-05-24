@@ -1663,10 +1663,11 @@ export default function FamilySetup() {
                 <button
                   type="button"
                   onClick={handleCopyJoinCode}
-                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-white border border-cream-border hover:border-plum/40 transition-colors"
+                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-cream-border hover:border-plum/40 transition-colors"
+                  style={{ background: '#faf9f7' }}
                   title="Copy join code"
                 >
-                  <span className="font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace' }}>
+                  <span className="font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace', fontSize: 13 }}>
                     {household.join_code}
                   </span>
                   <span className="text-cocoa text-xs">
