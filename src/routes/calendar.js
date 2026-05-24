@@ -43,6 +43,60 @@ const VALID_COLORS = [
 const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
 /**
+ * Render a human-readable date/time line for an event, suitable for
+ * dropping into a push body or a WhatsApp broadcast - "Sat 30 May,
+ * 10:00-11:00" / "Sat 30 May, all day" / "Tomorrow, 14:00".
+ *
+ * Inputs:
+ *   event: { start_time, end_time, all_day } - timestamps may be ISO
+ *          (TIMESTAMPTZ from Postgres) or "YYYY-MM-DD HH:mm" style.
+ *   tz:    IANA timezone (household.timezone), defaults to Europe/London.
+ *
+ * Returns '' if no usable start info - the caller can fall back to a
+ * bare title. Never throws.
+ */
+function formatEventWhen(event, tz = 'Europe/London') {
+  if (!event?.start_time) return '';
+  try {
+    const start = new Date(event.start_time);
+    if (isNaN(start.getTime())) return '';
+
+    // Date label - relative if it's today / tomorrow (more useful than
+    // the absolute date when the event is imminent), otherwise weekday
+    // + day + short month.
+    const today = new Date();
+    const isSameDay = (a, b) =>
+      a.toLocaleDateString('en-GB', { timeZone: tz }) ===
+      b.toLocaleDateString('en-GB', { timeZone: tz });
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    let dateLabel;
+    if (isSameDay(start, today)) {
+      dateLabel = 'Today';
+    } else if (isSameDay(start, tomorrow)) {
+      dateLabel = 'Tomorrow';
+    } else {
+      dateLabel = start.toLocaleDateString('en-GB', {
+        weekday: 'short', day: 'numeric', month: 'short', timeZone: tz,
+      });
+    }
+
+    if (event.all_day) return `${dateLabel}, all day`;
+
+    const formatHM = (iso) => new Date(iso).toLocaleTimeString('en-GB', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
+    });
+    const startHM = formatHM(event.start_time);
+    const endHM = event.end_time ? formatHM(event.end_time) : null;
+    const timeStr = endHM ? `${startHM}-${endHM}` : startHM;
+    return `${dateLabel}, ${timeStr}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Parse a "YYYY-MM" month string into start and end date strings.
  * Returns { startDate, endDate } where endDate is the last day of the month.
  */
@@ -393,16 +447,27 @@ router.post('/events', async (req, res) => {
     // Fire-and-forget - a failure in either channel must not block the response.
     (async () => {
       try {
-        const members = await db.getHouseholdMembers(req.householdId);
+        const [members, household] = await Promise.all([
+          db.getHouseholdMembers(req.householdId),
+          db.getHouseholdById(req.householdId).catch(() => null),
+        ]);
         const creator = members.find(m => m.id === req.user.id);
         const creatorName = creator?.name || 'Someone';
-        const pushBody = `${creatorName} added "${event.title}"`;
+        const tz = household?.timezone || 'Europe/London';
+        const when = formatEventWhen(event, tz);
+        // "Padel - Sat 30 May, 10:00-11:00" / "Padel - Sat 30 May, all day".
+        // Putting the date+time inline saves the recipient from having
+        // to open the app just to find out "for when?" - which was the
+        // pain point: a bare "Grant added event: Padel" is information-
+        // empty in the lock-screen / WhatsApp preview.
+        const titleWithWhen = when ? `${event.title} - ${when}` : event.title;
+        const pushBody = `${creatorName} added "${titleWithWhen}"`;
         push.sendToHousehold(req.householdId, req.user.id, {
           title: 'New event',
           body: pushBody,
           category: 'calendar_reminders',
         }).catch((err) => console.error('[calendar] push failed:', err.message));
-        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${event.title}`);
+        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${titleWithWhen}`);
       } catch (err) {
         console.error('[calendar] notify household failed:', err.message);
       }
