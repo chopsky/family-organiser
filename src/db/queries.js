@@ -2590,6 +2590,32 @@ async function deleteExternalFeed(feedId, householdId, db = supabase) {
   if (error) throw error;
 }
 
+/**
+ * Update editable fields on an external feed. Currently scoped to
+ * display_name + color - the URL is intentionally immutable (changing
+ * it would mean a different feed; the user should delete and re-add).
+ * Household-scoped UPDATE so the bare id can't be used cross-tenant.
+ */
+async function updateExternalFeed(feedId, householdId, fields, db = supabase) {
+  const allowed = {};
+  if (typeof fields.display_name === 'string' && fields.display_name.trim()) {
+    allowed.display_name = fields.display_name.trim().slice(0, 200);
+  }
+  if (typeof fields.color === 'string' && fields.color.trim()) {
+    allowed.color = fields.color.trim();
+  }
+  if (Object.keys(allowed).length === 0) return null;
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .update(allowed)
+    .eq('id', feedId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function recordExternalFeedSuccess(feedId, db = supabase) {
   const { error } = await db
     .from('external_calendar_feeds')
@@ -5330,6 +5356,7 @@ module.exports = {
   getExternalFeedById,
   createExternalFeed,
   deleteExternalFeed,
+  updateExternalFeed,
   recordExternalFeedSuccess,
   recordExternalFeedFailure,
   getExternalFeedEvents,

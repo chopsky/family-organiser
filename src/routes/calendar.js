@@ -775,6 +775,31 @@ router.post('/external-feeds/:id/refresh', async (req, res) => {
 });
 
 /**
+ * PATCH /api/calendar/external-feeds/:id
+ * Update editable fields on a subscribed feed - currently just colour
+ * and display name. URL is immutable (changing it would mean a
+ * different feed; remove + re-add for that). The new colour
+ * propagates to every event from this feed on the next calendar
+ * render via the Calendar.jsx feedColorById lookup.
+ *
+ * Body: { color?, display_name? }
+ */
+router.patch('/external-feeds/:id', async (req, res) => {
+  const feed = await db.getExternalFeedById(req.params.id);
+  if (!feed || feed.household_id !== req.householdId) {
+    return res.status(404).json({ error: 'Feed not found.' });
+  }
+  try {
+    const updated = await db.updateExternalFeed(feed.id, req.householdId, req.body || {});
+    if (!updated) return res.status(400).json({ error: 'No supported fields to update.' });
+    return res.json({ feed: updated });
+  } catch (err) {
+    console.error(`PATCH /api/calendar/external-feeds/${feed.id} error:`, err);
+    return res.status(500).json({ error: err.message || 'Could not update feed.' });
+  }
+});
+
+/**
  * DELETE /api/calendar/external-feeds/:id
  * Remove a feed. Events created by this feed are hard-deleted via the
  * ON DELETE CASCADE on calendar_events.external_feed_id - they re-appear

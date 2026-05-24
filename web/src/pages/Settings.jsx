@@ -27,6 +27,24 @@ const avatarColors = {
   sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', lavender: 'bg-indigo text-white',
 };
 
+// Canonical 16-colour palette - same order as the member-theme picker
+// in FamilySetup so the two pickers feel consistent and a user who's
+// already coloured the household members has the same swatches to
+// pick from when colouring a subscribed calendar.
+const FEED_COLOR_PALETTE = [
+  'red', 'burnt-orange', 'amber', 'gold',
+  'leaf', 'emerald', 'teal', 'sky',
+  'cobalt', 'indigo', 'purple', 'magenta',
+  'rose', 'terracotta', 'moss', 'slate',
+];
+// Hex map for the swatch backgrounds - mirrors index.css --color-* vars.
+const FEED_COLOR_HEX = {
+  red: '#E25555', 'burnt-orange': '#E07A3A', amber: '#E8A040', gold: '#C5A833',
+  leaf: '#7BAE4E', emerald: '#3A9E6E', teal: '#3AADA0', sky: '#4A9FCC',
+  cobalt: '#3A6FD4', indigo: '#6558C7', purple: '#9050B5', magenta: '#C74E95',
+  rose: '#E06888', terracotta: '#C47A5E', moss: '#7C8A6E', slate: '#7A8694',
+};
+
 /**
  * Settings → Plan card. Renders subscription state + the right CTA for
  * the current status. Extracted into its own component so the Settings
@@ -311,6 +329,8 @@ export default function Settings() {
   const [showAddFeed, setShowAddFeed] = useState(false);
   const [newFeedUrl, setNewFeedUrl] = useState('');
   const [newFeedName, setNewFeedName] = useState('');
+  const [newFeedColor, setNewFeedColor] = useState('sky'); // default matches backend
+  const [colorPickerOpenId, setColorPickerOpenId] = useState(null); // id of feed whose inline colour picker is expanded
   const [addingFeed, setAddingFeed] = useState(false);
   const [feedActionId, setFeedActionId] = useState(null); // id of feed currently being refreshed/removed
 
@@ -785,6 +805,7 @@ export default function Settings() {
       const { data } = await api.post('/calendar/external-feeds', {
         feed_url: newFeedUrl.trim(),
         display_name: newFeedName.trim(),
+        color: newFeedColor,
       });
       setExternalFeeds(prev => [...prev, data.feed]);
       const stats = data.refresh;
@@ -794,6 +815,7 @@ export default function Settings() {
       setSuccess(summary);
       setNewFeedUrl('');
       setNewFeedName('');
+      setNewFeedColor('sky');
       setShowAddFeed(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not add calendar feed.');
@@ -822,6 +844,20 @@ export default function Settings() {
       loadExternalFeeds();
     } finally {
       setFeedActionId(null);
+    }
+  }
+
+  async function handleUpdateFeedColor(id, color) {
+    setColorPickerOpenId(null);
+    // Optimistic update so the swatch flips immediately - revert if the
+    // PATCH fails.
+    const prev = externalFeeds;
+    setExternalFeeds(p => p.map(f => f.id === id ? { ...f, color } : f));
+    try {
+      await api.patch(`/calendar/external-feeds/${id}`, { color });
+    } catch (err) {
+      setExternalFeeds(prev);
+      setError(err.response?.data?.error || 'Could not update calendar colour.');
     }
   }
 
@@ -1210,6 +1246,25 @@ export default function Settings() {
                 onChange={(e) => setNewFeedUrl(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
+              {/* Colour picker - 16-swatch palette matching the member-theme
+                  picker in FamilySetup. Sets the colour that subscribed-feed
+                  events will use on the calendar grid; defaults to 'sky'. */}
+              <div>
+                <p className="text-xs text-cocoa mb-1.5">Colour <span className="text-cocoa">(how this calendar's events appear on the grid)</span></p>
+                <div className="flex flex-wrap gap-2">
+                  {FEED_COLOR_PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewFeedColor(c)}
+                      title={c}
+                      aria-label={`Set colour ${c}`}
+                      className={`w-6 h-6 rounded-full transition-transform ${newFeedColor === c ? 'ring-2 ring-bark ring-offset-2 ring-offset-white scale-110' : 'hover:scale-105'}`}
+                      style={{ backgroundColor: FEED_COLOR_HEX[c] }}
+                    />
+                  ))}
+                </div>
+              </div>
               {/* Instructions adapt to platform - the desktop iCloud.com /
                   Google Calendar / Outlook publish flows are completely
                   different (and mostly impossible) on a phone. iOS users
@@ -1266,6 +1321,16 @@ export default function Settings() {
               {externalFeeds.map((feed) => (
                 <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
+                    {/* Clickable colour swatch - tap to expand the inline
+                        16-colour picker below the row. Optimistically
+                        updates on pick. */}
+                    <button
+                      type="button"
+                      onClick={() => setColorPickerOpenId(colorPickerOpenId === feed.id ? null : feed.id)}
+                      aria-label={`Change colour for ${feed.display_name}`}
+                      className="w-5 h-5 rounded-full shrink-0 ring-1 ring-cream-border hover:ring-bark transition-shadow"
+                      style={{ backgroundColor: FEED_COLOR_HEX[feed.color] || FEED_COLOR_HEX.sky }}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-bark truncate">{feed.display_name}</p>
                       <p className="text-xs text-cocoa truncate">
@@ -1292,6 +1357,24 @@ export default function Settings() {
                       </button>
                     </div>
                   </div>
+                  {/* Inline colour picker - expands beneath the row when the
+                      swatch is tapped. Same 16-colour palette as the add
+                      form. Picking a colour fires the PATCH + collapses. */}
+                  {colorPickerOpenId === feed.id && (
+                    <div className="mt-2 pt-2 border-t border-cream-border flex flex-wrap gap-2">
+                      {FEED_COLOR_PALETTE.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => handleUpdateFeedColor(feed.id, c)}
+                          title={c}
+                          aria-label={`Set ${feed.display_name} colour to ${c}`}
+                          className={`w-6 h-6 rounded-full transition-transform ${feed.color === c ? 'ring-2 ring-bark ring-offset-2 ring-offset-white scale-110' : 'hover:scale-105'}`}
+                          style={{ backgroundColor: FEED_COLOR_HEX[c] }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
