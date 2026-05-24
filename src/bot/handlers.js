@@ -804,14 +804,24 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
     }
 
     // Update actions so the caller's confirmation/broadcast picks up the event.
+    // Push the full saved row (start_time / end_time / all_day /
+    // assigned_to_names) so the downstream summary line can format
+    // "Padel - Today, 09:00-10:00 (for Grant)" the same way the web-app
+    // POST does. Previously this was bare titles only and the bot
+    // broadcast was opaque about when / who the event was for.
     actions.eventsAdded = actions.eventsAdded || [];
-    actions.eventsAdded.push(ev.title);
+    actions.eventsAdded.push(created || { title: ev.title });
     rememberAdd(user.id, 'event', [created.id], `"${ev.title}"`);
 
-    // iOS push for household members living in the native app.
+    // iOS push for household members living in the native app. Include
+    // the date/time tail so the lock-screen preview is useful at a
+    // glance ("Grant added 'Padel - Today, 09:00-10:00'").
+    const { formatEventWhen } = require('../utils/event-when');
+    const pushWhen = formatEventWhen(created || ev, household.timezone || 'Europe/London');
+    const pushTail = pushWhen ? ` - ${pushWhen}` : '';
     push.sendToHousehold(household.id, user.id, {
       title: 'New event',
-      body: `${user.name} added "${ev.title}"`,
+      body: `${user.name} added "${ev.title}${pushTail}"`,
       category: 'calendar_reminders',
     }).catch((err) => console.error('[handlers] calendar push failed:', err.message));
 
@@ -1658,12 +1668,15 @@ async function handleTextMessage(text, user, household) {
  * Build a short broadcast notification message for other household members.
  * Returns null if no meaningful actions were taken.
  *
- * @param {string} userName - Name of the person who made the change
- * @param {object} actions  - { shoppingAdded, shoppingCompleted, tasksAdded, tasksCompleted }
+ * @param {string} userName  - Name of the person who made the change
+ * @param {object} actions   - { shoppingAdded, shoppingCompleted, tasksAdded, tasksCompleted, eventsAdded }
+ * @param {object} [household] - { timezone } - used to format event date/time
+ *   in the receiver's local time. Defaults to Europe/London if omitted.
  * @returns {string|null}
  */
-function buildBroadcastMessage(userName, actions) {
+function buildBroadcastMessage(userName, actions, household = null) {
   const lines = [];
+  const tz = household?.timezone || 'Europe/London';
 
   if (actions.shoppingAdded.length) {
     lines.push(`🛒 ${userName} added: ${actions.shoppingAdded.join(', ')}`);
@@ -1682,7 +1695,18 @@ function buildBroadcastMessage(userName, actions) {
     lines.push(`✅ ${userName} completed: ${actions.tasksCompleted.join(', ')}`);
   }
   if (actions.eventsAdded?.length) {
-    lines.push(`📅 ${userName} added event: ${actions.eventsAdded.join(', ')}`);
+    // Each entry is the full event row (start_time / end_time / all_day
+    // / assigned_to_names). Format with date/time + assignee bracket to
+    // match the web-app POST broadcast - previously bot-added events
+    // sent just a bare title, hiding the when/who from recipients.
+    const { formatEventWhen } = require('../utils/event-when');
+    const { assigneeBracket } = require('../utils/notification-format');
+    const formatted = actions.eventsAdded.map((e) => {
+      const when = formatEventWhen(e, tz);
+      const who = assigneeBracket(e.assigned_to_names);
+      return `${e.title}${when ? ` - ${when}` : ''}${who}`;
+    }).join(', ');
+    lines.push(`📅 ${userName} added event: ${formatted}`);
   }
 
   return lines.length ? lines.join('\n') : null;

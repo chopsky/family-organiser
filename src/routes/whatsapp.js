@@ -206,7 +206,7 @@ router.post('/webhook', async (req, res) => {
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: null, processingMs: Date.now() - start, body: result.transcription || null, response: result.response });
 
           // Broadcast to other members
-          const notification = handlers.buildBroadcastMessage(user.name, result.actions);
+          const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
           if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Voice note error:', err.message);
@@ -226,7 +226,7 @@ router.post('/webhook', async (req, res) => {
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start, body: '[photo]', response: result.response });
 
           // Broadcast to other members
-          const notification = handlers.buildBroadcastMessage(user.name, result.actions);
+          const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
           if (notification) broadcast.toHousehold(user.id, members, notification);
         } catch (err) {
           console.error('[whatsapp] Photo error:', err.message);
@@ -248,7 +248,7 @@ router.post('/webhook', async (req, res) => {
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: result.intent || null, processingMs: Date.now() - start, body: text, response: result.response });
 
         // Broadcast to other members
-        const notification = handlers.buildBroadcastMessage(user.name, result.actions);
+        const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
         if (notification) broadcast.toHousehold(user.id, members, notification);
       } catch (err) {
         // Verbose error logging - the old single-line console.error ate
