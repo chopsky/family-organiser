@@ -1237,7 +1237,7 @@ export default function Calendar() {
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5 flex-wrap">
-        <h1 className="flex items-center gap-2.5 flex-1 min-w-0 text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-bark">
+        <h1 className="flex items-center gap-2.5 flex-1 min-w-0 text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-bark">
           <div
             className="hidden"
             style={{

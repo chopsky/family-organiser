@@ -67,7 +67,7 @@ export default function Meals() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      <h1 className="text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-bark flex items-center gap-2">
+      <h1 className="text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-bark flex items-center gap-2">
         <div
           className="hidden"
           style={{

@@ -1018,7 +1018,7 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="flex text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-bark items-center gap-2">
+      <h1 className="flex text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-bark items-center gap-2">
         <div
           className="hidden"
           style={{
