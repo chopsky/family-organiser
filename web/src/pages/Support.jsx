@@ -23,7 +23,7 @@ export default function Support() {
       <div className="my-auto w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-4" />
-          <h1 className="text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-bark" style={{ letterSpacing: '-0.015em' }}>
+          <h1 className="text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-bark" style={{ letterSpacing: '-0.015em' }}>
             How can we{' '}
             <em style={{ fontStyle: 'italic', color: '#6B2FB8' }}>help?</em>
           </h1>

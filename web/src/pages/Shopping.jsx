@@ -359,7 +359,7 @@ export default function Shopping() {
             <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
           </svg>
         </div>
-        <h1 className="text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-bark">
+        <h1 className="text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-bark">
           Shopping List
         </h1>
         <span className="text-sm font-medium text-cocoa">{itemCount} items</span>

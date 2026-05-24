@@ -50,7 +50,7 @@ export default function Help() {
         <div className="text-[11px] font-bold tracking-[0.1em] uppercase text-plum mb-2">
           We're here for you
         </div>
-        <h1 className="text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-charcoal" style={{ letterSpacing: '-0.015em' }}>
+        <h1 className="text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-charcoal" style={{ letterSpacing: '-0.015em' }}>
           How can we{' '}
           <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>help?</em>
         </h1>

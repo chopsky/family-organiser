@@ -741,7 +741,7 @@ export default function Tasks() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1
-          className="flex items-center gap-2 text-[38px] md:text-[26px] font-normal md:font-medium leading-none text-charcoal"
+          className="flex items-center gap-2 text-[38px] md:text-[29px] font-normal md:font-medium leading-none text-charcoal"
           style={{ letterSpacing: '-0.02em' }}
         >
           <div
