@@ -1632,7 +1632,7 @@ export default function FamilySetup() {
           </button>
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-[22px] font-semibold text-bark truncate" style={{ letterSpacing: '-0.01em' }}>
+            <h2 className="text-[22px] font-medium text-bark truncate" style={{ letterSpacing: '-0.01em' }}>
               {household?.name || 'Your household'}
             </h2>
             {household?.address ? (
@@ -1697,7 +1697,7 @@ export default function FamilySetup() {
 
       {/* Members */}
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Family Members</h2>
+        <h2 className="text-base md:text-lg font-medium text-bark mb-2">Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
           <ul className="space-y-4">
@@ -1829,7 +1829,7 @@ export default function FamilySetup() {
 
       {/* Other Family Members (dependents) */}
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Other Family Members</h2>
+        <h2 className="text-base md:text-lg font-medium text-bark mb-2">Other Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
           <>
@@ -1928,7 +1928,7 @@ export default function FamilySetup() {
           member modals; everywhere else sees this card). */}
       {!showSchools && (
         <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-          <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Schools</h2>
+          <h2 className="text-base md:text-lg font-medium text-bark mb-2">Schools</h2>
           <p className="text-sm text-cocoa">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries -
@@ -1939,7 +1939,7 @@ export default function FamilySetup() {
 
       {/* Allergies & Dietary Requirements */}
       <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-lg font-semibold text-bark mb-2">Allergies & Dietary Requirements</h2>
+        <h2 className="text-base md:text-lg font-medium text-bark mb-2">Allergies & Dietary Requirements</h2>
         <p className="text-sm text-cocoa mb-4">Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.</p>
         <div className="flex flex-wrap gap-2">
           {[
@@ -2006,7 +2006,7 @@ export default function FamilySetup() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base md:text-lg font-semibold text-bark">Edit household</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">Edit household</h2>
               <button onClick={closeHouseholdEdit} className="text-cocoa hover:text-bark p-1" aria-label="Close">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -2133,7 +2133,7 @@ export default function FamilySetup() {
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base md:text-lg font-semibold text-bark">Add family member</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">Add family member</h2>
               <button onClick={() => setShowAddDependent(false)} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -2392,7 +2392,7 @@ export default function FamilySetup() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base md:text-lg font-semibold text-bark">Add new member</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">Add new member</h2>
               <button onClick={() => setShowAddMember(false)} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -2651,7 +2651,7 @@ export default function FamilySetup() {
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base md:text-lg font-semibold text-bark">Import term dates</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">Import term dates</h2>
               <button onClick={() => setShowTermDateOptions(false)} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -2855,7 +2855,7 @@ export default function FamilySetup() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base md:text-lg font-semibold text-bark">{editingMember?.id === user?.id ? 'Edit profile' : `Edit ${editingMember?.name}`}</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">{editingMember?.id === user?.id ? 'Edit profile' : `Edit ${editingMember?.name}`}</h2>
               <button onClick={() => { setEditingMember(null); setProfileError(''); }} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -3377,7 +3377,7 @@ export default function FamilySetup() {
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base md:text-lg font-semibold text-bark">Review imported dates</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">Review imported dates</h2>
               <button onClick={() => setDraftImport(null)} disabled={savingDraftImport} className="text-cocoa hover:text-bark p-1 disabled:opacity-50">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -3506,7 +3506,7 @@ export default function FamilySetup() {
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base md:text-lg font-semibold text-bark">All term dates</h2>
+              <h2 className="text-base md:text-lg font-medium text-bark">All term dates</h2>
               <button onClick={() => setShowAllDates(false)} className="text-cocoa hover:text-bark p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />

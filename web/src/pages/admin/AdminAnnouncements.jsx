@@ -147,7 +147,7 @@ export default function AdminAnnouncements() {
 
       {/* ── Compose ───────────────────────────────────────────────── */}
       <div className="bg-white border border-light-grey rounded-2xl p-5 mb-8">
-        <h2 className="text-base font-semibold text-charcoal mb-3">New announcement</h2>
+        <h2 className="text-base font-medium text-charcoal mb-3">New announcement</h2>
 
         {composeError && (
           <p className="text-sm text-coral mb-3">{composeError}</p>
@@ -227,7 +227,7 @@ export default function AdminAnnouncements() {
       </div>
 
       {/* ── List of recent announcements ─────────────────────────── */}
-      <h2 className="text-base font-semibold text-charcoal mb-3">Recent announcements</h2>
+      <h2 className="text-base font-medium text-charcoal mb-3">Recent announcements</h2>
       {loadingList && <p className="text-sm text-warm-grey">Loading…</p>}
       {listError && <p className="text-sm text-coral">{listError}</p>}
       {!loadingList && !listError && list.length === 0 && (

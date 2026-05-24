@@ -2002,7 +2002,7 @@ export default function Calendar() {
           <div ref={formRef} onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-2xl border border-light-grey w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-5 pb-2">
-              <h2 className="text-lg font-semibold text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>
+              <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>
                 {editingEvent ? 'Edit Event' : 'New Event'}
               </h2>
               <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="text-warm-grey hover:text-charcoal p-1">
@@ -2341,7 +2341,7 @@ export default function Calendar() {
           <div className="absolute inset-0 bg-black/40" />
           <div ref={taskFormRef} onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-2xl border border-light-grey p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>Edit Task</h2>
+              <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>Edit Task</h2>
               <button type="button" onClick={closeTaskForm} className="text-warm-grey hover:text-charcoal p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />

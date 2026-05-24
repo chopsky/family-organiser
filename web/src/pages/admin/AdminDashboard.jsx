@@ -68,7 +68,7 @@ export default function AdminDashboard() {
 
       {/* Subscription Stats */}
       <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Subscriptions</h2>
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Subscriptions</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {subscriptionCards.map(({ label, value, valueClass }) => (
             <div key={label} className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
       {/* Recent Users */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-display text-lg font-semibold text-charcoal">Recent Users</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal">Recent Users</h2>
           <Link to="/admin/users" className="text-sm font-semibold text-plum hover:underline">View all</Link>
         </div>
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
@@ -119,7 +119,7 @@ export default function AdminDashboard() {
       {/* Recent Households */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-display text-lg font-semibold text-charcoal">Recent Households</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal">Recent Households</h2>
           <Link to="/admin/households" className="text-sm font-semibold text-plum hover:underline">View all</Link>
         </div>
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">

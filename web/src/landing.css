@@ -1,3 +1,25 @@
+/* Saans (TRIAL) — landing-only body face, swap candidate vs Inter.
+ *
+ * Trial version, evaluation only — don't ship to production until a
+ * commercial licence is in place. The trial files include normal +
+ * italic across Light/Regular/Medium/SemiBold (no 700 Bold), so any
+ * `font-weight: 700` in CSS falls back to SemiBold 600 (the browser
+ * picks the closest declared weight rather than synthesising). Worth
+ * eyeballing the buttons and bold inline labels to confirm that's OK.
+ *
+ * Same scoping rule as Matter: declarations are global but only the
+ * .lp-v2 wrapper sets `font-family: 'Saans'`, so the in-app surfaces
+ * still use their system stack.
+ */
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-Light.woff2')          format('woff2'); font-weight: 300; font-style: normal;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-LightItalic.woff2')    format('woff2'); font-weight: 300; font-style: italic;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-Regular.woff2')        format('woff2'); font-weight: 400; font-style: normal;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-RegularItalic.woff2')  format('woff2'); font-weight: 400; font-style: italic;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-Medium.woff2')         format('woff2'); font-weight: 500; font-style: normal;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-MediumItalic.woff2')   format('woff2'); font-weight: 500; font-style: italic;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-SemiBold.woff2')       format('woff2'); font-weight: 600; font-style: normal;  font-display: swap; }
+@font-face { font-family: 'Saans'; src: url('/fonts/saans/SaansTRIAL-SemiBoldItalic.woff2') format('woff2'); font-weight: 600; font-style: italic;  font-display: swap; }
+
 :root {
   --purple: #6B2FB8;
   --purple-deep: #4A1D82;
@@ -24,7 +46,7 @@
 .lp-v2 * { box-sizing: border-box; }
 
 .lp-v2 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Saans', system-ui, sans-serif;
   color: var(--ink);
   background: var(--cream);
   -webkit-font-smoothing: antialiased;
@@ -116,7 +138,7 @@ h1.display em { font-style: italic; color: var(--purple); }
   background: #fff;
 }
 .collage .app img { width: 100%; display: block; }
-.collage .app-mock { padding: 14px 14px 12px; font-family: 'Inter', sans-serif; }
+.collage .app-mock { padding: 14px 14px 12px; font-family: 'Saans', sans-serif; }
 .collage .app-mock .app-mock-head { padding: 4px 4px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .collage .app-mock .kicker { font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
 .collage .app-mock .greet { font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.1; margin-top: 4px; letter-spacing: -.01em; }

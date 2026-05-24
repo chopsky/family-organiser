@@ -55,7 +55,7 @@ export default function AdminAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         {/* Feature Usage */}
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Feature Usage (30d)</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">Feature Usage (30d)</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -78,7 +78,7 @@ export default function AdminAnalytics() {
 
         {/* Onboarding Funnel */}
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Onboarding Funnel</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">Onboarding Funnel</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
             <FunnelStep label="Registered" value={funnel.registered ?? 0} total={funnel.registered} />
             <FunnelStep label="Email Verified" value={funnel.verified ?? 0} total={funnel.registered} />
@@ -99,7 +99,7 @@ export default function AdminAnalytics() {
 
       {/* DAU Timeline */}
       <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Daily Active Users</h2>
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Daily Active Users</h2>
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

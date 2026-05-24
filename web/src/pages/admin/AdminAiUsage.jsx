@@ -51,7 +51,7 @@ export default function AdminAiUsage() {
       {/* Provider Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">By Provider</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">By Provider</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -76,7 +76,7 @@ export default function AdminAiUsage() {
         </div>
 
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">By Feature</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">By Feature</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -104,7 +104,7 @@ export default function AdminAiUsage() {
       {/* Top Households & Users */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Top Households</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">Top Households</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -135,7 +135,7 @@ export default function AdminAiUsage() {
         </div>
 
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Top Users</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">Top Users</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -169,7 +169,7 @@ export default function AdminAiUsage() {
 
       {/* Daily Timeline */}
       <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Daily Usage</h2>
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Daily Usage</h2>
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

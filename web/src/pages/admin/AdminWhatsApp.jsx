@@ -53,7 +53,7 @@ export default function AdminWhatsApp() {
       <div className="bg-white border border-light-grey rounded-2xl p-5 mt-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-charcoal">Send my morning brief now</h2>
+            <h2 className="text-sm font-medium text-charcoal">Send my morning brief now</h2>
             <p className="text-xs text-warm-grey mt-1 max-w-md">
               Manually fires today's WhatsApp digest to your own number, bypassing the daily lock and the weather cache. Use this to verify digest fixes without waiting until 07:00 tomorrow.
             </p>
@@ -87,7 +87,7 @@ export default function AdminWhatsApp() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         {/* By Type */}
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">By Message Type</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">By Message Type</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -113,7 +113,7 @@ export default function AdminWhatsApp() {
 
         {/* By Intent */}
         <div>
-          <h2 className="font-display text-lg font-semibold text-charcoal mb-3">By Intent</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">By Intent</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -140,7 +140,7 @@ export default function AdminWhatsApp() {
 
       {/* Daily Timeline */}
       <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Daily Volume</h2>
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Daily Volume</h2>
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

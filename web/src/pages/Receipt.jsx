@@ -144,7 +144,7 @@ export default function Receipt() {
         <div className="space-y-4">
           {/* Checked off */}
           <div className="bg-success/10 border border-success/30 rounded-2xl p-5">
-            <h2 className="font-semibold text-success mb-3">
+            <h2 className="font-medium text-success mb-3">
               <span className="flex items-center gap-1.5"><IconCheck className="h-4 w-4" /> Checked off ({result.checkedOff?.length ?? 0})</span>
             </h2>
             {result.checkedOff?.length === 0 ? (
@@ -163,7 +163,7 @@ export default function Receipt() {
           {/* Unmatched items from receipt */}
           {result.unmatched?.length > 0 && (
             <div className="bg-warn/10 border border-warn/30 rounded-2xl p-5">
-              <h2 className="font-semibold text-warn mb-3">
+              <h2 className="font-medium text-warn mb-3">
                 <span className="flex items-center gap-1.5"><IconClipboard className="h-4 w-4" /> On receipt, not in your list ({result.unmatched.length})</span>
               </h2>
               <ul className="space-y-1">
@@ -176,7 +176,7 @@ export default function Receipt() {
 
           {/* All extracted items */}
           <div className="bg-oat border border-cream-border rounded-2xl p-5">
-            <h2 className="font-semibold text-bark mb-3">
+            <h2 className="font-medium text-bark mb-3">
               <span className="flex items-center gap-1.5"><IconReceipt className="h-4 w-4" /> Extracted from receipt ({result.extracted?.items?.length ?? 0})</span>
             </h2>
             <ul className="space-y-1">

@@ -67,7 +67,7 @@ export default function AdminCalendarSync() {
 
       {/* Connections Table */}
       <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Connections</h2>
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Connections</h2>
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

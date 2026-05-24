@@ -592,7 +592,7 @@ I'm always here if you need me!`;
                   <button onClick={() => setShowHistory(false)} className="p-1 text-warm-grey hover:text-charcoal transition-colors">
                     <ArrowLeftIcon className="h-5 w-5" />
                   </button>
-                  <h2 className="flex-1 text-sm font-semibold text-charcoal">Chat History</h2>
+                  <h2 className="flex-1 text-sm font-medium text-charcoal">Chat History</h2>
                 </>
               ) : (
                 <>
@@ -600,7 +600,7 @@ I'm always here if you need me!`;
                     <HistoryIcon className="h-5 w-5" />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-sm font-semibold text-charcoal truncate">
+                    <h2 className="text-sm font-medium text-charcoal truncate">
                       {activeConversationId ? (conversations.find(c => c.id === activeConversationId)?.title || 'Chat') : 'New conversation'}
                     </h2>
                   </div>

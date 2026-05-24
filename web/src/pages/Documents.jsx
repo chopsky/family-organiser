@@ -331,7 +331,7 @@ export default function Documents() {
           {/* Folders */}
           {folders.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-xs font-semibold text-warm-grey uppercase tracking-wider mb-3">Folders</h2>
+              <h2 className="text-xs font-medium text-warm-grey uppercase tracking-wider mb-3">Folders</h2>
               <div className={viewMode === 'grid'
                 ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3'
                 : 'flex flex-col gap-2'
@@ -354,7 +354,7 @@ export default function Documents() {
           {/* Documents */}
           {documents.length > 0 && (
             <div>
-              <h2 className="text-xs font-semibold text-warm-grey uppercase tracking-wider mb-3">Files</h2>
+              <h2 className="text-xs font-medium text-warm-grey uppercase tracking-wider mb-3">Files</h2>
               <div className={viewMode === 'grid'
                 ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3'
                 : 'flex flex-col gap-2'
@@ -649,7 +649,7 @@ function NewFolderModal({ folder, onSave, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 px-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display text-lg font-semibold text-charcoal">
+          <h2 className="font-display text-lg font-medium text-charcoal">
             {folder ? 'Edit Folder' : 'New Folder'}
           </h2>
           <button onClick={onClose} className="text-warm-grey hover:text-charcoal transition-colors">

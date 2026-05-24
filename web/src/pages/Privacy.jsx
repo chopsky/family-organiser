@@ -437,7 +437,7 @@ export default function Privacy() {
 function Section({ title, children }) {
   return (
     <section className="pt-4">
-      <h2 className="text-xl md:text-2xl font-semibold text-plum mt-6 mb-3 leading-snug">{title}</h2>
+      <h2 className="text-xl md:text-2xl font-medium text-plum mt-6 mb-3 leading-snug">{title}</h2>
       <div className="space-y-4">{children}</div>
     </section>
   )
