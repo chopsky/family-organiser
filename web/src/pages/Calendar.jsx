@@ -295,6 +295,13 @@ export default function Calendar() {
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
   const [schoolData, setSchoolData] = useState(null);
+  // Subscribed (read-only) external calendars. Used to colour their
+  // events with the per-feed colour configured in Settings, so a
+  // subscribed event reads visually distinct from a native Housemait
+  // event - previously everything-not-assigned fell through to plum,
+  // which made it impossible to tell at a glance which events were
+  // 'yours' vs 'pulled from someone else's calendar'.
+  const [externalFeeds, setExternalFeeds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Form state
@@ -532,6 +539,15 @@ export default function Calendar() {
       () => api.get('/household').then(r => r.data.members ?? []),
       setMembers,
     ).catch(() => {});
+  }, []);
+
+  // Load the household's subscribed external calendars once so we can
+  // colour their events with the per-feed colour the user configured.
+  // Failure here is non-fatal: external events just fall back to plum.
+  useEffect(() => {
+    api.get('/calendar/external-feeds')
+      .then(({ data }) => setExternalFeeds(Array.isArray(data?.feeds) ? data.feeds : []))
+      .catch(() => {});
   }, []);
 
   // Scroll to form when it opens
@@ -836,10 +852,29 @@ export default function Calendar() {
     }
   }
 
-  // Resolve event colour: prefer the first assigned member's theme, then
-  // category, fallback to plum. Multi-assignee events still get one
-  // colour - the avatar stack carries the multi-person signal.
+  // Lookup of external-feed-id → configured colour for that feed.
+  // Built once per feed-list change so getEventColor stays O(1).
+  const feedColorById = useMemo(() => {
+    const m = {};
+    for (const f of externalFeeds) {
+      if (f?.id) m[f.id] = f.color || 'slate';
+    }
+    return m;
+  }, [externalFeeds]);
+
+  // Resolve event colour. Precedence:
+  //   1. Subscribed external calendar - use the feed's own colour so
+  //      these read distinct from native Housemait events (previously
+  //      both fell through to plum and were visually indistinguishable).
+  //   2. First assigned member's theme.
+  //   3. Category default (public holiday / birthday / school).
+  //   4. Plum fallback for native unassigned ("everyone") events.
+  // Multi-assignee events still get one colour - the avatar stack
+  // carries the multi-person signal.
   function getEventColor(ev) {
+    if (ev.external_feed_id && feedColorById[ev.external_feed_id]) {
+      return feedColorById[ev.external_feed_id];
+    }
     const names = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0
       ? ev.assigned_to_names
       : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
