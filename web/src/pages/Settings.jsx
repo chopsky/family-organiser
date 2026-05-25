@@ -239,6 +239,32 @@ function PlanSection() {
  * 119+). Older browsers ignore the attribute and just allow
  * multiple-open, which is the previous behaviour (graceful fallback).
  */
+/**
+ * SettingsCard - always-expanded standalone card, no collapse chrome.
+ * Web layout uses this for every section EXCEPT Notifications + Active
+ * sessions (which stay as accordions so the long lists they contain
+ * can be hidden when not in use). Visually matches the My Profile /
+ * Plan cards already on this page, and the section cards on the
+ * Family page.
+ */
+function SettingsCard({ title, icon: IconCmp, danger = false, children }) {
+  const baseStyle = danger
+    ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
+    : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
+  const wrapClass = danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-5 md:p-6';
+  const iconColor = danger ? 'text-error' : 'text-plum';
+  const titleColor = danger ? 'text-error' : 'text-bark';
+  return (
+    <div className={wrapClass} style={baseStyle}>
+      <div className="flex items-center gap-3 mb-3">
+        {IconCmp && <IconCmp className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}
+        <h2 className={`flex-1 text-base md:text-lg font-medium ${titleColor}`}>{title}</h2>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = false, bare = false, children }) {
   // bare = render just the content with no title, no chevron, no collapse
   // chrome. Used by the iOS sub-page mode where the page header above
@@ -318,6 +344,27 @@ export default function Settings() {
   const iosActiveSection = isIosPlatform ? IOS_SECTIONS.find((s) => s.slug === subSlug) || null : null;
   const iosSubPageMode  = !!iosActiveSection;
   const iosListMode     = isIosPlatform && !subSlug;
+
+  // Per-section wrapper picker. Three rendering paths:
+  //   1. iOS list mode - section is represented by a row in the list
+  //      above, so this returns null (skip rendering here).
+  //   2. iOS sub-page mode - only the active section renders, as bare
+  //      content (the page header above already shows the title).
+  //   3. Web - either AccordionItem (if accordion={true}) or
+  //      SettingsCard (always-expanded standalone card).
+  // Centralising the logic here keeps each section's call-site to a
+  // single <SectionWrapper> element, no per-section conditional gates
+  // duplicating the platform checks.
+  function SectionWrapper({ slug, title, icon, danger, accordion, children }) {
+    if (iosListMode) return null;
+    if (iosSubPageMode) {
+      return subSlug === slug ? <div className="py-1">{children}</div> : null;
+    }
+    if (accordion) {
+      return <AccordionItem title={title} icon={icon} danger={danger}>{children}</AccordionItem>;
+    }
+    return <SettingsCard title={title} icon={icon} danger={danger}>{children}</SettingsCard>;
+  }
 
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
@@ -1175,19 +1222,15 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Grouped accordion card - mirrors the Help-page pattern where
-          multiple <details> share one container with internal hairlines,
-          so Settings reads as a single panel of preferences rather than
-          a stack of individually-floating cards. On iOS list mode this
-          block is skipped entirely (replaced by the section list above).
-          The danger-zone accordion (Delete account) sits OUTSIDE this
-          group so the destructive action keeps its visual distinction. */}
-      {!iosListMode && (
-      <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      {/* Sections - each renders via SectionWrapper which picks the
+          right wrapper for the platform/sub-page state:
+            • Web: cards for most sections, accordion for Notifications
+              + Active sessions (long lists worth hiding when not in use).
+            • iOS list mode: each row sits in the section list above.
+            • iOS sub-page mode: only the active section renders, bare. */}
 
       {/* Connect WhatsApp */}
-      {(!iosSubPageMode || subSlug === 'whatsapp') && (
-      <AccordionItem title="Connect WhatsApp" icon={IconMessageCircle} bare={iosSubPageMode}>
+      <SectionWrapper slug="whatsapp" title="Connect WhatsApp" icon={IconMessageCircle}>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
@@ -1231,12 +1274,10 @@ export default function Settings() {
             />
           </>
         )}
-      </AccordionItem>
-      )}
+      </SectionWrapper>
 
       {/* Connect Calendars */}
-      {(!iosSubPageMode || subSlug === 'calendars') && (
-      <AccordionItem title="Connect Calendars" icon={IconCalendar} bare={iosSubPageMode}>
+      <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar}>
         <p className="text-sm text-cocoa mb-3">
           Show the events from your Housemait calendar in your external calendars. One-way - events you create here appear there automatically.
         </p>
@@ -1479,13 +1520,11 @@ export default function Settings() {
           )}
         </div>
 
-      </AccordionItem>
-      )}
+      </SectionWrapper>
 
 
       {/* Send Emails to AI */}
-      {(!iosSubPageMode || subSlug === 'emails-to-ai') && (
-      <AccordionItem title="Send Emails to AI" icon={IconMail} bare={iosSubPageMode}>
+      <SectionWrapper slug="emails-to-ai" title="Send Emails to AI" icon={IconMail}>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details - receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
@@ -1626,16 +1665,26 @@ export default function Settings() {
             Your household does not have a forwarding email address yet. It will be generated automatically.
           </p>
         )}
-      </AccordionItem>
-      )}
+      </SectionWrapper>
+
+      {/* Grouped accordion card - JUST for Notifications + Active
+          sessions, the two sections that stay as collapsible accordions
+          on web because their content (long preferences toggle lists,
+          long device-session lists) is worth hiding when not in use.
+          The other six sections are always-expanded cards. On iOS this
+          wrapper renders empty (SectionWrapper returns null in list
+          mode; on sub-page mode the wrapper div still renders but
+          contains nothing for non-active sub-slugs, which is fine - an
+          empty bg-linen card has no visual weight). */}
+      {!iosListMode && !(iosSubPageMode && subSlug !== 'notifications' && subSlug !== 'sessions') && (
+      <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
 
       {/* Notifications - unified on every platform. Two subsections:
           Push (iOS only, where APNs delivers) and WhatsApp (any platform
           once linked). Each subsection lists per-type toggles wired to
           notification_preferences. Rendered always so users on web also
           know the section exists; subsection content adapts to capability. */}
-      {(!iosSubPageMode || subSlug === 'notifications') && (
-      <AccordionItem title="Notifications" icon={IconBell} bare={iosSubPageMode}>
+      <SectionWrapper slug="notifications" title="Notifications" icon={IconBell} accordion>
         {loadingNotifPrefs ? (
           <div className="py-4 text-center text-sm text-cocoa">Loading…</div>
         ) : notifPrefs ? (
@@ -1728,15 +1777,13 @@ export default function Settings() {
             </div>
           </div>
         ) : null}
-      </AccordionItem>
-      )}
+      </SectionWrapper>
 
       {/* Active sessions - lets users see + revoke live refresh tokens.
           Security-adjacent but non-destructive to the account itself;
           sits above the GDPR export so the "who's logged in right now"
           question is answered before the heavier "export everything" tool. */}
-      {(!iosSubPageMode || subSlug === 'sessions') && (
-      <AccordionItem title="Active sessions" icon={IconShield} bare={iosSubPageMode}>
+      <SectionWrapper slug="sessions" title="Active sessions" icon={IconShield} accordion>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
           don't recognise - the device gets signed out immediately.
@@ -1791,13 +1838,14 @@ export default function Settings() {
             {revokingAllOthers ? 'Revoking…' : 'Revoke all other sessions'}
           </button>
         )}
-      </AccordionItem>
+      </SectionWrapper>
+
+      </div>
       )}
 
       {/* Your data - GDPR right to portability (Article 20). Sits below
           Active sessions; non-destructive action, no surprises. */}
-      {(!iosSubPageMode || subSlug === 'data') && (
-      <AccordionItem title="Your data" icon={IconDownload} bare={iosSubPageMode}>
+      <SectionWrapper slug="data" title="Your data" icon={IconDownload}>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
           your household - tasks, events, shopping lists, notes, documents
@@ -1812,14 +1860,12 @@ export default function Settings() {
         >
           {exporting ? 'Preparing…' : 'Export my data'}
         </button>
-      </AccordionItem>
-      )}
+      </SectionWrapper>
 
       {/* Account card - shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
-      {(!iosSubPageMode || subSlug === 'account') && (
-      <AccordionItem title="Account" icon={IconUser} bare={iosSubPageMode}>
+      <SectionWrapper slug="account" title="Account" icon={IconUser}>
         <p className="text-sm text-cocoa">
           Signed in as <span className="font-medium text-bark">{user?.name}</span>
           {user?.role && <span> ({user.role})</span>}
@@ -1848,22 +1894,16 @@ export default function Settings() {
             {accountInfo.email && <span className="text-bark">{accountInfo.email}</span>}
           </div>
         )}
-      </AccordionItem>
-      )}
-
-      </div>
-      )}
+      </SectionWrapper>
 
       {/* Danger zone - delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
-          a destructive action. Kept OUTSIDE the grouped accordion card
-          above so the destructive action keeps its own visual frame.
-          On iOS list mode the danger row lives in the section list
-          above instead; only the dedicated /settings/delete sub-page
-          renders this AccordionItem. */}
-      {!iosListMode && (!iosSubPageMode || subSlug === 'delete') && (
-      <AccordionItem title="Delete account" danger icon={IconTrash} bare={iosSubPageMode}>
+          a destructive action. SectionWrapper renders this as a danger-
+          tinted SettingsCard on web; on iOS list mode the danger row
+          lives in the section list above instead, and on the
+          /settings/delete sub-page it renders bare. */}
+      <SectionWrapper slug="delete" title="Delete account" icon={IconTrash} danger>
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
           member of your household, <strong className="text-bark">everything in it</strong>{' '}
@@ -1882,8 +1922,7 @@ export default function Settings() {
         >
           Delete my account
         </button>
-      </AccordionItem>
-      )}
+      </SectionWrapper>
 
       {/* Log out - bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
