@@ -199,7 +199,6 @@ function AppRoutes() {
         <Route path="/documents" element={<RequireAuth><Layout><Documents /></Layout></RequireAuth>} />
         <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
-        <Route path="/settings/:section" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
         <Route path="/help" element={<RequireAuth><Layout><Help /></Layout></RequireAuth>} />
         {/* Subscribe flow - Subscribe page is reachable by anyone logged in
             (including expired users, so they can reactivate). Success and

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link, useParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -10,7 +10,7 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
-  IconDownload, IconShield, IconUser, IconTrash, IconArrowLeft, IconChevronRight,
+  IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -333,44 +333,80 @@ const IOS_SECTION_ICONS = {
 export default function Settings() {
   const { household, user, isAdmin, login, logout, token } = useAuth();
   const navigate = useNavigate();
-  const { section: subSlug } = useParams();
 
-  // iOS native shell: the Settings landing becomes a list of section
-  // rows that each navigate to a dedicated sub-page (matches the iOS
-  // Settings.app pattern - tap a row, slide to a new screen with a
-  // back arrow at the top). On web (browser or PWA) the layout stays
-  // as it was: cards + accordion sections all on one page.
-  const isIosPlatform   = isIos();
-  const iosActiveSection = isIosPlatform ? IOS_SECTIONS.find((s) => s.slug === subSlug) || null : null;
-  const iosSubPageMode  = !!iosActiveSection;
-  const iosListMode     = isIosPlatform && !subSlug;
+  // iOS native shell: the Settings landing is a list of section rows
+  // (same surface as a sectioned iOS Settings.app screen). Tapping a
+  // row opens a popup overlay for that section's content. Closing the
+  // popup returns to the list. URL doesn't change - no deep linking,
+  // back button does NOT close the popup (close affordance is the X
+  // button in the popup header).
+  //
+  // On web (browser or PWA) the layout is unchanged: cards + accordion
+  // sections all on one page.
+  const isIosPlatform = isIos();
+  const [popupSlug, setPopupSlug] = useState(null); // slug of section currently shown in popup, null = closed
+  const iosPopupOpen   = isIosPlatform && !!popupSlug;
+  const iosListMode    = isIosPlatform && !popupSlug;
+  const popupSection   = iosPopupOpen ? IOS_SECTIONS.find((s) => s.slug === popupSlug) || null : null;
+
+  // Close the popup whenever the platform changes away from iOS (e.g.
+  // running in dev with platform mocking) so we never have a stuck
+  // overlay. No-op in production.
+  useEffect(() => {
+    if (!isIosPlatform && popupSlug) setPopupSlug(null);
+  }, [isIosPlatform, popupSlug]);
 
   // Per-section wrapper picker. Three rendering paths:
-  //   1. iOS list mode - section is represented by a row in the list
-  //      above, so this returns null (skip rendering here).
-  //   2. iOS sub-page mode - only the active section renders, as bare
-  //      content (the page header above already shows the title).
-  //   3. Web - either AccordionItem (if accordion={true}) or
+  //   1. iOS list mode (popup closed) - section is represented by a
+  //      row in the list above, so this returns null.
+  //   2. iOS popup mode for THIS slug - render as a fixed-position
+  //      modal overlay with header (title + X close) and the section
+  //      content scrollable below.
+  //   3. iOS popup mode for ANOTHER slug - return null (only one
+  //      popup at a time).
+  //   4. Web - either AccordionItem (if accordion={true}) or
   //      SettingsCard (always-expanded standalone card).
-  // Centralising the logic here keeps each section's call-site to a
-  // single <SectionWrapper> element, no per-section conditional gates
-  // duplicating the platform checks.
   function SectionWrapper({ slug, title, icon, danger, accordion, children }) {
     if (iosListMode) return null;
-    if (iosSubPageMode) {
-      if (subSlug !== slug) return null;
-      // iOS sub-page: wrap content in a properly-padded card so the
-      // section has the same internal breathing room as a SettingsCard
-      // on web. Title is NOT rendered here - the page header above
-      // shows the section title already; a second one inside the card
-      // would be redundant.
-      const baseStyle = danger
-        ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
-        : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
-      const wrapClass = danger
-        ? 'rounded-2xl border p-5 md:p-6'
-        : 'bg-linen rounded-2xl p-5 md:p-6';
-      return <div className={wrapClass} style={baseStyle}>{children}</div>;
+    if (iosPopupOpen) {
+      if (popupSlug !== slug) return null;
+      const titleColor = danger ? 'text-error' : 'text-bark';
+      return (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-cream"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+        >
+          {/* Popup header - title on the left, X on the right. Sticky
+              so the title stays visible while the content scrolls. */}
+          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-cream-border bg-cream">
+            <h2 className={`flex-1 text-base md:text-lg font-medium truncate ${titleColor}`}>{title}</h2>
+            <button
+              type="button"
+              onClick={() => setPopupSlug(null)}
+              aria-label="Close"
+              className="-mr-2 p-2 rounded-lg text-cocoa hover:text-bark hover:bg-oat transition-colors"
+            >
+              <IconX className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Content - scrollable. Wrapped in the same card visual as
+              a SettingsCard on web so the section content has the
+              breathing room it has everywhere else. */}
+          <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)' }}>
+            <div
+              className={danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-5 md:p-6'}
+              style={danger
+                ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
+                : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+            >
+              {children}
+            </div>
+          </div>
+        </div>
+      );
     }
     if (accordion) {
       return <AccordionItem title={title} icon={icon} danger={danger}>{children}</AccordionItem>;
@@ -1116,52 +1152,29 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {iosSubPageMode ? (
-        /* iOS sub-page header - back arrow + section title. Title is
-           styled to match the section h2 style on the Settings landing
-           (text-base md:text-lg, font-medium, system font) - a
-           sub-page is conceptually one section, so the heading should
-           read as a section heading, not as a page-level display title. */
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/settings')}
-            aria-label="Back to Settings"
-            className="-ml-2 p-2 rounded-lg text-cocoa hover:text-bark hover:bg-cream transition-colors"
-          >
-            <IconArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="flex-1 text-base md:text-lg font-medium text-bark truncate">
-            {iosActiveSection.title}
-          </h1>
-        </div>
-      ) : (
-        <h1
-          className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
-          style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+      <h1
+        className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
+        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+      >
+        <div
+          className="hidden"
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f1eef8',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <div
-            className="hidden"
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#f1eef8',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IconSettings className="h-5 w-5 text-plum" />
-          </div>
-          Settings
-        </h1>
-      )}
+          <IconSettings className="h-5 w-5 text-plum" />
+        </div>
+        Settings
+      </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* My profile - hidden on iOS sub-pages (focus is just the active
-          section's content; My profile lives on the /settings landing). */}
-      {!iosSubPageMode && (
+      {/* My profile */}
       <>
       {/* My profile */}
       {(() => {
@@ -1205,13 +1218,13 @@ export default function Settings() {
       {/* Plan / subscription */}
       <PlanSection />
       </>
-      )}
 
-      {/* iOS list mode: replace the accordion stack with a list of
-          nav rows that each navigate to /settings/<slug>. Visual
-          mirrors the accordion summaries (icon + title + chevron)
-          so the surface stays familiar - just behaviour changes
-          from "expand inline" to "go to sub-page". */}
+      {/* iOS list mode: list of nav rows, each opens a popup overlay
+          for that section. Visual mirrors the accordion summaries
+          (icon + title + chevron) so the landing surface stays
+          familiar - the chevron implies "tap to see more", which is
+          true whether the more is inline (accordion), a sub-page, or
+          a popup. */}
       {iosListMode && (
         <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           {IOS_SECTIONS.map((sec) => {
@@ -1219,15 +1232,16 @@ export default function Settings() {
             const iconColor = sec.danger ? 'text-error' : 'text-plum';
             const titleColor = sec.danger ? 'text-error' : 'text-bark';
             return (
-              <Link
+              <button
                 key={sec.slug}
-                to={`/settings/${sec.slug}`}
-                className="flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none border-b border-cream-border last:border-b-0"
+                type="button"
+                onClick={() => setPopupSlug(sec.slug)}
+                className="w-full flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none border-b border-cream-border last:border-b-0 text-left"
               >
                 {Icon && <Icon className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}
                 <h2 className={`flex-1 text-base md:text-lg font-medium ${titleColor}`}>{sec.title}</h2>
                 <IconChevronRight className="w-4 h-4 md:w-5 md:h-5 text-cocoa shrink-0" />
-              </Link>
+              </button>
             );
           })}
         </div>
@@ -1938,16 +1952,13 @@ export default function Settings() {
 
       {/* Log out - bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
-          find it here. Hidden on iOS sub-pages (only shows on the
-          /settings landing or on web). */}
-      {!iosSubPageMode && (
+          find it here. */}
       <button
         onClick={() => { logout(); navigate('/'); }}
         className="w-full mt-6 py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
       >
         Log out
       </button>
-      )}
 
       {/* Delete Account Modal */}
       {deleteOpen && (
