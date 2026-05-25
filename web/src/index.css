@@ -172,6 +172,18 @@
     letter-spacing: 0;
   }
 
+  /* iOS-only: bump h2 weight to semibold. The system font on iOS
+     renders lighter than on macOS / Windows / Android, and at
+     font-medium the section headings look anaemic on a retina iPhone.
+     Targeting the html.platform-ios class set in main.jsx so the rule
+     never fires for web/PWA visitors. !important is needed because
+     most h2s in the codebase carry explicit Tailwind weight classes
+     (font-medium) that live in @layer utilities and would otherwise
+     win over this @layer base rule. */
+  html.platform-ios h2 {
+    font-weight: 600 !important;
+  }
+
   /* FAQ accordion uses a custom chevron; suppress the browser default
      disclosure triangle on <summary> elements globally so we don't have
      to repeat these resets per-component. */
