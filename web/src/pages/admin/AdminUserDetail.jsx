@@ -139,8 +139,21 @@ export default function AdminUserDetail() {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h2 className="font-display text-xl font-bold text-charcoal">{user.name}</h2>
-            <p className="text-warm-grey text-sm">{user.email || 'No email'}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-display text-xl font-bold text-charcoal">{user.name}</h2>
+                <p className="text-warm-grey text-sm">{user.email || 'No email'}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider">Last Active</p>
+                <p
+                  className={`text-sm font-medium ${staleness(user.last_active_at)}`}
+                  title={user.last_active_at ? new Date(user.last_active_at).toLocaleString() : ''}
+                >
+                  {formatRelativeTime(user.last_active_at)}
+                </p>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2 mt-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-charcoal text-xs font-semibold capitalize">
                 {user.role}

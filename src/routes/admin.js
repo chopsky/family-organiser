@@ -183,7 +183,7 @@ router.get('/users/:id/usage', async (req, res) => {
 
 router.get('/households', async (req, res) => {
   try {
-    const { search, page = 1, limit = 50, sort, sortDir, plan } = req.query;
+    const { search, page = 1, limit = 50, sort, sortDir, plan, activity } = req.query;
     const result = await db.getAllHouseholdsAdmin({
       search,
       page: parseInt(page, 10),
@@ -191,6 +191,7 @@ router.get('/households', async (req, res) => {
       sort,
       sortDir,
       plan,
+      activity,
     });
     return res.json(result);
   } catch (err) {

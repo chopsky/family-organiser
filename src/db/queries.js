@@ -3222,6 +3222,33 @@ async function getRecentPurchases(householdId, days = 14, db = supabase) {
 
 // ─── Platform Admin ──────────────────────────────────────────────────────────
 
+/**
+ * "Last active" signal for admin views. Every successful JWT refresh bumps
+ * refresh_tokens.last_used_at (see src/middleware/auth.js + the
+ * migration-refresh-token-metadata.sql) — taking the MAX across all of a
+ * user's tokens (including revoked ones, which freeze at logout time) is the
+ * best proxy we have for "when did this person last actually open the app."
+ *
+ * Returns a Map<userId, ISO timestamp>. Missing entries mean the user has
+ * never had a refresh token (e.g. password-reset-only or signed up but never
+ * completed login) — UI treats them as "Never".
+ */
+async function fetchLastActiveByUserIds(userIds, db = supabase) {
+  if (!userIds || userIds.length === 0) return new Map();
+  const { data, error } = await db
+    .from('refresh_tokens')
+    .select('user_id, last_used_at')
+    .in('user_id', userIds);
+  if (error) throw error;
+  const map = new Map();
+  for (const r of data || []) {
+    if (!r.last_used_at) continue;
+    const existing = map.get(r.user_id);
+    if (!existing || r.last_used_at > existing) map.set(r.user_id, r.last_used_at);
+  }
+  return map;
+}
+
 async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc' } = {}, db = supabase) {
   let query = db
     .from('users')
@@ -3241,6 +3268,13 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
     .range(from, from + limit - 1);
 
   if (error) throw error;
+
+  // Attach last_active_at (MAX refresh_tokens.last_used_at per user)
+  const lastActiveMap = await fetchLastActiveByUserIds((data || []).map((u) => u.id), db);
+  for (const u of data || []) {
+    u.last_active_at = lastActiveMap.get(u.id) || null;
+  }
+
   return { users: data, total: count };
 }
 
@@ -3262,10 +3296,59 @@ async function getUserByIdAdmin(userId, db = supabase) {
     household = h;
   }
 
-  return { ...user, household };
+  const lastActiveMap = await fetchLastActiveByUserIds([userId], db);
+
+  return { ...user, household, last_active_at: lastActiveMap.get(userId) || null };
 }
 
-async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc', plan } = {}, db = supabase) {
+const IDLE_THRESHOLD_DAYS = 14;
+
+/**
+ * Resolve the activity filter to an explicit list of household IDs the main
+ * query can constrain on. Filtering by a derived field can't be done in
+ * Postgres directly without a view, so we compute it up-front in two cheap
+ * queries (refresh_tokens recent → users with those tokens) and use .in().
+ * Returns { householdIds, allActiveHouseholdIds, isEmpty } — caller short-
+ * circuits the main query when isEmpty=true.
+ */
+async function resolveActivityFilter(activity, db = supabase) {
+  if (activity !== 'idle' && activity !== 'active') return null;
+
+  const since = new Date(Date.now() - IDLE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentTokens } = await db
+    .from('refresh_tokens')
+    .select('user_id')
+    .gte('last_used_at', since);
+  const activeUserIds = [...new Set((recentTokens || []).map((t) => t.user_id))];
+
+  const activeHouseholdIds = new Set();
+  if (activeUserIds.length > 0) {
+    const { data: activeMembers } = await db
+      .from('users')
+      .select('household_id')
+      .in('id', activeUserIds)
+      .not('household_id', 'is', null);
+    for (const m of activeMembers || []) activeHouseholdIds.add(m.household_id);
+  }
+
+  if (activity === 'active') {
+    return { householdIds: Array.from(activeHouseholdIds), isEmpty: activeHouseholdIds.size === 0 };
+  }
+
+  // idle: every household NOT in the active set
+  const { data: allHouseholds } = await db.from('households').select('id');
+  const idleIds = (allHouseholds || []).map((h) => h.id).filter((id) => !activeHouseholdIds.has(id));
+  return { householdIds: idleIds, isEmpty: idleIds.length === 0 };
+}
+
+async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc', plan, activity } = {}, db = supabase) {
+  // Resolve the activity filter into explicit household IDs first - if it
+  // matches nothing we can short-circuit without hitting households at all.
+  const activityFilter = await resolveActivityFilter(activity, db);
+  if (activityFilter?.isEmpty) {
+    return { households: [], total: 0 };
+  }
+
   let query = db
     .from('households')
     .select('id, name, join_code, timezone, reminder_time, created_at, subscription_status, subscription_plan, trial_ends_at, is_internal, subscription_current_period_end, stripe_customer_id', { count: 'exact' });
@@ -3283,6 +3366,10 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
     query = query.eq('subscription_status', plan).eq('is_internal', false);
   }
 
+  if (activityFilter) {
+    query = query.in('id', activityFilter.householdIds);
+  }
+
   // Whitelist sort columns to prevent injection
   const sortColumn = sort === 'name' ? 'name' : 'created_at';
   const ascending = sortDir === 'asc';
@@ -3294,20 +3381,36 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
 
   if (error) throw error;
 
-  // Attach member counts
+  // Attach member counts + last_active_at + documents
   const householdIds = data.map((h) => h.id);
   if (householdIds.length > 0) {
     const { data: users } = await db
       .from('users')
-      .select('household_id')
+      .select('id, household_id')
       .in('household_id', householdIds);
 
     const countMap = {};
+    const membersByHousehold = {};
     for (const u of users || []) {
       countMap[u.household_id] = (countMap[u.household_id] || 0) + 1;
+      if (!membersByHousehold[u.household_id]) membersByHousehold[u.household_id] = [];
+      membersByHousehold[u.household_id].push(u.id);
     }
     for (const h of data) {
       h.member_count = countMap[h.id] || 0;
+    }
+
+    // Bulk fetch last_active_at across all members, then take max per household
+    const allMemberIds = (users || []).map((u) => u.id);
+    const lastActiveMap = await fetchLastActiveByUserIds(allMemberIds, db);
+    for (const h of data) {
+      const memberIds = membersByHousehold[h.id] || [];
+      let max = null;
+      for (const mid of memberIds) {
+        const ts = lastActiveMap.get(mid);
+        if (ts && (!max || ts > max)) max = ts;
+      }
+      h.last_active_at = max;
     }
 
     // Attach document counts + total bytes (single bulk fetch - same pattern as members)
@@ -3349,11 +3452,25 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     getHouseholdStorageUsage(householdId).catch(() => ({ totalBytes: 0, fileCount: 0 })),
   ]);
 
+  // Enrich each member with last_active_at, and roll up the max as the
+  // household's last_active_at (so the detail header can show staleness
+  // at a glance).
+  const memberIds = (members || []).map((m) => m.id);
+  const lastActiveMap = await fetchLastActiveByUserIds(memberIds, db);
+  let householdLastActive = null;
+  for (const m of members || []) {
+    m.last_active_at = lastActiveMap.get(m.id) || null;
+    if (m.last_active_at && (!householdLastActive || m.last_active_at > householdLastActive)) {
+      householdLastActive = m.last_active_at;
+    }
+  }
+
   return {
     ...household,
     members: members || [],
     documents_count: storage.fileCount,
     documents_bytes: storage.totalBytes,
+    last_active_at: householdLastActive,
   };
 }
 
@@ -3361,12 +3478,13 @@ async function getPlatformStats(db = supabase) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats] = await Promise.all([
+  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats, idleFilter] = await Promise.all([
     db.from('users').select('id', { count: 'exact', head: true }),
     db.from('households').select('id', { count: 'exact', head: true }),
     db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
     db.from('households').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
     getSubscriptionStats(db),
+    resolveActivityFilter('idle', db),
   ]);
 
   return {
@@ -3375,6 +3493,7 @@ async function getPlatformStats(db = supabase) {
     newUsersThisWeek: newUsersResult.count || 0,
     newHouseholdsThisWeek: newHouseholdsResult.count || 0,
     subscriptions: subStats,
+    atRiskHouseholds: idleFilter?.householdIds?.length || 0,
   };
 }
 

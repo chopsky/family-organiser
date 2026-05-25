@@ -95,7 +95,18 @@ export default function AdminHouseholdDetail() {
 
       {/* Header Card */}
       <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
-        <h2 className="font-display text-xl font-bold text-charcoal">{household.name}</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="font-display text-xl font-bold text-charcoal">{household.name}</h2>
+          <div className="shrink-0 text-right">
+            <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider">Last Active</p>
+            <p
+              className={`text-sm font-medium ${staleness(household.last_active_at)}`}
+              title={household.last_active_at ? new Date(household.last_active_at).toLocaleString() : ''}
+            >
+              {formatRelativeTime(household.last_active_at)}
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-light-grey">
           <Detail label="Join Code" value={household.join_code} mono />
@@ -203,6 +214,15 @@ export default function AdminHouseholdDetail() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-charcoal text-sm">{m.name}</p>
                   <p className="text-xs text-warm-grey">{m.email || 'No email'}</p>
+                </div>
+                <div className="hidden sm:block text-right shrink-0 mr-2">
+                  <p className="text-[10px] text-warm-grey font-semibold uppercase tracking-wider">Last Active</p>
+                  <p
+                    className={`text-xs font-medium ${staleness(m.last_active_at)}`}
+                    title={m.last_active_at ? new Date(m.last_active_at).toLocaleString() : ''}
+                  >
+                    {formatRelativeTime(m.last_active_at)}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-charcoal text-xs font-semibold capitalize">

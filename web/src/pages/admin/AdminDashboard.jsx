@@ -66,6 +66,29 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Engagement */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Engagement</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            to="/admin/households?activity=idle"
+            className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow"
+          >
+            <p className="text-2xl font-bold text-coral">{stats?.atRiskHouseholds ?? 0}</p>
+            <p className="text-xs text-warm-grey font-medium mt-0.5">At-Risk Households</p>
+            <p className="text-[10px] text-warm-grey mt-1">No member active in 14+ days</p>
+          </Link>
+          <Link
+            to="/admin/households?activity=active"
+            className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow"
+          >
+            <p className="text-2xl font-bold text-sage">{Math.max(0, (stats?.totalHouseholds ?? 0) - (stats?.atRiskHouseholds ?? 0))}</p>
+            <p className="text-xs text-warm-grey font-medium mt-0.5">Active Households</p>
+            <p className="text-[10px] text-warm-grey mt-1">Activity within 14 days</p>
+          </Link>
+        </div>
+      </div>
+
       {/* Subscription Stats */}
       <div className="mt-8">
         <h2 className="font-display text-lg font-medium text-charcoal mb-3">Subscriptions</h2>

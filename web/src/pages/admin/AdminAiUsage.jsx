@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconCpu } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import DailyChart from '../../components/DailyChart';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 export default function AdminAiUsage() {
@@ -47,6 +48,16 @@ export default function AdminAiUsage() {
           </div>
         ))}
       </div>
+
+      {/* Platform-wide daily chart */}
+      {timeline.length > 0 && (
+        <div className="mt-8">
+          <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+            <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Last 10 Days</p>
+            <DailyChart data={timeline.slice(-10).map((d) => ({ date: d.date, calls: d.total }))} />
+          </div>
+        </div>
+      )}
 
       {/* Provider Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
 import SortableHeader from '../../components/SortableHeader';
 import { formatBytes } from '../../lib/formatBytes';
+import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 const PAGE_SIZE = 20;
 const PLAN_OPTIONS = [
@@ -16,13 +17,23 @@ const PLAN_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'internal', label: 'Internal' },
 ];
+const ACTIVITY_OPTIONS = [
+  { value: '', label: 'All activity' },
+  { value: 'active', label: 'Active (within 14d)' },
+  { value: 'idle', label: 'Idle (>14d)' },
+];
 
 export default function AdminHouseholds() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialActivity = searchParams.get('activity') || '';
+  const initialPlan = searchParams.get('plan') || '';
+
   const [households, setHouseholds] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [planFilter, setPlanFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState(initialPlan);
+  const [activityFilter, setActivityFilter] = useState(initialActivity);
   const [sort, setSort] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
@@ -33,6 +44,7 @@ export default function AdminHouseholds() {
       const params = { page, limit: PAGE_SIZE, sort, sortDir };
       if (search.trim()) params.search = search.trim();
       if (planFilter) params.plan = planFilter;
+      if (activityFilter) params.activity = activityFilter;
       const { data } = await api.get('/admin/households', { params });
       setHouseholds(data.households || []);
       setTotal(data.total || 0);
@@ -41,7 +53,7 @@ export default function AdminHouseholds() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, planFilter, sort, sortDir]);
+  }, [page, search, planFilter, activityFilter, sort, sortDir]);
 
   useEffect(() => { loadHouseholds(); }, [loadHouseholds]);
 
@@ -60,6 +72,17 @@ export default function AdminHouseholds() {
   function handlePlanChange(e) {
     setPage(1);
     setPlanFilter(e.target.value);
+    const next = new URLSearchParams(searchParams);
+    if (e.target.value) next.set('plan', e.target.value); else next.delete('plan');
+    setSearchParams(next, { replace: true });
+  }
+
+  function handleActivityChange(e) {
+    setPage(1);
+    setActivityFilter(e.target.value);
+    const next = new URLSearchParams(searchParams);
+    if (e.target.value) next.set('activity', e.target.value); else next.delete('activity');
+    setSearchParams(next, { replace: true });
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -95,6 +118,15 @@ export default function AdminHouseholds() {
             <option key={value || 'all'} value={value}>{label}</option>
           ))}
         </select>
+        <select
+          value={activityFilter}
+          onChange={handleActivityChange}
+          className="px-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm font-medium text-charcoal focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
+        >
+          {ACTIVITY_OPTIONS.map(({ value, label }) => (
+            <option key={value || 'all'} value={value}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Table */}
@@ -109,9 +141,10 @@ export default function AdminHouseholds() {
                   <SortableHeader column="name" label="Name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Last Active</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Storage</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Join Code</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Timezone</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Join Code</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Timezone</th>
                   <SortableHeader column="created_at" label="Created" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
@@ -131,18 +164,24 @@ export default function AdminHouseholds() {
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <SubscriptionBadge household={h} />
                     </td>
+                    <td
+                      className={`px-4 py-3 text-xs hidden md:table-cell ${staleness(h.last_active_at)}`}
+                      title={h.last_active_at ? new Date(h.last_active_at).toLocaleString() : ''}
+                    >
+                      {formatRelativeTime(h.last_active_at)}
+                    </td>
                     <td className="px-4 py-3 text-warm-grey text-xs hidden lg:table-cell whitespace-nowrap">
                       {(h.documents_count ?? 0)} files · {formatBytes(h.documents_bytes ?? 0)}
                     </td>
-                    <td className="px-4 py-3 text-warm-grey font-mono text-xs hidden md:table-cell">{h.join_code}</td>
-                    <td className="px-4 py-3 text-warm-grey text-xs hidden md:table-cell">{h.timezone || '-'}</td>
+                    <td className="px-4 py-3 text-warm-grey font-mono text-xs hidden lg:table-cell">{h.join_code}</td>
+                    <td className="px-4 py-3 text-warm-grey text-xs hidden lg:table-cell">{h.timezone || '-'}</td>
                     <td className="px-4 py-3 text-warm-grey hidden lg:table-cell">
                       {h.created_at ? new Date(h.created_at).toLocaleDateString() : '-'}
                     </td>
                   </tr>
                 ))}
                 {households.length === 0 && (
-                  <tr><td colSpan="7" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
+                  <tr><td colSpan="8" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
                 )}
               </tbody>
             </table>
