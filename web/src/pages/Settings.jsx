@@ -358,7 +358,19 @@ export default function Settings() {
   function SectionWrapper({ slug, title, icon, danger, accordion, children }) {
     if (iosListMode) return null;
     if (iosSubPageMode) {
-      return subSlug === slug ? <div className="py-1">{children}</div> : null;
+      if (subSlug !== slug) return null;
+      // iOS sub-page: wrap content in a properly-padded card so the
+      // section has the same internal breathing room as a SettingsCard
+      // on web. Title is NOT rendered here - the page header above
+      // shows the section title already; a second one inside the card
+      // would be redundant.
+      const baseStyle = danger
+        ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
+        : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
+      const wrapClass = danger
+        ? 'rounded-2xl border p-5 md:p-6'
+        : 'bg-linen rounded-2xl p-5 md:p-6';
+      return <div className={wrapClass} style={baseStyle}>{children}</div>;
     }
     if (accordion) {
       return <AccordionItem title={title} icon={icon} danger={danger}>{children}</AccordionItem>;
@@ -1105,10 +1117,12 @@ export default function Settings() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {iosSubPageMode ? (
-        /* iOS sub-page header - back arrow + section title. Replaces
-           the standard "Settings" h1 since this IS a sub-page, not
-           the root. Tapping back navigates to /settings (the list). */
-        <div className="flex items-center gap-3 -mt-1">
+        /* iOS sub-page header - back arrow + section title. Title is
+           styled to match the section h2 style on the Settings landing
+           (text-base md:text-lg, font-medium, system font) - a
+           sub-page is conceptually one section, so the heading should
+           read as a section heading, not as a page-level display title. */
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate('/settings')}
@@ -1117,10 +1131,7 @@ export default function Settings() {
           >
             <IconArrowLeft className="w-5 h-5" />
           </button>
-          <h1
-            className="flex-1 text-[28px] font-normal leading-none text-bark truncate"
-            style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
-          >
+          <h1 className="flex-1 text-base md:text-lg font-medium text-bark truncate">
             {iosActiveSection.title}
           </h1>
         </div>
@@ -1671,12 +1682,11 @@ export default function Settings() {
           sessions, the two sections that stay as collapsible accordions
           on web because their content (long preferences toggle lists,
           long device-session lists) is worth hiding when not in use.
-          The other six sections are always-expanded cards. On iOS this
-          wrapper renders empty (SectionWrapper returns null in list
-          mode; on sub-page mode the wrapper div still renders but
-          contains nothing for non-active sub-slugs, which is fine - an
-          empty bg-linen card has no visual weight). */}
-      {!iosListMode && !(iosSubPageMode && subSlug !== 'notifications' && subSlug !== 'sessions') && (
+          The other six sections are always-expanded cards. Skipped on
+          iOS (list mode uses the section-row list; sub-page mode has
+          each section render its own card via SectionWrapper, so we'd
+          end up with a card-in-a-card double wrap otherwise). */}
+      {!isIosPlatform && (
       <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
 
       {/* Notifications - unified on every platform. Two subsections:
