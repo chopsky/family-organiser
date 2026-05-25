@@ -184,6 +184,19 @@
     font-weight: 600 !important;
   }
 
+  /* iOS Safari / WKWebView gives input[type="date"] and
+     input[type="time"] an intrinsic min-width based on the native
+     picker UI ("MM/DD/YYYY", "HH:MM"). Combined with our `w-full`
+     + `px-4` styling, the field overflows its container. Resetting
+     -webkit-appearance + min-width: 0 lets the inputs shrink to fit
+     while still using the native picker on tap. */
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+  }
+
   /* FAQ accordion uses a custom chevron; suppress the browser default
      disclosure triangle on <summary> elements globally so we don't have
      to repeat these resets per-component. */
