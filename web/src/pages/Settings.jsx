@@ -218,6 +218,118 @@ function PlanSection() {
 }
 
 /**
+ * EditProfileForm - the form body of the Edit-profile modal. Extracted
+ * so the iOS popup wrapper and the web centered-modal wrapper can both
+ * render the same form without duplicating ~80 lines of JSX. All state
+ * + handlers come in via props (the Settings component owns them).
+ */
+function EditProfileForm({
+  profileAvatar, profileName, profileColor, profileRole, profileBirthday,
+  profileReminderTime, uploadingAvatar, savingProfile, household, avatarColors,
+  setProfileName, setProfileRole, setProfileBirthday, setProfileColor, setProfileReminderTime,
+  handlePickAvatar, handleAvatarRemove, handleSaveProfile, onCancel,
+}) {
+  return (
+    <>
+      <div className="space-y-4">
+        {/* Avatar upload */}
+        <div className="flex flex-col items-center gap-2">
+          {profileAvatar ? (
+            <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
+          ) : (
+            <div className={`w-20 h-20 rounded-full ${avatarColors[profileColor] || avatarColors.teal} flex items-center justify-center font-bold text-2xl`}>
+              {profileName?.[0]?.toUpperCase() || '?'}
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handlePickAvatar}
+              disabled={uploadingAvatar}
+              className={`text-sm font-medium ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}
+            >
+              {uploadingAvatar ? 'Uploading…' : 'Upload photo'}
+            </button>
+            {profileAvatar && (
+              <button type="button" onClick={handleAvatarRemove} disabled={uploadingAvatar} className="text-sm text-error hover:text-error/80 transition-colors">
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
+          <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="Your name" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-bark mb-1">Family role</label>
+          <input type="text" value={profileRole} onChange={(e) => setProfileRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Father, Mother, Daughter" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
+          <input type="date" value={profileBirthday} onChange={(e) => setProfileBirthday(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
+          <div className="grid grid-cols-8 gap-2.5">
+            {[
+              { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
+              { key: 'burnt-orange',  bg: 'bg-burnt-orange',  ring: 'ring-burnt-orange' },
+              { key: 'amber',         bg: 'bg-amber',         ring: 'ring-amber' },
+              { key: 'gold',          bg: 'bg-gold',          ring: 'ring-gold' },
+              { key: 'leaf',          bg: 'bg-leaf',          ring: 'ring-leaf' },
+              { key: 'emerald',       bg: 'bg-emerald',       ring: 'ring-emerald' },
+              { key: 'teal',          bg: 'bg-teal',          ring: 'ring-teal' },
+              { key: 'sky',           bg: 'bg-sky',           ring: 'ring-sky' },
+              { key: 'cobalt',        bg: 'bg-cobalt',        ring: 'ring-cobalt' },
+              { key: 'indigo',        bg: 'bg-indigo',        ring: 'ring-indigo' },
+              { key: 'purple',        bg: 'bg-purple',        ring: 'ring-purple' },
+              { key: 'magenta',       bg: 'bg-magenta',       ring: 'ring-magenta' },
+              { key: 'rose',          bg: 'bg-rose',          ring: 'ring-rose' },
+              { key: 'terracotta',    bg: 'bg-terracotta',    ring: 'ring-terracotta' },
+              { key: 'moss',          bg: 'bg-moss',          ring: 'ring-moss' },
+              { key: 'slate',         bg: 'bg-slate',         ring: 'ring-slate' },
+            ].map(({ key, bg, ring }) => (
+              <button key={key} type="button" onClick={() => setProfileColor(key)}
+                className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${profileColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}
+                title={key.charAt(0).toUpperCase() + key.slice(1)}
+              >
+                {profileColor === key && (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white drop-shadow" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
+          <input type="time" value={profileReminderTime} onChange={(e) => setProfileReminderTime(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
+          <p className="text-xs text-cocoa mt-1">
+            {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-3 mt-6">
+        <button onClick={onCancel} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors">
+          Cancel
+        </button>
+        <button onClick={handleSaveProfile} disabled={savingProfile} className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors">
+          {savingProfile ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </>
+  );
+}
+
+/**
  * AccordionItem - collapsible row. Uses native <details>/<summary> so
  * the browser owns open/close state (no React, no useState), and screen
  * readers already understand the disclosure pattern.
@@ -2078,8 +2190,65 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Edit Profile Modal */}
-      {editingProfile && (
+      {/* Edit Profile Modal - on iOS uses the same full-screen popup
+          pattern as the section rows (sticky header with title + X,
+          scrollable card content below) so the Edit-profile surface
+          feels consistent with the other tap-to-popup interactions.
+          On web, keeps the centered overlay - a full-screen takeover
+          on desktop would feel disproportionate.
+
+          The form body is rendered inline below in BOTH branches; the
+          duplication is acceptable here because the alternative
+          (extracting ~80 lines of form JSX into a const) would
+          create a less-readable shape for a single modal. */}
+      {editingProfile && isIosPlatform && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-cream"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit profile"
+        >
+          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-cream-border bg-cream">
+            <h2 className="flex-1 text-base md:text-lg font-medium truncate text-bark">Edit profile</h2>
+            <button
+              type="button"
+              onClick={() => setEditingProfile(false)}
+              aria-label="Close"
+              className="-mr-2 p-2 rounded-lg text-cocoa hover:text-bark hover:bg-oat transition-colors"
+            >
+              <IconX className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)' }}>
+            <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+              <EditProfileForm
+                profileAvatar={profileAvatar}
+                profileName={profileName}
+                profileColor={profileColor}
+                profileRole={profileRole}
+                profileBirthday={profileBirthday}
+                profileReminderTime={profileReminderTime}
+                uploadingAvatar={uploadingAvatar}
+                savingProfile={savingProfile}
+                household={household}
+                avatarColors={avatarColors}
+                setProfileName={setProfileName}
+                setProfileRole={setProfileRole}
+                setProfileBirthday={setProfileBirthday}
+                setProfileColor={setProfileColor}
+                setProfileReminderTime={setProfileReminderTime}
+                handlePickAvatar={handlePickAvatar}
+                handleAvatarRemove={handleAvatarRemove}
+                handleSaveProfile={handleSaveProfile}
+                onCancel={() => setEditingProfile(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingProfile && !isIosPlatform && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingProfile(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
@@ -2095,102 +2264,27 @@ export default function Settings() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              {/* Avatar upload */}
-              <div className="flex flex-col items-center gap-2">
-                {profileAvatar ? (
-                  <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
-                ) : (
-                  <div className={`w-20 h-20 rounded-full ${
-                    avatarColors[profileColor] || avatarColors.teal
-                  } flex items-center justify-center font-bold text-2xl`}>
-                    {profileName?.[0]?.toUpperCase() || '?'}
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePickAvatar}
-                    disabled={uploadingAvatar}
-                    className={`text-sm font-medium ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}
-                  >
-                    {uploadingAvatar ? 'Uploading…' : 'Upload photo'}
-                  </button>
-                  {profileAvatar && (
-                    <button type="button" onClick={handleAvatarRemove} disabled={uploadingAvatar} className="text-sm text-error hover:text-error/80 transition-colors">
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
-                <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="Your name" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-                <input type="text" value={profileRole} onChange={(e) => setProfileRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Father, Mother, Daughter" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
-                <input type="date" value={profileBirthday} onChange={(e) => setProfileBirthday(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
-                <div className="grid grid-cols-8 gap-2.5">
-                  {[
-                    { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
-                    { key: 'burnt-orange',  bg: 'bg-burnt-orange',  ring: 'ring-burnt-orange' },
-                    { key: 'amber',         bg: 'bg-amber',         ring: 'ring-amber' },
-                    { key: 'gold',          bg: 'bg-gold',          ring: 'ring-gold' },
-                    { key: 'leaf',          bg: 'bg-leaf',          ring: 'ring-leaf' },
-                    { key: 'emerald',       bg: 'bg-emerald',       ring: 'ring-emerald' },
-                    { key: 'teal',          bg: 'bg-teal',          ring: 'ring-teal' },
-                    { key: 'sky',           bg: 'bg-sky',           ring: 'ring-sky' },
-                    { key: 'cobalt',        bg: 'bg-cobalt',        ring: 'ring-cobalt' },
-                    { key: 'indigo',        bg: 'bg-indigo',        ring: 'ring-indigo' },
-                    { key: 'purple',        bg: 'bg-purple',        ring: 'ring-purple' },
-                    { key: 'magenta',       bg: 'bg-magenta',       ring: 'ring-magenta' },
-                    { key: 'rose',          bg: 'bg-rose',          ring: 'ring-rose' },
-                    { key: 'terracotta',    bg: 'bg-terracotta',    ring: 'ring-terracotta' },
-                    { key: 'moss',          bg: 'bg-moss',          ring: 'ring-moss' },
-                    { key: 'slate',         bg: 'bg-slate',         ring: 'ring-slate' },
-                  ].map(({ key, bg, ring }) => (
-                    <button key={key} type="button" onClick={() => setProfileColor(key)}
-                      className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${profileColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}
-                      title={key.charAt(0).toUpperCase() + key.slice(1)}
-                    >
-                      {profileColor === key && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white drop-shadow" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
-                <input type="time" value={profileReminderTime} onChange={(e) => setProfileReminderTime(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
-                <p className="text-xs text-cocoa mt-1">
-                  {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setEditingProfile(false)} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors">
-                Cancel
-              </button>
-              <button onClick={handleSaveProfile} disabled={savingProfile} className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors">
-                {savingProfile ? 'Saving…' : 'Save'}
-              </button>
-            </div>
+            <EditProfileForm
+              profileAvatar={profileAvatar}
+              profileName={profileName}
+              profileColor={profileColor}
+              profileRole={profileRole}
+              profileBirthday={profileBirthday}
+              profileReminderTime={profileReminderTime}
+              uploadingAvatar={uploadingAvatar}
+              savingProfile={savingProfile}
+              household={household}
+              avatarColors={avatarColors}
+              setProfileName={setProfileName}
+              setProfileRole={setProfileRole}
+              setProfileBirthday={setProfileBirthday}
+              setProfileColor={setProfileColor}
+              setProfileReminderTime={setProfileReminderTime}
+              handlePickAvatar={handlePickAvatar}
+              handleAvatarRemove={handleAvatarRemove}
+              handleSaveProfile={handleSaveProfile}
+              onCancel={() => setEditingProfile(false)}
+            />
           </div>
         </div>
       )}
