@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu, IconMessageCircle } from '../../components/Icons';
+import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu, IconMessageCircle, IconRefresh } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DailyChart from '../../components/DailyChart';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
@@ -70,6 +70,27 @@ export default function AdminUserDetail() {
       await loadUser();
     } catch (err) {
       console.error('Failed to update user:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleForceLogout() {
+    if (isSelf || actionLoading) return;
+    const ok = window.confirm(
+      `Force ${user.name || 'this user'} to log out?\n\n` +
+      'All their active sessions will be revoked. They will be redirected ' +
+      'to login within the next hour (or instantly if they log out manually). ' +
+      'Use this after a data fix that invalidates their cached household, ' +
+      'or to kick them off a lost device.'
+    );
+    if (!ok) return;
+    setActionLoading(true);
+    try {
+      const { data } = await api.post(`/admin/users/${id}/force-logout`);
+      window.alert(data.message || 'Sessions revoked.');
+    } catch (err) {
+      window.alert(`Force logout failed: ${err.response?.data?.error || err.message}`);
     } finally {
       setActionLoading(false);
     }
@@ -195,6 +216,14 @@ export default function AdminUserDetail() {
               }`}
             >
               {user.disabled_at ? <><IconCheckCircle className="h-4 w-4" /> Enable</> : <><IconBan className="h-4 w-4" /> Disable</>}
+            </button>
+            <button
+              onClick={handleForceLogout}
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-[1.5px] border-warm-grey text-warm-grey text-sm font-semibold hover:bg-cream transition-colors disabled:opacity-50"
+              title="Revoke all active sessions"
+            >
+              <IconRefresh className="h-4 w-4" /> Force logout
             </button>
             <button
               onClick={openDeleteConfirm}

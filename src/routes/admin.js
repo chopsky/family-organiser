@@ -122,6 +122,50 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// ─── POST /api/admin/users/:id/force-logout ─────────────────────────────────
+//
+// Revokes every refresh token for the target user. Their currently-held
+// JWT access token still works until it expires (1h, see
+// JWT_EXPIRES_IN in src/middleware/auth.js) - we can't invalidate
+// JWTs mid-flight without a token revocation list, which the app
+// doesn't have. So the practical effect is: within the next hour,
+// the app's silent refresh fails, frontend redirects to login, user
+// logs in, gets a fresh authResponse with current household state.
+//
+// Use cases:
+//   - After a data-fix (household merge, etc.) that invalidates the
+//     user's cached household_id in localStorage.
+//   - Revoking access on a departed admin / lost device.
+//   - Forcing re-auth after a security incident.
+//
+// Refuses to operate on the caller's own account - the platform admin
+// using this tool always loses access to *another* user's sessions,
+// never their own.
+
+router.post('/users/:id/force-logout', async (req, res) => {
+  const { id } = req.params;
+  if (id === req.user.id) {
+    return res.status(400).json({ error: 'Use the normal Log out button for your own account.' });
+  }
+  try {
+    const target = await db.getUserByIdAdmin(id);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    // keepTokenId = null means revoke every session.
+    await db.revokeOtherUserRefreshTokens(id, null);
+
+    console.log(`[admin/force-logout] Platform admin ${req.user.id} revoked all sessions for user ${id} (${target.email || target.name})`);
+
+    return res.json({
+      success: true,
+      message: `Sessions revoked. ${target.name || 'The user'} will be redirected to login within the next hour, or instantly if they log out manually.`,
+    });
+  } catch (err) {
+    console.error('POST /api/admin/users/:id/force-logout error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/users/:id/usage ─────────────────────────────────────────
 
 router.get('/users/:id/usage', async (req, res) => {
