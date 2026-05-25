@@ -98,15 +98,15 @@ export default function Notifications({ next, setError }) {
     <div>
       <div className="text-center">
         <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-          Step 3 - notifications
+          Step 5 - notifications
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
-          Gentle <i>nudges</i>, when they matter.
+          Stay in the <i>loop</i>.
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
-          Housemait sends a quick notification when someone in the family adds or
-          completes a task, shares a shopping item, or adds to the calendar.
-          Nothing marketing, just the stuff you'd miss otherwise.
+          Get pinged when someone in the household adds a shopping item, ticks
+          off a task, or schedules an event - the moments you'd otherwise find
+          out about a day late. Nothing marketing, only family activity.
         </p>
       </div>
 
