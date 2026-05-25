@@ -1628,30 +1628,10 @@ export default function Settings() {
         ) : null}
       </AccordionItem>
 
-      {/* Your data - GDPR right to portability (Article 20). Sits above
-          the danger zone because it's a non-destructive action and should
-          be the first thing users see in the "my rights" area. */}
-      <AccordionItem title="Your data" icon={IconDownload}>
-        <p className="text-sm text-cocoa">
-          Download a JSON file with every row Housemait holds about you and
-          your household - tasks, events, shopping lists, notes, documents
-          metadata, message history. Safe to generate any time; nothing is
-          deleted.
-        </p>
-        <button
-          type="button"
-          onClick={handleExportData}
-          disabled={exporting}
-          className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl border border-cream-border text-bark hover:bg-cream font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {exporting ? 'Preparing…' : 'Export my data'}
-        </button>
-      </AccordionItem>
-
       {/* Active sessions - lets users see + revoke live refresh tokens.
-          Sits between "Your data" (non-destructive GDPR surface) and the
-          delete-account danger zone since it's security-adjacent but
-          non-destructive to the account itself. */}
+          Security-adjacent but non-destructive to the account itself;
+          sits above the GDPR export so the "who's logged in right now"
+          question is answered before the heavier "export everything" tool. */}
       <AccordionItem title="Active sessions" icon={IconShield}>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
@@ -1707,6 +1687,25 @@ export default function Settings() {
             {revokingAllOthers ? 'Revoking…' : 'Revoke all other sessions'}
           </button>
         )}
+      </AccordionItem>
+
+      {/* Your data - GDPR right to portability (Article 20). Sits below
+          Active sessions; non-destructive action, no surprises. */}
+      <AccordionItem title="Your data" icon={IconDownload}>
+        <p className="text-sm text-cocoa">
+          Download a JSON file with every row Housemait holds about you and
+          your household - tasks, events, shopping lists, notes, documents
+          metadata, message history. Safe to generate any time; nothing is
+          deleted.
+        </p>
+        <button
+          type="button"
+          onClick={handleExportData}
+          disabled={exporting}
+          className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl border border-cream-border text-bark hover:bg-cream font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {exporting ? 'Preparing…' : 'Export my data'}
+        </button>
       </AccordionItem>
 
       {/* Account card - shows name, role, and HOW the user is signed
