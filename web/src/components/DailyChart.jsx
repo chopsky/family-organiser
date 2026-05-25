@@ -10,16 +10,22 @@ export default function DailyChart({ data, height = 'h-20' }) {
   const max = Math.max(1, ...data.map((d) => d.calls));
 
   return (
-    <div className={`flex items-end gap-1 ${height}`}>
+    // No items-end on the outer flex - the default align-items: stretch lets
+    // each column fill the full height. Without that, the bar wrapper inside
+    // each column has 0 height, so the bar's percentage-height collapses to 0
+    // and the chart renders as just the count labels with no bars.
+    <div className={`flex gap-1 ${height}`}>
       {data.map((d) => {
         const heightPct = d.calls > 0 ? Math.max(8, (d.calls / max) * 100) : 0;
         const dayLabel = new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         return (
           <div
             key={d.date}
-            className="flex-1 flex flex-col items-center gap-1"
+            className="flex-1 flex flex-col items-center gap-1 min-w-0"
             title={`${dayLabel}: ${d.calls} call${d.calls === 1 ? '' : 's'}`}
           >
+            {/* flex-1 takes remaining vertical space after the count label;
+                items-end pushes the bar to the bottom of that area. */}
             <div className="flex-1 w-full flex items-end">
               <div
                 className={`w-full rounded-t-sm ${d.calls > 0 ? 'bg-plum' : 'bg-light-grey'}`}
