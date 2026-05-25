@@ -2801,6 +2801,86 @@ async function deleteFeedToken(userId, householdId, db = supabase) {
   if (error) throw error;
 }
 
+/**
+ * Admin: rolled-up view of the new calendar model — every inbound iCal
+ * subscription (external_calendar_feeds) with owner + household names and
+ * an event_count, plus every outbound feed token (calendar_feed_tokens)
+ * with owner + household. Uses the same bulk-enrichment pattern as
+ * getAllHouseholdsAdmin: one query per table, then in-memory joins, so
+ * the page stays O(1) round-trips regardless of household count.
+ */
+async function getCalendarSyncHealthAdmin(db = supabase) {
+  const [feedsRes, tokensRes] = await Promise.all([
+    db.from('external_calendar_feeds').select().order('created_at', { ascending: false }),
+    db.from('calendar_feed_tokens').select().order('created_at', { ascending: false }),
+  ]);
+
+  const feeds = feedsRes.data || [];
+  const tokens = tokensRes.data || [];
+
+  const householdIds = new Set();
+  const userIds = new Set();
+  for (const f of feeds) {
+    if (f.household_id) householdIds.add(f.household_id);
+    if (f.user_id) userIds.add(f.user_id);
+  }
+  for (const t of tokens) {
+    if (t.household_id) householdIds.add(t.household_id);
+    if (t.user_id) userIds.add(t.user_id);
+  }
+
+  // Fetch household + user names + event counts in parallel
+  const [householdsRes, usersRes, eventCountRes] = await Promise.all([
+    householdIds.size > 0
+      ? db.from('households').select('id, name').in('id', Array.from(householdIds))
+      : Promise.resolve({ data: [] }),
+    userIds.size > 0
+      ? db.from('users').select('id, name, email').in('id', Array.from(userIds))
+      : Promise.resolve({ data: [] }),
+    feeds.length > 0
+      ? db.from('calendar_events').select('external_feed_id').in('external_feed_id', feeds.map((f) => f.id)).is('deleted_at', null)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const householdMap = {};
+  for (const h of householdsRes.data || []) householdMap[h.id] = h.name;
+  const userMap = {};
+  for (const u of usersRes.data || []) userMap[u.id] = u;
+  const eventCounts = {};
+  for (const row of eventCountRes.data || []) {
+    eventCounts[row.external_feed_id] = (eventCounts[row.external_feed_id] || 0) + 1;
+  }
+
+  const enrichedFeeds = feeds.map((f) => ({
+    id: f.id,
+    household_id: f.household_id,
+    household_name: householdMap[f.household_id] || 'Unknown',
+    user_id: f.user_id,
+    user_name: userMap[f.user_id]?.name || 'Unknown',
+    user_email: userMap[f.user_id]?.email || '',
+    feed_url: f.feed_url,
+    display_name: f.display_name,
+    color: f.color,
+    sync_enabled: f.sync_enabled,
+    last_synced_at: f.last_synced_at,
+    last_error: f.last_error,
+    consecutive_failures: f.consecutive_failures || 0,
+    created_at: f.created_at,
+    event_count: eventCounts[f.id] || 0,
+  }));
+
+  const enrichedTokens = tokens.map((t) => ({
+    household_id: t.household_id,
+    household_name: householdMap[t.household_id] || 'Unknown',
+    user_id: t.user_id,
+    user_name: userMap[t.user_id]?.name || 'Unknown',
+    user_email: userMap[t.user_id]?.email || '',
+    created_at: t.created_at,
+  }));
+
+  return { feeds: enrichedFeeds, outboundTokens: enrichedTokens };
+}
+
 async function getAllEventsForFeed(householdId, db = supabase) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -5392,6 +5472,7 @@ module.exports = {
   upsertExternalFeedEvent,
   batchUpsertExternalFeedEvents,
   batchSoftDeleteCalendarEvents,
+  getCalendarSyncHealthAdmin,
   getAllEventsForFeed,
   createCalendarEventFromSync,
   // Dependents

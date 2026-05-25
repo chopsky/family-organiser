@@ -227,6 +227,19 @@ router.get('/households/:id/ai-usage', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/calendar-sync ───────────────────────────────────────────
+// Inbound iCal subscriptions and outbound feed tokens across every household.
+
+router.get('/calendar-sync', async (req, res) => {
+  try {
+    const result = await db.getCalendarSyncHealthAdmin();
+    return res.json(result);
+  } catch (err) {
+    console.error('GET /api/admin/calendar-sync error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── PATCH /api/admin/households/:id/subscription ──────────────────────────
 
 router.patch('/households/:id/subscription', async (req, res) => {
