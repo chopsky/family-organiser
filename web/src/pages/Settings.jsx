@@ -1678,16 +1678,19 @@ export default function Settings() {
         )}
       </SectionWrapper>
 
-      {/* Grouped accordion card - JUST for Notifications + Active
-          sessions, the two sections that stay as collapsible accordions
-          on web because their content (long preferences toggle lists,
-          long device-session lists) is worth hiding when not in use.
-          The other six sections are always-expanded cards. Skipped on
-          iOS (list mode uses the section-row list; sub-page mode has
-          each section render its own card via SectionWrapper, so we'd
-          end up with a card-in-a-card double wrap otherwise). */}
-      {!isIosPlatform && (
-      <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      {/* Grouped wrapper for Notifications + Active sessions - the
+          two sections that stay collapsible on web. On web the wrapper
+          is a shared bg-linen card with internal hairlines between
+          the two accordions. On iOS the wrapper is an unstyled div so
+          each section renders standalone (sub-page mode wraps each
+          in its own card via SectionWrapper; list mode skips them).
+          Wrapper must always render so children stay mounted - the
+          previous bug was gating the wrapper conditionally, which
+          dropped the children too. */}
+      <div
+        className={isIosPlatform ? '' : 'bg-linen rounded-2xl px-5 md:px-6'}
+        style={isIosPlatform ? undefined : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+      >
 
       {/* Notifications - unified on every platform. Two subsections:
           Push (iOS only, where APNs delivers) and WhatsApp (any platform
@@ -1851,7 +1854,6 @@ export default function Settings() {
       </SectionWrapper>
 
       </div>
-      )}
 
       {/* Your data - GDPR right to portability (Article 20). Sits below
           Active sessions; non-destructive action, no surprises. */}
