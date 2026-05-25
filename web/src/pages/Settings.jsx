@@ -1304,7 +1304,7 @@ export default function Settings() {
       {/* Connect Calendars */}
       <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar}>
         <p className="text-sm text-cocoa mb-3">
-          Show the events from your Housemait calendar in your external calendars. One-way - events you create here appear there automatically.
+          Show your Housemait calendar events in your third-party calendars. One-way - events you create here appear there automatically.
         </p>
 
 
@@ -1391,7 +1391,7 @@ export default function Settings() {
             )}
           </div>
           <p className="text-sm text-cocoa mb-3">
-            Show the events from your external calendars in your Housemait calendar. Read-only - edits happen in the source calendar.
+            Show your third-party calendar events in your Housemait calendar. Read-only - edits happen in the source calendar.
           </p>
 
           {showAddFeed && (
