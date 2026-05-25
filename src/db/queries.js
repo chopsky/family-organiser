@@ -3308,8 +3308,16 @@ const IDLE_THRESHOLD_DAYS = 14;
  * query can constrain on. Filtering by a derived field can't be done in
  * Postgres directly without a view, so we compute it up-front in two cheap
  * queries (refresh_tokens recent → users with those tokens) and use .in().
- * Returns { householdIds, allActiveHouseholdIds, isEmpty } — caller short-
- * circuits the main query when isEmpty=true.
+ *
+ * "active"  → any household with at least one member active in the window.
+ *             Broad on purpose: a cancelled-but-still-using household is
+ *             worth seeing.
+ * "idle"    → at-risk in the business sense: trialing OR active subscription
+ *             AND not internal AND no member active in the window. Cancelled
+ *             / expired / internal accounts are excluded because they can't
+ *             churn (they already did, or never will).
+ *
+ * Returns { householdIds, isEmpty }; caller short-circuits when isEmpty=true.
  */
 async function resolveActivityFilter(activity, db = supabase) {
   if (activity !== 'idle' && activity !== 'active') return null;
@@ -3335,9 +3343,17 @@ async function resolveActivityFilter(activity, db = supabase) {
     return { householdIds: Array.from(activeHouseholdIds), isEmpty: activeHouseholdIds.size === 0 };
   }
 
-  // idle: every household NOT in the active set
-  const { data: allHouseholds } = await db.from('households').select('id');
-  const idleIds = (allHouseholds || []).map((h) => h.id).filter((id) => !activeHouseholdIds.has(id));
+  // idle = at-risk: only count households that COULD still churn. Already-
+  // cancelled / expired / internal-flagged households are excluded because
+  // they're not paying customers we could lose.
+  const { data: payingHouseholds } = await db
+    .from('households')
+    .select('id')
+    .in('subscription_status', ['trialing', 'active'])
+    .eq('is_internal', false);
+  const idleIds = (payingHouseholds || [])
+    .map((h) => h.id)
+    .filter((id) => !activeHouseholdIds.has(id));
   return { householdIds: idleIds, isEmpty: idleIds.length === 0 };
 }
 
@@ -3478,13 +3494,14 @@ async function getPlatformStats(db = supabase) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats, idleFilter] = await Promise.all([
+  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats, idleFilter, activeFilter] = await Promise.all([
     db.from('users').select('id', { count: 'exact', head: true }),
     db.from('households').select('id', { count: 'exact', head: true }),
     db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
     db.from('households').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
     getSubscriptionStats(db),
     resolveActivityFilter('idle', db),
+    resolveActivityFilter('active', db),
   ]);
 
   return {
@@ -3494,6 +3511,7 @@ async function getPlatformStats(db = supabase) {
     newHouseholdsThisWeek: newHouseholdsResult.count || 0,
     subscriptions: subStats,
     atRiskHouseholds: idleFilter?.householdIds?.length || 0,
+    activeHouseholds: activeFilter?.householdIds?.length || 0,
   };
 }
 

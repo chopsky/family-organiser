@@ -20,7 +20,7 @@ const PLAN_OPTIONS = [
 const ACTIVITY_OPTIONS = [
   { value: '', label: 'All activity' },
   { value: 'active', label: 'Active (within 14d)' },
-  { value: 'idle', label: 'Idle (>14d)' },
+  { value: 'idle', label: 'At-risk (paying, idle 14d+)' },
 ];
 
 export default function AdminHouseholds() {
