@@ -19,6 +19,7 @@ import ErrorBanner from '../components/ErrorBanner';
 const Welcome          = lazy(() => import('./onboarding/Welcome'));
 const InviteFamily     = lazy(() => import('./onboarding/InviteFamily'));
 const ConnectWhatsApp  = lazy(() => import('./onboarding/ConnectWhatsApp'));
+const ConnectCalendar  = lazy(() => import('./onboarding/ConnectCalendar'));
 const Notifications    = lazy(() => import('./onboarding/Notifications'));
 const Done             = lazy(() => import('./onboarding/Done'));
 
@@ -73,10 +74,12 @@ export default function Onboarding() {
     { id: 'welcome',           Component: Welcome },
     { id: 'invite-family',     Component: InviteFamily },
     { id: 'connect-whatsapp',  Component: ConnectWhatsApp },
-    // Calendar sync intentionally isn't a wizard step - OAuth redirects
-    // away from the app for Google/Microsoft, and there's no good way to
-    // inline that without risking wizard progress. Users discover it from
-    // Settings once they reach the dashboard.
+    // ConnectCalendar covers the simple iCal subscribe flow only - tap
+    // "Subscribe in Apple Calendar" / Copy URL for Google + Outlook.
+    // The deeper OAuth-based two-way sync (Google / Microsoft) is
+    // Settings-only because the OAuth redirect would navigate away
+    // from the wizard mid-flow.
+    { id: 'connect-calendar',  Component: ConnectCalendar },
     ...(includeNotifications ? [{ id: 'notifications', Component: Notifications }] : []),
     { id: 'done',              Component: Done },
   ];
