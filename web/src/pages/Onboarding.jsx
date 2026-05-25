@@ -16,12 +16,13 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 
-const Welcome          = lazy(() => import('./onboarding/Welcome'));
-const InviteFamily     = lazy(() => import('./onboarding/InviteFamily'));
-const ConnectWhatsApp  = lazy(() => import('./onboarding/ConnectWhatsApp'));
-const ConnectCalendar  = lazy(() => import('./onboarding/ConnectCalendar'));
-const Notifications    = lazy(() => import('./onboarding/Notifications'));
-const Done             = lazy(() => import('./onboarding/Done'));
+const Welcome           = lazy(() => import('./onboarding/Welcome'));
+const InviteFamily      = lazy(() => import('./onboarding/InviteFamily'));
+const ConnectWhatsApp   = lazy(() => import('./onboarding/ConnectWhatsApp'));
+const ConnectCalendar   = lazy(() => import('./onboarding/ConnectCalendar'));
+const SubscribeCalendar = lazy(() => import('./onboarding/SubscribeCalendar'));
+const Notifications     = lazy(() => import('./onboarding/Notifications'));
+const Done              = lazy(() => import('./onboarding/Done'));
 
 export default function Onboarding() {
   const { user, household, updateUser, logout } = useAuth();
@@ -74,12 +75,15 @@ export default function Onboarding() {
     { id: 'welcome',           Component: Welcome },
     { id: 'invite-family',     Component: InviteFamily },
     { id: 'connect-whatsapp',  Component: ConnectWhatsApp },
-    // ConnectCalendar covers the simple iCal subscribe flow only - tap
-    // "Subscribe in Apple Calendar" / Copy URL for Google + Outlook.
-    // The deeper OAuth-based two-way sync (Google / Microsoft) is
-    // Settings-only because the OAuth redirect would navigate away
-    // from the wizard mid-flow.
-    { id: 'connect-calendar',  Component: ConnectCalendar },
+    // Calendar steps are paired: ConnectCalendar pushes Housemait
+    // events OUT to the user's phone calendar; SubscribeCalendar pulls
+    // their work / school / other calendars INTO Housemait. The two
+    // together let users treat Housemait as their single calendar
+    // surface. Both are skippable. OAuth-based two-way sync stays
+    // Settings-only - the OAuth redirect would navigate away from the
+    // wizard mid-flow.
+    { id: 'connect-calendar',    Component: ConnectCalendar },
+    { id: 'subscribe-calendar',  Component: SubscribeCalendar },
     ...(includeNotifications ? [{ id: 'notifications', Component: Notifications }] : []),
     { id: 'done',              Component: Done },
   ];
