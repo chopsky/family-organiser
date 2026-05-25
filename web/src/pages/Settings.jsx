@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -7,9 +7,10 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
+import { isIos } from '../lib/platform';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
-  IconDownload, IconShield, IconUser, IconTrash,
+  IconDownload, IconShield, IconUser, IconTrash, IconArrowLeft, IconChevronRight,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -238,7 +239,14 @@ function PlanSection() {
  * 119+). Older browsers ignore the attribute and just allow
  * multiple-open, which is the previous behaviour (graceful fallback).
  */
-function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = false, children }) {
+function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = false, bare = false, children }) {
+  // bare = render just the content with no title, no chevron, no collapse
+  // chrome. Used by the iOS sub-page mode where the page header above
+  // already shows the back arrow + section title, so the accordion's
+  // own header would be redundant.
+  if (bare) {
+    return <div className="py-1">{children}</div>;
+  }
   if (danger) {
     return (
       <details
@@ -276,9 +284,40 @@ function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = fal
   );
 }
 
+// Settings sub-pages on iOS - each row on the iOS settings landing
+// navigates to /settings/<slug> which renders just that one section.
+// `slug` is the URL fragment, `match` lists which AccordionItem title
+// (or 'delete' for the danger one) belongs to this sub-page. Order
+// here drives the order of the row list on the iOS landing.
+const IOS_SECTIONS = [
+  { slug: 'whatsapp',     title: 'Connect WhatsApp',  icon: 'IconMessageCircle' },
+  { slug: 'calendars',    title: 'Connect Calendars', icon: 'IconCalendar' },
+  { slug: 'emails-to-ai', title: 'Send Emails to AI', icon: 'IconMail' },
+  { slug: 'notifications',title: 'Notifications',     icon: 'IconBell' },
+  { slug: 'sessions',     title: 'Active sessions',   icon: 'IconShield' },
+  { slug: 'data',         title: 'Your data',         icon: 'IconDownload' },
+  { slug: 'account',      title: 'Account',           icon: 'IconUser' },
+  { slug: 'delete',       title: 'Delete account',    icon: 'IconTrash', danger: true },
+];
+const IOS_SECTION_ICONS = {
+  IconMessageCircle, IconCalendar, IconMail, IconBell,
+  IconShield, IconDownload, IconUser, IconTrash,
+};
+
 export default function Settings() {
   const { household, user, isAdmin, login, logout, token } = useAuth();
   const navigate = useNavigate();
+  const { section: subSlug } = useParams();
+
+  // iOS native shell: the Settings landing becomes a list of section
+  // rows that each navigate to a dedicated sub-page (matches the iOS
+  // Settings.app pattern - tap a row, slide to a new screen with a
+  // back arrow at the top). On web (browser or PWA) the layout stays
+  // as it was: cards + accordion sections all on one page.
+  const isIosPlatform   = isIos();
+  const iosActiveSection = isIosPlatform ? IOS_SECTIONS.find((s) => s.slug === subSlug) || null : null;
+  const iosSubPageMode  = !!iosActiveSection;
+  const iosListMode     = isIosPlatform && !subSlug;
 
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
@@ -1018,28 +1057,54 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1
-        className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
-      >
-        <div
-          className="hidden"
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: '#f1eef8',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconSettings className="h-5 w-5 text-plum" />
+      {iosSubPageMode ? (
+        /* iOS sub-page header - back arrow + section title. Replaces
+           the standard "Settings" h1 since this IS a sub-page, not
+           the root. Tapping back navigates to /settings (the list). */
+        <div className="flex items-center gap-3 -mt-1">
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            aria-label="Back to Settings"
+            className="-ml-2 p-2 rounded-lg text-cocoa hover:text-bark hover:bg-cream transition-colors"
+          >
+            <IconArrowLeft className="w-5 h-5" />
+          </button>
+          <h1
+            className="flex-1 text-[28px] font-normal leading-none text-bark truncate"
+            style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+          >
+            {iosActiveSection.title}
+          </h1>
         </div>
-        Settings
-      </h1>
+      ) : (
+        <h1
+          className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
+          style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+        >
+          <div
+            className="hidden"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: '#f1eef8',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconSettings className="h-5 w-5 text-plum" />
+          </div>
+          Settings
+        </h1>
+      )}
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
+      {/* My profile - hidden on iOS sub-pages (focus is just the active
+          section's content; My profile lives on the /settings landing). */}
+      {!iosSubPageMode && (
+      <>
       {/* My profile */}
       {(() => {
         const me = members.find((m) => m.id === user?.id);
@@ -1081,17 +1146,48 @@ export default function Settings() {
 
       {/* Plan / subscription */}
       <PlanSection />
+      </>
+      )}
+
+      {/* iOS list mode: replace the accordion stack with a list of
+          nav rows that each navigate to /settings/<slug>. Visual
+          mirrors the accordion summaries (icon + title + chevron)
+          so the surface stays familiar - just behaviour changes
+          from "expand inline" to "go to sub-page". */}
+      {iosListMode && (
+        <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+          {IOS_SECTIONS.map((sec) => {
+            const Icon = IOS_SECTION_ICONS[sec.icon];
+            const iconColor = sec.danger ? 'text-error' : 'text-plum';
+            const titleColor = sec.danger ? 'text-error' : 'text-bark';
+            return (
+              <Link
+                key={sec.slug}
+                to={`/settings/${sec.slug}`}
+                className="flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none border-b border-cream-border last:border-b-0"
+              >
+                {Icon && <Icon className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}
+                <h2 className={`flex-1 text-base md:text-lg font-medium ${titleColor}`}>{sec.title}</h2>
+                <IconChevronRight className="w-4 h-4 md:w-5 md:h-5 text-cocoa shrink-0" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       {/* Grouped accordion card - mirrors the Help-page pattern where
           multiple <details> share one container with internal hairlines,
           so Settings reads as a single panel of preferences rather than
-          a stack of individually-floating cards. The danger-zone
-          accordion (Delete account) sits OUTSIDE this group so the
-          destructive action keeps its visual distinction. */}
+          a stack of individually-floating cards. On iOS list mode this
+          block is skipped entirely (replaced by the section list above).
+          The danger-zone accordion (Delete account) sits OUTSIDE this
+          group so the destructive action keeps its visual distinction. */}
+      {!iosListMode && (
       <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
 
       {/* Connect WhatsApp */}
-      <AccordionItem title="Connect WhatsApp" icon={IconMessageCircle}>
+      {(!iosSubPageMode || subSlug === 'whatsapp') && (
+      <AccordionItem title="Connect WhatsApp" icon={IconMessageCircle} bare={iosSubPageMode}>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
@@ -1136,9 +1232,11 @@ export default function Settings() {
           </>
         )}
       </AccordionItem>
+      )}
 
       {/* Connect Calendars */}
-      <AccordionItem title="Connect Calendars" icon={IconCalendar}>
+      {(!iosSubPageMode || subSlug === 'calendars') && (
+      <AccordionItem title="Connect Calendars" icon={IconCalendar} bare={iosSubPageMode}>
         <p className="text-sm text-cocoa mb-3">
           Show the events from your Housemait calendar in your external calendars. One-way - events you create here appear there automatically.
         </p>
@@ -1382,10 +1480,12 @@ export default function Settings() {
         </div>
 
       </AccordionItem>
+      )}
 
 
       {/* Send Emails to AI */}
-      <AccordionItem title="Send Emails to AI" icon={IconMail}>
+      {(!iosSubPageMode || subSlug === 'emails-to-ai') && (
+      <AccordionItem title="Send Emails to AI" icon={IconMail} bare={iosSubPageMode}>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details - receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
@@ -1527,13 +1627,15 @@ export default function Settings() {
           </p>
         )}
       </AccordionItem>
+      )}
 
       {/* Notifications - unified on every platform. Two subsections:
           Push (iOS only, where APNs delivers) and WhatsApp (any platform
           once linked). Each subsection lists per-type toggles wired to
           notification_preferences. Rendered always so users on web also
           know the section exists; subsection content adapts to capability. */}
-      <AccordionItem title="Notifications" icon={IconBell}>
+      {(!iosSubPageMode || subSlug === 'notifications') && (
+      <AccordionItem title="Notifications" icon={IconBell} bare={iosSubPageMode}>
         {loadingNotifPrefs ? (
           <div className="py-4 text-center text-sm text-cocoa">Loading…</div>
         ) : notifPrefs ? (
@@ -1627,12 +1729,14 @@ export default function Settings() {
           </div>
         ) : null}
       </AccordionItem>
+      )}
 
       {/* Active sessions - lets users see + revoke live refresh tokens.
           Security-adjacent but non-destructive to the account itself;
           sits above the GDPR export so the "who's logged in right now"
           question is answered before the heavier "export everything" tool. */}
-      <AccordionItem title="Active sessions" icon={IconShield}>
+      {(!iosSubPageMode || subSlug === 'sessions') && (
+      <AccordionItem title="Active sessions" icon={IconShield} bare={iosSubPageMode}>
         <p className="text-sm text-cocoa">
           Everywhere you're signed into Housemait right now. Revoke any you
           don't recognise - the device gets signed out immediately.
@@ -1688,10 +1792,12 @@ export default function Settings() {
           </button>
         )}
       </AccordionItem>
+      )}
 
       {/* Your data - GDPR right to portability (Article 20). Sits below
           Active sessions; non-destructive action, no surprises. */}
-      <AccordionItem title="Your data" icon={IconDownload}>
+      {(!iosSubPageMode || subSlug === 'data') && (
+      <AccordionItem title="Your data" icon={IconDownload} bare={iosSubPageMode}>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
           your household - tasks, events, shopping lists, notes, documents
@@ -1707,11 +1813,13 @@ export default function Settings() {
           {exporting ? 'Preparing…' : 'Export my data'}
         </button>
       </AccordionItem>
+      )}
 
       {/* Account card - shows name, role, and HOW the user is signed
           in. Sits just above the danger zone so the user has a clear
           reminder of which account they're about to delete. */}
-      <AccordionItem title="Account" icon={IconUser}>
+      {(!iosSubPageMode || subSlug === 'account') && (
+      <AccordionItem title="Account" icon={IconUser} bare={iosSubPageMode}>
         <p className="text-sm text-cocoa">
           Signed in as <span className="font-medium text-bark">{user?.name}</span>
           {user?.role && <span> ({user.role})</span>}
@@ -1741,15 +1849,21 @@ export default function Settings() {
           </div>
         )}
       </AccordionItem>
+      )}
 
       </div>
+      )}
 
       {/* Danger zone - delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
           a destructive action. Kept OUTSIDE the grouped accordion card
-          above so the destructive action keeps its own visual frame. */}
-      <AccordionItem title="Delete account" danger icon={IconTrash}>
+          above so the destructive action keeps its own visual frame.
+          On iOS list mode the danger row lives in the section list
+          above instead; only the dedicated /settings/delete sub-page
+          renders this AccordionItem. */}
+      {!iosListMode && (!iosSubPageMode || subSlug === 'delete') && (
+      <AccordionItem title="Delete account" danger icon={IconTrash} bare={iosSubPageMode}>
         <p className="text-sm text-cocoa">
           Permanently delete your Housemait account. If you're the only
           member of your household, <strong className="text-bark">everything in it</strong>{' '}
@@ -1769,16 +1883,20 @@ export default function Settings() {
           Delete my account
         </button>
       </AccordionItem>
+      )}
 
       {/* Log out - bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
-          find it here. */}
+          find it here. Hidden on iOS sub-pages (only shows on the
+          /settings landing or on web). */}
+      {!iosSubPageMode && (
       <button
         onClick={() => { logout(); navigate('/'); }}
         className="w-full mt-6 py-3 rounded-2xl border border-error/30 text-error font-semibold text-sm hover:bg-error/5 transition-colors"
       >
         Log out
       </button>
+      )}
 
       {/* Delete Account Modal */}
       {deleteOpen && (
