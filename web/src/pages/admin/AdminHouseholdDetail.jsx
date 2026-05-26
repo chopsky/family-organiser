@@ -31,6 +31,8 @@ export default function AdminHouseholdDetail() {
   const [saving, setSaving] = useState(false);
   const [aiUsage, setAiUsage] = useState(null);
   const [aiUsageLoading, setAiUsageLoading] = useState(true);
+  const [activity, setActivity] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(true);
 
   const loadHousehold = useCallback(async () => {
     try {
@@ -50,6 +52,13 @@ export default function AdminHouseholdDetail() {
       .then(({ data }) => setAiUsage(data))
       .catch((err) => console.error('Failed to load household AI usage:', err))
       .finally(() => setAiUsageLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    api.get(`/admin/households/${id}/activity`, { params: { days: 30 } })
+      .then(({ data }) => setActivity(data))
+      .catch((err) => console.error('Failed to load household activity:', err))
+      .finally(() => setActivityLoading(false));
   }, [id]);
 
   async function patchSubscription(updates) {
@@ -190,6 +199,12 @@ export default function AdminHouseholdDetail() {
       <div className="mt-6">
         <h3 className="font-display text-lg font-semibold text-charcoal mb-3">AI Usage (30d)</h3>
         <AiUsageCard usage={aiUsage} loading={aiUsageLoading} />
+      </div>
+
+      {/* Product Activity */}
+      <div className="mt-6">
+        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Activity (30d)</h3>
+        <ActivityCard activity={activity} loading={activityLoading} />
       </div>
 
       {/* Members */}
@@ -395,6 +410,70 @@ function AiUsageCard({ usage, loading }) {
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const ACTIVITY_FEATURES = [
+  { key: 'tasks', label: 'Tasks', verb: 'added' },
+  { key: 'shopping', label: 'Shopping', verb: 'added' },
+  { key: 'calendar', label: 'Calendar', verb: 'created' },
+  { key: 'documents', label: 'Documents', verb: 'uploaded' },
+  { key: 'meals', label: 'Meals', verb: 'planned' },
+];
+
+function ActivityCard({ activity, loading }) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">Loading activity…</p>
+      </div>
+    );
+  }
+  if (!activity) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">No activity data</p>
+      </div>
+    );
+  }
+
+  const total = Object.values(activity.totals || {}).reduce((a, b) => a + b, 0);
+
+  if (total === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">No product activity in the last {activity.days} days.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+      <div className="flex items-baseline gap-3 flex-wrap mb-5">
+        <span className="font-display text-2xl font-bold text-charcoal">{total}</span>
+        <span className="text-warm-grey text-sm">total actions</span>
+      </div>
+
+      <div className="space-y-4">
+        {ACTIVITY_FEATURES.map(({ key, label, verb }) => {
+          const count = activity.totals?.[key] || 0;
+          const daily = activity.daily?.[key] || [];
+          // DailyChart expects { date, calls } — adapt the count field.
+          const chartData = daily.map((d) => ({ date: d.date, calls: d.count }));
+          return (
+            <div key={key} className="flex items-stretch gap-4">
+              <div className="w-28 shrink-0">
+                <p className="font-medium text-sm text-charcoal">{label}</p>
+                <p className="text-xs text-warm-grey">{count} {verb}</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <DailyChart data={chartData} height="h-12" />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

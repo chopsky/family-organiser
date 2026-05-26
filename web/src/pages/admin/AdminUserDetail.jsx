@@ -26,6 +26,8 @@ export default function AdminUserDetail() {
   const [deleteError, setDeleteError] = useState(null);
   const [usage, setUsage] = useState(null);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [featureSpread, setFeatureSpread] = useState(null);
+  const [featureSpreadLoading, setFeatureSpreadLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
     try {
@@ -45,6 +47,13 @@ export default function AdminUserDetail() {
       .then(({ data }) => setUsage(data))
       .catch((err) => console.error('Failed to load usage:', err))
       .finally(() => setUsageLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    api.get(`/admin/users/${id}/feature-spread`)
+      .then(({ data }) => setFeatureSpread(data))
+      .catch((err) => console.error('Failed to load feature spread:', err))
+      .finally(() => setFeatureSpreadLoading(false));
   }, [id]);
 
   const isSelf = currentUser?.id === id;
@@ -282,6 +291,13 @@ export default function AdminUserDetail() {
         </div>
       )}
 
+      {/* Feature Spread */}
+      <div className="mt-6 bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+        <h3 className="font-display text-base font-semibold text-charcoal mb-3">Feature Spread</h3>
+        <p className="text-xs text-warm-grey mb-3">Which features this user has ever touched (lifetime).</p>
+        <FeatureSpreadPills spread={featureSpread} loading={featureSpreadLoading} />
+      </div>
+
       {/* Usage Stats */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* AI Usage */}
@@ -409,6 +425,56 @@ function Detail({ label, value, noCapitalize }) {
     <div>
       <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider">{label}</p>
       <p className={`text-sm text-charcoal mt-0.5 ${noCapitalize ? '' : 'capitalize'}`}>{value || '-'}</p>
+    </div>
+  );
+}
+
+const FEATURE_PILLS = [
+  { key: 'calendar', label: 'Calendar' },
+  { key: 'shopping', label: 'Shopping' },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'meals', label: 'Meals' },
+  { key: 'documents', label: 'Documents' },
+  { key: 'chat', label: 'Chat' },
+];
+
+function FeatureSpreadPills({ spread, loading }) {
+  if (loading) {
+    return <p className="text-sm text-warm-grey">Loading feature spread…</p>;
+  }
+  if (!spread) {
+    return <p className="text-sm text-warm-grey">No data</p>;
+  }
+
+  const touched = FEATURE_PILLS.filter((f) => spread[f.key]?.used).length;
+  const total = FEATURE_PILLS.length;
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        {FEATURE_PILLS.map(({ key, label }) => {
+          const used = spread[key]?.used;
+          const count = spread[key]?.count || 0;
+          return (
+            <span
+              key={key}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                used
+                  ? 'bg-plum-light text-plum'
+                  : 'bg-cream text-warm-grey border border-dashed border-light-grey'
+              }`}
+              title={used ? `${count} ${count === 1 ? 'action' : 'actions'}` : 'Never used'}
+            >
+              {label}
+              {used && <span className="text-[10px] font-bold opacity-80">{count}</span>}
+            </span>
+          );
+        })}
+      </div>
+      <p className="text-xs text-warm-grey mt-3">
+        {touched} of {total} features used
+        {touched < total && ` — ${total - touched} untried`}
+      </p>
     </div>
   );
 }

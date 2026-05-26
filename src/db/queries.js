@@ -3838,19 +3838,28 @@ async function getWhatsAppTimeline({ days = 30 } = {}, db = supabase) {
 async function getAnalytics({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // DAU: distinct users with activity per day
-  const [shoppingRes, tasksRes, calendarRes, chatRes] = await Promise.all([
+  // Pull creates (added_by/created_by) and completions in parallel. Completions
+  // are filtered by completed_at >= since, not created_at, because a task
+  // created last year and completed yesterday IS recent activity.
+  const [shoppingRes, tasksRes, calendarRes, chatRes, documentsRes, mealsRes, shoppingCompletedRes, tasksCompletedRes] = await Promise.all([
     db.from('shopping_items').select('added_by, created_at').gte('created_at', since),
     db.from('tasks').select('added_by, created_at').gte('created_at', since),
-    db.from('calendar_events').select('created_by, created_at').gte('created_at', since),
+    db.from('calendar_events').select('created_by, created_at').gte('created_at', since).is('external_feed_id', null),
     db.from('chat_messages').select('user_id, created_at').gte('created_at', since).eq('role', 'user'),
+    db.from('documents').select('uploaded_by, created_at').gte('created_at', since),
+    db.from('meal_plan').select('added_by, created_at').gte('created_at', since),
+    db.from('shopping_items').select('added_by, completed_at').gte('completed_at', since).not('completed_at', 'is', null),
+    db.from('tasks').select('added_by, completed_at').gte('completed_at', since).not('completed_at', 'is', null),
   ]);
 
-  // Build DAU map
+  // Build DAU map — completions count as activity too (checking off a task is
+  // engagement even if the task was created days ago).
   const dauMap = {};
-  function addActivity(rows, userField) {
+  function addActivity(rows, userField, dateField = 'created_at') {
     for (const row of rows || []) {
-      const date = row.created_at.split('T')[0];
+      const ts = row[dateField];
+      if (!ts) continue;
+      const date = ts.split('T')[0];
       if (!dauMap[date]) dauMap[date] = new Set();
       if (row[userField]) dauMap[date].add(row[userField]);
     }
@@ -3859,17 +3868,25 @@ async function getAnalytics({ days = 30 } = {}, db = supabase) {
   addActivity(tasksRes.data, 'added_by');
   addActivity(calendarRes.data, 'created_by');
   addActivity(chatRes.data, 'user_id');
+  addActivity(documentsRes.data, 'uploaded_by');
+  addActivity(mealsRes.data, 'added_by');
+  addActivity(shoppingCompletedRes.data, 'added_by', 'completed_at');
+  addActivity(tasksCompletedRes.data, 'added_by', 'completed_at');
 
   const dau = Object.entries(dauMap)
     .map(([date, users]) => ({ date, activeUsers: users.size }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Feature usage counts
+  // Feature usage now reports both created + completed where the concept
+  // applies. Calendar / chat / documents / meals don't have a completion
+  // notion, so completed is undefined for them.
   const featureUsage = {
-    shopping: shoppingRes.data?.length || 0,
-    tasks: tasksRes.data?.length || 0,
-    calendar: calendarRes.data?.length || 0,
-    chat: chatRes.data?.length || 0,
+    shopping: { created: shoppingRes.data?.length || 0, completed: shoppingCompletedRes.data?.length || 0 },
+    tasks: { created: tasksRes.data?.length || 0, completed: tasksCompletedRes.data?.length || 0 },
+    calendar: { created: calendarRes.data?.length || 0 },
+    chat: { created: chatRes.data?.length || 0 },
+    documents: { created: documentsRes.data?.length || 0 },
+    meals: { created: mealsRes.data?.length || 0 },
   };
 
   // Onboarding funnel
@@ -4023,6 +4040,102 @@ async function getHouseholdAiUsage(householdId, { days = 30 } = {}, db = supabas
     byProvider,
     byFeature,
     daily,
+  };
+}
+
+/**
+ * Per-household product activity for the last N days, broken down by feature.
+ *
+ * Calendar excludes events that came in via an inbound external feed
+ * (external_feed_id IS NOT NULL) — those aren't real "user activity", they're
+ * pulled in by the iCal sync cron.
+ *
+ * Returns:
+ *   {
+ *     days: number,                       // window size we resolved
+ *     totals: { tasks, shopping, ... },   // total creates in window
+ *     daily: { tasks: [{date, count}], shopping: [...], ... }  // zero-filled
+ *   }
+ */
+async function getHouseholdActivity(householdId, { days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const [tasksRes, shoppingRes, calendarRes, documentsRes, mealsRes] = await Promise.all([
+    db.from('tasks').select('created_at').eq('household_id', householdId).gte('created_at', since),
+    db.from('shopping_items').select('created_at').eq('household_id', householdId).gte('created_at', since),
+    db
+      .from('calendar_events')
+      .select('created_at')
+      .eq('household_id', householdId)
+      .gte('created_at', since)
+      .is('external_feed_id', null),
+    db.from('documents').select('created_at').eq('household_id', householdId).gte('created_at', since),
+    db.from('meal_plan').select('created_at').eq('household_id', householdId).gte('created_at', since),
+  ]);
+
+  // Build zero-filled date axis covering the full window so charts have a
+  // continuous x-axis even on quiet days.
+  const dateAxis = [];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    dateAxis.push(d.toISOString().slice(0, 10));
+  }
+
+  function bucketByDate(rows) {
+    const byDate = {};
+    for (const r of rows || []) {
+      const date = (r.created_at || '').slice(0, 10);
+      if (date) byDate[date] = (byDate[date] || 0) + 1;
+    }
+    return dateAxis.map((date) => ({ date, count: byDate[date] || 0 }));
+  }
+
+  return {
+    days,
+    totals: {
+      tasks: tasksRes.data?.length || 0,
+      shopping: shoppingRes.data?.length || 0,
+      calendar: calendarRes.data?.length || 0,
+      documents: documentsRes.data?.length || 0,
+      meals: mealsRes.data?.length || 0,
+    },
+    daily: {
+      tasks: bucketByDate(tasksRes.data),
+      shopping: bucketByDate(shoppingRes.data),
+      calendar: bucketByDate(calendarRes.data),
+      documents: bucketByDate(documentsRes.data),
+      meals: bucketByDate(mealsRes.data),
+    },
+  };
+}
+
+/**
+ * Lifetime "has this user ever touched feature X" + counts. Uses head:true
+ * count queries so we don't pull payloads — six counts in parallel.
+ *
+ * Excludes external_feed_id calendar events from the calendar count for the
+ * same reason as getHouseholdActivity (those weren't created by the user).
+ */
+async function getUserFeatureSpread(userId, db = supabase) {
+  const [calendar, shopping, tasks, chat, documents, meals] = await Promise.all([
+    db.from('calendar_events').select('id', { count: 'exact', head: true }).eq('created_by', userId).is('external_feed_id', null),
+    db.from('shopping_items').select('id', { count: 'exact', head: true }).eq('added_by', userId),
+    db.from('tasks').select('id', { count: 'exact', head: true }).eq('added_by', userId),
+    db.from('chat_messages').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('role', 'user'),
+    db.from('documents').select('id', { count: 'exact', head: true }).eq('uploaded_by', userId),
+    db.from('meal_plan').select('id', { count: 'exact', head: true }).eq('added_by', userId),
+  ]);
+
+  return {
+    calendar: { used: (calendar.count || 0) > 0, count: calendar.count || 0 },
+    shopping: { used: (shopping.count || 0) > 0, count: shopping.count || 0 },
+    tasks: { used: (tasks.count || 0) > 0, count: tasks.count || 0 },
+    chat: { used: (chat.count || 0) > 0, count: chat.count || 0 },
+    documents: { used: (documents.count || 0) > 0, count: documents.count || 0 },
+    meals: { used: (meals.count || 0) > 0, count: meals.count || 0 },
   };
 }
 
@@ -5691,6 +5804,8 @@ module.exports = {
   getAiUsageTopHouseholds,
   getAiUsageTopUsers,
   getHouseholdAiUsage,
+  getHouseholdActivity,
+  getUserFeatureSpread,
   getUserUsageStats,
   // Inbound email
   getHouseholdByInboundToken,

@@ -228,6 +228,34 @@ router.get('/households/:id/ai-usage', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/households/:id/activity ─────────────────────────────────
+// Per-household product activity timeline (tasks/shopping/calendar/etc.)
+
+router.get('/households/:id/activity', async (req, res) => {
+  try {
+    const days = Math.min(parseInt(req.query.days, 10) || 30, 90);
+    const activity = await db.getHouseholdActivity(req.params.id, { days });
+    return res.json(activity);
+  } catch (err) {
+    console.error('GET /api/admin/households/:id/activity error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/admin/users/:id/feature-spread ────────────────────────────────
+// Lifetime "which features has this user ever touched" (Calendar / Lists /
+// Tasks / Chat / Documents / Meals) with per-feature counts.
+
+router.get('/users/:id/feature-spread', async (req, res) => {
+  try {
+    const spread = await db.getUserFeatureSpread(req.params.id);
+    return res.json(spread);
+  } catch (err) {
+    console.error('GET /api/admin/users/:id/feature-spread error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/calendar-sync ───────────────────────────────────────────
 // Inbound iCal subscriptions and outbound feed tokens across every household.
 

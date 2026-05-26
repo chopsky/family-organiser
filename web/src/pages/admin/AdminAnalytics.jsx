@@ -43,7 +43,9 @@ export default function AdminAnalytics() {
           <p className="text-xs text-warm-grey font-medium mt-0.5">WAU</p>
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
-          <p className="text-2xl font-bold text-charcoal">{Object.values(featureUsage).reduce((a, b) => a + b, 0)}</p>
+          <p className="text-2xl font-bold text-charcoal">
+            {Object.values(featureUsage).reduce((a, b) => a + (b?.created || 0) + (b?.completed || 0), 0)}
+          </p>
           <p className="text-xs text-warm-grey font-medium mt-0.5">Actions (30d)</p>
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
@@ -61,16 +63,22 @@ export default function AdminAnalytics() {
               <thead>
                 <tr className="border-b border-light-grey text-left">
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Feature</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Actions</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Created</th>
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Completed</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(featureUsage).sort((a, b) => b[1] - a[1]).map(([feature, count]) => (
-                  <tr key={feature} className="border-b border-light-grey last:border-0">
-                    <td className="px-4 py-3 font-medium text-charcoal capitalize">{feature}</td>
-                    <td className="px-4 py-3 text-right text-charcoal">{count}</td>
-                  </tr>
-                ))}
+                {Object.entries(featureUsage)
+                  .sort((a, b) => ((b[1]?.created || 0) + (b[1]?.completed || 0)) - ((a[1]?.created || 0) + (a[1]?.completed || 0)))
+                  .map(([feature, stats]) => (
+                    <tr key={feature} className="border-b border-light-grey last:border-0">
+                      <td className="px-4 py-3 font-medium text-charcoal capitalize">{feature}</td>
+                      <td className="px-4 py-3 text-right text-charcoal">{stats?.created ?? 0}</td>
+                      <td className="px-4 py-3 text-right text-charcoal">
+                        {stats?.completed === undefined ? <span className="text-warm-grey">—</span> : stats.completed}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
