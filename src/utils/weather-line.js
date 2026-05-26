@@ -42,14 +42,30 @@ function buildDigestWeatherLine(forecast) {
   }
 
   // 3. Heavy rain
+  // Cross-check probability: Open-Meteo's daily weather_code is the
+  // "most severe condition of the day" - a single forecast hour with
+  // a heavy-rain marker can flip the daily code to 65 even when the
+  // probability for the day as a whole is near zero. Gate on a high
+  // probability so we don't tell users to brace for a downpour when
+  // there's no real chance of rain.
   if (code === 65 || code === 82 || code === 55) {
-    return `🌧 ${hi}°C, heavy rain in ${city} — worth a brolly all day.`;
+    if (precipProbability >= 50) {
+      return `🌧 ${hi}°C, heavy rain in ${city} — worth a brolly all day.`;
+    }
+    // Probability too low to trust the code - fall through to the
+    // temperature / cloud branches below.
   }
 
-  // 4. Light/moderate rain - chance-of-rain matters
+  // 4. Light/moderate rain - same probability gate, lower threshold.
+  // Without this gate the "wet day" line was firing on days with 0%
+  // chance of rain because Open-Meteo had picked up a single hour of
+  // possible drizzle in its daily aggregate.
   if (code === 61 || code === 63 || code === 80 || code === 81 || code === 51 || code === 53) {
-    const chance = precipProbability && precipProbability >= 20 ? ` (${precipProbability}% chance)` : '';
-    return `🌦 ${hi}°C, wet day in ${city}${chance} — worth a brolly.`;
+    if (precipProbability >= 30) {
+      const chance = precipProbability >= 20 ? ` (${precipProbability}% chance)` : '';
+      return `🌦 ${hi}°C, wet day in ${city}${chance} — worth a brolly.`;
+    }
+    // Probability too low - fall through.
   }
 
   // 5. Fog
