@@ -20,10 +20,17 @@ const RECOMMENDED = [
   // Stripe - Phase 3. Recommended (not REQUIRED) so the app still boots
   // without them during local dev / in tests. Checkout and webhook routes
   // will surface their own errors if called while unset.
+  //
+  // Note: there are NO per-plan / per-currency Price ID env vars. The Price
+  // IDs are resolved at runtime from Stripe using lookup_keys (see
+  // src/services/stripe.js - SUPPORTED_INTERVALS x SUPPORTED_CURRENCIES =
+  // 12 lookup_keys like "monthly_gbp", "annual_usd", etc.). Each managed
+  // Price in the Stripe Dashboard must have its lookup_key field set to the
+  // matching string; otherwise checkout for that (plan, currency) pair will
+  // fail with a clear runtime error. That's a Stripe-side config concern,
+  // not an env var.
   { key: 'STRIPE_SECRET_KEY', hint: 'Stripe API secret (test or live) - needed for checkout + portal' },
   { key: 'STRIPE_WEBHOOK_SECRET', hint: 'Stripe webhook signing secret - needed to verify /api/webhooks/stripe' },
-  { key: 'STRIPE_PRICE_MONTHLY', hint: 'Stripe Price ID for the £5.99/month plan' },
-  { key: 'STRIPE_PRICE_ANNUAL', hint: 'Stripe Price ID for the £59.99/year plan' },
 ];
 
 const OPTIONAL = [
