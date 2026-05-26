@@ -321,8 +321,8 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
     <div
       className="flex flex-col shrink-0"
       style={{
-        minWidth: isMobile ? '100%' : 350,
-        width: isMobile ? '100%' : 350,
+        minWidth: isMobile ? '100%' : 300,
+        width: isMobile ? '100%' : 300,
         background: bgTint,
         borderRadius: 16,
         padding: 16,
