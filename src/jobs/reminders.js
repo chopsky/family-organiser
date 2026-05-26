@@ -53,7 +53,22 @@ function formatEventAssignee(ev) {
  * @param {string} [tz='Europe/London'] - Household timezone for time formatting
  * @returns {string}
  */
-function buildDailyReminderMessage(user, opts = {}) {
+/**
+ * Build the daily-reminder content as discrete parts so it can be plugged
+ * into a Twilio Content Template (one variable per part) instead of being
+ * shipped as a freeform string. Returns:
+ *   {
+ *     name: string,       // user's display name (or "there")
+ *     greeting: string,   // "Good morning" / "Good afternoon" / "Good evening"
+ *     weekday: string,    // "Tuesday" - localised to household tz
+ *     body: string,       // multi-line: weather + schedule + reminders + …
+ *   }
+ *
+ * The legacy buildDailyReminderMessage() composes these parts into the
+ * exact single-string layout it always produced, so tests + non-template
+ * fallback senders are unaffected.
+ */
+function buildDailyReminderParts(user, opts = {}) {
   const {
     todayEvents = [],
     shoppingCount = 0,
@@ -76,11 +91,7 @@ function buildDailyReminderMessage(user, opts = {}) {
     weekday = new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz });
   } catch { /* leave blank if tz is invalid */ }
 
-  const lines = [
-    weekday
-      ? `${greeting}, ${user.name}! Here's your ${weekday}:\n`
-      : `${greeting}, ${user.name}! Here's what's on for today:\n`,
-  ];
+  const lines = [];
 
   // Weather one-liner - null on quiet days so we don't pad with filler.
   if (weatherLine) {
@@ -163,7 +174,21 @@ function buildDailyReminderMessage(user, opts = {}) {
   lines.push('');
   lines.push(pickDigestFooter(linkedAt));
 
-  return lines.join('\n').trim();
+  const body = lines.join('\n').trim();
+  return { name: user.name || 'there', greeting, weekday, body };
+}
+
+/**
+ * Legacy single-string daily reminder, produced by composing parts into
+ * the exact layout we shipped before the Content-Template work. Keeps
+ * the freeform-fallback path identical and tests passing.
+ */
+function buildDailyReminderMessage(user, opts = {}) {
+  const { name, greeting, weekday, body } = buildDailyReminderParts(user, opts);
+  const opener = weekday
+    ? `${greeting}, ${name}! Here's your ${weekday}:`
+    : `${greeting}, ${name}! Here's what's on for today:`;
+  return body ? `${opener}\n\n${body}` : opener;
 }
 
 /**
@@ -335,7 +360,7 @@ async function sendDailyReminders(householdId, singleMember) {
       }
     } catch { /* silently skip school activities on error */ }
 
-    const message = buildDailyReminderMessage(member, {
+    const buildOpts = {
       todayEvents,
       shoppingCount,
       schoolActivities,
@@ -345,12 +370,34 @@ async function sendDailyReminders(householdId, singleMember) {
       dinner,
       taskReminders,
       billReminders,
-    });
+    };
+    const parts = buildDailyReminderParts(member, buildOpts);
+    const message = buildDailyReminderMessage(member, buildOpts);
 
-    // Send via WhatsApp
+    // Send via WhatsApp. Prefer the approved Content Template path when
+    // TWILIO_TEMPLATE_DAILY_REMINDER is set - that's what gets through
+    // WhatsApp's 24-hour customer-service window. The freeform path is
+    // kept as a fallback so local dev / un-approved deploys still send
+    // something (even if it'll be silently dropped outside the window).
     if (whatsapp.isConfigured()) {
+      const templateSid = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
+      // Variables must all be non-empty for WhatsApp to accept the
+      // template send - fall back to placeholders when something is
+      // missing rather than failing the whole reminder.
+      const contentVars = {
+        '1': parts.name || 'there',
+        '2': parts.weekday || 'day',
+        '3': parts.body || '✨ Nothing major on the agenda today - enjoy!',
+      };
+
       try {
-        await whatsapp.sendTemplate(member.whatsapp_phone, message);
+        if (templateSid) {
+          await whatsapp.sendTemplate(member.whatsapp_phone, templateSid, contentVars);
+        } else {
+          // Legacy freeform path - sendTemplate falls through to
+          // sendMessage when the second arg isn't a Content SID.
+          await whatsapp.sendTemplate(member.whatsapp_phone, message);
+        }
         await db.logWhatsAppMessage({
           householdId,
           userId: member.id,
@@ -375,4 +422,4 @@ async function sendDailyReminders(householdId, singleMember) {
   }
 }
 
-module.exports = { buildDailyReminderMessage, sendDailyReminders };
+module.exports = { buildDailyReminderMessage, buildDailyReminderParts, sendDailyReminders };
