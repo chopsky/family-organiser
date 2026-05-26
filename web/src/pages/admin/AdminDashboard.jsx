@@ -89,6 +89,9 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Revenue */}
+      <Revenue revenue={stats?.revenue} />
+
       {/* Subscription Stats */}
       <div className="mt-8">
         <h2 className="font-display text-lg font-medium text-charcoal mb-3">Subscriptions</h2>
@@ -181,6 +184,47 @@ export default function AdminDashboard() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Revenue({ revenue }) {
+  const r = revenue || {};
+  const mrr = r.mrrGbp ?? 0;
+  const mrrDisplay = mrr.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 });
+  const conversion = r.conversionPct;
+  const conversionLabel = conversion === null || conversion === undefined ? '—' : `${conversion}%`;
+  const conversionSubtitle = r.trialsEnded > 0
+    ? `${r.trialsConverted} of ${r.trialsEnded} converted`
+    : 'No trials ended in last 30d';
+
+  return (
+    <div className="mt-8">
+      <h2 className="font-display text-lg font-semibold text-charcoal mb-3">Revenue</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-sage">{mrrDisplay}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">MRR (GBP est.)</p>
+          <p className="text-[10px] text-warm-grey mt-1">
+            {r.activeMonthly ?? 0} monthly + {r.activeAnnual ?? 0} annual
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-plum">{conversionLabel}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">Trial → Paid (30d)</p>
+          <p className="text-[10px] text-warm-grey mt-1">{conversionSubtitle}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-coral">{r.churn30d ?? 0}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">Churn (30d)</p>
+          <p className="text-[10px] text-warm-grey mt-1">Cancelled in window</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-charcoal">{r.newTrialsThisMonth ?? 0}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">New Trials (MTD)</p>
+          <p className="text-[10px] text-warm-grey mt-1">Signed up this month</p>
         </div>
       </div>
     </div>

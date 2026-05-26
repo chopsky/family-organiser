@@ -3919,6 +3919,185 @@ async function getAnalytics({ days = 30 } = {}, db = supabase) {
   return { dau, featureUsage, funnel, wau: weeklyUsers.size };
 }
 
+// ─── Retention cohorts ──────────────────────────────────────────────────────
+//
+// Group users by signup week (ISO week starting Monday) and report % active
+// in subsequent weeks. "Active" = created any row in
+// tasks/shopping/calendar/chat/documents/meals during that week. Refresh-
+// token last_used_at would be cleaner but it only stores the latest use,
+// not a history, so we'd lose visibility into intermediate weeks.
+
+function weekStartMonday(isoTimestamp) {
+  const d = new Date(isoTimestamp);
+  d.setUTCHours(0, 0, 0, 0);
+  const dayOfWeek = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const offsetToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  d.setUTCDate(d.getUTCDate() + offsetToMon);
+  return d.toISOString().slice(0, 10);
+}
+
+function addWeeksToIsoDate(isoDate, n) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+const RETENTION_OFFSETS = [0, 1, 2, 4, 8];
+
+async function getRetentionCohorts({ weeks = 12 } = {}, db = supabase) {
+  // Pull users with signup_at within the cohort window
+  const cohortWindowSince = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000).toISOString();
+  // Activity window extends further back so we can compute W8 retention for
+  // the OLDEST cohort - it signed up `weeks` ago and we need data up to today.
+  const activityWindowSince = cohortWindowSince;
+
+  const { data: users, error: usersErr } = await db
+    .from('users')
+    .select('id, created_at')
+    .gte('created_at', cohortWindowSince);
+  if (usersErr) throw usersErr;
+
+  const [shoppingRes, tasksRes, calendarRes, chatRes, documentsRes, mealsRes] = await Promise.all([
+    db.from('shopping_items').select('added_by, created_at').gte('created_at', activityWindowSince),
+    db.from('tasks').select('added_by, created_at').gte('created_at', activityWindowSince),
+    db.from('calendar_events').select('created_by, created_at').gte('created_at', activityWindowSince).is('external_feed_id', null),
+    db.from('chat_messages').select('user_id, created_at').gte('created_at', activityWindowSince).eq('role', 'user'),
+    db.from('documents').select('uploaded_by, created_at').gte('created_at', activityWindowSince),
+    db.from('meal_plan').select('added_by, created_at').gte('created_at', activityWindowSince),
+  ]);
+
+  // user_id → Set of week starts they were active in
+  const userActiveWeeks = new Map();
+  function noteActivity(rows, userField) {
+    for (const r of rows || []) {
+      const userId = r[userField];
+      if (!userId || !r.created_at) continue;
+      const wk = weekStartMonday(r.created_at);
+      let set = userActiveWeeks.get(userId);
+      if (!set) { set = new Set(); userActiveWeeks.set(userId, set); }
+      set.add(wk);
+    }
+  }
+  noteActivity(shoppingRes.data, 'added_by');
+  noteActivity(tasksRes.data, 'added_by');
+  noteActivity(calendarRes.data, 'created_by');
+  noteActivity(chatRes.data, 'user_id');
+  noteActivity(documentsRes.data, 'uploaded_by');
+  noteActivity(mealsRes.data, 'added_by');
+
+  // Group users by signup week → cohort
+  const cohorts = new Map();
+  for (const u of users || []) {
+    const signupWk = weekStartMonday(u.created_at);
+    let cohort = cohorts.get(signupWk);
+    if (!cohort) {
+      cohort = { signupWeek: signupWk, userIds: [], size: 0 };
+      cohorts.set(signupWk, cohort);
+    }
+    cohort.userIds.push(u.id);
+    cohort.size++;
+  }
+
+  // Compute retention at each offset. Offsets where the target week hasn't
+  // happened yet (i.e. cohort is too new) are returned as null so the UI can
+  // render an empty cell instead of a misleading 0%.
+  const todayWk = weekStartMonday(new Date().toISOString());
+  const result = [];
+  for (const cohort of cohorts.values()) {
+    const retention = {};
+    for (const offset of RETENTION_OFFSETS) {
+      const targetWk = addWeeksToIsoDate(cohort.signupWeek, offset);
+      if (targetWk > todayWk) { retention[offset] = null; continue; }
+      let activeCount = 0;
+      for (const userId of cohort.userIds) {
+        const userWeeks = userActiveWeeks.get(userId);
+        if (userWeeks?.has(targetWk)) activeCount++;
+      }
+      retention[offset] = cohort.size > 0 ? Math.round((activeCount / cohort.size) * 100) : 0;
+    }
+    result.push({ signupWeek: cohort.signupWeek, size: cohort.size, retention });
+  }
+
+  result.sort((a, b) => b.signupWeek.localeCompare(a.signupWeek));
+  return { offsets: RETENTION_OFFSETS, cohorts: result };
+}
+
+// ─── Revenue stats (Stripe-derived) ─────────────────────────────────────────
+//
+// Numbers are estimates: MRR uses fixed GBP per-plan rates (5.99/mo,
+// 59.99/yr ÷ 12) regardless of the household's billing currency, because
+// cross-currency conversion at the admin level isn't worth the complexity
+// for a single-operator dashboard. Treat as a ballpark, not exact revenue.
+
+const MRR_PER_PLAN_GBP = {
+  monthly: 5.99,
+  annual: 59.99 / 12, // ~4.9925
+};
+
+async function getRevenueStats(db = supabase) {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+
+  // 1. Active paying households (excludes internal accounts)
+  const { data: activeRows } = await db
+    .from('households')
+    .select('subscription_plan')
+    .eq('subscription_status', 'active')
+    .eq('is_internal', false);
+
+  let monthly = 0;
+  let annual = 0;
+  for (const h of activeRows || []) {
+    if (h.subscription_plan === 'monthly') monthly++;
+    else if (h.subscription_plan === 'annual') annual++;
+  }
+  const mrrGbp = monthly * MRR_PER_PLAN_GBP.monthly + annual * MRR_PER_PLAN_GBP.annual;
+
+  // 2. Trial → paid conversion (last 30d):
+  //    of households whose trial ended in the window, % currently active.
+  const { data: endedTrials } = await db
+    .from('households')
+    .select('subscription_status')
+    .gte('trial_ends_at', thirtyDaysAgo)
+    .lte('trial_ends_at', now.toISOString())
+    .eq('is_internal', false);
+
+  const trialsEnded = (endedTrials || []).length;
+  const trialsConverted = (endedTrials || []).filter((h) => h.subscription_status === 'active').length;
+  const conversionPct = trialsEnded > 0 ? Math.round((trialsConverted / trialsEnded) * 100) : null;
+
+  // 3. Churn (last 30d): cancelled households whose inactive_since lands in
+  //    the window. inactive_since is written by the stripe webhook handler
+  //    on customer.subscription.deleted.
+  const churnRes = await db
+    .from('households')
+    .select('id', { count: 'exact', head: true })
+    .gte('inactive_since', thirtyDaysAgo)
+    .eq('subscription_status', 'cancelled');
+
+  // 4. Net new this month: trial signups this calendar month (proxy for
+  //    funnel-top growth - cleaner signal than active-conversions since
+  //    those depend on a full 30-day trial having elapsed).
+  const newTrialsRes = await db
+    .from('households')
+    .select('id', { count: 'exact', head: true })
+    .gte('trial_started_at', startOfMonth)
+    .eq('is_internal', false);
+
+  return {
+    activeSubscribers: monthly + annual,
+    activeMonthly: monthly,
+    activeAnnual: annual,
+    mrrGbp: Math.round(mrrGbp * 100) / 100,
+    trialsEnded,
+    trialsConverted,
+    conversionPct, // null when no trials ended in window
+    churn30d: churnRes.count || 0,
+    newTrialsThisMonth: newTrialsRes.count || 0,
+  };
+}
+
 // ─── Phase 2 Admin: Per-user/household breakdowns ───────────────────────────
 
 async function getAiUsageTopHouseholds({ days = 30, limit = 10 } = {}, db = supabase) {
@@ -5801,6 +5980,8 @@ module.exports = {
   getWhatsAppStats,
   getWhatsAppTimeline,
   getAnalytics,
+  getRetentionCohorts,
+  getRevenueStats,
   getAiUsageTopHouseholds,
   getAiUsageTopUsers,
   getHouseholdAiUsage,

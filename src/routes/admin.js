@@ -13,8 +13,11 @@ router.use(requireAuth, requirePlatformAdmin);
 
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await db.getPlatformStats();
-    return res.json(stats);
+    const [stats, revenue] = await Promise.all([
+      db.getPlatformStats(),
+      db.getRevenueStats(),
+    ]);
+    return res.json({ ...stats, revenue });
   } catch (err) {
     console.error('GET /api/admin/stats error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -339,8 +342,12 @@ router.get('/whatsapp-stats', async (req, res) => {
 router.get('/analytics', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
-    const analytics = await db.getAnalytics({ days });
-    return res.json(analytics);
+    const cohortWeeks = Math.min(parseInt(req.query.cohortWeeks, 10) || 12, 26);
+    const [analytics, retention] = await Promise.all([
+      db.getAnalytics({ days }),
+      db.getRetentionCohorts({ weeks: cohortWeeks }),
+    ]);
+    return res.json({ ...analytics, retention });
   } catch (err) {
     console.error('GET /api/admin/analytics error:', err);
     return res.status(500).json({ error: 'Internal server error' });

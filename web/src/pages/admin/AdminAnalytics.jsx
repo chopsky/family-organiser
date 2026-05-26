@@ -16,7 +16,7 @@ export default function AdminAnalytics() {
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
 
-  const { dau = [], featureUsage = {}, funnel = {}, wau = 0 } = data || {};
+  const { dau = [], featureUsage = {}, funnel = {}, wau = 0, retention = null } = data || {};
 
   // Calculate DAU average
   const recentDau = dau.slice(-7);
@@ -105,6 +105,16 @@ export default function AdminAnalytics() {
         </div>
       </div>
 
+      {/* Retention cohorts */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Retention by Cohort</h2>
+        <p className="text-xs text-warm-grey mb-3">
+          Each row is a weekly signup cohort. Cells show the % of that cohort active N weeks later
+          ("active" = created any content during that week). Empty cells = cohort too new to measure.
+        </p>
+        <RetentionGrid retention={retention} />
+      </div>
+
       {/* DAU Timeline */}
       <div className="mt-8">
         <h2 className="font-display text-lg font-medium text-charcoal mb-3">Daily Active Users</h2>
@@ -145,6 +155,71 @@ function FunnelStep({ label, value, total }) {
       <div className="h-2 bg-cream rounded-full overflow-hidden">
         <div className="h-full bg-plum rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  );
+}
+
+// Map a retention % to a tailwind background colour. Linear gradient from
+// coral (low retention) through butter (mid) to sage (high). Cohort row
+// header (the "100%" Week 0 cell) is always sage.
+function retentionCellClass(pct) {
+  if (pct === null || pct === undefined) return 'bg-cream text-warm-grey';
+  if (pct >= 70) return 'bg-sage-light text-sage';
+  if (pct >= 40) return 'bg-butter-light text-charcoal';
+  if (pct > 0)   return 'bg-coral-light text-coral';
+  return 'bg-cream text-warm-grey';
+}
+
+function formatCohortLabel(iso) {
+  // iso is the Monday of the cohort week. Render as "13 Apr" — compact.
+  if (!iso) return '';
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function RetentionGrid({ retention }) {
+  if (!retention || !retention.cohorts || retention.cohorts.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">Not enough cohort data yet — retention grid will populate as users sign up across more weeks.</p>
+      </div>
+    );
+  }
+  const { offsets, cohorts } = retention;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-light-grey text-left">
+            <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Cohort (Mon)</th>
+            <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-right">Size</th>
+            {offsets.map((n) => (
+              <th key={n} className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider text-center">
+                W{n}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cohorts.map((c) => (
+            <tr key={c.signupWeek} className="border-b border-light-grey last:border-0">
+              <td className="px-4 py-3 font-medium text-charcoal">{formatCohortLabel(c.signupWeek)}</td>
+              <td className="px-4 py-3 text-right text-warm-grey">{c.size}</td>
+              {offsets.map((n) => {
+                const pct = c.retention?.[n];
+                const cell = retentionCellClass(pct);
+                return (
+                  <td key={n} className="px-2 py-2 text-center">
+                    <span className={`inline-block w-full px-2 py-1 rounded-md text-xs font-semibold ${cell}`}>
+                      {pct === null || pct === undefined ? '—' : `${pct}%`}
+                    </span>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
