@@ -141,7 +141,7 @@ export default function AdminHouseholds() {
                   <SortableHeader column="name" label="Name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Last Active</th>
+                  <SortableHeader column="last_active_at" label="Last Active" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Storage</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Join Code</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Timezone</th>

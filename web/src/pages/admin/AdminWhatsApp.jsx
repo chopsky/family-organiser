@@ -2,19 +2,27 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { IconMessageCircle } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+
+function rangeLabel(days) {
+  if (days === DAYS_ALL) return 'all time';
+  return `${days}d`;
+}
 
 export default function AdminWhatsApp() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
   const [triggerStatus, setTriggerStatus] = useState(null);
+  const [days, setDays] = useState(30);
 
   useEffect(() => {
-    api.get('/admin/whatsapp-stats')
+    setLoading(true);
+    api.get('/admin/whatsapp-stats', { params: { days } })
       .then(({ data }) => setData(data))
       .catch((err) => console.error('Failed to load WhatsApp stats:', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [days]);
 
   async function handleTriggerMorningBrief() {
     setTriggering(true);
@@ -29,13 +37,13 @@ export default function AdminWhatsApp() {
     }
   }
 
-  if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
+  if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
   const stats = data?.stats || {};
   const timeline = data?.timeline || [];
 
   const statCards = [
-    { label: 'Total Messages (30d)', value: stats.totalMessages ?? 0 },
+    { label: `Total Messages (${rangeLabel(days)})`, value: stats.totalMessages ?? 0 },
     { label: 'Avg Response Time', value: `${stats.avgProcessingMs ?? 0}ms` },
     { label: 'Error Rate', value: `${stats.errorRate ?? 0}%` },
     { label: 'Unique Users', value: stats.uniqueUsers ?? 0 },
@@ -43,11 +51,16 @@ export default function AdminWhatsApp() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1">
-        <IconMessageCircle className="h-6 w-6 text-plum" />
-        <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">WhatsApp Bot</h1>
+      <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <IconMessageCircle className="h-6 w-6 text-plum" />
+            <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">WhatsApp Bot</h1>
+          </div>
+          <p className="text-warm-grey text-sm">Message processing and intent breakdown</p>
+        </div>
+        <DateRangeToggle value={days} onChange={setDays} />
       </div>
-      <p className="text-warm-grey text-sm">Message processing and intent breakdown</p>
 
       {/* Test tools - admin-only manual digest trigger */}
       <div className="bg-white border border-light-grey rounded-2xl p-5 mt-6">

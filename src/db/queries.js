@@ -3250,6 +3250,16 @@ async function fetchLastActiveByUserIds(userIds, db = supabase) {
 }
 
 async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc' } = {}, db = supabase) {
+  // Sorting by last_active_at can't be done in a single SQL query because
+  // it's a derived value (MAX refresh_tokens.last_used_at). For that sort
+  // we go two-step: fetch all matching IDs (no range), join the activity
+  // map, sort in memory, then page through the sorted ID list. The user
+  // base is small enough (hundreds, not millions) that the extra
+  // round-trip is fine.
+  if (sort === 'last_active_at') {
+    return getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db);
+  }
+
   let query = db
     .from('users')
     .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
@@ -3276,6 +3286,60 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
   }
 
   return { users: data, total: count };
+}
+
+/**
+ * Two-step path for sort=last_active_at. Fetches all matching user IDs
+ * + last_active_at, sorts (nulls always last so users who've never logged
+ * in surface at the bottom regardless of direction), then fetches full
+ * rows for just the requested page.
+ */
+async function getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db) {
+  // 1. All matching IDs (no range, no full payload yet)
+  let idQuery = db.from('users').select('id', { count: 'exact' });
+  if (search) idQuery = idQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  const { data: idRows, error: idErr, count } = await idQuery;
+  if (idErr) throw idErr;
+  const allIds = (idRows || []).map((r) => r.id);
+  if (allIds.length === 0) return { users: [], total: 0 };
+
+  // 2. last_active_at for each
+  const lastActiveMap = await fetchLastActiveByUserIds(allIds, db);
+
+  // 3. Sort. Nulls always go last regardless of direction - if we're sorting
+  //    most-recent-first the never-logged-in users sit at the bottom; if
+  //    oldest-first they still sit at the bottom (rather than spuriously
+  //    leading the list with "earliest" = null).
+  const sortedIds = allIds.slice().sort((a, b) => {
+    const ta = lastActiveMap.get(a);
+    const tb = lastActiveMap.get(b);
+    if (!ta && !tb) return 0;
+    if (!ta) return 1;
+    if (!tb) return -1;
+    return sortDir === 'asc' ? ta.localeCompare(tb) : tb.localeCompare(ta);
+  });
+
+  // 4. Page through sorted IDs
+  const from = (page - 1) * limit;
+  const pageIds = sortedIds.slice(from, from + limit);
+  if (pageIds.length === 0) return { users: [], total: count || 0 };
+
+  // 5. Fetch the actual rows for just this page
+  const { data: rows, error: rowErr } = await db
+    .from('users')
+    .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at')
+    .in('id', pageIds);
+  if (rowErr) throw rowErr;
+
+  // 6. Preserve the sorted order (Postgres .in() doesn't return rows in
+  //    the order we asked for) + attach last_active_at to the response
+  const byId = new Map((rows || []).map((r) => [r.id, r]));
+  const ordered = pageIds
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .map((u) => ({ ...u, last_active_at: lastActiveMap.get(u.id) || null }));
+
+  return { users: ordered, total: count || 0 };
 }
 
 async function getUserByIdAdmin(userId, db = supabase) {
@@ -3386,14 +3450,26 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
     query = query.in('id', activityFilter.householdIds);
   }
 
+  // last_active_at is a derived value (MAX across members) so the DB can't
+  // sort by it. For that path we fetch ALL matching rows, enrich, then sort
+  // + paginate in JS. For everything else we use the normal SQL order + range.
+  const sortByActive = sort === 'last_active_at';
+
   // Whitelist sort columns to prevent injection
   const sortColumn = sort === 'name' ? 'name' : 'created_at';
   const ascending = sortDir === 'asc';
 
-  const from = (page - 1) * limit;
-  const { data, error, count } = await query
-    .order(sortColumn, { ascending })
-    .range(from, from + limit - 1);
+  let data, error, count;
+  if (sortByActive) {
+    const res = await query;
+    data = res.data; error = res.error; count = res.count;
+  } else {
+    const from = (page - 1) * limit;
+    const res = await query
+      .order(sortColumn, { ascending })
+      .range(from, from + limit - 1);
+    data = res.data; error = res.error; count = res.count;
+  }
 
   if (error) throw error;
 
@@ -3446,6 +3522,23 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
       h.documents_count = docStats[h.id]?.count || 0;
       h.documents_bytes = docStats[h.id]?.bytes || 0;
     }
+  }
+
+  // For sort=last_active_at we deferred ordering + pagination until after
+  // enrichment (since the field is derived). Apply both now.
+  // Nulls always go last so households with no activity sit at the bottom
+  // regardless of direction.
+  if (sortByActive) {
+    data.sort((a, b) => {
+      const ta = a.last_active_at;
+      const tb = b.last_active_at;
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return ascending ? ta.localeCompare(tb) : tb.localeCompare(ta);
+    });
+    const from = (page - 1) * limit;
+    data = data.slice(from, from + limit);
   }
 
   return { households: data, total: count };

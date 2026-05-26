@@ -11,9 +11,11 @@ export default function SortableHeader({ column, label, sort, sortDir, onSort, c
     if (isActive) {
       onSort(column, sortDir === 'asc' ? 'desc' : 'asc');
     } else {
-      // First click on a new column defaults to descending for created_at,
-      // ascending for everything else (names look natural A→Z first)
-      onSort(column, column === 'created_at' ? 'desc' : 'asc');
+      // First click on a new column defaults to descending for timestamp
+      // columns (most-recent first feels natural for activity / dates),
+      // ascending for text columns (names look natural A→Z first).
+      const isTimestampCol = column === 'created_at' || column === 'last_active_at';
+      onSort(column, isTimestampCol ? 'desc' : 'asc');
     }
   }
 

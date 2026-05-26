@@ -5,8 +5,14 @@ import { IconArrowLeft } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
 import DailyChart from '../../components/DailyChart';
+import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import { formatBytes } from '../../lib/formatBytes';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
+
+function rangeLabel(days) {
+  if (days === DAYS_ALL) return 'all time';
+  return `${days}d`;
+}
 
 const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB - mirrors src/routes/documents.js
 const FILE_QUOTA_COUNT = 500;
@@ -31,8 +37,10 @@ export default function AdminHouseholdDetail() {
   const [saving, setSaving] = useState(false);
   const [aiUsage, setAiUsage] = useState(null);
   const [aiUsageLoading, setAiUsageLoading] = useState(true);
+  const [aiUsageDays, setAiUsageDays] = useState(30);
   const [activity, setActivity] = useState(null);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [activityDays, setActivityDays] = useState(30);
 
   const loadHousehold = useCallback(async () => {
     try {
@@ -48,18 +56,20 @@ export default function AdminHouseholdDetail() {
   useEffect(() => { loadHousehold(); }, [loadHousehold]);
 
   useEffect(() => {
-    api.get(`/admin/households/${id}/ai-usage`)
+    setAiUsageLoading(true);
+    api.get(`/admin/households/${id}/ai-usage`, { params: { days: aiUsageDays } })
       .then(({ data }) => setAiUsage(data))
       .catch((err) => console.error('Failed to load household AI usage:', err))
       .finally(() => setAiUsageLoading(false));
-  }, [id]);
+  }, [id, aiUsageDays]);
 
   useEffect(() => {
-    api.get(`/admin/households/${id}/activity`, { params: { days: 30 } })
+    setActivityLoading(true);
+    api.get(`/admin/households/${id}/activity`, { params: { days: activityDays } })
       .then(({ data }) => setActivity(data))
       .catch((err) => console.error('Failed to load household activity:', err))
       .finally(() => setActivityLoading(false));
-  }, [id]);
+  }, [id, activityDays]);
 
   async function patchSubscription(updates) {
     setSaving(true);
@@ -197,13 +207,20 @@ export default function AdminHouseholdDetail() {
 
       {/* AI Usage */}
       <div className="mt-6">
-        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">AI Usage (30d)</h3>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="font-display text-lg font-semibold text-charcoal">AI Usage ({rangeLabel(aiUsageDays)})</h3>
+          <DateRangeToggle value={aiUsageDays} onChange={setAiUsageDays} />
+        </div>
         <AiUsageCard usage={aiUsage} loading={aiUsageLoading} />
       </div>
 
       {/* Product Activity */}
       <div className="mt-6">
-        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Activity (30d)</h3>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="font-display text-lg font-semibold text-charcoal">Activity ({rangeLabel(activityDays)})</h3>
+          {/* Activity timeline endpoint caps at 90d server-side, so no "All" option here */}
+          <DateRangeToggle value={activityDays} onChange={setActivityDays} includeAll={false} />
+        </div>
         <ActivityCard activity={activity} loading={activityLoading} />
       </div>
 

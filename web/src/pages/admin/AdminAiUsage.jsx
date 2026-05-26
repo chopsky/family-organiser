@@ -4,20 +4,28 @@ import api from '../../lib/api';
 import { IconCpu } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DailyChart from '../../components/DailyChart';
+import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
+
+function rangeLabel(days) {
+  if (days === DAYS_ALL) return 'all time';
+  return `${days}d`;
+}
 
 export default function AdminAiUsage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
 
   useEffect(() => {
-    api.get('/admin/ai-usage')
+    setLoading(true);
+    api.get('/admin/ai-usage', { params: { days } })
       .then(({ data }) => setData(data))
       .catch((err) => console.error('Failed to load AI usage:', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [days]);
 
-  if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
+  if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
   const stats = data?.stats || {};
   const timeline = data?.timeline || [];
@@ -25,7 +33,7 @@ export default function AdminAiUsage() {
   const topUsers = data?.topUsers || [];
 
   const statCards = [
-    { label: 'Total Calls (30d)', value: stats.totalCalls ?? 0, color: 'text-plum bg-plum-light' },
+    { label: `Total Calls (${rangeLabel(days)})`, value: stats.totalCalls ?? 0, color: 'text-plum bg-plum-light' },
     { label: 'Avg Latency', value: `${stats.avgLatencyMs ?? 0}ms`, color: 'text-sage bg-sage-light' },
     { label: 'Failover Rate', value: `${stats.failoverRate ?? 0}%`, color: 'text-coral bg-coral-light' },
     { label: 'Failover Calls', value: stats.failoverCalls ?? 0, color: 'text-warm-grey bg-cream' },
@@ -33,11 +41,16 @@ export default function AdminAiUsage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1">
-        <IconCpu className="h-6 w-6 text-plum" />
-        <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">AI Usage</h1>
+      <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <IconCpu className="h-6 w-6 text-plum" />
+            <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">AI Usage</h1>
+          </div>
+          <p className="text-warm-grey text-sm">API calls across Gemini, Claude, and GPT-4o</p>
+        </div>
+        <DateRangeToggle value={days} onChange={setDays} />
       </div>
-      <p className="text-warm-grey text-sm">API calls across Gemini, Claude, and GPT-4o</p>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

@@ -2,19 +2,27 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { IconTrendingUp } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+
+function rangeLabel(days) {
+  if (days === DAYS_ALL) return 'all time';
+  return `${days}d`;
+}
 
 export default function AdminAnalytics() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
 
   useEffect(() => {
-    api.get('/admin/analytics')
+    setLoading(true);
+    api.get('/admin/analytics', { params: { days } })
       .then(({ data }) => setData(data))
       .catch((err) => console.error('Failed to load analytics:', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [days]);
 
-  if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
+  if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
   const { dau = [], featureUsage = {}, funnel = {}, wau = 0, retention = null } = data || {};
 
@@ -26,11 +34,16 @@ export default function AdminAnalytics() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1">
-        <IconTrendingUp className="h-6 w-6 text-plum" />
-        <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Analytics</h1>
+      <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <IconTrendingUp className="h-6 w-6 text-plum" />
+            <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Analytics</h1>
+          </div>
+          <p className="text-warm-grey text-sm">User activity, feature usage, and onboarding</p>
+        </div>
+        <DateRangeToggle value={days} onChange={setDays} />
       </div>
-      <p className="text-warm-grey text-sm">User activity, feature usage, and onboarding</p>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
@@ -46,7 +59,7 @@ export default function AdminAnalytics() {
           <p className="text-2xl font-bold text-charcoal">
             {Object.values(featureUsage).reduce((a, b) => a + (b?.created || 0) + (b?.completed || 0), 0)}
           </p>
-          <p className="text-xs text-warm-grey font-medium mt-0.5">Actions (30d)</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">Actions ({rangeLabel(days)})</p>
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
           <p className="text-2xl font-bold text-charcoal">{funnel.registered ?? 0}</p>
@@ -57,7 +70,7 @@ export default function AdminAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         {/* Feature Usage */}
         <div>
-          <h2 className="font-display text-lg font-medium text-charcoal mb-3">Feature Usage (30d)</h2>
+          <h2 className="font-display text-lg font-medium text-charcoal mb-3">Feature Usage ({rangeLabel(days)})</h2>
           <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>

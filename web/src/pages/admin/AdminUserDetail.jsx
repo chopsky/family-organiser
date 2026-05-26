@@ -5,7 +5,13 @@ import { useAuth } from '../../context/AuthContext';
 import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu, IconMessageCircle, IconRefresh } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DailyChart from '../../components/DailyChart';
+import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
+
+function rangeLabel(days) {
+  if (days === DAYS_ALL) return 'all time';
+  return `${days}d`;
+}
 
 const avatarColors = {
   red: 'bg-red', 'burnt-orange': 'bg-burnt-orange', amber: 'bg-amber', gold: 'bg-gold',
@@ -26,6 +32,7 @@ export default function AdminUserDetail() {
   const [deleteError, setDeleteError] = useState(null);
   const [usage, setUsage] = useState(null);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [usageDays, setUsageDays] = useState(30);
   const [featureSpread, setFeatureSpread] = useState(null);
   const [featureSpreadLoading, setFeatureSpreadLoading] = useState(true);
 
@@ -43,11 +50,12 @@ export default function AdminUserDetail() {
   useEffect(() => { loadUser(); }, [loadUser]);
 
   useEffect(() => {
-    api.get(`/admin/users/${id}/usage`, { params: { days: 30 } })
+    setUsageLoading(true);
+    api.get(`/admin/users/${id}/usage`, { params: { days: usageDays } })
       .then(({ data }) => setUsage(data))
       .catch((err) => console.error('Failed to load usage:', err))
       .finally(() => setUsageLoading(false));
-  }, [id]);
+  }, [id, usageDays]);
 
   useEffect(() => {
     api.get(`/admin/users/${id}/feature-spread`)
@@ -299,13 +307,17 @@ export default function AdminUserDetail() {
       </div>
 
       {/* Usage Stats */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="mt-6 flex items-center justify-between gap-3 mb-3">
+        <h3 className="font-display text-lg font-semibold text-charcoal">Usage</h3>
+        <DateRangeToggle value={usageDays} onChange={setUsageDays} />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* AI Usage */}
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
               <IconCpu className="h-5 w-5 text-plum" />
-              <h3 className="font-display text-base font-semibold text-charcoal">AI Usage (30d)</h3>
+              <h3 className="font-display text-base font-semibold text-charcoal">AI Usage ({rangeLabel(usageDays)})</h3>
             </div>
             {usage?.ai?.lastUsedAt && (
               <span
@@ -370,7 +382,7 @@ export default function AdminUserDetail() {
         <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
           <div className="flex items-center gap-2 mb-4">
             <IconMessageCircle className="h-5 w-5 text-plum" />
-            <h3 className="font-display text-base font-semibold text-charcoal">WhatsApp (30d)</h3>
+            <h3 className="font-display text-base font-semibold text-charcoal">WhatsApp ({rangeLabel(usageDays)})</h3>
           </div>
           {usageLoading ? (
             <div className="flex justify-center py-4"><Spinner /></div>
