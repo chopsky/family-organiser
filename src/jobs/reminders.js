@@ -395,6 +395,13 @@ async function sendDailyReminders(householdId, singleMember) {
         '2': parts.body || '✨ Nothing major on the agenda today - enjoy!',
       };
 
+      // Per-request diagnostic so we can see what the if/else actually
+      // decides. We saw the startup log show TWILIO_TEMPLATE_DAILY_REMINDER
+      // as set, but the WhatsApp messages arrived in freeform format -
+      // logically impossible unless something between startup and the
+      // request mutates the env. This log line resolves the ambiguity.
+      console.log(`[reminders] WhatsApp send decision for ${member.name}: TWILIO_TEMPLATE_DAILY_REMINDER ${templateSid ? `set (${templateSid.slice(0, 8)}..., len ${templateSid.length})` : 'EMPTY'} → ${templateSid ? 'TEMPLATE path' : 'FREEFORM fallback'}`);
+
       try {
         if (templateSid) {
           await whatsapp.sendTemplate(member.whatsapp_phone, templateSid, contentVars);
