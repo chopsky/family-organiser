@@ -171,6 +171,17 @@ async function sendTemplate(phone, contentSidOrBody, contentVars = {}) {
   const isContentSid = typeof contentSidOrBody === 'string'
     && /^HX[a-f0-9]{32}$/i.test(contentSidOrBody);
   if (!isContentSid) {
+    // Log loudly when the SID arg fails the format check, so a stale /
+    // whitespace-padded / wrong-shape env var doesn't silently degrade
+    // the send to freeform with no diagnostic trail (which is exactly
+    // what bit us when TWILIO_TEMPLATE_DAILY_REMINDER was rotated to a
+    // value with a trailing newline). Only log when the arg actually
+    // LOOKS like an attempted SID (starts with HX) - legacy callers
+    // pass the message body as the second arg deliberately and we
+    // don't want to noise-flood for those.
+    if (typeof contentSidOrBody === 'string' && contentSidOrBody.startsWith('HX')) {
+      console.warn(`[WhatsApp] sendTemplate: '${contentSidOrBody}' (length ${contentSidOrBody.length}) does not match HX + 32 hex chars - falling back to freeform sendMessage. Check the env var for whitespace / wrong format.`);
+    }
     return sendMessage(phone, contentSidOrBody);
   }
   const contentSid = contentSidOrBody;
