@@ -832,7 +832,13 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
   }
 }
 
-async function handleTextMessage(text, user, household) {
+async function handleTextMessage(text, user, household, ctx = {}) {
+  // ctx is an OUT parameter the caller can use to retrieve the resolved
+  // intent for telemetry / logging. We set ctx.intent at each decision
+  // point (pre-classify shortcuts AND after the AI classify call). The
+  // function still returns { response, actions } as before - intent is
+  // surfaced via ctx so existing call sites that don't care about it
+  // (or pass no ctx) keep working unchanged.
   const memberNames = household.members.map((m) => m.name);
 
   // ── Cheap regex pre-classifiers (no AI call) ──
@@ -841,6 +847,7 @@ async function handleTextMessage(text, user, household) {
   // and similar phrases wouldn't match a greeting/thanks/emoji pattern anyway.
   if (isUndoRequest(text)) {
     console.log('[handlers] Pre-classified as undo for:', text.slice(0, 50));
+    ctx.intent = 'undo';
     return await runUndo(user, household);
   }
 
@@ -857,6 +864,7 @@ async function handleTextMessage(text, user, household) {
       const chosen = resolveDisambiguationChoice(text, pendingDisamb);
       if (chosen) {
         console.log(`[handlers] Resolved disambiguation: "${text.slice(0, 30)}" → ${pendingDisamb.kind} ${chosen.id}`);
+        ctx.intent = pendingDisamb.intent || 'disambiguation_reply';
         return await executeModifyAction({
           intent: pendingDisamb.intent,
           kind: pendingDisamb.kind,
@@ -878,6 +886,7 @@ async function handleTextMessage(text, user, household) {
   const trivial = matchTrivialMessage(text);
   if (trivial) {
     console.log('[handlers] Short-circuit trivial reply for:', text.slice(0, 50));
+    ctx.intent = 'trivial';
     return {
       response: trivial.response,
       actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] },
@@ -892,6 +901,7 @@ async function handleTextMessage(text, user, household) {
   const slashCmd = matchSlashCommand(text);
   if (slashCmd) {
     console.log('[handlers] Slash command matched:', slashCmd);
+    ctx.intent = `slash_${slashCmd}`;
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     switch (slashCmd) {
       case 'shopping':
@@ -925,6 +935,7 @@ async function handleTextMessage(text, user, household) {
   const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
   if (weatherPattern.test(text)) {
     console.log('[handlers] Pre-classified as weather for:', text.slice(0, 50));
+    ctx.intent = 'weather';
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     try {
       // Prefer an explicit location in the message ("weather in
@@ -1001,6 +1012,12 @@ async function handleTextMessage(text, user, household) {
   const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
+
+  // Surface the classifier intent for telemetry. Every return below this
+  // point inherits this value via ctx (the route reads it after the call
+  // and writes it into whatsapp_message_log.intent). Pre-classify branches
+  // above set ctx.intent themselves before returning.
+  ctx.intent = result.intent || null;
 
   const actions = {
     shoppingAdded: [],
@@ -1722,14 +1739,17 @@ function buildBroadcastMessage(userName, actions, household = null) {
  * @param {object} household
  * @returns {Promise<{transcription: string, response: string}>}
  */
-async function handleVoiceNote(audioBuffer, filename, user, household) {
+async function handleVoiceNote(audioBuffer, filename, user, household, ctx = {}) {
   const transcribedText = await transcribeVoice(audioBuffer, filename);
 
   if (!transcribedText) {
+    ctx.intent = 'voice_unintelligible';
     return { transcription: null, response: "🎙️ Couldn't hear anything in that voice note. Please try again." };
   }
 
-  const result = await handleTextMessage(transcribedText, user, household);
+  // Pass ctx through so the classifier intent set inside handleTextMessage
+  // is visible to the route's logWhatsAppMessage call for voice messages too.
+  const result = await handleTextMessage(transcribedText, user, household, ctx);
   return {
     transcription: transcribedText,
     response: `🎙️ _"${transcribedText}"_\n\n${result.response}`,

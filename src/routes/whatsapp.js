@@ -199,11 +199,16 @@ router.post('/webhook', async (req, res) => {
         const start = Date.now();
         try {
           const audioBuffer = await whatsapp.downloadMedia(mediaUrl);
-          const result = await handlers.handleVoiceNote(audioBuffer, 'voice.ogg', user, household);
+          // ctx is an OUT parameter populated by handleVoiceNote (via the
+          // handleTextMessage call inside it) with the classifier intent,
+          // so the log captures "create_event" / "task_add" / "chat" etc.
+          // for voice notes too - not the perma-null it used to write.
+          const ctx = {};
+          const result = await handlers.handleVoiceNote(audioBuffer, 'voice.ogg', user, household, ctx);
           await whatsapp.sendMessage(phone, result.response);
           // Persist the transcribed text (if any) as the body so voice-note
           // turns can be replayed as conversation context too.
-          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: null, processingMs: Date.now() - start, body: result.transcription || null, response: result.response });
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: ctx.intent || null, processingMs: Date.now() - start, body: result.transcription || null, response: result.response });
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
@@ -243,9 +248,17 @@ router.post('/webhook', async (req, res) => {
       const start = Date.now();
 
       try {
-        const result = await handlers.handleTextMessage(text, user, household);
+        // ctx is an OUT parameter populated by handleTextMessage with the
+        // resolved intent (either the AI classifier's result.intent or a
+        // pre-classify shortcut tag like 'trivial' / 'slash_shopping' /
+        // 'weather' / 'undo'). The function's RETURN value is still just
+        // { response, actions }; intent surfaces through ctx so the log
+        // call here can persist it without changing every return path
+        // inside handleTextMessage's 30+ branches.
+        const ctx = {};
+        const result = await handlers.handleTextMessage(text, user, household, ctx);
         await whatsapp.sendMessage(phone, result.response);
-        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: result.intent || null, processingMs: Date.now() - start, body: text, response: result.response });
+        db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: ctx.intent || null, processingMs: Date.now() - start, body: text, response: result.response });
 
         // Broadcast to other members
         const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
