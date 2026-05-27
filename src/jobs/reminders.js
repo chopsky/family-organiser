@@ -291,6 +291,14 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   // {{7}} footer - prefer the dinner plan when there is one (the most
   // actionable line in the digest), otherwise fall back to a rotating
   // discovery tip so the var is never empty.
+  //
+  // The template body wraps {{7}} with a static "💡 " prefix, and
+  // pickDigestFooter() returns "💡 Did you know:..." strings ready for
+  // the freeform path which has no template wrapper. Inside the
+  // template we need to strip that leading emoji + space, otherwise
+  // it renders as "💡 💡 Did you know..." (the static + dynamic bulb
+  // colliding). Same applies to any other leading-glyph footer that
+  // pickDigestFooter may emit in the future.
   let footer;
   if (dinner && dinner.meal_name) {
     const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
@@ -299,6 +307,10 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
     // pickDigestFooter returns a multi-segment string; collapse it.
     footer = oneLine(pickDigestFooter(linkedAt)) || 'Reply /help for all commands';
   }
+  // Strip a leading emoji + whitespace so the template's static glyph
+  // isn't duplicated. Range covers WhatsApp's common pictographs incl.
+  // 💡 (U+1F4A1), 🍽️ (U+1F37D + VS16), etc.
+  footer = footer.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}](?:️)?\s*/u, '');
 
   return {
     '1': firstName,
