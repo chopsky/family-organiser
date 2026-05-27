@@ -14,27 +14,10 @@
 //     Apple Calendar.
 
 // Lazy-load tsdav via dynamic import - it's ESM-only and can't use require().
-//
-// CRITICAL: tsdav transitively requires xml-js, whose dist/xml-js.js file
-// is a browserify bundle that includes a browser-style process shim. At
-// module load it executes `process.env = {};` (xml-js.js:2323), wiping
-// every environment variable Node had loaded from Railway. That includes
-// TWILIO_TEMPLATE_DAILY_REMINDER + TWILIO_TEMPLATE_HOUSEHOLD_UPDATE which
-// reminders.js reads dynamically at send time - explaining why the
-// morning brief silently fell back to the freeform send path despite
-// the env vars being correctly set in Railway and visible at server
-// startup.
-//
-// Fix: snapshot process.env BEFORE the import, then restore it AFTER.
-// Object.assign-ing into process.env restores all the keys on the
-// (now-empty) object xml-js installed. This runs exactly once per
-// process because we cache _DAVClient.
 let _DAVClient = null;
 async function getDAVClient() {
   if (!_DAVClient) {
-    const envBackup = { ...process.env };
     const tsdav = await import('tsdav');
-    Object.assign(process.env, envBackup);
     _DAVClient = tsdav.DAVClient;
   }
   return _DAVClient;
@@ -448,16 +431,8 @@ async function deleteEventsBatch(connection, syncMappings) {
   return result;
 }
 
-// Pre-warm helper called from server.js at boot. Triggers the tsdav
-// import so the xml-js process.env wipe + our restore happens at a
-// deterministic point in startup, before requests start arriving.
-async function _warmupAppleSync() {
-  await getDAVClient();
-}
-
 module.exports = {
   parseVEvent,
   expandRecurrence,
   deleteEventsBatch,
-  _warmupAppleSync,
 };

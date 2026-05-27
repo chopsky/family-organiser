@@ -534,27 +534,7 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
     invalidateHouseholdWeatherCache(member.household_id);
     await sendDailyReminders(member.household_id, member);
 
-    // Diagnostic: read process.env directly AND spawn a child process
-    // that reads the OS-level environment (via printenv). If the child
-    // process sees TWILIO_TEMPLATE_DAILY_REMINDER but the parent
-    // process.env doesn't, that's definitive proof something at the
-    // JS level is hiding it (vs the OS env not having it).
-    const debug = { twilioKeysInProcessEnv: [], rawValueLength: null, osEnvHasTemplateVar: null };
-    try {
-      debug.twilioKeysInProcessEnv = Object.keys(process.env).filter(k => k.startsWith('TWILIO_')).sort();
-      const raw = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
-      debug.rawValueLength = typeof raw === 'string' ? raw.length : (raw === undefined ? 'undefined' : typeof raw);
-    } catch (e) { debug.processEnvReadError = e.message; }
-
-    try {
-      const { spawnSync } = require('child_process');
-      const r = spawnSync('sh', ['-c', 'printenv | grep -E "^TWILIO_" | sort | awk -F= "{print \\$1}"'], { encoding: 'utf8', timeout: 2000 });
-      debug.osLevelTwilioKeys = (r.stdout || '').split('\n').filter(Boolean);
-      const check = spawnSync('sh', ['-c', 'test -n "${TWILIO_TEMPLATE_DAILY_REMINDER}" && echo SET || echo UNSET'], { encoding: 'utf8', timeout: 2000 });
-      debug.osEnvHasTemplateVar = (check.stdout || '').trim();
-    } catch (e) { debug.osLevelReadError = e.message; }
-
-    return res.json({ ok: true, sentTo: member.whatsapp_phone, debug });
+    return res.json({ ok: true, sentTo: member.whatsapp_phone });
   } catch (err) {
     console.error('POST /api/admin/tools/trigger-morning-brief error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });

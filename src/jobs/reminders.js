@@ -545,21 +545,6 @@ async function sendDailyReminders(householdId, singleMember) {
       const templateSid = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
       const contentVars = buildDailyReminderTemplateVars(member, buildOpts);
 
-      // Per-request diagnostic: capture PID + all TWILIO_* env keys
-      // visible to the request handler. The startup log shows the
-      // env var as set, but the request handler reads it as empty -
-      // logically impossible in a single Node process. This either
-      // confirms a different process is handling the request (PID
-      // would differ from boot PID) or that the env keys list itself
-      // is missing the var (which would mean env was mutated).
-      const twilioKeys = Object.keys(process.env).filter(k => k.startsWith('TWILIO_')).sort().join(',');
-      const rawValue = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
-      const rawLen = typeof rawValue === 'string' ? rawValue.length : 'N/A';
-      const decisionTag = templateSid
-        ? `TEMPLATE path | sid=${templateSid.slice(0, 8)}... len=${templateSid.length} pid=${process.pid}`
-        : `FREEFORM fallback | rawType=${typeof rawValue} rawLen=${rawLen} pid=${process.pid} twilioKeys=[${twilioKeys}]`;
-      console.log(`[reminders] WhatsApp send decision for ${member.name}: ${decisionTag}`);
-
       try {
         if (templateSid) {
           await whatsapp.sendTemplate(member.whatsapp_phone, templateSid, contentVars);
@@ -574,7 +559,6 @@ async function sendDailyReminders(householdId, singleMember) {
           direction: 'outbound',
           messageType: 'daily_reminder',
           body: message,
-          response: `[diagnostic] ${decisionTag}`,
         });
       } catch (err) {
         console.error(`Failed to send reminder to ${member.name} via WhatsApp:`, err.message);

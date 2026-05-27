@@ -24,43 +24,6 @@ async function start() {
       console.log('ℹ WhatsApp not configured - set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER to enable');
     }
 
-    // Diagnostic startup log: confirm which WhatsApp Content Templates
-    // are actually visible to this process. Useful for catching cases
-    // where the env var is set in Railway's Variables tab but the
-    // running container doesn't see it (env-var propagation lag,
-    // typo in the variable NAME, wrong environment, etc.). Logs only
-    // the boolean + the first 8 chars of the SID - never the full
-    // value (these aren't secrets but no reason to surface them in
-    // every deploy log line). PID is logged too so request-time
-    // diagnostics can be compared - if PIDs differ, we have multiple
-    // processes / forks happening.
-    const _shortSid = (v) => (typeof v === 'string' && v.trim().length > 0 ? `${v.trim().slice(0, 8)}…(len ${v.length})` : 'NOT SET');
-    console.log(`  [startup pid=${process.pid}]`);
-    console.log(`  TWILIO_TEMPLATE_DAILY_REMINDER:    ${_shortSid(process.env.TWILIO_TEMPLATE_DAILY_REMINDER)}`);
-    console.log(`  TWILIO_TEMPLATE_HOUSEHOLD_UPDATE:  ${_shortSid(process.env.TWILIO_TEMPLATE_HOUSEHOLD_UPDATE)}`);
-    console.log(`  TWILIO_MESSAGING_SERVICE_SID:      ${_shortSid(process.env.TWILIO_MESSAGING_SERVICE_SID)}`);
-    const _twilioKeys = Object.keys(process.env).filter(k => k.startsWith('TWILIO_')).sort().join(',');
-    console.log(`  twilio env keys at startup: [${_twilioKeys}]`);
-
-    // Pre-warm the tsdav (Apple CalDAV) import so its transitive
-    // xml-js dep does its `process.env = {}` wipe NOW, at a known
-    // point in boot, after which our snapshot+restore inside
-    // services/providers/apple.js puts the env back together. Without
-    // this, the wipe happens at an unpredictable later moment (first
-    // Apple calendar sync) and any code path that reads env
-    // dynamically AFTER that point sees gaps - most visibly:
-    // reminders.js reading TWILIO_TEMPLATE_DAILY_REMINDER at send
-    // time and falling back to freeform.
-    try {
-      const { _warmupAppleSync } = require('./services/providers/apple');
-      if (typeof _warmupAppleSync === 'function') {
-        await _warmupAppleSync();
-        console.log('✓ tsdav warmed up (xml-js process.env wipe contained)');
-      }
-    } catch (err) {
-      console.warn('[startup] tsdav warmup failed (non-fatal):', err.message);
-    }
-
     // Start Express API
     app.listen(PORT, () => {
       console.log(`✓ Server running on port ${PORT}`);
