@@ -395,15 +395,19 @@ async function sendDailyReminders(householdId, singleMember) {
         '2': parts.body || '✨ Nothing major on the agenda today - enjoy!',
       };
 
-      // Per-request diagnostic: log the if/else decision both to
-      // stdout AND to the whatsapp_message_log.response column. The
-      // DB write is the reliable channel - Railway log visibility has
-      // been unworkable in our debugging session and we need a
-      // deterministic way to see what process.env actually returns at
-      // request time.
+      // Per-request diagnostic: capture PID + all TWILIO_* env keys
+      // visible to the request handler. The startup log shows the
+      // env var as set, but the request handler reads it as empty -
+      // logically impossible in a single Node process. This either
+      // confirms a different process is handling the request (PID
+      // would differ from boot PID) or that the env keys list itself
+      // is missing the var (which would mean env was mutated).
+      const twilioKeys = Object.keys(process.env).filter(k => k.startsWith('TWILIO_')).sort().join(',');
+      const rawValue = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
+      const rawLen = typeof rawValue === 'string' ? rawValue.length : 'N/A';
       const decisionTag = templateSid
-        ? `TEMPLATE path | TWILIO_TEMPLATE_DAILY_REMINDER set (${templateSid.slice(0, 8)}..., len ${templateSid.length})`
-        : `FREEFORM fallback | TWILIO_TEMPLATE_DAILY_REMINDER EMPTY at request time`;
+        ? `TEMPLATE path | sid=${templateSid.slice(0, 8)}... len=${templateSid.length} pid=${process.pid}`
+        : `FREEFORM fallback | rawType=${typeof rawValue} rawLen=${rawLen} pid=${process.pid} twilioKeys=[${twilioKeys}]`;
       console.log(`[reminders] WhatsApp send decision for ${member.name}: ${decisionTag}`);
 
       try {

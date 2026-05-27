@@ -31,11 +31,16 @@ async function start() {
     // typo in the variable NAME, wrong environment, etc.). Logs only
     // the boolean + the first 8 chars of the SID - never the full
     // value (these aren't secrets but no reason to surface them in
-    // every deploy log line).
+    // every deploy log line). PID is logged too so request-time
+    // diagnostics can be compared - if PIDs differ, we have multiple
+    // processes / forks happening.
     const _shortSid = (v) => (typeof v === 'string' && v.trim().length > 0 ? `${v.trim().slice(0, 8)}…(len ${v.length})` : 'NOT SET');
+    console.log(`  [startup pid=${process.pid}]`);
     console.log(`  TWILIO_TEMPLATE_DAILY_REMINDER:    ${_shortSid(process.env.TWILIO_TEMPLATE_DAILY_REMINDER)}`);
     console.log(`  TWILIO_TEMPLATE_HOUSEHOLD_UPDATE:  ${_shortSid(process.env.TWILIO_TEMPLATE_HOUSEHOLD_UPDATE)}`);
     console.log(`  TWILIO_MESSAGING_SERVICE_SID:      ${_shortSid(process.env.TWILIO_MESSAGING_SERVICE_SID)}`);
+    const _twilioKeys = Object.keys(process.env).filter(k => k.startsWith('TWILIO_')).sort().join(',');
+    console.log(`  twilio env keys at startup: [${_twilioKeys}]`);
 
     // Start Express API
     app.listen(PORT, () => {
