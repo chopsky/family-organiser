@@ -77,7 +77,6 @@ so no CORS issues and no need to set `VITE_API_URL` locally.
 | `ANTHROPIC_API_KEY` | ✅ | Claude API key |
 | `OPENAI_API_KEY` | ✅ | OpenAI key for Whisper transcription |
 | `JWT_SECRET` | ✅ | Random 32-byte hex string |
-| `WEBHOOK_URL` | Production only | Railway backend URL |
 | `WEB_URL` | Production only | Vercel frontend URL (enables CORS restriction) |
 | `PORT` | ❌ | Defaults to 3000 (Railway sets this automatically) |
 | `DAILY_REMINDER_HOUR` | ❌ | e.g. `08:00` (default) |
