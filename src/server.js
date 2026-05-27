@@ -42,6 +42,25 @@ async function start() {
     const _twilioKeys = Object.keys(process.env).filter(k => k.startsWith('TWILIO_')).sort().join(',');
     console.log(`  twilio env keys at startup: [${_twilioKeys}]`);
 
+    // Pre-warm the tsdav (Apple CalDAV) import so its transitive
+    // xml-js dep does its `process.env = {}` wipe NOW, at a known
+    // point in boot, after which our snapshot+restore inside
+    // services/providers/apple.js puts the env back together. Without
+    // this, the wipe happens at an unpredictable later moment (first
+    // Apple calendar sync) and any code path that reads env
+    // dynamically AFTER that point sees gaps - most visibly:
+    // reminders.js reading TWILIO_TEMPLATE_DAILY_REMINDER at send
+    // time and falling back to freeform.
+    try {
+      const { _warmupAppleSync } = require('./services/providers/apple');
+      if (typeof _warmupAppleSync === 'function') {
+        await _warmupAppleSync();
+        console.log('✓ tsdav warmed up (xml-js process.env wipe contained)');
+      }
+    } catch (err) {
+      console.warn('[startup] tsdav warmup failed (non-fatal):', err.message);
+    }
+
     // Start Express API
     app.listen(PORT, () => {
       console.log(`✓ Server running on port ${PORT}`);
