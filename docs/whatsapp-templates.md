@@ -134,3 +134,70 @@ For a household of four with one passive member receiving ~5 template-initiated 
 ## Rollback
 
 If template sending causes problems (e.g. Meta revokes approval, a template typo), the fastest rollback is to **unset** `TWILIO_TEMPLATE_HOUSEHOLD_UPDATE` on Railway. The code will revert to the previous behaviour: free-form sends work inside the window, and out-of-window sends are skipped with a warning log. No code deploy needed.
+
+---
+
+## Daily morning brief template
+
+Separate from the household-update template above, the daily 07:00 WhatsApp digest (`src/jobs/reminders.js`) goes via its own approved template — this is what reaches Lynn (and every other household member) at the configured `reminder_time` regardless of when they last replied to the bot.
+
+### The template
+
+**Name:** `housemait_morning_brief`
+**Category:** `UTILITY`
+**Language:** `en_GB`
+
+**Body:**
+
+```
+Your Housemait morning brief
+
+{{1}}
+
+Open Housemait or reply to this message to manage anything.
+```
+
+**Variable:**
+- `{{1}}` - the full pre-formatted digest string from `buildDailyReminderMessage` in `src/jobs/reminders.js`. Single rich block with the greeting, weather line, today's events, tasks due today/tomorrow, shopping count, school activities, and a "did you know" tip.
+
+**Example value (submit this when registering the template):**
+
+```
+Good morning, Grant! Here's your Tuesday:
+
+☀️ 22°C, sunny in London today.
+
+📅 Today's Schedule:
+14:00 - Dentist
+15:30 - Logan pickup
+
+🛒 5 items on the shopping list.
+```
+
+A concrete example matters for Meta review — vague placeholders like "default update" get rejected far more often than realistic content. The reviewer needs to see what the template will actually look like to a recipient.
+
+### History
+
+A previous version used three variables (`{{1}}` name, `{{2}}` weekday, `{{3}}` body) and was rejected by Meta. The single-variable shape above was resubmitted after Meta Business Verification came through, simpler and easier for reviewers to evaluate.
+
+### Wiring
+
+Set on Railway, alongside the other Twilio env vars:
+
+```
+TWILIO_TEMPLATE_DAILY_REMINDER=HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+This is the only template SID the daily digest path looks up. If it's unset, the code falls through to a free-form send (which Twilio will drop with error 63016 outside the recipient's 24-hour window — the same skip-quietly behaviour the household-update path has when its env var is missing).
+
+### Verifying it works
+
+Don't wait for the next morning's 07:00 cron — there's a manual trigger built specifically for this:
+
+1. Sign in as a platform admin on the web app.
+2. Navigate to `/admin/whatsapp` → **"Send my morning brief now"** button (shipped in commit `1f75278`).
+3. The admin endpoint `POST /api/admin/tools/trigger-morning-brief` fires immediately, bypasses the per-member-per-day scheduler lock, and invalidates the digest-weather cache so a stale earlier failure doesn't poison the test.
+4. Check Railway logs for `[WhatsApp] Sending template via REST API` with the new SID and `vars: { '1': "Good morning, ..." }`.
+5. Confirm WhatsApp receipt: the message arrives with the "Your Housemait morning brief" header, then the full digest, then "Open Housemait or reply to this message to manage anything."
+
+If you see `[broadcast] Template REST API error: {"code":63018, ...}`, the template is still pending approval or the SID is wrong for the recipient's region.

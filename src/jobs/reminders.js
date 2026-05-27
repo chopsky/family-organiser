@@ -371,23 +371,28 @@ async function sendDailyReminders(householdId, singleMember) {
       taskReminders,
       billReminders,
     };
-    const parts = buildDailyReminderParts(member, buildOpts);
     const message = buildDailyReminderMessage(member, buildOpts);
 
     // Send via WhatsApp. Prefer the approved Content Template path when
     // TWILIO_TEMPLATE_DAILY_REMINDER is set - that's what gets through
     // WhatsApp's 24-hour customer-service window. The freeform path is
     // kept as a fallback so local dev / un-approved deploys still send
-    // something (even if it'll be silently dropped outside the window).
+    // something (even if it'll be silently dropped outside the window
+    // by Twilio with error 63016).
+    //
+    // The morning-brief template is a single-variable utility template
+    // (body shape: "Your Housemait morning brief\n\n{{1}}\n\nOpen
+    // Housemait or reply..."). We pass the full digest as {{1}}; the
+    // template header + footer wrap it. Previous shape used 3 vars
+    // (name / weekday / body) split via buildDailyReminderParts but
+    // Meta rejected that template; the simpler single-var version is
+    // what got submitted for re-approval. buildDailyReminderParts is
+    // still used internally by buildDailyReminderMessage to assemble
+    // the rich greeting + weekday header.
     if (whatsapp.isConfigured()) {
       const templateSid = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
-      // Variables must all be non-empty for WhatsApp to accept the
-      // template send - fall back to placeholders when something is
-      // missing rather than failing the whole reminder.
       const contentVars = {
-        '1': parts.name || 'there',
-        '2': parts.weekday || 'day',
-        '3': parts.body || '✨ Nothing major on the agenda today - enjoy!',
+        '1': message || '✨ Nothing major on the agenda today - enjoy!',
       };
 
       try {
