@@ -179,6 +179,139 @@ function buildDailyReminderParts(user, opts = {}) {
 }
 
 /**
+ * Build the seven single-line variables for the Twilio Content Template
+ * `housemait_morning_brief_v2`. WhatsApp / Twilio rejects variable
+ * values containing newlines, tabs, or 4+ consecutive whitespace chars
+ * (error 21656), and empty strings are forbidden too - so every var
+ * here is guaranteed non-empty single-line content.
+ *
+ * Template body baked into Twilio Content Builder:
+ *   Good morning, {{1}}! Here's your {{2}}.
+ *
+ *   {{3}}
+ *
+ *   📅 Today's Schedule:
+ *   {{4}}
+ *
+ *   📋 Reminders:
+ *   {{5}}
+ *
+ *   🛒 {{6}}
+ *
+ *   💡 {{7}}
+ *
+ *   Open Housemait or reply to this message to manage anything.
+ *
+ * Variable shapes:
+ *   {{1}} first name        e.g. "Grant"
+ *   {{2}} weekday           e.g. "Tuesday"
+ *   {{3}} weather one-liner e.g. "18°C, light rain later in London"
+ *   {{4}} events            comma-separated  "14:00 - Dentist · 15:30 - Logan pickup (Sarah)"
+ *   {{5}} reminders         comma-separated  "Buy birthday card due today"
+ *   {{6}} shopping          e.g. "5 items on the shopping list"
+ *   {{7}} footer            dinner plan / rotating tip
+ */
+function buildDailyReminderTemplateVars(user, opts = {}) {
+  const {
+    todayEvents = [],
+    shoppingCount = 0,
+    schoolActivities = [],
+    tz = 'Europe/London',
+    linkedAt = null,
+    weatherLine = null,
+    dinner = null,
+    taskReminders = [],
+    billReminders = [],
+  } = opts;
+
+  // First name only - the template greeting "Good morning, {{1}}!" reads
+  // weirdly with a full name, and Meta's reviewers used the first-name
+  // sample we supplied.
+  const firstName = (user.name || 'there').trim().split(/\s+/)[0] || 'there';
+
+  // Weekday in the household tz so a 07:00 BST send says "Thursday"
+  // even when the server clock is UTC.
+  let weekday = 'today';
+  try {
+    weekday = new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz });
+  } catch { /* fallback already set */ }
+
+  // ── single-line sanitiser ──────────────────────────────────────────
+  // Collapse any whitespace run (newlines, tabs, doubled spaces) into a
+  // single space. Strip leading/trailing whitespace. Strip the freeform-
+  // markdown emphasis (*bold*, _italic_) we use in WhatsApp text - it's
+  // pointless inside a template variable and would render as literal
+  // asterisks in the wrapped output.
+  const oneLine = (s) => String(s ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[*_]([^*_]+)[*_]/g, '$1')
+    .trim();
+
+  // {{3}} weather - one-liner from the upstream service.
+  const weather = oneLine(weatherLine) || 'Weather unavailable for today';
+
+  // {{4}} events - all-day first, then timed, then school activities,
+  // joined by " · " (middle dot + spaces - reads as bullets in WA).
+  const allDay = (todayEvents || []).filter(e => e.all_day);
+  const timed = (todayEvents || []).filter(e => !e.all_day);
+  const eventStrings = [
+    ...allDay.map(e => {
+      const who = formatEventAssignee(e);
+      return `All day - ${e.title}${who ? ` (${who})` : ''}`;
+    }),
+    ...timed.map(e => {
+      const t = formatEventTime(e.start_time, tz);
+      const who = formatEventAssignee(e);
+      return `${t} - ${e.title}${who ? ` (${who})` : ''}`;
+    }),
+    ...(schoolActivities || []).map(a => {
+      const timeStr = a.time_end ? ` until ${a.time_end.substring(0, 5)}` : '';
+      return `${a.child_name} - ${a.activity}${timeStr}`;
+    }),
+  ];
+  const events = eventStrings.length > 0
+    ? oneLine(eventStrings.join(' · '))
+    : 'Nothing scheduled today';
+
+  // {{5}} reminders - tasks + bills joined by " · ".
+  const reminderStrings = [
+    ...(taskReminders || []).map(t => `${t.title} due ${t.when}`),
+    ...(billReminders || []).map(b => `${b.name} due ${b.when}`),
+  ];
+  const reminders = reminderStrings.length > 0
+    ? oneLine(reminderStrings.join(' · '))
+    : 'Nothing due today';
+
+  // {{6}} shopping - the count phrase that previously sat in the body.
+  const shopping = shoppingCount > 0
+    ? `${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the shopping list`
+    : 'Shopping list is empty';
+
+  // {{7}} footer - prefer the dinner plan when there is one (the most
+  // actionable line in the digest), otherwise fall back to a rotating
+  // discovery tip so the var is never empty.
+  let footer;
+  if (dinner && dinner.meal_name) {
+    const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
+    footer = `Tonight's dinner: ${dinner.meal_name}${cookTime}`;
+  } else {
+    // pickDigestFooter returns a multi-segment string; collapse it.
+    footer = oneLine(pickDigestFooter(linkedAt)) || 'Reply /help for all commands';
+  }
+
+  return {
+    '1': firstName,
+    '2': weekday,
+    '3': weather,
+    '4': events,
+    '5': reminders,
+    '6': shopping,
+    '7': footer,
+  };
+}
+
+/**
  * Legacy single-string daily reminder, produced by composing parts into
  * the exact layout we shipped before the Content-Template work. Keeps
  * the freeform-fallback path identical and tests passing.
@@ -371,7 +504,6 @@ async function sendDailyReminders(householdId, singleMember) {
       taskReminders,
       billReminders,
     };
-    const parts = buildDailyReminderParts(member, buildOpts);
     const message = buildDailyReminderMessage(member, buildOpts);
 
     // Send via WhatsApp. Prefer the approved Content Template path when
@@ -381,19 +513,25 @@ async function sendDailyReminders(householdId, singleMember) {
     // something (even if it'll be silently dropped outside the window
     // by Twilio with error 63016).
     //
-    // The approved morning-brief template uses TWO variables:
-    //   {{1}} = first name (greeting target)
-    //   {{2}} = digest body (events / tasks / shopping / weather)
-    // Template body wraps these as:
-    //   "Good morning, {{1}}! Here's what's on for today:\n\n{{2}}\n\nOpen Housemait..."
-    // So we pass parts.name + parts.body. The full assembled message
-    // string is only used for the freeform fallback below.
+    // The approved morning-brief-v2 template uses SEVEN single-line
+    // variables - each cell of the digest is one variable, so the
+    // structure (newlines, section headings, emoji glyphs) lives in
+    // the static template body rather than in any variable value.
+    // This sidesteps Twilio's variable-content restrictions (no
+    // newlines / no 4+ consecutive whitespace / no empty strings - any
+    // of which trigger error 21656).
+    //
+    //   {{1}} first name           {{2}} weekday
+    //   {{3}} weather one-liner    {{4}} events summary
+    //   {{5}} reminders summary    {{6}} shopping count
+    //   {{7}} dinner / rotating tip
+    //
+    // The full multi-line message string is still used for the freeform
+    // fallback below - we only flatten to single-line per-section when
+    // the template path is in play.
     if (whatsapp.isConfigured()) {
       const templateSid = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
-      const contentVars = {
-        '1': parts.name || 'there',
-        '2': parts.body || '✨ Nothing major on the agenda today - enjoy!',
-      };
+      const contentVars = buildDailyReminderTemplateVars(member, buildOpts);
 
       // Per-request diagnostic: capture PID + all TWILIO_* env keys
       // visible to the request handler. The startup log shows the
@@ -443,4 +581,9 @@ async function sendDailyReminders(householdId, singleMember) {
   }
 }
 
-module.exports = { buildDailyReminderMessage, buildDailyReminderParts, sendDailyReminders };
+module.exports = {
+  buildDailyReminderMessage,
+  buildDailyReminderParts,
+  buildDailyReminderTemplateVars,
+  sendDailyReminders,
+};
