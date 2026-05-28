@@ -203,6 +203,56 @@ async function updateUser(userId, fields, db = supabase) {
   return data;
 }
 
+/**
+ * Find users eligible for the T+24h WhatsApp re-engagement email.
+ * Used by scheduler.runWhatsAppFollowupCheck (engagement audit Tier 2).
+ *
+ * Criteria:
+ *   - email_verified = true   (don't bother emailing unverified users)
+ *   - whatsapp_linked = false (they haven't completed the activation)
+ *   - whatsapp_followup_sent_at IS NULL (we've never emailed them)
+ *   - created_at older than 24h (give them a full day to come back on
+ *     their own before nudging)
+ *   - created_at newer than 7 days (don't blast stale signups - a user
+ *     who signed up a month ago and never came back is not going to
+ *     activate from an out-of-the-blue email)
+ *   - disabled_at IS NULL    (skip disabled accounts)
+ *
+ * Returns: array of { id, name, email }.
+ */
+async function findUsersAwaitingWhatsAppFollowup(db = supabase) {
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const cutoff7d  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await db
+    .from('users')
+    .select('id, name, email')
+    .eq('email_verified', true)
+    .eq('whatsapp_linked', false)
+    .is('whatsapp_followup_sent_at', null)
+    .is('disabled_at', null)
+    .lt('created_at', cutoff24h)
+    .gt('created_at', cutoff7d)
+    .not('email', 'is', null);
+  if (error) {
+    console.error('[findUsersAwaitingWhatsAppFollowup] query failed:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Stamp users.whatsapp_followup_sent_at on a user after the re-engagement
+ * email is sent. Idempotent - second call is a no-op since the cron only
+ * picks up users with the column still NULL.
+ */
+async function markWhatsAppFollowupSent(userId, db = supabase) {
+  const { error } = await db
+    .from('users')
+    .update({ whatsapp_followup_sent_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) console.error('[markWhatsAppFollowupSent] update failed:', error.message);
+}
+
 // ─── Token helpers (verification, reset) ─────────────────────────────────────
 
 async function createToken(table, { userId, token, expiresAt }, db = supabase) {
@@ -6154,4 +6204,7 @@ module.exports = {
   deleteSubscription,
   getSubscriptionsRenewingBetween,
   updateSubscriptionRenewal,
+  // WhatsApp re-engagement (T+24h email for signups who never linked)
+  findUsersAwaitingWhatsAppFollowup,
+  markWhatsAppFollowupSent,
 };

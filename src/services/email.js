@@ -135,6 +135,70 @@ async function sendVerificationEmail(to, name, token) {
 }
 
 /**
+ * T+24h re-engagement email for users who signed up + verified email
+ * but never connected WhatsApp. Engagement audit Tier 2 (G) - recovers
+ * a portion of the verified-but-not-activated leakage without changing
+ * anything in the product. Sent exactly once per user, gated by the
+ * users.whatsapp_followup_sent_at column.
+ *
+ * The CTA links straight at /onboarding which RequireAuth redirects
+ * to the unfinished step 2 (WhatsApp pairing) for users whose
+ * onboarded_at is null - so a tap from the email lands them one click
+ * away from being linked.
+ */
+async function sendWhatsAppFollowupEmail(to, name) {
+  const firstName = (name || 'there').trim().split(/\s+/)[0] || 'there';
+  // Mirror the verification-email preview block so the user is reminded
+  // exactly what they're opting into. Keeping the brief mockup identical
+  // also means we only have one piece of copy to update when the
+  // morning-brief format evolves.
+  const url = `${BASE_URL}/onboarding`;
+  const html = emailTemplate('Your Housemait is waiting on WhatsApp', `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">Hi ${firstName},</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 18px;">
+      You signed up for Housemait yesterday but haven't connected WhatsApp yet - which is where the bot actually lives. Once you connect, every morning at 07:00 you'll get a calm digest like this:
+    </p>
+
+    <div style="background:${BRAND.cream};border-radius:12px;padding:18px 18px 16px;margin:0 0 20px;border:1px solid ${BRAND.sand};">
+      <p style="color:${BRAND.charcoal};font-size:14px;line-height:1.5;margin:0 0 12px;">
+        <strong>Good morning, ${firstName}!</strong> Here's your Tuesday.
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
+        ☀️ 18°C, sunny in London today
+      </p>
+      <p style="color:${BRAND.charcoal};font-size:13px;line-height:1.5;margin:0 0 2px;font-weight:600;">
+        📅 Today's Schedule:
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
+        14:00 - Dentist · 15:30 - School run (Sarah)
+      </p>
+      <p style="color:${BRAND.charcoal};font-size:13px;line-height:1.5;margin:0 0 2px;font-weight:600;">
+        📋 Reminders:
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
+        Buy birthday card due today
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 10px;">
+        🛒 5 items on the shopping list
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0;">
+        💡 Tonight's dinner: Spaghetti bolognese
+      </p>
+    </div>
+
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:15px;margin:0 0 4px;">
+      It's a 10-second setup - just a phone number and a 6-digit code we'll send via WhatsApp.
+    </p>
+
+    <div style="text-align:center;">${button('Connect WhatsApp now', url)}</div>
+    <p style="color:${BRAND.inkLight};font-size:12px;margin:16px 0 0;">
+      If WhatsApp isn't your thing, no worries - you can still use Housemait directly in the app. We won't email you about this again.
+    </p>
+  `);
+  await sendEmail(to, `${firstName}, your Housemait bot is waiting`, html);
+}
+
+/**
  * Confirmation reply for an inbound (forwarded) email after the AI has
  * processed it. Summarises what got done + offers a one-tap UNDO link
  * so users can revert mistakes without contacting support. The link is
@@ -580,6 +644,7 @@ async function sendAnnouncementEmail({ to, subject, html }) {
 
 module.exports = {
   sendVerificationEmail,
+  sendWhatsAppFollowupEmail,
   sendInviteEmail,
   sendInboundEmailConfirmation,
   sendPasswordResetEmail,

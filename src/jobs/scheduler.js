@@ -101,6 +101,45 @@ async function runSubscriptionRenewalCheck() {
 }
 
 /**
+ * T+24h WhatsApp re-engagement email. Engagement audit Tier 2 (G).
+ * Finds verified users who signed up 24h-7d ago and never linked
+ * WhatsApp, sends them a one-shot re-engagement email pointing back
+ * at /onboarding, and stamps users.whatsapp_followup_sent_at so each
+ * user is contacted at most once.
+ *
+ * 7-day cap intentional: a user who signed up a month ago and never
+ * came back is not going to activate from an out-of-the-blue email,
+ * and would likely flag the message as unwanted. The window is
+ * "still warm enough to nudge."
+ *
+ * Cron runs every 15 minutes - keeps the latency from "crossed 24h"
+ * to "got the email" small enough to feel timely.
+ */
+async function runWhatsAppFollowupCheck() {
+  try {
+    const { sendWhatsAppFollowupEmail } = require('../services/email');
+    const eligible = await db.findUsersAwaitingWhatsAppFollowup();
+    if (!eligible || eligible.length === 0) return;
+    console.log(`[whatsapp-followup] Sending ${eligible.length} re-engagement email(s)`);
+    for (const user of eligible) {
+      try {
+        await sendWhatsAppFollowupEmail(user.email, user.name);
+        await db.markWhatsAppFollowupSent(user.id);
+        console.log(`[whatsapp-followup] sent to ${user.email}`);
+      } catch (err) {
+        // Don't mark as sent on failure - next tick will retry. If the
+        // email address is genuinely undeliverable, Postmark will mark
+        // it as a hard bounce; the retry loop is bounded by the 7-day
+        // window so a permanently broken address will simply age out.
+        console.error(`[whatsapp-followup] failed for user ${user.id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[whatsapp-followup] outer check failed:', err.message);
+  }
+}
+
+/**
  * Run overdue nudge check for every household.
  * Sends at 14:00 in the household's timezone (6 hours after default reminder).
  * Called every minute by cron.
@@ -588,6 +627,14 @@ function startScheduler() {
   // fired inline from /api/auth/create-household, not here.
   cron.schedule('0 9 * * *', () => runTrialEmailCheck(), { timezone: 'Europe/London' });
   console.log('✓ Trial lifecycle emails scheduled (09:00 Europe/London daily)');
+
+  // ── WhatsApp re-engagement email: every 15 minutes ─────────────────────────
+  // T+24h nudge for verified users who never linked WhatsApp. Engagement
+  // audit Tier 2 (G). One-shot per user (stamped on users table). The
+  // every-15-minute cadence keeps latency from "crossed 24h" to "got
+  // the email" under 15 min.
+  cron.schedule('*/15 * * * *', () => runWhatsAppFollowupCheck());
+  console.log('✓ WhatsApp re-engagement check scheduled (every 15 min)');
 
   // ── AI provider health check: every hour at :05 ────────────────────────────
   // Detects "Gemini went dark" failure modes (key unset, quota exhausted,
