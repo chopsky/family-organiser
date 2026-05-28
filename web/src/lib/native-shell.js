@@ -61,9 +61,17 @@ export async function setupNativeShell() {
   // Home-screen quick actions (long-press the app icon for "Add
   // Task" / "Add to Shopping" / "View Calendar" / "Open Shopping
   // List" shortcuts). Registered once per launch - idempotent.
+  //
+  // startShortcutListener has to fire HERE at boot, not later from
+  // Layout.jsx, because the plugin's click event fires within
+  // milliseconds of cold launch - long before React mounts. The
+  // listener buffers the route at module scope and drains it once
+  // Layout.jsx calls onShortcutTapped(). Without this, the first
+  // cold-launch tap is silently lost and the user lands on the
+  // dashboard with no idea why "Add Task" did nothing.
   try {
-    const { registerShortcuts } = await import('./app-shortcuts.js');
-    await registerShortcuts();
+    const { registerShortcuts, startShortcutListener } = await import('./app-shortcuts.js');
+    await Promise.all([registerShortcuts(), startShortcutListener()]);
   } catch (err) {
     console.warn('[native-shell] app shortcuts setup failed:', err?.message || err);
   }

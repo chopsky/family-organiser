@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { AISLE_CATEGORIES, AISLE_CONFIG, getItemEmoji } from '../lib/shopping-constants';
 import Spinner from '../components/Spinner';
@@ -110,6 +111,25 @@ export default function Shopping() {
   const [showNewListInput, setShowNewListInput] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [editFields, setEditFields] = useState({});
+
+  // Ref on the add-item input so the iOS home-screen quick action
+  // ("Add to Shopping") can focus it after the route navigation lands.
+  // See app-shortcuts.js for the shortcut registration; this handler
+  // matches the Tasks.jsx pattern (read ?quickAdd=1, do the action,
+  // strip the param so refresh doesn't re-fire).
+  const addInputRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('quickAdd') === '1') {
+      // Defer the focus so the input has actually mounted (the page
+      // is still in its loading skeleton on first render).
+      setTimeout(() => addInputRef.current?.focus(), 100);
+      const next = new URLSearchParams(searchParams);
+      next.delete('quickAdd');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('quickAdd')]);
 
   // Load lists on mount
   const loadLists = useCallback(async () => {
@@ -451,6 +471,7 @@ export default function Shopping() {
       <WriteGate message="Subscribe to add items to your shopping lists">
       <div className="flex gap-2.5 items-center">
         <input
+          ref={addInputRef}
           type="text"
           value={addText}
           onChange={e => setAddText(e.target.value)}

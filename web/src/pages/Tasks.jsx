@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/Spinner';
@@ -499,6 +500,24 @@ export default function Tasks() {
     if (preAssignee) setAssignees([preAssignee]);
     setShowForm(true);
   }
+
+  // iOS home-screen quick action: long-pressing the app icon and tapping
+  // "Add Task" navigates here with ?quickAdd=1. Open the add modal on
+  // mount and strip the query param so a tab refresh / hot reload
+  // doesn't re-open the form. See web/src/lib/app-shortcuts.js for the
+  // shortcut registration and Layout.jsx for the routing.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('quickAdd') === '1') {
+      openAddForm();
+      const next = new URLSearchParams(searchParams);
+      next.delete('quickAdd');
+      setSearchParams(next, { replace: true });
+    }
+    // Only run when the param itself appears - subsequent state changes
+    // shouldn't re-trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('quickAdd')]);
 
   function openEditForm(task) {
     setTitle(task.title);

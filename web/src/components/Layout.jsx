@@ -134,14 +134,16 @@ export default function Layout({ children }) {
 
   // iOS home-screen quick actions - when the user long-presses the
   // app icon and picks "Add Task" / "View Calendar" / etc., the
-  // plugin fires this listener. Navigate to whatever route the
-  // shortcut config carries. No-op on web.
+  // plugin fires the click listener registered in native-shell.js
+  // at boot. That listener buffers the route at module scope; here
+  // we register our handler so live taps fire immediately AND any
+  // cold-launch route gets drained to navigate() on the next tick.
+  // No-op on web.
   useEffect(() => {
-    let cleanup = () => {};
-    onShortcutTapped((route) => {
+    const unsubscribe = onShortcutTapped((route) => {
       if (route) navigate(route);
-    }).then((fn) => { cleanup = fn; });
-    return () => cleanup();
+    });
+    return unsubscribe;
   }, [navigate]);
 
   // Esc-to-close + body-scroll-lock while the More sheet is open. The
