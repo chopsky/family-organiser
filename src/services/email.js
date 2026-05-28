@@ -78,13 +78,60 @@ async function sendVerificationEmail(to, name, token) {
   // for any in-flight emails sent before this change; new emails point
   // at the frontend route so iOS deep-links work.
   const url = `${BASE_URL}/verify?token=${token}`;
+  // Pull just the first name for the preview greeting - looks weird
+  // to address someone as "Sarah Smith" in a sample WhatsApp message.
+  const firstName = (name || 'there').trim().split(/\s+/)[0] || 'there';
+  // The morning-brief preview block below is a static mockup of what the
+  // 07:00 WhatsApp digest looks like. The engagement audit found the
+  // generic "click here to verify" email was doing zero acquisition work
+  // at the email-verification gate (the second-largest drop in the
+  // signup → active funnel after the WhatsApp-link step itself). Showing
+  // the actual product output the user is opting into - structured,
+  // branded, named-after-them - gives them a concrete reason to come back
+  // and click the button. Sample content matches the housemait_morning_
+  // brief_v2 template's approved sample content so the email and the
+  // first real brief feel of-a-piece.
   const html = emailTemplate('Verify your email', `
-    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Hi ${name},</p>
-    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click the button below to verify your email address and get started with Housemait.</p>
-    <div style="text-align:center;">${button('Verify email', url)}</div>
-    <p style="color:${BRAND.inkLight};font-size:13px;">This link expires in 24 hours.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">Hi ${firstName},</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 18px;">
+      Tomorrow morning at 07:00, Housemait can send you a calm WhatsApp digest like this:
+    </p>
+
+    <div style="background:${BRAND.cream};border-radius:12px;padding:18px 18px 16px;margin:0 0 20px;border:1px solid ${BRAND.sand};">
+      <p style="color:${BRAND.charcoal};font-size:14px;line-height:1.5;margin:0 0 12px;">
+        <strong>Good morning, ${firstName}!</strong> Here's your Tuesday.
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
+        ☀️ 18°C, sunny in London today
+      </p>
+      <p style="color:${BRAND.charcoal};font-size:13px;line-height:1.5;margin:0 0 2px;font-weight:600;">
+        📅 Today's Schedule:
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
+        14:00 - Dentist · 15:30 - School run (Sarah)
+      </p>
+      <p style="color:${BRAND.charcoal};font-size:13px;line-height:1.5;margin:0 0 2px;font-weight:600;">
+        📋 Reminders:
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
+        Buy birthday card due today
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 10px;">
+        🛒 5 items on the shopping list
+      </p>
+      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0;">
+        💡 Tonight's dinner: Spaghetti bolognese
+      </p>
+    </div>
+
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:15px;margin:0 0 4px;">
+      You can also add tasks, manage shopping lists, scan receipts, and update the family calendar just by messaging the bot.
+    </p>
+
+    <div style="text-align:center;">${button('Verify and get started', url)}</div>
+    <p style="color:${BRAND.inkLight};font-size:13px;margin:0;">This link expires in 24 hours.</p>
   `);
-  await sendEmail(to, 'Verify your email for Housemait', html);
+  await sendEmail(to, `${firstName}, your first Housemait brief is one click away`, html);
 }
 
 /**
