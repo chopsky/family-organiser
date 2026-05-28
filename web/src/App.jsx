@@ -26,6 +26,7 @@ const Verified        = lazy(() => import('./pages/Verified'));
 const Verify          = lazy(() => import('./pages/Verify'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
+const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStandalone'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
 const Shopping        = lazy(() => import('./pages/Shopping'));
 const Tasks           = lazy(() => import('./pages/Tasks'));
@@ -190,6 +191,12 @@ function AppRoutes() {
             NOT a completed onboarding (that's what it sets). Renders without
             the regular Layout so the wizard owns the full viewport. */}
         <Route path="/onboarding" element={<RequireAuthOnly><Onboarding /></RequireAuthOnly>} />
+        {/* Standalone WhatsApp pairing surface for the T+24h re-engagement
+            email's CTA. RequireAuthOnly (not RequireAuth) so users who
+            never completed the wizard AND users who did but skipped
+            WhatsApp can both reach it - the page itself bounces already-
+            linked users to /dashboard. */}
+        <Route path="/connect-whatsapp" element={<RequireAuthOnly><ConnectWhatsAppStandalone /></RequireAuthOnly>} />
         <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
         <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
         <Route path="/tasks" element={<RequireAuth><Layout><Tasks /></Layout></RequireAuth>} />

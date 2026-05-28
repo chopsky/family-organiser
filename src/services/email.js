@@ -141,61 +141,85 @@ async function sendVerificationEmail(to, name, token) {
  * anything in the product. Sent exactly once per user, gated by the
  * users.whatsapp_followup_sent_at column.
  *
+ * Email content leads with what the bot DOES (text → list, voice → task,
+ * photo → calendar) rather than what the user passively receives (the
+ * morning digest). The digest is demoted to a single trailing line.
+ * Frame the WhatsApp link as the actual product, not as an extra: "the
+ * app is the catalogue, the bot is what saves you time."
+ *
  * The CTA links straight at /onboarding which RequireAuth redirects
- * to the unfinished step 2 (WhatsApp pairing) for users whose
- * onboarded_at is null - so a tap from the email lands them one click
- * away from being linked.
+ * to the unfinished WhatsApp-pairing step for users whose onboarded_at
+ * is null - so a tap from the email lands them one click away from
+ * being linked.
  */
 async function sendWhatsAppFollowupEmail(to, name) {
   const firstName = (name || 'there').trim().split(/\s+/)[0] || 'there';
-  // Mirror the verification-email preview block so the user is reminded
-  // exactly what they're opting into. Keeping the brief mockup identical
-  // also means we only have one piece of copy to update when the
-  // morning-brief format evolves.
-  const url = `${BASE_URL}/onboarding`;
-  const html = emailTemplate('Your Housemait is waiting on WhatsApp', `
+  // /connect-whatsapp is a standalone pairing surface that works for both
+  // case 1 (never finished the wizard) and case 2 (finished wizard but
+  // skipped WhatsApp). The old /onboarding link was fine for case 1 but
+  // bounced case 2 users to /dashboard with no WhatsApp prompt - exactly
+  // the cohort this email is targeting.
+  const url = `${BASE_URL}/connect-whatsapp`;
+  // Inline-styled WhatsApp-shaped chat mockup. Right-aligned green
+  // bubbles for the user, left-aligned white bubbles for the bot -
+  // instantly recognisable from any WhatsApp screenshot. We use a
+  // table layout (vs floats / flexbox) because email clients vary
+  // wildly in CSS support; tables render consistently in Gmail web,
+  // Apple Mail, Outlook desktop, and webmail.
+  const WA_GREEN_BG = '#DCF8C6'; // outgoing-message green - WhatsApp standard
+  const userBubble = (text) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 6px;">
+      <tr><td style="text-align:right;">
+        <span style="display:inline-block;background:${WA_GREEN_BG};color:${BRAND.charcoal};padding:8px 12px;border-radius:14px 14px 4px 14px;max-width:78%;font-size:13px;line-height:1.4;text-align:left;">
+          ${text}
+        </span>
+      </td></tr>
+    </table>`;
+  const botBubble = (text) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 14px;">
+      <tr><td style="text-align:left;">
+        <span style="display:inline-block;background:#FFFFFF;color:${BRAND.charcoal};padding:8px 12px;border-radius:14px 14px 14px 4px;max-width:78%;font-size:13px;line-height:1.4;border:1px solid ${BRAND.sand};">
+          ${text}
+        </span>
+      </td></tr>
+    </table>`;
+
+  const html = emailTemplate(`You haven't met your Housemait yet`, `
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">Hi ${firstName},</p>
-    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 18px;">
-      You signed up for Housemait yesterday but haven't connected WhatsApp yet - which is where the bot actually lives. Once you connect, every morning at 07:00 you'll get a calm digest like this:
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">
+      You signed up yesterday, but the part that makes Housemait <em>different</em> is still missing.
+    </p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 16px;">
+      The Housemait bot lives in WhatsApp. Instead of opening an app every time, you just message it like a friend:
     </p>
 
-    <div style="background:${BRAND.cream};border-radius:12px;padding:18px 18px 16px;margin:0 0 20px;border:1px solid ${BRAND.sand};">
-      <p style="color:${BRAND.charcoal};font-size:14px;line-height:1.5;margin:0 0 12px;">
-        <strong>Good morning, ${firstName}!</strong> Here's your Tuesday.
-      </p>
-      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
-        ☀️ 18°C, sunny in London today
-      </p>
-      <p style="color:${BRAND.charcoal};font-size:13px;line-height:1.5;margin:0 0 2px;font-weight:600;">
-        📅 Today's Schedule:
-      </p>
-      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
-        14:00 - Dentist · 15:30 - School run (Sarah)
-      </p>
-      <p style="color:${BRAND.charcoal};font-size:13px;line-height:1.5;margin:0 0 2px;font-weight:600;">
-        📋 Reminders:
-      </p>
-      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 14px;">
-        Buy birthday card due today
-      </p>
-      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0 0 10px;">
-        🛒 5 items on the shopping list
-      </p>
-      <p style="color:${BRAND.ink};font-size:13px;line-height:1.5;margin:0;">
-        💡 Tonight's dinner: Spaghetti bolognese
-      </p>
+    <div style="background:${BRAND.cream};border-radius:12px;padding:14px 14px 4px;margin:0 0 18px;border:1px solid ${BRAND.sand};">
+      ${userBubble('We need milk and eggs')}
+      ${botBubble('🛒 Added to shopping list')}
+
+      ${userBubble('Logan dentist Tuesday 3pm')}
+      ${botBubble('📅 Added to the family calendar')}
+
+      ${userBubble('🎙️ <em>voice note:</em> "Remind me to book MOT next month"')}
+      ${botBubble('📋 Reminder set for 25 June')}
+
+      ${userBubble('📸 <em>photo of the school newsletter</em>')}
+      ${botBubble('Pulled out 3 dates and added them to the calendar.')}
     </div>
 
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:15px;margin:0 0 12px;">
+      The app is the catalogue. The bot is what actually saves you time. It's why we built Housemait. You'll also get a calm morning brief at 07:00 every day with what's on.
+    </p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:15px;margin:0 0 4px;">
-      It's a 10-second setup - just a phone number and a 6-digit code we'll send via WhatsApp.
+      Takes 10 seconds to connect. <strong>Free during your trial</strong>. Try it now while it's still fresh.
     </p>
 
     <div style="text-align:center;">${button('Connect WhatsApp now', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:12px;margin:16px 0 0;">
-      If WhatsApp isn't your thing, no worries - you can still use Housemait directly in the app. We won't email you about this again.
+      If WhatsApp isn't for you, no worries. You can keep using Housemait in the app. We won't email about this again.
     </p>
   `);
-  await sendEmail(to, `${firstName}, your Housemait bot is waiting`, html);
+  await sendEmail(to, `${firstName}, you haven't met your Housemait yet`, html);
 }
 
 /**
