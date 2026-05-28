@@ -18,8 +18,7 @@ export default function Welcome({ user, household, next }) {
         Welcome, <i>{firstName}</i>.
       </h1>
       <p className="text-cocoa mt-5 max-w-md mx-auto">
-        Let's get your household set up in a couple of minutes. You can skip
-        any step and come back to it later from Settings.
+        One quick thing and you're chatting with Housemait on WhatsApp.
       </p>
       <button type="button" onClick={next} className={primaryBtn + ' mt-8'}>
         Get started →

@@ -70,11 +70,19 @@ export default function Onboarding() {
   // Build the step list from the cross-platform base + any platform-specific
   // inserts. Index-based navigation is fine because the list is built once
   // and doesn't change during the session.
+  //
+  // Step order matters - we put ConnectWhatsApp IMMEDIATELY after Welcome
+  // because the central magic of Housemait is the WhatsApp bot. Earlier
+  // versions had InviteFamily and Calendar steps gating WhatsApp, which
+  // collapsed activation: a user signs up wanting to try the bot, gets
+  // asked to invite their family + paste an iCal URL first, and bounces.
+  // After this reorder the user goes Welcome → WhatsApp pairing → first
+  // chat with the bot before any social or technical commitment.
   const includeNotifications = isIOS && pushStatus && pushStatus !== 'granted' && pushStatus !== 'skip';
   const steps = [
     { id: 'welcome',           Component: Welcome },
-    { id: 'invite-family',     Component: InviteFamily },
     { id: 'connect-whatsapp',  Component: ConnectWhatsApp },
+    { id: 'invite-family',     Component: InviteFamily },
     // Calendar steps are paired: ConnectCalendar pushes Housemait
     // events OUT to the user's phone calendar; SubscribeCalendar pulls
     // their work / school / other calendars INTO Housemait. The two

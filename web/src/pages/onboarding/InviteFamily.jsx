@@ -64,7 +64,7 @@ export default function InviteFamily({ user, household, next, setError }) {
     <div>
       <div className="text-center">
         <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-          Step 1 - invite family
+          Invite family
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
           Who's <i>in the house</i>?

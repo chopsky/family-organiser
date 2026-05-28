@@ -25,7 +25,7 @@ export default function ConnectWhatsApp({ next, setError }) {
       <div>
         <div className="text-center">
           <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-            Step 2 - WhatsApp
+            WhatsApp
           </p>
           <h1 className={serifHeading} style={serifHeadingStyle}>
             Manage everything from <i>WhatsApp</i>.
@@ -65,7 +65,7 @@ export default function ConnectWhatsApp({ next, setError }) {
       <div>
         <div className="text-center">
           <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
-            Step 2 - WhatsApp
+            WhatsApp
           </p>
           <h1 className={serifHeading} style={serifHeadingStyle}>
             Send us a <i>quick message</i>.
