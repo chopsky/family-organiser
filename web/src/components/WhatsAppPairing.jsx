@@ -1,22 +1,28 @@
 /**
- * WhatsAppPairing - pull-push linking widget.
+ * WhatsAppPairing - two-mode linking widget.
  *
- * The previous "send me a code by SMS-to-WhatsApp" flow needed a
- * Meta-approved Authentication Content Template, which requires Meta
- * Business Verification (unreachable for sole traders without a
- * registered company). This flow inverts the direction: the server
- * mints a short pairing code, the user opens WhatsApp and sends it to
- * the bot themselves, and the inbound webhook (src/routes/whatsapp.js)
- * links their number on receipt.
+ * Renders one of two flows depending on server config:
  *
- * No templates, no Meta approval, works in every country immediately.
+ *   1. OTP mode (preferred when TWILIO_TEMPLATE_VERIFICATION_CODE is
+ *      approved + set). User enters their phone, server sends a 6-digit
+ *      code via the approved Authentication Content Template, user
+ *      types it back in. One input field, ~10 seconds end-to-end.
+ *
+ *   2. Pull-push mode (fallback). Server mints a short code, user opens
+ *      WhatsApp themselves and sends it to the bot, inbound webhook
+ *      links on receipt. Multi-step app-switch dance - kept around for
+ *      deployments where the OTP Authentication template hasn't been
+ *      approved yet, or markets where Meta hasn't enabled it.
+ *
+ * The component fetches /auth/whatsapp-bot-info on mount to learn
+ * which mode the server supports.
  *
  * Used by:
  *   • Onboarding wizard (pages/onboarding/ConnectWhatsApp.jsx)
  *   • Settings → Notifications → Connect WhatsApp accordion
  *
  * Props:
- *   onSuccess(linkedPhone) - called once the bot has linked the number
+ *   onSuccess(linkedPhone) - called once the number is linked
  *   onError(msg)           - surface API failures to the parent
  *   autoStart=true         - if false, render only the "Connect" button
  *   compact=false          - denser layout (used inside Settings)
@@ -26,12 +32,191 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../lib/api';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 
-const POLL_INTERVAL_MS = 2500;
-const MAX_POLL_DURATION_MS = 11 * 60 * 1000; // a little longer than the 10-min server TTL
-
 export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, compact = false }) {
+  // mode resolution: null while we don't know, then 'otp' or 'pull-push'
+  const [mode, setMode] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/auth/whatsapp-bot-info')
+      .then((res) => {
+        if (cancelled) return;
+        setMode(res.data?.otp_available ? 'otp' : 'pull-push');
+      })
+      .catch(() => {
+        // Fail-safe: pull-push works regardless of template approval.
+        if (!cancelled) setMode('pull-push');
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (mode === null) {
+    return <p className={`text-sm text-cocoa ${compact ? '' : 'py-2'}`}>Loading…</p>;
+  }
+
+  if (mode === 'otp') {
+    return <OTPPairing onSuccess={onSuccess} onError={onError} autoStart={autoStart} compact={compact} />;
+  }
+
+  return <PullPushPairing onSuccess={onSuccess} onError={onError} autoStart={autoStart} compact={compact} />;
+}
+
+// ─── OTP mode ──────────────────────────────────────────────────────
+// Phone → server → WhatsApp template → 6-digit code → server verify.
+// Single input on each of two screens. The friction story is: one
+// number, one code, done - same shape as Stripe / Linear / Notion /
+// every modern app's phone-verification flow.
+function OTPPairing({ onSuccess, onError, compact }) {
+  const [stage, setStage] = useState('phone'); // phone | sending | code | verifying | done | error
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const codeInputRef = useRef(null);
+
+  // Auto-focus the code input the moment we move to that stage so the
+  // user doesn't have to tap to focus before typing.
+  useEffect(() => {
+    if (stage === 'code') {
+      setTimeout(() => codeInputRef.current?.focus(), 50);
+    }
+  }, [stage]);
+
+  async function sendCode(e) {
+    e?.preventDefault?.();
+    if (!phone.trim()) return;
+    setStage('sending');
+    try {
+      await api.post('/auth/whatsapp-send-code', { phone: phone.trim() });
+      setStage('code');
+    } catch (err) {
+      setStage('phone');
+      onError?.(err.response?.data?.error || 'Could not send the code. Please try again.');
+    }
+  }
+
+  async function verify(e) {
+    e?.preventDefault?.();
+    if (!code.trim() || code.trim().length < 6) return;
+    setStage('verifying');
+    try {
+      const { data } = await api.post('/auth/whatsapp-verify-code', { code: code.trim() });
+      setStage('done');
+      onSuccess?.(data.phone || null);
+    } catch (err) {
+      setStage('code');
+      onError?.(err.response?.data?.error || 'Could not verify that code. Please try again.');
+    }
+  }
+
+  async function resend() {
+    // Same as sendCode but doesn't move stage off 'code' on success -
+    // the user is already on the code-entry screen and we just want a
+    // fresh code delivered.
+    try {
+      await api.post('/auth/whatsapp-send-code', { phone: phone.trim() });
+      // Reset the input so they can type the new code cleanly.
+      setCode('');
+      codeInputRef.current?.focus();
+    } catch (err) {
+      onError?.(err.response?.data?.error || 'Could not resend the code. Please try again.');
+    }
+  }
+
+  if (stage === 'done') {
+    return (
+      <div className={`${compact ? 'py-1' : 'py-2'} text-sm text-success bg-success/10 rounded-xl px-3`}>
+        ✅ WhatsApp linked! Look out for a welcome message in your chat with the bot.
+      </div>
+    );
+  }
+
+  if (stage === 'phone' || stage === 'sending') {
+    return (
+      <form onSubmit={sendCode} className="space-y-3">
+        <label className="block">
+          <span className="text-sm text-cocoa block mb-1.5">Your WhatsApp number</span>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+44 7700 900000"
+            autoComplete="tel"
+            inputMode="tel"
+            className="w-full border border-cream-border rounded-xl px-3 py-2 text-base focus:outline-none focus:border-primary bg-white"
+            disabled={stage === 'sending'}
+          />
+        </label>
+        <p className="text-xs text-cocoa">
+          We'll send you a 6-digit code on WhatsApp. International format with country code (e.g. +44).
+        </p>
+        <button
+          type="submit"
+          disabled={stage === 'sending' || !phone.trim()}
+          className="inline-flex items-center gap-2 bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors w-full justify-center"
+        >
+          {stage === 'sending' ? 'Sending code…' : 'Send code'}
+        </button>
+      </form>
+    );
+  }
+
+  // stage === 'code' or 'verifying'
+  return (
+    <form onSubmit={verify} className="space-y-3">
+      <p className="text-sm text-cocoa">
+        Check WhatsApp for a 6-digit code from Housemait. Enter it below:
+      </p>
+      <input
+        ref={codeInputRef}
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        pattern="[0-9]{6}"
+        maxLength={6}
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        placeholder="123456"
+        className="w-full border border-cream-border rounded-xl px-3 py-3 text-center text-2xl font-mono tracking-[0.4em] focus:outline-none focus:border-primary bg-white"
+        disabled={stage === 'verifying'}
+      />
+      <button
+        type="submit"
+        disabled={stage === 'verifying' || code.length < 6}
+        className="inline-flex items-center gap-2 bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors w-full justify-center"
+      >
+        {stage === 'verifying' ? 'Verifying…' : 'Verify and link'}
+      </button>
+      <div className="flex items-center justify-between text-xs">
+        <button
+          type="button"
+          onClick={() => { setStage('phone'); setCode(''); }}
+          className="text-cocoa hover:text-bark transition-colors"
+        >
+          ← Use a different number
+        </button>
+        <button
+          type="button"
+          onClick={resend}
+          className="text-primary hover:underline"
+        >
+          Resend code
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Pull-push mode (fallback) ─────────────────────────────────────
+// Original pre-OTP flow. Server mints a short code, user opens WhatsApp
+// themselves and sends it to the bot, inbound webhook (src/routes/
+// whatsapp.js) consumes it and links. No template approval needed -
+// kept around for deployments without the Authentication template
+// approved yet.
+const POLL_INTERVAL_MS = 2500;
+const MAX_POLL_DURATION_MS = 11 * 60 * 1000;
+
+function PullPushPairing({ onSuccess, onError, autoStart, compact }) {
   const [stage, setStage] = useState(autoStart ? 'init' : 'idle'); // idle | init | waiting | done | error
-  const [pairing, setPairing] = useState(null); // { code, message, bot_number, deep_link }
+  const [pairing, setPairing] = useState(null);
   const pollRef = useRef(null);
   const pollStartedAtRef = useRef(null);
   const onSuccessRef = useRef(onSuccess);
@@ -52,15 +237,11 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
     }
   }
 
-  // Auto-start on first mount when autoStart is true.
   useEffect(() => {
     if (autoStart) start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // One-shot status check, used both inside the interval and on
-  // foreground events (so the user doesn't have to wait up to ~2.5s
-  // after returning from WhatsApp to see the success state).
   const pollOnce = useCallback(async () => {
     if (!pairing?.code) return;
     if (Date.now() - (pollStartedAtRef.current || 0) > MAX_POLL_DURATION_MS) {
@@ -90,7 +271,6 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
     }
   }, [pairing?.code]);
 
-  // Background interval poll while in the waiting stage.
   useEffect(() => {
     if (stage !== 'waiting' || !pairing?.code) return undefined;
     pollRef.current = setInterval(pollOnce, POLL_INTERVAL_MS);
@@ -100,11 +280,6 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
     };
   }, [stage, pairing?.code, pollOnce]);
 
-  // When the app/tab returns to the foreground (user came back from
-  // WhatsApp), poll immediately. iOS suspends the JS engine while in
-  // the background so the next setInterval tick can take ~2.5s to fire
-  // - without this, the user sees the "waiting" state for an awkward
-  // moment after their WhatsApp message has already been linked.
   useAppForegroundRefresh(() => {
     if (stage === 'waiting') pollOnce();
   }, { throttleMs: 0 });
@@ -148,7 +323,6 @@ export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, 
     );
   }
 
-  // stage === 'waiting' - show the code + tap-to-open button.
   return (
     <div className="space-y-3">
       <p className="text-sm text-cocoa">

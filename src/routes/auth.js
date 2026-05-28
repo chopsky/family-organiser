@@ -1360,9 +1360,19 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
 
 router.get('/whatsapp-bot-info', requireAuth, (req, res) => {
   const whatsapp = require('../services/whatsapp');
+  // otp_available signals to WhatsAppPairing.jsx whether the OTP flow
+  // (single 6-digit code entry) is usable, or whether to fall back to
+  // the pull-push pairing UX. OTP requires an approved Twilio
+  // Authentication Content Template - SID lives in
+  // TWILIO_TEMPLATE_VERIFICATION_CODE. When unset, sendVerificationCode
+  // falls back to freeform which only works inside the 24h window, so
+  // first-time connects would silently fail. Gating UI on this flag
+  // keeps the experience honest.
   return res.json({
     configured: whatsapp.isConfigured(),
     bot_number: whatsapp.getBotNumberForWaLink(),
+    otp_available: !!(process.env.TWILIO_TEMPLATE_VERIFICATION_CODE
+      && /^HX[a-f0-9]{32}$/i.test(process.env.TWILIO_TEMPLATE_VERIFICATION_CODE)),
   });
 });
 
