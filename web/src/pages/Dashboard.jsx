@@ -326,21 +326,32 @@ export default function Dashboard() {
     }
   }
 
-  // Outstanding-task count, computed from the digest. Used by both
-  // the badge effect below and the Tasks card render. Computing it
-  // here (before any early return) keeps hook order stable, which
-  // the Rules of Hooks require - running useEffect AFTER an early
-  // `if (loading) return` previously crashed with React #301
+  // Actionable-task count = tasks due today OR overdue. Drives both
+  // the iOS app-icon badge AND the Tasks card heading - keeping them in
+  // sync was the whole point of the badge-confusion fix (user reported
+  // "badge says 14 but I can't see what they are"). The new semantic
+  // matches Reminders.app / Things: the badge means "things needing
+  // attention RIGHT NOW", not "every task on the books." Tasks with no
+  // due_date or a future due_date don't contribute to the count.
+  //
+  // Computing this here (before any early return) keeps hook order
+  // stable - the Rules of Hooks require it. Running useEffect AFTER an
+  // early `if (loading) return` previously crashed with React #301
   // ("Max update depth exceeded") on iOS.
-  const outstandingCount = (digest?.outstanding ?? []).length;
+  const outstandingTasks = digest?.outstanding ?? [];
+  const actionableCount = outstandingTasks.reduce((count, task) => {
+    const label = formatTaskDueLabel(task.due_date);
+    if (!label) return count;
+    if (label.overdue || label.text === 'Today') return count + 1;
+    return count;
+  }, 0);
 
-  // Update the iOS app-icon badge whenever the outstanding-task count
-  // shifts. Shows the same number a user would see on the Tasks tab.
+  // Update the iOS app-icon badge whenever the actionable count shifts.
   // No-op on web. MUST stay above the loading early-return so the
   // hook is called on every render (Rules of Hooks).
   useEffect(() => {
-    setBadgeCount(outstandingCount);
-  }, [outstandingCount]);
+    setBadgeCount(actionableCount);
+  }, [actionableCount]);
 
   if (loading) return <DashboardSkeleton />;
 
@@ -522,7 +533,12 @@ export default function Dashboard() {
         {/* Card 2 - Tasks */}
         <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-sans font-medium text-bark">Tasks</h2>
+            <h2 className="text-base font-sans font-medium text-bark">
+              Tasks
+              {actionableCount > 0 && (
+                <span className="text-cocoa font-normal"> · {actionableCount} due</span>
+              )}
+            </h2>
             <Link to="/tasks" className="text-xs font-medium text-primary hover:underline">View all →</Link>
           </div>
           {outstanding.length === 0 ? (
