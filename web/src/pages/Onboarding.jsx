@@ -19,8 +19,12 @@ import ErrorBanner from '../components/ErrorBanner';
 const Welcome           = lazy(() => import('./onboarding/Welcome'));
 const InviteFamily      = lazy(() => import('./onboarding/InviteFamily'));
 const ConnectWhatsApp   = lazy(() => import('./onboarding/ConnectWhatsApp'));
-const ConnectCalendar   = lazy(() => import('./onboarding/ConnectCalendar'));
-const SubscribeCalendar = lazy(() => import('./onboarding/SubscribeCalendar'));
+// Calendar onboarding steps (ConnectCalendar / SubscribeCalendar) were
+// removed from the wizard - both required technical input (OAuth dance
+// or pasting an ICS URL) that mid-flow killed activation. The component
+// files are still imported by Settings.jsx so they're not orphaned;
+// Dashboard now surfaces a single nudge banner when no external feed
+// exists, deferring the calendar setup to a moment the user chooses.
 const Notifications     = lazy(() => import('./onboarding/Notifications'));
 const Done              = lazy(() => import('./onboarding/Done'));
 
@@ -83,15 +87,6 @@ export default function Onboarding() {
     { id: 'welcome',           Component: Welcome },
     { id: 'connect-whatsapp',  Component: ConnectWhatsApp },
     { id: 'invite-family',     Component: InviteFamily },
-    // Calendar steps are paired: ConnectCalendar pushes Housemait
-    // events OUT to the user's phone calendar; SubscribeCalendar pulls
-    // their work / school / other calendars INTO Housemait. The two
-    // together let users treat Housemait as their single calendar
-    // surface. Both are skippable. OAuth-based two-way sync stays
-    // Settings-only - the OAuth redirect would navigate away from the
-    // wizard mid-flow.
-    { id: 'connect-calendar',    Component: ConnectCalendar },
-    { id: 'subscribe-calendar',  Component: SubscribeCalendar },
     ...(includeNotifications ? [{ id: 'notifications', Component: Notifications }] : []),
     { id: 'done',              Component: Done },
   ];

@@ -128,6 +128,67 @@ function formatTaskDueLabel(dueDateStr) {
   return { text: due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), overdue: false };
 }
 
+// ── Calendar setup nudge ────────────────────────────────────────
+// Soft banner shown on Dashboard when the household has no external
+// calendar feed subscribed. Calendar onboarding was removed from the
+// signup wizard (kept activation focused on WhatsApp pairing); this
+// surface gives the user a low-pressure entry point to set it up at
+// a moment they choose. Auto-hides once a feed exists, and a "Not
+// now" dismiss writes a localStorage flag so the banner doesn't
+// reappear for users who genuinely don't want the calendar feature.
+function CalendarSetupNudge() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    // Dismissal check first - cheap, no API call needed.
+    if (localStorage.getItem('housemait_calendar_nudge_dismissed') === '1') return;
+    // Feed-count check - only show if zero feeds. Silently skips on
+    // transient API error (better to under-prompt than nag).
+    api.get('/calendar/external-feeds')
+      .then((res) => {
+        const feeds = res.data?.feeds || [];
+        if (Array.isArray(feeds) && feeds.length === 0) setShow(true);
+      })
+      .catch(() => { /* no-op */ });
+  }, []);
+
+  function dismiss() {
+    localStorage.setItem('housemait_calendar_nudge_dismissed', '1');
+    setShow(false);
+  }
+
+  if (!show) return null;
+
+  return (
+    <div
+      className="rounded-2xl p-4 mb-4 flex items-start gap-3"
+      style={{ background: 'rgba(243, 237, 252, 0.55)', border: '1px solid rgba(107, 63, 160, 0.18)' }}
+    >
+      <div className="text-2xl leading-none mt-0.5" aria-hidden="true">📅</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-bark">
+          See your work, school, and family calendars all in one place
+        </p>
+        <p className="text-xs text-cocoa mt-1 leading-relaxed">
+          Subscribe to your other calendars in Settings — events show up here automatically alongside everything else.
+        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <Link to="/settings" className="text-xs font-semibold text-primary hover:underline">
+            Set up calendars →
+          </Link>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="text-xs text-cocoa hover:text-bark transition-colors"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── AI Chat Input ───────────────────────────────────────────────
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
@@ -474,6 +535,13 @@ export default function Dashboard() {
       <WriteGate size="lg" message="Subscribe to create events, tasks, and more with AI">
         <DashboardAiInput />
       </WriteGate>
+
+      {/* Soft calendar-setup nudge for households that haven't subscribed
+          any external feed yet. Renders nothing once a feed exists or
+          the user dismisses. Sits above the 2-column grid so it's the
+          first thing a brand-new user sees but doesn't push existing
+          content off the fold. */}
+      <CalendarSetupNudge />
 
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
