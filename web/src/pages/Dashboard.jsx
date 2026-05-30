@@ -511,7 +511,7 @@ export default function Dashboard() {
           // with utilities here (custom font family + weight).
           className="text-[42px] md:text-[52px] leading-[1.05] md:leading-[1.02] tracking-[-0.8px] md:tracking-[-1px]"
           style={{
-            fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
+            fontFamily: '"Instrument Serif", "Times New Roman", serif',
             fontWeight: 400,
             margin: 0,
           }}

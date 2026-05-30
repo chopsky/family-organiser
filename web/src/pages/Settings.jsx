@@ -1266,7 +1266,7 @@ export default function Settings() {
     <div className="max-w-3xl mx-auto space-y-6">
       <h1
         className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+        style={{ fontFamily: '"Instrument Serif", "Times New Roman", serif' }}
       >
         <div
           className="hidden"

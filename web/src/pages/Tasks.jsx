@@ -349,7 +349,7 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
           {initial}
         </div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 500, fontFamily: 'var(--font-display, "Instrument Serif", Georgia, serif)', color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 16, fontWeight: 500, fontFamily: 'var(--font-display, "Instrument Serif", serif)', color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.02em' }}>
             {displayName}
           </div>
           <div style={{ fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
@@ -764,7 +764,7 @@ export default function Tasks() {
           style={{
             fontWeight: 400,
             lineHeight: 1,
-            fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif',
+            fontFamily: '"Instrument Serif", "Times New Roman", serif',
             color: 'var(--charcoal, #2D2A33)',
             letterSpacing: '-0.02em',
           }}
@@ -831,7 +831,7 @@ export default function Tasks() {
                 style={{
                   fontSize: 18,
                   fontWeight: 600,
-                  fontFamily: 'var(--font-display, "Instrument Serif", Georgia, serif)',
+                  fontFamily: 'var(--font-display, "Instrument Serif", serif)',
                   color: 'var(--charcoal, #2D2A33)',
                 }}
               >

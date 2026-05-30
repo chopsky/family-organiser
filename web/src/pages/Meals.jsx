@@ -69,7 +69,7 @@ export default function Meals() {
     <div className="max-w-5xl mx-auto space-y-5">
       <h1
         className="text-[38px] md:text-[40px] font-normal leading-none text-bark flex items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif' }}
+        style={{ fontFamily: '"Instrument Serif", "Times New Roman", serif' }}
       >
         <div
           className="hidden"
@@ -430,7 +430,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               alt="Housemait"
               style={{ height: '36px', display: 'inline-block', marginBottom: '12px' }}
             />
-            <h1 style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
+            <h1 style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
               Weekly Meal Plan
             </h1>
             <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>
@@ -463,7 +463,7 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                       <div className={`text-[11px] font-bold uppercase tracking-[0.12em] ${isToday ? 'text-plum' : 'text-cocoa'}`}>
                         {DAY_HEADERS[dayIdx]}{isToday ? ' · TODAY' : ''}
                       </div>
-                      <div className="text-[34px] leading-none mt-1" style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontWeight: 400 }}>
+                      <div className="text-[34px] leading-none mt-1" style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400 }}>
                         {date.getDate()}
                       </div>
                     </div>

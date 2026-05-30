@@ -18,9 +18,7 @@ const QUICK_CHIPS = [
   { label: 'Shopping', color: 'var(--sage)' },
   { label: 'Tasks', color: 'var(--coral)' },
   { label: 'Meal plan', color: 'var(--butter)' },
-  { label: 'Receipts', color: 'var(--sky)' },
   { label: 'Documents', color: 'var(--pink)' },
-  { label: 'WhatsApp', color: '#25D366' },
 ]
 
 /** Build the FAQ list with pricing strings interpolated from the active
