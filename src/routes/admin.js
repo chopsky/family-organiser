@@ -557,6 +557,59 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
 // Platform-admin gated (whole router is). Safe to leave in place
 // long-term - it's the canonical "is my AI config right" probe.
 
+// ─── GET /api/admin/tools/ai-selftest ─────────────────────────────────────
+//
+// Drives a real callWithFailover call with a tiny prompt and reports
+// exactly what happened: which provider answered, the latency, and the
+// env-var state observed at the moment of the call. Builds on the
+// ai-runtime probe by closing the timing gap - the runtime probe shows
+// what env looks like NOW; this shows what env looked like at the
+// moment the AI client made its routing decision.
+//
+// Used to triage the case where: env var probe shows GEMINI_API_KEY
+// present, but ai_usage_log shows 100% Claude-primary (is_failover=false).
+// If the env is genuinely visible at AI-call time, callWithFailover
+// will route to Gemini. If something is mutating process.env between
+// HTTP handler and AI call, this endpoint surfaces that delta directly.
+
+router.get('/tools/ai-selftest', async (req, res) => {
+  const envSnapshot = {
+    GEMINI_API_KEY: !!process.env.GEMINI_API_KEY,
+    GEMINI_API_KEY_length: process.env.GEMINI_API_KEY?.length || 0,
+    ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+    OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+    pid: process.pid,
+  };
+  const { callWithFailover } = require('../services/ai-client');
+  const t0 = Date.now();
+  try {
+    const result = await callWithFailover({
+      system: 'You answer in exactly one word.',
+      messages: [{ role: 'user', content: 'Reply with the word PONG.' }],
+      maxTokens: 8,
+      feature: 'admin_selftest',
+      householdId: null,
+      userId: req.user.id,
+    });
+    return res.json({
+      ok: true,
+      envAtCallTime: envSnapshot,
+      provider: result.provider,
+      text: result.text,
+      totalLatencyMs: Date.now() - t0,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      envAtCallTime: envSnapshot,
+      error: err.message,
+      errorCode: err.code,
+      errorStatus: err.status,
+      totalLatencyMs: Date.now() - t0,
+    });
+  }
+});
+
 router.get('/tools/ai-runtime', (req, res) => {
   const probe = (name) => {
     const v = process.env[name];
