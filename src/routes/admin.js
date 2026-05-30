@@ -541,4 +541,47 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/tools/ai-runtime ──────────────────────────────────────
+//
+// Diagnostic for AI-provider env-var visibility. Returns which keys the
+// running Node process can actually see in its process.env. Never exposes
+// the key VALUE - only presence, length, and first-4 chars (enough to
+// rule out a wrong-key paste, but not enough to leak a working credential).
+//
+// Built to triage the "Gemini key may be unset" health alert: that cron
+// infers Gemini absence from BEHAVIOUR (no Gemini provider rows in
+// ai_usage_log), but doesn't read env directly. This endpoint reads env
+// directly so we can prove whether the Railway UI value is reaching the
+// container or not.
+//
+// Platform-admin gated (whole router is). Safe to leave in place
+// long-term - it's the canonical "is my AI config right" probe.
+
+router.get('/tools/ai-runtime', (req, res) => {
+  const probe = (name) => {
+    const v = process.env[name];
+    if (v == null) return { present: false, length: 0, starts: null };
+    return {
+      present: v.length > 0,
+      length: v.length,
+      starts: v.slice(0, 4),
+      hasTrailingWhitespace: /\s$/.test(v),
+      hasLeadingWhitespace: /^\s/.test(v),
+    };
+  };
+  return res.json({
+    pid: process.pid,
+    nodeEnv: process.env.NODE_ENV || null,
+    GEMINI_API_KEY: probe('GEMINI_API_KEY'),
+    ANTHROPIC_API_KEY: probe('ANTHROPIC_API_KEY'),
+    OPENAI_API_KEY: probe('OPENAI_API_KEY'),
+    // All env keys starting with AI-relevant prefixes - catches a typo'd
+    // variant like GEMINI_KEY / GOOGLE_GEMINI_API_KEY that's technically
+    // set but isn't the name the code reads.
+    aiRelatedKeys: Object.keys(process.env)
+      .filter(k => /GEMINI|ANTHROPIC|OPENAI|CLAUDE|GPT|GOOGLE_AI/i.test(k))
+      .sort(),
+  });
+});
+
 module.exports = router;
