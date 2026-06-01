@@ -521,10 +521,8 @@ export default function Dashboard() {
         <p
           style={{
             color: 'var(--ink-2)',
-            fontSize: '11px',
+            fontSize: '13px',
             fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
           }}
         >
           {todayStr}

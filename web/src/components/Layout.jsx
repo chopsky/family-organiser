@@ -300,7 +300,7 @@ export default function Layout({ children }) {
       {/* ── Main Content ── */}
       <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">
         <OfflineBanner />
-        <div className="px-4 md:px-8 py-6 md:py-9 pb-28 md:pb-9">
+        <div className="px-4 md:px-8 py-4 md:py-9 pb-28 md:pb-9">
           {children}
         </div>
       </main>
