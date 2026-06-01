@@ -416,7 +416,7 @@ router.delete('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdm
  * Add a weekly activity for a child.
  */
 router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { child_id, day_of_week, activity, time_start, time_end, reminder_text } = req.body;
+  const { child_id, day_of_week, activity, time_start, time_end, reminder_text, pickup_member_id } = req.body;
 
   if (!child_id || day_of_week === undefined || !activity?.trim()) {
     return res.status(400).json({ error: 'child_id, day_of_week, and activity are required.' });
@@ -434,11 +434,41 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
       time_start: time_start || null,
       time_end: time_end || null,
       reminder_text: reminder_text || null,
+      pickup_member_id: pickup_member_id || null,
     });
     cache.invalidate(`schools:${req.householdId}`);
     return res.status(201).json({ activity: created });
   } catch (err) {
     console.error('POST /api/schools/activities error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/schools/activities/:activityId
+ * Edit an existing after-school activity (day, name, end time, pickup person).
+ */
+router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { day_of_week, activity, time_start, time_end, pickup_member_id } = req.body;
+  if (day_of_week !== undefined && (day_of_week < 0 || day_of_week > 4)) {
+    return res.status(400).json({ error: 'day_of_week must be 0 (Monday) to 4 (Friday).' });
+  }
+  if (activity !== undefined && !activity.trim()) {
+    return res.status(400).json({ error: 'activity cannot be empty.' });
+  }
+  try {
+    const fields = {};
+    if (day_of_week !== undefined) fields.day_of_week = day_of_week;
+    if (activity !== undefined) fields.activity = activity.trim();
+    if (time_start !== undefined) fields.time_start = time_start || null;
+    if (time_end !== undefined) fields.time_end = time_end || null;
+    // Use 'in' so an explicit null clears the pickup person.
+    if ('pickup_member_id' in req.body) fields.pickup_member_id = pickup_member_id || null;
+    const updated = await db.updateChildActivity(req.params.activityId, fields);
+    cache.invalidate(`schools:${req.householdId}`);
+    return res.json({ activity: updated });
+  } catch (err) {
+    console.error('PATCH /api/schools/activities error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

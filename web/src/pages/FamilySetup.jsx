@@ -232,7 +232,9 @@ export default function FamilySetup() {
   const [addActivityDay, setAddActivityDay] = useState(0);
   const [addActivityName, setAddActivityName] = useState('');
   const [addActivityEnd, setAddActivityEnd] = useState('');
+  const [addActivityPickup, setAddActivityPickup] = useState(''); // member id or ''
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [editingActivity, setEditingActivity] = useState(null); // activity being edited, or null = add mode
   const [savingActivity, setSavingActivity] = useState(false);
   const [editTermDates, setEditTermDates] = useState([]);
   const [showAddTermDate, setShowAddTermDate] = useState(false);
@@ -548,23 +550,53 @@ export default function FamilySetup() {
     }
   }
 
+  // Open the form to ADD a new activity (clears any edit state).
+  function openAddActivity() {
+    setEditingActivity(null);
+    setAddActivityDay(0);
+    setAddActivityName('');
+    setAddActivityEnd('');
+    setAddActivityPickup('');
+    setShowAddActivity(true);
+  }
+
+  // Open the form to EDIT an existing activity (pre-filled).
+  function openEditActivity(a) {
+    setEditingActivity(a);
+    setAddActivityDay(a.day_of_week ?? 0);
+    setAddActivityName(a.activity || '');
+    setAddActivityEnd(a.time_end ? a.time_end.substring(0, 5) : '');
+    setAddActivityPickup(a.pickup_member_id || '');
+    setShowAddActivity(true);
+  }
+
+  function closeActivityForm() {
+    setShowAddActivity(false);
+    setEditingActivity(null);
+  }
+
+  // Handles both add (POST) and edit (PATCH) depending on editingActivity.
   async function handleAddActivity() {
     if (!addActivityName.trim() || !editingMember) return;
     setSavingActivity(true);
     try {
-      const { data } = await api.post('/schools/activities', {
-        child_id: editingMember.id,
+      const body = {
         day_of_week: addActivityDay,
         activity: addActivityName.trim(),
         time_end: addActivityEnd || null,
-      });
-      setEditActivities(prev => [...prev, data.activity]);
-      setAddActivityName('');
-      setAddActivityEnd('');
-      setShowAddActivity(false);
+        pickup_member_id: addActivityPickup || null,
+      };
+      if (editingActivity) {
+        const { data } = await api.patch(`/schools/activities/${editingActivity.id}`, body);
+        setEditActivities(prev => prev.map(a => (a.id === editingActivity.id ? data.activity : a)));
+      } else {
+        const { data } = await api.post('/schools/activities', { ...body, child_id: editingMember.id });
+        setEditActivities(prev => [...prev, data.activity]);
+      }
+      closeActivityForm();
       await loadSchools(); // refresh activity pills
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not add activity.');
+      setError(err.response?.data?.error || 'Could not save activity.');
     } finally {
       setSavingActivity(false);
     }
@@ -3105,8 +3137,8 @@ export default function FamilySetup() {
                   below under the same any-member-with-a-school rule. */}
               {editingMember?.school_id && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📅 Weekly activities</h3>
-                  <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time</p>
+                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📅 After school activities</h3>
+                  <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time. Tap an activity to edit it.</p>
 
                   {loadingActivities ? <Spinner /> : (
                     <>
@@ -3118,17 +3150,29 @@ export default function FamilySetup() {
                               <div className="text-[11px] font-semibold text-cocoa mb-1">{day}</div>
                               {dayActivities.length > 0 ? (
                                 <div className="space-y-1">
-                                  {dayActivities.map(a => (
-                                    <div key={a.id} className="bg-white rounded-lg px-1.5 py-1.5 text-[11px] text-bark border border-cream-border relative group">
-                                      <div className="font-medium">{a.activity}</div>
-                                      {a.time_end && <div className="text-cocoa text-[10px]">til {a.time_end.substring(0, 5)}</div>}
+                                  {dayActivities.map(a => {
+                                    const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
+                                    return (
                                       <button
-                                        onClick={() => handleDeleteActivity(a.id)}
-                                        className="absolute -top-1 -right-1 w-4 h-4 bg-error text-white rounded-full text-[9px] hidden group-hover:flex items-center justify-center"
-                                        title="Remove"
-                                      >×</button>
-                                    </div>
-                                  ))}
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => openEditActivity(a)}
+                                        className="w-full text-left bg-white rounded-lg px-1.5 py-1.5 text-[11px] text-bark border border-cream-border relative group hover:border-primary transition-colors"
+                                        title="Tap to edit"
+                                      >
+                                        <div className="font-medium truncate">{a.activity}</div>
+                                        {a.time_end && <div className="text-cocoa text-[10px]">til {a.time_end.substring(0, 5)}</div>}
+                                        {pickup && <div className="text-primary text-[10px] truncate">🚗 {pickup.name}</div>}
+                                        <span
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={(e) => { e.stopPropagation(); handleDeleteActivity(a.id); }}
+                                          className="absolute -top-1 -right-1 w-4 h-4 bg-error text-white rounded-full text-[9px] hidden group-hover:flex items-center justify-center cursor-pointer"
+                                          title="Remove"
+                                        >×</span>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <div className="text-cocoa text-sm py-2">-</div>
@@ -3138,7 +3182,7 @@ export default function FamilySetup() {
                         })}
                       </div>
 
-                      {/* Add activity form */}
+                      {/* Add / edit activity form */}
                       {showAddActivity ? (
                         <div className="bg-white rounded-lg border border-cream-border p-3 mt-2 space-y-2">
                           <div className="flex gap-2">
@@ -3150,16 +3194,29 @@ export default function FamilySetup() {
                           <div className="flex gap-2 items-center">
                             <label className="text-xs text-cocoa">Ends at:</label>
                             <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
+                            <select
+                              value={addActivityPickup}
+                              onChange={(e) => setAddActivityPickup(e.target.value)}
+                              className="flex-1 border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white"
+                            >
+                              <option value="">No pickup set</option>
+                              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex gap-2 items-center">
                             <div className="flex-1" />
-                            <button onClick={() => setShowAddActivity(false)} className="text-xs text-cocoa">Cancel</button>
+                            <button onClick={closeActivityForm} className="text-xs text-cocoa">Cancel</button>
                             <button onClick={handleAddActivity} disabled={savingActivity || !addActivityName.trim()} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
-                              {savingActivity ? 'Adding...' : 'Add'}
+                              {savingActivity ? 'Saving...' : (editingActivity ? 'Save' : 'Add')}
                             </button>
                           </div>
                         </div>
                       ) : (
                         <button
-                          onClick={() => { setShowAddActivity(true); setAddActivityName(''); setAddActivityEnd(''); }}
+                          onClick={openAddActivity}
                           className="mt-2 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors"
                         >
                           + Add activity

@@ -915,7 +915,29 @@ async function addChildActivity(data, db = supabase) {
       reminder_text: data.reminder_text || null,
       reminder_offset: data.reminder_offset || 'morning_of',
       term_only: data.term_only !== false,
+      pickup_member_id: data.pickup_member_id || null,
     })
+    .select()
+    .single();
+  if (error) throw error;
+  return activity;
+}
+
+/**
+ * Update an existing after-school activity. Only whitelisted fields are
+ * applied; pickup_member_id of null clears the pickup person.
+ */
+async function updateChildActivity(activityId, fields, db = supabase) {
+  const patch = {};
+  if (fields.day_of_week !== undefined) patch.day_of_week = fields.day_of_week;
+  if (fields.activity !== undefined) patch.activity = fields.activity;
+  if (fields.time_end !== undefined) patch.time_end = fields.time_end || null;
+  if (fields.time_start !== undefined) patch.time_start = fields.time_start || null;
+  if ('pickup_member_id' in fields) patch.pickup_member_id = fields.pickup_member_id || null;
+  const { data: activity, error } = await db
+    .from('child_weekly_schedule')
+    .update(patch)
+    .eq('id', activityId)
     .select()
     .single();
   if (error) throw error;
@@ -6079,6 +6101,7 @@ module.exports = {
   deleteAllTermDatesBySchool,
   getSchoolsWithIcalUrls,
   addChildActivity,
+  updateChildActivity,
   getChildActivities,
   getActivitiesByChildIds,
   deleteChildActivity,

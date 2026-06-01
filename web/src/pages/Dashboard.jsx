@@ -522,7 +522,7 @@ export default function Dashboard() {
           style={{
             color: 'var(--ink-2)',
             fontSize: '13px',
-            fontWeight: 700,
+            fontWeight: 500,
           }}
         >
           {todayStr}
