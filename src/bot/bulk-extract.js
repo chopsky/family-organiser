@@ -161,7 +161,14 @@ async function extractAndApply(text, subject, user, household) {
   const memberNames = members.map(m => m.name);
   let extraction = null;
   try {
-    extraction = await extractFromEmail(text, subject || null, memberNames, {}, {
+    // Pass the household country so the extractor interprets ambiguous
+    // numeric dates correctly (DD/MM for UK/ZA vs MM/DD for US). Without
+    // it, "01/06/2026" on a fixture sheet is ambiguous and the model
+    // tends to default to today - which silently fabricated the wrong
+    // date on the U11 cricket test paste.
+    extraction = await extractFromEmail(text, subject || null, memberNames, {
+      country: household.country || null,
+    }, {
       householdId: household.id,
       userId: user.id,
     });
