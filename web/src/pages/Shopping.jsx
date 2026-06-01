@@ -380,7 +380,7 @@ export default function Shopping() {
           </svg>
         </div>
         <h1
-          className="text-[38px] md:text-[40px] font-normal leading-none text-bark"
+          className="text-[32px] md:text-[40px] font-normal leading-none text-bark"
           style={{ fontFamily: '"Instrument Serif"' }}
         >
           Shopping List

@@ -1563,7 +1563,7 @@ export default function FamilySetup() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h1
-        className="flex text-[38px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
+        className="flex text-[32px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
         style={{ fontFamily: '"Instrument Serif"' }}
       >
         <div
