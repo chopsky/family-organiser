@@ -15,6 +15,9 @@ const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotificati
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
+const { detectCalendarFeedUrl, subscribeCalendarFeed } = require('./calendar-url');
+const { looksLikeBulkPaste, extractAndApply } = require('./bulk-extract');
+const { extractTextFromDocument } = require('../services/document-extract');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -893,6 +896,18 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     };
   }
 
+  // Calendar feed URL - if the message is (or contains) an iCal/webcal
+  // link, subscribe it as an external calendar feed instead of sending
+  // it to the AI. This closes the gap that lost a trialling customer:
+  // they pasted their Google Calendar private iCal URL to connect it and
+  // the bot just said "How can I help you today?". Deterministic, no LLM.
+  const feedUrl = detectCalendarFeedUrl(text);
+  if (feedUrl) {
+    console.log('[handlers] Detected calendar feed URL, subscribing:', feedUrl.slice(0, 60));
+    ctx.intent = 'calendar_subscribe';
+    return await subscribeCalendarFeed(feedUrl, user, household);
+  }
+
   // Slash commands - deterministic, never sent to the AI. See SLASH_COMMANDS
   // above for the list. These exist primarily because the daily reminder
   // tells users to reply "/shopping" to see the list - letting the AI
@@ -917,6 +932,27 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       case 'help':
         return { response: SLASH_HELP_TEXT, actions };
     }
+  }
+
+  // Bulk paste - a parent pastes a fixture list / school letter straight
+  // into the chat. The conversational classifier treats these as "chat"
+  // and just acknowledges them ("Thanks for the details") without pulling
+  // out the dates - the exact failure in the 2026-06-01 churn transcript.
+  // looksLikeBulkPaste gates on length + date/schedule signals; if it
+  // fires we run the email-grade extractor and create the events/tasks.
+  // If nothing extractable is found we fall through to the normal
+  // classifier, so ordinary long chat messages aren't hijacked.
+  if (looksLikeBulkPaste(text)) {
+    console.log('[handlers] Bulk-paste detected, running extraction:', text.slice(0, 60));
+    const extracted = await extractAndApply(text, null, user, household);
+    if (extracted.count > 0) {
+      ctx.intent = 'bulk_extract';
+      let response = extracted.response;
+      response += `\n\nIf any of those look wrong, just tell me and I'll fix them.`;
+      return { response, actions: extracted.actions };
+    }
+    // Nothing extracted - fall through to the conversational classifier.
+    console.log('[handlers] Bulk-paste extraction found nothing, falling through to classify');
   }
 
   // Fetch recent WhatsApp conversation turns (last ~30 min) so the AI can
@@ -1758,6 +1794,54 @@ async function handleVoiceNote(audioBuffer, filename, user, household, ctx = {})
 }
 
 /**
+ * Handle a document attachment (.pdf / .docx / text).
+ *
+ * Text-extracts the document, then runs the same extraction-to-calendar
+ * path as a pasted fixture list. Built for the case that lost a trialling
+ * customer: a parent forwarded a .docx school fixture sheet and the bot
+ * replied "I can't open document attachments directly".
+ *
+ * @param {Buffer} buffer
+ * @param {string} mediaType - MIME (Twilio MediaContentType0)
+ * @param {string} filename  - best-effort filename for context (may be '')
+ * @param {object} user
+ * @param {object} household
+ * @param {object} [ctx]     - OUT param for intent telemetry
+ * @returns {Promise<{response: string, actions: object}>}
+ */
+async function handleDocument(buffer, mediaType, filename, user, household, ctx = {}) {
+  const emptyActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+
+  let extractedText;
+  try {
+    const { text } = await extractTextFromDocument(buffer, mediaType);
+    extractedText = text;
+  } catch (err) {
+    // extractTextFromDocument throws user-safe messages (unsupported
+    // type, scanned/empty, legacy .doc). Relay verbatim.
+    ctx.intent = 'document_unsupported';
+    return { response: `📄 ${err.message}`, actions: emptyActions };
+  }
+
+  const extracted = await extractAndApply(extractedText, filename || null, user, household);
+  if (extracted.count > 0) {
+    ctx.intent = 'document_extract';
+    return {
+      response: `${extracted.response}\n\nIf any of those look wrong, just tell me and I'll fix them.`,
+      actions: extracted.actions,
+    };
+  }
+
+  // We read the document fine but found nothing schedulable. Be honest
+  // and offer the fallback rather than pretending we did something.
+  ctx.intent = 'document_no_events';
+  return {
+    response: `📄 I read the document but couldn't find any dates or tasks to add. If there's something specific you'd like in your calendar, tell me and I'll add it.`,
+    actions: emptyActions,
+  };
+}
+
+/**
  * Handle a photo - smart image scanning.
  * First classifies the image (receipt vs event/invitation vs unknown),
  * then routes to the appropriate handler.
@@ -2101,6 +2185,7 @@ module.exports = {
   handleTextMessage,
   handleVoiceNote,
   handlePhoto,
+  handleDocument,
   handleList,
   handleTasks,
   handleMyTasks,

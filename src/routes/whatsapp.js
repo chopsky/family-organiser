@@ -12,6 +12,7 @@ const whatsapp = require('../services/whatsapp');
 const broadcast = require('../services/broadcast');
 const handlers = require('../bot/handlers');
 const cache = require('../services/cache');
+const { isSupportedDocument } = require('../services/document-extract');
 
 const router = Router();
 
@@ -237,6 +238,30 @@ router.post('/webhook', async (req, res) => {
           console.error('[whatsapp] Photo error:', err.message);
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', processingMs: Date.now() - start, body: '[photo]', error: err.message });
           await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble scanning that receipt. Please try again with a clearer photo.');
+        }
+        return;
+      }
+
+      if (isSupportedDocument(mediaType)) {
+        // Document (.pdf / .docx / text) - extract text + pull out any
+        // dates/tasks. Closes the "I can't open document attachments
+        // directly" gap. Filename arrives as the message Body on Twilio
+        // document messages, so we pass it through for extraction context.
+        const start = Date.now();
+        const filename = (Body || '').trim() || null;
+        try {
+          const docBuffer = await whatsapp.downloadMedia(mediaUrl);
+          const ctx = {};
+          const result = await handlers.handleDocument(docBuffer, mediaType, filename, user, household, ctx);
+          await whatsapp.sendMessage(phone, result.response);
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'document', intent: ctx.intent || null, processingMs: Date.now() - start, body: filename || '[document]', response: result.response });
+
+          const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
+          if (notification) broadcast.toHousehold(user.id, members, notification);
+        } catch (err) {
+          console.error('[whatsapp] Document error:', err.message);
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'document', processingMs: Date.now() - start, body: filename || '[document]', error: err.message });
+          await whatsapp.sendMessage(phone, "📄 Sorry, I had trouble reading that document. Try a PDF or .docx, or paste the text directly.");
         }
         return;
       }
