@@ -146,14 +146,14 @@ export default function WeatherStrip({ onOpenAI }) {
           <div
             className="weatherstrip-hours"
             style={{
-              display: 'flex', gap: 4, overflowX: 'auto', padding: '0 12px 12px',
+              display: 'flex', gap: 4, overflowX: 'auto', padding: '0px 14px 14px',
               // scrollPaddingLeft must match the container's padding-left.
               // Without it, scroll-snap aligns the "Now" cell's start edge
               // to the scrollport (padding-box) edge at rest, "scrolling
-              // under" the 12px left padding so the highlighted Now cell
-              // sits flush against the card edge. Insetting the snapport by
-              // 12px makes the snap land 12px in, preserving the gap.
-              scrollPaddingLeft: '12px',
+              // under" the left padding so the highlighted Now cell sits
+              // flush against the card edge. Insetting the snapport by the
+              // same amount makes the snap land at the padding, keeping the gap.
+              scrollPaddingLeft: '14px',
               WebkitOverflowScrolling: 'touch', scrollSnapType: 'x proximity', scrollbarWidth: 'none',
             }}
           >
