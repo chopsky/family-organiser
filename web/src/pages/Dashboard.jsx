@@ -499,12 +499,10 @@ export default function Dashboard() {
   return (
     <div {...ptr.bindings} className="max-w-5xl mx-auto space-y-4">
       <PullIndicator state={ptr.state} />
-      {/* Greeting + date kicker. Order flips by breakpoint:
-          - mobile: greeting on top, date/events line below (flex-col)
-          - desktop: date kicker above the serif headline (flex-col-reverse)
-          DOM keeps the <h1> first so the heading leads for screen readers.
-          gap-1.5 gives the 6px separation the kicker's old margin provided. */}
-      <div className="flex flex-col md:flex-col-reverse gap-1.5">
+      {/* Greeting + date kicker. Greeting (h1) on top, date/events line
+          below, on all viewports. gap-1.5 gives the 6px separation the
+          kicker's old margin provided. */}
+      <div className="flex flex-col gap-1.5">
         <h1
           // Responsive sizing via Tailwind arbitrary values - mobile gets
           // the cosier 38px treatment, desktop the full 52px editorial
