@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Custom 18px padding step (between p-4 = 16px and p-5 = 20px). Defined
+   as a real utility so responsive overrides (e.g. md:p-6) win over it the
+   same way they do over p-5. Used for the mobile card padding on the
+   dashboard, Family, and Settings cards. */
+@utility p-4\.5 {
+  padding: calc(var(--spacing) * 4.5);
+}
+
 @theme {
   /* Font stacks - system fonts only, no external loads */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';

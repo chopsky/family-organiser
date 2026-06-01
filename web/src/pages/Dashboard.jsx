@@ -620,7 +620,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Card 1 - Today's schedule */}
-        <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">Today's schedule</h2>
             <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">Week →</Link>
@@ -678,7 +678,7 @@ export default function Dashboard() {
         <AfterSchoolCard members={members} />
 
         {/* Card 2 - Tasks */}
-        <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">
               Tasks
@@ -732,7 +732,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card 3 - Grocery list */}
-        <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">
               Grocery list
@@ -780,7 +780,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card 4 - Today's meals */}
-        <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">Today's meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>

@@ -122,7 +122,7 @@ function PlanSection() {
   if (loading && !isActive && !isTrialing && !isExpired && !isInternal) return null;
 
   return (
-    <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+    <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
       <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Plan</h2>
 
       {isInternal && (
@@ -363,7 +363,7 @@ function SettingsCard({ title, icon: IconCmp, danger = false, children }) {
   const baseStyle = danger
     ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
     : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
-  const wrapClass = danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-5 md:p-6';
+  const wrapClass = danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-4.5 md:p-6';
   const iconColor = danger ? 'text-error' : 'text-plum';
   const titleColor = danger ? 'text-error' : 'text-bark';
   return (
@@ -509,7 +509,7 @@ export default function Settings() {
               breathing room it has everywhere else. */}
           <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)' }}>
             <div
-              className={danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-5 md:p-6'}
+              className={danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-4.5 md:p-6'}
               style={danger
                 ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
                 : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
@@ -1293,7 +1293,7 @@ export default function Settings() {
         const me = members.find((m) => m.id === user?.id);
         const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
         return (
-          <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+          <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
             <div className="flex items-start justify-between mb-3">
               <h2 className="text-base md:text-medium font-semibold text-bark">My profile</h2>
               {/* Subtle trial indicator - renders nothing unless the household
@@ -2221,7 +2221,7 @@ export default function Settings() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)' }}>
-            <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+            <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
               <EditProfileForm
                 profileAvatar={profileAvatar}
                 profileName={profileName}
