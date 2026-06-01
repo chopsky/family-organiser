@@ -3137,7 +3137,7 @@ export default function FamilySetup() {
                   below under the same any-member-with-a-school rule. */}
               {editingMember?.school_id && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5">📅 Weekly activities</h3>
+                  <h3 className="text-sm font-semibold text-plum">Weekly activities</h3>
                   <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time. Tap an activity to edit it.</p>
 
                   {loadingActivities ? <Spinner /> : (
@@ -3243,7 +3243,7 @@ export default function FamilySetup() {
 
                     return (
                       <>
-                        <h3 className="text-sm font-semibold text-plum flex items-center gap-1.5 mt-4">📅 Term dates</h3>
+                        <h3 className="text-sm font-semibold text-plum">Term dates</h3>
                         {school && <p className="text-xs text-cocoa">{school.school_name}</p>}
 
                         {/* Sibling note */}
