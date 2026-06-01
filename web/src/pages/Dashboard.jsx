@@ -425,6 +425,15 @@ export default function Dashboard() {
   const todayEvents = digest?.todayEvents ?? [];
   const eventCount = todayEvents.length;
   const members = digest?.members ?? [];
+
+  // "Up Next" card data: the soonest TIMED event today that hasn't started
+  // yet. All-day events are excluded (no meaningful countdown). Hidden
+  // entirely when nothing's left today, per the design brief (no empty
+  // state). digest only carries today's events, so this is same-day.
+  const nowMsUpNext = Date.now();
+  const nextUp = todayEvents
+    .filter(e => !e.all_day && e.start_time && new Date(e.start_time).getTime() >= nowMsUpNext)
+    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0] || null;
   const outstanding = digest?.outstanding ?? [];
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
   const weekMeals = digest?.weekMeals ?? [];
@@ -541,6 +550,54 @@ export default function Dashboard() {
       <WriteGate size="lg" message="Subscribe to create events, tasks, and more with AI">
         <DashboardAiInput />
       </WriteGate>
+
+      {/* "Up Next" card - the soonest upcoming timed event today, with a
+          lead-up progress bar. Sits between the AI composer and the day's
+          schedule (design handoff: docs/design_handoff_up_next_card,
+          Variant A light). Hidden when nothing's left today. Taps through
+          to the calendar. */}
+      {nextUp && (() => {
+        const startMs = new Date(nextUp.start_time).getTime();
+        const inMins = Math.max(0, Math.round((startMs - Date.now()) / 60000));
+        const who = getMemberForEvent(nextUp);
+        // "{Name} · {title}" per the brief, but avoid "Mason · Mason's tennis"
+        // when the title already names the member.
+        const title = who && !((nextUp.title || '').toLowerCase().includes(who.name.toLowerCase()))
+          ? `${who.name} · ${nextUp.title}`
+          : (nextUp.title || 'Event');
+        const when = inMins <= 0 ? 'now' : inMins < 60 ? `in ${inMins} min` : `at ${formatTime(nextUp.start_time)}`;
+        const endStr = nextUp.end_time ? `–${formatTime(nextUp.end_time)}` : '';
+        const sub = `${formatTime(nextUp.start_time)}${endStr}${nextUp.location ? ` · ${nextUp.location}` : ''}`;
+        // Lead-up window = 60 min; bar fills as the event approaches.
+        const progress = Math.min(1, Math.max(0, 1 - inMins / 60));
+        const ac = avatarColors[who?.color_theme] || avatarColors.sage;
+        return (
+          <button
+            type="button"
+            onClick={() => navigate('/calendar')}
+            aria-label={`Up next: ${title}, ${when}${nextUp.location ? `, ${nextUp.location}` : ''}. Opens calendar.`}
+            className="block w-full text-left bg-white rounded-[20px] overflow-hidden transition-transform active:scale-[0.99]"
+            style={{ border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 2px rgba(26,22,32,0.04)' }}
+          >
+            <div className="flex items-center justify-between gap-3" style={{ padding: '16px 18px 14px' }}>
+              <div className="min-w-0">
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-plum)', marginBottom: 2 }}>
+                  Up next · {when}
+                </div>
+                <div className="truncate" style={{ fontSize: 18, fontWeight: 700, color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.3px' }}>{title}</div>
+                <div className="truncate" style={{ fontSize: 13, color: 'var(--warm-grey, #6B6774)', marginTop: 2 }}>{sub}</div>
+              </div>
+              {who && (who.avatar_url
+                ? <img src={who.avatar_url} alt="" className="w-[42px] h-[42px] rounded-full object-cover shrink-0" />
+                : <div className={`w-[42px] h-[42px] rounded-full ${ac} flex items-center justify-center font-semibold shrink-0`} style={{ fontSize: 18 }}>{who.name?.[0]?.toUpperCase()}</div>
+              )}
+            </div>
+            <div style={{ height: 6, background: '#F3EEE5', overflow: 'hidden' }}>
+              <div style={{ width: `${Math.round(progress * 100)}%`, height: '100%', background: 'var(--color-plum)' }} />
+            </div>
+          </button>
+        );
+      })()}
 
       {/* Soft calendar-setup nudge for households that haven't subscribed
           any external feed yet. Renders nothing once a feed exists or
