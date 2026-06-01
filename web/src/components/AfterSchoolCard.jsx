@@ -52,6 +52,8 @@ const AS_ICONS = {
   swim: (p = {}) => wrap(<><circle cx="15" cy="7" r="2" /><path d="M5 13l4-2.5 3 2 2.5-1.5M3 17.5c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M8.5 11.5L12 8l-2-1.5" /></>, p),
   music: (p = {}) => wrap(<><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M9 17.5V6l11-2v9.5" /><path d="M9 9l11-2" /></>, p),
   gym: (p = {}) => wrap(<path d="M2 9v6M5 7v10M19 7v10M22 9v6M5 12h14" />, p),
+  // chef's hat - cooking / baking
+  chef: (p = {}) => wrap(<><path d="M6 13.5h12V18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-4.5z" /><path d="M6 13.5a3 3 0 0 1-.8-5.9A3.5 3.5 0 0 1 12 6a3.5 3.5 0 0 1 6.8 1.6 3 3 0 0 1-.8 5.9" /></>, p),
   // generic fallback
   star: (p = {}) => wrap(<path d="M12 3l2.5 5.6 6 .6-4.5 4 1.3 6L12 16.8 6.7 19.2l1.3-6-4.5-4 6-.6L12 3z" />, p),
 };
@@ -66,6 +68,7 @@ function iconFor(name) {
   if (/cod(e|ing)|computer|ict|programming|robot/.test(n)) return 'code';
   if (/swim|water polo|diving/.test(n)) return 'swim';
   if (/choir|music|sing|band|orchestra|instrument/.test(n)) return 'music';
+  if (/cook|bak(e|ing)|chef|cuisine|culinary|food/.test(n)) return 'chef';
   if (/gym|\bpe\b|sport|athletic|fitness/.test(n)) return 'gym';
   return 'star';
 }
