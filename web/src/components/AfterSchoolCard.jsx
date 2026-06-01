@@ -156,8 +156,9 @@ export default function AfterSchoolCard({ members = [] }) {
 
   return (
     <div
+      className="p-5"
       style={{
-        background: '#fff', borderRadius: 22, padding: 18,
+        background: '#fff', borderRadius: 22,
         boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)',
       }}
     >
