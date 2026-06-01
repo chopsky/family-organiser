@@ -14,6 +14,7 @@ import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { setBadgeCount } from '../lib/badge';
 import WeatherStrip from '../components/WeatherStrip';
+import AfterSchoolCard from '../components/AfterSchoolCard';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -669,6 +670,12 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* After School (mobile only) - kids' after-school activities + pickup,
+            per design handoff. Sits between Today's schedule and Tasks. Renders
+            null on desktop and when the household has no activities, so it won't
+            occupy a grid cell in those cases. */}
+        <AfterSchoolCard members={members} onOpenCalendar={() => navigate('/calendar')} />
 
         {/* Card 2 - Tasks */}
         <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
