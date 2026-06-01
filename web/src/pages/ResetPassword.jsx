@@ -82,7 +82,7 @@ const inputStyle = {
   borderRadius: 12,
   background: '#FFFFFF',
   border: '1px solid rgba(26,22,32,0.10)',
-  fontFamily: 'Inter, sans-serif',
+  fontFamily: 'var(--font-sans)',
   fontSize: 14,
   color: '#1A1620',
   outline: 'none',
@@ -94,7 +94,7 @@ const ctaStyle = {
   color: '#FFFFFF',
   border: '1px solid transparent',
   boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-  fontFamily: 'Inter, sans-serif',
+  fontFamily: 'var(--font-sans)',
   fontWeight: 600,
   fontSize: 14,
   lineHeight: 1.45,
@@ -133,7 +133,7 @@ export default function ResetPassword() {
         <h1 className="text-center" style={headlineStyle}>
           Invalid <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>link.</em>
         </h1>
-        <p className="text-center" style={{ marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#4A4453' }}>
+        <p className="text-center" style={{ marginTop: 16, fontFamily: 'var(--font-sans)', fontSize: 14, color: '#4A4453' }}>
           The reset link is missing or has expired. Request a new one to try again.
         </p>
         <Link to="/forgot-password" className="block text-center w-full transition-all" style={{ ...ctaStyle, marginTop: 24, textDecoration: 'none' }}>

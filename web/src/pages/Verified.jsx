@@ -87,7 +87,7 @@ export default function Verified() {
           className="text-center"
           style={{
             marginTop: 16,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 14,
             color: '#4A4453',
             lineHeight: 1.5,
@@ -107,7 +107,7 @@ export default function Verified() {
             color: '#FFFFFF',
             border: '1px solid transparent',
             boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontWeight: 600,
             fontSize: 14,
             lineHeight: 1.45,

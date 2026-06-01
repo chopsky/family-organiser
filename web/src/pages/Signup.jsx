@@ -154,7 +154,7 @@ export default function Signup() {
             className="text-center"
             style={{
               marginTop: 12,
-              fontFamily: 'Inter, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: 13,
               color: '#6B3FA0',
               fontWeight: 500,
@@ -182,7 +182,7 @@ export default function Signup() {
                   color: '#1A1620',
                   border: '1px solid rgba(26,22,32,0.10)',
                   boxShadow: '0 1px 0 rgba(26,22,32,0.04)',
-                  fontFamily: 'Inter, sans-serif',
+                  fontFamily: 'var(--font-sans)',
                   fontWeight: 600,
                   fontSize: 14,
                   lineHeight: 1.45,
@@ -201,7 +201,7 @@ export default function Signup() {
                   <div className="flex-1" style={{ height: 1, background: 'rgba(26,22,32,0.12)' }} />
                   <span
                     style={{
-                      fontFamily: 'Inter, sans-serif',
+                      fontFamily: 'var(--font-sans)',
                       fontSize: 11,
                       fontWeight: 400,
                       letterSpacing: '0.08em',
@@ -229,7 +229,7 @@ export default function Signup() {
                         borderRadius: 12,
                         background: '#FFFFFF',
                         border: '1px solid rgba(26,22,32,0.10)',
-                        fontFamily: 'Inter, sans-serif',
+                        fontFamily: 'var(--font-sans)',
                         fontSize: 14,
                         color: '#1A1620',
                         outline: 'none',
@@ -252,7 +252,7 @@ export default function Signup() {
                         borderRadius: 12,
                         background: '#FFFFFF',
                         border: '1px solid rgba(26,22,32,0.10)',
-                        fontFamily: 'Inter, sans-serif',
+                        fontFamily: 'var(--font-sans)',
                         fontSize: 14,
                         color: '#1A1620',
                         outline: 'none',
@@ -275,7 +275,7 @@ export default function Signup() {
                         borderRadius: 12,
                         background: '#FFFFFF',
                         border: '1px solid rgba(26,22,32,0.10)',
-                        fontFamily: 'Inter, sans-serif',
+                        fontFamily: 'var(--font-sans)',
                         fontSize: 14,
                         color: '#1A1620',
                         outline: 'none',
@@ -294,7 +294,7 @@ export default function Signup() {
                       color: '#FFFFFF',
                       border: '1px solid transparent',
                       boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-                      fontFamily: 'Inter, sans-serif',
+                      fontFamily: 'var(--font-sans)',
                       fontWeight: 600,
                       fontSize: 14,
                       lineHeight: 1.45,
@@ -312,7 +312,7 @@ export default function Signup() {
           className="text-center"
           style={{
             marginTop: 20,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 13,
             fontWeight: 400,
             color: '#4A4453',
@@ -323,7 +323,7 @@ export default function Signup() {
           <Link
             to="/login"
             style={{
-              fontFamily: 'Inter, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontWeight: 700,
               fontSize: 13,
               color: '#6B3FA0',
@@ -340,7 +340,7 @@ export default function Signup() {
           className="text-center"
           style={{
             marginTop: 14,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 12,
             color: '#8A8493',
             lineHeight: 1.45,
@@ -361,7 +361,7 @@ export default function Signup() {
         .signup-concierge-auth > div.space-y-3 > button {
           padding: 14px 18px !important;
           border-radius: 12px !important;
-          font-family: Inter, sans-serif !important;
+          font-family: var(--font-sans) !important;
           font-weight: 600 !important;
           font-size: 14px !important;
           line-height: 1.45 !important;

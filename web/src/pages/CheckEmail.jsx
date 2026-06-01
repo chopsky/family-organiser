@@ -83,7 +83,7 @@ export default function CheckEmail() {
           className="text-center"
           style={{
             marginTop: 16,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 14,
             color: '#4A4453',
             lineHeight: 1.5,
@@ -97,7 +97,7 @@ export default function CheckEmail() {
           className="text-center"
           style={{
             marginTop: 24,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 12,
             color: '#8A8493',
             lineHeight: 1.5,
@@ -114,7 +114,7 @@ export default function CheckEmail() {
           className="text-center"
           style={{
             marginTop: 16,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 13,
             color: '#4A4453',
             lineHeight: 1.45,

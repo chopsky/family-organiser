@@ -109,7 +109,7 @@ export default function ForgotPassword() {
           className="text-center"
           style={{
             marginTop: 16,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 14,
             color: '#4A4453',
             lineHeight: 1.5,
@@ -134,7 +134,7 @@ export default function ForgotPassword() {
                 color: '#FFFFFF',
                 border: '1px solid transparent',
                 boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-                fontFamily: 'Inter, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontWeight: 600,
                 fontSize: 14,
                 lineHeight: 1.45,
@@ -157,7 +157,7 @@ export default function ForgotPassword() {
                   borderRadius: 12,
                   background: '#FFFFFF',
                   border: '1px solid rgba(26,22,32,0.10)',
-                  fontFamily: 'Inter, sans-serif',
+                  fontFamily: 'var(--font-sans)',
                   fontSize: 14,
                   color: '#1A1620',
                   outline: 'none',
@@ -175,7 +175,7 @@ export default function ForgotPassword() {
                   color: '#FFFFFF',
                   border: '1px solid transparent',
                   boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-                  fontFamily: 'Inter, sans-serif',
+                  fontFamily: 'var(--font-sans)',
                   fontWeight: 600,
                   fontSize: 14,
                   lineHeight: 1.45,
@@ -192,7 +192,7 @@ export default function ForgotPassword() {
             className="text-center"
             style={{
               marginTop: 20,
-              fontFamily: 'Inter, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: 13,
               color: '#4A4453',
             }}
@@ -217,7 +217,7 @@ export default function ForgotPassword() {
           className="text-center"
           style={{
             marginTop: 14,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             fontSize: 12,
             color: '#8A8493',
           }}

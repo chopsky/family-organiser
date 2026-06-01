@@ -1,11 +1,9 @@
-/* Landing page body face: Inter (loaded via Google Fonts in index.html),
- * matching the brand body typeface. This previously referenced a Saans
- * TRIAL font from /fonts/saans/ - those trial files were evaluation-only
- * (not licensed for production), were never actually present, so the
- * @font-face refs 404'd and the page silently fell back to system-ui.
- * Removed the dead trial declarations and pointed the landing page at
- * Inter. If Saans is ever properly licensed, re-add its @font-face here
- * and swap the family below back. */
+/* Landing page body face: the system font stack (var(--font-sans)),
+ * matching the rest of the app. Previously referenced a Saans TRIAL font
+ * (evaluation-only, never licensed, files never present - the @font-face
+ * refs 404'd) and later Inter; both have been removed in favour of native
+ * system fonts. Headings still use Instrument Serif (loaded via Google
+ * Fonts in index.html). */
 
 :root {
   --purple: #6B2FB8;
@@ -33,7 +31,7 @@
 .lp-v2 * { box-sizing: border-box; }
 
 .lp-v2 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: var(--ink);
   background: var(--cream);
   -webkit-font-smoothing: antialiased;
@@ -125,7 +123,7 @@ h1.display em { font-style: italic; color: var(--purple); }
   background: #fff;
 }
 .collage .app img { width: 100%; display: block; }
-.collage .app-mock { padding: 14px 14px 12px; font-family: 'Inter', sans-serif; }
+.collage .app-mock { padding: 14px 14px 12px; font-family: var(--font-sans); }
 .collage .app-mock .app-mock-head { padding: 4px 4px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .collage .app-mock .kicker { font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
 .collage .app-mock .greet { font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.1; margin-top: 4px; letter-spacing: -.01em; }

@@ -764,7 +764,7 @@ export default function Tasks() {
           style={{
             fontWeight: 400,
             lineHeight: 1,
-            fontFamily: '"Instrument Serif", "Times New Roman", serif',
+            fontFamily: '"Instrument Serif"',
             color: 'var(--charcoal, #2D2A33)',
             letterSpacing: '-0.02em',
           }}

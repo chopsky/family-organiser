@@ -133,7 +133,7 @@ export default function Verify() {
 
         {error ? (
           <>
-            <p className="text-center" style={{ marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#4A4453', lineHeight: 1.5 }}>
+            <p className="text-center" style={{ marginTop: 16, fontFamily: 'var(--font-sans)', fontSize: 14, color: '#4A4453', lineHeight: 1.5 }}>
               {error}
             </p>
             <Link
@@ -147,7 +147,7 @@ export default function Verify() {
                 color: '#FFFFFF',
                 border: '1px solid transparent',
                 boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
-                fontFamily: 'Inter, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontWeight: 600,
                 fontSize: 14,
                 lineHeight: 1.45,
@@ -158,7 +158,7 @@ export default function Verify() {
             </Link>
           </>
         ) : (
-          <p className="text-center" style={{ marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#4A4453', lineHeight: 1.5 }}>
+          <p className="text-center" style={{ marginTop: 16, fontFamily: 'var(--font-sans)', fontSize: 14, color: '#4A4453', lineHeight: 1.5 }}>
             One moment - signing you in.
           </p>
         )}

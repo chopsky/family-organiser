@@ -69,7 +69,7 @@ export default function Meals() {
     <div className="max-w-5xl mx-auto space-y-5">
       <h1
         className="text-[38px] md:text-[40px] font-normal leading-none text-bark flex items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif", "Times New Roman", serif' }}
+        style={{ fontFamily: '"Instrument Serif"' }}
       >
         <div
           className="hidden"
