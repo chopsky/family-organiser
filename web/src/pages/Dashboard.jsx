@@ -496,24 +496,14 @@ export default function Dashboard() {
 
 
   return (
-    <div {...ptr.bindings} className="max-w-5xl mx-auto space-y-6">
+    <div {...ptr.bindings} className="max-w-5xl mx-auto space-y-4">
       <PullIndicator state={ptr.state} />
-      {/* Greeting - kicker (date + event count) above, serif headline below.
-          Matches the Housemait editorial greeting style. */}
-      <div>
-        <p
-          style={{
-            color: 'var(--color-plum)',
-            marginBottom: '6px',
-            fontSize: '11px',
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {todayStr}
-          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
-        </p>
+      {/* Greeting + date kicker. Order flips by breakpoint:
+          - mobile: greeting on top, date/events line below (flex-col)
+          - desktop: date kicker above the serif headline (flex-col-reverse)
+          DOM keeps the <h1> first so the heading leads for screen readers.
+          gap-1.5 gives the 6px separation the kicker's old margin provided. */}
+      <div className="flex flex-col md:flex-col-reverse gap-1.5">
         <h1
           // Responsive sizing via Tailwind arbitrary values - mobile gets
           // the cosier 38px treatment, desktop the full 52px editorial
@@ -528,6 +518,18 @@ export default function Dashboard() {
         >
           {getGreeting()}, <i>{user?.name}</i>.
         </h1>
+        <p
+          style={{
+            color: 'var(--ink-2)',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {todayStr}
+          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
+        </p>
       </div>
 
       {/* Weather widget - sits directly below the greeting and above the
