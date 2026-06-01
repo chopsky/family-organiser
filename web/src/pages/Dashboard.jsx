@@ -683,7 +683,7 @@ export default function Dashboard() {
             <h2 className="text-base font-sans font-semibold text-bark">
               Tasks
               {actionableCount > 0 && (
-                <span className="text-cocoa font-normal"> · {actionableCount} due</span>
+                <span className="text-sm font-normal" style={{ color: 'var(--ink-2)' }}> · {actionableCount} due</span>
               )}
             </h2>
             <Link to="/tasks" className="text-xs font-medium text-primary hover:underline">View all →</Link>
@@ -734,7 +734,12 @@ export default function Dashboard() {
         {/* Card 3 - Grocery list */}
         <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-sans font-semibold text-bark">Grocery list</h2>
+            <h2 className="text-base font-sans font-semibold text-bark">
+              Grocery list
+              {shoppingItems.length > 0 && (
+                <span className="text-sm font-normal" style={{ color: 'var(--ink-2)' }}> · {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}</span>
+              )}
+            </h2>
             <Link to="/shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
           </div>
           {shoppingItems.length === 0 ? (
