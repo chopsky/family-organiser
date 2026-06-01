@@ -49,6 +49,7 @@ export function usePullToRefresh(onRefresh) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startYRef = useRef(null);
+  const startXRef = useRef(null);    // for horizontal-vs-vertical direction lock
   const armedRef = useRef(false);    // we've crossed the trigger threshold
   const refreshingRef = useRef(false); // mirror of refreshing for handlers
 
@@ -61,6 +62,7 @@ export function usePullToRefresh(onRefresh) {
       return;
     }
     startYRef.current = e.touches?.[0]?.clientY ?? null;
+    startXRef.current = e.touches?.[0]?.clientX ?? null;
     armedRef.current = false;
   }, [native]);
 
@@ -68,7 +70,19 @@ export function usePullToRefresh(onRefresh) {
     if (!native || refreshingRef.current) return;
     if (startYRef.current == null) return;
     const y = e.touches?.[0]?.clientY ?? 0;
+    const x = e.touches?.[0]?.clientX ?? 0;
     const delta = y - startYRef.current;
+    const dx = x - (startXRef.current ?? x);
+    // Direction lock: if the gesture is more horizontal than vertical, the
+    // user is side-scrolling (e.g. the weather hourly strip), not pulling
+    // to refresh. Abandon PTR for the rest of this touch so the horizontal
+    // scroller wins cleanly and we don't yank the page down.
+    if (Math.abs(dx) > Math.abs(delta)) {
+      setPull(0);
+      startYRef.current = null;
+      armedRef.current = false;
+      return;
+    }
     if (delta <= 0) {
       // Finger moved up - user is just scrolling, not pulling. Bail.
       setPull(0);
@@ -108,6 +122,7 @@ export function usePullToRefresh(onRefresh) {
       setPull(0);
     }
     startYRef.current = null;
+    startXRef.current = null;
     armedRef.current = false;
   }, [native, onRefresh]);
 
@@ -115,6 +130,7 @@ export function usePullToRefresh(onRefresh) {
   useEffect(() => () => {
     refreshingRef.current = false;
     startYRef.current = null;
+    startXRef.current = null;
     armedRef.current = false;
   }, []);
 
