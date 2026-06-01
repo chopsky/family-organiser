@@ -28,11 +28,15 @@ function firstUrl(text) {
 function isCalendarFeedUrl(url) {
   if (!url) return false;
   const u = url.toLowerCase();
-  if (u.startsWith('webcal://')) return true;            // any webcal feed
-  if (/\.ics(\?|$)/.test(u)) return true;                // any .ics file
-  if (/calendar\.google\.com\/calendar\/ical\//.test(u)) return true; // Google
-  if (/icloud\.com\/published\//.test(u)) return true;   // iCloud published
-  if (/outlook\.(office365\.com|live\.com).*\/calendar/.test(u)) return true; // Outlook publish
+  if (u.startsWith('webcal://')) return true;            // Apple/iCloud + any webcal feed
+  if (/\.ics(\?|$)/.test(u)) return true;                // Outlook calendar.ics, Google basic.ics, any .ics
+  if (/calendar\.google\.com\/calendar\/ical\//.test(u)) return true; // Google (redundant w/ .ics, kept defensively)
+  if (/icloud\.com\/published\//.test(u)) return true;   // iCloud published (https form, no .ics suffix)
+  // NB: we deliberately do NOT match a bare outlook ".../calendar" path.
+  // Outlook's "Publish a calendar" hands the user TWO links - an .ics
+  // feed (caught above) and an .html VIEW that is NOT subscribable.
+  // Matching the loose path would accept the .html, "succeed", then
+  // silently never sync. The .ics rule already catches the real feed.
   return false;
 }
 

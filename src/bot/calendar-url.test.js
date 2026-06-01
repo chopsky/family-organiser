@@ -15,8 +15,23 @@ describe('calendar-url detection', () => {
     test('iCloud published', () => {
       expect(isCalendarFeedUrl('https://p52-caldav.icloud.com/published/2/MT...')).toBe(true);
     });
-    test('Outlook publish URL', () => {
-      expect(isCalendarFeedUrl('https://outlook.office365.com/owa/calendar/abc/def/calendar.ics')).toBe(true);
+    test('Outlook (Office 365) published .ics feed', () => {
+      expect(isCalendarFeedUrl('https://outlook.office365.com/owa/calendar/abc123/def456/calendar.ics')).toBe(true);
+    });
+    test('Outlook.com (personal) published .ics feed', () => {
+      expect(isCalendarFeedUrl('https://outlook.live.com/owa/calendar/00000000-0000-0000-0000-000000000000/cid-ABCD1234/calendar.ics')).toBe(true);
+    });
+    test('rejects the Outlook .html VIEW link (not subscribable)', () => {
+      // Outlook publishes both an .ics feed and an .html view; only the
+      // .ics is subscribable. We must NOT accept the .html or we silently
+      // "connect" a feed that never syncs.
+      expect(isCalendarFeedUrl('https://outlook.office365.com/owa/calendar/abc123/def456/calendar.html')).toBe(false);
+    });
+    test('Apple iCloud webcal feed (does not end in .ics)', () => {
+      expect(isCalendarFeedUrl('webcal://p52-caldav.icloud.com/published/2/MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkw')).toBe(true);
+    });
+    test('Apple iCloud published feed in https form', () => {
+      expect(isCalendarFeedUrl('https://p52-caldav.icloud.com/published/2/MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkw')).toBe(true);
     });
     test('rejects a normal web link', () => {
       expect(isCalendarFeedUrl('https://www.bbc.co.uk/news')).toBe(false);
