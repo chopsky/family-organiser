@@ -164,7 +164,7 @@ export default function AfterSchoolCard({ members = [], onOpenCalendar }) {
       <div className="flex items-end justify-between" style={{ marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK3, marginBottom: 4 }}>The kids</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: INK, letterSpacing: -0.2 }}>After school</div>
+          <h2 className="text-base font-sans font-semibold text-bark">After school</h2>
         </div>
         <button
           type="button"
