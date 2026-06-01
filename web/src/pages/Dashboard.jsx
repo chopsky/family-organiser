@@ -675,7 +675,7 @@ export default function Dashboard() {
             per design handoff. Sits between Today's schedule and Tasks. Renders
             null on desktop and when the household has no activities, so it won't
             occupy a grid cell in those cases. */}
-        <AfterSchoolCard members={members} onOpenCalendar={() => navigate('/calendar')} />
+        <AfterSchoolCard members={members} />
 
         {/* Card 2 - Tasks */}
         <div className="bg-linen rounded-2xl p-5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>

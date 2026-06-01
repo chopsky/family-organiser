@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
@@ -92,7 +93,7 @@ function Avatar({ member, size = 26 }) {
   );
 }
 
-export default function AfterSchoolCard({ members = [], onOpenCalendar }) {
+export default function AfterSchoolCard({ members = [] }) {
   const [activities, setActivities] = useState(null); // null = loading, [] = loaded-empty
   const [isMobile, setIsMobile] = useState(
     () => (typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : true),
@@ -161,19 +162,9 @@ export default function AfterSchoolCard({ members = [], onOpenCalendar }) {
       }}
     >
       {/* Header */}
-      <div className="flex items-end justify-between" style={{ marginBottom: 14 }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-2)', marginBottom: 4 }}>The kids</div>
-          <h2 className="text-base font-sans font-semibold text-bark">After school</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenCalendar}
-          className="flex items-center gap-1"
-          style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', color: BRAND, fontWeight: 600, fontSize: 13 }}
-        >
-          Calendar ›
-        </button>
+      <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
+        <h2 className="text-base font-sans font-semibold text-bark">After school</h2>
+        <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">Calendar →</Link>
       </div>
 
       {/* Day selector */}
