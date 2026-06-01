@@ -369,9 +369,8 @@ export default function Help() {
         className="bg-white rounded-2xl border border-cream-border p-6 md:p-8 mt-10"
       >
         <h2
-          className="text-charcoal m-0 text-base md:text-xl"
+          className="text-charcoal m-0 text-base md:text-xl font-semibold md:font-medium"
           style={{
-            fontWeight: 500,
             lineHeight: 1.3,
           }}
         >
@@ -422,9 +421,8 @@ function FaqSection({ id, title, children }) {
   return (
     <section id={id} className="mt-10 scroll-mt-24">
       <h2
-        className="text-charcoal mb-3 text-base md:text-xl"
+        className="text-charcoal mb-3 text-base md:text-xl font-semibold md:font-medium"
         style={{
-          fontWeight: 500,
           lineHeight: 1.3,
         }}
       >
