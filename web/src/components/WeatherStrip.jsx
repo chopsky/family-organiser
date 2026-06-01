@@ -68,18 +68,35 @@ export default function WeatherStrip({ onOpenAI }) {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(false);
 
+  // Mobile-only: the weather widget is intentionally not shown on the
+  // desktop app (≥768px, the design's sidebar breakpoint). We gate on a
+  // media query rather than CSS-hiding so desktop never fires the
+  // /weather/widget request - which would otherwise trigger a server-side
+  // AI-note LLM call for a widget no one sees. Reactive to resize.
+  const [isMobile, setIsMobile] = useState(
+    () => (typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : true),
+  );
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mql = window.matchMedia('(max-width: 767px)');
+    const handler = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return undefined; // don't fetch on desktop
     let cancelled = false;
     api.get('/weather/widget')
       .then((res) => { if (!cancelled) setData(res.data); })
       .catch(() => { if (!cancelled) setData({ available: false }); });
     return () => { cancelled = true; };
-  }, []);
+  }, [isMobile]);
 
-  // Render nothing until we have a positive payload. No skeleton: the
-  // widget is a nicety, not core content, and a flash of empty card
-  // above the composer would be more jarring than its absence.
-  if (!data || !data.available) return null;
+  // Render nothing on desktop, or until we have a positive payload. No
+  // skeleton: the widget is a nicety, not core content, and a flash of
+  // empty card above the composer would be more jarring than its absence.
+  if (!isMobile || !data || !data.available) return null;
 
   const w = data;
   const Big = WX[w.icon] || WX.partly;
