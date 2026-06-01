@@ -559,10 +559,14 @@ export default function Dashboard() {
       {nextUp && (() => {
         const startMs = new Date(nextUp.start_time).getTime();
         const inMins = Math.max(0, Math.round((startMs - Date.now()) / 60000));
-        const who = getMemberForEvent(nextUp);
-        // "{Name} · {title}" per the brief, but avoid "Mason · Mason's tennis"
-        // when the title already names the member.
-        const title = who && !((nextUp.title || '').toLowerCase().includes(who.name.toLowerCase()))
+        // Multi-assignee aware: events from the member picker store the
+        // list in ev.assignees; older ones use assigned_to_name. (Using
+        // the single-assignee helper here was the bug that hid the avatar.)
+        const whoList = getMembersForEvent(nextUp);
+        const who = whoList[0] || null;
+        // "{Name} · {title}" for a single assignee (per the brief), avoiding
+        // "Mason · Mason's tennis"; plain title for multiple / none.
+        const title = (whoList.length === 1 && who && !((nextUp.title || '').toLowerCase().includes(who.name.toLowerCase())))
           ? `${who.name} · ${nextUp.title}`
           : (nextUp.title || 'Event');
         const when = inMins <= 0 ? 'now' : inMins < 60 ? `in ${inMins} min` : `at ${formatTime(nextUp.start_time)}`;
@@ -570,7 +574,6 @@ export default function Dashboard() {
         const sub = `${formatTime(nextUp.start_time)}${endStr}${nextUp.location ? ` · ${nextUp.location}` : ''}`;
         // Lead-up window = 60 min; bar fills as the event approaches.
         const progress = Math.min(1, Math.max(0, 1 - inMins / 60));
-        const ac = avatarColors[who?.color_theme] || avatarColors.sage;
         return (
           <button
             type="button"
@@ -587,9 +590,15 @@ export default function Dashboard() {
                 <div className="truncate" style={{ fontSize: 18, fontWeight: 700, color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.3px' }}>{title}</div>
                 <div className="truncate" style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>{sub}</div>
               </div>
-              {who && (who.avatar_url
-                ? <img src={who.avatar_url} alt="" className="w-[42px] h-[42px] rounded-full object-cover shrink-0" />
-                : <div className={`w-[42px] h-[42px] rounded-full ${ac} flex items-center justify-center font-semibold shrink-0`} style={{ fontSize: 18 }}>{who.name?.[0]?.toUpperCase()}</div>
+              {whoList.length > 0 && (
+                <div className="flex shrink-0 -space-x-2">
+                  {whoList.map((m) => {
+                    const ac = avatarColors[m.color_theme] || avatarColors.sage;
+                    return m.avatar_url
+                      ? <img key={m.id} src={m.avatar_url} alt={m.name} className="w-[42px] h-[42px] rounded-full object-cover ring-2 ring-white" />
+                      : <div key={m.id} title={m.name} className={`w-[42px] h-[42px] rounded-full ${ac} flex items-center justify-center font-semibold ring-2 ring-white`} style={{ fontSize: 18 }}>{m.name?.[0]?.toUpperCase()}</div>;
+                  })}
+                </div>
               )}
             </div>
             <div style={{ height: 6, background: '#F3EEE5', overflow: 'hidden' }}>
