@@ -683,7 +683,7 @@ export default function Dashboard() {
             <h2 className="text-base font-sans font-semibold text-bark">
               Tasks
               {actionableCount > 0 && (
-                <span className="text-sm font-normal" style={{ color: 'var(--ink-2)' }}> · {actionableCount} due</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-2)' }}> · {actionableCount} due</span>
               )}
             </h2>
             <Link to="/tasks" className="text-xs font-medium text-primary hover:underline">View all →</Link>
@@ -737,7 +737,7 @@ export default function Dashboard() {
             <h2 className="text-base font-sans font-semibold text-bark">
               Grocery list
               {shoppingItems.length > 0 && (
-                <span className="text-sm font-normal" style={{ color: 'var(--ink-2)' }}> · {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-2)' }}> · {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}</span>
               )}
             </h2>
             <Link to="/shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
