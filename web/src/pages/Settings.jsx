@@ -123,7 +123,7 @@ function PlanSection() {
 
   return (
     <div className="bg-linen rounded-2xl p-5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-      <h2 className="text-base md:text-lg font-medium text-bark mb-2">Plan</h2>
+      <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Plan</h2>
 
       {isInternal && (
         <p className="text-sm text-cocoa">
