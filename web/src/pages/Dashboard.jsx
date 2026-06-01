@@ -13,6 +13,7 @@ import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { setBadgeCount } from '../lib/badge';
+import WeatherStrip from '../components/WeatherStrip';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 const avatarColors = {
@@ -511,7 +512,7 @@ export default function Dashboard() {
           // with utilities here (custom font family + weight).
           className="text-[38px] md:text-[52px] leading-[1.05] md:leading-[1.02] tracking-[-0.8px] md:tracking-[-1px]"
           style={{
-            fontFamily: '"Instrument Serif", "Times New Roman", serif',
+            fontFamily: '"Instrument Serif"',
             fontWeight: 400,
             margin: 0,
           }}
@@ -519,6 +520,13 @@ export default function Dashboard() {
           {getGreeting()}, <i>{user?.name}</i>.
         </h1>
       </div>
+
+      {/* Weather widget - sits directly below the greeting and above the
+          AI composer (per design handoff). Renders nothing when the
+          household has no address set or the upstream is down. Tapping
+          its AI-note row opens the composer via the same openChatWidget
+          event the dashboard input uses. */}
+      <WeatherStrip onOpenAI={() => window.dispatchEvent(new CustomEvent('openChatWidget', { detail: {} }))} />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
