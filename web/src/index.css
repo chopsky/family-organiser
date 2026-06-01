@@ -75,6 +75,9 @@
     --shadow-sm: 0 2px 8px rgba(107, 63, 160, 0.06);
     --shadow-md: 0 4px 16px rgba(107, 63, 160, 0.08);
     --shadow-lg: 0 8px 24px rgba(107, 63, 160, 0.10);
+    /* Muted slate-grey for secondary meta text (e.g. the Up Next card's
+       time/location sub-line). Distinct from --warm-grey (#6B6774). */
+    --ink-2: #8a8493;
   }
 
   html {

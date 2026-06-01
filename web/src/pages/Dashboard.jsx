@@ -585,7 +585,7 @@ export default function Dashboard() {
                   Up next · {when}
                 </div>
                 <div className="truncate" style={{ fontSize: 18, fontWeight: 700, color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.3px' }}>{title}</div>
-                <div className="truncate" style={{ fontSize: 13, color: 'var(--warm-grey, #6B6774)', marginTop: 2 }}>{sub}</div>
+                <div className="truncate" style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>{sub}</div>
               </div>
               {who && (who.avatar_url
                 ? <img src={who.avatar_url} alt="" className="w-[42px] h-[42px] rounded-full object-cover shrink-0" />
