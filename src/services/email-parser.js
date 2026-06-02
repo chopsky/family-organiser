@@ -1,9 +1,12 @@
 /**
  * Email content extraction for inbound receipt forwarding.
- * Handles Postmark inbound webhook payloads - extracts text, images, and PDFs.
+ * Handles Postmark inbound webhook payloads - extracts text, images, and
+ * document attachments (PDF + Word .docx) via the shared document-extract
+ * service, so a forwarded school .docx is parsed exactly like one sent to
+ * the WhatsApp bot.
  */
 
-const pdfParse = require('pdf-parse');
+const { extractTextFromDocument, isSupportedDocument } = require('./document-extract');
 
 const MAX_TEXT_LENGTH = 8000;
 
@@ -97,38 +100,47 @@ function extractEmailContent(postmarkPayload) {
 }
 
 /**
- * Extract text from PDF attachments in a Postmark payload.
+ * Extract text from document attachments (PDF + Word .docx + plain text)
+ * in a Postmark payload. Image attachments are handled separately by the
+ * receipt/image path; anything else is skipped.
  *
  * @param {object} postmarkPayload - The full JSON body from Postmark inbound webhook
- * @returns {Promise<string>} Extracted text from all PDF attachments combined
+ * @returns {Promise<string>} Extracted text from all document attachments combined
  */
-async function extractPdfText(postmarkPayload) {
+async function extractAttachmentText(postmarkPayload) {
   const attachments = postmarkPayload.Attachments || [];
-  const pdfTexts = [];
+  const texts = [];
 
   for (const att of attachments) {
     const contentType = (att.ContentType || '').toLowerCase();
-    if (contentType !== 'application/pdf') continue;
+    if (!isSupportedDocument(contentType)) continue; // skip images & unknown types
 
     const content = att.Content;
     if (!content) continue;
 
     try {
       const buffer = Buffer.from(content, 'base64');
-      const result = await pdfParse(buffer);
-      if (result.text?.trim()) {
-        pdfTexts.push(result.text.trim());
-      }
+      const { text } = await extractTextFromDocument(buffer, contentType);
+      if (text?.trim()) texts.push(text.trim());
     } catch (err) {
-      console.warn('[email-parser] Failed to parse PDF attachment:', err.message);
+      // Best-effort: a single unreadable/empty/legacy-.doc attachment
+      // shouldn't block extraction of the rest. document-extract throws a
+      // user-facing message for those; we just log and move on here.
+      console.warn(`[email-parser] Failed to parse ${contentType} attachment:`, err.message);
     }
   }
 
-  const combined = pdfTexts.join('\n\n---\n\n');
+  const combined = texts.join('\n\n---\n\n');
   if (combined.length > MAX_TEXT_LENGTH) {
     return combined.slice(0, MAX_TEXT_LENGTH) + '\n\n[... truncated]';
   }
   return combined;
 }
 
-module.exports = { extractEmailContent, extractPdfText, htmlToText };
+module.exports = {
+  extractEmailContent,
+  extractAttachmentText,
+  // Back-compat alias: this used to be PDF-only. Now it also reads .docx.
+  extractPdfText: extractAttachmentText,
+  htmlToText,
+};

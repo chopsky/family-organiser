@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
 const { scanReceipt, matchReceiptToList, extractFromEmail } = require('../services/ai');
-const { extractEmailContent, extractPdfText } = require('../services/email-parser');
+const { extractEmailContent, extractAttachmentText } = require('../services/email-parser');
 const { detectAisle } = require('../utils/aisle-detect');
 const { sendInboundEmailConfirmation } = require('../services/email');
 
@@ -137,11 +137,11 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       const members = await db.getHouseholdMembers(householdId);
       const memberNames = members.map(m => m.name);
 
-      // Extract PDF text if any
-      const pdfText = await extractPdfText(req.body);
+      // Extract text from document attachments (PDF + Word .docx) if any
+      const attachmentText = await extractAttachmentText(req.body);
 
       // Combine all text content
-      const combinedText = [text, pdfText].filter(Boolean).join('\n\n---\n\n');
+      const combinedText = [text, attachmentText].filter(Boolean).join('\n\n---\n\n');
       console.log('[inbound-email] Email text length:', combinedText.length, '| Subject:', subject);
       console.log('[inbound-email] First 500 chars:', combinedText.slice(0, 500));
 
