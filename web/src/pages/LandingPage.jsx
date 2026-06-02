@@ -1063,8 +1063,16 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <a href={SIGNUP_URL} className={`fab-cta${showFab ? ' show' : ''}`}>
-        Get Started <ArrowRight />
+      {/* Mobile-only floating CTA. iOS visitors get a 'Get Housemait'
+          button that deep-links to the App Store, since the phone they're
+          browsing on is also the phone they'd install the app on. Android
+          visitors keep the 'Get Started' web signup path because they
+          can't install the iOS app on their device. */}
+      <a
+        href={iosVisitor ? APP_STORE_URL : SIGNUP_URL}
+        className={`fab-cta${showFab ? ' show' : ''}`}
+      >
+        {iosVisitor ? 'Get Housemait' : 'Get Started'} <ArrowRight />
       </a>
     </div>
   )
