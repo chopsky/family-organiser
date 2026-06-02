@@ -625,12 +625,22 @@ export default function LandingPage() {
                 <>
                   {APP_STORE_CONFIGURED && (
                     <span className="download-pill-wrapper">
-                      <a href={APP_STORE_URL} className="btn btn-primary download-pill" aria-label="Download Housemait on the App Store">
+                      {/* Pure hover trigger — NOT a link. Clicking doesn't
+                          navigate (a desktop click on this button would
+                          send the visitor to the App Store URL on their
+                          desktop, where they can't install). The QR is the
+                          point. type="button" + no onClick keeps it a
+                          no-op while remaining keyboard-focusable so
+                          screen readers + Tab navigation reveal the QR. */}
+                      <button
+                        type="button"
+                        className="btn btn-primary download-pill"
+                        aria-label="Show QR code to download Housemait on the App Store"
+                      >
                         Download App
-                      </a>
+                      </button>
                       <span className="qr-popover" role="tooltip">
-                        <img src="/assets/app-store-qr.svg" alt="" width="160" height="160" />
-                        <span className="qr-caption">Scan to download</span>
+                        <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="180" height="180" />
                       </span>
                     </span>
                   )}
