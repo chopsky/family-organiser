@@ -3920,10 +3920,15 @@ async function getRecentWhatsAppTurns(userId, { limit = 10, windowMinutes = 30 }
   const rows = (data || []).filter((r) => !r.error);
   if (!rows.length) return [];
 
-  // Only include rows from the same "conversation window" - i.e. within
-  // `windowMinutes` of the most recent row.
-  const mostRecentMs = new Date(rows[0].created_at).getTime();
-  const cutoffMs = mostRecentMs - windowMinutes * 60 * 1000;
+  // Only include rows from the current conversation window - i.e. within
+  // `windowMinutes` of NOW. Anchoring to now (not to the most recent stored
+  // row) is deliberate: anchoring to the last row meant a stale message -
+  // e.g. this morning's automated "you have N overdue tasks" nudge - stayed
+  // "in window" hours later and got replayed as context for an unrelated new
+  // message. That made a bare "Testing" come back as "Thanks for the
+  // reminder! I'll get to those overdue tasks." Anchoring to now drops
+  // anything older than windowMinutes from the current turn.
+  const cutoffMs = Date.now() - windowMinutes * 60 * 1000;
   const windowed = rows
     .filter((r) => new Date(r.created_at).getTime() >= cutoffMs)
     .reverse(); // chronological (oldest → newest)
