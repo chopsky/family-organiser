@@ -198,20 +198,24 @@ h1.display em { font-style: italic; color: var(--purple); }
     pointer-events: auto;
   }
 }
-/* App Store badge link — matches the trial button's vertical rhythm
-   (48px) but uses Apple's badge aspect ratio (135 x 40). transition
-   matches .btn-primary so both feel like part of the same family. */
+/* App Store badge link. The badge ships as an <img>, not an <svg> —
+   the selector covers both shapes belt-and-braces in case we ever swap
+   back to inline SVG. Height 60px is the noticeably-larger size Apple
+   uses on its own marketing pages; the trial button at 48px no longer
+   has to be the height anchor here. */
 .app-store-cta,
 .app-store-cta-secondary {
   display: inline-flex;
   align-items: center;
-  height: 48px;
-  border-radius: 8px;
+  height: 60px;
+  border-radius: 10px;
   transition: transform .15s ease, opacity .15s ease;
 }
+.app-store-cta img,
+.app-store-cta-secondary img,
 .app-store-cta svg,
 .app-store-cta-secondary svg {
-  height: 48px;
+  height: 60px;
   width: auto;
   display: block;
 }
