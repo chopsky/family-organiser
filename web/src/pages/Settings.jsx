@@ -1616,20 +1616,29 @@ export default function Settings() {
                         {feed.last_error && ' · last error: ' + feed.last_error}
                       </p>
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex gap-1 shrink-0">
                       <button
                         onClick={() => handleRefreshExternalFeed(feed.id)}
                         disabled={feedActionId === feed.id}
-                        className="text-xs text-primary hover:text-primary-pressed disabled:opacity-50"
+                        aria-label={`Refresh ${feed.display_name}`}
+                        title="Refresh"
+                        className="p-1.5 text-primary hover:text-primary-pressed disabled:opacity-50"
                       >
-                        {feedActionId === feed.id ? '…' : 'Refresh'}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={feedActionId === feed.id ? 'animate-spin' : ''} aria-hidden="true">
+                          <path d="M21 12a9 9 0 1 1-3.5-7.1" />
+                          <polyline points="21 4 21 10 15 10" />
+                        </svg>
                       </button>
                       <button
                         onClick={() => handleRemoveExternalFeed(feed.id)}
                         disabled={feedActionId === feed.id}
-                        className="text-xs text-error hover:text-error/80 disabled:opacity-50"
+                        aria-label={`Remove ${feed.display_name}`}
+                        title="Remove"
+                        className="p-1.5 text-error hover:text-error/80 disabled:opacity-50"
                       >
-                        Remove
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        </svg>
                       </button>
                     </div>
                   </div>
