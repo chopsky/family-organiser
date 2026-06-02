@@ -640,7 +640,7 @@ export default function LandingPage() {
                         Download App
                       </button>
                       <span className="qr-popover" role="tooltip">
-                        <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="180" height="180" />
+                        <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="150" height="150" />
                       </span>
                     </span>
                   )}

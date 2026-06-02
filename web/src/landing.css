@@ -135,22 +135,34 @@ h1.display em { font-style: italic; color: var(--purple); }
   transform: translate(-50%, -6px);
   /* Hard-locked dimensions so even if the inner SVG ever misbehaves
    * (no intrinsic width, viewBox-only sizing, etc.) the card stays
-   * square. 220px QR + 20px padding both sides = 260px square. */
-  width: 260px;
-  height: 260px;
+   * square. 150px QR + 16px padding both sides = 182px square. */
+  width: 182px;
+  height: 182px;
   box-sizing: border-box;
   background: #fff;
-  border-radius: 22px;
-  padding: 20px;
+  border-radius: 18px;
+  padding: 16px;
   box-shadow: 0 22px 50px -18px rgba(27, 20, 36, .25), 0 6px 14px rgba(27, 20, 36, .06);
   opacity: 0;
   pointer-events: none;
   transition: opacity .18s ease, transform .18s ease;
   z-index: 10;
 }
+/* Transparent bridge above the popover that covers the 12px gap
+ * between the button and the card. Without this, moving the cursor
+ * from button → QR crosses transparent space and the hover state
+ * drops, dismissing the popover before the user reaches it. */
+.qr-popover::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: 0;
+  right: 0;
+  height: 14px;
+}
 .qr-popover img {
-  width: 220px;
-  height: 220px;
+  width: 150px;
+  height: 150px;
   display: block;
 }
 /* Show on hover and on focus-within (keyboard accessibility). Only fires
