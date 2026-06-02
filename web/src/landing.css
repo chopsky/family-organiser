@@ -207,7 +207,7 @@ h1.display em { font-style: italic; color: var(--purple); }
 .app-store-cta-secondary {
   display: inline-flex;
   align-items: center;
-  height: 60px;
+  height: 55px;
   border-radius: 10px;
   transition: transform .15s ease, opacity .15s ease;
 }
@@ -215,7 +215,7 @@ h1.display em { font-style: italic; color: var(--purple); }
 .app-store-cta-secondary img,
 .app-store-cta svg,
 .app-store-cta-secondary svg {
-  height: 60px;
+  height: 55px;
   width: auto;
   display: block;
 }
