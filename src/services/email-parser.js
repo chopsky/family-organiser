@@ -11,6 +11,96 @@ const { extractTextFromDocument, isSupportedDocument } = require('./document-ext
 const MAX_TEXT_LENGTH = 8000;
 
 /**
+ * Strip the low-value chrome that rides along with forwarded / replied
+ * email so the AI extractor sees the actual content, not boilerplate.
+ *
+ * IMPORTANT design choice: this is a CONSERVATIVE, tail-only cleaner. The
+ * whole product is "forward an email and we read it," so the forwarded
+ * payload - including any quoted history below a forwarding banner - is the
+ * thing we MUST keep. We therefore never cut a forwarded/quoted block. We
+ * only remove trailing noise that is reliably *not* content:
+ *   - email signatures (the standard "\n-- \n" delimiter)
+ *   - "Sent from my iPhone / Android / Samsung" client taglines
+ *   - confidentiality / legal disclaimer blocks
+ *   - marketing "you received this email because… / unsubscribe" footers
+ *   - decorative forwarding-banner rule lines (the long dashes), while
+ *     keeping the From/Subject/Date header fields they wrap
+ *   - inline-image placeholders and tracking-pixel remnants
+ * plus whitespace normalisation. Anything we're unsure about, we keep -
+ * a false negative (a bit of noise survives) is far cheaper here than a
+ * false positive (we delete the school date the user forwarded).
+ *
+ * @param {string} input
+ * @returns {string}
+ */
+function stripQuotedAndForwardedNoise(input) {
+  if (!input) return '';
+  let text = String(input);
+
+  // Drop inline-image placeholders Gmail/Outlook leave in the text part,
+  // e.g. "[image: logo.png]" or "[cid:image001.png@01D...]".
+  text = text.replace(/\[(?:image|cid)[^\]]*\]/gi, ' ');
+
+  // Collapse the decorative rule lines of a forwarding banner but keep the
+  // header fields. "---------- Forwarded message ----------" -> removed;
+  // the "From: / Sent: / To: / Subject:" lines underneath survive because
+  // they give the AI useful sender/date context.
+  text = text.replace(/^[ \t]*-{3,}[ \t]*forwarded message[ \t]*-{3,}[ \t]*$/gim, '');
+  text = text.replace(/^[ \t]*-{3,}[ \t]*original message[ \t]*-{3,}[ \t]*$/gim, '');
+
+  const lines = text.split('\n');
+  const kept = [];
+  // Match the standard signature delimiter line: exactly "--" or "-- "
+  // (RFC 3676 §4.3). Everything after the LAST such line is the signature.
+  const SIG_DELIM = /^--\s?$/;
+  // Trailing client taglines.
+  const SENT_FROM = /^sent (?:from|via) (?:my )?(?:iphone|ipad|android|samsung|galaxy|blackberry|mobile|smartphone|outlook|gmail|mail|huawei|the\b).*/i;
+  // First line of a confidentiality / legal-disclaimer block. Once we see
+  // it, everything below is boilerplate.
+  const DISCLAIMER = /(this (?:e-?mail|message|communication)[^.]{0,80}(?:confidential|intended (?:solely|only) for|privileged|may contain)|the (?:information|contents) (?:in|of) this (?:e-?mail|message)|disclaimer:|please consider the environment before printing)/i;
+  // First line of a list-marketing footer. Everything below is boilerplate.
+  const MARKETING = /(you (?:are )?receiv(?:ed|ing) this (?:e-?mail|message|because)|unsubscribe|manage (?:your )?(?:email )?preferences|update your preferences|view (?:this|it) in (?:your )?browser|©\s?\d{4}|all rights reserved|to stop receiving)/i;
+
+  let cutFrom = lines.length;
+  let lastSigDelim = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (SIG_DELIM.test(line)) lastSigDelim = i;
+    if (
+      (DISCLAIMER.test(line) || MARKETING.test(line) || SENT_FROM.test(line)) &&
+      i < cutFrom
+    ) {
+      cutFrom = i;
+    }
+  }
+  // Prefer the earliest cut point, but only treat the signature delimiter
+  // as a cut if there's substantial content above it (guards against a
+  // top-posted "-- " typo nuking the whole body).
+  if (lastSigDelim > -1 && lastSigDelim < cutFrom) {
+    const above = lines.slice(0, lastSigDelim).join('\n').trim();
+    if (above.length >= 40) cutFrom = lastSigDelim;
+  }
+
+  let out = lines.slice(0, cutFrom).join('\n');
+
+  // Whitespace tidy: trim trailing spaces per line, collapse 3+ blank
+  // lines to a single blank line, trim ends.
+  out = out
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // Never return less than we'd lose by giving up: if the cleaner somehow
+  // ate almost everything (e.g. an unusual layout where a disclaimer line
+  // appeared near the top), fall back to the lightly-normalised original
+  // so we don't starve the extractor.
+  if (out.length < 20 && input.trim().length > out.length) {
+    return String(input).replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  return out;
+}
+
+/**
  * Strip HTML tags but preserve table structure so receipt line items aren't lost.
  * Extracts <td> cell contents separated by tabs, rows separated by newlines.
  */
@@ -91,6 +181,10 @@ function extractEmailContent(postmarkPayload) {
     // PDFs are handled separately via extractPdfText below
   }
 
+  // Strip signatures / disclaimers / marketing footers BEFORE truncating,
+  // so a long footer can't push the real content past the length cap.
+  text = stripQuotedAndForwardedNoise(text);
+
   // Truncate text to keep within AI context limits
   if (text.length > MAX_TEXT_LENGTH) {
     text = text.slice(0, MAX_TEXT_LENGTH) + '\n\n[... truncated]';
@@ -143,4 +237,5 @@ module.exports = {
   // Back-compat alias: this used to be PDF-only. Now it also reads .docx.
   extractPdfText: extractAttachmentText,
   htmlToText,
+  stripQuotedAndForwardedNoise,
 };

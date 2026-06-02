@@ -720,6 +720,8 @@ OTHER RULES:
 - If the email contains multiple events (e.g. a school newsletter with several dates), extract ALL of them.
 - If you cannot determine a specific field, use null.
 - If the email has no actionable content (marketing, spam, generic newsletters with no dates), return empty arrays.
+- **Ignore email chrome.** Forwarded mail carries noise: email signatures, "Sent from my iPhone" taglines, confidentiality/legal disclaimers, unsubscribe/marketing footers, and the forwarding-banner header lines (From:/Sent:/To:/Subject:). Never turn any of these into an event or task, and never let a DATE that appears inside a signature, disclaimer, or the forwarding header (e.g. the date the email was *sent*) override the actual event date stated in the body. Extract only the real content the family forwarded.
+- **When a forward contains a quoted reply chain**, the event the family cares about is usually in the most recent / most specific message. Don't extract the same event twice from both the new note and its quoted copy - dedupe to one event.
 - **When uncertain, prefer empty arrays over guessing.** A missed extraction creates frustration; a wrong extraction creates duplicate work for the user.
 
 USING THE HOUSEHOLD CONTEXT:

@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Housemait - Facebook cover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /*
+      Facebook Page cover.
+      Display:    851 × 315 px
+      Source (retina): 1640 × 624 px  - what we render below
+      Safe area:  centre ~70% (mobile crops the sides). Keep critical
+                  text/logo within the 70% centre band horizontally.
+                  On desktop, the Page profile picture overlays the
+                  bottom-LEFT corner - keep that quadrant clear.
+
+      To export:
+        1. Open this file in Chrome.
+        2. Resize the window so the .cover element fits without scroll
+           (devtools "Capture full size screenshot" works too - set
+           device toolbar to 1640 × 624).
+        3. Screenshot, upload as the Page cover.
+    */
+    :root {
+      --purple: #6B2FB8;
+      --purple-deep: #4A1D82;
+      --purple-soft: #EADCFB;
+      --cream: #F8F1E8;
+      --cream-deep: #F1E6D3;
+      --ink: #1B1424;
+      --ink-soft: #52485C;
+      --coral: #E8795A;
+      --coral-soft: #FADDD0;
+      --sage: #8FB089;
+      --sage-soft: #DCE8D5;
+      --butter: #F3C775;
+      --butter-soft: #FBE9C7;
+      --shadow: 0 10px 30px -12px rgba(74, 29, 130, .18), 0 4px 12px rgba(27, 20, 36, .06);
+      --shadow-lg: 0 30px 80px -20px rgba(74, 29, 130, .35), 0 10px 30px rgba(27, 20, 36, .1);
+    }
+
+    body {
+      margin: 0;
+      background: #1a1a1a;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    .cover {
+      width: 1640px;
+      height: 624px;
+      background: #f8f1e8;
+      position: relative;
+      overflow: hidden;
+      color: var(--ink);
+      box-shadow: 0 30px 80px rgba(0,0,0,.3);
+    }
+
+    /* Decorative tinted blob behind the headline - same trick as the
+       site's .shot-wrap::before. */
+    .blob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-46%, -52%) rotate(-3deg);
+      width: 1180px;
+      height: 480px;
+      background: #fff;
+      border-radius: 64px;
+      box-shadow: var(--shadow);
+    }
+
+    /* Centre headline - the hero from the website. */
+    .stack {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 2;
+      width: 1100px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid rgba(27, 20, 36, .08);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      box-shadow: var(--shadow);
+      margin-bottom: 28px;
+    }
+    .eyebrow .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--sage);
+      box-shadow: 0 0 0 4px rgba(143, 176, 137, .25);
+    }
+
+    h1 {
+      font-family: 'Instrument Serif', serif;
+      font-weight: 400;
+      font-size: 92px;
+      line-height: 1.02;
+      letter-spacing: -0.018em;
+      margin: 0 0 20px;
+      color: var(--ink);
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--purple);
+    }
+
+    .lede {
+      font-size: 22px;
+      color: var(--ink-soft);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    /* Floating stickers - same style as the hero collage. */
+    .sticker {
+      position: absolute;
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      z-index: 2;
+    }
+    .sticker .ic {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .sticker .meta {
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--ink-soft);
+      margin-top: 2px;
+    }
+
+    /* One sticker top-right - Calendar. */
+    .s-cal {
+      top: 88px;
+      right: 96px;
+      transform: rotate(2.5deg);
+    }
+    .s-cal .ic {
+      background: var(--purple-soft);
+      color: var(--purple-deep);
+    }
+
+    /* One sticker bottom-right - Shopping. */
+    .s-shop {
+      bottom: 76px;
+      right: 124px;
+      transform: rotate(-3deg);
+    }
+    .s-shop .ic {
+      background: var(--sage-soft);
+      color: #3f6b3a;
+    }
+
+    /* Top-left - Tasks. Mirrors s-cal's tilt so the layout feels balanced. */
+    .s-task {
+      top: 88px;
+      left: 96px;
+      transform: rotate(-2.5deg);
+    }
+    .s-task .ic {
+      background: var(--coral-soft);
+      color: #a84522;
+    }
+
+    /* Bottom-left - Meals. Sits a touch higher than s-shop to keep it
+       clear of the Page profile-photo overlay zone. */
+    .s-meal {
+      bottom: 110px;
+      left: 124px;
+      transform: rotate(3deg);
+    }
+    .s-meal .ic {
+      background: var(--butter-soft);
+      color: #8a5a14;
+    }
+
+    /* Tagline tucked bottom-right under the URL. */
+    .url {
+      position: absolute;
+      bottom: 56px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--purple);
+      letter-spacing: 0.02em;
+      z-index: 3;
+    }
+
+    /* Notes box (only visible outside the cover) */
+    .notes {
+      max-width: 1640px;
+      color: #aaa;
+      font-size: 13px;
+      padding: 24px 8px 80px;
+      line-height: 1.6;
+    }
+    .notes strong { color: #fff; }
+    .notes code { background: #2a2a2a; padding: 2px 6px; border-radius: 4px; color: #ddd; }
+  </style>
+</head>
+<body>
+  <div class="cover" id="cover">
+    <div class="blob"></div>
+
+    <div class="sticker s-task">
+      <div class="ic">✓</div>
+      <div>
+        Pick up prescription
+        <span class="meta">Mum · due Tuesday</span>
+      </div>
+    </div>
+
+    <div class="sticker s-cal">
+      <div class="ic">📅</div>
+      <div>
+        Parents' evening · Thursday
+        <span class="meta">Sofia's class · 18:30</span>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="eyebrow">
+        <span class="dot"></span>
+        AI assistant for modern families
+      </div>
+      <h1>Housemait makes <em>family life</em><br />easy with AI.</h1>
+      <p class="lede">Calendar, shopping, tasks and meals - handled. On the app, or via WhatsApp.</p>
+    </div>
+
+    <div class="sticker s-meal">
+      <div class="ic">🍝</div>
+      <div>
+        Pasta night
+        <span class="meta">Planned for Tuesday</span>
+      </div>
+    </div>
+
+    <div class="sticker s-shop">
+      <div class="ic">🛒</div>
+      <div>
+        Whole milk
+        <span class="meta">Added to shopping list</span>
+      </div>
+    </div>
+
+    <div class="url">housemait.com</div>
+  </div>
+
+  <div class="notes">
+    <strong>How to export</strong><br />
+    Open this file in Chrome → DevTools (<code>⌥⌘I</code>) → toggle device toolbar (<code>⌘⇧M</code>)
+    → set viewport to <code>1640 × 624</code> → ⋮ menu → "Capture screenshot".<br />
+    Or, simply screenshot the cream rectangle above at 100% zoom on a retina display.<br /><br />
+    <strong>Facebook safe area</strong> - sides crop on mobile (avoid critical text within 220px of the
+    left/right edges) and the Page profile photo overlays the bottom-left corner on desktop.
+    The current design keeps the headline centre-stage and the brand mark in a corner that's safe.
+    The "🛒 Beef sausages" sticker is far enough right to clear the profile photo overlay.
+  </div>
+</body>
+</html>

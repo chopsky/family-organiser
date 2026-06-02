@@ -5,7 +5,11 @@ const db = require('../db/queries');
 const { scanReceipt, matchReceiptToList, extractFromEmail } = require('../services/ai');
 const { extractEmailContent, extractAttachmentText } = require('../services/email-parser');
 const { detectAisle } = require('../utils/aisle-detect');
-const { sendInboundEmailConfirmation } = require('../services/email');
+const { sendInboundEmailConfirmation, sendInboundEmailNoResults } = require('../services/email');
+
+// Don't auto-reply to automated/no-reply senders even if they're somehow
+// on the allowlist - replying risks a mail loop and the bounce is noise.
+const NO_REPLY_RE = /(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|notifications?@|bounce)/i;
 
 // Undo links go to the public-facing web URL (housemait.com), not the
 // Railway API URL. Vercel already proxies /api/* → Railway via the
@@ -382,6 +386,22 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
           await sendInboundEmailConfirmation(from, lines.join('\n'), undoUrl, subject);
         } catch (err) {
           console.warn('[inbound-email] Confirmation email failed:', err.message);
+        }
+      } else if (
+        from &&
+        !NO_REPLY_RE.test(fromAddress) &&
+        (combinedText.trim() || images.length)
+      ) {
+        // We received and read the email but found nothing to add. Close the
+        // loop with feedback so the user doesn't conclude the feature is
+        // broken (the #1 cause of "I forwarded it and nothing happened").
+        // Gated to real human senders with actual content - we don't reply
+        // to blank emails or automated no-reply addresses.
+        try {
+          await sendInboundEmailNoResults(from, subject);
+          console.log(`[inbound-email] No actions for "${subject}" - sent no-results reply to ${fromAddress}`);
+        } catch (err) {
+          console.warn('[inbound-email] No-results email failed:', err.message);
         }
       }
     } catch (err) {

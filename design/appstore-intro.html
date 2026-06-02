@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Housemait - App Store intro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* App Store screenshot spec for iPhone 15 Pro Max / 6.7": 1290 x 2796 (portrait). */
+    :root {
+      --purple: #6B2FB8;
+      --purple-deep: #4A1D82;
+      --purple-soft: #EADCFB;
+      --cream: #F8F1E8;
+      --cream-deep: #F1E6D3;
+      --ink: #1B1424;
+      --ink-soft: #52485C;
+      --coral: #E8795A;
+      --coral-soft: #FADDD0;
+      --sage: #8FB089;
+      --sage-soft: #DCE8D5;
+      --butter: #F3C775;
+      --butter-soft: #FBE9C7;
+      --wa-green: #25D366;
+      --wa-bg: #E7DDD1;
+      --shadow-card: 0 10px 30px -12px rgba(74, 29, 130, .18), 0 4px 12px rgba(27, 20, 36, .06);
+      --shadow-deep: 0 30px 80px -20px rgba(74, 29, 130, .25), 0 12px 30px rgba(27, 20, 36, .1);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #1a1424; }
+
+    /* Centre the canvas on the design surface so it's previewable in the browser. */
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .canvas {
+      width: 1290px;
+      height: 2796px;
+      background: var(--cream);
+      position: relative;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: 'Inter', system-ui, sans-serif;
+      box-shadow: 0 30px 80px rgba(0,0,0,.4);
+    }
+
+    /* Soft backdrop blob behind the headline - same trick as the landing
+       and FB cover, gives the cream more depth without being noisy. */
+    .blob {
+      position: absolute;
+      top: 700px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-3deg);
+      width: 1100px;
+      height: 1600px;
+      background: var(--purple-soft);
+      opacity: .55;
+      border-radius: 80px;
+      filter: blur(.5px);
+      z-index: 0;
+    }
+
+    .stack {
+      position: relative;
+      z-index: 1;
+      padding: 220px 80px 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 110px;
+    }
+
+    /* ── Eyebrow ── */
+    .eyebrow {
+      display: inline-flex;
+      align-self: center;
+      align-items: center;
+      gap: 18px;
+      background: #fff;
+      border-radius: 999px;
+      padding: 22px 40px;
+      font-size: 40px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      box-shadow: var(--shadow-card);
+    }
+    .eyebrow .dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--sage);
+      box-shadow: 0 0 0 12px rgba(143, 176, 137, .25);
+    }
+
+    /* ── Headline ── */
+    h1 {
+      font-family: 'Instrument Serif', serif;
+      font-weight: 400;
+      font-size: 240px;
+      line-height: .94;
+      letter-spacing: -0.025em;
+      margin: 0;
+      text-align: center;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--purple);
+    }
+
+    /* ── Centre chat card - WhatsApp thread mock ── */
+    .chat-card {
+      align-self: center;
+      width: 1080px;
+      background: #fff;
+      border-radius: 48px;
+      padding: 48px 48px 56px;
+      box-shadow: var(--shadow-deep);
+      transform: rotate(-1.2deg);
+      position: relative;
+    }
+    .chat-card .chat-head {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding-bottom: 32px;
+      margin-bottom: 8px;
+    }
+    .chat-card .chat-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: var(--purple);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-family: 'Instrument Serif', serif;
+      font-size: 56px;
+      letter-spacing: -.02em;
+    }
+    .chat-card .chat-name {
+      font-size: 44px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .chat-card .chat-status {
+      font-size: 28px;
+      color: var(--ink-soft);
+      margin-top: 4px;
+    }
+    .chat-card .chat-status .live {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--wa-green);
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    .chat-card .chat-body {
+      background: var(--wa-bg);
+      margin: 0 -48px -56px;
+      padding: 44px 44px 52px;
+      border-radius: 0 0 48px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .bubble {
+      max-width: 82%;
+      padding: 30px 38px;
+      border-radius: 36px;
+      font-size: 46px;
+      line-height: 1.3;
+      box-shadow: 0 2px 6px rgba(0,0,0,.04);
+    }
+    .bubble.user {
+      align-self: flex-end;
+      background: #DCF8C6;
+      border-bottom-right-radius: 10px;
+    }
+    .bubble.bot {
+      align-self: flex-start;
+      background: #fff;
+      border-bottom-left-radius: 10px;
+    }
+    .bubble .time {
+      display: block;
+      font-size: 26px;
+      color: var(--ink-soft);
+      margin-top: 10px;
+      text-align: right;
+    }
+    .bubble.bot strong {
+      color: var(--purple);
+      font-weight: 600;
+    }
+
+    /* ── Feature chips - 2-column grid for tidy 3-row layout ── */
+    .chips {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      justify-items: center;
+      gap: 28px;
+      max-width: 1130px;
+      align-self: center;
+      width: 100%;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 20px;
+      background: #fff;
+      border-radius: 999px;
+      padding: 30px 52px;
+      font-size: 48px;
+      font-weight: 600;
+      color: var(--ink);
+      box-shadow: var(--shadow-card);
+      white-space: nowrap;
+    }
+    .chip .ic {
+      font-size: 54px;
+      line-height: 1;
+    }
+
+
+    /* To export this canvas as a 1290 x 2796 PNG:
+         Chrome → DevTools → device toolbar (Cmd-Shift-M) → 1290 x 2796 → ⋮ "Capture screenshot"
+       Or run headless Chrome:
+         "Google Chrome" --headless=new --window-size=1290,2796 \
+           --screenshot=out.png file:///path/to/appstore-intro.html  */
+  </style>
+</head>
+<body>
+  <div class="canvas" id="canvas">
+    <div class="blob"></div>
+
+    <div class="stack">
+      <div class="eyebrow">
+        <span class="dot"></span>
+        AI assistant for modern families
+      </div>
+
+      <h1>Family life,<br /><em>made easy</em><br />with AI.</h1>
+
+      <div class="chat-card">
+        <div class="chat-head">
+          <div class="chat-avatar">h</div>
+          <div>
+            <div class="chat-name">housemait</div>
+            <div class="chat-status"><span class="live"></span>Family Bot · online</div>
+          </div>
+        </div>
+        <div class="chat-body">
+          <div class="bubble user">
+            Book Tom's dentist for Thursday at 4
+            <span class="time">9:42 ✓✓</span>
+          </div>
+          <div class="bubble bot">
+            <strong>✓ Added</strong> "Dentist · Tom · Thu 16:00" to the family calendar.
+            <span class="time">9:42</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chips">
+        <div class="chip"><span class="ic">📅</span>Calendar</div>
+        <div class="chip"><span class="ic">✓</span>Tasks</div>
+        <div class="chip"><span class="ic">🍝</span>Meals</div>
+        <div class="chip"><span class="ic">🛒</span>Shopping lists</div>
+        <div class="chip"><span class="ic">💬</span>WhatsApp AI bot</div>
+        <div class="chip"><span class="ic">📄</span>Documents</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -4707,6 +4707,38 @@ async function getRecentInboundEmails(householdId, limit = 10, db = supabase) {
   return data;
 }
 
+/**
+ * Distinct sender addresses whose mail was REJECTED for not being on the
+ * household's allowlist, newest first. Powers the Settings "we blocked
+ * mail from these addresses - allow them?" nudge so a parent forwarding
+ * from an unlisted work address isn't met with silence.
+ *
+ * Dedupes by normalised email (the log stores the raw "Name <addr>" From),
+ * so a sender who tried five times shows once. Returns at most `limit`.
+ */
+async function getRejectedInboundSenders(householdId, limit = 5, db = supabase) {
+  const { data, error } = await db
+    .from('inbound_email_log')
+    .select('from_email, subject, created_at')
+    .eq('household_id', householdId)
+    .eq('status', 'rejected')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+
+  const seen = new Set();
+  const out = [];
+  for (const row of data || []) {
+    const m = String(row.from_email || '').match(/<([^>]+)>/);
+    const email = (m ? m[1] : row.from_email || '').trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    out.push({ email, subject: row.subject || null, created_at: row.created_at });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 // Admin-wide view of recent inbound-email activity. Joins on
 // households so the UI can show which household forwarded each email
 // without firing N+1 lookups.
@@ -6169,6 +6201,7 @@ module.exports = {
   getInboundEmailLogByUndoToken,
   getRecentInboundEmailsAdmin,
   getRecentInboundEmails,
+  getRejectedInboundSenders,
   checkDuplicateEmail,
   // Event reminders & assignees
   saveEventReminders,

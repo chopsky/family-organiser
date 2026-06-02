@@ -600,6 +600,10 @@ export default function Settings() {
   const [senderInput, setSenderInput] = useState('');
   const [senderAdding, setSenderAdding] = useState(false);
   const [senderError, setSenderError] = useState('');
+  // Rejected-sender nudge: addresses we blocked for not being on the
+  // allowlist, surfaced so an admin can one-tap allow them.
+  const [rejections, setRejections] = useState([]);
+  const [allowingRejected, setAllowingRejected] = useState(null); // email being allowed
 
   // Edit profile state
   const [editingProfile, setEditingProfile] = useState(false);
@@ -1145,6 +1149,9 @@ export default function Settings() {
     api.get('/household/inbound-senders')
       .then(({ data }) => setSenders(data.senders || []))
       .catch(() => setSenders([]));
+    api.get('/household/inbound-rejections')
+      .then(({ data }) => setRejections(data.rejections || []))
+      .catch(() => setRejections([]));
   }, []);
 
   // Pull fresh account info (email + auth provider) for the Account
@@ -1259,6 +1266,26 @@ export default function Settings() {
     } catch (err) {
       setError(err.response?.data?.error || 'Could not remove sender.');
     }
+  }
+
+  // One-tap "allow" from the rejected-sender nudge: add to the allowlist
+  // and drop it from the nudge list.
+  async function handleAllowRejected(email) {
+    setAllowingRejected(email);
+    setSenderError('');
+    try {
+      const { data } = await api.post('/household/inbound-senders', { email });
+      setSenders((prev) => [...prev, data.sender]);
+      setRejections((prev) => prev.filter((r) => r.email !== email));
+    } catch (err) {
+      setSenderError(err.response?.data?.error || 'Could not allow that address.');
+    } finally {
+      setAllowingRejected(null);
+    }
+  }
+
+  function handleDismissRejected(email) {
+    setRejections((prev) => prev.filter((r) => r.email !== email));
   }
 
 
@@ -1795,6 +1822,45 @@ export default function Settings() {
               )}
               {senderError && <p className="text-xs text-coral mt-1">{senderError}</p>}
             </div>
+
+            {/* Rejected-sender nudge: mail we blocked because the sender
+                wasn't on the allowlist. Admin-only, since only admins can
+                allow. Surfacing this turns a silent failure ("I forwarded
+                it and nothing happened") into a one-tap fix. */}
+            {isAdmin && rejections.length > 0 && (
+              <div className="rounded-xl border border-coral/30 bg-coral-light p-3.5">
+                <p className="text-sm font-semibold text-bark mb-1">We blocked some forwarded mail</p>
+                <p className="text-xs text-cocoa mb-3">
+                  These addresses tried to forward to your inbound email but aren't on your allowlist, so we ignored them. Recognise one? Allow it and re-forward.
+                </p>
+                <ul className="space-y-2">
+                  {rejections.map((r) => (
+                    <li key={r.email} className="flex items-center gap-2 bg-white border border-cream-border rounded-lg px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-bark truncate">{r.email}</p>
+                        {r.subject && <p className="text-xs text-cocoa truncate">{r.subject}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAllowRejected(r.email)}
+                        disabled={allowingRejected === r.email}
+                        className="bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap"
+                      >
+                        {allowingRejected === r.email ? 'Allowing…' : 'Allow'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDismissRejected(r.email)}
+                        aria-label={`Dismiss ${r.email}`}
+                        className="text-cocoa hover:text-bark transition-colors p-1"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {isAdmin && (
               <button

@@ -652,6 +652,27 @@ router.get('/inbound-senders', requireAuth, requireHousehold, async (req, res) =
 });
 
 /**
+ * GET /api/household/inbound-rejections
+ * Recent sender addresses whose forwarded mail was blocked because they're
+ * not on the allowlist. Excludes any already added since (race-safe), so
+ * the Settings nudge only shows addresses still worth allowing.
+ */
+router.get('/inbound-rejections', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const [rejected, allowed] = await Promise.all([
+      db.getRejectedInboundSenders(req.householdId, 5),
+      db.getInboundSenders(req.householdId),
+    ]);
+    const allowedSet = new Set((allowed || []).map((s) => String(s.email || '').toLowerCase()));
+    const rejections = (rejected || []).filter((r) => !allowedSet.has(r.email));
+    return res.json({ rejections });
+  } catch (err) {
+    console.error('GET /api/household/inbound-rejections error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/household/inbound-senders
  * Body: { email: string }   Admin only.
  *

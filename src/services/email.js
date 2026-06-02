@@ -247,6 +247,28 @@ async function sendInboundEmailConfirmation(to, summary, undoUrl, originalSubjec
   await sendEmail(to, 'Housemait: processed your forwarded email', html);
 }
 
+/**
+ * Sent when a forwarded email was received and read, but nothing
+ * actionable could be extracted (no dates, no shopping items, no tasks).
+ * Without this, the user gets silence and assumes the feature is broken -
+ * the single biggest "I forwarded it and nothing happened" complaint.
+ * We close the loop with a friendly note + examples of what works best.
+ */
+async function sendInboundEmailNoResults(to, originalSubject) {
+  const html = emailTemplate("We couldn't find anything to add", `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Thanks for forwarding${originalSubject ? ` <em>${originalSubject}</em>` : ' that email'} - we read it, but couldn't find a date, shopping item, or task to add automatically.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:15px;margin-top:20px;">Housemait works best with emails like:</p>
+    <ul style="color:${BRAND.ink};line-height:1.7;font-size:15px;padding-left:20px;margin:8px 0 0;">
+      <li>School newsletters with term dates, trips or non-uniform days</li>
+      <li>Appointment reminders (dentist, doctor, vet, hairdresser)</li>
+      <li>Flight, hotel or restaurant booking confirmations</li>
+      <li>Grocery receipts with an itemised list</li>
+    </ul>
+    <p style="color:${BRAND.inkLight};line-height:1.6;font-size:13px;margin-top:20px;">If you think this one should have worked, just reply and let us know - it helps us improve.</p>
+  `);
+  await sendEmail(to, 'Housemait: nothing to add from that email', html);
+}
+
 async function sendInviteEmail(to, inviterName, householdName, token) {
   const url = `${BASE_URL}/signup?invite=${token}`;
   const html = emailTemplate(`You're invited!`, `
@@ -671,6 +693,7 @@ module.exports = {
   sendWhatsAppFollowupEmail,
   sendInviteEmail,
   sendInboundEmailConfirmation,
+  sendInboundEmailNoResults,
   sendPasswordResetEmail,
   sendWeeklyDigestEmail,
   sendAdminAlert,
