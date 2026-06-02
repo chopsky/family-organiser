@@ -108,21 +108,18 @@ const ArrowRight = () => (
   </svg>
 )
 
-/** "Download on the App Store" badge — inline SVG so there's no extra
- *  HTTP fetch on first paint and no risk of a broken <img> if the file
- *  is missing. Mirrors Apple's official badge dimensions (135 x 40)
- *  and the dark-fill variant suitable for our cream background. Apple's
- *  marketing guidelines accept faithful black-on-white badges of this
- *  shape — if you'd rather use Apple's exact SVG, download from
- *  https://tools.applemediaservices.com/app-store/ and replace this
- *  component with an <img>. */
+/** "Download on the App Store" badge — Apple's official UK/US English
+ *  badge SVG, served from /assets/app-store-badge.svg. Using Apple's
+ *  exact asset (rather than a recreation) keeps us inside their brand
+ *  guidelines for app marketing. Aspect ratio is 119.66 × 40 — the
+ *  CSS sizes by height so the width follows naturally. */
 const AppStoreBadge = () => (
-  <svg viewBox="0 0 135 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-    <rect width="135" height="40" rx="6.5" fill="#000" />
-    <path d="M28.6 20.3c0-2 1.6-3 1.7-3.05-.9-1.4-2.4-1.6-3-1.6-1.2-.1-2.4.8-3 .8-.6 0-1.6-.7-2.6-.7-1.4 0-2.6.8-3.3 2-.4.7-.8 2-.8 3.4 0 1.7.4 3.5 1.4 5 .6 1 1.7 2.4 3 2.4 1.1 0 1.5-.7 3-.7s1.8.7 3 .7c1.2 0 2.2-1.2 3-2.4.7-.9 1-1.7 1.2-2.4-2.6-1-2.6-3.4-2.6-3.4zm-2-5.5c.6-.8 1-1.9.9-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 0 2-.5 2.7-1.3z" fill="#fff" />
-    <text x="46" y="16.5" fill="#fff" fontFamily="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" fontSize="7.5" fontWeight="400">Download on the</text>
-    <text x="46" y="31" fill="#fff" fontFamily="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" fontSize="14.5" fontWeight="600" letterSpacing="-0.2">App Store</text>
-  </svg>
+  <img
+    src="/assets/app-store-badge.svg"
+    alt="Download on the App Store"
+    width="120"
+    height="40"
+  />
 )
 
 /** Calendar mock for the showcase. parentTerm is locale-dependent
@@ -615,12 +612,9 @@ export default function LandingPage() {
                   badge is only rendered at all when the App Store ID
                   has been configured in lib/app-store.js. */}
               {iosVisitor ? (
-                <>
-                  <a href={APP_STORE_URL} className="app-store-cta" aria-label="Download Housemait on the App Store">
-                    <AppStoreBadge />
-                  </a>
-                  <a href={SIGNUP_URL} className="btn btn-outline">Or sign up on the web</a>
-                </>
+                <a href={APP_STORE_URL} className="app-store-cta" aria-label="Download Housemait on the App Store">
+                  <AppStoreBadge />
+                </a>
               ) : (
                 <>
                   <a href={SIGNUP_URL} className="btn btn-primary">
@@ -635,7 +629,7 @@ export default function LandingPage() {
               )}
             </div>
             <div className="hero-price">
-              Then {pricing.monthly.amount}/month. Cancel anytime.
+              Free 30-day trial. Cancel anytime.
             </div>
             <div className="quicks">
               {QUICK_CHIPS.map(c => (
