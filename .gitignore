@@ -11,3 +11,6 @@ web/node_modules/
 
 # Apple auth keys (APNs / App Store Connect) - never commit
 *.p8
+
+# Stray agent worktrees - never commit
+.claude/worktrees/
