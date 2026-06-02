@@ -1712,7 +1712,7 @@ export default function Settings() {
                     type="text"
                     value={aliasInput}
                     onChange={(e) => setAliasInput(e.target.value.toLowerCase())}
-                    placeholder="e.g. shapiro"
+                    placeholder="e.g. smithfamily"
                     autoFocus
                     className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
                   />
