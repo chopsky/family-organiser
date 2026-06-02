@@ -1028,7 +1028,13 @@ export default function LandingPage() {
                 <li key={f}><span className="check">✓</span> {f}</li>
               ))}
             </ul>
-            <a href={SIGNUP_URL} className="btn btn-primary">Start your free 30-day trial</a>
+            {/* Hidden on iPhone visitors — they're funnelled to the App
+                Store via the hero badge / Smart Banner / FAB, and an
+                in-Safari signup would create an account they'd have to
+                re-authenticate inside the native app. */}
+            {!iosVisitor && (
+              <a href={SIGNUP_URL} className="btn btn-primary">Start your free 30-day trial</a>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 28, justifyContent: 'center', flexWrap: 'wrap', marginTop: 36, color: 'var(--ink-soft)', fontSize: 14 }}>
