@@ -99,6 +99,25 @@ h1.display em { font-style: italic; color: var(--purple); }
 
 .lede { font-size: 19px; color: var(--ink-soft); max-width: 520px; margin: 0 0 28px; }
 .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+/* App Store badge link — matches the trial button's vertical rhythm
+   (48px) but uses Apple's badge aspect ratio (135 x 40). transition
+   matches .btn-primary so both feel like part of the same family. */
+.app-store-cta,
+.app-store-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+  border-radius: 8px;
+  transition: transform .15s ease, opacity .15s ease;
+}
+.app-store-cta svg,
+.app-store-cta-secondary svg {
+  height: 48px;
+  width: auto;
+  display: block;
+}
+.app-store-cta:hover,
+.app-store-cta-secondary:hover { transform: translateY(-1px); opacity: .9; }
 .hero-price { margin-top: 12px; color: var(--ink-soft); font-size: 14px; }
 .hero-meta { display: flex; gap: 22px; margin-top: 20px; color: var(--ink-soft); font-size: 14px; align-items: center; flex-wrap: wrap; }
 .hero-meta .stars { color: var(--butter); letter-spacing: 1px; }
