@@ -632,8 +632,17 @@ export default function LandingPage() {
           {NAV_LINKS.map(l => (
             <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)}>{l.label}</a>
           ))}
-          <a href={SIGNIN_URL} onClick={() => setMenuOpen(false)}>Sign in</a>
-          <a href={SIGNUP_URL} className="btn btn-primary" style={{ marginTop: 12, justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Start 30-day free trial</a>
+          {/* On iPhone visitors we drop Sign in + the trial CTA from the
+              mobile menu — they're being pushed toward the App Store
+              instead (via the hero badge and the 'Get Housemait' FAB),
+              and an in-Safari signup would just create an account they'd
+              have to re-authenticate inside the native app. */}
+          {!iosVisitor && (
+            <>
+              <a href={SIGNIN_URL} onClick={() => setMenuOpen(false)}>Sign in</a>
+              <a href={SIGNUP_URL} className="btn btn-primary" style={{ marginTop: 12, justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Start 30-day free trial</a>
+            </>
+          )}
         </div>
       </nav>
 
