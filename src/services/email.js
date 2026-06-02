@@ -58,6 +58,31 @@ function button(text, url) {
   return `<a href="${url}" style="display:inline-block;background:${BRAND.plum};color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;font-size:16px;margin:16px 0;">${text}</a>`;
 }
 
+// Single source of truth for the iOS App Store link (mirrors
+// web/src/lib/app-store.js, which the backend can't import). Update both
+// if the App Store ID ever changes.
+const APP_STORE_URL = 'https://apps.apple.com/app/housemait/id6762131562';
+
+// Bulletproof "App Store" pill for email. We deliberately use a styled
+// CSS button rather than Apple's official badge image: email clients
+// (Gmail, Outlook, Yahoo) strip SVG, and many block remote images by
+// default - an <img> badge renders as a broken box for a big share of
+// recipients. A solid black pill always renders, including in dark mode.
+function appStoreButton(label = 'Download on the App Store') {
+  return `<a href="${APP_STORE_URL}" style="display:inline-block;background:#000000;color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:10px;font-weight:600;font-size:15px;">${label}</a>`;
+}
+
+// Compact secondary CTA block to drop at the foot of an email. Separated
+// by a hairline so it reads as a footnote, not as competition for the
+// email's primary action.
+function appStoreCta(lead = 'Get Housemait on your iPhone') {
+  return `
+    <div style="text-align:center;margin:24px 0 0;padding:20px 0 0;border-top:1px solid ${BRAND.sand};">
+      <p style="color:${BRAND.inkMuted};font-size:14px;margin:0 0 12px;">${lead}</p>
+      ${appStoreButton()}
+    </div>`;
+}
+
 async function sendEmail(to, subject, html, options = {}) {
   if (!client) {
     console.warn('Postmark not configured - skipping email to', to);
@@ -130,6 +155,7 @@ async function sendVerificationEmail(to, name, token) {
 
     <div style="text-align:center;">${button('Verify and get started', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;margin:0;">This link expires in 24 hours.</p>
+    ${appStoreCta('Prefer your phone? Get the app.')}
   `);
   await sendEmail(to, `${firstName}, your first Housemait brief is one click away`, html);
 }
@@ -218,6 +244,7 @@ async function sendWhatsAppFollowupEmail(to, name) {
     <p style="color:${BRAND.inkLight};font-size:12px;margin:16px 0 0;">
       If WhatsApp isn't for you, no worries. You can keep using Housemait in the app. We won't email about this again.
     </p>
+    ${appStoreCta('Prefer the app? Get Housemait on your iPhone.')}
   `);
   await sendEmail(to, `${firstName}, you haven't met your Housemait yet`, html);
 }
@@ -437,6 +464,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
       <div style="text-align:center;margin-top:24px;">
         ${button('Open Housemait', BASE_URL)}
       </div>
+      ${appStoreCta('Get reminders on the go — Housemait for iPhone')}
     </div>
 
     <!-- Footer -->
