@@ -387,16 +387,13 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         } catch (err) {
           console.warn('[inbound-email] Confirmation email failed:', err.message);
         }
-      } else if (
-        from &&
-        !NO_REPLY_RE.test(fromAddress) &&
-        (combinedText.trim() || images.length)
-      ) {
-        // We received and read the email but found nothing to add. Close the
-        // loop with feedback so the user doesn't conclude the feature is
-        // broken (the #1 cause of "I forwarded it and nothing happened").
-        // Gated to real human senders with actual content - we don't reply
-        // to blank emails or automated no-reply addresses.
+      } else if (from && !NO_REPLY_RE.test(fromAddress)) {
+        // We received and processed the email but found nothing to add. Always
+        // close the loop with feedback so the user doesn't conclude the
+        // feature is broken (the #1 cause of "I forwarded it and nothing
+        // happened"). This fires even for an empty-bodied email - in that case
+        // the reply doubles as a useful hint that the details need to be in
+        // the body. Only automated no-reply senders are skipped (loop guard).
         try {
           await sendInboundEmailNoResults(from, subject);
           console.log(`[inbound-email] No actions for "${subject}" - sent no-results reply to ${fromAddress}`);
