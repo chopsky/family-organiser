@@ -4671,13 +4671,20 @@ async function touchInboundSender(householdId, email, db = supabase) {
     .ilike('email', normalised);
 }
 
-async function createInboundEmailLog(householdId, fromEmail, subject, db = supabase) {
+async function createInboundEmailLog(householdId, fromEmail, subject, extra = {}, db = supabase) {
+  // `extra` lets callers stamp the final status (+ error_message) at insert
+  // time. The rejection path uses this so a blocked sender is written as
+  // status:'rejected' atomically - no create-then-update window that could
+  // leave the row orphaned at 'pending' (which would also hide it from the
+  // rejected-sender nudge). Back-compat: callers that omit `extra` get the
+  // old behaviour (status defaults to 'pending' via the column default).
   const { data, error } = await db
     .from('inbound_email_log')
     .insert({
       household_id: householdId,
       from_email: fromEmail,
       subject: subject || null,
+      ...extra,
     })
     .select()
     .single();

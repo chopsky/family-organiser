@@ -111,8 +111,10 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       if (!allowed) {
         console.warn('[inbound-email] Rejected: sender not on allowlist -', fromAddress, 'for household', householdId);
         try {
-          const rejectedLog = await db.createInboundEmailLog(householdId, from, subject);
-          await db.updateInboundEmailLog(rejectedLog.id, {
+          // Write status:'rejected' in the single insert - no create-then-
+          // update window that could orphan the row at 'pending' and hide it
+          // from the Settings rejected-sender nudge.
+          await db.createInboundEmailLog(householdId, from, subject, {
             status: 'rejected',
             error_message: `Sender ${fromAddress} not on this household's allowlist.`,
           });
