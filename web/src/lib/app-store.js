@@ -11,7 +11,7 @@
  * codebase is `APP_STORE_ID` below.
  */
 
-export const APP_STORE_ID = 'REPLACE_WITH_APP_STORE_ID';
+export const APP_STORE_ID = '6762131562';
 
 /** Direct link to the App Store product page. */
 export const APP_STORE_URL = `https://apps.apple.com/app/housemait/id${APP_STORE_ID}`;
