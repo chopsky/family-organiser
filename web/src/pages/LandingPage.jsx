@@ -612,19 +612,31 @@ export default function LandingPage() {
                   badge is only rendered at all when the App Store ID
                   has been configured in lib/app-store.js. */}
               {iosVisitor ? (
+                // iOS phone/iPad: one tap installs from the App Store —
+                // no QR detour needed, the Apple badge does its job.
                 <a href={APP_STORE_URL} className="app-store-cta" aria-label="Download Housemait on the App Store">
                   <AppStoreBadge />
                 </a>
               ) : (
+                // Desktop + Android: give two paths. "Download App"
+                // shows a QR popover on hover so a desktop visitor can
+                // scan with their phone and install in one motion. "Try
+                // Housemait Online" stays as the no-install fallback.
                 <>
-                  <a href={SIGNUP_URL} className="btn btn-primary">
-                    Start 30-day free trial <ArrowRight />
-                  </a>
                   {APP_STORE_CONFIGURED && (
-                    <a href={APP_STORE_URL} className="app-store-cta-secondary" aria-label="Download Housemait on the App Store">
-                      <AppStoreBadge />
-                    </a>
+                    <span className="download-pill-wrapper">
+                      <a href={APP_STORE_URL} className="btn btn-primary download-pill" aria-label="Download Housemait on the App Store">
+                        Download App
+                      </a>
+                      <span className="qr-popover" role="tooltip">
+                        <img src="/assets/app-store-qr.svg" alt="" width="160" height="160" />
+                        <span className="qr-caption">Scan to download</span>
+                      </span>
+                    </span>
                   )}
+                  <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
+                    Try Housemait Online
+                  </a>
                 </>
               )}
             </div>
