@@ -1664,11 +1664,28 @@ export default function FamilySetup() {
           </button>
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-[22px] font-medium text-bark truncate">
-              {household?.name || 'Your household'}
-            </h2>
+            {/* Name + edit share one row, so the pencil sits top-right
+                in line with the household name. Address and join code
+                then get the full column width below, each on a single
+                line. */}
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[22px] font-medium text-bark truncate">
+                {household?.name || 'Your household'}
+              </h2>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={openHouseholdEdit}
+                  className="shrink-0 inline-flex items-center gap-1.5 text-sm text-cocoa hover:text-bark transition-colors px-2 py-1 -mr-2"
+                  title="Edit household"
+                >
+                  <IconEdit className="h-4 w-4" />
+                  <span className="hidden sm:inline">Edit</span>
+                </button>
+              )}
+            </div>
             {household?.address ? (
-              <p className="text-sm text-cocoa flex items-center gap-1.5 mt-0.5">
+              <p className="text-sm text-cocoa flex items-center gap-1.5 mt-1 min-w-0">
                 <IconMapPin className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{household.address}</span>
               </p>
@@ -1676,21 +1693,18 @@ export default function FamilySetup() {
               <button
                 type="button"
                 onClick={openHouseholdEdit}
-                className="text-sm text-plum hover:underline flex items-center gap-1.5 mt-0.5"
+                className="text-sm text-plum hover:underline flex items-center gap-1.5 mt-1 whitespace-nowrap"
               >
-                <IconMapPin className="h-3.5 w-3.5" />
+                <IconMapPin className="h-3.5 w-3.5 shrink-0" />
                 Add your home address
               </button>
             ) : (
               <p className="text-xs text-cocoa mt-1">No address set.</p>
             )}
-            {/* Join code - sits inline with the household identity as a
-                third attribute under the address. Label sits outside
-                the pill so the clickable target is just the
-                code+Copy chip, matching the visual pattern of paired
-                label/value rows elsewhere in the app. */}
+            {/* Join code - full-width row under the address; nowrap keeps
+                the label and the code+Copy chip together on one line. */}
             {household?.join_code && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-cocoa">
+              <div className="mt-2 flex items-center gap-2 text-sm text-cocoa whitespace-nowrap">
                 <span>Join code</span>
                 <button
                   type="button"
@@ -1709,18 +1723,6 @@ export default function FamilySetup() {
               </div>
             )}
           </div>
-
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={openHouseholdEdit}
-              className="shrink-0 inline-flex items-center gap-1.5 text-sm text-cocoa hover:text-bark transition-colors px-2 py-1"
-              title="Edit household"
-            >
-              <IconEdit className="h-4 w-4" />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
-          )}
         </div>
 
         {!isAdmin && (
