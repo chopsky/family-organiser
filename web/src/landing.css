@@ -148,10 +148,11 @@ h1.display em { font-style: italic; color: var(--purple); }
   transition: opacity .18s ease, transform .18s ease;
   z-index: 10;
 }
-/* Transparent bridge above the popover that covers the 12px gap
- * between the button and the card. Without this, moving the cursor
- * from button → QR crosses transparent space and the hover state
- * drops, dismissing the popover before the user reaches it. */
+/* Transparent bridge that covers the 12px gap between the button and
+ * the card. Without this, moving the cursor between them crosses
+ * transparent space and the hover state drops, dismissing the popover
+ * before the user reaches it. The bridge sits on top of the popover
+ * when placed below the button, and underneath when flipped above. */
 .qr-popover::before {
   content: '';
   position: absolute;
@@ -159,6 +160,27 @@ h1.display em { font-style: italic; color: var(--purple); }
   left: 0;
   right: 0;
   height: 14px;
+}
+
+/* Flipped placement — popover sits ABOVE the button when there isn't
+ * enough room below. The bridge also flips, so it covers the gap on
+ * the underside of the popover (between the popover and the button
+ * top edge). The hover transform direction inverts so the enter
+ * animation still slides toward the button. */
+.download-pill-wrapper[data-placement="top"] .qr-popover {
+  top: auto;
+  bottom: calc(100% + 12px);
+  transform: translate(-50%, 6px);
+}
+.download-pill-wrapper[data-placement="top"] .qr-popover::before {
+  top: auto;
+  bottom: -14px;
+}
+@media (hover: hover) {
+  .download-pill-wrapper[data-placement="top"]:hover .qr-popover,
+  .download-pill-wrapper[data-placement="top"]:focus-within .qr-popover {
+    transform: translate(-50%, 0);
+  }
 }
 .qr-popover img {
   width: 150px;

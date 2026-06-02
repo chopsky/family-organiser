@@ -487,6 +487,57 @@ function Showcase({ items }) {
   )
 }
 
+/** "Download App" pill + QR popover with auto-flip placement.
+ *
+ * Defaults to popover-below-button. On pointer/keyboard activation we
+ * measure how much space is below the wrapper in the viewport and
+ * flip the popover above the button when there isn't enough room.
+ * Why on activation rather than at mount: the visitor may scroll
+ * between renders and the popover's correct placement depends on the
+ * button's *current* viewport position, not its position when the
+ * page first painted.
+ *
+ * The pill is a <button>, not a link — clicking does nothing. The
+ * QR is the affordance. type="button" keeps it Tab-focusable, so
+ * keyboard users can also reveal the popover via :focus-within.
+ */
+function DownloadQR() {
+  const wrapperRef = useRef(null)
+  const [placement, setPlacement] = useState('bottom')
+
+  const recompute = () => {
+    const el = wrapperRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    // ~200 = popover height (182) + gap (12) + small buffer. If less
+    // than that fits below the button before the viewport edge, flip
+    // the popover above the button instead.
+    const spaceBelow = window.innerHeight - rect.bottom
+    setPlacement(spaceBelow < 200 ? 'top' : 'bottom')
+  }
+
+  return (
+    <span
+      ref={wrapperRef}
+      className="download-pill-wrapper"
+      data-placement={placement}
+      onMouseEnter={recompute}
+      onFocus={recompute}
+    >
+      <button
+        type="button"
+        className="btn btn-primary download-pill"
+        aria-label="Show QR code to download Housemait on the App Store"
+      >
+        Download App
+      </button>
+      <span className="qr-popover" role="tooltip">
+        <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="150" height="150" />
+      </span>
+    </span>
+  )
+}
+
 export default function LandingPage() {
   const locale = useLocale()
   const [billing, setBilling] = useState('monthly')
@@ -624,25 +675,7 @@ export default function LandingPage() {
                 // Housemait Online" stays as the no-install fallback.
                 <>
                   {APP_STORE_CONFIGURED && (
-                    <span className="download-pill-wrapper">
-                      {/* Pure hover trigger — NOT a link. Clicking doesn't
-                          navigate (a desktop click on this button would
-                          send the visitor to the App Store URL on their
-                          desktop, where they can't install). The QR is the
-                          point. type="button" + no onClick keeps it a
-                          no-op while remaining keyboard-focusable so
-                          screen readers + Tab navigation reveal the QR. */}
-                      <button
-                        type="button"
-                        className="btn btn-primary download-pill"
-                        aria-label="Show QR code to download Housemait on the App Store"
-                      >
-                        Download App
-                      </button>
-                      <span className="qr-popover" role="tooltip">
-                        <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="150" height="150" />
-                      </span>
-                    </span>
+                    <DownloadQR />
                   )}
                   <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
                     Try Housemait Online
