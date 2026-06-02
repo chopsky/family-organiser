@@ -133,6 +133,12 @@ h1.display em { font-style: italic; color: var(--purple); }
   top: calc(100% + 12px);
   left: 50%;
   transform: translate(-50%, -6px);
+  /* Hard-locked dimensions so even if the inner SVG ever misbehaves
+   * (no intrinsic width, viewBox-only sizing, etc.) the card stays
+   * square. 220px QR + 20px padding both sides = 260px square. */
+  width: 260px;
+  height: 260px;
+  box-sizing: border-box;
   background: #fff;
   border-radius: 22px;
   padding: 20px;
@@ -141,8 +147,6 @@ h1.display em { font-style: italic; color: var(--purple); }
   pointer-events: none;
   transition: opacity .18s ease, transform .18s ease;
   z-index: 10;
-  display: block;
-  line-height: 0; /* kill the inline-element baseline gap under the img */
 }
 .qr-popover img {
   width: 220px;
