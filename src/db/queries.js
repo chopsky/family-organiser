@@ -3907,10 +3907,20 @@ async function logWhatsAppMessage({ householdId, userId, direction, messageType,
  */
 async function getRecentWhatsAppTurns(userId, { limit = 10, windowMinutes = 30 } = {}, db = supabase) {
   if (!userId) return [];
+  // INBOUND rows only. A genuine user<->bot turn is logged as a single
+  // inbound row carrying both `body` (what the user said) and `response`
+  // (what the bot replied). Outbound rows are exclusively system broadcasts
+  // - the morning brief, the weekly "Weekly roundup" digest, overdue-task
+  // nudges, cross-member "Grant added event X" pings. Those are NOT
+  // conversation: replaying them as context made the bot treat an unrelated
+  // message as a reply (e.g. "Mallorca dinner booked" -> "Thanks for the
+  // weekly roundup!") - worse, an outbound digest's body was being injected
+  // with role:'user', so the AI thought the human had handed it the digest.
   const { data, error } = await db
     .from('whatsapp_message_log')
     .select('direction, body, response, created_at, error, message_type')
     .eq('user_id', userId)
+    .eq('direction', 'inbound')
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) {
