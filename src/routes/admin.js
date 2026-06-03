@@ -637,54 +637,70 @@ router.get('/tools/ai-runtime', (req, res) => {
   });
 });
 
-// ─── Promo codes ──────────────────────────────────────────────────────────────
+// ─── Discount codes (Stripe coupons + promotion codes) ──────────────────────────
+//
+// Customer-facing % discount codes for web checkout. The customer types the
+// code on the Stripe-hosted checkout page (allow_promotion_codes is on). For
+// iOS the operator mirrors the same string as an Apple Offer Code in App
+// Store Connect - the two systems don't share codes, only the human string.
+const stripeService = require('../services/stripe');
 
-// List all campaign codes (newest first) with their redemption counts.
 router.get('/promo-codes', async (req, res) => {
   try {
-    return res.json({ codes: await db.listPromoCodes() });
+    return res.json({ codes: await stripeService.listDiscountCodes({ limit: 100 }) });
   } catch (err) {
     console.error('GET /api/admin/promo-codes error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
-// Create a campaign code. Body: { code, description?, grant_days?,
-// max_redemptions?, expires_at? }. grant_days defaults to 365 (one year).
+// Create a discount code. Body: { code, percent_off, duration?,
+// duration_in_months?, applies_to?, max_redemptions?, expires_at? }.
 router.post('/promo-codes', async (req, res) => {
   try {
-    const { code, description, grant_days, max_redemptions, expires_at } = req.body || {};
+    const { code, percent_off, duration, duration_in_months, applies_to, max_redemptions, expires_at } = req.body || {};
     const trimmed = String(code || '').trim();
     if (!/^[A-Za-z0-9_-]{3,40}$/.test(trimmed)) {
       return res.status(400).json({ error: 'Code must be 3-40 characters: letters, numbers, dashes or underscores.' });
     }
-    const created = await db.createPromoCode({
+    const pct = Math.round(Number(percent_off));
+    if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+      return res.status(400).json({ error: 'Percent off must be a whole number from 1 to 100.' });
+    }
+    const dur = ['once', 'repeating', 'forever'].includes(duration) ? duration : 'once';
+    if (dur === 'repeating' && !(Number(duration_in_months) > 0)) {
+      return res.status(400).json({ error: 'Repeating discounts need a number of months.' });
+    }
+    const result = await stripeService.createDiscountCode({
       code: trimmed,
-      description: description ? String(description).slice(0, 200) : null,
-      grantDays: Number.isFinite(+grant_days) && +grant_days > 0 ? Math.floor(+grant_days) : 365,
+      percentOff: pct,
+      duration: dur,
+      durationInMonths: dur === 'repeating' ? Math.floor(Number(duration_in_months)) : null,
+      appliesTo: ['annual', 'monthly'].includes(applies_to) ? applies_to : 'any',
       maxRedemptions: (max_redemptions === undefined || max_redemptions === null || max_redemptions === '')
         ? null
-        : Math.max(1, Math.floor(+max_redemptions)),
+        : Math.max(1, Math.floor(Number(max_redemptions))),
       expiresAt: expires_at || null,
     });
-    return res.status(201).json({ code: created });
+    return res.status(201).json(result);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'That code already exists.' });
+    if (err.code === 'resource_already_exists' || /already exists/i.test(err.message || '')) {
+      return res.status(409).json({ error: 'That code already exists in Stripe.' });
+    }
     console.error('POST /api/admin/promo-codes error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
-// Update a code - primarily to activate/deactivate it (a kill switch that
-// preserves its redemption history, vs deleting).
+// Enable/disable a promotion code (Stripe's kill switch; codes aren't deleted).
 router.patch('/promo-codes/:id', async (req, res) => {
   try {
-    const updated = await db.updatePromoCode(req.params.id, req.body || {});
-    if (!updated) return res.status(400).json({ error: 'Nothing to update.' });
-    return res.json({ code: updated });
+    const active = !!(req.body && req.body.active);
+    await stripeService.setDiscountCodeActive(req.params.id, active);
+    return res.json({ ok: true, active });
   } catch (err) {
     console.error('PATCH /api/admin/promo-codes/:id error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 

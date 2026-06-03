@@ -204,6 +204,102 @@ function constructWebhookEvent(rawBody, signatureHeader) {
   return stripe.webhooks.constructEvent(rawBody, signatureHeader, secret);
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Discount codes (admin-created marketing codes).
+//
+// These are real Stripe coupons + promotion codes - the customer enters the
+// code on the Stripe-hosted checkout page (which already has the field via
+// allow_promotion_codes:true). Percentage-only by product decision. For iOS,
+// the operator creates a matching Apple Offer Code in App Store Connect; the
+// two systems don't share codes, only the human-facing string.
+// ────────────────────────────────────────────────────────────────────────
+
+// Distinct Stripe product ids backing a given interval ('annual'|'monthly'),
+// resolved from the managed lookup_keys. Used to restrict a coupon to one
+// plan. Returns [] if none resolve (e.g. wrong env) - caller leaves the
+// coupon unrestricted. If annual & monthly share ONE product, this returns
+// that shared id for both, so a product restriction can't separate them -
+// the caller surfaces that as a note.
+async function productIdsForInterval(interval) {
+  const stripe = getStripe();
+  const lookupKeys = SUPPORTED_CURRENCIES.map((c) => `${interval}_${c}`); // <=6, under Stripe's 10 cap
+  const res = await stripe.prices.list({ lookup_keys: lookupKeys, expand: ['data.product'], limit: 100 });
+  const ids = new Set();
+  for (const p of res.data) {
+    const pid = typeof p.product === 'object' && p.product ? p.product.id : p.product;
+    if (pid) ids.add(pid);
+  }
+  return [...ids];
+}
+
+/**
+ * Create a discount code = a Stripe coupon + a customer-facing promotion code.
+ * @param {object} opts
+ *   code            - the string customers type (e.g. "SAVE25")
+ *   percentOff      - 1..100 (use 100 for a free first period)
+ *   duration        - 'once' | 'repeating' | 'forever'
+ *   durationInMonths- required when duration === 'repeating'
+ *   appliesTo       - 'any' | 'annual' | 'monthly'
+ *   maxRedemptions  - cap | null
+ *   expiresAt       - ISO string | null
+ * Returns { code, restrictedToPlan, sharedProductWarning }.
+ */
+async function createDiscountCode({ code, percentOff, duration = 'once', durationInMonths = null, appliesTo = 'any', maxRedemptions = null, expiresAt = null }) {
+  const stripe = getStripe();
+  const couponParams = { percent_off: percentOff, duration, name: code };
+  if (duration === 'repeating') couponParams.duration_in_months = durationInMonths;
+
+  let sharedProductWarning = false;
+  let restrictedToPlan = null;
+  if (appliesTo === 'annual' || appliesTo === 'monthly') {
+    const wantIds = await productIdsForInterval(appliesTo);
+    const otherIds = await productIdsForInterval(appliesTo === 'annual' ? 'monthly' : 'annual');
+    const overlap = wantIds.some((id) => otherIds.includes(id));
+    if (wantIds.length && !overlap) {
+      couponParams.applies_to = { products: wantIds };
+      restrictedToPlan = appliesTo;
+    } else if (wantIds.length && overlap) {
+      // Annual & monthly share a Stripe product - can't restrict by product.
+      sharedProductWarning = true;
+    }
+  }
+
+  const coupon = await stripe.coupons.create(couponParams);
+  const promo = await stripe.promotionCodes.create({
+    coupon: coupon.id,
+    code,
+    ...(maxRedemptions ? { max_redemptions: maxRedemptions } : {}),
+    ...(expiresAt ? { expires_at: Math.floor(new Date(expiresAt).getTime() / 1000) } : {}),
+  });
+
+  return { code: promo.code, id: promo.id, restrictedToPlan, sharedProductWarning };
+}
+
+/** List promotion codes (newest first) with their coupon details flattened. */
+async function listDiscountCodes({ limit = 50 } = {}) {
+  const stripe = getStripe();
+  const res = await stripe.promotionCodes.list({ limit, expand: ['data.coupon'] });
+  return res.data.map((pc) => ({
+    id: pc.id,
+    code: pc.code,
+    active: pc.active,
+    max_redemptions: pc.max_redemptions ?? null,
+    times_redeemed: pc.times_redeemed ?? 0,
+    expires_at: pc.expires_at ? new Date(pc.expires_at * 1000).toISOString() : null,
+    percent_off: pc.coupon?.percent_off ?? null,
+    duration: pc.coupon?.duration ?? null,
+    duration_in_months: pc.coupon?.duration_in_months ?? null,
+    restricted_products: pc.coupon?.applies_to?.products || null,
+  }));
+}
+
+/** Enable/disable a promotion code (Stripe can't delete an active one). */
+async function setDiscountCodeActive(promotionCodeId, active) {
+  const stripe = getStripe();
+  const pc = await stripe.promotionCodes.update(promotionCodeId, { active: !!active });
+  return pc;
+}
+
 // Test hook: let tests reset the memoised client between runs so a
 // re-mocked env var actually takes effect. Not used in production.
 function _resetForTests() {
@@ -217,5 +313,8 @@ module.exports = {
   createCheckoutSession,
   createPortalSession,
   constructWebhookEvent,
+  createDiscountCode,
+  listDiscountCodes,
+  setDiscountCodeActive,
   _resetForTests,
 };

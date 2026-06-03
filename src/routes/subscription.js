@@ -158,43 +158,4 @@ router.post('/portal', requireAuth, requireHousehold, async (req, res) => {
   }
 });
 
-// Map the redeem function's failure reasons to a status + friendly message.
-const REDEEM_REASONS = {
-  invalid:            { code: 404, msg: "That code isn't valid. Double-check it and try again." },
-  expired:            { code: 410, msg: 'That code has expired.' },
-  exhausted:          { code: 409, msg: 'That code has been fully claimed.' },
-  already_subscribed: { code: 409, msg: 'You already have an active subscription - no code needed.' },
-  already_redeemed:   { code: 409, msg: "You've already redeemed this code." },
-  already_promo:      { code: 409, msg: 'You already have a promo applied to this household.' },
-  no_household:       { code: 400, msg: 'No household found for your account.' },
-};
-
-/**
- * POST /api/subscription/redeem
- * Redeem a campaign promo code. Mounted under /api/subscription, which is
- * excluded from the trial gate - so an EXPIRED household can still redeem to
- * revive itself. The grant lands on the households row, so it syncs across
- * web + iOS automatically.
- */
-router.post('/redeem', requireAuth, requireHousehold, async (req, res) => {
-  try {
-    const code = String(req.body?.code || '').trim();
-    if (!code) return res.status(400).json({ error: 'Please enter a code.' });
-
-    const result = await db.redeemPromoCode(req.householdId, req.user.id, code);
-    if (result?.ok) {
-      return res.json({
-        ok: true,
-        granted_until: result.granted_until,
-        grant_days: result.grant_days,
-      });
-    }
-    const r = REDEEM_REASONS[result?.reason] || { code: 400, msg: "That code couldn't be redeemed." };
-    return res.status(r.code).json({ error: r.msg });
-  } catch (err) {
-    console.error('POST /api/subscription/redeem error:', err);
-    return res.status(500).json({ error: 'Something went wrong redeeming that code. Please try again.' });
-  }
-});
-
 module.exports = router;
