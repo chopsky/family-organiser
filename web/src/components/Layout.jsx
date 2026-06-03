@@ -20,7 +20,7 @@ const mainNav = [
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
   { to: '/documents',  label: 'Documents', Icon: IconFileText  },
   { to: '/family',     label: 'Family',    Icon: IconUsers     },
-  { to: '/help',       label: 'Help & Support', Icon: IconHelp },
+  { to: '/help',       label: 'Help Centre', Icon: IconHelp },
   { to: '/settings',   label: 'Settings',  Icon: IconSettings  },
 ];
 
