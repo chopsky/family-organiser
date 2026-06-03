@@ -14,6 +14,8 @@
 	<string>Housemait uses your microphone to convert speech to text when you tap the voice input button on the AI chat.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Housemait uses speech recognition to convert what you say into text in the AI chat, so you can ask questions hands-free.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Housemait uses your location to show local weather on your home screen and to answer questions that depend on where you are. You can also set a home address instead under Family Setup.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>

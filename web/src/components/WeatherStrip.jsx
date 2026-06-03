@@ -19,6 +19,8 @@
 
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
+import { getDeviceLocation, openLocationSettings } from '../lib/location';
+import { isNative } from '../lib/platform';
 
 // ── Weather glyphs - minimalist line icons, 24px viewBox (from the brief) ──
 const WX = {
@@ -87,9 +89,23 @@ export default function WeatherStrip({ onOpenAI }) {
   useEffect(() => {
     if (!isMobile) return undefined; // don't fetch on desktop
     let cancelled = false;
-    api.get('/weather/widget')
-      .then((res) => { if (!cancelled) setData(res.data); })
-      .catch(() => { if (!cancelled) setData({ available: false }); });
+    (async () => {
+      // Device GPS is the PRIMARY location source. Try to read it (prompts
+      // for permission on iOS the first time); fall back to the household
+      // address server-side when we can't. Never blocks the fetch — a null
+      // fix just means "use the saved address".
+      let coords = null;
+      try {
+        coords = await getDeviceLocation();
+      } catch {
+        coords = null;
+      }
+      if (cancelled) return;
+      const qs = coords ? `?lat=${coords.lat}&lon=${coords.lon}` : '';
+      api.get(`/weather/widget${qs}`)
+        .then((res) => { if (!cancelled) setData(res.data); })
+        .catch(() => { if (!cancelled) setData({ available: false }); });
+    })();
     return () => { cancelled = true; };
   }, [isMobile]);
 
@@ -122,7 +138,53 @@ export default function WeatherStrip({ onOpenAI }) {
     );
   }
 
-  // Loaded but genuinely unavailable (no household address / upstream down):
+  // No device location AND no saved address → we can't show weather at all.
+  // Rather than a broken card, prompt the user toward the two ways to fix it:
+  // enable location (the primary source) or add a home address (the fallback).
+  if (!data.available && data.reason === 'no_location') {
+    return (
+      <div
+        style={{
+          borderRadius: 20,
+          border: `1px solid ${LINE}`,
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #EAF1FB 0%, #F4F0FB 52%, #FBF1E4 100%)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+          <div
+            style={{
+              width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+              background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: WX_COLOR.partly,
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={WX_COLOR.partly} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: INK2, lineHeight: 1.45 }}>
+            Weather needs your location.{' '}
+            {isNative() ? (
+              <button
+                type="button"
+                onClick={openLocationSettings}
+                style={{ border: 0, background: 'transparent', padding: 0, color: BRAND, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}
+              >
+                Open Settings
+              </button>
+            ) : (
+              <span style={{ color: INK2, fontWeight: 600 }}>Open Settings</span>
+            )}{' '}
+            to enable it, or add a home address in Family Setup.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loaded but genuinely unavailable (geocode/upstream failure):
   // show nothing rather than a broken card, per the design brief.
   if (!data.available) return null;
 
