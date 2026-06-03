@@ -170,7 +170,19 @@ export default function AdminWhatsApp() {
                 <tbody>
                   {devices.devices.map((d) => (
                     <tr key={d.id} className="border-b border-light-grey/60">
-                      <td className="py-2 pr-3 font-mono text-charcoal">{d.tokenMasked}</td>
+                      <td className="py-2 pr-3 font-mono text-charcoal whitespace-nowrap">
+                        {d.tokenMasked}
+                        {d.token && (
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard?.writeText(d.token)}
+                            className="ml-2 text-plum hover:underline font-sans"
+                            title="Copy full device token (for Apple's Push Notifications Console)"
+                          >
+                            Copy
+                          </button>
+                        )}
+                      </td>
                       <td className="py-2 pr-3 text-warm-grey">{d.platform}</td>
                       <td className="py-2 pr-3">
                         <span className={d.active ? 'text-sage font-medium' : 'text-warm-grey'}>

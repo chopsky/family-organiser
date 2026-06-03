@@ -583,6 +583,11 @@ router.get('/tools/my-devices', async (req, res) => {
     const devices = rows.map((r) => ({
       id: r.id,
       tokenMasked: r.token ? `${r.token.slice(0, 8)}…${r.token.slice(-4)}` : null,
+      // Full token included so the admin can paste their OWN device token into
+      // Apple's Push Notifications Console for a backend-bypass test. Device
+      // tokens aren't credentials (you still need the provider key to send),
+      // and this is the caller's own data behind the admin gate.
+      token: r.token,
       platform: r.platform,
       active: r.active,
       created_at: r.created_at,
