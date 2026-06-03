@@ -515,7 +515,7 @@ export default function Dashboard() {
             margin: 0,
           }}
         >
-          {getGreeting()}, <i>{user?.name}</i>.
+          {getGreeting()}, <i style={{ color: 'var(--color-plum)' }}>{user?.name}</i>.
         </h1>
         <p
           style={{
