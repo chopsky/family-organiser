@@ -20,6 +20,8 @@ const mainNav = [
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
   { to: '/documents',  label: 'Documents', Icon: IconFileText  },
   { to: '/family',     label: 'Family',    Icon: IconUsers     },
+  { to: '/help',       label: 'Help & Support', Icon: IconHelp },
+  { to: '/settings',   label: 'Settings',  Icon: IconSettings  },
 ];
 
 // Mobile bottom-tab order from the iOS design handoff: Home · Calendar ·
@@ -264,12 +266,6 @@ export default function Layout({ children }) {
               <IconShield className="h-5 w-5" />
             </Link>
           )}
-          <Link to="/help" className="text-warm-grey hover:text-charcoal transition-colors" title="Help & support">
-            <IconHelp className="h-5 w-5" />
-          </Link>
-          <Link to="/settings" className="text-warm-grey hover:text-charcoal transition-colors" title="Settings">
-            <IconSettings className="h-5 w-5" />
-          </Link>
         </div>
       </aside>
 
