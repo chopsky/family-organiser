@@ -263,6 +263,27 @@ async function deliver(deviceToken, payload) {
   return last || { success: false };
 }
 
+/**
+ * Diagnostic variant of deliver(): reports which environment a token
+ * succeeded on (or both failures), and NEVER prunes - so a self-test run
+ * can't deactivate a token we're trying to inspect. For the admin push
+ * self-test only. Returns { success, env, status, reason }.
+ */
+async function deliverDiagnostic(deviceToken, payload) {
+  if (!configured) return { success: false, reason: 'APNs not configured on the server' };
+  const order = [PRIMARY_ENV, FALLBACK_ENV];
+  let last = null;
+  for (let i = 0; i < order.length; i++) {
+    const env = order[i];
+    // eslint-disable-next-line no-await-in-loop
+    const res = await sendOne(deviceToken, payload, APN_HOSTS[env]);
+    if (res.success) return { success: true, env, status: 200 };
+    last = { success: false, env, status: res.status, reason: res.reason };
+    if (i === 0 && !isEnvironmentMismatch(res.reason)) break;
+  }
+  return last || { success: false };
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -427,6 +448,7 @@ module.exports = {
   sendToUser,
   sendToHousehold,
   isConfigured: () => configured,
+  deliverDiagnostic,
   // Exported for unit testing the environment-retry decision.
   _isEnvironmentMismatch: isEnvironmentMismatch,
 };

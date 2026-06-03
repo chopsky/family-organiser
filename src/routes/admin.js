@@ -599,6 +599,48 @@ router.get('/tools/my-devices', async (req, res) => {
   }
 });
 
+// ─── POST /api/admin/tools/push-selftest ───────────────────────────────────
+//
+// Send a test alert to each of the calling admin's ACTIVE device tokens and
+// report the per-token outcome - including which APNs environment delivered
+// it. This is the ground truth for "APNs says sent but I see no banner":
+// it shows whether the live (recently-updated) token actually succeeds, and
+// on sandbox vs production. Uses the diagnostic sender, which never prunes.
+
+router.post('/tools/push-selftest', async (req, res) => {
+  try {
+    if (!push.isConfigured()) {
+      return res.json({ configured: false, results: [] });
+    }
+    const tokens = await db.getActiveDeviceTokens(req.user.id);
+    const payload = {
+      aps: {
+        alert: {
+          title: 'Housemait push test',
+          body: 'If you can see this, push notifications are working ✅',
+        },
+        sound: 'default',
+      },
+      type: 'push_selftest',
+    };
+    const results = await Promise.all((tokens || []).map(async (t) => {
+      const r = await push.deliverDiagnostic(t.token, payload);
+      return {
+        tokenMasked: t.token ? `${t.token.slice(0, 8)}…${t.token.slice(-4)}` : null,
+        updated_at: t.updated_at,
+        success: !!r.success,
+        env: r.env || null,
+        status: r.status || null,
+        reason: r.reason || null,
+      };
+    }));
+    return res.json({ configured: true, count: results.length, results });
+  } catch (err) {
+    console.error('POST /api/admin/tools/push-selftest error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
 // ─── GET /api/admin/tools/ai-runtime ──────────────────────────────────────
 //
 // Diagnostic for AI-provider env-var visibility. Returns which keys the

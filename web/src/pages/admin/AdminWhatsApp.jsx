@@ -16,6 +16,8 @@ export default function AdminWhatsApp() {
   const [triggerStatus, setTriggerStatus] = useState(null);
   const [days, setDays] = useState(30);
   const [devices, setDevices] = useState(null);
+  const [selftest, setSelftest] = useState(null);
+  const [selftesting, setSelftesting] = useState(false);
 
   async function loadDevices() {
     try {
@@ -26,6 +28,19 @@ export default function AdminWhatsApp() {
     }
   }
   useEffect(() => { loadDevices(); }, []);
+
+  async function handleSelfTest() {
+    setSelftesting(true);
+    setSelftest(null);
+    try {
+      const { data: d } = await api.post('/admin/tools/push-selftest');
+      setSelftest(d);
+    } catch (err) {
+      setSelftest({ error: err.response?.data?.error || err.message });
+    } finally {
+      setSelftesting(false);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -110,13 +125,23 @@ export default function AdminWhatsApp() {
       <div className="bg-white border border-light-grey rounded-2xl p-5 mt-4">
         <div className="flex items-center justify-between gap-3 mb-1">
           <h2 className="text-sm font-medium text-charcoal">Your push devices</h2>
-          <button
-            type="button"
-            onClick={loadDevices}
-            className="text-xs text-plum hover:underline shrink-0"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={handleSelfTest}
+              disabled={selftesting}
+              className="text-xs font-semibold text-plum hover:underline disabled:opacity-50"
+            >
+              {selftesting ? 'Testing…' : 'Run push self-test'}
+            </button>
+            <button
+              type="button"
+              onClick={loadDevices}
+              className="text-xs text-plum hover:underline"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
         {!devices ? (
           <p className="text-xs text-warm-grey">Loading…</p>
@@ -160,6 +185,40 @@ export default function AdminWhatsApp() {
               </table>
             </div>
           </>
+        )}
+
+        {/* Per-token self-test results - the ground truth for "APNs says
+            sent but no banner". Shows whether each token actually succeeded
+            and on which APNs environment (sandbox vs production). */}
+        {selftest && (
+          <div className="mt-4 pt-4 border-t border-light-grey">
+            {selftest.error ? (
+              <p className="text-xs text-coral">{selftest.error}</p>
+            ) : selftest.configured === false ? (
+              <p className="text-xs text-coral">APNs isn&apos;t configured on the server (missing APN_KEY / APN_KEY_ID / APN_TEAM_ID).</p>
+            ) : selftest.results.length === 0 ? (
+              <p className="text-xs text-warm-grey">No active tokens to test.</p>
+            ) : (
+              <>
+                <p className="text-xs text-warm-grey mb-2">
+                  Self-test result per token. A <span className="text-sage font-medium">delivered</span> on your live (most-recent) token + no banner = an iOS display setting (Focus / Scheduled Summary / banner style). A <span className="text-coral font-medium">failed</span> on the live token = a real delivery problem (see the reason).
+                </p>
+                <div className="space-y-1">
+                  {selftest.results.map((r) => (
+                    <div key={r.tokenMasked} className="flex items-center justify-between gap-3 text-xs py-1">
+                      <span className="font-mono text-charcoal">{r.tokenMasked}</span>
+                      <span className="text-warm-grey">{fmtWhen(r.updated_at)}</span>
+                      {r.success ? (
+                        <span className="text-sage font-medium shrink-0">delivered via {r.env}</span>
+                      ) : (
+                        <span className="text-coral font-medium shrink-0">failed{r.reason ? ` — ${r.reason}` : ''}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
