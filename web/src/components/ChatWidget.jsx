@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../lib/api';
+import { getDeviceLocation } from '../lib/location';
 
 /**
  * Format markdown-style text into React elements.
@@ -406,6 +407,15 @@ I'm always here if you need me!`;
     try {
       const payload = { message: trimmed };
       if (activeConversationId) payload.conversation_id = activeConversationId;
+
+      // Attach the device's live location (iOS app) so location-aware
+      // answers and weather use where the user actually is. Silent: only
+      // reads when permission is already granted - never prompts mid-chat
+      // (the weather widget + Settings own the permission request).
+      try {
+        const coords = await getDeviceLocation({ skipIfDenied: true });
+        if (coords) payload.coords = coords;
+      } catch { /* no location → backend falls back to the saved address */ }
 
       const { data } = await api.post('/chat', payload);
 

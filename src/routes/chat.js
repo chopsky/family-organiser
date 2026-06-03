@@ -6,7 +6,7 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
 const { scanImage, scanReceipt, matchReceiptToList, classify } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
-const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
+const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation, reverseGeocode } = require('../services/weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
@@ -100,7 +100,7 @@ function localToUTC(date, time, timezone) {
 /**
  * Build the system prompt with family context injected.
  */
-async function buildSystemPrompt(householdId, householdName, userId, currentMessage = '') {
+async function buildSystemPrompt(householdId, householdName, userId, currentMessage = '', deviceCoords = null) {
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
@@ -137,8 +137,22 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const homeAddress = household?.address?.trim();
   const userCity = getCityFromTimezone(userTz);
   const wantsLocation = messageMentionsLocation(currentMessage);
+  // Device GPS (from the iOS app) is the PRIMARY location source - where the
+  // user actually is right now beats the saved home address (they might be
+  // out and about). Reverse-geocode to a city label only when the message is
+  // location-relevant, to avoid a network round-trip on every chat turn.
+  let deviceCity = null;
+  if (wantsLocation && deviceCoords
+      && Number.isFinite(deviceCoords.lat) && Number.isFinite(deviceCoords.lon)) {
+    try {
+      const rev = await reverseGeocode(deviceCoords.lat, deviceCoords.lon);
+      if (rev?.name && rev.name !== 'your location') deviceCity = rev.name;
+    } catch { /* fall back to address/timezone */ }
+  }
   let locationStr = '';
-  if (wantsLocation && homeAddress) {
+  if (wantsLocation && deviceCity) {
+    locationStr = `The user is currently in **${deviceCity}** (from their live device location). Use this for proximity-aware recommendations - suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than coordinates.`;
+  } else if (wantsLocation && homeAddress) {
     locationStr = `The family's home address is **${homeAddress}**. Use this for proximity-aware recommendations - suggest specific restaurants, GPs, dentists, parks, shops, services nearby. Mention neighbourhoods or rough distance ("about a 10-minute walk", "in Camden") rather than echoing the full street address back to the user. Treat the exact address as confidential.`;
   } else if (wantsLocation && userCity) {
     locationStr = `The family is based in **${userCity}**. Use this for local recommendations - suggest specific places, neighbourhoods, and services in this area.`;
@@ -342,11 +356,18 @@ router.delete('/history', requireAuth, requireHousehold, async (req, res) => {
  * Send a message to the AI assistant and get a response.
  */
 router.post('/', requireAuth, requireHousehold, async (req, res) => {
-  const { message, conversation_id } = req.body;
+  const { message, conversation_id, coords } = req.body;
 
   if (!message?.trim()) {
     return res.status(400).json({ error: 'Message is required.' });
   }
+
+  // Device GPS from the iOS app (primary location source). Validate defensively
+  // - bad/absent coords just fall back to the saved household address.
+  const deviceCoords = coords
+    && Number.isFinite(Number(coords.lat)) && Number.isFinite(Number(coords.lon))
+    ? { lat: Number(coords.lat), lon: Number(coords.lon) }
+    : null;
 
   try {
     // Resolve or create conversation
@@ -361,7 +382,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // address: it's only added to the prompt when this specific
     // message asks about somewhere local. See location-relevance.js.
     const household = await db.getHouseholdById(req.householdId);
-    const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id, message);
+    const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id, message, deviceCoords);
 
     // Get recent conversation history for context
     const history = await db.getChatHistory(conversationId, 30);
@@ -464,19 +485,36 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
         } else if (act.action === 'fetch_weather') {
-          // Prefer an explicit location from the message ("weather in
-          // Brighton tomorrow"). Otherwise fall back to the household
-          // address saved under Family → Household settings - the user
-          // already told us where they live, no reason to make them
-          // type it again. Last resort is the "I don't know where you
-          // are" hint.
+          // Location precedence for weather:
+          //   1. An explicit place in the message ("weather in Brighton").
+          //   2. The device's live GPS location (iOS app) - where they are
+          //      right now beats a saved address.
+          //   3. The household address under Family → Household settings.
+          // Last resort is the "I don't know where you are" hint.
           const locationName = extractLocationFromMessage(message);
           const householdAddress = household?.address?.trim();
-          const lookup = locationName || householdAddress;
+          // If the user named a place, geocode that. Else if we have device
+          // coords, use them directly (reverse-geocoded for the label).
+          // Else geocode the saved address.
+          let geo = null;
+          if (locationName) {
+            geo = await geocodeLocation(locationName);
+          } else if (deviceCoords) {
+            const rev = await reverseGeocode(deviceCoords.lat, deviceCoords.lon);
+            geo = {
+              lat: deviceCoords.lat,
+              lon: deviceCoords.lon,
+              name: rev?.name || 'your location',
+              country: rev?.country || '',
+              timezone: 'auto',
+            };
+          } else if (householdAddress) {
+            geo = await geocodeLocation(householdAddress);
+          }
+          const lookup = locationName || deviceCoords || householdAddress;
           if (!lookup) {
             cleanContent += "\n\n📍 I don't know where you live yet. Add your home address under Family → Household, or ask with a city like _\"weather in Brighton tomorrow\"_.";
           } else {
-            const geo = await geocodeLocation(lookup);
             if (!geo) {
               const fallbackHint = locationName
                 ? `I couldn't find _"${locationName}"_ on the map. Try the full city + country, e.g. _"weather in Cape Town, South Africa"_.`
@@ -484,7 +522,8 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
               cleanContent += `\n\n🗺️ ${fallbackHint}`;
             } else {
               const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: message });
-              cleanContent += `\n\n📍 **${geo.name}, ${geo.country}**\n\n` + report;
+              const place = geo.country ? `${geo.name}, ${geo.country}` : geo.name;
+              cleanContent += `\n\n📍 **${place}**\n\n` + report;
               executedActions.push({ type: 'fetch_weather' });
             }
           }
