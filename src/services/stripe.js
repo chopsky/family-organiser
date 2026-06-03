@@ -22,7 +22,12 @@ function getStripe() {
       'Set it in .env (test key) or Railway (live key).'
     );
   }
-  _stripe = new Stripe(key);
+  // Pin the API version. The SDK (v22) otherwise defaults to a 2025 version
+  // where promotionCodes.create no longer accepts a top-level `coupon` param,
+  // which broke discount-code creation. Pinning is Stripe best practice
+  // anyway - it stops a future SDK bump silently changing behaviour. Checkout,
+  // prices and the portal are stable across these versions.
+  _stripe = new Stripe(key, { apiVersion: '2024-06-20' });
   return _stripe;
 }
 
