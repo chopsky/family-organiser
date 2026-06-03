@@ -173,4 +173,22 @@ module.exports = [
       return null;
     },
   },
+  {
+    name: 'redirect-to-app: "import school calendars" points to the app, not a dead-end',
+    message: 'I need to add the school calendars for my three children. Can you import them from a website?',
+    ctx: {
+      sender: 'Jade',
+      memberNames: ['Jade', 'Angus', 'Elowen', 'Isla'],
+      tasks: [],
+    },
+    check: (r) => {
+      if (r.intent !== 'chat') return `expected chat, got ${r.intent}`;
+      const msg = (r.response_message || '').toLowerCase();
+      // Must NOT dead-end ("add each one manually"); must name a real in-app
+      // place to import them.
+      const pointsToApp = /family setup|term dates|connect calendars|in the app/.test(msg);
+      if (!pointsToApp) return `reply doesn't point to the app: "${r.response_message}"`;
+      return null;
+    },
+  },
 ];
