@@ -675,4 +675,17 @@ router.post('/promo-codes', async (req, res) => {
   }
 });
 
+// Update a code - primarily to activate/deactivate it (a kill switch that
+// preserves its redemption history, vs deleting).
+router.patch('/promo-codes/:id', async (req, res) => {
+  try {
+    const updated = await db.updatePromoCode(req.params.id, req.body || {});
+    if (!updated) return res.status(400).json({ error: 'Nothing to update.' });
+    return res.json({ code: updated });
+  } catch (err) {
+    console.error('PATCH /api/admin/promo-codes/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

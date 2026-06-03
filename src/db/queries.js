@@ -5681,6 +5681,23 @@ async function listPromoCodes(db = supabase) {
   return data || [];
 }
 
+async function updatePromoCode(id, fields, db = supabase) {
+  const ALLOWED = new Set(['active', 'max_redemptions', 'expires_at', 'description', 'grant_days']);
+  const clean = {};
+  for (const [k, v] of Object.entries(fields || {})) {
+    if (ALLOWED.has(k)) clean[k] = v;
+  }
+  if (Object.keys(clean).length === 0) return null;
+  const { data, error } = await db
+    .from('promo_codes')
+    .update(clean)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function findHouseholdByStripeCustomerId(customerId, db = supabase) {
   const { data, error } = await db
     .from('households')
@@ -6042,6 +6059,7 @@ module.exports = {
   redeemPromoCode,
   createPromoCode,
   listPromoCodes,
+  updatePromoCode,
   findHouseholdByStripeCustomerId,
   findHouseholdByStripeSubscriptionId,
   recordStripeEventIfNew,
