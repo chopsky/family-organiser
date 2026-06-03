@@ -19,9 +19,14 @@ const mainNav = [
   { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
   { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
   { to: '/documents',  label: 'Documents', Icon: IconFileText  },
-  { to: '/family',     label: 'Family',    Icon: IconUsers     },
-  { to: '/help',       label: 'Help Centre', Icon: IconHelp },
-  { to: '/settings',   label: 'Settings',  Icon: IconSettings  },
+];
+
+// Household / account group - rendered below a thin divider in the
+// desktop sidebar, set apart from the everyday tools above.
+const accountNav = [
+  { to: '/family',     label: 'Family',      Icon: IconUsers     },
+  { to: '/help',       label: 'Help Centre', Icon: IconHelp      },
+  { to: '/settings',   label: 'Settings',    Icon: IconSettings  },
 ];
 
 // Mobile bottom-tab order from the iOS design handoff: Home · Calendar ·
@@ -250,6 +255,8 @@ export default function Layout({ children }) {
         {/* Main nav */}
         <nav className="flex-1 px-3 flex flex-col gap-0.5">
           {mainNav.map(renderNavLink)}
+          <div className="my-2 border-t border-light-grey" aria-hidden="true" />
+          {accountNav.map(renderNavLink)}
         </nav>
 
         {/* User footer - top border uses a warmer grey than the global
