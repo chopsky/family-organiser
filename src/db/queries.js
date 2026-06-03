@@ -5451,6 +5451,19 @@ async function getActiveDeviceTokens(userId) {
   return data;
 }
 
+// All device tokens for a user, active AND inactive, newest first. For the
+// admin push diagnostic - lets us see whether the current device registered
+// (a recent updated_at) versus a pile of stale ghosts.
+async function getDeviceTokensForUserAdmin(userId) {
+  const { data, error } = await supabase
+    .from('device_tokens')
+    .select('id, token, platform, active, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
 async function getHouseholdDeviceTokens(householdId, excludeUserId = null) {
   let query = supabase
     .from('device_tokens')
@@ -6335,6 +6348,7 @@ module.exports = {
   registerDeviceToken,
   unregisterDeviceToken,
   getActiveDeviceTokens,
+  getDeviceTokensForUserAdmin,
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,

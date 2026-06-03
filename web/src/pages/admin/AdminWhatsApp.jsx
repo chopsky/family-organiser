@@ -15,6 +15,17 @@ export default function AdminWhatsApp() {
   const [triggering, setTriggering] = useState(false);
   const [triggerStatus, setTriggerStatus] = useState(null);
   const [days, setDays] = useState(30);
+  const [devices, setDevices] = useState(null);
+
+  async function loadDevices() {
+    try {
+      const { data: d } = await api.get('/admin/tools/my-devices');
+      setDevices(d);
+    } catch {
+      setDevices({ error: true });
+    }
+  }
+  useEffect(() => { loadDevices(); }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -30,11 +41,17 @@ export default function AdminWhatsApp() {
     try {
       const { data } = await api.post('/admin/tools/trigger-morning-brief');
       setTriggerStatus({ kind: 'ok', message: `Sent via ${data.where}.` });
+      loadDevices(); // dead tokens may have just been pruned
     } catch (err) {
       setTriggerStatus({ kind: 'err', message: err.response?.data?.error || err.message });
     } finally {
       setTriggering(false);
     }
+  }
+
+  function fmtWhen(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; }
   }
 
   if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
@@ -84,6 +101,65 @@ export default function AdminWhatsApp() {
           <p className={`text-xs mt-3 ${triggerStatus.kind === 'ok' ? 'text-sage' : 'text-coral'}`}>
             {triggerStatus.message}
           </p>
+        )}
+      </div>
+
+      {/* Push diagnostic - your registered devices. Lets you confirm the
+          current device actually registered for push (a recent "updated")
+          vs old ghost tokens from past installs. */}
+      <div className="bg-white border border-light-grey rounded-2xl p-5 mt-4">
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h2 className="text-sm font-medium text-charcoal">Your push devices</h2>
+          <button
+            type="button"
+            onClick={loadDevices}
+            className="text-xs text-plum hover:underline shrink-0"
+          >
+            Refresh
+          </button>
+        </div>
+        {!devices ? (
+          <p className="text-xs text-warm-grey">Loading…</p>
+        ) : devices.error ? (
+          <p className="text-xs text-coral">Couldn&apos;t load devices.</p>
+        ) : devices.devices.length === 0 ? (
+          <p className="text-xs text-warm-grey">
+            No devices registered. Your phone hasn&apos;t registered a push token - open the app and allow notifications when prompted (or enable them in iOS Settings → Housemait → Notifications, then reopen the app).
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-warm-grey mb-3">
+              {devices.activeCount} active of {devices.totalCount} total. The device you&apos;re using now should show a recent &quot;updated&quot; time and <span className="text-sage font-medium">active</span>. Old <span className="text-warm-grey font-medium">inactive</span> rows are pruned ghosts from past installs.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-light-grey text-left text-warm-grey">
+                    <th className="py-2 pr-3 font-semibold uppercase tracking-wider">Token</th>
+                    <th className="py-2 pr-3 font-semibold uppercase tracking-wider">Platform</th>
+                    <th className="py-2 pr-3 font-semibold uppercase tracking-wider">Status</th>
+                    <th className="py-2 pr-3 font-semibold uppercase tracking-wider">Registered</th>
+                    <th className="py-2 font-semibold uppercase tracking-wider">Last updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.devices.map((d) => (
+                    <tr key={d.id} className="border-b border-light-grey/60">
+                      <td className="py-2 pr-3 font-mono text-charcoal">{d.tokenMasked}</td>
+                      <td className="py-2 pr-3 text-warm-grey">{d.platform}</td>
+                      <td className="py-2 pr-3">
+                        <span className={d.active ? 'text-sage font-medium' : 'text-warm-grey'}>
+                          {d.active ? 'active' : 'inactive'}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-3 text-warm-grey">{fmtWhen(d.created_at)}</td>
+                      <td className="py-2 text-warm-grey">{fmtWhen(d.updated_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

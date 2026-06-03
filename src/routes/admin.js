@@ -569,6 +569,36 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/tools/my-devices ───────────────────────────────────────
+//
+// Push diagnostic: list the calling admin's registered device tokens (active
+// and inactive) with timestamps, so we can tell whether the current device
+// actually registered for push (a recent updated_at) versus a pile of stale
+// ghosts from past installs/rebuilds. Tokens are masked - we only need the
+// first/last few chars to correlate with APNs logs, never the full token.
+
+router.get('/tools/my-devices', async (req, res) => {
+  try {
+    const rows = await db.getDeviceTokensForUserAdmin(req.user.id);
+    const devices = rows.map((r) => ({
+      id: r.id,
+      tokenMasked: r.token ? `${r.token.slice(0, 8)}…${r.token.slice(-4)}` : null,
+      platform: r.platform,
+      active: r.active,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    }));
+    return res.json({
+      activeCount: devices.filter((d) => d.active).length,
+      totalCount: devices.length,
+      devices,
+    });
+  } catch (err) {
+    console.error('GET /api/admin/tools/my-devices error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
 // ─── GET /api/admin/tools/ai-runtime ──────────────────────────────────────
 //
 // Diagnostic for AI-provider env-var visibility. Returns which keys the
