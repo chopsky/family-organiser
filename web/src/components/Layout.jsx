@@ -266,7 +266,9 @@ export default function Layout({ children }) {
             --color-light-grey so it sits more softly against the cream
             page background. */}
         <div className="px-4 py-4 flex items-center gap-2.5" style={{ borderTop: '1px solid #f2f0ed' }}>
-          {renderAvatar('w-8 h-8', 'text-xs')}
+          <Link to="/settings" className="shrink-0 rounded-full transition-opacity hover:opacity-80" title="Settings" aria-label="Open settings">
+            {renderAvatar('w-8 h-8', 'text-xs')}
+          </Link>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
             <p className="text-[11px] text-warm-grey capitalize">{user?.role || 'Member'}</p>
