@@ -7,7 +7,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
-import { isIos, isNative } from '../lib/platform';
+import { isIos } from '../lib/platform';
 import { APP_STORE_URL, isIos as isIosBrowser } from '../lib/app-store';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
@@ -461,7 +461,10 @@ export default function Settings() {
   // (they already have it). iOS-browser users get a tappable App Store
   // badge; desktop users get a scan-to-phone QR. Android-mobile browser
   // users see nothing - there's no Android app to send them to yet.
-  const isNativeApp = isNative();
+  // Use Capacitor directly here: a local `const isNative` already exists
+  // further down this component, and importing platform's isNative would
+  // collide with it (block-scoped shadowing => TDZ at this line).
+  const isNativeApp = Capacitor.isNativePlatform();
   const isIosBrowserUser = !isNativeApp && isIosBrowser();
   const isDesktopWeb = !isNativeApp && !isIosBrowserUser
     && typeof window !== 'undefined'
