@@ -22,9 +22,22 @@ const APN_KEY_PATH = process.env.APN_KEY_PATH; // alternative: path to .p8 file
 const APN_BUNDLE_ID = process.env.APN_BUNDLE_ID || 'com.housemait.app';
 const APN_PRODUCTION = process.env.APN_PRODUCTION === 'true';
 
-const APN_HOST = APN_PRODUCTION
-  ? 'https://api.push.apple.com'
-  : 'https://api.sandbox.push.apple.com';
+// APNs has two isolated environments. A device token only works against the
+// environment whose entitlement the app was built with: Xcode debug builds →
+// sandbox; TestFlight + App Store builds → production. Sending a token to the
+// wrong host fails with 403 BadEnvironmentKeyInToken / BadDeviceToken. Because
+// the device_tokens table inevitably holds a MIX (dev builds while testing,
+// production builds in the wild) we deliver each token to whichever
+// environment it actually belongs to: try the primary, and on an
+// environment-mismatch retry the other. APN_PRODUCTION only decides which we
+// attempt FIRST (set it true once you're testing TestFlight/App Store builds
+// to avoid a wasted sandbox attempt).
+const APN_HOSTS = {
+  production: 'https://api.push.apple.com',
+  sandbox: 'https://api.sandbox.push.apple.com',
+};
+const PRIMARY_ENV = APN_PRODUCTION ? 'production' : 'sandbox';
+const FALLBACK_ENV = PRIMARY_ENV === 'production' ? 'sandbox' : 'production';
 
 let signingKey = null;
 let configured = false;
@@ -37,7 +50,7 @@ if (APN_KEY_ID && APN_TEAM_ID && (APN_KEY || APN_KEY_PATH)) {
       signingKey = require('fs').readFileSync(APN_KEY_PATH, 'utf8');
     }
     configured = true;
-    console.log('[push] APNs configured', APN_PRODUCTION ? '(production)' : '(sandbox)');
+    console.log(`[push] APNs configured (trying ${PRIMARY_ENV} first, ${FALLBACK_ENV} on environment mismatch)`);
   } catch (err) {
     console.warn('[push] Failed to load APNs key:', err.message);
   }
@@ -101,36 +114,40 @@ function derToRaw(derSig) {
 // HTTP/2 connection management
 // ---------------------------------------------------------------------------
 
-let h2Session = null;
-let h2SessionTimer = null;
+// One HTTP/2 session per APNs host (production + sandbox), opened lazily.
+const h2Sessions = {};      // host → ClientHttp2Session
+const h2SessionTimers = {}; // host → idle-close timer
 
-function getH2Session() {
-  if (h2Session && !h2Session.closed && !h2Session.destroyed) {
-    return h2Session;
+function getH2Session(host) {
+  const existing = h2Sessions[host];
+  if (existing && !existing.closed && !existing.destroyed) {
+    return existing;
   }
-  h2Session = http2.connect(APN_HOST);
-  h2Session.on('error', (err) => {
+  const session = http2.connect(host);
+  session.on('error', (err) => {
     console.error('[push] HTTP/2 session error:', err.message);
-    h2Session = null;
+    if (h2Sessions[host] === session) h2Sessions[host] = null;
   });
-  h2Session.on('close', () => { h2Session = null; });
+  session.on('close', () => { if (h2Sessions[host] === session) h2Sessions[host] = null; });
+  h2Sessions[host] = session;
   // Close idle sessions after 5 minutes
-  clearTimeout(h2SessionTimer);
-  h2SessionTimer = setTimeout(() => {
-    if (h2Session) { h2Session.close(); h2Session = null; }
+  clearTimeout(h2SessionTimers[host]);
+  h2SessionTimers[host] = setTimeout(() => {
+    const s = h2Sessions[host];
+    if (s) { s.close(); h2Sessions[host] = null; }
   }, 5 * 60 * 1000);
-  if (h2SessionTimer.unref) h2SessionTimer.unref();
-  return h2Session;
+  if (h2SessionTimers[host].unref) h2SessionTimers[host].unref();
+  return session;
 }
 
 // ---------------------------------------------------------------------------
 // Send a single push notification to one device
 // ---------------------------------------------------------------------------
 
-function sendOne(deviceToken, payload) {
+function sendOne(deviceToken, payload, host) {
   return new Promise((resolve) => {
     try {
-      const session = getH2Session();
+      const session = getH2Session(host);
       const jwt = getApnsJwt();
       const body = JSON.stringify(payload);
 
@@ -154,12 +171,12 @@ function sendOne(deviceToken, payload) {
         if (status === 200) {
           resolve({ success: true });
         } else {
-          console.error('[push] APNs error for token', deviceToken.substring(0, 8) + '...', '- status:', status, responseBody);
+          // Logging happens in deliver() once retries are exhausted, so an
+          // environment-mismatch that succeeds on retry doesn't spam errors.
           resolve({ success: false, status, reason: responseBody });
         }
       });
       req.on('error', (err) => {
-        console.error('[push] Request error:', err.message);
         resolve({ success: false, reason: err.message });
       });
 
@@ -175,6 +192,63 @@ function sendOne(deviceToken, payload) {
       resolve({ success: false, reason: err.message });
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// deliver - send one token to the correct APNs environment
+// ---------------------------------------------------------------------------
+
+// Reasons that mean "right token, wrong environment" - retrying the other
+// host fixes it. BadDeviceToken is included because token-auth environment
+// mismatches frequently surface as BadDeviceToken rather than the explicit
+// environment reason.
+function isEnvironmentMismatch(reason) {
+  return /BadEnvironmentKeyInToken|BadCertificateEnvironment|BadDeviceToken/i.test(reason || '');
+}
+
+// Remember which environment a token last delivered to, so repeat sends in the
+// same process skip the wasted first attempt. Cleared when a token is pruned.
+const tokenEnvCache = new Map(); // token → 'production' | 'sandbox'
+
+/**
+ * Deliver a single notification to the environment the token belongs to.
+ * Tries the primary environment (or the cached one), and on an
+ * environment-mismatch retries the other. Prunes tokens APNs reports as
+ * Unregistered (410 - app deleted). Never throws.
+ */
+async function deliver(deviceToken, payload) {
+  const known = tokenEnvCache.get(deviceToken);
+  const order = known
+    ? [known, known === 'production' ? 'sandbox' : 'production']
+    : [PRIMARY_ENV, FALLBACK_ENV];
+
+  let last = null;
+  for (let i = 0; i < order.length; i++) {
+    const env = order[i];
+    // eslint-disable-next-line no-await-in-loop
+    const res = await sendOne(deviceToken, payload, APN_HOSTS[env]);
+    if (res.success) {
+      tokenEnvCache.set(deviceToken, env);
+      return res;
+    }
+    last = res;
+    // Only the first attempt is worth retrying, and only on an env mismatch -
+    // other errors (PayloadTooLarge, Unregistered, etc.) won't change.
+    if (i === 0 && !isEnvironmentMismatch(res.reason)) break;
+  }
+
+  // App uninstalled → APNs returns 410 Unregistered. Prune the dead token so
+  // it stops failing every send.
+  if (last && (last.status === 410 || /Unregistered/i.test(last.reason || ''))) {
+    try {
+      await db.unregisterDeviceToken(deviceToken);
+      tokenEnvCache.delete(deviceToken);
+      console.log('[push] Pruned unregistered token', `${deviceToken.slice(0, 8)}...`);
+    } catch { /* best-effort */ }
+  } else if (last && !last.success) {
+    console.error('[push] APNs failed for token', `${deviceToken.slice(0, 8)}...`, '- status:', last.status, last.reason);
+  }
+  return last || { success: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +309,7 @@ async function sendPushNotification(deviceTokens, { title, body, data, badge, so
     Object.assign(payload, data);
   }
 
-  const results = await Promise.all(deviceTokens.map((t) => sendOne(t, payload)));
+  const results = await Promise.all(deviceTokens.map((t) => deliver(t, payload)));
   const sent = results.filter((r) => r.success).length;
   const failed = results.length - sent;
 
@@ -341,4 +415,6 @@ module.exports = {
   sendToUser,
   sendToHousehold,
   isConfigured: () => configured,
+  // Exported for unit testing the environment-retry decision.
+  _isEnvironmentMismatch: isEnvironmentMismatch,
 };
