@@ -81,10 +81,13 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
 
   const cappedEvents = calendarEvents.slice(0, 100);
   const calendarStr = cappedEvents.length > 0
-    ? cappedEvents.map(e => {
+    ? cappedEvents.map((e, i) => {
         const date = new Date(e.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: userTz });
         const time = e.all_day ? 'All day' : new Date(e.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: userTz });
-        return `- ${date} ${time}: ${e.title}${formatWho(e)}${e.location ? ` @ ${e.location}` : ''}`;
+        // Leading [N] is the event's reference number - on update_event /
+        // delete_event the model returns it as target.target_id so we modify
+        // THAT exact event by id instead of fuzzy-matching the title.
+        return `[${i + 1}] ${date} ${time}: ${e.title}${formatWho(e)}${e.location ? ` @ ${e.location}` : ''}`;
       }).join('\n') + (calendarEvents.length > 100 ? `\n... and ${calendarEvents.length - 100} more events` : '')
     : '(no upcoming events)';
 

@@ -68,6 +68,7 @@ INTENT DETECTION:
 - "delete_task": User wants to remove/cancel a task (e.g. "cancel book car service", "forget the task about calling the plumber", "remove the homework reminder"). Distinct from "complete" - use "remove" intent when the user marks something done (e.g. "finished homework").
 - "update_shopping_item": User wants to change an existing shopping item (e.g. "change milk to semi-skimmed", "update eggs quantity to 12"). Populate "target" + "updates".
 - "delete_shopping_item": User wants to remove an item from the shopping list without buying it (e.g. "remove milk from the list", "take eggs off the list", "I don't need bread anymore"). Distinct from "remove" intent which means the user bought/got the item - this intent means the user no longer wants it on the list at all. When in doubt, prefer the "remove" intent.
+- TARGETING (update_task / delete_task / update_event / delete_event): set target.target_id to the [N] reference number shown next to the matching item in OPEN TASKS (for tasks) or UPCOMING CALENDAR EVENTS (for events), AND set target.title to that item's title. The [N] is how the handler edits/removes the EXACT item - never guess. If you genuinely cannot tell which one the user means, leave target_id null (the handler will ask them to pick). (Shopping items have no [N] - for update_shopping_item / delete_shopping_item just set target.title.)
 - "query_calendar": User is asking about what's on the calendar, when an event is, what's happening on a date, or asking about someone's schedule (e.g. "when is Hillelfest?", "what's on Saturday?", "what's on the calendar this week?", "when is Mason's tennis?", "do I have anything tomorrow?", "what's happening next Friday?"). Look up the answer from the UPCOMING CALENDAR EVENTS below and include it in response_message. If you can't find the event, say you couldn't find it and suggest they check the calendar.
 - "weather": User is asking about meteorological conditions specifically (e.g. "what's the weather?", "will it rain today?", "do I need an umbrella?", "how's the weather this week?", "temperature outside", "is it warm enough for shorts?"). DO NOT trigger this intent when "cold" / "hot" / "warm" / "freezing" is describing a drink, food, person, room, etc. - those are descriptive adjectives, not weather queries. Worked counter-example (real failure): "Tell Grant to bring me a cold Coke Zero right now" → the "cold" describes the drink, NOT the outside temperature; this is an "add" intent (task for Grant), NOT weather. Same for "make sure the soup is hot", "the room is freezing", "I want warm bread" - none of these are weather. Only trigger weather when the question is unambiguously about outside conditions.
 - "school_activity": User is adding/updating a child's weekly school activity (e.g. "Mason has PE on Tuesdays", "Emma starts art club Wednesday until 4", "Jake's stopped coding club"). Extract into "school_activity" field.
@@ -381,6 +382,7 @@ Respond only with valid JSON matching this schema:
   } | null,
   "target": {
     "title": string,
+    "target_id": number | null,
     "context": string | null,
     "assigned_to_name": string | null
   } | null,

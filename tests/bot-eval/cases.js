@@ -17,6 +17,7 @@
 const completions = (r) => (r.tasks || []).filter((t) => t.action === 'complete');
 const adds = (r) => (r.tasks || []).filter((t) => t.action === 'add');
 const shoppingAdds = (r) => (r.shopping_items || []).filter((s) => (s.action || 'add') === 'add');
+const futureISO = (days) => new Date(Date.now() + days * 86400000).toISOString();
 
 module.exports = [
   {
@@ -134,6 +135,41 @@ module.exports = [
       if (a.length < 1) return 'no task added';
       const forLynn = a.some((t) => (t.assigned_to_names || []).some((n) => /lynn/i.test(n)));
       if (!forLynn) return `task not assigned to Lynn: ${JSON.stringify(a.map((t) => t.assigned_to_names))}`;
+      return null;
+    },
+  },
+  {
+    name: 'delete_task: "cancel the dentist task" grounds on the right task_id',
+    message: 'cancel the dentist task',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant'],
+      tasks: [
+        { id: 't1', title: 'Call EUSS' },
+        { id: 't2', title: 'Book dentist appointment' },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'delete_task') return `expected delete_task, got ${r.intent}`;
+      if (Number(r.target?.target_id) !== 2) return `expected target.target_id 2 (dentist), got ${r.target?.target_id}`;
+      return null;
+    },
+  },
+  {
+    name: 'delete_event: "cancel my haircut" grounds on the right event id',
+    message: 'cancel my haircut',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant'],
+      tasks: [],
+      calendarEvents: [
+        { id: 'e1', title: 'Dentist', start_time: futureISO(2), all_day: false },
+        { id: 'e2', title: 'Haircut', start_time: futureISO(3), all_day: false },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'delete_event') return `expected delete_event, got ${r.intent}`;
+      if (Number(r.target?.target_id) !== 2) return `expected target.target_id 2 (haircut), got ${r.target?.target_id}`;
       return null;
     },
   },

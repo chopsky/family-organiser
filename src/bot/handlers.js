@@ -353,20 +353,38 @@ function formatCandidate(kind, row) {
  * context + optional assignee) and, for updates, `result.updates` with only
  * the fields to change. This function does the fuzzy lookup + disambiguation.
  */
-async function handleModifyIntent(result, user, household) {
+async function handleModifyIntent(result, user, household, { openTasks = [], calendarEvents = [] } = {}) {
   const actions = {
     shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [],
   };
   const target = result.target || {};
   const updates = result.updates || {};
-  const title = (target.title || '').trim();
-  if (!title) {
-    return { response: "I couldn't work out which item you meant - try again with a title.", actions };
-  }
 
   const isEvent   = result.intent === 'update_event' || result.intent === 'delete_event';
   const isTask    = result.intent === 'update_task'  || result.intent === 'delete_task';
   const isDelete  = result.intent.startsWith('delete_');
+
+  // ID grounding (phase 2b): if the model returned a valid target_id (the [N]
+  // reference number shown next to the item in OPEN TASKS / UPCOMING CALENDAR
+  // EVENTS), act on THAT exact entity - no fuzzy title match, no
+  // disambiguation. It's the same household-scoped, same-order array the
+  // model saw, so index→row is exact; the bounds check guards a hallucinated
+  // number, falling through to fuzzy matching below.
+  const ref = Number(target.target_id);
+  const groundedList = isEvent ? calendarEvents : isTask ? openTasks : null;
+  if (groundedList && Number.isInteger(ref) && ref >= 1 && ref <= groundedList.length) {
+    const hit = groundedList[ref - 1];
+    if (hit) {
+      return await executeModifyAction({
+        intent: result.intent, kind: isEvent ? 'event' : 'task', hit, updates, user, household, actions,
+      });
+    }
+  }
+
+  const title = (target.title || '').trim();
+  if (!title) {
+    return { response: "I couldn't work out which item you meant - try again with a title.", actions };
+  }
 
   // 1. Fuzzy find candidates
   let candidates = [];
@@ -1313,7 +1331,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   //
   // Broadcasts fire on success so other household members see the change.
   if (['update_event', 'delete_event', 'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item'].includes(result.intent)) {
-    return await handleModifyIntent(result, user, household);
+    return await handleModifyIntent(result, user, household, { openTasks, calendarEvents });
   }
 
   // Handle school activity add/remove

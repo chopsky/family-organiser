@@ -1425,20 +1425,51 @@ async function getShoppingList(householdId, { includeCompleted = false, listId }
   return data;
 }
 
+// Score how well a list item matches a requested name. 1.0 = exact. The
+// product of "fraction of query words found" and "fraction of item words
+// used" deliberately demotes a partial hit: "milk" scores 1.0 against the
+// item "milk" but only 0.5 against "almond milk" - so "got the milk" picks
+// the plain milk and never checks off almond milk + milk chocolate too.
+function shoppingMatchScore(itemStr, queryStr) {
+  const item = String(itemStr || '').toLowerCase().trim();
+  const query = String(queryStr || '').toLowerCase().trim();
+  if (!item || !query) return 0;
+  if (item === query) return 1;
+  const iw = item.split(/\s+/).filter((w) => w.length > 1);
+  const qw = query.split(/\s+/).filter((w) => w.length > 1);
+  if (!iw.length || !qw.length) return 0;
+  const iset = new Set(iw);
+  const hits = qw.filter((w) => iset.has(w)).length;
+  if (hits === 0) return 0;
+  return (hits / qw.length) * (hits / iset.size);
+}
+
 async function completeShoppingItemsByName(householdId, itemNames, db = supabase) {
-  // Find items matching the names (case-insensitive, incomplete only)
-  const lowerNames = itemNames.map((n) => n.toLowerCase());
   const { data: items, error: fetchErr } = await db
     .from('shopping_items')
     .select()
     .eq('household_id', householdId)
     .eq('completed', false);
   if (fetchErr) throw fetchErr;
+  if (!items?.length) return [];
 
-  const matched = items.filter((i) => lowerNames.some((n) => i.item.toLowerCase().includes(n) || n.includes(i.item.toLowerCase())));
-  if (!matched.length) return [];
+  // Pick the SINGLE best item per requested name (exact first, then best
+  // fuzzy). The old code checked off EVERY substring match for one name -
+  // an over-completion (the shopping analogue of the "Call EUSS" task bug).
+  const chosen = new Map(); // id -> item, dedup if two names resolve to one
+  for (const name of itemNames) {
+    let best = null;
+    let bestScore = 0;
+    for (const it of items) {
+      if (chosen.has(it.id)) continue;
+      const score = shoppingMatchScore(it.item, name);
+      if (score > bestScore) { best = it; bestScore = score; }
+    }
+    if (best && bestScore > 0) chosen.set(best.id, best);
+  }
+  if (!chosen.size) return [];
 
-  const ids = matched.map((i) => i.id);
+  const ids = [...chosen.keys()];
   const { data, error } = await db
     .from('shopping_items')
     .update({ completed: true, completed_at: new Date().toISOString() })
