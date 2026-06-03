@@ -255,8 +255,11 @@ export default function Layout({ children }) {
         {/* Main nav */}
         <nav className="flex-1 px-3 flex flex-col gap-0.5">
           {mainNav.map(renderNavLink)}
-          <div className="my-2 border-t border-light-grey" aria-hidden="true" />
-          {accountNav.map(renderNavLink)}
+          {/* Account group anchored to the bottom of the sidebar (mt-auto),
+              set apart from the everyday tools by the empty space above. */}
+          <div className="mt-auto flex flex-col gap-0.5">
+            {accountNav.map(renderNavLink)}
+          </div>
         </nav>
 
         {/* User footer - top border uses a warmer grey than the global
