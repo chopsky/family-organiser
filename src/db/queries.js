@@ -5634,6 +5634,53 @@ async function updateHouseholdSubscription(householdId, fields, db = supabase) {
   return data;
 }
 
+// ─── Promo codes ──────────────────────────────────────────────────────────────
+
+/**
+ * Atomically redeem a campaign code for a household. All validation + the
+ * grant happen inside the redeem_promo_code() SQL function (row-locked, so
+ * the redemption cap is race-safe). Returns the function's jsonb result:
+ *   { ok: true,  granted_until, grant_days }
+ *   { ok: false, reason: 'invalid'|'expired'|'exhausted'|'already_subscribed'
+ *                        |'already_redeemed'|'already_promo'|'no_household' }
+ */
+async function redeemPromoCode(householdId, userId, code, db = supabase) {
+  const { data, error } = await db.rpc('redeem_promo_code', {
+    p_code: String(code || ''),
+    p_household_id: householdId,
+    p_user_id: userId || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function createPromoCode({ code, description = null, grantDays = 365, maxRedemptions = null, expiresAt = null }, db = supabase) {
+  const normalised = String(code || '').trim();
+  if (!normalised) throw new Error('Code is required.');
+  const { data, error } = await db
+    .from('promo_codes')
+    .insert({
+      code: normalised,
+      description,
+      grant_days: grantDays,
+      max_redemptions: maxRedemptions,
+      expires_at: expiresAt,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function listPromoCodes(db = supabase) {
+  const { data, error } = await db
+    .from('promo_codes')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
 async function findHouseholdByStripeCustomerId(customerId, db = supabase) {
   const { data, error } = await db
     .from('households')
@@ -5992,6 +6039,9 @@ module.exports = {
   updateHouseholdSettings,
   // Subscription / Stripe
   updateHouseholdSubscription,
+  redeemPromoCode,
+  createPromoCode,
+  listPromoCodes,
   findHouseholdByStripeCustomerId,
   findHouseholdByStripeSubscriptionId,
   recordStripeEventIfNew,

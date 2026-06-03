@@ -60,9 +60,13 @@ const FEED_COLOR_HEX = {
  *   • loading   → subtle loading state (no spinner - this card is ambient)
  */
 function PlanSection() {
-  const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
+  const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading, refresh } = useSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
+  const [redeemCode, setRedeemCode] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState('');
+  const [redeemErr, setRedeemErr] = useState('');
 
   // Phase 3 (IAP rebuild): the iOS-hide hack is gone. iOS users now see
   // their real subscription state and a working Manage button. The
@@ -114,6 +118,28 @@ function PlanSection() {
       console.error('[Settings] portal open failed:', err);
       setPortalError(err.response?.data?.error || 'Could not open the portal. Try again?');
       setPortalLoading(false);
+    }
+  }
+
+  async function handleRedeem(e) {
+    e?.preventDefault();
+    const code = redeemCode.trim();
+    if (!code || redeemLoading) return;
+    setRedeemLoading(true);
+    setRedeemMsg('');
+    setRedeemErr('');
+    try {
+      const { data } = await api.post('/subscription/redeem', { code });
+      const until = data?.granted_until
+        ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' }).format(new Date(data.granted_until))
+        : null;
+      setRedeemMsg(until ? `Code applied! You're all set until ${until}.` : 'Code applied!');
+      setRedeemCode('');
+      refresh?.(); // re-pull subscription status so the card reflects the new end date
+    } catch (err) {
+      setRedeemErr(err.response?.data?.error || "That code couldn't be redeemed.");
+    } finally {
+      setRedeemLoading(false);
     }
   }
 
@@ -208,6 +234,36 @@ function PlanSection() {
             Subscribe
           </Link>
         </div>
+      )}
+
+      {/* Promo code redemption - only useful to non-paying households
+          (trialing or expired). Active/internal don't need it. */}
+      {!isInternal && !isActive && (
+        <form onSubmit={handleRedeem} className="mt-4 pt-4 border-t border-cream-border">
+          <label htmlFor="promo-code" className="block text-xs font-semibold text-cocoa mb-1.5">Have a promo code?</label>
+          <div className="flex items-stretch gap-2">
+            <input
+              id="promo-code"
+              type="text"
+              value={redeemCode}
+              onChange={(e) => { setRedeemCode(e.target.value.toUpperCase()); setRedeemErr(''); setRedeemMsg(''); }}
+              placeholder="e.g. FREEYEAR"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              className="flex-1 min-w-0 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent uppercase"
+            />
+            <button
+              type="submit"
+              disabled={redeemLoading || !redeemCode.trim()}
+              className="shrink-0 bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap"
+            >
+              {redeemLoading ? 'Applying…' : 'Apply'}
+            </button>
+          </div>
+          {redeemMsg && <p className="text-xs text-emerald-700 mt-2">{redeemMsg}</p>}
+          {redeemErr && <p className="text-xs text-coral mt-2">{redeemErr}</p>}
+        </form>
       )}
 
       {portalError && (

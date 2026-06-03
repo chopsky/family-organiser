@@ -637,4 +637,42 @@ router.get('/tools/ai-runtime', (req, res) => {
   });
 });
 
+// ─── Promo codes ──────────────────────────────────────────────────────────────
+
+// List all campaign codes (newest first) with their redemption counts.
+router.get('/promo-codes', async (req, res) => {
+  try {
+    return res.json({ codes: await db.listPromoCodes() });
+  } catch (err) {
+    console.error('GET /api/admin/promo-codes error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create a campaign code. Body: { code, description?, grant_days?,
+// max_redemptions?, expires_at? }. grant_days defaults to 365 (one year).
+router.post('/promo-codes', async (req, res) => {
+  try {
+    const { code, description, grant_days, max_redemptions, expires_at } = req.body || {};
+    const trimmed = String(code || '').trim();
+    if (!/^[A-Za-z0-9_-]{3,40}$/.test(trimmed)) {
+      return res.status(400).json({ error: 'Code must be 3-40 characters: letters, numbers, dashes or underscores.' });
+    }
+    const created = await db.createPromoCode({
+      code: trimmed,
+      description: description ? String(description).slice(0, 200) : null,
+      grantDays: Number.isFinite(+grant_days) && +grant_days > 0 ? Math.floor(+grant_days) : 365,
+      maxRedemptions: (max_redemptions === undefined || max_redemptions === null || max_redemptions === '')
+        ? null
+        : Math.max(1, Math.floor(+max_redemptions)),
+      expiresAt: expires_at || null,
+    });
+    return res.status(201).json({ code: created });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'That code already exists.' });
+    console.error('POST /api/admin/promo-codes error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
