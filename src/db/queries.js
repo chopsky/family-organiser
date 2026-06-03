@@ -3770,6 +3770,44 @@ async function updateHouseholdSubscriptionAdmin(householdId, updates, db = supab
   return data;
 }
 
+/**
+ * Pause or resume a household's trial.
+ *  - pause:  stamp trial_paused_at = now (the gate then keeps access + never
+ *            expires while it's set). No-op if already paused.
+ *  - resume: add the paused duration back onto trial_ends_at and clear
+ *            trial_paused_at, so no trial days were lost. No-op if not paused.
+ * Idempotent; returns the updated household row.
+ */
+async function pauseOrResumeTrial(householdId, paused, db = supabase) {
+  const { data: hh, error: e1 } = await db
+    .from('households')
+    .select('trial_ends_at, trial_paused_at')
+    .eq('id', householdId)
+    .single();
+  if (e1) throw e1;
+
+  const updates = {};
+  if (paused) {
+    if (hh.trial_paused_at) return hh; // already paused
+    updates.trial_paused_at = new Date().toISOString();
+  } else {
+    if (!hh.trial_paused_at) return hh; // not paused
+    const pausedMs = Math.max(0, Date.now() - new Date(hh.trial_paused_at).getTime());
+    const base = hh.trial_ends_at ? new Date(hh.trial_ends_at).getTime() : Date.now();
+    updates.trial_ends_at = new Date(base + pausedMs).toISOString();
+    updates.trial_paused_at = null;
+  }
+
+  const { data, error } = await db
+    .from('households')
+    .update(updates)
+    .eq('id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function disableUser(userId, db = supabase) {
   const { data, error } = await db
     .from('users')
@@ -6224,6 +6262,7 @@ module.exports = {
   getPlatformStats,
   getSubscriptionStats,
   updateHouseholdSubscriptionAdmin,
+  pauseOrResumeTrial,
   disableUser,
   enableUser,
   deleteUserAdmin,

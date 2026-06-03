@@ -44,15 +44,21 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
     // zero prematurely. Clamp at 0 so we never report negative days for a
     // trial that's technically past but hasn't been flipped to 'expired'
     // yet (the gate middleware flips it on the next gated request).
+    // While the trial is paused, freeze the countdown: measure remaining days
+    // from when it was paused, not from now, so it doesn't tick down while the
+    // clock is held.
+    const trialPaused = status === 'trialing' && !!household.trial_paused_at;
     let daysRemaining = null;
     if (status === 'trialing' && trialEndsAt) {
-      const diffMs = new Date(trialEndsAt).getTime() - Date.now();
+      const fromMs = trialPaused ? new Date(household.trial_paused_at).getTime() : Date.now();
+      const diffMs = new Date(trialEndsAt).getTime() - fromMs;
       daysRemaining = Math.max(0, Math.ceil(diffMs / 86_400_000));
     }
 
     return res.json({
       status,
       trial_ends_at: trialEndsAt,
+      trial_paused: trialPaused,
       days_remaining: daysRemaining,
       subscription_plan: household.subscription_plan || null,
       // Lowercase ISO-4217 code the household is billed in (gbp, usd,

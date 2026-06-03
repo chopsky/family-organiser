@@ -303,6 +303,21 @@ router.patch('/households/:id/subscription', async (req, res) => {
   }
 });
 
+// Pause or resume a household's trial clock. Body: { paused: boolean }.
+// Pausing freezes the trial (the gate keeps access, never expires); resuming
+// adds the paused time back onto trial_ends_at so no days are lost.
+router.post('/households/:id/trial-pause', async (req, res) => {
+  try {
+    const paused = !!(req.body && req.body.paused);
+    const household = await db.pauseOrResumeTrial(req.params.id, paused);
+    return res.json(household);
+  } catch (err) {
+    if (err.code === 'PGRST116') return res.status(404).json({ error: 'Household not found' });
+    console.error('POST /api/admin/households/:id/trial-pause error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/ai-usage ─────────────────────────────────────────────────
 
 router.get('/ai-usage', async (req, res) => {

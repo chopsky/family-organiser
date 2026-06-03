@@ -103,6 +103,25 @@ export default function AdminHouseholdDetail() {
     await patchSubscription({ trial_ends_at: newEnd });
   }
 
+  async function handleTrialPause() {
+    if (!household) return;
+    const next = !household.trial_paused_at;
+    const msg = next
+      ? "Pause this trial? The clock freezes (they keep access) until you resume - no trial days are used."
+      : 'Resume this trial? The paused time gets added back onto their trial end date.';
+    if (!confirm(msg)) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post(`/admin/households/${id}/trial-pause`, { paused: next });
+      setHousehold((prev) => ({ ...prev, ...data }));
+    } catch (err) {
+      console.error('Failed to pause/resume trial:', err);
+      alert('Failed to update the trial. See console for details.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
   if (!household) return <p className="text-warm-grey py-10 text-center">Household not found</p>;
 
@@ -181,6 +200,18 @@ export default function AdminHouseholdDetail() {
               className="px-4 py-2 rounded-xl text-sm font-semibold border border-plum text-plum hover:bg-plum-light transition-colors disabled:opacity-50"
             >
               Extend Trial 30 Days
+            </button>
+            <button
+              onClick={handleTrialPause}
+              disabled={saving}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 border ${
+                household.trial_paused_at
+                  ? 'bg-amber/15 text-amber border-amber/40 hover:bg-amber/25'
+                  : 'border-light-grey text-charcoal hover:bg-light-grey'
+              }`}
+              title={household.trial_paused_at ? `Paused since ${new Date(household.trial_paused_at).toLocaleString()}` : 'Freeze the trial clock'}
+            >
+              {household.trial_paused_at ? 'Resume Trial' : 'Pause Trial'}
             </button>
             {household.stripe_customer_id && (
               <a

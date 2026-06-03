@@ -216,6 +216,26 @@ describe('requireActiveSubscription', () => {
         });
       }
     );
+
+    test('paused trial keeps access even when past trial_ends_at', async () => {
+      primeChain({
+        household: {
+          id: HOUSEHOLD_ID,
+          is_internal: false,
+          subscription_status: 'trialing',
+          trial_ends_at: new Date(Date.now() - 5 * 86_400_000).toISOString(), // 5 days ago
+          trial_paused_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        },
+      });
+      const req = makeReq(); // POST (mutation)
+      const res = makeRes();
+      const next = jest.fn();
+
+      await requireActiveSubscription(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled(); // not expired while paused
+    });
   });
 
   // ── 3. Auth handling (fail-open pass-through) ──────────────────────

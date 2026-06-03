@@ -104,7 +104,7 @@ async function requireActiveSubscription(req, res, next) {
   try {
     const { data, error } = await supabaseAdmin
       .from('households')
-      .select('id, is_internal, subscription_status, trial_ends_at')
+      .select('id, is_internal, subscription_status, trial_ends_at, trial_paused_at')
       .eq('id', householdId)
       .single();
     if (error || !data) {
@@ -131,6 +131,11 @@ async function requireActiveSubscription(req, res, next) {
 
   // 7. Active paid subscription.
   if (status === 'active') return next();
+
+  // 7b. Paused trial: an admin froze the clock (e.g. while resolving an
+  //     account issue) so it doesn't burn the user's days. Keep access and
+  //     never expire until the trial is resumed.
+  if (status === 'trialing' && household.trial_paused_at) return next();
 
   // 8. Still within the trial window.
   if (status === 'trialing' && trialEndsAt && now < trialEndsAt) return next();
