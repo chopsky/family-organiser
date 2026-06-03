@@ -24,7 +24,7 @@ const mainNav = [
 // Household / account group - rendered below a thin divider in the
 // desktop sidebar, set apart from the everyday tools above.
 const accountNav = [
-  { to: '/family',     label: 'Family',      Icon: IconUsers     },
+  { to: '/family',     label: 'Family Setup', Icon: IconUsers    },
   { to: '/help',       label: 'Help Centre', Icon: IconHelp      },
   { to: '/settings',   label: 'Settings',    Icon: IconSettings  },
 ];
