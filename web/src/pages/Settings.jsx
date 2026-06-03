@@ -15,7 +15,6 @@ import {
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
-import { isNative } from '../lib/platform';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
 } from '../lib/location';
@@ -1933,6 +1932,32 @@ export default function Settings() {
           <div className="py-4 text-center text-sm text-cocoa">Loading…</div>
         ) : notifPrefs ? (
           <div className="space-y-6">
+            {/* Morning briefing - the master switch for the daily brief.
+                It's delivered as a push if the app is installed, otherwise
+                on WhatsApp, so it lives ABOVE the channel subsections and is
+                always reachable (push-only users couldn't see it when it was
+                nested under WhatsApp). Bound to whatsapp_daily_reminder. */}
+            <div className="flex items-center justify-between pb-5 border-b border-cream-border">
+              <div className="min-w-0 flex-1 pr-3">
+                <p className="text-sm font-medium text-bark">Morning briefing</p>
+                <p className="text-xs text-cocoa">Your daily summary of what&apos;s on - sent as a phone notification if you have the app, otherwise on WhatsApp.</p>
+              </div>
+              <button
+                onClick={() => toggleNotifPref('whatsapp_daily_reminder')}
+                disabled={savingNotifPref === 'whatsapp_daily_reminder'}
+                aria-label="Toggle morning briefing"
+                className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${
+                  notifPrefs.whatsapp_daily_reminder !== false ? 'bg-primary' : 'bg-sand'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                    notifPrefs.whatsapp_daily_reminder !== false ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
             {/* Push subsection - iOS app only */}
             <div>
               <h3 className="text-sm font-semibold text-bark mb-1">Push notifications</h3>
@@ -1988,7 +2013,6 @@ export default function Settings() {
                     <p className="text-xs text-cocoa mb-3">Choose which messages the Housemait bot sends you on WhatsApp.</p>
                     <div className="space-y-1">
                       {[
-                        { key: 'whatsapp_daily_reminder', label: 'Daily morning reminder', desc: "Your morning briefing of what's on for today" },
                         { key: 'whatsapp_event_reminders', label: 'Event reminders', desc: 'Heads-up before an event starts (uses per-event timing)' },
                         { key: 'whatsapp_weekly_digest', label: 'Weekly digest', desc: 'Sunday recap of the week ahead and tasks done' },
                         { key: 'whatsapp_overdue_nudge', label: 'Overdue task nudges', desc: 'Gentle reminder when tasks are past due' },
@@ -2043,18 +2067,18 @@ export default function Settings() {
               <p className="text-sm text-bark">
                 <span className="font-semibold">Location is on.</span>{' '}
                 Weather and the assistant use your current location.
-                {isNative() && ' You can turn this off in your device Settings.'}
+                {isNative && ' You can turn this off in your device Settings.'}
               </p>
             </div>
           ) : locationPerm === 'denied' ? (
             <div className="rounded-xl border border-cream-border p-3">
               <p className="text-sm text-bark mb-3">
                 <span className="font-semibold">Location is off.</span>{' '}
-                {isNative()
+                {isNative
                   ? 'Turn it back on in your device Settings to use local weather and location-aware answers.'
                   : 'Allow location for this site in your browser settings to use local weather and location-aware answers.'}
               </p>
-              {isNative() && (
+              {isNative && (
                 <button
                   type="button"
                   onClick={openLocationSettings}
