@@ -195,8 +195,9 @@ function CalendarSetupNudge() {
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
   const fileInputRef = useRef(null);
-  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   function handleAiSubmit(e) {
     e.preventDefault();
@@ -222,39 +223,65 @@ function DashboardAiInput() {
     }, 500);
   }
 
-  // Web Speech API - supported in Safari (incl. iOS WKWebView from iOS
-  // 14.5+), Chrome, Edge. Each recognized phrase replaces the input
-  // value; users can submit normally with the send button or by
-  // pressing Enter. Tapping the mic again while recording stops it.
-  // SpeechRecognitionSupported is browser-only so we re-detect each
-  // click to avoid SSR / first-render issues.
-  function handleMicClick() {
+  // Voice input. We record audio with MediaRecorder and transcribe it
+  // server-side (Whisper), rather than the Web Speech API - which is NOT
+  // available in the iOS Capacitor WKWebView (webkitSpeechRecognition is
+  // undefined there), so the old approach did nothing on the iOS app.
+  // MediaRecorder + getUserMedia DO work in WKWebView (Info.plist grants
+  // NSMicrophoneUsageDescription). Tap once to start, again to stop.
+  async function handleMicClick() {
     if (isRecording) {
-      recognitionRef.current?.stop();
+      mediaRecorderRef.current?.stop();
       return;
     }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      // Tell the user gently rather than failing silently.
-      alert('Voice input is not supported in this browser. Try Chrome or Safari.');
+    if (isTranscribing) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      alert('Voice input isn’t available on this device.');
       return;
     }
-    const recognition = new SR();
-    recognition.lang = navigator.language || 'en-GB';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || '';
-      if (aiInputRef.current) {
-        aiInputRef.current.value = transcript;
-        aiInputRef.current.focus();
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error('[voice] mic permission/error:', err);
+      alert('I couldn’t access the microphone. Allow microphone access for Housemait in Settings, then try again.');
+      return;
+    }
+    // iOS WKWebView supports audio/mp4, not webm; desktop Chrome prefers webm.
+    const mime = MediaRecorder.isTypeSupported?.('audio/webm') ? 'audio/webm'
+      : MediaRecorder.isTypeSupported?.('audio/mp4') ? 'audio/mp4'
+      : '';
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
+    rec.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setIsRecording(false);
+      const type = rec.mimeType || mime || 'audio/mp4';
+      const ext = type.includes('webm') ? 'webm' : type.includes('wav') ? 'wav' : 'mp4';
+      const blob = new Blob(chunks, { type });
+      if (!blob.size) return;
+      setIsTranscribing(true);
+      try {
+        const fd = new FormData();
+        fd.append('audio', blob, `voice.${ext}`);
+        const { data } = await api.post('/chat/transcribe', fd);
+        const text = (data?.text || '').trim();
+        if (text && aiInputRef.current) {
+          const cur = aiInputRef.current.value;
+          aiInputRef.current.value = cur ? `${cur} ${text}` : text;
+          aiInputRef.current.focus();
+        }
+      } catch (err) {
+        console.error('[voice] transcription failed:', err);
+        alert('Sorry, I couldn’t transcribe that. Please try again.');
+      } finally {
+        setIsTranscribing(false);
       }
     };
-    recognition.onend = () => setIsRecording(false);
-    recognition.onerror = () => setIsRecording(false);
-    recognitionRef.current = recognition;
+    mediaRecorderRef.current = rec;
     setIsRecording(true);
-    recognition.start();
+    rec.start();
   }
 
   return (
@@ -282,23 +309,27 @@ function DashboardAiInput() {
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
           </button>
-          {/* Voice input via the Web Speech API. Properly functional
-              (transcribes one phrase into the input) so it doesn't
-              trip App Review Guideline 2.1(a) like the old non-
-              functional placeholder did. Falls back to an explanatory
-              alert on unsupported browsers. */}
+          {/* Voice input: record audio + transcribe server-side (Whisper).
+              Works in the iOS WKWebView, unlike the Web Speech API. */}
           <button
             type="button"
             onClick={handleMicClick}
-            className={`p-2 rounded-lg transition-colors ${isRecording ? 'text-coral bg-coral/10' : 'text-warm-grey hover:text-primary hover:bg-plum-light/50'}`}
-            title={isRecording ? 'Stop recording' : 'Voice input'}
+            disabled={isTranscribing}
+            className={`p-2 rounded-lg transition-colors disabled:opacity-60 ${isRecording ? 'text-coral bg-coral/10' : 'text-warm-grey hover:text-primary hover:bg-plum-light/50'}`}
+            title={isTranscribing ? 'Transcribing…' : isRecording ? 'Stop recording' : 'Voice input'}
             aria-pressed={isRecording}
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="2" width="6" height="12" rx="3" />
-              <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
+            {isTranscribing ? (
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            )}
           </button>
           <button
             type="submit"

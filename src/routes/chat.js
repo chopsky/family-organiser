@@ -10,6 +10,7 @@ const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geoco
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
+const { transcribeVoice } = require('../services/transcribe');
 
 // Multer config for chat attachments. Accepts both images (receipts,
 // event invitations, screenshots) and PDFs (school newsletters, party
@@ -26,7 +27,39 @@ const chatAttachmentUpload = multer({
   },
 });
 
+// Voice input from the in-app composer mic. The browser records audio
+// (webm on desktop, mp4 in the iOS WKWebView) and we transcribe it with
+// Whisper. 15 MB covers a generous spoken note.
+const voiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('audio/')) return cb(null, true);
+    return cb(new Error('Only audio files are accepted'));
+  },
+});
+
 const router = Router();
+
+/**
+ * POST /api/chat/transcribe
+ * Multipart: field `audio` = recorded clip. Returns { text }.
+ * Powers the composer mic - the Web Speech API doesn't work in the iOS
+ * WKWebView, so we record + transcribe server-side instead.
+ */
+router.post('/transcribe', requireAuth, requireHousehold, voiceUpload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file?.buffer?.length) {
+      return res.status(400).json({ error: 'No audio received.' });
+    }
+    const name = req.file.originalname || 'voice.mp4';
+    const text = await transcribeVoice(req.file.buffer, name);
+    return res.json({ text: (text || '').trim() });
+  } catch (err) {
+    console.error('POST /api/chat/transcribe error:', err.message);
+    return res.status(500).json({ error: 'Could not transcribe that audio. Please try again.' });
+  }
+});
 
 /**
  * Convert a local date+time string to a UTC ISO timestamp using the user's timezone.
