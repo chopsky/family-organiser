@@ -29,7 +29,7 @@ export default function AdminWhatsApp() {
     setTriggerStatus(null);
     try {
       const { data } = await api.post('/admin/tools/trigger-morning-brief');
-      setTriggerStatus({ kind: 'ok', message: `Sent to ${data.sentTo}. Check WhatsApp.` });
+      setTriggerStatus({ kind: 'ok', message: `Sent via ${data.where}.` });
     } catch (err) {
       setTriggerStatus({ kind: 'err', message: err.response?.data?.error || err.message });
     } finally {
@@ -68,7 +68,7 @@ export default function AdminWhatsApp() {
           <div className="min-w-0">
             <h2 className="text-sm font-medium text-charcoal">Send my morning brief now</h2>
             <p className="text-xs text-warm-grey mt-1 max-w-md">
-              Manually fires today's WhatsApp digest to your own number, bypassing the daily lock and the weather cache. Use this to verify digest fixes without waiting until 07:00 tomorrow.
+              Fires today's brief to you on your best channel - a push notification if you have the app installed, otherwise WhatsApp - bypassing the daily lock, weather cache, and your own on/off toggle. Use it to preview the real copy without waiting until 07:00 tomorrow.
             </p>
           </div>
           <button

@@ -399,8 +399,11 @@ async function fetchTodayEvents(householdId, todayStr) {
  *
  * @param {string} householdId
  * @param {object} [singleMember] - If provided, only send to this member
+ * @param {object} [options]
+ * @param {boolean} [options.ignoreOptOut] - send even if the member has
+ *   turned the brief off (used by the admin "send to me now" preview)
  */
-async function sendDailyReminders(householdId, singleMember) {
+async function sendDailyReminders(householdId, singleMember, options = {}) {
   const today = new Date().toISOString().split('T')[0];
 
   // Fetch household for timezone (used to render event times in the
@@ -495,7 +498,7 @@ async function sendDailyReminders(householdId, singleMember) {
     // (a null row, missing column, or any non-false value all mean "send");
     // only an explicit false turns it off.
     const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
-    const briefDisabled = !!(prefs && prefs.whatsapp_daily_reminder === false);
+    const briefDisabled = !options.ignoreOptOut && !!(prefs && prefs.whatsapp_daily_reminder === false);
     const whatsappLinked = !!(member.whatsapp_linked && member.whatsapp_phone);
 
     // App installed? = has ≥1 active push device token. App users get the

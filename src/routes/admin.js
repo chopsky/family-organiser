@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requirePlatformAdmin } = require('../middleware/auth');
-const { sendDailyReminders } = require('../jobs/reminders');
+const { sendDailyReminders, chooseDailyBriefChannel } = require('../jobs/reminders');
 const { invalidateHouseholdWeatherCache } = require('../services/digest-weather');
 
 const router = Router();
@@ -540,16 +540,29 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
     const member = await db.getUserByIdAdmin(req.user.id);
     if (!member) return res.status(404).json({ error: 'Caller not found' });
     if (!member.household_id) return res.status(400).json({ error: 'Caller has no household' });
-    if (!member.whatsapp_linked || !member.whatsapp_phone) {
+
+    // Mirror the cron's channel choice so we can tell the admin where to
+    // look: push (app installed) beats WhatsApp. Requires at least one
+    // channel to exist.
+    const deviceTokens = await db.getActiveDeviceTokens(member.id).catch(() => []);
+    const hasDevices = Array.isArray(deviceTokens) && deviceTokens.length > 0;
+    const whatsappLinked = !!(member.whatsapp_linked && member.whatsapp_phone);
+    const channel = chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled: false });
+    if (!channel) {
       return res.status(400).json({
-        error: 'Your WhatsApp is not linked. Link it from Settings → Notifications first.',
+        error: 'You have no app device and no WhatsApp linked. Install the Housemait app (or link WhatsApp in Settings → Notifications) to preview your brief.',
       });
     }
 
     invalidateHouseholdWeatherCache(member.household_id);
-    await sendDailyReminders(member.household_id, member);
+    // ignoreOptOut: this is an explicit self-preview, so fire even if the
+    // admin has their own Morning briefing toggle switched off.
+    await sendDailyReminders(member.household_id, member, { ignoreOptOut: true });
 
-    return res.json({ ok: true, sentTo: member.whatsapp_phone });
+    const where = channel === 'push'
+      ? `a push notification to your ${deviceTokens.length} device${deviceTokens.length === 1 ? '' : 's'} - check your phone`
+      : `WhatsApp (${member.whatsapp_phone})`;
+    return res.json({ ok: true, channel, where });
   } catch (err) {
     console.error('POST /api/admin/tools/trigger-morning-brief error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });
