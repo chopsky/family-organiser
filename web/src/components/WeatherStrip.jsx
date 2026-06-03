@@ -93,10 +93,38 @@ export default function WeatherStrip({ onOpenAI }) {
     return () => { cancelled = true; };
   }, [isMobile]);
 
-  // Render nothing on desktop, or until we have a positive payload. No
-  // skeleton: the widget is a nicety, not core content, and a flash of
-  // empty card above the composer would be more jarring than its absence.
-  if (!isMobile || !data || !data.available) return null;
+  // Desktop never shows the widget.
+  if (!isMobile) return null;
+
+  // While loading, render a skeleton that reserves the card's space and
+  // tells the user it's loading - so it doesn't suddenly pop in. The
+  // skeleton matches the collapsed card's height, so the swap to real data
+  // is seamless (no layout shift).
+  if (!data) {
+    return (
+      <div
+        style={{
+          borderRadius: 20,
+          border: `1px solid ${LINE}`,
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #EAF1FB 0%, #F4F0FB 52%, #FBF1E4 100%)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+          <div className="animate-pulse" style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: 'rgba(255,255,255,0.65)' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="animate-pulse" style={{ width: 110, height: 16, borderRadius: 6, background: 'rgba(26,22,32,0.08)' }} />
+            <div className="animate-pulse" style={{ width: 150, height: 11, borderRadius: 5, background: 'rgba(26,22,32,0.06)', marginTop: 9 }} />
+          </div>
+          <span style={{ fontSize: 11, color: INK3, fontWeight: 500, whiteSpace: 'nowrap' }}>Loading…</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Loaded but genuinely unavailable (no household address / upstream down):
+  // show nothing rather than a broken card, per the design brief.
+  if (!data.available) return null;
 
   const w = data;
   const Big = WX[w.icon] || WX.partly;
