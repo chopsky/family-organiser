@@ -8,7 +8,6 @@ import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
-import { APP_STORE_URL, isIos as isIosBrowser } from '../lib/app-store';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX,
@@ -457,19 +456,6 @@ export default function Settings() {
   // On web (browser or PWA) the layout is unchanged: cards + accordion
   // sections all on one page.
   const isIosPlatform = isIos();
-  // "Get the app" promo visibility. Never shown inside the native app
-  // (they already have it). iOS-browser users get a tappable App Store
-  // badge; desktop users get a scan-to-phone QR. Android-mobile browser
-  // users see nothing - there's no Android app to send them to yet.
-  // Use Capacitor directly here: a local `const isNative` already exists
-  // further down this component, and importing platform's isNative would
-  // collide with it (block-scoped shadowing => TDZ at this line).
-  const isNativeApp = Capacitor.isNativePlatform();
-  const isIosBrowserUser = !isNativeApp && isIosBrowser();
-  const isDesktopWeb = !isNativeApp && !isIosBrowserUser
-    && typeof window !== 'undefined'
-    && window.matchMedia('(min-width: 768px)').matches;
-  const showGetApp = isIosBrowserUser || isDesktopWeb;
   const [popupSlug, setPopupSlug] = useState(null); // slug of section currently shown in popup, null = closed
   const iosPopupOpen   = isIosPlatform && !!popupSlug;
   const iosListMode    = isIosPlatform && !popupSlug;
@@ -1324,36 +1310,6 @@ export default function Settings() {
         </div>
         Settings
       </h1>
-
-      {/* Get-the-app promo. Browser-only (hidden in the native app via
-          showGetApp). iOS-browser users get a tappable App Store badge;
-          desktop users get a scan-to-phone QR. */}
-      {showGetApp && (
-        <div
-          className="bg-linen rounded-2xl p-4.5 md:p-6 flex items-center gap-4"
-          style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
-        >
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-bark mb-1">Get the Housemait app</h2>
-            <p className="text-sm text-cocoa">
-              {isIosBrowserUser
-                ? 'Push reminders, home-screen quick-add, and a faster, native experience.'
-                : 'Scan with your iPhone camera to download. Push reminders, home-screen quick-add, and native speed.'}
-            </p>
-          </div>
-          {isIosBrowserUser ? (
-            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="shrink-0" aria-label="Download Housemait on the App Store">
-              <img src="/assets/app-store-badge.svg" alt="Download on the App Store" className="h-10 w-auto" />
-            </a>
-          ) : (
-            <img
-              src="/assets/app-store-qr.svg"
-              alt="QR code to download Housemait on the App Store"
-              className="w-24 h-24 shrink-0 rounded-lg"
-            />
-          )}
-        </div>
-      )}
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
