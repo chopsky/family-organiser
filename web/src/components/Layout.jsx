@@ -257,7 +257,7 @@ export default function Layout({ children }) {
           {mainNav.map(renderNavLink)}
           {/* Account group anchored to the bottom of the sidebar (mt-auto),
               set apart from the everyday tools by the empty space above. */}
-          <div className="mt-auto flex flex-col gap-0.5">
+          <div className="mt-auto flex flex-col gap-0.5 pb-3">
             {accountNav.map(renderNavLink)}
           </div>
         </nav>
