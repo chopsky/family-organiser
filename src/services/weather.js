@@ -251,6 +251,33 @@ async function geocodeLocation(name) {
 }
 
 /**
+ * Reverse geocode device coordinates → a city/region label. Used when the
+ * iOS app supplies GPS coords (primary location source) so the weather widget
+ * and AI can show a human-readable place name. Photon's reverse endpoint is
+ * OSM-backed and key-free, matching the forward geocoder above. Returns
+ * { lat, lon, name, country } or null on failure.
+ */
+async function reverseGeocode(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  try {
+    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const props = data.features?.[0]?.properties || {};
+    const cityName = props.city || props.town || props.village || props.county || props.name || null;
+    return {
+      lat,
+      lon,
+      name: cityName || 'your location',
+      country: props.country || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Derive a human-readable city/region from timezone string.
  * e.g. 'Africa/Johannesburg' → 'Johannesburg, South Africa'
  */
@@ -298,4 +325,4 @@ function getCityFromTimezone(tz) {
   return null;
 }
 
-module.exports = { getWeatherReport, extractLocationFromMessage, geocodeLocation, getCityFromTimezone };
+module.exports = { getWeatherReport, extractLocationFromMessage, geocodeLocation, reverseGeocode, getCityFromTimezone };

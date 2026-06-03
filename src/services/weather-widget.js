@@ -20,7 +20,7 @@
  */
 
 const { callWithFailover } = require('./ai-client');
-const { geocodeLocation } = require('./weather');
+const { geocodeLocation, reverseGeocode } = require('./weather');
 
 const CACHE_TTL_MS = 30 * 60 * 1000;       // 30 min for a good payload
 const NEG_CACHE_TTL_MS = 5 * 60 * 1000;    // 5 min for a failed fetch
@@ -165,29 +165,50 @@ async function generateNote({ householdId, userId, city, label, hi, lo, rain, ev
 /**
  * Build the full widget payload for a household.
  *
+ * Location precedence: device GPS coords (passed from the iOS app, primary)
+ * → household.address (secondary fallback). When neither is available the
+ * payload is { available:false, reason:'no_location' } so the UI can prompt
+ * the user to enable location or add an address.
+ *
  * @param {object} household - { id, address, timezone }
- * @param {object} [opts] - { userId, events } events = today's calendar events
+ * @param {object} [opts] - { userId, events, coords } events = today's calendar
+ *   events; coords = { lat, lon } device location (primary)
  * @returns {Promise<object>} { available, ...weather } | { available:false }
  */
-async function getWeatherWidget(household, { userId, events } = {}) {
+async function getWeatherWidget(household, { userId, events, coords } = {}) {
   if (!household?.id) return { available: false };
 
-  const cached = cache.get(household.id);
+  const hasCoords = coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon);
+  // Cache device-coords payloads by rounded position (so one member's GPS
+  // weather isn't served to another household member on a different device),
+  // and address payloads by household id (the address is shared).
+  const cacheKey = hasCoords
+    ? `c:${coords.lat.toFixed(2)},${coords.lon.toFixed(2)}`
+    : household.id;
+
+  const cached = cache.get(cacheKey);
   if (cached) {
     const ttl = cached.data.available ? CACHE_TTL_MS : NEG_CACHE_TTL_MS;
     if (Date.now() - cached.ts < ttl) return cached.data;
   }
 
-  if (!household.address?.trim()) {
-    const payload = { available: false, reason: 'no_address' };
-    cache.set(household.id, { data: payload, ts: Date.now() });
-    return payload;
-  }
-
-  const loc = await geocodeLocation(household.address.trim());
-  if (!loc) {
-    const payload = { available: false, reason: 'geocode_failed' };
-    cache.set(household.id, { data: payload, ts: Date.now() });
+  // Resolve a location: device coords first (reverse-geocoded for a label),
+  // then the household address.
+  let loc = null;
+  if (hasCoords) {
+    const rev = await reverseGeocode(coords.lat, coords.lon);
+    loc = { lat: coords.lat, lon: coords.lon, name: rev?.name || 'your location', timezone: null };
+  } else if (household.address?.trim()) {
+    loc = await geocodeLocation(household.address.trim());
+    if (!loc) {
+      const payload = { available: false, reason: 'geocode_failed' };
+      cache.set(cacheKey, { data: payload, ts: Date.now() });
+      return payload;
+    }
+  } else {
+    // No device location and no saved address → nothing to show.
+    const payload = { available: false, reason: 'no_location' };
+    cache.set(cacheKey, { data: payload, ts: Date.now() });
     return payload;
   }
 
@@ -198,7 +219,7 @@ async function getWeatherWidget(household, { userId, events } = {}) {
   } catch (err) {
     console.warn(`[weather-widget] fetch failed for household ${household.id}: ${err.message}`);
     const payload = { available: false, reason: 'fetch_failed' };
-    cache.set(household.id, { data: payload, ts: Date.now() });
+    cache.set(cacheKey, { data: payload, ts: Date.now() });
     return payload;
   }
 
@@ -232,7 +253,7 @@ async function getWeatherWidget(household, { userId, events } = {}) {
     note, // null → UI hides the row
     hours: buildHours(data, tz),
   };
-  cache.set(household.id, { data: payload, ts: Date.now() });
+  cache.set(cacheKey, { data: payload, ts: Date.now() });
   return payload;
 }
 

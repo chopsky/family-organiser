@@ -11,13 +11,24 @@ const router = Router();
  * forward forecast, and a context-aware AI note tying the weather to
  * today's calendar.
  *
- * Returns { available: false, reason } when the household has no address
- * set or the upstream is down, so the UI can render nothing cleanly.
+ * Optional ?lat= & ?lon= query params carry the device's GPS location from
+ * the iOS app. When present they're the primary location source; otherwise
+ * the household address is used as a fallback.
+ *
+ * Returns { available: false, reason } when there's no device location and
+ * no address set, or the upstream is down, so the UI can render nothing
+ * cleanly (or prompt the user to enable location).
  */
 router.get('/widget', requireAuth, requireHousehold, async (req, res) => {
   try {
     const household = await db.getHouseholdById(req.householdId);
     if (!household) return res.json({ available: false, reason: 'no_household' });
+
+    // Device GPS coords (primary). Parse defensively — bad params fall back
+    // to the household address rather than erroring.
+    const lat = parseFloat(req.query.lat);
+    const lon = parseFloat(req.query.lon);
+    const coords = (Number.isFinite(lat) && Number.isFinite(lon)) ? { lat, lon } : null;
 
     // Today's calendar events feed the AI note. Scope to the household's
     // local day. Soft-fail to an empty list - the note generator just
@@ -37,7 +48,7 @@ router.get('/widget', requireAuth, requireHousehold, async (req, res) => {
       console.warn('[weather/widget] event fetch failed:', e.message);
     }
 
-    const payload = await getWeatherWidget(household, { userId: req.user.id, events });
+    const payload = await getWeatherWidget(household, { userId: req.user.id, events, coords });
     return res.json(payload);
   } catch (err) {
     console.error('GET /api/weather/widget error:', err);
