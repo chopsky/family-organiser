@@ -63,21 +63,27 @@ async function getPriceCache() {
   const stripe = getStripe();
   const keys = allManagedLookupKeys();
 
-  // Stripe's list endpoint accepts a `lookup_keys[]` array. We expand
-  // the linked Product so debugging in logs is friendlier ("Housemait
-  // Monthly" instead of an opaque prod_xxx ID).
-  const result = await stripe.prices.list({
-    lookup_keys: keys,
-    expand: ['data.product'],
-    limit: 100,
-  });
-
   const byLookupKey = new Map();
   const byPriceId = new Map();
-  for (const price of result.data) {
-    if (!price.lookup_key) continue;
-    byLookupKey.set(price.lookup_key, price.id);
-    byPriceId.set(price.id, price.lookup_key);
+
+  // Stripe's prices.list caps `lookup_keys` at 10 elements, so request in
+  // batches of ≤10 and merge. We currently manage 12 (2 intervals × 6
+  // currencies); passing all 12 at once fails with "Array lookup_keys
+  // exceeded maximum 10 allowed elements" and breaks every checkout.
+  // We expand the linked Product so debugging in logs is friendlier
+  // ("Housemait Monthly" instead of an opaque prod_xxx ID).
+  for (let i = 0; i < keys.length; i += 10) {
+    const batch = keys.slice(i, i + 10);
+    const result = await stripe.prices.list({
+      lookup_keys: batch,
+      expand: ['data.product'],
+      limit: 100,
+    });
+    for (const price of result.data) {
+      if (!price.lookup_key) continue;
+      byLookupKey.set(price.lookup_key, price.id);
+      byPriceId.set(price.id, price.lookup_key);
+    }
   }
 
   _priceCache = { byLookupKey, byPriceId };
