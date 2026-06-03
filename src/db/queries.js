@@ -1592,12 +1592,18 @@ async function completeTasksByName(householdId, taskTitles, assigneeName = null,
     const aLower = aiTitle.toLowerCase();
     // Exact or substring match
     if (tLower.includes(aLower) || aLower.includes(tLower)) return true;
-    // Word overlap: if more than half the significant words match, it's the same task
+    // Word overlap: require at least half of the LONGER title's significant
+    // words to overlap. The denominator is deliberately max(), not min():
+    // with min(), a short query like "Call EUSS" (significant words
+    // "call","euss") gets a threshold of 1, so a single shared generic verb
+    // ("call") matches every "Call …" task - and they all get ticked off.
+    // max() makes a short query cover a real share of the candidate title,
+    // so "Call EUSS" matches "Call EUSS" but not "Call the eye doctor".
     const taskWords = extractWords(taskTitle);
     const aiWords = extractWords(aiTitle);
     if (taskWords.length === 0 || aiWords.length === 0) return false;
     const overlap = taskWords.filter(w => aiWords.some(aw => aw.includes(w) || w.includes(aw)));
-    return overlap.length >= Math.min(taskWords.length, aiWords.length) * 0.5;
+    return overlap.length >= Math.max(taskWords.length, aiWords.length) * 0.5;
   }
 
   let matched = tasks.filter((t) =>
