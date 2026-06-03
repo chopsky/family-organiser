@@ -10,11 +10,15 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
-  IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX,
+  IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
+import { isNative } from '../lib/platform';
+import {
+  getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
+} from '../lib/location';
 
 const avatarColors = {
   red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
@@ -432,13 +436,14 @@ const IOS_SECTIONS = [
   { slug: 'calendars',    title: 'Connect Calendars', icon: 'IconCalendar' },
   { slug: 'emails-to-ai', title: 'Send Emails to AI', icon: 'IconMail' },
   { slug: 'notifications',title: 'Notifications',     icon: 'IconBell' },
+  { slug: 'location',     title: 'Location',          icon: 'IconMapPin' },
   { slug: 'sessions',     title: 'Active sessions',   icon: 'IconShield' },
   { slug: 'data',         title: 'Your data',         icon: 'IconDownload' },
   { slug: 'account',      title: 'Account',           icon: 'IconUser' },
   { slug: 'delete',       title: 'Delete account',    icon: 'IconTrash', danger: true },
 ];
 const IOS_SECTION_ICONS = {
-  IconMessageCircle, IconCalendar, IconMail, IconBell,
+  IconMessageCircle, IconCalendar, IconMail, IconBell, IconMapPin,
   IconShield, IconDownload, IconUser, IconTrash,
 };
 
@@ -555,6 +560,31 @@ export default function Settings() {
   const [notifPrefs, setNotifPrefs] = useState(null);
   const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(true);
   const [savingNotifPref, setSavingNotifPref] = useState(null); // which key is saving
+
+  // Location permission state - drives the Location section. One of
+  // 'granted' | 'denied' | 'prompt' | 'unavailable' | null (still loading).
+  const [locationPerm, setLocationPerm] = useState(null);
+  const [requestingLocation, setRequestingLocation] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getLocationPermission().then((p) => { if (!cancelled) setLocationPerm(p); });
+    return () => { cancelled = true; };
+  }, []);
+  // Re-check on foreground - the user may have toggled the OS permission in
+  // iOS Settings while we were backgrounded.
+  useAppForegroundRefresh(() => {
+    getLocationPermission().then(setLocationPerm);
+  });
+  const handleRequestLocation = async () => {
+    setRequestingLocation(true);
+    try {
+      const result = await requestLocationPermission();
+      clearLocationCache(); // force a fresh fix next time the widget asks
+      setLocationPerm(result);
+    } finally {
+      setRequestingLocation(false);
+    }
+  };
 
   // WhatsApp link state. Phone is now learnt from the inbound webhook
   // (pull-push pairing) rather than entered up front, so no phone/code
@@ -1991,6 +2021,66 @@ export default function Settings() {
             </div>
           </div>
         ) : null}
+      </SectionWrapper>
+
+      {/* Location - device GPS is the primary source for the weather widget
+          and location-aware AI answers; the Family Setup address is the
+          fallback. Lets the user grant, see, or re-enable the permission. */}
+      <SectionWrapper slug="location" title="Location" icon={IconMapPin} accordion>
+        <p className="text-sm text-cocoa">
+          Housemait uses your current location to show local weather on your
+          home screen and to answer questions that depend on where you are.
+          When location is off, it uses your household address from Family
+          Setup instead.
+        </p>
+
+        <div className="mt-4">
+          {locationPerm === null ? (
+            <p className="text-sm text-cocoa">Checking…</p>
+          ) : locationPerm === 'granted' ? (
+            <div className="flex items-center gap-2 rounded-xl border border-cream-border bg-leaf/10 p-3">
+              <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-leaf" aria-hidden="true" />
+              <p className="text-sm text-bark">
+                <span className="font-semibold">Location is on.</span>{' '}
+                Weather and the assistant use your current location.
+                {isNative() && ' You can turn this off in your device Settings.'}
+              </p>
+            </div>
+          ) : locationPerm === 'denied' ? (
+            <div className="rounded-xl border border-cream-border p-3">
+              <p className="text-sm text-bark mb-3">
+                <span className="font-semibold">Location is off.</span>{' '}
+                {isNative()
+                  ? 'Turn it back on in your device Settings to use local weather and location-aware answers.'
+                  : 'Allow location for this site in your browser settings to use local weather and location-aware answers.'}
+              </p>
+              {isNative() && (
+                <button
+                  type="button"
+                  onClick={openLocationSettings}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity"
+                >
+                  Open Settings
+                </button>
+              )}
+            </div>
+          ) : locationPerm === 'unavailable' ? (
+            <p className="text-sm text-cocoa">
+              Location isn't available on this device. Housemait will use your
+              household address from Family Setup instead.
+            </p>
+          ) : (
+            // 'prompt'
+            <button
+              type="button"
+              onClick={handleRequestLocation}
+              disabled={requestingLocation}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {requestingLocation ? 'Requesting…' : 'Use my location'}
+            </button>
+          )}
+        </div>
       </SectionWrapper>
 
       {/* Active sessions - lets users see + revoke live refresh tokens.
