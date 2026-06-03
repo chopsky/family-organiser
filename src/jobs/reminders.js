@@ -1,8 +1,32 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
+const push = require('../services/push');
+const { generateMorningBriefPush } = require('../services/morning-brief');
 const { pickDigestFooter } = require('../utils/whatsapp-tips');
 const { buildDigestWeatherLine } = require('../utils/weather-line');
 const { fetchTodayForecastForHousehold } = require('../services/digest-weather');
+
+/**
+ * Pick the delivery channel for a member's morning brief.
+ *
+ * The brief is ONE notification delivered on the member's best channel:
+ *   - app installed (has device tokens) → iOS push (free, free-form, tappable)
+ *   - otherwise WhatsApp (the legacy path)
+ * If the member has turned the brief off, or has no channel at all, returns
+ * null (skip). Pure + exported for testing.
+ *
+ * @param {object} p
+ * @param {boolean} p.hasDevices     - member has ≥1 active push device token
+ * @param {boolean} p.whatsappLinked - member has WhatsApp linked + a phone
+ * @param {boolean} p.briefDisabled  - member opted out of the daily brief
+ * @returns {'push'|'whatsapp'|null}
+ */
+function chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled }) {
+  if (briefDisabled) return null;
+  if (hasDevices) return 'push';
+  if (whatsappLinked) return 'whatsapp';
+  return null;
+}
 
 // ─── Message builders (pure functions - easy to test) ─────────────────────────
 
@@ -466,17 +490,23 @@ async function sendDailyReminders(householdId, singleMember) {
   const targets = singleMember ? [singleMember] : await db.getHouseholdMembers(householdId);
 
   for (const member of targets) {
-    const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasWhatsApp) {
-      console.log(`[reminders] Skipping ${member.name} - whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
-      continue;
-    }
-    // Per-user opt-out (Settings → Notifications → WhatsApp). Default
-    // true: a null row, missing column, or any non-false value all
-    // mean "send". Only an explicit false skips.
+    // Per-user opt-out (Settings → Notifications). whatsapp_daily_reminder is
+    // the channel-agnostic master switch for the morning brief: default true
+    // (a null row, missing column, or any non-false value all mean "send");
+    // only an explicit false turns it off.
     const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
-    if (prefs && prefs.whatsapp_daily_reminder === false) {
-      console.log(`[reminders] Skipping ${member.name} - daily reminder disabled by user pref`);
+    const briefDisabled = !!(prefs && prefs.whatsapp_daily_reminder === false);
+    const whatsappLinked = !!(member.whatsapp_linked && member.whatsapp_phone);
+
+    // App installed? = has ≥1 active push device token. App users get the
+    // richer push brief; everyone else falls back to the WhatsApp digest.
+    let deviceTokens = [];
+    try { deviceTokens = (await db.getActiveDeviceTokens(member.id)) || []; } catch { deviceTokens = []; }
+    const hasDevices = deviceTokens.length > 0;
+
+    const channel = chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled });
+    if (!channel) {
+      console.log(`[reminders] Skipping ${member.name} - no channel (devices=${hasDevices}, whatsapp=${whatsappLinked}, disabled=${briefDisabled})`);
       continue;
     }
 
@@ -516,6 +546,37 @@ async function sendDailyReminders(householdId, singleMember) {
       taskReminders,
       billReminders,
     };
+    // ── Push channel (app installed): warm, LLM-generated copy that varies
+    // each day, free of WhatsApp's rigid template rules. Reuses the exact
+    // same digest data (parts.body) as the source, rewritten conversationally.
+    if (channel === 'push') {
+      const parts = buildDailyReminderParts(member, buildOpts);
+      const { title, body } = await generateMorningBriefPush(
+        {
+          name: parts.name,
+          weekday: parts.weekday,
+          summary: parts.body,
+          counts: {
+            eventCount: todayEvents.length,
+            taskCount: taskReminders.length,
+            billCount: billReminders.length,
+          },
+        },
+        { householdId, userId: member.id },
+      );
+      try {
+        const result = await push.sendPushNotification(
+          deviceTokens.map((t) => t.token),
+          { title, body, data: { type: 'morning_brief' } },
+        );
+        console.log(`[reminders] Morning brief push → ${member.name}: sent=${result.sent} failed=${result.failed}`);
+      } catch (err) {
+        console.error(`Failed to send morning brief push to ${member.name}:`, err.message);
+      }
+      continue;
+    }
+
+    // ── WhatsApp channel (no app installed): the legacy digest ──
     const message = buildDailyReminderMessage(member, buildOpts);
 
     // Send via WhatsApp. Prefer the approved Content Template path when
@@ -581,5 +642,6 @@ module.exports = {
   buildDailyReminderMessage,
   buildDailyReminderParts,
   buildDailyReminderTemplateVars,
+  chooseDailyBriefChannel,
   sendDailyReminders,
 };

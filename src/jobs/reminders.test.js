@@ -2,7 +2,7 @@
 jest.mock('../db/queries');
 jest.mock('../db/client', () => ({ supabase: { from: jest.fn() } }));
 
-const { buildDailyReminderMessage } = require('./reminders');
+const { buildDailyReminderMessage, chooseDailyBriefChannel } = require('./reminders');
 
 const SARAH = { id: 'u1', name: 'Sarah' };
 
@@ -156,5 +156,25 @@ describe('buildDailyReminderMessage()', () => {
   test('omits the Reminders block entirely when no tasks or bills due', () => {
     const msg = buildDailyReminderMessage(SARAH, {});
     expect(msg).not.toContain('Reminders');
+  });
+});
+
+describe('chooseDailyBriefChannel()', () => {
+  test('prefers push when the app is installed (even if WhatsApp is also linked)', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false })).toBe('push');
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: false, briefDisabled: false })).toBe('push');
+  });
+
+  test('falls back to WhatsApp when there is no app but WhatsApp is linked', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: true, briefDisabled: false })).toBe('whatsapp');
+  });
+
+  test('returns null when the member has opted out, regardless of channels', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: true })).toBeNull();
+    expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: true, briefDisabled: true })).toBeNull();
+  });
+
+  test('returns null when there is no channel at all', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: false, briefDisabled: false })).toBeNull();
   });
 });
