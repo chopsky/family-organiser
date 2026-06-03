@@ -237,13 +237,25 @@ async function deliver(deviceToken, payload) {
     if (i === 0 && !isEnvironmentMismatch(res.reason)) break;
   }
 
-  // App uninstalled → APNs returns 410 Unregistered. Prune the dead token so
-  // it stops failing every send.
-  if (last && (last.status === 410 || /Unregistered/i.test(last.reason || ''))) {
+  // Prune confirmed-dead tokens so they stop failing on every send (and stop
+  // inflating the user's device count). Two cases, both terminal here:
+  //   • 410 Unregistered  - the app was deleted from the device.
+  //   • BadDeviceToken    - stale token from a past install / rebuild / OS
+  //     token rotation. Safe to prune because deliver() already retried BOTH
+  //     environments above, so this token is invalid in production AND
+  //     sandbox - not a recoverable environment mismatch.
+  // NOTE: we deliberately do NOT prune on DeviceTokenNotForTopic or other
+  // reasons, which would indicate a server-side misconfig affecting every
+  // token rather than a dead device.
+  const isDead = last && (
+    last.status === 410
+    || /Unregistered|BadDeviceToken/i.test(last.reason || '')
+  );
+  if (isDead) {
     try {
       await db.unregisterDeviceToken(deviceToken);
       tokenEnvCache.delete(deviceToken);
-      console.log('[push] Pruned unregistered token', `${deviceToken.slice(0, 8)}...`);
+      console.log('[push] Pruned dead token', `${deviceToken.slice(0, 8)}...`, `(${last.status} ${last.reason})`);
     } catch { /* best-effort */ }
   } else if (last && !last.success) {
     console.error('[push] APNs failed for token', `${deviceToken.slice(0, 8)}...`, '- status:', last.status, last.reason);
