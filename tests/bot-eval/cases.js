@@ -35,6 +35,8 @@ module.exports = [
       const c = completions(r);
       if (c.length !== 1) return `expected 1 completion, got ${c.length} (${c.map((x) => x.title).join(' | ')})`;
       if (!/euss/i.test(c[0].title || '')) return `expected EUSS, got "${c[0].title}"`;
+      // Phase 2: the model must ground on the [1] reference number for EUSS.
+      if (Number(c[0].task_id) !== 1) return `expected task_id 1 (EUSS), got ${c[0].task_id}`;
       return null;
     },
   },
@@ -53,6 +55,7 @@ module.exports = [
       const c = completions(r);
       if (c.length !== 1) return `expected 1 completion, got ${c.length}`;
       if (!/mallorca|dinner/i.test(c[0].title || '')) return `wrong task: "${c[0].title}"`;
+      if (Number(c[0].task_id) !== 1) return `expected task_id 1, got ${c[0].task_id}`;
       return null;
     },
   },

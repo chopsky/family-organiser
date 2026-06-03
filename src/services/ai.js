@@ -93,12 +93,16 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   // up the prompt for busy households.
   const cappedTasks = tasks.slice(0, 50);
   const tasksStr = cappedTasks.length > 0
-    ? cappedTasks.map(t => {
+    ? cappedTasks.map((t, i) => {
         const due = t.due_date
           ? new Date(`${t.due_date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: userTz })
           : 'no due date';
         const priority = t.priority && t.priority !== 'medium' ? ` [${t.priority}]` : '';
-        return `- "${t.title}"${formatWho(t)} - due ${due}${priority}`;
+        // The leading [N] is the task's reference number. When the user
+        // completes a task, the model returns that number as task_id and we
+        // complete THAT exact task by id - no fuzzy re-matching (which used
+        // to tick off every "Call …" task for a single "I called EUSS").
+        return `[${i + 1}] "${t.title}"${formatWho(t)} - due ${due}${priority}`;
       }).join('\n') + (tasks.length > 50 ? `\n... and ${tasks.length - 50} more tasks` : '')
     : '(no open tasks)';
 

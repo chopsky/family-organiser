@@ -191,12 +191,13 @@ TASK COMPLETION SIGNALS:
 - BEFORE adding a new task, check the OPEN TASKS list above. If the user is reporting that they DID something that matches an existing open task, treat it as a completion ("remove" intent for shopping, task with action: "complete" for tasks), NOT as a new task.
 - Past-tense statements, done/finished/paid/sorted/booked language, and casual "got the X" phrasing are completion signals - not new-task creation.
 - Match semantically, not literally. "Elementor paid" matches "Pay Elementor". "Kids fetched" matches "Fetch kids from school". "Car booked in" matches "Book car service". Be generous with fuzzy matching as long as the topic is clearly the same.
-- When you detect a completion, set the task's title to the EXACT title from the OPEN TASKS list (so the handler can find it), set action: "complete", and keep response_message short and natural ("Great, I've ticked off Pay Elementor. ✅").
-- Examples (assume these tasks exist in OPEN TASKS):
-  ✓ User: "Elementor paid" → intent: remove, tasks: [{ title: "Pay Elementor", action: "complete" }]
-  ✓ User: "Homework done" (task "Finish homework" exists) → tasks: [{ title: "Finish homework", action: "complete" }]
+- When you detect a completion, set action: "complete" AND set task_id to the [N] reference number shown in front of the matching task in OPEN TASKS - this is how the handler ticks off the EXACT task you mean. Also set title to that task's exact title (for the reply wording). Keep response_message short and natural ("Great, I've ticked off Pay Elementor. ✅").
+- Complete ONLY the task(s) the user actually reported done. One reported completion = one task_id. NEVER complete several tasks because they share a word (e.g. a single "I called EUSS" must complete only the EUSS task, not every "Call …" task).
+- Examples (assume these tasks exist in OPEN TASKS, with the [N] numbers shown):
+  ✓ OPEN TASKS has [4] "Pay Elementor". User: "Elementor paid" → tasks: [{ title: "Pay Elementor", task_id: 4, action: "complete" }]
+  ✓ OPEN TASKS has [2] "Finish homework". User: "Homework done" → tasks: [{ title: "Finish homework", task_id: 2, action: "complete" }]
   ✓ User: "Got the milk" (shopping item "milk" exists) → intent: remove, shopping_items: [{ item: "milk", action: "remove" }]
-  ✓ User: "Booked the car service" (task "Book car service" exists) → tasks: [{ title: "Book car service", action: "complete" }]
+  ✓ OPEN TASKS has [7] "Book car service". User: "Booked the car service" → tasks: [{ title: "Book car service", task_id: 7, action: "complete" }]
 - If there is NO matching task, fall through to normal handling (chat reply, or add as a new task only if the user explicitly asked to add one).
 - Do NOT over-match. "I need to pay Elementor" (future intent) is NOT a completion - it's a chat/ack. Only treat it as a completion when the user is reporting the thing is already DONE.
 
@@ -358,6 +359,7 @@ Respond only with valid JSON matching this schema:
   "tasks": [
     {
       "title": string,
+      "task_id": number | null,
       "assigned_to_names": string[],
       "due_date": string,
       "recurrence": "daily" | "weekly" | "biweekly" | "monthly" | "yearly" | null,

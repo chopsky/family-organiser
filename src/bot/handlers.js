@@ -1568,14 +1568,37 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       const completionAssignee = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length > 0
         ? t.assigned_to_names[0]
         : t.assigned_to_name;
-      const done = await db.completeTasksByName(household.id, [t.title], completionAssignee);
+
+      let done = [];
+      // ID grounding (phase 2): the classifier returns task_id = the [N]
+      // reference number shown next to the task in OPEN TASKS. We complete
+      // THAT exact task by id - no fuzzy re-matching, which is what ticked
+      // off every "Call …" task for a single "I called EUSS". openTasks is
+      // the same household-scoped list (same order) we handed the model, so
+      // the index→row mapping is exact, and the bounds check guards a
+      // hallucinated number.
+      const ref = Number(t.task_id);
+      if (Number.isInteger(ref) && ref >= 1 && ref <= openTasks.length) {
+        const chosen = openTasks[ref - 1];
+        if (chosen && !chosen.completed) {
+          const row = await db.completeTask(chosen.id).catch(() => null);
+          if (row) done = [row];
+        }
+      }
+      // Fallback: only when the model gave no usable id (older payloads /
+      // beyond the 50-task cap). Name matching is now max()-guarded so it
+      // no longer over-matches short titles.
+      if (done.length === 0) {
+        done = await db.completeTasksByName(household.id, [t.title], completionAssignee);
+      }
+
       if (done.length === 0) {
         // Nothing actually got ticked. Track the requested title so we
         // can correct the AI's (overconfident) response message below.
         unmatchedCompletions.push(t.title);
         continue;
       }
-      // Push the ACTUAL matched titles so actions mirror reality -
+      // Push the ACTUAL completed titles so actions mirror reality -
       // important for the broadcast notification other members see.
       actions.tasksCompleted.push(...done.map((d) => d.title));
       for (const completedTask of done) {

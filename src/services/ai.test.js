@@ -8,6 +8,24 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const { classify, scanReceipt, matchReceiptToList, parseJSON } = require('./ai');
 
+// These tests mock ONLY the Anthropic SDK and assert against the Claude call.
+// callWithFailover prefers Gemini (then GPT) when those keys are present, so a
+// real GEMINI_API_KEY / OPENAI_API_KEY in the environment (e.g. set for the
+// bot eval) would route to a live, unmocked provider and break every
+// assertion. Clear those keys for the duration of this suite so the mocked
+// Claude path is always used; restore them afterwards.
+const _AI_KEYS = ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY', 'OPENAI_API_KEY'];
+const _savedAiKeys = {};
+beforeAll(() => {
+  for (const k of _AI_KEYS) { _savedAiKeys[k] = process.env[k]; delete process.env[k]; }
+});
+afterAll(() => {
+  for (const k of _AI_KEYS) {
+    if (_savedAiKeys[k] === undefined) delete process.env[k];
+    else process.env[k] = _savedAiKeys[k];
+  }
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a mock stream that resolves to a message with a single text block. */
