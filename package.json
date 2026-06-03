@@ -12,7 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:verbose": "jest --verbose",
-    "eval:emails": "node tests/email-eval/run.js"
+    "eval:emails": "node tests/email-eval/run.js",
+    "eval:bot": "node tests/bot-eval/run.js"
   },
   "keywords": [],
   "author": "",
