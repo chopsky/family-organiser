@@ -31,16 +31,13 @@ export default function SubscribeCancel() {
     <div className="min-h-screen bg-cream px-4 py-8 md:py-12 flex flex-col items-center">
       <div className="my-auto w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-[0_4px_16px_rgba(107,63,160,0.08)] border border-cream-border p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-plum-light flex items-center justify-center mx-auto mb-5">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {/* House icon - "nothing's changed, you're still home" */}
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </div>
+          {/* Housemait logomark - matches /login + /signup. The house
+              metaphor here ("nothing's changed, you're still home") still
+              lands because the brand mark itself is a house. */}
+          <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-5" />
           <h1
             className="text-[28px] text-charcoal mb-2"
-            style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 600, letterSpacing: '-0.02em' }}
+            style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, letterSpacing: '-0.02em' }}
           >
             No worries - you're still good
           </h1>
