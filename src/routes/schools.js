@@ -416,7 +416,7 @@ router.delete('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdm
  * Add a weekly activity for a child.
  */
 router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { child_id, day_of_week, activity, time_start, time_end, reminder_text, pickup_member_id } = req.body;
+  const { child_id, day_of_week, activity, time_start, time_end, reminder_text, pickup_member_id, start_date, end_date, term_label } = req.body;
 
   if (!child_id || day_of_week === undefined || !activity?.trim()) {
     return res.status(400).json({ error: 'child_id, day_of_week, and activity are required.' });
@@ -435,6 +435,9 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
       time_end: time_end || null,
       reminder_text: reminder_text || null,
       pickup_member_id: pickup_member_id || null,
+      start_date: start_date || null,
+      end_date: end_date || null,
+      term_label: term_label || null,
     });
     cache.invalidate(`schools:${req.householdId}`);
     return res.status(201).json({ activity: created });
@@ -464,6 +467,9 @@ router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAd
     if (time_end !== undefined) fields.time_end = time_end || null;
     // Use 'in' so an explicit null clears the pickup person.
     if ('pickup_member_id' in req.body) fields.pickup_member_id = pickup_member_id || null;
+    if ('start_date' in req.body) fields.start_date = req.body.start_date || null;
+    if ('end_date' in req.body) fields.end_date = req.body.end_date || null;
+    if ('term_label' in req.body) fields.term_label = req.body.term_label || null;
     const updated = await db.updateChildActivity(req.params.activityId, fields);
     cache.invalidate(`schools:${req.householdId}`);
     return res.json({ activity: updated });
@@ -483,6 +489,26 @@ router.get('/activities/:childId', requireAuth, requireHousehold, async (req, re
     return res.json({ activities });
   } catch (err) {
     console.error('GET /api/schools/activities/:childId error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/schools/terms/:childId
+ * The child's school terms (derived from imported term dates), so the weekly-
+ * activities UI can offer real terms with auto-filled date windows. Returns
+ * [] when the child has no school or no term dates yet (UI falls back to
+ * custom dates). Each term: { label, academic_year, start_date, end_date }.
+ */
+router.get('/terms/:childId', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const child = await db.getUserByIdAdmin(req.params.childId);
+    if (!child || !child.school_id) return res.json({ terms: [] });
+    const { getSchoolTerms } = require('../utils/school-terms');
+    const terms = await getSchoolTerms(child.school_id);
+    return res.json({ terms });
+  } catch (err) {
+    console.error('GET /api/schools/terms/:childId error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

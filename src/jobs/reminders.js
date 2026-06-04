@@ -525,12 +525,15 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
 
         for (const child of dependents) {
           // Check if today is during term time for this child's school
-          const { isSchoolInSession } = require('../utils/school-terms');
+          const { isSchoolInSession, activityActiveOn } = require('../utils/school-terms');
           const inSession = await isSchoolInSession(child.school_id, todayStr);
           if (!inSession) continue; // Skip - school holiday, inset day, half term, etc.
 
           const activities = await db.getChildActivities(child.id);
-          const todayActivities = activities.filter(a => a.day_of_week === dayOfWeek && a.term_only !== false);
+          // Honour the activity's term window: an activity only shows when
+          // today falls inside [start_date, end_date] (NULL dates = ongoing).
+          const todayActivities = activities.filter(a =>
+            a.day_of_week === dayOfWeek && a.term_only !== false && activityActiveOn(a, todayStr));
           for (const act of todayActivities) {
             schoolActivities.push({ ...act, child_name: child.name });
           }

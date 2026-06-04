@@ -916,6 +916,9 @@ async function addChildActivity(data, db = supabase) {
       reminder_offset: data.reminder_offset || 'morning_of',
       term_only: data.term_only !== false,
       pickup_member_id: data.pickup_member_id || null,
+      start_date: data.start_date || null,
+      end_date: data.end_date || null,
+      term_label: data.term_label || null,
     })
     .select()
     .single();
@@ -934,6 +937,9 @@ async function updateChildActivity(activityId, fields, db = supabase) {
   if (fields.time_end !== undefined) patch.time_end = fields.time_end || null;
   if (fields.time_start !== undefined) patch.time_start = fields.time_start || null;
   if ('pickup_member_id' in fields) patch.pickup_member_id = fields.pickup_member_id || null;
+  if ('start_date' in fields) patch.start_date = fields.start_date || null;
+  if ('end_date' in fields) patch.end_date = fields.end_date || null;
+  if ('term_label' in fields) patch.term_label = fields.term_label || null;
   const { data: activity, error } = await db
     .from('child_weekly_schedule')
     .update(patch)

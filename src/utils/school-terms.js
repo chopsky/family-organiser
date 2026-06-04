@@ -54,4 +54,83 @@ async function isSchoolInSession(schoolId, dateStr) {
   }
 }
 
-module.exports = { isSchoolInSession };
+/** UK season label from a YYYY-MM-DD start date. */
+function seasonLabel(dateStr) {
+  const month = Number(String(dateStr).slice(5, 7));
+  if (month >= 9) return 'Autumn Term';
+  if (month <= 4) return 'Spring Term';
+  return 'Summer Term';
+}
+
+/**
+ * Derive discrete terms from raw school_term_dates rows by pairing each
+ * term_start with the next term_end within the same academic year. Pure (no
+ * DB) so it's easy to test. Returns terms sorted by start, each:
+ *   { label, academic_year, start_date, end_date }
+ * `label` prefers the source row's own label, else "<Season> Term <year>".
+ *
+ * @param {Array} termDates - school_term_dates rows
+ * @returns {Array<{label,academic_year,start_date,end_date}>}
+ */
+function deriveTerms(termDates = []) {
+  const byYear = new Map();
+  for (const td of termDates) {
+    if (td.event_type !== 'term_start' && td.event_type !== 'term_end') continue;
+    const yr = td.academic_year || '';
+    if (!byYear.has(yr)) byYear.set(yr, { starts: [], ends: [] });
+    (td.event_type === 'term_start' ? byYear.get(yr).starts : byYear.get(yr).ends).push(td);
+  }
+
+  const terms = [];
+  for (const [yr, { starts, ends }] of byYear) {
+    starts.sort((a, b) => a.date.localeCompare(b.date));
+    ends.sort((a, b) => a.date.localeCompare(b.date));
+    for (let i = 0; i < starts.length; i++) {
+      const s = starts[i];
+      const e = ends[i];
+      if (!e) continue; // unpaired start - skip rather than guess an end
+      const label = (s.label && s.label.trim())
+        ? s.label.trim()
+        : `${seasonLabel(s.date)}${yr ? ` ${yr}` : ''}`;
+      terms.push({ label, academic_year: yr, start_date: s.date, end_date: e.date });
+    }
+  }
+  return terms.sort((a, b) => a.start_date.localeCompare(b.start_date));
+}
+
+/** The term whose window contains dateStr, or null. */
+function currentTerm(terms = [], dateStr) {
+  return terms.find((t) => dateStr >= t.start_date && dateStr <= t.end_date) || null;
+}
+
+/**
+ * Is a weekly activity active on a given date? An activity with no window
+ * (start_date and end_date both null) is "ongoing" and always active;
+ * otherwise the date must fall within [start_date, end_date].
+ */
+function activityActiveOn(activity, dateStr) {
+  if (!activity) return false;
+  if (activity.start_date && dateStr < activity.start_date) return false;
+  if (activity.end_date && dateStr > activity.end_date) return false;
+  return true;
+}
+
+/** Fetch + derive the terms for a school. */
+async function getSchoolTerms(schoolId) {
+  try {
+    const rows = await db.getSchoolTermDates(schoolId);
+    return deriveTerms(rows || []);
+  } catch (err) {
+    console.error(`[school-terms] getSchoolTerms failed for ${schoolId}:`, err.message);
+    return [];
+  }
+}
+
+module.exports = {
+  isSchoolInSession,
+  deriveTerms,
+  currentTerm,
+  activityActiveOn,
+  getSchoolTerms,
+  seasonLabel,
+};

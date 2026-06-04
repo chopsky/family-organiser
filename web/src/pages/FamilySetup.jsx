@@ -12,6 +12,21 @@ import { pickPhoto } from '../lib/photo-picker';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
+// ── Term-aware weekly activities helpers ──
+const todayYmd = () => new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
+const isOngoingActivity = (a) => !a.start_date && !a.end_date;
+// Does an activity's window overlap a term's window? (ongoing always does)
+function activityInTerm(a, term) {
+  if (isOngoingActivity(a)) return true;
+  if (a.end_date && a.end_date < term.start_date) return false;
+  if (a.start_date && a.start_date > term.end_date) return false;
+  return true;
+}
+const fmtTermRange = (t) => {
+  const f = (d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${f(t.start_date)} – ${f(t.end_date)}`;
+};
+
 const COLOUR_OPTIONS = [
   { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
   { key: 'burnt-orange',  bg: 'bg-burnt-orange',  ring: 'ring-burnt-orange' },
@@ -233,6 +248,12 @@ export default function FamilySetup() {
   const [addActivityName, setAddActivityName] = useState('');
   const [addActivityEnd, setAddActivityEnd] = useState('');
   const [addActivityPickup, setAddActivityPickup] = useState(''); // member id or ''
+  // Term-aware activities: the child's school terms, which term the grid is
+  // showing (a term label | 'ongoing' | 'custom'), and custom-window inputs.
+  const [activityTerms, setActivityTerms] = useState([]);
+  const [selectedTermKey, setSelectedTermKey] = useState('ongoing');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null); // activity being edited, or null = add mode
   const [savingActivity, setSavingActivity] = useState(false);
@@ -540,6 +561,17 @@ export default function FamilySetup() {
         .then(({ data }) => setEditActivities(data.activities || []))
         .catch(() => setEditActivities([]))
         .finally(() => setLoadingActivities(false));
+      // Load the child's school terms so the grid can default to the current
+      // term and offer real terms when adding. Falls back to 'ongoing'.
+      api.get(`/schools/terms/${member.id}`)
+        .then(({ data }) => {
+          const terms = data.terms || [];
+          setActivityTerms(terms);
+          const today = todayYmd();
+          const cur = terms.find(t => today >= t.start_date && today <= t.end_date);
+          setSelectedTermKey(cur ? cur.label : 'ongoing');
+        })
+        .catch(() => { setActivityTerms([]); setSelectedTermKey('ongoing'); });
       api.get(`/schools/${member.school_id}/term-dates`)
         .then(({ data }) => setEditTermDates(data.term_dates || []))
         .catch(() => setEditTermDates([]));
@@ -557,6 +589,8 @@ export default function FamilySetup() {
     setAddActivityName('');
     setAddActivityEnd('');
     setAddActivityPickup('');
+    setCustomStart('');
+    setCustomEnd('');
     setShowAddActivity(true);
   }
 
@@ -575,6 +609,16 @@ export default function FamilySetup() {
     setEditingActivity(null);
   }
 
+  // Which activities the grid shows for the currently-selected term view.
+  // Ongoing activities (no window) show in every term view.
+  function activityInSelectedTerm(a) {
+    if (selectedTermKey === 'ongoing') return isOngoingActivity(a);
+    if (selectedTermKey === 'custom') return true; // manage everything
+    const t = activityTerms.find(x => x.label === selectedTermKey);
+    if (!t) return true;
+    return activityInTerm(a, t);
+  }
+
   // Handles both add (POST) and edit (PATCH) depending on editingActivity.
   async function handleAddActivity() {
     if (!addActivityName.trim() || !editingMember) return;
@@ -586,6 +630,20 @@ export default function FamilySetup() {
         time_end: addActivityEnd || null,
         pickup_member_id: addActivityPickup || null,
       };
+      // New activities inherit the selected term's window so they only show
+      // that term (and next term can be prepared without touching this one).
+      // Edits preserve the activity's existing window (the grid selector is a
+      // view control, not a per-activity move).
+      if (!editingActivity) {
+        const termObj = activityTerms.find(t => t.label === selectedTermKey) || null;
+        if (selectedTermKey === 'custom') {
+          Object.assign(body, { start_date: customStart || null, end_date: customEnd || null, term_label: null });
+        } else if (termObj) {
+          Object.assign(body, { start_date: termObj.start_date, end_date: termObj.end_date, term_label: termObj.label });
+        } else {
+          Object.assign(body, { start_date: null, end_date: null, term_label: null });
+        }
+      }
       if (editingActivity) {
         const { data } = await api.patch(`/schools/activities/${editingActivity.id}`, body);
         setEditActivities(prev => prev.map(a => (a.id === editingActivity.id ? data.activity : a)));
@@ -3140,13 +3198,37 @@ export default function FamilySetup() {
               {editingMember?.school_id && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-plum">Weekly activities</h3>
-                  <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule during term time. Tap an activity to edit it.</p>
+                  <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule. Pick a term to view or set it up - you can prepare next term without changing this one. Tap an activity to edit it.</p>
+
+                  {/* Term selector: real school terms (default the current one),
+                      plus Ongoing (every term) and Custom dates. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs text-cocoa font-medium">Term:</label>
+                    <select
+                      value={selectedTermKey}
+                      onChange={(e) => setSelectedTermKey(e.target.value)}
+                      className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white"
+                    >
+                      {activityTerms.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
+                      <option value="ongoing">Ongoing (every term)</option>
+                      <option value="custom">Custom dates…</option>
+                    </select>
+                    {(() => {
+                      const t = activityTerms.find(x => x.label === selectedTermKey);
+                      return t ? <span className="text-[11px] text-cocoa">{fmtTermRange(t)}</span> : null;
+                    })()}
+                  </div>
+                  {activityTerms.length === 0 && (
+                    <p className="text-[11px] text-cocoa">
+                      Tip: import this school&apos;s term dates (below) and we&apos;ll offer real terms here automatically.
+                    </p>
+                  )}
 
                   {loadingActivities ? <Spinner /> : (
                     <>
                       <div className="grid grid-cols-5 gap-1.5 mt-2">
                         {DAY_LABELS.map((day, idx) => {
-                          const dayActivities = editActivities.filter(a => a.day_of_week === idx);
+                          const dayActivities = editActivities.filter(a => a.day_of_week === idx && activityInSelectedTerm(a));
                           return (
                             <div key={day} className="text-center">
                               <div className="text-[11px] font-semibold text-cocoa mb-1">{day}</div>
@@ -3197,6 +3279,25 @@ export default function FamilySetup() {
                             <label className="text-xs text-cocoa">Ends at:</label>
                             <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
                           </div>
+
+                          {/* Term window for NEW activities. Edits keep their
+                              existing window, so this only shows when adding. */}
+                          {!editingActivity && selectedTermKey === 'custom' && (
+                            <div className="flex gap-2 items-center flex-wrap">
+                              <label className="text-xs text-cocoa">Runs:</label>
+                              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                              <span className="text-xs text-cocoa">to</span>
+                              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                            </div>
+                          )}
+                          {!editingActivity && selectedTermKey !== 'custom' && (
+                            <p className="text-[11px] text-cocoa">
+                              {selectedTermKey === 'ongoing'
+                                ? 'Will show every term, until you remove it.'
+                                : `Will be set for ${selectedTermKey} only.`}
+                            </p>
+                          )}
+
                           <div className="flex gap-2 items-center">
                             <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
                             <select
