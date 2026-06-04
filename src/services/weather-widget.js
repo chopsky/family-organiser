@@ -138,7 +138,8 @@ async function generateNote({ householdId, userId, city, label, hi, lo, rain, ev
     const system = 'You write a single short weather nudge for a family home screen. '
       + 'ONE sentence, 10 words or fewer, plain and actionable. Reference a specific '
       + 'event by name ONLY if the weather is relevant to it (rain before an outdoor '
-      + 'event, warmth for a park trip, etc.). British spelling. No emoji. No quotes. '
+      + 'event, warmth for a park trip, etc.). British spelling is fine, but plain '
+      + 'words only - no regional slang ("umbrella", not "brolly"). No emoji. No quotes. '
       + 'If the weather is unremarkable for the day\'s events, reply with the single '
       + 'word SKIP and nothing else.';
     const user = `Weather in ${city}: ${label}, high ${hi}°C, low ${lo}°C, ${rain}% chance of rain.\n`
