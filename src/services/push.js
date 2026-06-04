@@ -270,18 +270,25 @@ async function deliver(deviceToken, payload) {
  * self-test only. Returns { success, env, status, reason }.
  */
 async function deliverDiagnostic(deviceToken, payload) {
-  if (!configured) return { success: false, reason: 'APNs not configured on the server' };
+  if (!configured) return { success: false, reason: 'APNs not configured on the server', attempts: [] };
   const order = [PRIMARY_ENV, FALLBACK_ENV];
+  const attempts = [];
   let last = null;
   for (let i = 0; i < order.length; i++) {
     const env = order[i];
     // eslint-disable-next-line no-await-in-loop
     const res = await sendOne(deviceToken, payload, APN_HOSTS[env]);
-    if (res.success) return { success: true, env, status: 200 };
+    attempts.push({
+      env,
+      ok: !!res.success,
+      status: res.success ? 200 : (res.status || null),
+      reason: res.reason || null,
+    });
+    if (res.success) return { success: true, env, status: 200, attempts };
     last = { success: false, env, status: res.status, reason: res.reason };
     if (i === 0 && !isEnvironmentMismatch(res.reason)) break;
   }
-  return last || { success: false };
+  return { ...(last || { success: false }), attempts };
 }
 
 // ---------------------------------------------------------------------------

@@ -618,7 +618,9 @@ router.post('/tools/push-selftest', async (req, res) => {
     if (!push.isConfigured()) {
       return res.json({ configured: false, results: [] });
     }
-    const tokens = await db.getActiveDeviceTokens(req.user.id);
+    // Test ALL tokens (active AND inactive) so a recently-pruned live token
+    // is included - that's often the real device. Diagnostic never prunes.
+    const tokens = await db.getDeviceTokensForUserAdmin(req.user.id);
     const payload = {
       aps: {
         alert: {
@@ -634,13 +636,19 @@ router.post('/tools/push-selftest', async (req, res) => {
       return {
         tokenMasked: t.token ? `${t.token.slice(0, 8)}…${t.token.slice(-4)}` : null,
         updated_at: t.updated_at,
+        active: t.active,
         success: !!r.success,
         env: r.env || null,
         status: r.status || null,
         reason: r.reason || null,
+        // Per-environment attempt trail: e.g. production ✗ BadDeviceToken → sandbox ✓
+        attempts: r.attempts || [],
       };
     }));
-    return res.json({ configured: true, count: results.length, results });
+    // Surface which environment the server tries first, so we can confirm
+    // APN_PRODUCTION is actually taking effect.
+    const primaryEnv = results.find((x) => x.attempts.length)?.attempts[0]?.env || null;
+    return res.json({ configured: true, count: results.length, primaryEnv, results });
   } catch (err) {
     console.error('POST /api/admin/tools/push-selftest error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });

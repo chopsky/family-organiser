@@ -213,18 +213,29 @@ export default function AdminWhatsApp() {
             ) : (
               <>
                 <p className="text-xs text-warm-grey mb-2">
-                  Self-test result per token. A <span className="text-sage font-medium">delivered</span> on your live (most-recent) token + no banner = an iOS display setting (Focus / Scheduled Summary / banner style). A <span className="text-coral font-medium">failed</span> on the live token = a real delivery problem (see the reason).
+                  Self-test result per token (active + inactive). The <strong>attempts</strong> column shows each APNs environment my server tried and what it returned.
+                  {selftest.primaryEnv && <> Server tries <span className="font-medium text-charcoal">{selftest.primaryEnv}</span> first.</>}
                 </p>
                 <div className="space-y-1">
                   {selftest.results.map((r) => (
-                    <div key={r.tokenMasked} className="flex items-center justify-between gap-3 text-xs py-1">
+                    <div key={r.tokenMasked} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs py-1.5 border-b border-light-grey/40">
                       <span className="font-mono text-charcoal">{r.tokenMasked}</span>
+                      <span className={r.active ? 'text-sage' : 'text-warm-grey'}>{r.active ? 'active' : 'inactive'}</span>
                       <span className="text-warm-grey">{fmtWhen(r.updated_at)}</span>
-                      {r.success ? (
-                        <span className="text-sage font-medium shrink-0">delivered via {r.env}</span>
-                      ) : (
-                        <span className="text-coral font-medium shrink-0">failed{r.reason ? ` — ${r.reason}` : ''}</span>
-                      )}
+                      {/* attempt trail: production ✗ BadDeviceToken → sandbox ✓ */}
+                      <span className="text-warm-grey">
+                        {(r.attempts || []).map((a, i) => (
+                          <span key={a.env}>
+                            {i > 0 && ' → '}
+                            <span className={a.ok ? 'text-sage font-medium' : 'text-coral'}>
+                              {a.env} {a.ok ? '✓' : `✗${a.reason ? ` ${a.reason.replace(/[{}"]/g, '').replace('reason:', '')}` : ''}`}
+                            </span>
+                          </span>
+                        ))}
+                      </span>
+                      {r.success
+                        ? <span className="text-sage font-medium shrink-0 ml-auto">delivered via {r.env}</span>
+                        : <span className="text-coral font-medium shrink-0 ml-auto">failed</span>}
                     </div>
                   ))}
                 </div>
