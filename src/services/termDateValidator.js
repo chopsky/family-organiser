@@ -142,12 +142,43 @@ function checkSaneWindow(row, now) {
   }
 }
 
+// Aggressive normalisation for fuzzy presence checks: lowercase, unify dash
+// variants, expand &, drop remaining punctuation, collapse whitespace. So
+// "Rosh Hashana – Early Finish (1.05)" and "rosh hashana - early finish 1 05"
+// compare as the same word stream.
+function normaliseForMatch(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[‐-―−]/g, '-')        // – — etc -> hyphen
+    .replace(/[‘’“”]/g, "'")   // smart quotes
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function checkSourceQuotePresent(row, sourceText) {
   if (!row.source_quote || !sourceText) return;
-  const haystack = normaliseWhitespace(sourceText);
-  const needle = normaliseWhitespace(row.source_quote);
-  if (needle.length < 5) return;
-  if (!haystack.includes(needle)) {
+  const needleWs = normaliseWhitespace(row.source_quote);
+  if (needleWs.length < 5) return;
+
+  // 1. Exact (whitespace-normalised) substring - the cheap, strict case.
+  if (normaliseWhitespace(sourceText).includes(needleWs)) return;
+
+  // 2. Punctuation-insensitive substring. The AI routinely normalises dashes,
+  //    quotes and brackets, so a verbatim match almost never survives - this
+  //    catches those without crying wolf.
+  const haystack = normaliseForMatch(sourceText);
+  const needle = normaliseForMatch(row.source_quote);
+  if (needle && haystack.includes(needle)) return;
+
+  // 3. Token overlap. The quote is often a lightly-reworded label, so only
+  //    warn when little of it actually appears on the page (the real
+  //    signature of an invented snippet). Significant tokens = words 3+ chars.
+  const tokens = needle.split(' ').filter((w) => w.length >= 3);
+  if (tokens.length === 0) return;
+  const present = tokens.filter((w) => haystack.includes(w)).length;
+  if (present / tokens.length < 0.5) {
     row.warnings.push("The quoted text isn't on the source page — the AI may have invented this date.");
   }
 }

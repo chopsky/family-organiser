@@ -218,4 +218,25 @@ describe('validateTermDates', () => {
     validateTermDates(input, '', NOW);
     expect(input[0]).not.toHaveProperty('warnings');
   });
+
+  const INVENTED = "The quoted text isn't on the source page — the AI may have invented this date.";
+
+  it('does NOT flag invented-date when the quote only differs by punctuation', () => {
+    // Quote uses an en-dash + parentheses; the page uses a hyphen and none.
+    const [row] = validateTermDates(
+      [{ event_type: 'inset_day', date: '2025-09-01', label: 'INSET', academic_year: '2025-2026', source_quote: 'INSET Day – (No Pupils in School)' }],
+      'INSET day - no pupils in school on 1 September 2025',
+      NOW
+    );
+    expect(row.warnings).not.toContain(INVENTED);
+  });
+
+  it('still flags an invented date when the quote barely appears on the page', () => {
+    const [row] = validateTermDates(
+      [{ event_type: 'inset_day', date: '2025-10-15', label: 'INSET', academic_year: '2025-2026', source_quote: 'Sports Day and Summer Fair celebration afternoon' }],
+      'The autumn term begins in September. Half term is in October.',
+      NOW
+    );
+    expect(row.warnings).toContain(INVENTED);
+  });
 });
