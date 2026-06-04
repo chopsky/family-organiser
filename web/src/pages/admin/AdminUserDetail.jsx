@@ -6,6 +6,7 @@ import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu
 import Spinner from '../../components/Spinner';
 import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+import PlatformBadges from '../../components/PlatformBadges';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 function rangeLabel(days) {
@@ -190,6 +191,7 @@ export default function AdminUserDetail() {
                   Verified
                 </span>
               )}
+              <PlatformBadges platforms={user.platforms} />
             </div>
           </div>
         </div>

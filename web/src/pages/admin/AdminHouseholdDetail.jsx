@@ -6,6 +6,7 @@ import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
 import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+import PlatformBadges from '../../components/PlatformBadges';
 import { formatBytes } from '../../lib/formatBytes';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
@@ -287,7 +288,7 @@ export default function AdminHouseholdDetail() {
                     {formatRelativeTime(m.last_active_at)}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-charcoal text-xs font-semibold capitalize">
                     {m.role}
                   </span>
@@ -301,6 +302,7 @@ export default function AdminHouseholdDetail() {
                       Disabled
                     </span>
                   )}
+                  <PlatformBadges platforms={m.platforms} size="sm" />
                 </div>
               </Link>
             );

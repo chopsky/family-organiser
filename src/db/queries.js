@@ -3358,6 +3358,79 @@ async function fetchLastActiveByUserIds(userIds, db = supabase) {
   return map;
 }
 
+const { parsePlatformFromUserAgent } = require('../utils/platform-detect');
+
+/**
+ * Bulk-fetch platform usage for a set of user IDs. Combines two signals:
+ *   1. refresh_tokens.user_agent — tells us whether each user has ever
+ *      logged in on an iOS device, on web/desktop, etc.
+ *   2. device_tokens (platform='ios') — definitive "has installed the
+ *      native iOS app" signal (only the native app registers a push token).
+ *
+ * Returns Map<userId, {
+ *   iosApp:        boolean,  // any ios device_token (active or inactive)
+ *   iosAppActive:  boolean,  // any active ios device_token (push working)
+ *   iosWeb:        boolean,  // iPhone/iPad UA in refresh_tokens
+ *   web:           boolean,  // non-mobile UA in refresh_tokens
+ *   lastIosAt:     ISO|null, // most-recent refresh on an ios device
+ *   lastWebAt:     ISO|null, // most-recent refresh on web/desktop
+ * }>
+ *
+ * Users with no data return undefined from the map.
+ */
+async function getPlatformsByUserIds(userIds, db = supabase) {
+  if (!userIds || userIds.length === 0) return new Map();
+
+  const [tokensRes, devicesRes] = await Promise.all([
+    db.from('refresh_tokens').select('user_id, user_agent, last_used_at').in('user_id', userIds),
+    db.from('device_tokens').select('user_id, active').in('user_id', userIds).eq('platform', 'ios'),
+  ]);
+
+  const map = new Map();
+  function entry(userId) {
+    let e = map.get(userId);
+    if (!e) {
+      e = {
+        iosApp: false, iosAppActive: false,
+        iosWeb: false, web: false,
+        lastIosAt: null, lastWebAt: null,
+      };
+      map.set(userId, e);
+    }
+    return e;
+  }
+
+  // 1. refresh_tokens → ios vs web bucket per session
+  for (const row of tokensRes.data || []) {
+    if (!row.user_id) continue;
+    const platform = parsePlatformFromUserAgent(row.user_agent);
+    if (!platform) continue;
+    const e = entry(row.user_id);
+    if (platform === 'ios') {
+      e.iosWeb = true;
+      if (row.last_used_at && (!e.lastIosAt || row.last_used_at > e.lastIosAt)) {
+        e.lastIosAt = row.last_used_at;
+      }
+    } else if (platform === 'web' || platform === 'android') {
+      // 'android' lumped into web for now — single bucket for "not iOS"
+      e.web = true;
+      if (row.last_used_at && (!e.lastWebAt || row.last_used_at > e.lastWebAt)) {
+        e.lastWebAt = row.last_used_at;
+      }
+    }
+  }
+
+  // 2. device_tokens upgrades 'iosWeb' → 'iosApp' (proves native install)
+  for (const row of devicesRes.data || []) {
+    if (!row.user_id) continue;
+    const e = entry(row.user_id);
+    e.iosApp = true;
+    if (row.active) e.iosAppActive = true;
+  }
+
+  return map;
+}
+
 async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc' } = {}, db = supabase) {
   // Sorting by last_active_at can't be done in a single SQL query because
   // it's a derived value (MAX refresh_tokens.last_used_at). For that sort
@@ -3388,10 +3461,17 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
 
   if (error) throw error;
 
-  // Attach last_active_at (MAX refresh_tokens.last_used_at per user)
-  const lastActiveMap = await fetchLastActiveByUserIds((data || []).map((u) => u.id), db);
+  // Attach last_active_at (MAX refresh_tokens.last_used_at per user) and
+  // platform usage (iOS app / web) - both queries are bounded by the
+  // current page's user IDs so they stay cheap.
+  const ids = (data || []).map((u) => u.id);
+  const [lastActiveMap, platformsMap] = await Promise.all([
+    fetchLastActiveByUserIds(ids, db),
+    getPlatformsByUserIds(ids, db),
+  ]);
   for (const u of data || []) {
     u.last_active_at = lastActiveMap.get(u.id) || null;
+    u.platforms = platformsMap.get(u.id) || null;
   }
 
   return { users: data, total: count };
@@ -3441,12 +3521,18 @@ async function getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db
   if (rowErr) throw rowErr;
 
   // 6. Preserve the sorted order (Postgres .in() doesn't return rows in
-  //    the order we asked for) + attach last_active_at to the response
+  //    the order we asked for) + attach last_active_at and platforms to
+  //    the response
+  const platformsMap = await getPlatformsByUserIds(pageIds, db);
   const byId = new Map((rows || []).map((r) => [r.id, r]));
   const ordered = pageIds
     .map((id) => byId.get(id))
     .filter(Boolean)
-    .map((u) => ({ ...u, last_active_at: lastActiveMap.get(u.id) || null }));
+    .map((u) => ({
+      ...u,
+      last_active_at: lastActiveMap.get(u.id) || null,
+      platforms: platformsMap.get(u.id) || null,
+    }));
 
   return { users: ordered, total: count || 0 };
 }
@@ -3469,9 +3555,17 @@ async function getUserByIdAdmin(userId, db = supabase) {
     household = h;
   }
 
-  const lastActiveMap = await fetchLastActiveByUserIds([userId], db);
+  const [lastActiveMap, platformsMap] = await Promise.all([
+    fetchLastActiveByUserIds([userId], db),
+    getPlatformsByUserIds([userId], db),
+  ]);
 
-  return { ...user, household, last_active_at: lastActiveMap.get(userId) || null };
+  return {
+    ...user,
+    household,
+    last_active_at: lastActiveMap.get(userId) || null,
+    platforms: platformsMap.get(userId) || null,
+  };
 }
 
 const IDLE_THRESHOLD_DAYS = 14;
@@ -3670,14 +3764,18 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     getHouseholdStorageUsage(householdId).catch(() => ({ totalBytes: 0, fileCount: 0 })),
   ]);
 
-  // Enrich each member with last_active_at, and roll up the max as the
-  // household's last_active_at (so the detail header can show staleness
-  // at a glance).
+  // Enrich each member with last_active_at + platforms, and roll up the
+  // max as the household's last_active_at (so the detail header can show
+  // staleness at a glance).
   const memberIds = (members || []).map((m) => m.id);
-  const lastActiveMap = await fetchLastActiveByUserIds(memberIds, db);
+  const [lastActiveMap, platformsMap] = await Promise.all([
+    fetchLastActiveByUserIds(memberIds, db),
+    getPlatformsByUserIds(memberIds, db),
+  ]);
   let householdLastActive = null;
   for (const m of members || []) {
     m.last_active_at = lastActiveMap.get(m.id) || null;
+    m.platforms = platformsMap.get(m.id) || null;
     if (m.last_active_at && (!householdLastActive || m.last_active_at > householdLastActive)) {
       householdLastActive = m.last_active_at;
     }

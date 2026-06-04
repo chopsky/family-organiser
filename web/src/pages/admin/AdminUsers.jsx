@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SortableHeader from '../../components/SortableHeader';
+import PlatformBadges from '../../components/PlatformBadges';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 const PAGE_SIZE = 20;
@@ -94,7 +95,8 @@ export default function AdminUsers() {
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Role</th>
                   <SortableHeader column="last_active_at" label="Last Active" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
-                  <SortableHeader column="created_at" label="Joined" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Platform</th>
+                  <SortableHeader column="created_at" label="Joined" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />
                 </tr>
               </thead>
               <tbody>
@@ -115,13 +117,16 @@ export default function AdminUsers() {
                     >
                       {formatRelativeTime(u.last_active_at)}
                     </td>
-                    <td className="px-4 py-3 text-warm-grey hidden lg:table-cell">
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <PlatformBadges platforms={u.platforms} size="sm" />
+                    </td>
+                    <td className="px-4 py-3 text-warm-grey hidden xl:table-cell">
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
                     </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
-                  <tr><td colSpan="6" className="px-4 py-8 text-center text-warm-grey">No users found</td></tr>
+                  <tr><td colSpan="7" className="px-4 py-8 text-center text-warm-grey">No users found</td></tr>
                 )}
               </tbody>
             </table>
