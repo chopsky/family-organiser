@@ -33,7 +33,7 @@ const GAP_INFO = {
     where: 'Family Setup, tap each child, then Term dates',
   },
   address: {
-    short: 'add your home address for local weather',
+    short: 'add your home address for local weather and nearby recommendations',
     where: 'Family Setup',
   },
 };
