@@ -711,12 +711,14 @@ router.post('/tools/setup-nudge/send', async (req, res) => {
       try {
         if (c.hasApp) {
           const n = buildPushNudge(c.gaps);
+          console.log(`[setup-nudge] push -> ${c.name} [${c.gaps.join(',')}]: ${n.body}`);
           const r = await push.sendToUser(c.userId, {
             title: n.title, body: n.body, data: { type: 'setup_nudge' },
           });
           if (r.sent > 0) pushSent += 1; else skipped += 1;
         } else if (c.whatsappPhone) {
           const msg = buildWhatsAppNudge(c.name, c.gaps);
+          console.log(`[setup-nudge] whatsapp -> ${c.name} (${c.whatsappPhone}) [${c.gaps.join(',')}]: ${msg}`);
           await sendBroadcastToMember({
             id: c.userId,
             name: c.name,
