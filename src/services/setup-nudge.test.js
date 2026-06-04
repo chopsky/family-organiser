@@ -63,6 +63,24 @@ describe('buildWhatsAppNudge', () => {
     expect(msg).not.toMatch(/[—–]/); // no em or en dashes
   });
 
+  test('adds a Family Setup catch-all for members + term dates not already flagged', () => {
+    const msg = buildWhatsAppNudge('Alex', ['calendars', 'address']);
+    expect(msg).toMatch(/other family members to add or school term dates to import/);
+    expect(msg).toMatch(/Family Setup too/);
+  });
+
+  test('catch-all omits items already covered as gaps', () => {
+    const msg = buildWhatsAppNudge('Alex', ['family', 'schools']);
+    // both family + schools are primary gaps, so no leftover catch-all
+    expect(msg).not.toMatch(/Family Setup too/);
+  });
+
+  test('catch-all mentions only the leftover item', () => {
+    const msg = buildWhatsAppNudge('Alex', ['schools']); // schools covered, family not
+    expect(msg).toMatch(/other family members to add, you can do that in Family Setup too/);
+    expect(msg).not.toMatch(/school term dates to import/);
+  });
+
   test('returns null when there are no valid gaps', () => {
     expect(buildWhatsAppNudge('Grant', [])).toBeNull();
     expect(buildWhatsAppNudge('Grant', ['bogus'])).toBeNull();

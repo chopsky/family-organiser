@@ -84,9 +84,22 @@ function buildWhatsAppNudge(name, gaps = []) {
 
   const things = humanList(valid.map((g) => GAP_INFO[g].short));
   const where = GAP_INFO[valid[0]].where;
+
+  // Soft catch-all for the things that aren't this household's flagged gaps:
+  // adding more family members, or importing school term dates. Framed
+  // conditionally ("if there are...") so it fits any household, and only for
+  // items not already covered above.
+  const extras = [];
+  if (!valid.includes('family')) extras.push('other family members to add');
+  if (!valid.includes('schools')) extras.push('school term dates to import');
+  const extrasLine = extras.length
+    ? `And if there are ${extras.join(' or ')}, you can do that in Family Setup too. `
+    : '';
+
   return `Hi ${firstName}! You're up and running on WhatsApp, but you're missing some of the best bits of Housemait. `
     + `You haven't had a chance to ${things} yet, and those live in the app, not here in chat. `
     + `Open the Housemait app and go to ${where} to set it up. It only takes a minute, and then I'll keep handling your reminders from there. `
+    + extrasLine
     + `Reply HELP if you'd like a hand.`;
 }
 
