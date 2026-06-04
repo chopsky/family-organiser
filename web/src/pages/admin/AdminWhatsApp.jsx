@@ -42,6 +42,48 @@ export default function AdminWhatsApp() {
     }
   }
 
+  // Setup-completion nudge
+  const [nudge, setNudge] = useState(null);
+  const [nudgeLoading, setNudgeLoading] = useState(false);
+  const [nudgeStatus, setNudgeStatus] = useState(null);
+
+  async function loadNudgePreview() {
+    setNudgeLoading(true);
+    setNudgeStatus(null);
+    try {
+      const { data: d } = await api.get('/admin/tools/setup-nudge/preview');
+      setNudge(d);
+    } catch (err) {
+      setNudge({ error: err.response?.data?.error || err.message });
+    } finally {
+      setNudgeLoading(false);
+    }
+  }
+
+  async function handleNudgeSendToMe() {
+    setNudgeStatus(null);
+    try {
+      const { data: d } = await api.post('/admin/tools/setup-nudge/send-to-me');
+      setNudgeStatus({ kind: 'ok', message: `Sent to you via ${d.channel}${d.usedSampleGaps ? " (sample gaps - you're fully set up)" : ''}.` });
+    } catch (err) {
+      setNudgeStatus({ kind: 'err', message: err.response?.data?.error || err.message });
+    }
+  }
+
+  async function handleNudgeSendAll() {
+    if (!nudge || !nudge.total) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`Send the setup nudge to all ${nudge.total} members (${nudge.viaPush} push, ${nudge.viaWhatsApp} WhatsApp)?`)) return;
+    setNudgeStatus({ kind: 'ok', message: 'Sending…' });
+    try {
+      const { data: d } = await api.post('/admin/tools/setup-nudge/send');
+      setNudgeStatus({ kind: 'ok', message: `Done. ${d.pushSent} push, ${d.whatsappSent} WhatsApp, ${d.skipped} skipped, ${d.failed} failed.` });
+      loadNudgePreview();
+    } catch (err) {
+      setNudgeStatus({ kind: 'err', message: err.response?.data?.error || err.message });
+    }
+  }
+
   useEffect(() => {
     setLoading(true);
     api.get('/admin/whatsapp-stats', { params: { days } })
@@ -249,6 +291,66 @@ export default function AdminWhatsApp() {
               </>
             )}
           </div>
+        )}
+      </div>
+
+      {/* Setup-completion nudge - reach WhatsApp-reliant members who haven't
+          set up the app (calendars / school dates / address). */}
+      <div className="bg-white border border-light-grey rounded-2xl p-5 mt-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <h2 className="text-sm font-medium text-charcoal">Setup-completion nudge</h2>
+            <p className="text-xs text-warm-grey mt-1 max-w-lg">
+              Reaches WhatsApp-connected members whose household hasn&apos;t done the app-only setup (connecting calendars, importing school term dates, adding a home address). Each is routed to push if they have the app, otherwise WhatsApp. Re-running skips anyone who&apos;s since set up.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button type="button" onClick={loadNudgePreview} disabled={nudgeLoading}
+              className="h-10 px-4 rounded-lg border border-light-grey text-charcoal text-sm font-semibold hover:bg-cream disabled:opacity-50">
+              {nudgeLoading ? 'Loading…' : 'Preview audience'}
+            </button>
+            <button type="button" onClick={handleNudgeSendToMe}
+              className="h-10 px-4 rounded-lg border border-light-grey text-charcoal text-sm font-semibold hover:bg-cream">
+              Send to me
+            </button>
+          </div>
+        </div>
+
+        {nudge && !nudge.error && (
+          <div className="mt-4 text-xs">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-charcoal">
+              <span><strong>{nudge.total}</strong> to nudge</span>
+              <span className="text-warm-grey">{nudge.viaPush} via push · {nudge.viaWhatsApp} via WhatsApp{nudge.noChannel ? ` · ${nudge.noChannel} no channel` : ''}</span>
+              <span className="text-warm-grey">
+                gaps: {Object.entries(nudge.gapCounts || {}).map(([g, n]) => `${g} ${n}`).join(' · ') || 'none'}
+              </span>
+            </div>
+            {nudge.sampleWhatsApp && (
+              <div className="mt-3 grid md:grid-cols-2 gap-3">
+                <div className="bg-cream rounded-lg p-3">
+                  <p className="font-semibold text-charcoal mb-1">Sample WhatsApp</p>
+                  <p className="text-warm-grey whitespace-pre-wrap">{nudge.sampleWhatsApp}</p>
+                </div>
+                {nudge.samplePush && (
+                  <div className="bg-cream rounded-lg p-3">
+                    <p className="font-semibold text-charcoal mb-1">Sample push</p>
+                    <p className="text-charcoal">{nudge.samplePush.title}</p>
+                    <p className="text-warm-grey">{nudge.samplePush.body}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {nudge.total > 0 && (
+              <button type="button" onClick={handleNudgeSendAll}
+                className="mt-3 h-10 px-4 rounded-lg bg-plum hover:bg-plum/90 text-white text-sm font-semibold">
+                Send to all {nudge.total}
+              </button>
+            )}
+          </div>
+        )}
+        {nudge?.error && <p className="text-xs text-coral mt-3">{nudge.error}</p>}
+        {nudgeStatus && (
+          <p className={`text-xs mt-3 ${nudgeStatus.kind === 'ok' ? 'text-sage' : 'text-coral'}`}>{nudgeStatus.message}</p>
         )}
       </div>
 

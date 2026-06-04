@@ -5456,6 +5456,59 @@ async function getDocumentAccessLog(documentId, householdId, limit = 50) {
 }
 
 /**
+ * Gather data for the setup-completion nudge: every WhatsApp-linked member,
+ * with their household's raw setup signals and whether they have the iOS app
+ * installed (for channel routing). The caller computes gaps + filters with
+ * detectSetupGaps(). Per-household signals are computed once and shared.
+ *
+ * @returns {Promise<Array<{ userId, name, householdId, whatsappPhone, hasApp,
+ *   household: { hasCalendarFeeds, hasSchools, hasAddress, hasChildren } }>>}
+ */
+async function getSetupNudgeCandidates(db = supabase) {
+  const { data: members, error } = await db
+    .from('users')
+    .select('id, name, household_id, whatsapp_phone, whatsapp_linked, whatsapp_last_inbound_at')
+    .eq('whatsapp_linked', true)
+    .not('household_id', 'is', null);
+  if (error) throw error;
+  if (!members || members.length === 0) return [];
+
+  const householdIds = [...new Set(members.map((m) => m.household_id))];
+
+  // Per-household setup signals, computed once.
+  const signals = new Map();
+  await Promise.all(householdIds.map(async (hid) => {
+    const [household, feeds, schools, allMembers] = await Promise.all([
+      getHouseholdById(hid, db).catch(() => null),
+      getExternalFeedsByHousehold(hid, db).catch(() => []),
+      getHouseholdSchools(hid, db).catch(() => []),
+      getHouseholdMembers(hid, db).catch(() => []),
+    ]);
+    signals.set(hid, {
+      hasCalendarFeeds: Array.isArray(feeds) && feeds.length > 0,
+      hasSchools: Array.isArray(schools) && schools.length > 0,
+      hasAddress: !!(household && household.address && String(household.address).trim()),
+      hasChildren: (allMembers || []).some((m) => m.member_type === 'dependent'),
+    });
+  }));
+
+  // Channel routing: does each member have the iOS app installed?
+  return Promise.all(members.map(async (m) => {
+    const tokens = await getActiveDeviceTokens(m.id).catch(() => []);
+    const hasApp = Array.isArray(tokens) && tokens.some((t) => t.platform === 'ios');
+    return {
+      userId: m.id,
+      name: m.name,
+      householdId: m.household_id,
+      whatsappPhone: m.whatsapp_phone,
+      whatsappLastInboundAt: m.whatsapp_last_inbound_at || null,
+      hasApp,
+      household: signals.get(m.household_id),
+    };
+  }));
+}
+
+/**
  * Recent document activity across the whole household. Powers the
  * "Who's been opening what?" admin view. Joined to documents and users
  * so the UI can show file names and member names without N+1 lookups.
@@ -6447,6 +6500,7 @@ module.exports = {
   unregisterDeviceToken,
   getActiveDeviceTokens,
   getDeviceTokensForUserAdmin,
+  getSetupNudgeCandidates,
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,

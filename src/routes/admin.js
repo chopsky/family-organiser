@@ -4,6 +4,8 @@ const { requireAuth, requirePlatformAdmin } = require('../middleware/auth');
 const { sendDailyReminders, chooseDailyBriefChannel } = require('../jobs/reminders');
 const { invalidateHouseholdWeatherCache } = require('../services/digest-weather');
 const push = require('../services/push');
+const { sendBroadcastToMember } = require('../services/whatsapp-templates');
+const { detectSetupGaps, buildWhatsAppNudge, buildPushNudge } = require('../services/setup-nudge');
 
 const router = Router();
 
@@ -651,6 +653,120 @@ router.post('/tools/push-selftest', async (req, res) => {
     return res.json({ configured: true, count: results.length, primaryEnv, apns: push.getConfigInfo(), results });
   } catch (err) {
     console.error('POST /api/admin/tools/push-selftest error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
+// ─── Setup-completion nudge ─────────────────────────────────────────────────
+//
+// Reach WhatsApp-connected members whose household still hasn't done the
+// app-only setup (subscribing to calendars, importing school term dates,
+// adding a home address). They rely on the bot and don't realise those live
+// in the app. Each member is routed to their best channel: push if they have
+// the iOS app installed (pulls them straight in), otherwise WhatsApp via the
+// generic utility broadcast template. Re-running naturally skips anyone who
+// has since set up, so there's no separate frequency state to manage.
+
+async function resolveSetupNudgeCandidates() {
+  const candidates = await db.getSetupNudgeCandidates();
+  return candidates
+    .map((c) => ({ ...c, gaps: detectSetupGaps(c.household || {}) }))
+    .filter((c) => c.gaps.length > 0);
+}
+
+// GET preview - counts + channel/gap breakdown + sample copy, no send.
+router.get('/tools/setup-nudge/preview', async (req, res) => {
+  try {
+    const withGaps = await resolveSetupNudgeCandidates();
+    const viaPush = withGaps.filter((c) => c.hasApp).length;
+    const viaWhatsApp = withGaps.filter((c) => !c.hasApp && c.whatsappPhone).length;
+    const noChannel = withGaps.length - viaPush - viaWhatsApp;
+    const gapCounts = {};
+    for (const c of withGaps) for (const g of c.gaps) gapCounts[g] = (gapCounts[g] || 0) + 1;
+    const sampleGaps = withGaps[0]?.gaps || ['calendars', 'schools'];
+    return res.json({
+      total: withGaps.length,
+      viaPush,
+      viaWhatsApp,
+      noChannel,
+      gapCounts,
+      sampleWhatsApp: buildWhatsAppNudge('Alex', sampleGaps),
+      samplePush: buildPushNudge(sampleGaps),
+    });
+  } catch (err) {
+    console.error('GET /api/admin/tools/setup-nudge/preview error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
+// POST send - deliver to every candidate on their best channel.
+router.post('/tools/setup-nudge/send', async (req, res) => {
+  try {
+    const withGaps = await resolveSetupNudgeCandidates();
+    let pushSent = 0;
+    let whatsappSent = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const c of withGaps) {
+      try {
+        if (c.hasApp) {
+          const n = buildPushNudge(c.gaps);
+          const r = await push.sendToUser(c.userId, {
+            title: n.title, body: n.body, data: { type: 'setup_nudge' },
+          });
+          if (r.sent > 0) pushSent += 1; else skipped += 1;
+        } else if (c.whatsappPhone) {
+          const msg = buildWhatsAppNudge(c.name, c.gaps);
+          await sendBroadcastToMember({
+            id: c.userId,
+            name: c.name,
+            whatsapp_phone: c.whatsappPhone,
+            whatsapp_linked: true,
+            whatsapp_last_inbound_at: c.whatsappLastInboundAt,
+          }, msg);
+          whatsappSent += 1;
+        } else {
+          skipped += 1;
+        }
+      } catch (e) {
+        failed += 1;
+        console.error('[setup-nudge] send failed for', c.userId, e.message);
+      }
+    }
+    return res.json({ total: withGaps.length, pushSent, whatsappSent, skipped, failed });
+  } catch (err) {
+    console.error('POST /api/admin/tools/setup-nudge/send error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
+// POST send-to-me - preview the real message on the admin's own channel,
+// using their household's actual gaps (or a sample set if they're fully set up).
+router.post('/tools/setup-nudge/send-to-me', async (req, res) => {
+  try {
+    const me = await db.getUserByIdAdmin(req.user.id);
+    if (!me) return res.status(404).json({ error: 'Caller not found' });
+    const candidates = await db.getSetupNudgeCandidates();
+    const mine = candidates.find((c) => c.userId === me.id);
+    const gaps = (mine && detectSetupGaps(mine.household || {})) || [];
+    const useGaps = gaps.length ? gaps : ['calendars', 'schools', 'address'];
+
+    const tokens = await db.getActiveDeviceTokens(me.id).catch(() => []);
+    const hasApp = Array.isArray(tokens) && tokens.some((t) => t.platform === 'ios');
+
+    if (hasApp) {
+      const n = buildPushNudge(useGaps);
+      await push.sendToUser(me.id, { title: n.title, body: n.body, data: { type: 'setup_nudge' } });
+      return res.json({ ok: true, channel: 'push', usedSampleGaps: gaps.length === 0 });
+    }
+    if (me.whatsapp_linked && me.whatsapp_phone) {
+      const msg = buildWhatsAppNudge(me.name, useGaps);
+      await sendBroadcastToMember(me, msg);
+      return res.json({ ok: true, channel: 'whatsapp', usedSampleGaps: gaps.length === 0 });
+    }
+    return res.status(400).json({ error: 'You have no app device and no WhatsApp linked to preview on.' });
+  } catch (err) {
+    console.error('POST /api/admin/tools/setup-nudge/send-to-me error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });
   }
 });
