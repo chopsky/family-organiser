@@ -346,6 +346,36 @@ function extractJsonBlock(text) {
  *   3. Remove trailing commas (a common Gemini quirk).
  * Throws with the original error if every strategy fails.
  */
+/**
+ * Best-effort repair of a TRUNCATED JSON string (the model ran out of output
+ * budget mid-value). Keeps everything up to the last fully-closed structure
+ * and appends the closers needed to balance the still-open brackets - so a
+ * cut-off "events": [ {...}, {...}, {<incomplete> response still yields the
+ * complete events. Returns null if there's nothing recoverable.
+ */
+function repairTruncatedJson(s) {
+  let inStr = false, esc = false;
+  const stack = [];
+  let safeEnd = -1;       // last index (inclusive) that closed a structure
+  let safeStack = null;   // bracket stack at safeEnd
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '{' || ch === '[') stack.push(ch);
+    else if (ch === '}' || ch === ']') { stack.pop(); safeEnd = i; safeStack = stack.slice(); }
+  }
+  if (safeEnd < 0 || !safeStack || safeStack.length === 0) return null;
+  let out = s.slice(0, safeEnd + 1);
+  for (let i = safeStack.length - 1; i >= 0; i--) out += safeStack[i] === '{' ? '}' : ']';
+  return out;
+}
+
 function parseJSON(text, context) {
   // Strip surrounding markdown fences if present.
   const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
@@ -359,6 +389,12 @@ function parseJSON(text, context) {
   if (block) {
     const detrailed = block.replace(/,(\s*[}\]])/g, '$1');
     if (detrailed !== block) candidates.push(detrailed);
+  }
+
+  // Truncation salvage: recover the complete portion of a cut-off response.
+  for (const base of [block || stripped]) {
+    const repaired = repairTruncatedJson(base);
+    if (repaired) candidates.push(repaired.replace(/,(\s*[}\]])/g, '$1'));
   }
 
   let firstErr;
@@ -461,7 +497,9 @@ async function extractFromEmail(emailText, subject, memberNames = [], context = 
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
       useThinking: false,
-      maxTokens: 4096,
+      // Generous: a forwarded contacts/birthday list or school newsletter can
+      // hold dozens of events; at 4096 the JSON truncated mid-list and failed.
+      maxTokens: 8192,
       feature: 'email_extraction',
       responseFormat: 'json',
       householdId,
