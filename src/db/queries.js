@@ -1687,6 +1687,51 @@ function advancePeriod(date, recurrence) {
 }
 
 /**
+ * Expand recurring calendar events into concrete occurrences within a window.
+ * A calendar_events row stores a single base occurrence plus a `recurrence`
+ * cadence; this materialises every occurrence between startDate and endDate so
+ * the calendar (and morning brief) actually show the repeats. Occurrences keep
+ * the row's real `id` (edit/delete act on the series) and get a unique
+ * `occurrence_key` for rendering. Pure; bounded by maxPerEvent.
+ */
+function expandRecurringEvents(events, startDate, endDate, maxPerEvent = 500) {
+  const winStart = new Date(startDate).getTime();
+  const winEnd = new Date(endDate).getTime();
+  const out = [];
+  for (const ev of events || []) {
+    if (!ev.recurrence) continue;
+    const baseStart = new Date(ev.start_time);
+    const baseEnd = new Date(ev.end_time || ev.start_time);
+    if (Number.isNaN(baseStart.getTime())) continue;
+    const durationMs = Math.max(0, baseEnd.getTime() - baseStart.getTime());
+    let occ = new Date(baseStart);
+    let n = 0;
+    // Skip occurrences that end before the window starts.
+    while (occ.getTime() + durationMs < winStart && n < maxPerEvent) {
+      const next = advancePeriod(occ, ev.recurrence);
+      if (!next) { occ = null; break; }
+      occ = next; n++;
+    }
+    if (!occ) continue;
+    // Emit occurrences that start on/before the window end.
+    while (occ.getTime() <= winEnd && n < maxPerEvent) {
+      const occEnd = new Date(occ.getTime() + durationMs);
+      out.push({
+        ...ev,
+        start_time: occ.toISOString(),
+        end_time: occEnd.toISOString(),
+        occurrence_key: `${ev.id}|${occ.toISOString()}`,
+        recurrence_instance: occ.getTime() !== baseStart.getTime(),
+      });
+      const next = advancePeriod(occ, ev.recurrence);
+      if (!next) break;
+      occ = next; n++;
+    }
+  }
+  return out;
+}
+
+/**
  * Compute the next valid due date for a recurring task - the earliest
  * scheduled instance that's >= today. Used by both completion-time
  * regeneration and the daily auto-advance cron.
@@ -2310,43 +2355,49 @@ async function getTasksForUser(householdId, userId, db = supabase) {
 // ─── Calendar Events ─────────────────────────────────────────────────────────
 
 async function getCalendarEvents(householdId, startDate, endDate, { userId, category } = {}, db = supabase) {
-  let query = db
-    .from('calendar_events')
-    .select()
-    .eq('household_id', householdId)
-    .is('deleted_at', null)
-    .lte('start_time', endDate)
-    .gte('end_time', startDate);
+  // Apply the household/visibility/category filters common to both queries.
+  const applyFilters = (q) => {
+    let query = q.eq('household_id', householdId).is('deleted_at', null);
+    if (category) query = query.eq('category', category);
+    if (userId) query = query.or(`visibility.eq.family,source_user_id.eq.${userId},source_user_id.is.null`);
+    return query;
+  };
 
-  // category/visibility columns may not exist until migration is run - try filtered
-  // query first, fall back to unfiltered if it fails
-  if (category) {
-    query = query.eq('category', category);
+  // Query 1: events that overlap the window directly (non-recurring, plus the
+  // base occurrence of any recurring event whose start lands in the window).
+  let overlap = await applyFilters(db.from('calendar_events').select())
+    .lte('start_time', endDate).gte('end_time', startDate).order('start_time');
+
+  if (overlap.error && (category || userId)) {
+    // category/visibility columns may not exist yet - retry unfiltered.
+    overlap = await db.from('calendar_events').select()
+      .eq('household_id', householdId).is('deleted_at', null)
+      .lte('start_time', endDate).gte('end_time', startDate).order('start_time');
   }
+  if (overlap.error) throw overlap.error;
+  const overlapRows = overlap.data || [];
 
-  // Visibility: show family events + personal events belonging to the requesting user
-  if (userId) {
-    query = query.or(`visibility.eq.family,source_user_id.eq.${userId},source_user_id.is.null`);
-  }
+  // Query 2: every recurring event that started on/before the window end, so we
+  // can materialise its occurrences inside the window (the row itself may sit
+  // far in the past). Degrades to no expansion if the recurrence column is
+  // missing, so the calendar never breaks - it just won't repeat.
+  let recurringRows = [];
+  try {
+    let rec = await applyFilters(db.from('calendar_events').select())
+      .lte('start_time', endDate).not('recurrence', 'is', null).neq('recurrence', '').order('start_time');
+    if (rec.error && (category || userId)) {
+      rec = await db.from('calendar_events').select()
+        .eq('household_id', householdId).is('deleted_at', null)
+        .lte('start_time', endDate).not('recurrence', 'is', null).neq('recurrence', '').order('start_time');
+    }
+    if (!rec.error) recurringRows = rec.data || [];
+  } catch { recurringRows = []; }
 
-  const { data, error } = await query.order('start_time');
-
-  if (error && (category || userId)) {
-    // Retry without category/visibility filters (columns may not exist yet)
-    const fallback = await db
-      .from('calendar_events')
-      .select()
-      .eq('household_id', householdId)
-      .is('deleted_at', null)
-      .lte('start_time', endDate)
-      .gte('end_time', startDate)
-      .order('start_time');
-    if (fallback.error) throw fallback.error;
-    return fallback.data;
-  }
-
-  if (error) throw error;
-  return data;
+  // Non-recurring overlapping events pass through; recurring events come from
+  // expansion (so the base occurrence isn't double-counted).
+  const nonRecurring = overlapRows.filter((e) => !e.recurrence);
+  const expanded = expandRecurringEvents(recurringRows, startDate, endDate);
+  return [...nonRecurring, ...expanded].sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
 }
 
 async function getCalendarEventById(eventId, householdId, db = supabase) {
@@ -6336,6 +6387,7 @@ module.exports = {
   updateShoppingItem,
   // Calendar
   getCalendarEvents,
+  expandRecurringEvents,
   getCalendarEventById,
   getTasksByDateRange,
   searchCalendar,

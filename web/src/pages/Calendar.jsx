@@ -1708,7 +1708,7 @@ export default function Calendar() {
                   <div key={i} className={`p-0.5 flex flex-col gap-0.5 bg-cream ${i < 6 ? 'border-r border-light-grey' : ''}`}>
                     {dayEvs.map(ev => (
                       <div
-                        key={ev.id}
+                        key={ev.occurrence_key || ev.id}
                         className="text-[11px] font-semibold px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-85"
                         style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
                         onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
@@ -1766,7 +1766,7 @@ export default function Calendar() {
 
                         return (
                           <div
-                            key={ev.id}
+                            key={ev.occurrence_key || ev.id}
                             className="absolute rounded-[5px] px-1.5 py-0.5 text-[11px] font-semibold overflow-hidden z-[2] cursor-pointer hover:opacity-85 leading-snug"
                             style={{
                               top: `${pos.top}px`,
@@ -1828,7 +1828,7 @@ export default function Calendar() {
               <div className="px-5 py-2 bg-cream border-b border-light-grey flex flex-wrap gap-1.5">
                 {allDay.map(ev => (
                   <div
-                    key={ev.id}
+                    key={ev.occurrence_key || ev.id}
                     className="text-[10px] font-semibold px-2 py-0.5 rounded cursor-pointer hover:opacity-85"
                     style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
                     onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
@@ -1878,7 +1878,7 @@ export default function Calendar() {
 
                   return (
                     <div
-                      key={ev.id}
+                      key={ev.occurrence_key || ev.id}
                       className="absolute rounded-lg px-2.5 py-1.5 z-[2] cursor-pointer hover:opacity-90 flex items-start gap-2 overflow-hidden"
                       style={{
                         // Left gutter (44px) reserves room for the time
