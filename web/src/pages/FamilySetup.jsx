@@ -246,6 +246,7 @@ export default function FamilySetup() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [addActivityDay, setAddActivityDay] = useState(0);
   const [addActivityName, setAddActivityName] = useState('');
+  const [addActivityStart, setAddActivityStart] = useState('');
   const [addActivityEnd, setAddActivityEnd] = useState('');
   const [addActivityPickup, setAddActivityPickup] = useState(''); // member id or ''
   // Term-aware activities: the child's school terms, which term the grid is
@@ -587,6 +588,7 @@ export default function FamilySetup() {
     setEditingActivity(null);
     setAddActivityDay(0);
     setAddActivityName('');
+    setAddActivityStart('');
     setAddActivityEnd('');
     setAddActivityPickup('');
     setCustomStart('');
@@ -599,6 +601,7 @@ export default function FamilySetup() {
     setEditingActivity(a);
     setAddActivityDay(a.day_of_week ?? 0);
     setAddActivityName(a.activity || '');
+    setAddActivityStart(a.time_start ? a.time_start.substring(0, 5) : '');
     setAddActivityEnd(a.time_end ? a.time_end.substring(0, 5) : '');
     setAddActivityPickup(a.pickup_member_id || '');
     setShowAddActivity(true);
@@ -627,6 +630,7 @@ export default function FamilySetup() {
       const body = {
         day_of_week: addActivityDay,
         activity: addActivityName.trim(),
+        time_start: addActivityStart || null,
         time_end: addActivityEnd || null,
         pickup_member_id: addActivityPickup || null,
       };
@@ -3197,7 +3201,7 @@ export default function FamilySetup() {
                   below under the same any-member-with-a-school rule. */}
               {editingMember?.school_id && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-plum">Weekly activities</h3>
+                  <h3 className="text-sm font-semibold text-plum">Extracurricular activities</h3>
                   <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule. Pick a term to view or set it up - you can prepare next term without changing this one. Tap an activity to edit it.</p>
 
                   {/* Term selector: real school terms (default the current one),
@@ -3245,7 +3249,15 @@ export default function FamilySetup() {
                                         title="Tap to edit"
                                       >
                                         <div className="font-medium truncate">{a.activity}</div>
-                                        {a.time_end && <div className="text-cocoa text-[10px]">til {a.time_end.substring(0, 5)}</div>}
+                                        {(a.time_start || a.time_end) && (
+                                          <div className="text-cocoa text-[10px]">
+                                            {a.time_start && a.time_end
+                                              ? `${a.time_start.substring(0, 5)} - ${a.time_end.substring(0, 5)}`
+                                              : a.time_start
+                                                ? `from ${a.time_start.substring(0, 5)}`
+                                                : `til ${a.time_end.substring(0, 5)}`}
+                                          </div>
+                                        )}
                                         {pickup && <div className="text-primary text-[10px] truncate">🚗 {pickup.name}</div>}
                                         {isOngoingActivity(a) && selectedTermKey !== 'ongoing' && selectedTermKey !== 'custom' && (
                                           <div className="text-cocoa text-[9px] italic">every term</div>
@@ -3278,7 +3290,9 @@ export default function FamilySetup() {
                             </select>
                             <input type="text" value={addActivityName} onChange={(e) => setAddActivityName(e.target.value)} placeholder="e.g. PE, Swimming" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
                           </div>
-                          <div className="flex gap-2 items-center">
+                          <div className="flex gap-2 items-center flex-wrap">
+                            <label className="text-xs text-cocoa">Starts at:</label>
+                            <input type="time" value={addActivityStart} onChange={(e) => setAddActivityStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
                             <label className="text-xs text-cocoa">Ends at:</label>
                             <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
                           </div>
