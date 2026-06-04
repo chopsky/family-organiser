@@ -307,6 +307,10 @@ export default function Calendar() {
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  // Event attachments (files linked to an existing event).
+  const [eventAttachments, setEventAttachments] = useState([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const attachmentInputRef = useRef(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDate, setFormDate] = useState(toDateStr(today));
   const [formAllDay, setFormAllDay] = useState(false);
@@ -727,6 +731,44 @@ export default function Calendar() {
     setFormRecurrence('');
     setFormReminders([]);
     setShowMoreOptions(false);
+    setEventAttachments([]);
+  }
+
+  async function loadAttachments(eventId) {
+    try {
+      const { data } = await api.get(`/calendar/events/${eventId}/attachments`);
+      setEventAttachments(data.attachments || []);
+    } catch {
+      setEventAttachments([]);
+    }
+  }
+
+  async function handleAttachmentUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || !editingEvent?.id) return;
+    setUploadingAttachment(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post(`/calendar/events/${editingEvent.id}/attachments`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setEventAttachments(prev => [...prev, data.attachment]);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not attach that file.');
+    } finally {
+      setUploadingAttachment(false);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+    }
+  }
+
+  async function deleteAttachment(id) {
+    try {
+      await api.delete(`/calendar/attachments/${id}`);
+      setEventAttachments(prev => prev.filter(a => a.id !== id));
+    } catch {
+      alert('Could not remove that attachment.');
+    }
   }
 
   function openAddForm(date, hour) {
@@ -744,6 +786,8 @@ export default function Calendar() {
 
   function openEditForm(ev) {
     setEditingEvent(ev);
+    setEventAttachments([]);
+    if (ev.id) loadAttachments(ev.id);
     setFormTitle(ev.title || '');
     setFormDate(ev.start_time?.split('T')[0] || toDateStr(selectedDate));
     setFormEndDate(ev.end_time?.split('T')[0] || ev.start_time?.split('T')[0] || toDateStr(selectedDate));
@@ -2280,14 +2324,38 @@ export default function Calendar() {
                         placeholder="Add location"
                       />
                     </div>
-                    {/* Attachments placeholder */}
-                    <div className="flex gap-3 items-center">
-                      <div className="flex-shrink-0">
+                    {/* Attachments */}
+                    <div className="flex gap-3 items-start">
+                      <div className="flex-shrink-0 pt-0.5">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                       </div>
-                      <button type="button" className="text-sm text-warm-grey hover:text-plum transition-colors">
-                        Add attachment
-                      </button>
+                      <div className="flex-1 min-w-0">
+                        {editingEvent ? (
+                          <>
+                            {eventAttachments.length > 0 && (
+                              <ul className="space-y-1 mb-2">
+                                {eventAttachments.map(a => (
+                                  <li key={a.id} className="flex items-center gap-2 text-sm">
+                                    <a href={a.url || '#'} target="_blank" rel="noopener noreferrer" className="text-plum hover:underline truncate flex-1">{a.name}</a>
+                                    <button type="button" onClick={() => deleteAttachment(a.id)} className="text-warm-grey hover:text-coral text-xs shrink-0" title="Remove">×</button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            <input ref={attachmentInputRef} type="file" className="hidden" onChange={handleAttachmentUpload} />
+                            <button
+                              type="button"
+                              onClick={() => attachmentInputRef.current?.click()}
+                              disabled={uploadingAttachment}
+                              className="text-sm text-warm-grey hover:text-plum transition-colors disabled:opacity-50"
+                            >
+                              {uploadingAttachment ? 'Uploading…' : '+ Add attachment'}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-sm text-warm-grey">Save the event first, then you can attach files.</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

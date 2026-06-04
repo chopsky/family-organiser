@@ -2411,6 +2411,43 @@ async function getCalendarEventById(eventId, householdId, db = supabase) {
   return data || null;
 }
 
+// ─── Event attachments (files linked to a calendar event) ──────────────────
+async function createEventAttachment(householdId, { event_id, name, file_path, file_size, mime_type, uploaded_by }, db = supabase) {
+  const { data, error } = await db
+    .from('event_attachments')
+    .insert({ household_id: householdId, event_id, name, file_path, file_size: file_size || null, mime_type: mime_type || null, uploaded_by: uploaded_by || null })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getEventAttachments(eventId, db = supabase) {
+  const { data, error } = await db
+    .from('event_attachments')
+    .select()
+    .eq('event_id', eventId)
+    .order('created_at');
+  if (error) throw error;
+  return data || [];
+}
+
+async function getEventAttachmentById(id, householdId, db = supabase) {
+  const { data, error } = await db
+    .from('event_attachments')
+    .select()
+    .eq('id', id)
+    .eq('household_id', householdId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function deleteEventAttachment(id, db = supabase) {
+  const { error } = await db.from('event_attachments').delete().eq('id', id);
+  if (error) throw error;
+}
+
 async function getTasksByDateRange(householdId, startDate, endDate, db = supabase) {
   const { data, error } = await db
     .from('tasks')
@@ -6389,6 +6426,10 @@ module.exports = {
   getCalendarEvents,
   expandRecurringEvents,
   getCalendarEventById,
+  createEventAttachment,
+  getEventAttachments,
+  getEventAttachmentById,
+  deleteEventAttachment,
   getTasksByDateRange,
   searchCalendar,
   createCalendarEvent,

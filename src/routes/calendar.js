@@ -17,8 +17,20 @@ const broadcast = require('../services/broadcast');
 const externalFeed = require('../services/externalFeed');
 const publicHolidays = require('../services/publicHolidays');
 const { formatEventWhen } = require('../utils/event-when');
+const multer = require('multer');
+const crypto = require('crypto');
+const path = require('path');
+const r2 = require('../services/r2');
+const { validateUpload, normaliseFilename } = require('../utils/fileValidation');
 
 const router = Router();
+
+// Event attachments: in-memory multer, 25 MB cap (same as documents). Type
+// allowlist + magic-byte sniffing happens in validateUpload after parsing.
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
 
 // All colours that may appear as an event's `color`. The full surface
 // area is union of three sources:
@@ -785,6 +797,100 @@ router.post('/seed-holidays', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST /seed-holidays error:', err);
     return res.status(500).json({ error: 'Failed to seed holidays' });
+  }
+});
+
+// ─── Event attachments ──────────────────────────────────────────────────────
+
+/**
+ * GET /api/calendar/events/:id/attachments
+ * List a calendar event's attachments, each with a short-lived signed URL.
+ */
+router.get('/events/:id/attachments', async (req, res) => {
+  try {
+    const event = await db.getCalendarEventById(req.params.id, req.householdId);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    const rows = await db.getEventAttachments(req.params.id);
+    const attachments = await Promise.all(rows.map(async (a) => ({
+      id: a.id,
+      name: a.name,
+      mime_type: a.mime_type,
+      file_size: a.file_size,
+      created_at: a.created_at,
+      url: await r2.getSignedDownloadUrl(a.file_path).catch(() => null),
+    })));
+    return res.json({ attachments });
+  } catch (err) {
+    console.error('GET /api/calendar/events/:id/attachments error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/calendar/events/:id/attachments  (multipart, field "file")
+ * Attach a file to a calendar event. Stored in R2; metadata in the DB.
+ */
+router.post('/events/:id/attachments', attachmentUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded. Use field name "file".' });
+  try {
+    const event = await db.getCalendarEventById(req.params.id, req.householdId);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    // Type allowlist + magic-byte sniff (rejects executables, scripts, HTML/SVG,
+    // and extension/content mismatches) - same guard as the documents upload.
+    let validated;
+    try {
+      validated = validateUpload(req.file.buffer, req.file.originalname);
+    } catch (validationErr) {
+      return res.status(validationErr.statusCode || 415).json({ error: validationErr.message });
+    }
+
+    const displayName = normaliseFilename(req.file.originalname) || `file.${validated.ext}`;
+    const safeFilename = displayName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storageKey = `${req.householdId}/events/${req.params.id}/${crypto.randomUUID()}-${safeFilename}`;
+
+    await r2.uploadFile(storageKey, req.file.buffer, validated.mime);
+
+    const attachment = await db.createEventAttachment(req.householdId, {
+      event_id: req.params.id,
+      name: displayName,
+      file_path: storageKey,
+      file_size: req.file.size,
+      mime_type: validated.mime,
+      uploaded_by: req.user.id,
+    });
+
+    const url = await r2.getSignedDownloadUrl(storageKey).catch(() => null);
+    return res.status(201).json({
+      attachment: {
+        id: attachment.id,
+        name: attachment.name,
+        mime_type: attachment.mime_type,
+        file_size: attachment.file_size,
+        created_at: attachment.created_at,
+        url,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/calendar/events/:id/attachments error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/calendar/attachments/:attachmentId
+ * Remove an attachment (R2 object + row), scoped to the caller's household.
+ */
+router.delete('/attachments/:attachmentId', async (req, res) => {
+  try {
+    const a = await db.getEventAttachmentById(req.params.attachmentId, req.householdId);
+    if (!a) return res.status(404).json({ error: 'Attachment not found' });
+    await r2.deleteFile(a.file_path).catch((e) => console.warn('[calendar] R2 delete failed:', e.message));
+    await db.deleteEventAttachment(a.id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/calendar/attachments/:attachmentId error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
