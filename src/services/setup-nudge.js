@@ -97,8 +97,8 @@ function buildWhatsAppNudge(name, gaps = []) {
     : '';
 
   return `Hi ${firstName}! You're up and running on WhatsApp, but you're missing some of the best bits of Housemait. `
-    + `You haven't had a chance to ${things} yet, and those live in the app, not here in chat. `
-    + `Open the Housemait app and go to ${where} to set it up. It only takes a minute, and then I'll keep handling your reminders from there. `
+    + `You haven't had a chance to ${things} yet, and those are set up in the app, not here in chat. `
+    + `Open the Housemait app and go to ${where}. `
     + extrasLine
     + `Reply HELP if you'd like a hand.`;
 }
