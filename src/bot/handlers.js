@@ -1891,15 +1891,20 @@ async function handleDocument(buffer, mediaType, filename, user, household, ctx 
  * @param {string} mimeType - e.g. "image/jpeg"
  * @param {object} user
  * @param {object} household
+ * @param {string} [caption] - the text the user sent with the image; used to
+ *   route the image (e.g. "put these dates in the calendar" -> event extract)
  * @returns {Promise<{response: string, actions: object}>}
  */
-async function handlePhoto(imageBuffer, mimeType, user, household) {
+async function handlePhoto(imageBuffer, mimeType, user, household, caption = '') {
   const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
   const members = await db.getHouseholdMembers(household.id);
   const memberNames = members.map(m => m.name);
 
-  // Smart classify: receipt, event, or unknown
-  const ctx = { householdId: household.id, userId: user.id };
+  // Smart classify: receipt, event, or unknown. The caption (if any) is passed
+  // through so an explicit instruction ("add these dates to the calendar")
+  // overrides the blind guess - which used to misread booking confirmations
+  // as receipts.
+  const ctx = { householdId: household.id, userId: user.id, caption };
   const scan = await scanImage(imageBuffer, mimeType, memberNames, ctx);
 
   // ── Receipt handling ──

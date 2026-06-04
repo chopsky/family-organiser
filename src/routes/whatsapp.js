@@ -223,13 +223,15 @@ router.post('/webhook', async (req, res) => {
       }
 
       if (mediaType.startsWith('image/')) {
-        // Photo (receipt scanning)
+        // Photo - smart-classified (receipt / event / unknown). The text the
+        // user sent with the image is their instruction, so pass it through.
         const start = Date.now();
+        const caption = (req.body.Body || '').trim();
         try {
           const imageBuffer = await whatsapp.downloadMedia(mediaUrl);
-          const result = await handlers.handlePhoto(imageBuffer, mediaType, user, household);
+          const result = await handlers.handlePhoto(imageBuffer, mediaType, user, household, caption);
           await whatsapp.sendMessage(phone, result.response);
-          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start, body: '[photo]', response: result.response });
+          db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start, body: caption ? `[photo] ${caption}` : '[photo]', response: result.response });
 
           // Broadcast to other members
           const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
@@ -237,7 +239,7 @@ router.post('/webhook', async (req, res) => {
         } catch (err) {
           console.error('[whatsapp] Photo error:', err.message);
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', processingMs: Date.now() - start, body: '[photo]', error: err.message });
-          await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble scanning that receipt. Please try again with a clearer photo.');
+          await whatsapp.sendMessage(phone, '❌ Sorry, I had trouble reading that image. Please try again with a clearer photo.');
         }
         return;
       }

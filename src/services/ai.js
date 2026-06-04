@@ -237,7 +237,7 @@ async function matchReceiptToList(receiptItems, shoppingList, { householdId, use
 /**
  * Scan an image to determine if it's a receipt or contains calendar events.
  */
-async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], { householdId, userId } = {}) {
+async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], { householdId, userId, caption = '' } = {}) {
   const base64 = Buffer.isBuffer(imageData)
     ? imageData.toString('base64')
     : imageData;
@@ -246,7 +246,8 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], 
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const systemPrompt = IMAGE_SCAN_SYSTEM
     .replace(/{{DATE}}/g, today)
-    .replace(/{{MEMBERS}}/g, membersStr);
+    .replace(/{{MEMBERS}}/g, membersStr)
+    .replace(/{{CAPTION}}/g, (caption || '').trim() || '(none)');
 
   return withRetry(async () => {
     const { text } = await callWithFailover({

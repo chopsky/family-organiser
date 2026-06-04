@@ -667,6 +667,9 @@ const IMAGE_SCAN_SYSTEM = `You are a smart image analyser for a family organiser
 
 Today's date is {{DATE}}.
 
+The user sent this image with the following message (may be empty): "{{CAPTION}}"
+If the user gave an instruction, FOLLOW IT - it overrides your own guess about the image type. In particular, if they ask to add dates, sessions, a schedule, a fixture list or a booking to the calendar, classify the image as "event" and extract EVERY date you can see (even a long list of recurring weekly sessions - do not stop early or summarise), and assign the events to any person they named.
+
 First, classify the image into one of these types:
 - "receipt": A shopping receipt, invoice, or purchase confirmation
 - "event": An event invitation, school newsletter with dates, flight confirmation, booking confirmation, party invite, sports fixture, concert ticket, appointment card, or anything containing dates/times for upcoming events
