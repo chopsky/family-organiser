@@ -452,7 +452,8 @@ export default function Tasks() {
   const [members, setMembers] = useState([]);
 
   // UI state
-  const [showAll, setShowAll] = useState(false);
+  // Date-scope filter for active tasks. Default 'all'.
+  const [scope, setScope] = useState('all'); // 'all' | 'overdue' | 'today' | 'upcoming'
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -550,8 +551,10 @@ export default function Tasks() {
 
   const load = useCallback(async () => {
     try {
-      const params = showAll ? { all: 'true' } : {};
-      const tasksKey = `tasks:${showAll ? 'all' : 'active'}`;
+      // Always fetch active tasks; the date scope is filtered client-side so
+      // switching chips is instant and the counts are always accurate.
+      const params = {};
+      const tasksKey = 'tasks:active';
       await Promise.all([
         loadCached(
           tasksKey,
@@ -569,7 +572,7 @@ export default function Tasks() {
     } finally {
       setLoading(false);
     }
-  }, [showAll]);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -621,6 +624,30 @@ export default function Tasks() {
 
   /* ─ Group tasks by member ─ */
 
+  // Classify an active task by its due date relative to today.
+  const _td = today();
+  function taskScope(t) {
+    if (!t.due_date) return 'none';      // undated -> only counted under "All"
+    if (t.due_date < _td) return 'overdue';
+    if (t.due_date === _td) return 'today';
+    return 'upcoming';
+  }
+  function inScope(t) {
+    if (scope === 'all') return true;
+    return taskScope(t) === scope;
+  }
+  // Live counts per chip, from active (incomplete) tasks only.
+  const scopeCounts = (() => {
+    const c = { all: 0, overdue: 0, today: 0, upcoming: 0 };
+    for (const t of tasks) {
+      if (t.completed) continue;
+      c.all += 1;
+      const s = taskScope(t);
+      if (c[s] !== undefined) c[s] += 1;
+    }
+    return c;
+  })();
+
   const columnData = (() => {
     const memberNames = members.map((m) => m.name);
     const currentUserName = user?.name;
@@ -651,7 +678,7 @@ export default function Tasks() {
         if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
         if (task.completed) {
           groups[key].completed.push(task);
-        } else {
+        } else if (inScope(task)) {
           groups[key].incomplete.push(task);
         }
       }
@@ -785,13 +812,6 @@ export default function Tasks() {
           Tasks
         </h1>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowAll((v) => !v)}
-            className="text-sm hover:underline"
-            style={{ color: 'var(--plum, #6B3FA0)', fontWeight: 500 }}
-          >
-            {showAll ? 'Due today' : 'All tasks'}
-          </button>
           {canWrite && (
             <button
               onClick={() => openAddForm()}
@@ -806,6 +826,43 @@ export default function Tasks() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Date-scope filter chips with live counts. Default 'All'. */}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'overdue', label: 'Overdue' },
+          { key: 'today', label: 'Today' },
+          { key: 'upcoming', label: 'Upcoming' },
+        ].map(({ key, label }) => {
+          const active = scope === key;
+          const count = scopeCounts[key];
+          const isOverdue = key === 'overdue' && count > 0;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setScope(key)}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors border"
+              style={active
+                ? { background: 'var(--plum, #6B3FA0)', borderColor: 'var(--plum, #6B3FA0)', color: '#fff' }
+                : { background: '#fff', borderColor: 'var(--light-grey, #E8E5EC)', color: 'var(--charcoal, #2D2A33)' }}
+            >
+              {label}
+              <span
+                className="text-xs rounded-full px-1.5 min-w-[18px] text-center"
+                style={active
+                  ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
+                  : isOverdue
+                    ? { background: 'var(--coral-light, #FDF0EB)', color: 'var(--coral, #E8724A)', fontWeight: 600 }
+                    : { background: 'var(--light-grey, #E8E5EC)', color: 'var(--warm-grey, #6B6774)' }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit tasks" className="mb-4" />}
@@ -1256,12 +1313,15 @@ export default function Tasks() {
           {!loading && columnData.every((col) => col.incomplete.length === 0 && col.completed.length === 0) && (
             <div className="text-center py-10 max-w-md mx-auto px-4">
               <p className="text-[15px] font-medium text-charcoal">
-                {showAll ? 'No tasks yet' : 'Nothing due today'}
+                {scope === 'all' ? 'No tasks yet'
+                  : scope === 'overdue' ? 'Nothing overdue'
+                  : scope === 'today' ? 'Nothing due today'
+                  : 'Nothing upcoming'}
               </p>
               <p className="text-[13px] text-warm-grey mt-2 leading-relaxed">
-                {showAll
+                {scope === 'all'
                   ? <>Tap <span className="font-semibold text-plum">+</span> to add one, or message <span className="italic">"remind Sarah to book the dentist on Tuesday"</span> to the WhatsApp bot.</>
-                  : <>You're all caught up. Switch to <span className="font-medium">All tasks</span> to see what's coming up.</>
+                  : <>You're all caught up here. Switch to <span className="font-medium">All</span> to see everything.</>
                 }
               </p>
             </div>
