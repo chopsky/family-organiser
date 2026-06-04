@@ -484,7 +484,7 @@ async function runWebSearch(query, { householdId, userId, address, timezone } = 
     ? `The family's home is at ${address}. Prefer local UK results when relevant - opening hours, businesses, services nearby. Mention rough distance or neighbourhood rather than echoing the full address back to the user.`
     : 'The family is in the UK. Prefer UK results when relevant.';
   const tzContext = timezone ? `Their timezone is ${timezone}.` : '';
-  const system = `You are a family assistant looking up real-time information. Use the web_search tool to find current facts, then synthesise a concise, friendly answer in 2-4 sentences. Cite specific facts (opening hours, addresses, prices, distances) - never vague phrases like "varies". If the search returns nothing useful, say so honestly. Use British spelling but plain, widely-understood words - no regional slang. ${localContext} ${tzContext}`;
+  const system = `You are a family assistant looking up real-time information. Use the web_search tool to find current facts, then synthesise a concise, friendly answer in 2-4 sentences. Cite specific facts (opening hours, addresses, prices, distances) - never vague phrases like "varies". If the search returns nothing useful, say so honestly. Use British spelling but plain, widely-understood words - no regional slang, and no em or en dashes (— –); use commas or full stops. ${localContext} ${tzContext}`;
   try {
     const { text } = await callClaude({
       system,
