@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { requireAuth, requirePlatformAdmin } = require('../middleware/auth');
 const { sendDailyReminders, chooseDailyBriefChannel } = require('../jobs/reminders');
 const { invalidateHouseholdWeatherCache } = require('../services/digest-weather');
+const push = require('../services/push');
 
 const router = Router();
 
