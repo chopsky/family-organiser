@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
@@ -482,7 +482,12 @@ export default function Settings() {
   //      popup at a time).
   //   4. Web - either AccordionItem (if accordion={true}) or
   //      SettingsCard (always-expanded standalone card).
-  function SectionWrapper({ slug, title, icon, danger, accordion, children }) {
+  // Memoised so its component identity is STABLE across renders. Defined
+  // inside Settings (it needs the iOS popup state), but without this every
+  // keystroke would create a new SectionWrapper function -> React remounts
+  // every section -> focused inputs lose focus -> the iOS keyboard dismisses.
+  // Deps are only the iOS-mode values it closes over (none change while typing).
+  const SectionWrapper = useCallback(function SectionWrapper({ slug, title, icon, danger, accordion, children }) {
     if (iosListMode) return null;
     if (iosPopupOpen) {
       if (popupSlug !== slug) return null;
@@ -528,7 +533,7 @@ export default function Settings() {
       return <AccordionItem title={title} icon={icon} danger={danger}>{children}</AccordionItem>;
     }
     return <SettingsCard title={title} icon={icon} danger={danger}>{children}</SettingsCard>;
-  }
+  }, [iosListMode, iosPopupOpen, popupSlug, setPopupSlug]);
 
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
