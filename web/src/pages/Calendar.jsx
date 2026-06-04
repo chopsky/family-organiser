@@ -2375,9 +2375,13 @@ export default function Calendar() {
                     <button
                       type="button"
                       onClick={() => deleteEvent(editingEvent.id)}
-                      className="text-xs font-semibold text-coral hover:text-coral/80 ml-2 transition-colors"
+                      className="text-coral hover:text-coral/80 ml-2 p-1.5 -m-1.5 transition-colors"
+                      aria-label="Delete event"
+                      title="Delete event"
                     >
-                      Delete
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 5v6m4-6v6" />
+                      </svg>
                     </button>
                   )}
                 </div>
