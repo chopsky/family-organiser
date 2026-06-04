@@ -20,12 +20,16 @@ describe('deriveTerms', () => {
     ]);
   });
 
-  test('prefers an explicit row label when present', () => {
+  test('ignores boilerplate row labels and includes the year so terms are unique', () => {
     const terms = deriveTerms([
-      { event_type: 'term_start', academic_year: '2026/27', date: '2026-09-08', label: 'Michaelmas' },
+      { event_type: 'term_start', academic_year: '2026/27', date: '2026-09-08', label: 'Autumn Term starts' },
       { event_type: 'term_end', academic_year: '2026/27', date: '2026-12-17' },
+      { event_type: 'term_start', academic_year: '2027/28', date: '2027-09-07', label: 'Autumn Term starts' },
+      { event_type: 'term_end', academic_year: '2027/28', date: '2027-12-16' },
     ]);
-    expect(terms[0].label).toBe('Michaelmas');
+    expect(terms.map(t => t.label)).toEqual(['Autumn Term 2026/27', 'Autumn Term 2027/28']);
+    // distinguishable - no duplicate labels
+    expect(new Set(terms.map(t => t.label)).size).toBe(terms.length);
   });
 
   test('skips an unpaired term_start', () => {

@@ -89,9 +89,11 @@ function deriveTerms(termDates = []) {
       const s = starts[i];
       const e = ends[i];
       if (!e) continue; // unpaired start - skip rather than guess an end
-      const label = (s.label && s.label.trim())
-        ? s.label.trim()
-        : `${seasonLabel(s.date)}${yr ? ` ${yr}` : ''}`;
+      // Always derive "<Season> Term <year>" rather than trust the imported
+      // row label, which is often boilerplate like "Autumn Term starts" and
+      // carries no year - so two academic years would collide into identical,
+      // indistinguishable labels. The academic year makes each term unique.
+      const label = `${seasonLabel(s.date)}${yr ? ` ${yr}` : ''}`;
       terms.push({ label, academic_year: yr, start_date: s.date, end_date: e.date });
     }
   }

@@ -569,7 +569,7 @@ export default function FamilySetup() {
           setActivityTerms(terms);
           const today = todayYmd();
           const cur = terms.find(t => today >= t.start_date && today <= t.end_date);
-          setSelectedTermKey(cur ? cur.label : 'ongoing');
+          setSelectedTermKey(cur ? cur.start_date : 'ongoing');
         })
         .catch(() => { setActivityTerms([]); setSelectedTermKey('ongoing'); });
       api.get(`/schools/${member.school_id}/term-dates`)
@@ -614,7 +614,7 @@ export default function FamilySetup() {
   function activityInSelectedTerm(a) {
     if (selectedTermKey === 'ongoing') return isOngoingActivity(a);
     if (selectedTermKey === 'custom') return true; // manage everything
-    const t = activityTerms.find(x => x.label === selectedTermKey);
+    const t = activityTerms.find(x => x.start_date === selectedTermKey);
     if (!t) return true;
     return activityInTerm(a, t);
   }
@@ -635,7 +635,7 @@ export default function FamilySetup() {
       // Edits preserve the activity's existing window (the grid selector is a
       // view control, not a per-activity move).
       if (!editingActivity) {
-        const termObj = activityTerms.find(t => t.label === selectedTermKey) || null;
+        const termObj = activityTerms.find(t => t.start_date === selectedTermKey) || null;
         if (selectedTermKey === 'custom') {
           Object.assign(body, { start_date: customStart || null, end_date: customEnd || null, term_label: null });
         } else if (termObj) {
@@ -3209,12 +3209,12 @@ export default function FamilySetup() {
                       onChange={(e) => setSelectedTermKey(e.target.value)}
                       className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white"
                     >
-                      {activityTerms.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
+                      {activityTerms.map(t => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
                       <option value="ongoing">Ongoing (every term)</option>
                       <option value="custom">Custom dates…</option>
                     </select>
                     {(() => {
-                      const t = activityTerms.find(x => x.label === selectedTermKey);
+                      const t = activityTerms.find(x => x.start_date === selectedTermKey);
                       return t ? <span className="text-[11px] text-cocoa">{fmtTermRange(t)}</span> : null;
                     })()}
                   </div>
@@ -3247,6 +3247,9 @@ export default function FamilySetup() {
                                         <div className="font-medium truncate">{a.activity}</div>
                                         {a.time_end && <div className="text-cocoa text-[10px]">til {a.time_end.substring(0, 5)}</div>}
                                         {pickup && <div className="text-primary text-[10px] truncate">🚗 {pickup.name}</div>}
+                                        {isOngoingActivity(a) && selectedTermKey !== 'ongoing' && selectedTermKey !== 'custom' && (
+                                          <div className="text-cocoa text-[9px] italic">every term</div>
+                                        )}
                                         <span
                                           role="button"
                                           tabIndex={0}
@@ -3294,7 +3297,7 @@ export default function FamilySetup() {
                             <p className="text-[11px] text-cocoa">
                               {selectedTermKey === 'ongoing'
                                 ? 'Will show every term, until you remove it.'
-                                : `Will be set for ${selectedTermKey} only.`}
+                                : `Will be set for ${(activityTerms.find(t => t.start_date === selectedTermKey)?.label) || 'this term'} only.`}
                             </p>
                           )}
 
