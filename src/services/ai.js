@@ -265,7 +265,10 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], 
         },
       ],
       useThinking: false,
-      maxTokens: 2048,
+      // Generous budget: a termly booking / fixture list can hold 20-40 dated
+      // sessions, each a full event object. At 2048 the JSON truncated
+      // mid-list and failed to parse ("trouble reading that image").
+      maxTokens: 8192,
       feature: 'image_scan',
       responseFormat: 'json',
       householdId,
