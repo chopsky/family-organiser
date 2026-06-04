@@ -636,17 +636,6 @@ export default function Tasks() {
     if (scope === 'all') return true;
     return taskScope(t) === scope;
   }
-  // Live counts per chip, from active (incomplete) tasks only.
-  const scopeCounts = (() => {
-    const c = { all: 0, overdue: 0, today: 0, upcoming: 0 };
-    for (const t of tasks) {
-      if (t.completed) continue;
-      c.all += 1;
-      const s = taskScope(t);
-      if (c[s] !== undefined) c[s] += 1;
-    }
-    return c;
-  })();
 
   const columnData = (() => {
     const memberNames = members.map((m) => m.name);
@@ -837,29 +826,17 @@ export default function Tasks() {
           { key: 'upcoming', label: 'Upcoming' },
         ].map(({ key, label }) => {
           const active = scope === key;
-          const count = scopeCounts[key];
-          const isOverdue = key === 'overdue' && count > 0;
           return (
             <button
               key={key}
               type="button"
               onClick={() => setScope(key)}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors border"
+              className="shrink-0 inline-flex items-center rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors border"
               style={active
                 ? { background: 'var(--plum, #6B3FA0)', borderColor: 'var(--plum, #6B3FA0)', color: '#fff' }
                 : { background: '#fff', borderColor: 'var(--light-grey, #E8E5EC)', color: 'var(--charcoal, #2D2A33)' }}
             >
               {label}
-              <span
-                className="text-xs rounded-full px-1.5 min-w-[18px] text-center"
-                style={active
-                  ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
-                  : isOverdue
-                    ? { background: 'var(--coral-light, #FDF0EB)', color: 'var(--coral, #E8724A)', fontWeight: 600 }
-                    : { background: 'var(--light-grey, #E8E5EC)', color: 'var(--warm-grey, #6B6774)' }}
-              >
-                {count}
-              </span>
             </button>
           );
         })}
