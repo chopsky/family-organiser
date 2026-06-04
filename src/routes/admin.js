@@ -648,7 +648,7 @@ router.post('/tools/push-selftest', async (req, res) => {
     // Surface which environment the server tries first, so we can confirm
     // APN_PRODUCTION is actually taking effect.
     const primaryEnv = results.find((x) => x.attempts.length)?.attempts[0]?.env || null;
-    return res.json({ configured: true, count: results.length, primaryEnv, results });
+    return res.json({ configured: true, count: results.length, primaryEnv, apns: push.getConfigInfo(), results });
   } catch (err) {
     console.error('POST /api/admin/tools/push-selftest error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });

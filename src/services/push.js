@@ -450,8 +450,26 @@ async function sendToHousehold(householdId, excludeUserId, { title, body, data, 
   }
 }
 
+/**
+ * Non-secret APNs config for the admin diagnostic. Key ID and Team ID are
+ * identifiers (not secrets - they appear in entitlements/the portal); the
+ * private .p8 is never exposed. Lets an operator compare what the server is
+ * configured with against Apple Developer → Keys / Membership.
+ */
+function getConfigInfo() {
+  return {
+    configured,
+    keyId: APN_KEY_ID || null,
+    teamId: APN_TEAM_ID || null,
+    bundleId: APN_BUNDLE_ID,
+    primaryEnv: PRIMARY_ENV,
+    apnProduction: APN_PRODUCTION,
+  };
+}
+
 module.exports = {
   sendPushNotification,
+  getConfigInfo,
   sendToUser,
   sendToHousehold,
   isConfigured: () => configured,

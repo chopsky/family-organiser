@@ -212,9 +212,16 @@ export default function AdminWhatsApp() {
               <p className="text-xs text-warm-grey">No active tokens to test.</p>
             ) : (
               <>
+                {selftest.apns && (
+                  <div className="text-xs text-warm-grey mb-3 bg-cream rounded-lg p-3 space-y-0.5">
+                    <p className="font-semibold text-charcoal mb-1">Server APNs config — compare against Apple Developer</p>
+                    <p>Key ID: <span className="font-mono text-charcoal">{selftest.apns.keyId || '(unset)'}</span> — must exist under <em>Keys</em>, enabled for APNs.</p>
+                    <p>Team ID: <span className="font-mono text-charcoal">{selftest.apns.teamId || '(unset)'}</span> — must be the team that owns <span className="font-mono">com.housemait.app</span>.</p>
+                    <p>Bundle/topic: <span className="font-mono text-charcoal">{selftest.apns.bundleId}</span> · Tries <span className="font-medium text-charcoal">{selftest.apns.primaryEnv}</span> first (APN_PRODUCTION={String(selftest.apns.apnProduction)}).</p>
+                  </div>
+                )}
                 <p className="text-xs text-warm-grey mb-2">
                   Self-test result per token (active + inactive). The <strong>attempts</strong> column shows each APNs environment my server tried and what it returned.
-                  {selftest.primaryEnv && <> Server tries <span className="font-medium text-charcoal">{selftest.primaryEnv}</span> first.</>}
                 </p>
                 <div className="space-y-1">
                   {selftest.results.map((r) => (
