@@ -5,6 +5,7 @@ import { AISLE_CATEGORIES, AISLE_CONFIG, getItemEmoji } from '../lib/shopping-co
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { WriteGate } from '../components/SubscribePrompt';
+import { IconTrash } from '../components/Icons';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
@@ -577,7 +578,7 @@ export default function Shopping() {
                           onClick={e => { e.stopPropagation(); deleteItem(item.id); }}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-warm-grey hover:bg-coral-light hover:text-coral transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
                         >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
+                          <IconTrash className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ))}
@@ -646,7 +647,7 @@ export default function Shopping() {
                           onClick={() => deleteItem(item.id)}
                           className="w-6 h-6 rounded-md flex items-center justify-center text-coral hover:bg-coral-light transition-all"
                         >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
+                          <IconTrash className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     );

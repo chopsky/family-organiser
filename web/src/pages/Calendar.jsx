@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings } from '../components/Icons';
+import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
@@ -2379,9 +2379,7 @@ export default function Calendar() {
                       aria-label="Delete event"
                       title="Delete event"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 5v6m4-6v6" />
-                      </svg>
+                      <IconTrash className="w-[18px] h-[18px]" />
                     </button>
                   )}
                 </div>
