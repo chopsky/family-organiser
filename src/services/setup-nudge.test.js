@@ -24,7 +24,32 @@ describe('detectSetupGaps', () => {
   test('only the address gap when calendars + schools are done', () => {
     expect(detectSetupGaps({
       hasCalendarFeeds: true, hasSchools: true, hasAddress: false, hasChildren: true,
+      memberCount: 3,
     })).toEqual(['address']);
+  });
+
+  test('backfill: a solo household (just the admin) is flagged to add family, first', () => {
+    const gaps = detectSetupGaps({
+      hasCalendarFeeds: false, hasSchools: false, hasAddress: false, hasChildren: false,
+      memberCount: 1,
+    });
+    expect(gaps[0]).toBe('family');
+    expect(gaps).toEqual(['family', 'calendars', 'address']); // no schools (no kids)
+  });
+
+  test('no family gap once the household has more than one member', () => {
+    expect(detectSetupGaps({
+      hasCalendarFeeds: true, hasSchools: true, hasAddress: true, hasChildren: true,
+      memberCount: 4,
+    })).toEqual([]);
+  });
+
+  test('memberCount omitted does not flag family (back-compat)', () => {
+    const gaps = detectSetupGaps({
+      hasCalendarFeeds: false, hasSchools: false, hasAddress: true, hasChildren: false,
+    });
+    expect(gaps).not.toContain('family');
+    expect(gaps).toEqual(['calendars']);
   });
 });
 

@@ -5489,6 +5489,7 @@ async function getSetupNudgeCandidates(db = supabase) {
       hasSchools: Array.isArray(schools) && schools.length > 0,
       hasAddress: !!(household && household.address && String(household.address).trim()),
       hasChildren: (allMembers || []).some((m) => m.member_type === 'dependent'),
+      memberCount: (allMembers || []).length,
     });
   }));
 

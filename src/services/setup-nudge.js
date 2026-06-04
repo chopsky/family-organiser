@@ -20,6 +20,10 @@
 // The app-only setup steps we nudge about, in priority order. `where` mirrors
 // the exact screen names the WhatsApp bot points users to.
 const GAP_INFO = {
+  family: {
+    short: 'add your family (your partner and any children)',
+    where: 'Family Setup',
+  },
   calendars: {
     short: 'connect your shared calendars',
     where: 'Settings, then Connect Calendars',
@@ -34,7 +38,9 @@ const GAP_INFO = {
   },
 };
 
-const GAP_ORDER = ['calendars', 'schools', 'address'];
+// Foundational first: a household with no one added can't benefit from the
+// rest, so 'family' leads.
+const GAP_ORDER = ['family', 'calendars', 'schools', 'address'];
 
 /**
  * Work out which app-only setup steps a household is missing.
@@ -44,10 +50,16 @@ const GAP_ORDER = ['calendars', 'schools', 'address'];
  * @param {boolean} p.hasSchools       - any school set up for the household
  * @param {boolean} p.hasAddress       - a home address is saved
  * @param {boolean} p.hasChildren      - household has dependent members
+ * @param {number}  [p.memberCount]    - total members (incl. the admin)
  * @returns {string[]} gap keys, in priority order ([] = fully set up)
  */
-function detectSetupGaps({ hasCalendarFeeds, hasSchools, hasAddress, hasChildren } = {}) {
+function detectSetupGaps({ hasCalendarFeeds, hasSchools, hasAddress, hasChildren, memberCount } = {}) {
   const gaps = [];
+  // Backfill: a household that's still just the admin (no partner, no kids
+  // added) hasn't populated their family. Foundational - nudge it first.
+  // Conservative threshold (<= 1) so we don't pester households that have
+  // genuinely added everyone.
+  if (typeof memberCount === 'number' && memberCount <= 1) gaps.push('family');
   if (!hasCalendarFeeds) gaps.push('calendars');
   // Only nudge about school dates when there are actually children to set up.
   if (hasChildren && !hasSchools) gaps.push('schools');
