@@ -244,7 +244,6 @@ export default function Layout({ children }) {
       {/* ── Desktop Sidebar ── */}
       <aside
         className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30"
-        style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 0px 14px' }}
       >
         {/* Logo */}
         <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
