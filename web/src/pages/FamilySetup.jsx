@@ -533,7 +533,14 @@ export default function FamilySetup() {
     }
   }
 
+  // Personal profiles are private: an adult can edit only their OWN profile.
+  // Children (dependents) have no login, so any adult may edit theirs.
+  function canEditProfile(m) {
+    return !!m && (m.id === user?.id || m.member_type === 'dependent');
+  }
+
   function openEditProfile(member) {
+    if (!canEditProfile(member)) return;
     setEditingMember(member);
     setProfileName(member.name || '');
     setProfileRole(member.family_role || '');
@@ -1818,7 +1825,7 @@ export default function FamilySetup() {
                     {m.whatsapp_linked && ' · WhatsApp connected'}
                   </p>
                 </div>
-                {(m.id === user?.id || isAdmin) && (
+                {canEditProfile(m) && (
                   <button
                     onClick={() => openEditProfile(m)}
                     className="text-cocoa hover:text-primary p-1.5 rounded-lg transition-colors hover:bg-primary/10"
@@ -1977,7 +1984,7 @@ export default function FamilySetup() {
                           </div>
                         )}
                       </div>
-                      {isAdmin && (
+                      {canEditProfile(m) && (
                         <>
                           <button
                             onClick={() => openEditProfile(m)}

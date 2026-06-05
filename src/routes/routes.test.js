@@ -409,6 +409,46 @@ describe('PATCH /api/settings', () => {
   });
 });
 
+// ─── PATCH /api/household/profile (personal profiles are private) ───────────
+
+describe('PATCH /api/household/profile', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const PROFILE_MEMBERS = [
+    { id: 'u-1', name: 'Grant', role: 'admin', member_type: 'adult', household_id: 'hh-1' },
+    { id: 'u-2', name: 'Lynn', role: 'member', member_type: 'adult', household_id: 'hh-1' },
+    { id: 'k-1', name: 'Logan', role: 'member', member_type: 'dependent', household_id: 'hh-1' },
+  ];
+
+  test('a member can edit their own profile', async () => {
+    db.updateUser.mockResolvedValue({ id: 'u-2', name: 'Lynne' });
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    const res = await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` }).send({ name: 'Lynne' });
+    expect(res.status).not.toBe(403);
+    expect(db.updateUser).toHaveBeenCalledWith('u-2', expect.objectContaining({ name: 'Lynne' }));
+  });
+
+  test('a member CANNOT edit another adult\'s profile', async () => {
+    db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    const res = await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` }).send({ user_id: 'u-1', name: 'Hacked' });
+    expect(res.status).toBe(403);
+    expect(db.updateUser).not.toHaveBeenCalled();
+  });
+
+  test('a member CAN edit a child (dependent) profile', async () => {
+    db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
+    db.updateUser.mockResolvedValue({ id: 'k-1', name: 'Logan B' });
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    const res = await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` }).send({ user_id: 'k-1', name: 'Logan B' });
+    expect(res.status).not.toBe(403);
+    expect(db.updateUser).toHaveBeenCalledWith('k-1', expect.objectContaining({ name: 'Logan B' }));
+  });
+});
+
 // ─── DELETE /api/household/members/:userId ──────────────────────────────────
 
 describe('DELETE /api/household/members/:userId', () => {

@@ -100,16 +100,19 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
   const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id } = req.body;
 
-  // Determine target user - admins can edit others, members only themselves
+  // Determine target user. Personal profiles are private: each adult edits
+  // ONLY their own. Any adult may edit a child's (dependent's) profile, since
+  // children don't have their own login. So editing someone else is allowed
+  // only when that someone is a dependent.
   let targetUserId = req.user.id;
   if (user_id && user_id !== req.user.id) {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only admins can edit other members.' });
-    }
-    // Verify target belongs to same household
     const members = await db.getHouseholdMembers(req.householdId);
-    if (!members.find(m => m.id === user_id)) {
+    const target = members.find(m => m.id === user_id);
+    if (!target) {
       return res.status(404).json({ error: 'Member not found in this household.' });
+    }
+    if (target.member_type !== 'dependent') {
+      return res.status(403).json({ error: 'You can only edit your own profile. Each adult manages their own.' });
     }
     targetUserId = user_id;
   }
