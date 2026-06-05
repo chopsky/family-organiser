@@ -9,14 +9,7 @@ import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
 import { tap as hapticTap } from '../lib/haptics';
 import { onShortcutTapped } from '../lib/app-shortcuts';
-import { Capacitor } from '@capacitor/core';
 const ChatWidget = lazy(() => import('./ChatWidget'));
-
-// True only inside the native iOS/Android shell. Used to give the app
-// the same warm radial-gradient backdrop as the /login screen.
-function isNativeShell() {
-  try { return Capacitor.isNativePlatform(); } catch { return false; }
-}
 
 const mainNav = [
   { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
@@ -135,7 +128,6 @@ const avatarColors = {
 
 export default function Layout({ children }) {
   const { household, user, token, login, logout, isPlatformAdmin } = useAuth();
-  const native = isNativeShell();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -248,42 +240,7 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className={`relative min-h-screen flex flex-col md:flex-row ${native ? '' : 'bg-cream'}`}>
-      {/* ── Native radial-gradient backdrop ──
-          On the iOS/Android shell we drop the flat cream and paint the same
-          warm radial gradient + two ambient blobs the /login screen uses, so
-          the signed-in app feels of a piece with the concierge entry stage.
-          A fixed full-viewport layer keeps the gradient anchored to the screen
-          (not the scroll height) and reliable inside WKWebView. Purely
-          decorative, so aria-hidden and pointer-events-none. */}
-      {native && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-          style={{ background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)' }}
-        >
-          {/* Coral blob (bottom-left). */}
-          <div
-            className="absolute"
-            style={{
-              width: 760, height: 760, borderRadius: '50%',
-              left: -180, bottom: -300,
-              background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)',
-              filter: 'blur(20px)',
-            }}
-          />
-          {/* Purple blob (top-right). */}
-          <div
-            className="absolute"
-            style={{
-              width: 600, height: 600, borderRadius: '50%',
-              right: -160, top: -200,
-              background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)',
-              filter: 'blur(20px)',
-            }}
-          />
-        </div>
-      )}
+    <div className="min-h-screen bg-cream flex flex-col md:flex-row">
       {/* ── Desktop Sidebar ── */}
       <aside
         className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30"
