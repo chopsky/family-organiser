@@ -314,6 +314,14 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
   }
 
   try {
+    // The household owner (the person who set it up and holds the
+    // subscription) can't be removed by a co-member - that would orphan the
+    // billing relationship.
+    const household = await db.getHouseholdById(req.householdId);
+    if (household?.created_by && household.created_by === userId) {
+      return res.status(403).json({ error: 'The household owner can\'t be removed.' });
+    }
+
     // Verify target user belongs to the same household
     const members = await db.getHouseholdMembers(req.householdId);
     const target = members.find((m) => m.id === userId);

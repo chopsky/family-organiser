@@ -36,12 +36,20 @@ function requireAuth(req, res, next) {
 }
 
 /**
- * Middleware: requires the user to be an admin.
- * Must be chained after requireAuth.
+ * Household management gate. Housemait is collaborative: ANY adult member of a
+ * household can manage it - add family members, schools, term dates, weekly
+ * activities, and household settings. Children are never authenticated (they're
+ * records, not logins), so any authenticated household member is an adult and
+ * may manage. Billing/subscription is the one exception and is restricted to
+ * the household owner (created_by) - enforced inline in the subscription routes.
+ *
+ * The name `requireAdmin` is kept (it guards the same family-management routes
+ * it always did) so call sites don't churn; it now means "an authenticated
+ * member of a household". Must be chained after requireAuth + requireHousehold.
  */
 function requireAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+  if (!req.user || !req.householdId) {
+    return res.status(403).json({ error: 'You must be a member of a household.' });
   }
   return next();
 }

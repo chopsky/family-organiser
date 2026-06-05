@@ -107,6 +107,14 @@ router.post('/checkout', requireAuth, requireHousehold, async (req, res) => {
   const currency = (req.body?.currency || 'gbp').toLowerCase();
 
   try {
+    // Billing is owner-only: everyone in the household can use Housemait
+    // collaboratively, but only the person who set it up (created_by) manages
+    // the subscription. Legacy households without created_by aren't locked out.
+    const household = await db.getHouseholdById(req.householdId);
+    if (household?.created_by && household.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Only the household owner (the person who set up the account) can manage the subscription.' });
+    }
+
     const user = await db.getUserById(req.user.id);
     if (!user?.email) {
       // Pre-email-verified accounts or dependents - they shouldn't be
@@ -145,6 +153,11 @@ router.post('/checkout', requireAuth, requireHousehold, async (req, res) => {
 router.post('/portal', requireAuth, requireHousehold, async (req, res) => {
   try {
     const household = await db.getHouseholdById(req.householdId);
+    // Owner-only (see /checkout): only the person who set up the household
+    // manages the subscription.
+    if (household?.created_by && household.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Only the household owner (the person who set up the account) can manage the subscription.' });
+    }
     if (!household?.stripe_customer_id) {
       return res.status(400).json({
         error: 'No Stripe customer on this household - subscribe first to access the portal',

@@ -395,12 +395,12 @@ describe('PATCH /api/settings', () => {
     expect(res.body.household.name).toBe('The Joneses');
   });
 
-  test('non-admin gets 403', async () => {
+  test('any household member can manage settings (collaborative)', async () => {
     const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
     const res = await request(app).patch('/api/settings/settings')
       .set({ Authorization: `Bearer ${memberToken}` })
       .send({ name: 'New Name' });
-    expect(res.status).toBe(403);
+    expect(res.status).not.toBe(403);
   });
 
   test('returns 400 when no valid fields provided', async () => {
@@ -424,17 +424,29 @@ describe('DELETE /api/household/members/:userId', () => {
     expect(db.deleteUser).toHaveBeenCalledWith('u-2', 'hh-1');
   });
 
-  test('non-admin gets 403', async () => {
+  test('any household member can remove a member (collaborative)', async () => {
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    db.deleteUser.mockResolvedValue();
     const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
     const res = await request(app).delete('/api/household/members/u-1')
       .set({ Authorization: `Bearer ${memberToken}` });
-    expect(res.status).toBe(403);
+    expect(res.status).not.toBe(403);
   });
 
   test('admin cannot remove themselves', async () => {
     const res = await request(app).delete('/api/household/members/u-1').set(AUTH);
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('cannot remove yourself');
+  });
+
+  test('the household owner (created_by) cannot be removed by a co-member', async () => {
+    db.getHouseholdById.mockResolvedValue({ ...HOUSEHOLD, created_by: 'u-1' });
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
+    const res = await request(app).delete('/api/household/members/u-1')
+      .set({ Authorization: `Bearer ${memberToken}` });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain('owner');
   });
 
   test('returns 404 for member not in household', async () => {
@@ -957,13 +969,13 @@ describe('POST /api/household/invite', () => {
     expect(db.createInvite).toHaveBeenCalled();
   });
 
-  test('non-admin gets 403', async () => {
+  test('any household member can invite (collaborative)', async () => {
     const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
     const res = await request(app).post('/api/household/invite')
       .set({ Authorization: `Bearer ${memberToken}` })
       .send({ email: 'someone@test.com' });
 
-    expect(res.status).toBe(403);
+    expect(res.status).not.toBe(403);
   });
 
   test('returns 400 when email is missing', async () => {
@@ -988,11 +1000,12 @@ describe('GET /api/household/invites', () => {
     expect(res.body.invites).toHaveLength(1);
   });
 
-  test('non-admin gets 403', async () => {
+  test('any household member can list invites (collaborative)', async () => {
+    db.getPendingInvites.mockResolvedValue([]);
     const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
     const res = await request(app).get('/api/household/invites')
       .set({ Authorization: `Bearer ${memberToken}` });
 
-    expect(res.status).toBe(403);
+    expect(res.status).not.toBe(403);
   });
 });
