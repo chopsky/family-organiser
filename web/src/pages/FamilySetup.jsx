@@ -101,7 +101,9 @@ function pickNextAvatarColor(existingMembers) {
 }
 
 export default function FamilySetup() {
-  const { household, user, isAdmin, login, token } = useAuth();
+  // Family Setup is all collaborative management, so gate on canManage (any
+  // adult member), not the legacy single-admin flag.
+  const { household, user, canManage: isAdmin, login, token } = useAuth();
   const canWrite = useCanWrite();
   // Country-specific school flow gates. There are now three flows:
   //   • UK: GIAS-driven school search + LA term-date scrape (full-fat)

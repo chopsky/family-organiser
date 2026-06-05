@@ -64,6 +64,9 @@ const FEED_COLOR_HEX = {
  */
 function PlanSection() {
   const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
+  // Billing is owner-only: non-owners see the plan status but not the
+  // subscribe/manage controls (the server also enforces this).
+  const { isOwner } = useAuth();
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
 
@@ -157,12 +160,16 @@ function PlanSection() {
               Subscribe any time to avoid interruption.
             </p>
           </div>
-          <Link
-            to="/subscribe"
-            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-          >
-            Subscribe
-          </Link>
+          {isOwner ? (
+            <Link
+              to="/subscribe"
+              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            >
+              Subscribe
+            </Link>
+          ) : (
+            <span className="text-xs text-warm-grey">Managed by the account owner</span>
+          )}
         </div>
       )}
 
@@ -183,14 +190,18 @@ function PlanSection() {
                 : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCustomerPortal}
-            disabled={portalLoading}
-            className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {portalLoading ? 'Opening…' : 'Manage subscription'}
-          </button>
+          {isOwner ? (
+            <button
+              type="button"
+              onClick={openCustomerPortal}
+              disabled={portalLoading}
+              className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {portalLoading ? 'Opening…' : 'Manage subscription'}
+            </button>
+          ) : (
+            <span className="text-xs text-warm-grey">Managed by the account owner</span>
+          )}
         </div>
       )}
 
@@ -204,12 +215,16 @@ function PlanSection() {
               Your data's still here. Subscribe to unlock everything again.
             </p>
           </div>
-          <Link
-            to="/subscribe"
-            className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-          >
-            Subscribe
-          </Link>
+          {isOwner ? (
+            <Link
+              to="/subscribe"
+              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            >
+              Subscribe
+            </Link>
+          ) : (
+            <span className="text-xs text-warm-grey">Managed by the account owner</span>
+          )}
         </div>
       )}
 
@@ -447,7 +462,10 @@ const IOS_SECTION_ICONS = {
 };
 
 export default function Settings() {
-  const { household, user, isAdmin, login, logout, token } = useAuth();
+  // Management controls (e.g. the Send-Emails-to-AI allowlist) gate on
+  // canManage - any adult member - per the collaborative model. Billing is
+  // owner-only (isOwner), enforced on the server too.
+  const { household, user, canManage: isAdmin, isOwner, login, logout, token } = useAuth();
   const navigate = useNavigate();
 
   // iOS native shell: the Settings landing is a list of section rows

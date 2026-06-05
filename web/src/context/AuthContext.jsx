@@ -106,6 +106,12 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       token, user, household, login, logout, updateUser,
       isAdmin: user?.role === 'admin',
+      // Housemait is collaborative: every adult member can manage the
+      // household (add family, school dates, activities, settings). Children
+      // are never logged in, so any authenticated member is an adult.
+      canManage: !!user,
+      // The original purchaser/creator - the only one who manages billing.
+      isOwner: !!user && !!household && (!household.created_by || household.created_by === user.id),
       isPlatformAdmin: user?.isPlatformAdmin === true,
       needsHousehold: !!token && !household,
       needsOnboarding: !!token && !!household && user && !user.onboarded_at,
