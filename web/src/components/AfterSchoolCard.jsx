@@ -164,7 +164,7 @@ export default function AfterSchoolCard({ members = [] }) {
     >
       {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-        <h2 className="text-base font-sans font-semibold text-bark">After school</h2>
+        <h2 className="text-base font-sans font-semibold text-bark">Extracurricular</h2>
         <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">Calendar →</Link>
       </div>
 
