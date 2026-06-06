@@ -296,20 +296,37 @@ const markPasswordResetTokenUsed = (id) => markTokenUsed('password_reset_tokens'
 
 // ─── Refresh tokens (session security) ───────────────────────────────────────
 
+// True when a query failed only because the app_version column doesn't exist
+// yet (migration-app-version.sql not run). Lets the app_version touchpoints
+// degrade gracefully — write/read without it — instead of hard-failing core
+// flows like login while the migration is pending.
+function isMissingColumnError(error) {
+  if (!error) return false;
+  const code = error.code;
+  const msg = (error.message || '').toLowerCase();
+  return code === '42703' || code === 'PGRST204'
+    || (msg.includes('app_version'))
+    || (msg.includes('column') && msg.includes('does not exist'));
+}
+
 async function createRefreshToken(userId, token, expiresAt, meta = {}, db = supabase) {
-  const { data, error } = await db
+  const baseRow = {
+    user_id: userId,
+    token,
+    expires_at: expiresAt,
+    user_agent: meta.userAgent || null,
+    ip_address: meta.ipAddress || null,
+    last_used_at: new Date().toISOString(),
+  };
+  let { data, error } = await db
     .from('refresh_tokens')
-    .insert({
-      user_id: userId,
-      token,
-      expires_at: expiresAt,
-      user_agent: meta.userAgent || null,
-      app_version: meta.appVersion || null,
-      ip_address: meta.ipAddress || null,
-      last_used_at: new Date().toISOString(),
-    })
+    .insert({ ...baseRow, app_version: meta.appVersion || null })
     .select()
     .single();
+  // Pre-migration fallback: retry without app_version so login never breaks.
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await db.from('refresh_tokens').insert(baseRow).select().single());
+  }
   if (error) throw error;
   return data;
 }
@@ -3476,10 +3493,20 @@ const { parsePlatformFromUserAgent } = require('../utils/platform-detect');
 async function getPlatformsByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
 
-  const [tokensRes, devicesRes] = await Promise.all([
-    db.from('refresh_tokens').select('user_id, user_agent, app_version, last_used_at').in('user_id', userIds),
-    db.from('device_tokens').select('user_id, active, app_version, updated_at').in('user_id', userIds).eq('platform', 'ios'),
+  const selectPlatformRows = (withVersion) => Promise.all([
+    db.from('refresh_tokens')
+      .select(withVersion ? 'user_id, user_agent, app_version, last_used_at' : 'user_id, user_agent, last_used_at')
+      .in('user_id', userIds),
+    db.from('device_tokens')
+      .select(withVersion ? 'user_id, active, app_version, updated_at' : 'user_id, active, updated_at')
+      .in('user_id', userIds).eq('platform', 'ios'),
   ]);
+  let [tokensRes, devicesRes] = await selectPlatformRows(true);
+  // Pre-migration fallback: drop app_version from the projection. Rows then
+  // lack app_version, so noteAppVersion below simply records nothing.
+  if (isMissingColumnError(tokensRes.error) || isMissingColumnError(devicesRes.error)) {
+    [tokensRes, devicesRes] = await selectPlatformRows(false);
+  }
 
   const map = new Map();
   function entry(userId) {
@@ -5675,7 +5702,7 @@ async function getHouseholdStorageUsage(householdId) {
 // ─── Device Tokens & Notification Preferences ──────────────────────────────
 
 async function registerDeviceToken(userId, householdId, token, platform = 'ios', appVersion = null) {
-  const row = {
+  const baseRow = {
     user_id: userId,
     household_id: householdId,
     token,
@@ -5685,12 +5712,21 @@ async function registerDeviceToken(userId, householdId, token, platform = 'ios',
   };
   // Only overwrite app_version when the client actually reported one, so a
   // re-register from an older client that omits the header doesn't blank it.
-  if (appVersion) row.app_version = appVersion;
-  const { data, error } = await supabase
+  const row = appVersion ? { ...baseRow, app_version: appVersion } : baseRow;
+  let { data, error } = await supabase
     .from('device_tokens')
     .upsert(row, { onConflict: 'token' })
     .select()
     .single();
+  // Pre-migration fallback: retry without app_version so push registration
+  // never breaks while the migration is pending.
+  if (error && isMissingColumnError(error) && appVersion) {
+    ({ data, error } = await supabase
+      .from('device_tokens')
+      .upsert(baseRow, { onConflict: 'token' })
+      .select()
+      .single());
+  }
   if (error) throw error;
   return data;
 }
@@ -5722,7 +5758,9 @@ async function getActiveDeviceTokens(userId) {
 async function getDeviceTokensForUserAdmin(userId) {
   const { data, error } = await supabase
     .from('device_tokens')
-    .select('id, token, platform, active, app_version, created_at, updated_at')
+    // select('*') so this never breaks if app_version doesn't exist yet
+    // (migration pending); app_version flows through once the column is added.
+    .select('*')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
   if (error) throw error;
