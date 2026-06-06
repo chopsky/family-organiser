@@ -171,12 +171,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    /* TRIAL: Bricolage Grotesque as the heading face. !important so it also
-       overrides the inline `font-family: 'Instrument Serif'` set directly on
-       some headings (Calendar h1, etc.), letting us evaluate it everywhere.
-       To revert, drop this back to `var(--font-display)` and remove the
-       Bricolage load in index.html. */
-    font-family: 'Bricolage Grotesque', var(--font-display) !important;
+    font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
   /* h1 keeps the tighter display tracking; h2-h6 are subheads /
