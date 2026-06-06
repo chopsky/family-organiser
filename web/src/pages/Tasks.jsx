@@ -147,23 +147,24 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
   const menuRef = useRef(null);
 
   return (
-    <div className="relative group" style={{ opacity: completed ? 0.5 : 1 }}>
+    <div className="relative group">
       <div
-        className="bg-white flex items-start gap-2.5 p-3 cursor-pointer"
-        style={{ borderRadius: 12, padding: '12px 14px' }}
+        className="bg-white flex items-start gap-2.5 p-3"
+        style={{ borderRadius: 12, padding: '12px 14px', cursor: completed ? 'default' : 'pointer' }}
         onClick={() => !completed && onEdit(task)}
       >
         {/* Checkbox */}
         <button
           onClick={(e) => { e.stopPropagation(); completed ? (onRestore && onRestore(task)) : onToggle(task); }}
           disabled={toggling?.has(task.id) || restoring?.has(task.id)}
-          className="mt-0.5 shrink-0 flex items-center justify-center transition-colors"
+          className="mt-0.5 shrink-0 flex items-center justify-center transition-colors cursor-pointer"
           style={{
             width: 20,
             height: 20,
             borderRadius: 6,
             border: completed ? 'none' : '2px solid var(--light-grey, #E8E5EC)',
             background: completed ? 'var(--sage, #7DAE82)' : 'transparent',
+            opacity: completed ? 0.5 : 1,
           }}
         >
           {completed && <CheckmarkSVG />}
@@ -179,6 +180,7 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
               fontWeight: 500,
               color: completed ? 'var(--warm-grey, #6B6774)' : 'var(--charcoal, #2D2A33)',
               textDecoration: completed ? 'line-through' : 'none',
+              opacity: completed ? 0.5 : 1,
             }}
           >
             {task.title}
@@ -292,7 +294,7 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
           <button
             onClick={() => onRestore && onRestore(task)}
             disabled={restoring?.has(task.id)}
-            className="shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-colors"
+            className="shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-colors cursor-pointer"
             style={{
               color: 'var(--plum, #6B3FA0)',
               background: 'var(--plum-light, #F3EDFC)',
