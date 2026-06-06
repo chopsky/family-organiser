@@ -70,6 +70,33 @@ const AVATAR_COLOURS = {
   lavender: 'bg-indigo text-white',
 };
 
+// Soft per-member card tint (the member's colour at low opacity), used to
+// give each Family Member / dependent row its own gently-coloured card.
+// Literal class strings so Tailwind generates them.
+const CARD_TINTS = {
+  red: 'bg-red/10',
+  'burnt-orange': 'bg-burnt-orange/10',
+  amber: 'bg-amber/10',
+  gold: 'bg-gold/10',
+  leaf: 'bg-leaf/10',
+  emerald: 'bg-emerald/10',
+  teal: 'bg-teal/10',
+  sky: 'bg-sky/10',
+  cobalt: 'bg-cobalt/10',
+  indigo: 'bg-indigo/10',
+  purple: 'bg-purple/10',
+  magenta: 'bg-magenta/10',
+  rose: 'bg-rose/10',
+  terracotta: 'bg-terracotta/10',
+  moss: 'bg-moss/10',
+  slate: 'bg-slate/10',
+  // Legacy fallbacks
+  sage: 'bg-sage/10',
+  plum: 'bg-plum/10',
+  coral: 'bg-coral/10',
+  lavender: 'bg-indigo/10',
+};
+
 // Canonical 16-colour palette used for auto-assigning a unique colour
 // to each new household member. Order matches the backend's
 // COLOR_THEMES (src/db/queries.js) so the picker on both sides agrees
@@ -1832,21 +1859,22 @@ export default function FamilySetup() {
         <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Family Members</h2>
         <p className="text-sm text-cocoa mb-3">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
-          <ul className="space-y-4">
+          <ul className="space-y-3">
             {members.filter(m => m.member_type !== 'dependent').map((m) => {
               const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
+              const cardTint = CARD_TINTS[m.color_theme] || CARD_TINTS.slate;
               return (
-              <li key={m.id} className="flex items-center gap-3">
+              <li key={m.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${cardTint}`}>
                 {m.avatar_url ? (
-                  <img src={m.avatar_url} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                  <img src={m.avatar_url} alt={m.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
                 ) : (
-                  <div className={`w-9 h-9 rounded-full ${avatarClass} flex items-center justify-center font-bold text-sm shrink-0`}>
+                  <div className={`w-10 h-10 rounded-full ${avatarClass} flex items-center justify-center font-bold text-base shrink-0`}>
                     {m.name[0].toUpperCase()}
                   </div>
                 )}
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-bark">{m.name}</p>
-                  <p className="text-xs text-cocoa">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold text-bark">{m.name}</p>
+                  <p className="text-[13px] text-cocoa">
                     {m.family_role ? `${m.family_role} · ` : ''}{m.role}
                     {m.whatsapp_linked && ' · WhatsApp connected'}
                   </p>
@@ -1966,21 +1994,22 @@ export default function FamilySetup() {
         {loadingMembers ? <Spinner /> : (
           <>
             {members.filter(m => m.member_type === 'dependent').length > 0 ? (
-              <ul className="space-y-4">
+              <ul className="space-y-3">
                 {members.filter(m => m.member_type === 'dependent').map((m) => {
                   const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
+                  const cardTint = CARD_TINTS[m.color_theme] || CARD_TINTS.slate;
                   return (
-                    <li key={m.id} className="flex items-center gap-3">
+                    <li key={m.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${cardTint}`}>
                       {m.avatar_url ? (
-                        <img src={m.avatar_url} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                        <img src={m.avatar_url} alt={m.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className={`w-9 h-9 rounded-full ${avatarClass} flex items-center justify-center font-bold text-sm shrink-0`}>
+                        <div className={`w-10 h-10 rounded-full ${avatarClass} flex items-center justify-center font-bold text-base shrink-0`}>
                           {m.name[0].toUpperCase()}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-bark">{m.name}</p>
-                        {m.family_role && <p className="text-xs text-cocoa">{m.family_role}</p>}
+                        <p className="text-[15px] font-semibold text-bark">{m.name}</p>
+                        {m.family_role && <p className="text-[13px] text-cocoa">{m.family_role}</p>}
                         {/* School badge */}
                         {m.school_id && (() => {
                           const school = householdSchools.find(s => s.id === m.school_id);
