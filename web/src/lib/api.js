@@ -1,10 +1,28 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 
 // In production, set VITE_API_URL to the Railway backend URL (e.g. https://my-app.railway.app).
 // In development, the Vite proxy handles /api → localhost:3000, so leave VITE_API_URL unset.
 const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
 const api = axios.create({ baseURL: BASE });
+
+// ── App version reporting ────────────────────────────────────────
+// The native shell knows its own version (App.getInfo()); resolve it once at
+// startup and stamp it on every request via X-App-Version so the backend can
+// record which build each user is on. No-op on web (not native), where the
+// header is simply omitted.
+let cachedAppVersion = null;
+if (Capacitor?.isNativePlatform?.()) {
+  CapApp.getInfo()
+    .then((info) => {
+      if (info?.version) {
+        cachedAppVersion = info.build ? `${info.version} (${info.build})` : info.version;
+      }
+    })
+    .catch(() => {});
+}
 
 // ── Request deduplication ────────────────────────────────────────
 // If an identical GET request is already in flight, reuse its promise
@@ -21,6 +39,7 @@ function getDedupeKey(config) {
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (cachedAppVersion) config.headers['X-App-Version'] = cachedAppVersion;
   return config;
 });
 

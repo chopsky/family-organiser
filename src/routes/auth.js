@@ -29,6 +29,9 @@ function sessionMetaFromReq(req) {
   if (!req) return {};
   return {
     userAgent: req.get?.('user-agent') || null,
+    // Native app build, e.g. "1.7.0 (22)". Null on web. Lets us tell which
+    // app version a user's sessions are on (see getPlatformsByUserIds).
+    appVersion: req.get?.('x-app-version') || null,
     // Express populates req.ip by default; falls back to the raw socket
     // if a proxy header isn't configured. `trust proxy` is set in
     // src/app.js so req.ip is already the client's IP on Railway.

@@ -17,20 +17,23 @@ import { formatRelativeTime } from '../lib/formatRelativeTime';
  */
 export default function PlatformBadges({ platforms, size = 'md' }) {
   if (!platforms) return null;
-  const { iosApp, iosAppActive, iosWeb, web, lastIosAt, lastWebAt } = platforms;
+  const { iosApp, iosAppActive, iosWeb, web, lastIosAt, lastWebAt, appVersion } = platforms;
 
   const badges = [];
 
   if (iosApp) {
+    // Append the reported app version when we have it, so it's obvious which
+    // build a user is on (e.g. "iOS App · 1.7.0 (22)").
+    const verSuffix = appVersion ? ` · ${appVersion}` : '';
     badges.push({
       key: 'ios-app',
-      label: 'iOS App',
+      label: `iOS App${verSuffix}`,
       className: iosAppActive
         ? 'bg-sage-light text-sage'
         : 'bg-cream text-warm-grey',
       tooltip: iosAppActive
-        ? `Native iOS app, push active${lastIosAt ? ` — last seen ${formatRelativeTime(lastIosAt)}` : ''}`
-        : `iOS app installed at some point (push token inactive)${lastIosAt ? ` — last seen ${formatRelativeTime(lastIosAt)}` : ''}`,
+        ? `Native iOS app, push active${appVersion ? ` — version ${appVersion}` : ''}${lastIosAt ? ` — last seen ${formatRelativeTime(lastIosAt)}` : ''}`
+        : `iOS app installed at some point (push token inactive)${appVersion ? ` — version ${appVersion}` : ''}${lastIosAt ? ` — last seen ${formatRelativeTime(lastIosAt)}` : ''}`,
     });
   } else if (iosWeb) {
     badges.push({

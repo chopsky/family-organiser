@@ -593,6 +593,7 @@ router.get('/tools/my-devices', async (req, res) => {
       token: r.token,
       platform: r.platform,
       active: r.active,
+      app_version: r.app_version || null,
       created_at: r.created_at,
       updated_at: r.updated_at,
     }));

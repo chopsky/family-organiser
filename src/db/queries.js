@@ -304,6 +304,7 @@ async function createRefreshToken(userId, token, expiresAt, meta = {}, db = supa
       token,
       expires_at: expiresAt,
       user_agent: meta.userAgent || null,
+      app_version: meta.appVersion || null,
       ip_address: meta.ipAddress || null,
       last_used_at: new Date().toISOString(),
     })
@@ -3476,8 +3477,8 @@ async function getPlatformsByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
 
   const [tokensRes, devicesRes] = await Promise.all([
-    db.from('refresh_tokens').select('user_id, user_agent, last_used_at').in('user_id', userIds),
-    db.from('device_tokens').select('user_id, active').in('user_id', userIds).eq('platform', 'ios'),
+    db.from('refresh_tokens').select('user_id, user_agent, app_version, last_used_at').in('user_id', userIds),
+    db.from('device_tokens').select('user_id, active, app_version, updated_at').in('user_id', userIds).eq('platform', 'ios'),
   ]);
 
   const map = new Map();
@@ -3488,10 +3489,22 @@ async function getPlatformsByUserIds(userIds, db = supabase) {
         iosApp: false, iosAppActive: false,
         iosWeb: false, web: false,
         lastIosAt: null, lastWebAt: null,
+        // Most-recent reported native app build, e.g. "1.7.0 (22)". `_avAt`
+        // is the timestamp it came from, used internally to keep the newest.
+        appVersion: null, _avAt: null,
       };
       map.set(userId, e);
     }
     return e;
+  }
+
+  // Keep the app_version tied to the most recent signal we've seen for a user.
+  function noteAppVersion(e, version, at) {
+    if (!version || !at) return;
+    if (!e._avAt || at > e._avAt) {
+      e.appVersion = version;
+      e._avAt = at;
+    }
   }
 
   // 1. refresh_tokens → ios vs web bucket per session
@@ -3500,6 +3513,7 @@ async function getPlatformsByUserIds(userIds, db = supabase) {
     const platform = parsePlatformFromUserAgent(row.user_agent);
     if (!platform) continue;
     const e = entry(row.user_id);
+    noteAppVersion(e, row.app_version, row.last_used_at);
     if (platform === 'ios') {
       e.iosWeb = true;
       if (row.last_used_at && (!e.lastIosAt || row.last_used_at > e.lastIosAt)) {
@@ -3520,7 +3534,11 @@ async function getPlatformsByUserIds(userIds, db = supabase) {
     const e = entry(row.user_id);
     e.iosApp = true;
     if (row.active) e.iosAppActive = true;
+    noteAppVersion(e, row.app_version, row.updated_at);
   }
+
+  // Drop the internal sort key before returning.
+  for (const e of map.values()) delete e._avAt;
 
   return map;
 }
@@ -5656,20 +5674,21 @@ async function getHouseholdStorageUsage(householdId) {
 
 // ─── Device Tokens & Notification Preferences ──────────────────────────────
 
-async function registerDeviceToken(userId, householdId, token, platform = 'ios') {
+async function registerDeviceToken(userId, householdId, token, platform = 'ios', appVersion = null) {
+  const row = {
+    user_id: userId,
+    household_id: householdId,
+    token,
+    platform,
+    active: true,
+    updated_at: new Date(),
+  };
+  // Only overwrite app_version when the client actually reported one, so a
+  // re-register from an older client that omits the header doesn't blank it.
+  if (appVersion) row.app_version = appVersion;
   const { data, error } = await supabase
     .from('device_tokens')
-    .upsert(
-      {
-        user_id: userId,
-        household_id: householdId,
-        token,
-        platform,
-        active: true,
-        updated_at: new Date(),
-      },
-      { onConflict: 'token' }
-    )
+    .upsert(row, { onConflict: 'token' })
     .select()
     .single();
   if (error) throw error;
@@ -5703,7 +5722,7 @@ async function getActiveDeviceTokens(userId) {
 async function getDeviceTokensForUserAdmin(userId) {
   const { data, error } = await supabase
     .from('device_tokens')
-    .select('id, token, platform, active, created_at, updated_at')
+    .select('id, token, platform, active, app_version, created_at, updated_at')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
   if (error) throw error;

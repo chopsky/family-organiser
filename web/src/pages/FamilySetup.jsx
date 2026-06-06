@@ -235,6 +235,11 @@ export default function FamilySetup() {
   const [editSchoolSearch, setEditSchoolSearch] = useState('');
   const [editSchoolResults, setEditSchoolResults] = useState([]);
   const [editSelectedSchoolData, setEditSelectedSchoolData] = useState(null); // full GIAS school data for new school creation
+  // UK custom-school fallback for the edit-profile modal — mirrors the
+  // dep/new flows so a school missing from GIAS can be added by name here too.
+  const [editCustomSchoolMode, setEditCustomSchoolMode] = useState(false);
+  const [editCustomSchoolName, setEditCustomSchoolName] = useState('');
+  const [editCustomSchoolPostcode, setEditCustomSchoolPostcode] = useState('');
   // SA path for the edit-profile modal. profileSaSchoolName tracks the
   // (possibly newly-typed) name; profileSaSchoolExistingId, if set,
   // means "reuse this household_schools row" - typically populated when
@@ -553,6 +558,9 @@ export default function FamilySetup() {
     const school = householdSchools.find(s => s.id === member.school_id);
     setEditSchoolSearch(school?.school_name || '');
     setEditSchoolResults([]);
+    setEditCustomSchoolMode(false);
+    setEditCustomSchoolName('');
+    setEditCustomSchoolPostcode('');
     // SA path: pre-fill the typed name + the existing-school pointer.
     // The UK GIAS-search inputs above are simply unused on SA households.
     setProfileSaSchoolName(school?.school_name || '');
@@ -1284,6 +1292,24 @@ export default function FamilySetup() {
         }
       } else if (isSa && !profileAttendsSchool) {
         payload.school_id = null;
+      } else if (profileAttendsSchool && editCustomSchoolMode && editCustomSchoolName.trim()) {
+        // UK custom-school fallback — GIAS didn't have it. No URN/LA, so the
+        // LA-dates import stays gated off; user imports term dates from the
+        // school website / PDF / iCal instead. Reuse an existing custom school
+        // of the same name if one is already linked to the household.
+        const existingCustom = householdSchools.find(
+          s => !s.school_urn && s.school_name.toLowerCase() === editCustomSchoolName.trim().toLowerCase()
+        );
+        if (existingCustom) {
+          payload.school_id = existingCustom.id;
+        } else {
+          const { data: created } = await api.post('/schools', {
+            school_name: editCustomSchoolName.trim(),
+            postcode: editCustomSchoolPostcode.trim() || null,
+          });
+          payload.school_id = created.school.id;
+          createdNewSchool = !created.existing;
+        }
       } else if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
         // UK: need to create the school in household first
         const schoolData = editSelectedSchoolData || {};
@@ -3112,6 +3138,44 @@ export default function FamilySetup() {
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-bark mb-1">School</label>
+                      {editCustomSchoolMode ? (
+                        // Custom-school manual entry. Same fallback the
+                        // add-child / invite flows offer: school_urn stays
+                        // null so the LA-dates import is gated off and the
+                        // user imports term dates from website / PDF / iCal.
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={editCustomSchoolName}
+                            onChange={(e) => setEditCustomSchoolName(e.target.value)}
+                            className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                            placeholder="School name, e.g. The Sunshine Academy"
+                            autoFocus
+                          />
+                          <input
+                            type="text"
+                            value={editCustomSchoolPostcode}
+                            onChange={(e) => setEditCustomSchoolPostcode(e.target.value)}
+                            className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                            placeholder="Postcode (optional), e.g. SW1A 1AA"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditCustomSchoolMode(false);
+                              setEditCustomSchoolName('');
+                              setEditCustomSchoolPostcode('');
+                            }}
+                            className="text-xs text-cocoa hover:text-bark underline"
+                          >
+                            ← Back to search
+                          </button>
+                          <p className="text-xs text-cocoa">
+                            We&apos;ll set this up as a custom school. You can import term dates from the school&apos;s website or PDF afterwards.
+                          </p>
+                        </div>
+                      ) : (
+                      <>
                       <div className="relative">
                         <input
                           type="text"
@@ -3135,6 +3199,23 @@ export default function FamilySetup() {
                       </div>
                       {profileSchoolId && editSchoolSearch && (
                         <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
+                      )}
+                      {/* Manual fallback — parity with the add-child / invite
+                          flows so a school missing from GIAS can still be added. */}
+                      {!profileSchoolId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditCustomSchoolMode(true);
+                            setEditCustomSchoolName(editSchoolSearch.trim());
+                            setEditSchoolResults([]);
+                          }}
+                          className="block mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
+                        >
+                          Can&apos;t find your school? Add it manually →
+                        </button>
+                      )}
+                      </>
                       )}
                     </div>
                   </div>
