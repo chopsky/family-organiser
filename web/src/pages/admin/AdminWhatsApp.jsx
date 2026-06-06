@@ -19,25 +19,6 @@ export default function AdminWhatsApp() {
   const [selftest, setSelftest] = useState(null);
   const [selftesting, setSelftesting] = useState(false);
 
-  // AI provider diagnostics: ai-runtime (does the live process see the key?)
-  // + ai-selftest (a real call — which provider actually answered?).
-  const [ai, setAi] = useState(null);
-  const [aiChecking, setAiChecking] = useState(false);
-
-  async function handleAiCheck() {
-    setAiChecking(true);
-    setAi(null);
-    try {
-      const [rt, st] = await Promise.all([
-        api.get('/admin/tools/ai-runtime').then(r => r.data).catch(e => ({ error: e.response?.data?.error || e.message })),
-        api.get('/admin/tools/ai-selftest').then(r => r.data).catch(e => e.response?.data || { error: e.message }),
-      ]);
-      setAi({ runtime: rt, selftest: st });
-    } finally {
-      setAiChecking(false);
-    }
-  }
-
   async function loadDevices() {
     try {
       const { data: d } = await api.get('/admin/tools/my-devices');
@@ -309,80 +290,6 @@ export default function AdminWhatsApp() {
                 </div>
               </>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* AI provider self-test - triage "Gemini is being skipped" alerts.
-          ai-runtime reports whether the LIVE process sees GEMINI_API_KEY;
-          ai-selftest makes a real call and reports which provider answered. */}
-      <div className="bg-white border border-light-grey rounded-2xl p-5 mt-4">
-        <div className="flex items-center justify-between gap-3 mb-1">
-          <h2 className="text-sm font-medium text-charcoal">AI provider self-test</h2>
-          <button
-            type="button"
-            onClick={handleAiCheck}
-            disabled={aiChecking}
-            className="text-xs font-semibold text-plum hover:underline disabled:opacity-50 shrink-0"
-          >
-            {aiChecking ? 'Checking…' : 'Run AI self-test'}
-          </button>
-        </div>
-        <p className="text-xs text-warm-grey">
-          If you&apos;re getting &quot;Gemini is being skipped&quot; alerts, run this. It asks the live server whether it can see <span className="font-mono">GEMINI_API_KEY</span> and makes a real one-word call to see which provider actually answers.
-        </p>
-
-        {ai && (
-          <div className="mt-4 pt-4 border-t border-light-grey space-y-4">
-            {/* Runtime key probe */}
-            <div>
-              {ai.runtime?.error ? (
-                <p className="text-xs text-coral">Couldn&apos;t read runtime: {ai.runtime.error}</p>
-              ) : (() => {
-                const k = ai.runtime?.GEMINI_API_KEY || {};
-                const ok = k.present;
-                return (
-                  <div className="text-xs bg-cream rounded-lg p-3 space-y-0.5">
-                    <p className="font-semibold text-charcoal mb-1">Does the live process see the key? (pid {ai.runtime?.pid})</p>
-                    <p>
-                      <span className="font-mono">GEMINI_API_KEY</span>:{' '}
-                      {ok
-                        ? <span className="text-sage font-medium">present — {k.length} chars, starts &quot;{k.starts}&quot;</span>
-                        : <span className="text-coral font-medium">MISSING from the running process</span>}
-                    </p>
-                    {ok && (k.hasLeadingWhitespace || k.hasTrailingWhitespace) && (
-                      <p className="text-coral">⚠ Key has {k.hasLeadingWhitespace ? 'leading' : ''}{k.hasLeadingWhitespace && k.hasTrailingWhitespace ? ' & ' : ''}{k.hasTrailingWhitespace ? 'trailing' : ''} whitespace — trim it in Railway.</p>
-                    )}
-                    {!ok && (
-                      <p className="text-warm-grey">The Railway Variables UI may show it, but this process doesn&apos;t have it. Check it&apos;s on the right service + environment, then redeploy the API service.</p>
-                    )}
-                    {Array.isArray(ai.runtime?.aiRelatedKeys) && (
-                      <p className="text-warm-grey">AI-related env keys seen: <span className="font-mono">{ai.runtime.aiRelatedKeys.join(', ') || '(none)'}</span></p>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Real call - which provider answered */}
-            <div>
-              {ai.selftest?.error || ai.selftest?.ok === false ? (
-                <p className="text-xs text-coral">
-                  Live AI call failed: {ai.selftest.error || ai.selftest.errorCode || 'unknown error'}
-                </p>
-              ) : ai.selftest?.provider ? (
-                <p className="text-xs">
-                  Live call answered by{' '}
-                  <span className={ai.selftest.provider === 'gemini' ? 'text-sage font-semibold' : 'text-coral font-semibold'}>
-                    {ai.selftest.provider}
-                  </span>
-                  {' '}in {ai.selftest.totalLatencyMs}ms{ai.selftest.text ? ` (said "${ai.selftest.text.trim()}")` : ''}.
-                  {ai.selftest.provider !== 'gemini' && ' Gemini is not being used as primary — see the key probe above.'}
-                </p>
-              ) : (
-                <p className="text-xs text-warm-grey">No provider returned.</p>
-              )}
-            </div>
           </div>
         )}
       </div>
