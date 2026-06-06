@@ -617,7 +617,7 @@ export default function Dashboard() {
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-plum)', marginBottom: 2 }}>
                   Up next · {when}
                 </div>
-                <div className="truncate" style={{ fontSize: 18, fontWeight: 700, color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.3px' }}>{title}</div>
+                <div className="truncate" style={{ fontSize: 18, fontWeight: 600, color: 'var(--charcoal, #2D2A33)' }}>{title}</div>
                 <div className="truncate" style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>{sub}</div>
               </div>
               {whoList.length > 0 && (
