@@ -8,9 +8,7 @@ describe('isBirthdayTitle - real birthdays', () => {
     "Grandma's bday",
     'Happy Birthday Mum',
     "Dad's birthday 🎂",
-    "Olivia's birthday party",
     'Birthday',
-    'Office birthday celebration for Tom',
   ])('matches "%s"', (t) => {
     expect(isBirthdayTitle(t)).toBe(true);
   });
@@ -26,6 +24,11 @@ describe('isBirthdayTitle - NOT birthdays (errands / mentions)', () => {
     'RSVP to birthday party',
     'Birthday gift ideas',
     'Pick up birthday balloons',
+    // A party/celebration is a separate event, not the birthday itself
+    "Olivia's birthday party",
+    "Tom's birthday dinner",
+    'Office birthday celebration for Tom',
+    'Birthday drinks',
     // Plain non-birthday events
     'Dentist appointment',
     'Football training',

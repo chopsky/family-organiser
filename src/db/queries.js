@@ -2645,11 +2645,13 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
 //      phrase, or an explicit 🎂.
 const BIRTHDAY_MENTION_RE = /\bbirthdays?\b|\bb-?day\b|🎂/i;
 const BIRTHDAY_ERRAND_RE = /\b(buy|buying|bought|get|getting|order|ordering|ordered|wrap|wrapping|collect|collecting|pick|shop|shopping|book|booking|pay|paying|plan|planning|organi[sz]e|organi[sz]ing|sort|rsvp|invite|inviting|invitation|invitations|gift|gifts|present|presents|card|cards|cake|decorations?|balloons?|message|text|call|email|remind|reminder|ideas?|list)\b/i;
+// A party / celebration is a separate event that may not fall on the actual
+// birthday, so it must NOT be filed under the Birthdays category.
+const BIRTHDAY_CELEBRATION_RE = /\b(party|parties|celebration|celebrations|bash|do|drinks|dinner|lunch|brunch|meal|gathering|get-?together|outing|treat)\b/i;
 const BIRTHDAY_AFFIRMATIVE_RES = [
   /[\w’'-]+['’]s\s+(?:\d{1,3}(?:st|nd|rd|th)?\s+)?b(?:irth)?-?day\b/i, // "John's birthday", "Mia's 7th bday"
   /\bhappy\s+b(?:irth)?-?day\b/i,                                       // "Happy Birthday ..."
   /^\s*b(?:irth)?-?day\b/i,                                             // starts with "Birthday"
-  /\bbirthday\b.*\b(party|celebration|celebrations|dinner|lunch|drinks|bash|meal|do)\b/i, // "... birthday party"
   /🎂/,                                                                 // explicit cake emoji
 ];
 function isBirthdayTitle(title) {
@@ -2657,6 +2659,7 @@ function isBirthdayTitle(title) {
   const t = title.trim();
   if (!t || !BIRTHDAY_MENTION_RE.test(t)) return false;
   if (BIRTHDAY_ERRAND_RE.test(t)) return false;
+  if (BIRTHDAY_CELEBRATION_RE.test(t)) return false;
   return BIRTHDAY_AFFIRMATIVE_RES.some((re) => re.test(t));
 }
 
