@@ -9,6 +9,11 @@ describe('isBirthdayTitle - real birthdays', () => {
     'Happy Birthday Mum',
     "Dad's birthday 🎂",
     'Birthday',
+    // No-apostrophe / plural-possessive forms
+    'Felicity birthday',
+    'Ruby bday',
+    "Rael Philips' Birthday",
+    'Mel G, Martin, Kiki Birthday',
   ])('matches "%s"', (t) => {
     expect(isBirthdayTitle(t)).toBe(true);
   });
@@ -29,6 +34,10 @@ describe('isBirthdayTitle - NOT birthdays (errands / mentions)', () => {
     "Tom's birthday dinner",
     'Office birthday celebration for Tom',
     'Birthday drinks',
+    "Sarah's birthday tea",
+    'Birthday date night',
+    'Play date for Leo bday',
+    'Drop mom at Val bday',
     // Plain non-birthday events
     'Dentist appointment',
     'Football training',

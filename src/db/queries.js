@@ -2644,14 +2644,15 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
 //      a title that starts with "birthday", a "<birthday> party/celebration"
 //      phrase, or an explicit 🎂.
 const BIRTHDAY_MENTION_RE = /\bbirthdays?\b|\bb-?day\b|🎂/i;
-const BIRTHDAY_ERRAND_RE = /\b(buy|buying|bought|get|getting|order|ordering|ordered|wrap|wrapping|collect|collecting|pick|shop|shopping|book|booking|pay|paying|plan|planning|organi[sz]e|organi[sz]ing|sort|rsvp|invite|inviting|invitation|invitations|gift|gifts|present|presents|card|cards|cake|decorations?|balloons?|message|text|call|email|remind|reminder|ideas?|list)\b/i;
+const BIRTHDAY_ERRAND_RE = /\b(buy|buying|bought|get|getting|order|ordering|ordered|wrap|wrapping|collect|collecting|pick|shop|shopping|book|booking|pay|paying|plan|planning|organi[sz]e|organi[sz]ing|sort|rsvp|invite|inviting|invitation|invitations|gift|gifts|present|presents|card|cards|cake|decorations?|balloons?|message|text|call|email|remind|reminder|ideas?|list|drop|dropping)\b/i;
 // A party / celebration is a separate event that may not fall on the actual
 // birthday, so it must NOT be filed under the Birthdays category.
-const BIRTHDAY_CELEBRATION_RE = /\b(party|parties|celebration|celebrations|bash|do|drinks|dinner|lunch|brunch|meal|gathering|get-?together|outing|treat)\b/i;
+const BIRTHDAY_CELEBRATION_RE = /\b(party|parties|celebration|celebrations|bash|do|drinks|dinner|lunch|brunch|tea|meal|gathering|get-?together|outing|treat|play\s?date|date\s+night|night\s+out)\b/i;
 const BIRTHDAY_AFFIRMATIVE_RES = [
-  /[\w’'-]+['’]s\s+(?:\d{1,3}(?:st|nd|rd|th)?\s+)?b(?:irth)?-?day\b/i, // "John's birthday", "Mia's 7th bday"
+  /[\w’'-]+['’]s?\s+(?:\d{1,3}(?:st|nd|rd|th)?\s+)?b(?:irth)?-?day\b/i, // "John's birthday", "Philips' birthday", "Mia's 7th bday"
   /\bhappy\s+b(?:irth)?-?day\b/i,                                       // "Happy Birthday ..."
   /^\s*b(?:irth)?-?day\b/i,                                             // starts with "Birthday"
+  /\bb(?:irth)?-?day\b[^a-z]*$/i,                                       // ends with "birthday"/"bday" ("Felicity birthday", "Ruby bday")
   /🎂/,                                                                 // explicit cake emoji
 ];
 function isBirthdayTitle(title) {
