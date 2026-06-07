@@ -433,6 +433,17 @@ function MoreSheet({ onClose }) {
   const [mounted, setMounted] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+
+  // Submit the inline AI message: close the sheet, then open the chat with
+  // the typed message (ChatWidget's openChatWidget listener sends it).
+  function submitAiMessage(e) {
+    e.preventDefault();
+    const msg = aiInput.trim();
+    onClose();
+    window.dispatchEvent(new CustomEvent('openChatWidget', { detail: msg ? { message: msg } : {} }));
+    setAiInput('');
+  }
 
   function handleLogout() {
     setShowLogoutConfirm(false);
@@ -564,31 +575,41 @@ function MoreSheet({ onClose }) {
         {/* Scrollable body - only flexes when content overflows the
             88vh cap (rare on a phone, common on a small landscape view). */}
         <div className="flex-1 overflow-y-auto">
-          {/* AI chat - full-width entry that opens the assistant. Replaces the
-              floating launcher button on mobile (it's hidden < md). Closes the
-              sheet first, then fires the openChatWidget event the ChatWidget
-              listens for. */}
+          {/* AI chat - inline input. Replaces the floating launcher button on
+              mobile (it's hidden < md). On submit, closes the sheet and fires
+              the openChatWidget event with the typed message; ChatWidget opens
+              full-screen and sends it. */}
           <div className="px-5 pt-1 pb-4">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                window.dispatchEvent(new CustomEvent('openChatWidget'));
-              }}
-              className="w-full bg-white rounded-2xl border border-light-grey p-4 flex items-center gap-3.5 text-left active:scale-[0.98] transition-transform"
+            <form
+              onSubmit={submitAiMessage}
+              className="w-full bg-white rounded-2xl border border-light-grey p-2 pl-3.5 flex items-center gap-2"
             >
               <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                 style={{ backgroundColor: '#EFE9FB', color: '#6B3FA0' }}
               >
-                <IconMessageCircle className="h-[22px] w-[22px]" />
+                <IconMessageCircle className="h-[18px] w-[18px]" />
               </div>
-              <div className="min-w-0">
-                <div className="text-[14px] font-bold text-charcoal leading-tight">AI chat</div>
-                <div className="text-[11px] text-warm-grey mt-0.5">Ask Housemait anything</div>
-              </div>
-              <IconChevronRight className="h-3.5 w-3.5 text-warm-grey/60 ml-auto shrink-0" />
-            </button>
+              <input
+                type="text"
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                placeholder="Ask Housemait anything…"
+                aria-label="Ask Housemait anything"
+                className="flex-1 min-w-0 bg-transparent text-[14px] text-charcoal placeholder:text-warm-grey outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!aiInput.trim()}
+                aria-label="Send"
+                className="w-9 h-9 rounded-full bg-plum text-white flex items-center justify-center shrink-0 disabled:opacity-40 active:scale-95 transition-transform"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 2 11 13" />
+                  <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+                </svg>
+              </button>
+            </form>
           </div>
 
           {/* 2×2 feature tiles */}
