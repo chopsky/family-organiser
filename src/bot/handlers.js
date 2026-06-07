@@ -902,20 +902,23 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // Pending "repeat this birthday every year?" reply - resolve a bare yes/no
   // deterministically against the birthday event we just created.
   const pendingBday = popBirthdayRecurrence(user.id);
-  if (pendingBday && pendingBday.householdId === household.id) {
+  if (pendingBday && pendingBday.householdId === household.id && pendingBday.eventIds?.length) {
     const ans = parseAffirmative(text);
+    const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
     if (ans === 'yes') {
       ctx.intent = 'birthday_recurrence_reply';
-      try {
-        await db.updateCalendarEvent(pendingBday.eventId, household.id, { recurrence: 'yearly' });
-      } catch (e) {
-        console.error('[handlers] birthday recurrence update failed:', e.message);
+      for (const id of pendingBday.eventIds) {
+        try {
+          await db.updateCalendarEvent(id, household.id, { recurrence: 'yearly' });
+        } catch (e) {
+          console.error('[handlers] birthday recurrence update failed:', e.message);
+        }
       }
-      return { response: `Done — I'll repeat ${pendingBday.title} every year. 🎂`, actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] } };
+      return { response: `Done — I'll repeat ${pendingBday.label} every year. 🎂`, actions: noActions };
     }
     if (ans === 'no') {
       ctx.intent = 'birthday_recurrence_reply';
-      return { response: `No problem — I've left ${pendingBday.title} as a one-off.`, actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] } };
+      return { response: `No problem — I've left ${pendingBday.label} as ${pendingBday.eventIds.length === 1 ? 'a one-off' : 'one-offs'}.`, actions: noActions };
     }
     // Neither yes nor no - drop the pending question and classify normally.
   }
@@ -1014,7 +1017,22 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (extracted.count > 0) {
       ctx.intent = 'bulk_extract';
       let response = extracted.response;
-      response += `\n\nIf any of those look wrong, just tell me and I'll fix them.`;
+      // If the batch included birthdays, offer to repeat them all yearly in one
+      // go (rather than asking per-birthday, which would be absurd for 30).
+      const bulkBirthdays = (extracted.actions?.eventsAdded || []).filter(
+        (e) => e && e.category === 'birthday' && !e.recurrence && e.id
+      );
+      if (bulkBirthdays.length > 0) {
+        const n = bulkBirthdays.length;
+        response += `\n\nWant ${n === 1 ? 'that birthday' : `those ${n} birthdays`} to repeat every year? Reply yes or no.`;
+        rememberBirthdayRecurrence(user.id, {
+          eventIds: bulkBirthdays.map((e) => e.id),
+          householdId: household.id,
+          label: n === 1 ? bulkBirthdays[0].title : `those ${n} birthdays`,
+        });
+      } else {
+        response += `\n\nIf any of those look wrong, just tell me and I'll fix them.`;
+      }
       return { response, actions: extracted.actions };
     }
     // Nothing extracted - fall through to the conversational classifier.
@@ -1797,9 +1815,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (birthdayEvent) {
       followUp = 'Want this birthday to repeat every year? Reply yes or no.';
       rememberBirthdayRecurrence(user.id, {
-        eventId: birthdayEvent.id,
+        eventIds: [birthdayEvent.id],
         householdId: household.id,
-        title: birthdayEvent.title,
+        label: birthdayEvent.title,
       });
     } else if ((eventAdded || taskAdded) && !reminderSaved) {
       followUp = eventAdded
