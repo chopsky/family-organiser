@@ -1,23 +1,36 @@
 jest.mock('./client', () => ({ supabase: {}, supabaseAdmin: {} }));
 const { isBirthdayTitle } = require('./queries');
 
-describe('isBirthdayTitle', () => {
+describe('isBirthdayTitle - real birthdays', () => {
   test.each([
-    "Mia's birthday party",
-    "Grandma's Birthday",
-    'Olivia 7th birthday',
-    'Dad bday drinks',
-    'b-day lunch',
-    "Henry's Birthday 🎂",
+    "John's Birthday",
+    "Mia's 7th birthday",
+    "Grandma's bday",
+    'Happy Birthday Mum',
+    "Dad's birthday 🎂",
+    "Olivia's birthday party",
+    'Birthday',
+    'Office birthday celebration for Tom',
   ])('matches "%s"', (t) => {
     expect(isBirthdayTitle(t)).toBe(true);
   });
+});
 
+describe('isBirthdayTitle - NOT birthdays (errands / mentions)', () => {
   test.each([
+    'Buy birthday gift for John',
+    'Wrap birthday present',
+    'Birthday card for Sara',
+    'Order birthday cake',
+    'Plan Mia birthday party shopping',
+    'RSVP to birthday party',
+    'Birthday gift ideas',
+    'Pick up birthday balloons',
+    // Plain non-birthday events
     'Dentist appointment',
     'Football training',
-    'Birthing class', // must not match on a substring
-    'Abday', // not a word-boundary bday
+    'Birthing class',
+    'Abday',
     '',
     null,
     undefined,

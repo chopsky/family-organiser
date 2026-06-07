@@ -2631,12 +2631,33 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
   };
 }
 
-// Recognise a birthday from an event title so it auto-files under the
-// Birthdays filter, no matter how it was created (app, WhatsApp bot, chat,
-// email, extraction). Matches "birthday", "birthdays", "bday"/"b-day", 🎂.
-const BIRTHDAY_TITLE_RE = /\bbirthdays?\b|\bb-?day\b|🎂/i;
+// Decide whether an event title represents SOMEONE'S ACTUAL BIRTHDAY (which
+// should file under the Birthdays filter and recur yearly) rather than an
+// errand or note that merely mentions a birthday ("buy birthday gift for
+// John", "birthday card for Sara", "plan Mia's birthday party shopping").
+//
+// Two stages:
+//   1. Reject if the title contains an errand/admin verb or object - those are
+//      tasks about a birthday, not the birthday itself.
+//   2. Otherwise accept only if it reads like a birthday: a possessive name +
+//      birthday ("John's birthday", "Mia's 7th bday"), "happy birthday ...",
+//      a title that starts with "birthday", a "<birthday> party/celebration"
+//      phrase, or an explicit 🎂.
+const BIRTHDAY_MENTION_RE = /\bbirthdays?\b|\bb-?day\b|🎂/i;
+const BIRTHDAY_ERRAND_RE = /\b(buy|buying|bought|get|getting|order|ordering|ordered|wrap|wrapping|collect|collecting|pick|shop|shopping|book|booking|pay|paying|plan|planning|organi[sz]e|organi[sz]ing|sort|rsvp|invite|inviting|invitation|invitations|gift|gifts|present|presents|card|cards|cake|decorations?|balloons?|message|text|call|email|remind|reminder|ideas?|list)\b/i;
+const BIRTHDAY_AFFIRMATIVE_RES = [
+  /[\w’'-]+['’]s\s+(?:\d{1,3}(?:st|nd|rd|th)?\s+)?b(?:irth)?-?day\b/i, // "John's birthday", "Mia's 7th bday"
+  /\bhappy\s+b(?:irth)?-?day\b/i,                                       // "Happy Birthday ..."
+  /^\s*b(?:irth)?-?day\b/i,                                             // starts with "Birthday"
+  /\bbirthday\b.*\b(party|celebration|celebrations|dinner|lunch|drinks|bash|meal|do)\b/i, // "... birthday party"
+  /🎂/,                                                                 // explicit cake emoji
+];
 function isBirthdayTitle(title) {
-  return typeof title === 'string' && BIRTHDAY_TITLE_RE.test(title);
+  if (typeof title !== 'string') return false;
+  const t = title.trim();
+  if (!t || !BIRTHDAY_MENTION_RE.test(t)) return false;
+  if (BIRTHDAY_ERRAND_RE.test(t)) return false;
+  return BIRTHDAY_AFFIRMATIVE_RES.some((re) => re.test(t));
 }
 
 async function createCalendarEvent(householdId, eventData, createdByUserId, db = supabase) {
@@ -2657,6 +2678,10 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
     && isBirthdayTitle(eventData.title)
       ? 'birthday'
       : (explicitCategory || 'general');
+  // Birthdays recur every year unless the caller already chose a recurrence.
+  const recurrence = (category === 'birthday' && !eventData.recurrence)
+    ? 'yearly'
+    : (eventData.recurrence || null);
   const { data, error } = await db
     .from('calendar_events')
     .insert({
@@ -2669,7 +2694,7 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
       location: eventData.location || null,
       color: eventData.color || 'sage',
       category,
-      recurrence: eventData.recurrence || null,
+      recurrence,
       assigned_to_ids: ids,
       assigned_to_names: names,
       created_by: createdByUserId,
