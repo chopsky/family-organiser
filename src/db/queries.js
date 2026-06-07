@@ -2372,7 +2372,63 @@ async function getTasksForUser(householdId, userId, db = supabase) {
 
 // ─── Calendar Events ─────────────────────────────────────────────────────────
 
-async function getCalendarEvents(householdId, startDate, endDate, { userId, category } = {}, db = supabase) {
+function isLeapYear(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
+
+/**
+ * Synthesise all-day birthday events from members' `birthday` field — the
+ * single source of truth. Generates one occurrence per year in the window so
+ * birthdays always show (regardless of how they were entered) and recur every
+ * year, with no stored rows to keep in sync. IDs are synthetic strings.
+ */
+async function getBirthdayEvents(householdId, startDate, endDate, db = supabase) {
+  let res;
+  try {
+    res = await db.from('users')
+      .select('id, name, birthday')
+      .eq('household_id', householdId)
+      .not('birthday', 'is', null);
+  } catch { return []; }
+  if (res.error || !res.data) return [];
+
+  const startStr = String(startDate).slice(0, 10);
+  const endStr = String(endDate).slice(0, 10);
+  const startY = Number(startStr.slice(0, 4));
+  const endY = Number(endStr.slice(0, 4));
+  if (!startY || !endY) return [];
+
+  const out = [];
+  for (const m of res.data) {
+    if (!m.birthday || !m.name) continue;
+    const b = new Date(m.birthday);
+    if (isNaN(b.getTime())) continue;
+    const mo = b.getUTCMonth(); // 0-11
+    const day = b.getUTCDate();
+    for (let y = startY; y <= endY; y++) {
+      const d = (mo === 1 && day === 29 && !isLeapYear(y)) ? 28 : day; // clamp Feb 29
+      const dateStr = `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (dateStr < startStr || dateStr > endStr) continue;
+      const startTime = `${dateStr}T00:00:00Z`;
+      out.push({
+        id: `birthday-${m.id}-${y}`,
+        occurrence_key: `birthday-${m.id}-${y}`,
+        household_id: householdId,
+        title: `${m.name}'s Birthday 🎂`,
+        description: null,
+        start_time: startTime,
+        end_time: startTime,
+        all_day: true,
+        category: 'birthday',
+        source_user_id: m.id,
+        color: 'plum',
+        recurrence: null,
+        visibility: 'family',
+      });
+    }
+  }
+  return out;
+}
+
+async function getCalendarEvents(householdId, startDate, endDate, { userId, category, birthdays } = {}, db = supabase) {
   // Apply the household/visibility/category filters common to both queries.
   const applyFilters = (q) => {
     let query = q.eq('household_id', householdId).is('deleted_at', null);
@@ -2415,7 +2471,19 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
   // expansion (so the base occurrence isn't double-counted).
   const nonRecurring = overlapRows.filter((e) => !e.recurrence);
   const expanded = expandRecurringEvents(recurringRows, startDate, endDate);
-  return [...nonRecurring, ...expanded].sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+  let merged = [...nonRecurring, ...expanded];
+
+  // Birthdays are derived live from members' birthday field (single source of
+  // truth, recurs yearly). Drop any legacy stored birthday rows to avoid
+  // duplicates, then append the synthesised occurrences.
+  if (birthdays) {
+    merged = merged.filter((e) => e.category !== 'birthday');
+    if (!category || category === 'birthday') {
+      merged = merged.concat(await getBirthdayEvents(householdId, startDate, endDate, db));
+    }
+  }
+
+  return merged.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
 }
 
 async function getCalendarEventById(eventId, householdId, db = supabase) {
@@ -6481,6 +6549,7 @@ module.exports = {
   updateShoppingItem,
   // Calendar
   getCalendarEvents,
+  getBirthdayEvents,
   expandRecurringEvents,
   getCalendarEventById,
   createEventAttachment,

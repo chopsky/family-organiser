@@ -165,10 +165,12 @@ router.get('/events', async (req, res) => {
     const events = await db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
       userId: req.user.id,
       category: category || undefined,
+      birthdays: true,
     });
 
-    // Attach assignees to events
-    const eventIds = events.map((e) => e.id);
+    // Attach assignees to events (synthesised birthdays have non-uuid ids and
+    // no assignees - keep them out of the uuid-typed batch query).
+    const eventIds = events.filter((e) => e.category !== 'birthday').map((e) => e.id);
     const allAssignees = eventIds.length > 0
       ? await db.getEventAssigneesBatch(eventIds)
       : [];
@@ -275,6 +277,7 @@ router.get('/month', async (req, res) => {
       db.getCalendarEvents(req.householdId, parsed.startDate, parsed.endDate, {
         userId: req.user.id,
         category: category || undefined,
+        birthdays: true,
       }),
       db.getTasksByDateRange(req.householdId, parsed.startDate, parsed.endDate),
     ]);
@@ -284,7 +287,7 @@ router.get('/month', async (req, res) => {
     // client-side. The Edit Event modal reads ev.reminders to populate
     // the notification dropdown - without this join the modal opened
     // empty even when a reminder was saved (real bug from prod).
-    const eventIds = events.map((e) => e.id);
+    const eventIds = events.filter((e) => e.category !== 'birthday').map((e) => e.id);
     const [allAssignees, allReminders] = await Promise.all([
       eventIds.length > 0 ? db.getEventAssigneesBatch(eventIds) : Promise.resolve([]),
       eventIds.length > 0 ? db.getEventRemindersBatch(eventIds) : Promise.resolve([]),

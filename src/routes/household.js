@@ -149,12 +149,6 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    // Only fetch full user if birthday is being updated (expensive query)
-    let fullUser = null;
-    if (birthday !== undefined) {
-      fullUser = (await db.getHouseholdMembers(req.householdId)).find(m => m.id === targetUserId);
-    }
-
     // Capture the old school_id before updating (for orphan cleanup)
     let oldSchoolId = null;
     if (school_id !== undefined) {
@@ -179,52 +173,9 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
       }
     }
 
-    // Handle birthday calendar event - only when birthday field is explicitly sent and changed
-    if (birthday !== undefined && fullUser) {
-      try {
-        const currentBirthday = fullUser.birthday || null;
-        const newBirthday = birthday || null;
-        const currentStr = currentBirthday ? new Date(currentBirthday).toISOString().split('T')[0] : '';
-        const newStr = newBirthday ? new Date(newBirthday).toISOString().split('T')[0] : '';
-
-        if (newStr !== currentStr) {
-          // Remove any existing birthday events for this user
-          const allEvents = await db.getCalendarEvents(req.householdId, '1900-01-01', '2100-12-31');
-          const existingBirthdays = allEvents.filter(
-            (e) => e.category === 'birthday' && e.source_user_id === targetUserId
-          );
-          for (const ev of existingBirthdays) {
-            await db.deleteCalendarEvent(ev.id, req.householdId);
-          }
-
-          // Create new birthday event if a birthday was provided
-          if (newBirthday) {
-            const displayName = updates.name || fullUser.name || req.user.name;
-            const birthdayDate = new Date(newBirthday);
-            const thisYear = new Date().getFullYear();
-            const eventDate = new Date(thisYear, birthdayDate.getMonth(), birthdayDate.getDate());
-            const startTime = `${eventDate.toISOString().split('T')[0]}T00:00:00Z`;
-
-            await db.createCalendarEventFromSync(
-              req.householdId,
-              {
-                title: `${displayName}'s Birthday 🎂`,
-                description: null,
-                start_time: startTime,
-                end_time: startTime,
-                all_day: true,
-              },
-              targetUserId,
-              null,
-              'birthday',
-              'family'
-            );
-          }
-        }
-      } catch (birthdayErr) {
-        console.error('Birthday event update failed (non-fatal):', birthdayErr.message);
-      }
-    }
+    // Birthday calendar events are derived live from the member's birthday
+    // field in getCalendarEvents (single source of truth, recurs yearly), so
+    // there's nothing to create/sync here when the birthday changes.
 
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
