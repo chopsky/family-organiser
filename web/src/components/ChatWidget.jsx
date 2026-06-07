@@ -551,7 +551,7 @@ I'm always here if you need me!`;
     <>
       {/* Welcome speech bubble for first-time users */}
       {!isOpen && showWelcomeBubble && (
-        <div className="fixed bottom-40 md:bottom-[88px] right-4 md:right-6 z-50 max-w-[300px] animate-fade-in">
+        <div className="hidden md:block fixed bottom-40 md:bottom-[88px] right-4 md:right-6 z-50 max-w-[300px] animate-fade-in">
           <div className="relative bg-white rounded-2xl shadow-lg border border-light-grey p-4">
             <button
               onClick={(e) => { e.stopPropagation(); setShowWelcomeBubble(false); safeSetItem('housemait_welcome_dismissed', '1'); }}
@@ -580,7 +580,7 @@ I'm always here if you need me!`;
             }
             setIsOpen(true);
           }}
-          className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg flex items-center justify-center transition-all hover:scale-105"
+          className="hidden md:flex fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg items-center justify-center transition-all hover:scale-105"
           title="Chat with AI Assistant"
         >
           <SparklesIcon className="h-6 w-6" />

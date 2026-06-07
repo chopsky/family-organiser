@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp, IconMessageCircle } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -564,6 +564,33 @@ function MoreSheet({ onClose }) {
         {/* Scrollable body - only flexes when content overflows the
             88vh cap (rare on a phone, common on a small landscape view). */}
         <div className="flex-1 overflow-y-auto">
+          {/* AI chat - full-width entry that opens the assistant. Replaces the
+              floating launcher button on mobile (it's hidden < md). Closes the
+              sheet first, then fires the openChatWidget event the ChatWidget
+              listens for. */}
+          <div className="px-5 pt-1 pb-4">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                window.dispatchEvent(new CustomEvent('openChatWidget'));
+              }}
+              className="w-full bg-white rounded-2xl border border-light-grey p-4 flex items-center gap-3.5 text-left active:scale-[0.98] transition-transform"
+            >
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: '#EFE9FB', color: '#6B3FA0' }}
+              >
+                <IconMessageCircle className="h-[22px] w-[22px]" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[14px] font-bold text-charcoal leading-tight">AI chat</div>
+                <div className="text-[11px] text-warm-grey mt-0.5">Ask Housemait anything</div>
+              </div>
+              <IconChevronRight className="h-3.5 w-3.5 text-warm-grey/60 ml-auto shrink-0" />
+            </button>
+          </div>
+
           {/* 2×2 feature tiles */}
           <div className="grid grid-cols-2 gap-3 px-5 pt-1 pb-5">
             {moreTiles.map(({ to, label, sub, Icon, bg, fg }) => (
