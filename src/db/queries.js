@@ -2678,8 +2678,12 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
     && isBirthdayTitle(eventData.title)
       ? 'birthday'
       : (explicitCategory || 'general');
-  // Birthdays recur every year unless the caller already chose a recurrence.
-  const recurrence = (category === 'birthday' && !eventData.recurrence)
+  // Birthdays recur every year - but only when the title is age-agnostic.
+  // "Mia's 7th birthday" pins a specific year, and recurrence can't rewrite
+  // the "7th" to "8th", so we keep age-specific titles as a one-off. An
+  // explicit recurrence from the caller always wins.
+  const titleHasAge = /\b\d{1,3}(?:st|nd|rd|th)\b/i.test(eventData.title || '');
+  const recurrence = (category === 'birthday' && !eventData.recurrence && !titleHasAge)
     ? 'yearly'
     : (eventData.recurrence || null);
   const { data, error } = await db
