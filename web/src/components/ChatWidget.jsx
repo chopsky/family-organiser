@@ -520,12 +520,17 @@ I'm always here if you need me!`;
   useEffect(() => {
     function handleOpenChat(e) {
       const msg = e.detail?.message?.trim();
+      const attach = e.detail?.attach;
       setShowHistory(false);
       setIsOpen(true);
 
       if (msg) {
         // Send after a tick to let state settle
         setTimeout(() => sendMessage(msg), 100);
+      }
+      if (attach) {
+        // Open the native file picker once the composer has mounted.
+        setTimeout(() => document.querySelector('[data-chat-file-input]')?.click(), 200);
       }
     }
     window.addEventListener('openChatWidget', handleOpenChat);

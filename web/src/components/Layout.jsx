@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp, IconMessageCircle } from './Icons';
+import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -435,14 +435,17 @@ function MoreSheet({ onClose }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [aiInput, setAiInput] = useState('');
 
-  // Submit the inline AI message: close the sheet, then open the chat with
-  // the typed message (ChatWidget's openChatWidget listener sends it).
+  // Close the sheet and open the assistant. `detail` can carry { message } to
+  // auto-send, or { attach: true } to pop the file picker in the chat composer.
+  function openAiChat(detail = {}) {
+    onClose();
+    window.dispatchEvent(new CustomEvent('openChatWidget', { detail }));
+  }
   function submitAiMessage(e) {
     e.preventDefault();
     const msg = aiInput.trim();
-    onClose();
-    window.dispatchEvent(new CustomEvent('openChatWidget', { detail: msg ? { message: msg } : {} }));
     setAiInput('');
+    openAiChat(msg ? { message: msg } : {});
   }
 
   function handleLogout() {
@@ -582,33 +585,54 @@ function MoreSheet({ onClose }) {
           <div className="px-5 pt-1 pb-4">
             <form
               onSubmit={submitAiMessage}
-              className="w-full bg-white rounded-2xl border border-light-grey p-2 pl-3.5 flex items-center gap-2"
+              className="w-full bg-white rounded-full border border-light-grey p-2 flex items-center gap-2"
             >
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ backgroundColor: '#EFE9FB', color: '#6B3FA0' }}
+              {/* Attach a file - opens the chat and pops its file picker. */}
+              <button
+                type="button"
+                onClick={() => openAiChat({ attach: true })}
+                aria-label="Attach a file"
+                className="w-9 h-9 rounded-full bg-cream flex items-center justify-center text-warm-grey hover:text-plum shrink-0 active:scale-95 transition-transform"
               >
-                <IconMessageCircle className="h-[18px] w-[18px]" />
-              </div>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </button>
+
               <input
                 type="text"
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
                 placeholder="Ask Housemait anything…"
                 aria-label="Ask Housemait anything"
-                className="flex-1 min-w-0 bg-transparent text-[14px] text-charcoal placeholder:text-warm-grey outline-none"
+                className="flex-1 min-w-0 bg-transparent text-[15px] text-charcoal placeholder:text-warm-grey outline-none"
               />
-              <button
-                type="submit"
-                disabled={!aiInput.trim()}
-                aria-label="Send"
-                className="w-9 h-9 rounded-full bg-plum text-white flex items-center justify-center shrink-0 disabled:opacity-40 active:scale-95 transition-transform"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 2 11 13" />
-                  <path d="M22 2 15 22l-4-9-9-4 20-7z" />
-                </svg>
-              </button>
+
+              {aiInput.trim() ? (
+                <button
+                  type="submit"
+                  aria-label="Send"
+                  className="w-10 h-10 rounded-full bg-plum text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 2 11 13" />
+                    <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAiChat({})}
+                  aria-label="Voice input"
+                  className="w-10 h-10 rounded-full bg-charcoal text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </button>
+              )}
             </form>
           </div>
 
