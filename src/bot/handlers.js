@@ -155,6 +155,33 @@ function popPendingDisambiguation(userId) {
   return entry;
 }
 
+// ─── Pending "repeat this birthday yearly?" follow-up (in-memory, 5-min TTL) ──
+// When the bot adds a birthday event it asks whether to repeat it every year.
+// The user's next "yes"/"no" is resolved here, deterministically, rather than
+// re-classified by the LLM.
+const pendingBirthdayRecurrence = new Map(); // userId → { eventId, householdId, title, timestamp }
+
+function rememberBirthdayRecurrence(userId, entry) {
+  if (!userId || !entry?.eventId) return;
+  pendingBirthdayRecurrence.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popBirthdayRecurrence(userId) {
+  const entry = pendingBirthdayRecurrence.get(userId);
+  if (!entry) return null;
+  pendingBirthdayRecurrence.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+
+// Parse a bare yes/no answer. Returns 'yes', 'no', or null when it's neither
+// (so the message can fall through to normal classification).
+function parseAffirmative(text) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.\s]+$/g, '');
+  if (/^(y|ye|yes|yep|yeah|yup|sure|ok|okay|please|yes please|do it|go on|every year|annually|repeat|repeat it|each year)$/.test(t)) return 'yes';
+  if (/^(n|no|nope|nah|no thanks|no thank you|dont|don't|leave it|just once|one off|one-off|once|no need)$/.test(t)) return 'no';
+  return null;
+}
+
 /**
  * Given a user message and a pending disambiguation entry, resolve which
  * candidate the user picked. Returns the candidate object, or null if the
@@ -870,6 +897,27 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     console.log('[handlers] Pre-classified as undo for:', text.slice(0, 50));
     ctx.intent = 'undo';
     return await runUndo(user, household);
+  }
+
+  // Pending "repeat this birthday every year?" reply - resolve a bare yes/no
+  // deterministically against the birthday event we just created.
+  const pendingBday = popBirthdayRecurrence(user.id);
+  if (pendingBday && pendingBday.householdId === household.id) {
+    const ans = parseAffirmative(text);
+    if (ans === 'yes') {
+      ctx.intent = 'birthday_recurrence_reply';
+      try {
+        await db.updateCalendarEvent(pendingBday.eventId, household.id, { recurrence: 'yearly' });
+      } catch (e) {
+        console.error('[handlers] birthday recurrence update failed:', e.message);
+      }
+      return { response: `Done — I'll repeat ${pendingBday.title} every year. 🎂`, actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] } };
+    }
+    if (ans === 'no') {
+      ctx.intent = 'birthday_recurrence_reply';
+      return { response: `No problem — I've left ${pendingBday.title} as a one-off.`, actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] } };
+    }
+    // Neither yes nor no - drop the pending question and classify normally.
   }
 
   // Pending disambiguation reply - if we just asked "which one?", a number /
@@ -1737,11 +1785,23 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // is a paren.
   const trailingTrim = response.replace(/[\s)*_~`.!]+$/g, '');
   const alreadyAsks = /\?$/.test(trailingTrim);
+  // A just-added birthday event that isn't already recurring - offer to
+  // repeat it yearly (birthdays aren't auto-recurred; the user opts in).
+  const birthdayEvent = (actions.eventsAdded || []).find(
+    (e) => e && e.category === 'birthday' && !e.recurrence && e.id
+  );
   if (!alreadyAsks && (eventAdded || taskAdded)) {
     let followUp = null;
-    // Priority order: reminder offer (most useful) → assignee-broadening
-    // → none. We never add a generic "anything else?".
-    if ((eventAdded || taskAdded) && !reminderSaved) {
+    // Priority order: birthday-repeat → reminder offer → none. We never add a
+    // generic "anything else?".
+    if (birthdayEvent) {
+      followUp = 'Want this birthday to repeat every year? Reply yes or no.';
+      rememberBirthdayRecurrence(user.id, {
+        eventId: birthdayEvent.id,
+        householdId: household.id,
+        title: birthdayEvent.title,
+      });
+    } else if ((eventAdded || taskAdded) && !reminderSaved) {
       followUp = eventAdded
         ? 'Want me to add a reminder for it?'
         : 'Want me to set a reminder time?';
