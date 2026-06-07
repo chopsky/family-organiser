@@ -21,16 +21,24 @@ async function create(title, extra = {}) {
 }
 
 describe('createCalendarEvent birthday auto-categorisation', () => {
-  test('age-agnostic birthday → category birthday, recurs yearly', async () => {
+  test('age-agnostic birthday → category birthday, recurs yearly, title unchanged', async () => {
     const row = await create("Mia's birthday");
     expect(row.category).toBe('birthday');
     expect(row.recurrence).toBe('yearly');
+    expect(row.title).toBe("Mia's birthday");
   });
 
-  test('age-specific birthday → category birthday, but one-off (no recurrence)', async () => {
+  test('age-specific birthday → recurs yearly with the age stripped from the title', async () => {
     const row = await create("Mia's 7th birthday");
     expect(row.category).toBe('birthday');
-    expect(row.recurrence).toBe(null);
+    expect(row.recurrence).toBe('yearly');
+    expect(row.title).toBe("Mia's birthday");
+  });
+
+  test('milestone age is stripped too (80th → recurring "Grandma\'s birthday")', async () => {
+    const row = await create("Grandma's 80th birthday");
+    expect(row.recurrence).toBe('yearly');
+    expect(row.title).toBe("Grandma's birthday");
   });
 
   test('errand mentioning a birthday → not categorised, no recurrence', async () => {

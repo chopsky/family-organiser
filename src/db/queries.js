@@ -2673,24 +2673,32 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
   // specific category (treat 'general'/'event' as unset). An explicit category
   // always wins.
   const explicitCategory = eventData.category;
-  const category =
+  const isAutoBirthday =
     (!explicitCategory || explicitCategory === 'general' || explicitCategory === 'event')
-    && isBirthdayTitle(eventData.title)
-      ? 'birthday'
-      : (explicitCategory || 'general');
-  // Birthdays recur every year - but only when the title is age-agnostic.
-  // "Mia's 7th birthday" pins a specific year, and recurrence can't rewrite
-  // the "7th" to "8th", so we keep age-specific titles as a one-off. An
-  // explicit recurrence from the caller always wins.
-  const titleHasAge = /\b\d{1,3}(?:st|nd|rd|th)\b/i.test(eventData.title || '');
-  const recurrence = (category === 'birthday' && !eventData.recurrence && !titleHasAge)
-    ? 'yearly'
-    : (eventData.recurrence || null);
+    && isBirthdayTitle(eventData.title);
+  const category = isAutoBirthday ? 'birthday' : (explicitCategory || 'general');
+
+  // Auto-detected birthdays recur every year (these are typically non-member
+  // birthdays - friends, extended family - that have no profile to drive a
+  // recurring event). Recurrence clones the title verbatim, so we strip a
+  // fixed age ("Mia's 7th birthday" -> "Mia's birthday") to keep the perennial
+  // label correct year on year. An explicit recurrence from the caller wins,
+  // and in that case we leave the title exactly as given.
+  let title = eventData.title;
+  let recurrence = eventData.recurrence || null;
+  if (isAutoBirthday && !recurrence) {
+    recurrence = 'yearly';
+    const stripped = String(title)
+      .replace(/\s*\b\d{1,3}(?:st|nd|rd|th)\b/i, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (stripped) title = stripped;
+  }
   const { data, error } = await db
     .from('calendar_events')
     .insert({
       household_id: householdId,
-      title: eventData.title,
+      title,
       description: eventData.description || null,
       start_time: eventData.start_time,
       end_time: eventData.end_time,
