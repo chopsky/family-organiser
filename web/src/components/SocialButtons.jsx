@@ -175,7 +175,15 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
           provider: 'apple',
           options: { scopes: ['email', 'fullName'] },
         });
-        const idToken = result?.result?.identityToken;
+        // Capgo v8 returns { provider, result: { idToken, profile: { givenName,
+        // familyName, email } } }. Older versions used `identityToken` with the
+        // name fields at the top level - accept both so a plugin bump can't
+        // silently break sign-in again.
+        const idToken =
+          result?.result?.idToken ||
+          result?.result?.identityToken ||
+          result?.idToken ||
+          null;
         if (!idToken) {
           onError('Apple sign-in did not return a token. Please try again.');
           return;
@@ -183,8 +191,9 @@ export default function SocialButtons({ inviteToken, onSuccess, onError }) {
         // Apple gives the user's full name ONLY on the first sign-in (and
         // never again, even after revocation). Capture it now so we can
         // pre-fill the user record server-side.
-        const givenName = result?.result?.givenName;
-        const familyName = result?.result?.familyName;
+        const profile = result?.result?.profile || result?.result || {};
+        const givenName = profile.givenName;
+        const familyName = profile.familyName;
         const name = [givenName, familyName].filter(Boolean).join(' ').trim() || undefined;
         const { data } = await api.post('/auth/apple', {
           idToken,
