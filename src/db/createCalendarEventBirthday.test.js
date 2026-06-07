@@ -21,36 +21,29 @@ async function create(title, extra = {}) {
 }
 
 describe('createCalendarEvent birthday auto-categorisation', () => {
-  test('age-agnostic birthday → category birthday, recurs yearly, title unchanged', async () => {
+  test('birthday → categorised, but does NOT auto-recur; title kept verbatim', async () => {
     const row = await create("Mia's birthday");
     expect(row.category).toBe('birthday');
-    expect(row.recurrence).toBe('yearly');
+    expect(row.recurrence).toBe(null);
     expect(row.title).toBe("Mia's birthday");
   });
 
-  test('age-specific birthday → recurs yearly with the age stripped from the title', async () => {
+  test('age-specific birthday → categorised, title kept exactly as typed', async () => {
     const row = await create("Mia's 7th birthday");
     expect(row.category).toBe('birthday');
-    expect(row.recurrence).toBe('yearly');
-    expect(row.title).toBe("Mia's birthday");
+    expect(row.recurrence).toBe(null);
+    expect(row.title).toBe("Mia's 7th birthday");
   });
 
-  test('milestone age is stripped too (80th → recurring "Grandma\'s birthday")', async () => {
-    const row = await create("Grandma's 80th birthday");
-    expect(row.recurrence).toBe('yearly');
-    expect(row.title).toBe("Grandma's birthday");
-  });
-
-  test('errand mentioning a birthday → not categorised, no recurrence', async () => {
+  test('errand mentioning a birthday → not categorised', async () => {
     const row = await create('Buy birthday gift for John');
     expect(row.category).toBe('general');
-    expect(row.recurrence).toBe(null);
   });
 
   test('explicit recurrence from caller is preserved', async () => {
-    const row = await create("Mia's birthday", { recurrence: 'monthly' });
+    const row = await create("Mia's birthday", { recurrence: 'yearly' });
     expect(row.category).toBe('birthday');
-    expect(row.recurrence).toBe('monthly');
+    expect(row.recurrence).toBe('yearly');
   });
 
   test('non-birthday event is unaffected', async () => {

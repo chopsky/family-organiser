@@ -2674,34 +2674,20 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
     : (eventData.assigned_to_name ? [eventData.assigned_to_name] : []);
   // Auto-categorise birthdays from the title when the caller hasn't set a
   // specific category (treat 'general'/'event' as unset). An explicit category
-  // always wins.
+  // always wins. We only set the category - recurrence is left to the user
+  // (the event form's "repeat yearly" option, or the bot asking), so the title
+  // is stored exactly as given.
   const explicitCategory = eventData.category;
-  const isAutoBirthday =
+  const category =
     (!explicitCategory || explicitCategory === 'general' || explicitCategory === 'event')
-    && isBirthdayTitle(eventData.title);
-  const category = isAutoBirthday ? 'birthday' : (explicitCategory || 'general');
-
-  // Auto-detected birthdays recur every year (these are typically non-member
-  // birthdays - friends, extended family - that have no profile to drive a
-  // recurring event). Recurrence clones the title verbatim, so we strip a
-  // fixed age ("Mia's 7th birthday" -> "Mia's birthday") to keep the perennial
-  // label correct year on year. An explicit recurrence from the caller wins,
-  // and in that case we leave the title exactly as given.
-  let title = eventData.title;
-  let recurrence = eventData.recurrence || null;
-  if (isAutoBirthday && !recurrence) {
-    recurrence = 'yearly';
-    const stripped = String(title)
-      .replace(/\s*\b\d{1,3}(?:st|nd|rd|th)\b/i, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-    if (stripped) title = stripped;
-  }
+    && isBirthdayTitle(eventData.title)
+      ? 'birthday'
+      : (explicitCategory || 'general');
   const { data, error } = await db
     .from('calendar_events')
     .insert({
       household_id: householdId,
-      title,
+      title: eventData.title,
       description: eventData.description || null,
       start_time: eventData.start_time,
       end_time: eventData.end_time,
@@ -2709,7 +2695,7 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
       location: eventData.location || null,
       color: eventData.color || 'sage',
       category,
-      recurrence,
+      recurrence: eventData.recurrence || null,
       assigned_to_ids: ids,
       assigned_to_names: names,
       created_by: createdByUserId,
