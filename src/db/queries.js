@@ -2631,6 +2631,14 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
   };
 }
 
+// Recognise a birthday from an event title so it auto-files under the
+// Birthdays filter, no matter how it was created (app, WhatsApp bot, chat,
+// email, extraction). Matches "birthday", "birthdays", "bday"/"b-day", 🎂.
+const BIRTHDAY_TITLE_RE = /\bbirthdays?\b|\bb-?day\b|🎂/i;
+function isBirthdayTitle(title) {
+  return typeof title === 'string' && BIRTHDAY_TITLE_RE.test(title);
+}
+
 async function createCalendarEvent(householdId, eventData, createdByUserId, db = supabase) {
   // Accept either the new arrays or the legacy singular fields. Callers
   // in transitional code paths may still pass assigned_to / assigned_to_name.
@@ -2640,6 +2648,15 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
   const names = Array.isArray(eventData.assigned_to_names)
     ? eventData.assigned_to_names
     : (eventData.assigned_to_name ? [eventData.assigned_to_name] : []);
+  // Auto-categorise birthdays from the title when the caller hasn't set a
+  // specific category (treat 'general'/'event' as unset). An explicit category
+  // always wins.
+  const explicitCategory = eventData.category;
+  const category =
+    (!explicitCategory || explicitCategory === 'general' || explicitCategory === 'event')
+    && isBirthdayTitle(eventData.title)
+      ? 'birthday'
+      : (explicitCategory || 'general');
   const { data, error } = await db
     .from('calendar_events')
     .insert({
@@ -2651,7 +2668,7 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
       all_day: eventData.all_day || false,
       location: eventData.location || null,
       color: eventData.color || 'sage',
-      category: eventData.category || 'general',
+      category,
       recurrence: eventData.recurrence || null,
       assigned_to_ids: ids,
       assigned_to_names: names,
@@ -6550,6 +6567,7 @@ module.exports = {
   // Calendar
   getCalendarEvents,
   getBirthdayEvents,
+  isBirthdayTitle,
   expandRecurringEvents,
   getCalendarEventById,
   createEventAttachment,
