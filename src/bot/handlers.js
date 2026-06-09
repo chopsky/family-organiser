@@ -1102,13 +1102,19 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   });
   const now = new Date();
   const futureDate = new Date(now);
-  futureDate.setDate(futureDate.getDate() + 365);
-  const calendarEvents = await db.getCalendarEvents(
+  // 90 days of upcoming events is ample context for the classifier to
+  // disambiguate references ("the dentist appt", "our trip"). A full year
+  // bloats the prompt - especially for households with many birthdays - which
+  // pushes the classify LLM past its timeout on longer (recommendation) answers.
+  futureDate.setDate(futureDate.getDate() + 90);
+  const calendarEvents = (await db.getCalendarEvents(
     household.id,
     now.toISOString(),
     futureDate.toISOString(),
     { userId: user.id }
-  ).catch(() => []);
+  ).catch(() => []))
+    // Hard cap as a defensive backstop so a busy calendar can't balloon the prompt.
+    .slice(0, 40);
   // Open tasks give the classifier the context to turn "Elementor paid" into
   // a completion of the existing "Pay Elementor" task instead of a new one.
   const openTasks = await db.getAllIncompleteTasks(household.id).catch(() => []);

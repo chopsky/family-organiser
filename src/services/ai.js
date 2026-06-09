@@ -158,6 +158,13 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       // The JSON schema overhead alone is ~400 tokens, so 2048 was too tight
       // for longer response_message values and caused truncation → JSON parse errors.
       maxTokens: 4096,
+      // classify doubles as the chat/advice responder (the answer lands in
+      // response_message). Generating a long recommendation can exceed the 12s
+      // chat default, which then times out on BOTH providers (~24s) and fails.
+      // The WhatsApp webhook acks Twilio immediately and replies async, so a
+      // longer budget is safe. A healthy provider still answers in a few
+      // seconds; this only buys headroom for genuinely long generations.
+      timeoutMs: 22000,
       feature: 'classify',
       responseFormat: 'json', // force Gemini into structured-output mode
       householdId,
