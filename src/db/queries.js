@@ -169,7 +169,7 @@ async function getUserByEmail(email, db = supabase) {
   return data || null;
 }
 
-async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null }, db = supabase) {
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null }, db = supabase) {
   const row = {
     email,
     password_hash: passwordHash,
@@ -178,6 +178,8 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
     email_verified: emailVerified,
     role,
   };
+  // Campaign promo captured at signup (e.g. school-fair flyer code).
+  if (signupPromoCode) row.signup_promo_code = signupPromoCode;
   // Stamp how this user joined - read in Settings to show "Signed in
   // with Google" / "Signed in with Apple" / "Signed in with email".
   // Optional: callers from older code paths pass nothing and we leave

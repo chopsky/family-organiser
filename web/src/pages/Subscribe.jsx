@@ -78,7 +78,12 @@ function buildPlans(locale) {
 export default function Subscribe() {
   const navigate = useNavigate();
   const { isActive, isTrialing, isExpired, daysRemaining, trialEndsAt, plan: currentPlan } = useSubscription();
-  const { household } = useAuth();
+  const { household, user } = useAuth();
+  // A campaign promo saved at signup (e.g. school-fair HILLELFEST). It's
+  // annual-only and pre-applied server-side at checkout, so when one is pending
+  // we make Annual the hero and flag Monthly as full-price.
+  const pendingPromo = user?.signup_promo_code || null;
+  const showPromo = !!pendingPromo && !isActive;
   const [submitting, setSubmitting] = useState(null); // 'monthly' | 'annual' | null
   const [error, setError] = useState('');
 
@@ -150,25 +155,51 @@ export default function Subscribe() {
 
         <ErrorBanner message={error} onDismiss={() => setError('')} />
 
+        {showPromo && (
+          <div className="mb-6 rounded-2xl bg-plum-light border border-plum/20 px-5 py-4 text-center">
+            <p className="text-sm font-semibold text-plum">
+              🎁 Your {pendingPromo} discount is ready
+            </p>
+            <p className="text-xs text-plum/80 mt-0.5">
+              25% off your first year, plus 25% to the PTA — applied automatically when you choose Annual.
+            </p>
+          </div>
+        )}
+
+        {/* When a promo is pending, Annual leads as the hero (the discount is
+            annual-only); Monthly is the secondary, full-price fallback. Without
+            a promo, keep the standard Monthly-then-Annual layout. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <PricingCard
-            plan="monthly"
-            plans={plans}
-            highlighted={false}
-            currentPlan={currentPlan}
-            submitting={submitting === 'monthly'}
-            disabled={submitting !== null}
-            onSubscribe={() => handleSubscribe('monthly')}
-          />
-          <PricingCard
-            plan="annual"
-            plans={plans}
-            highlighted={true}
-            currentPlan={currentPlan}
-            submitting={submitting === 'annual'}
-            disabled={submitting !== null}
-            onSubscribe={() => handleSubscribe('annual')}
-          />
+          {(() => {
+            const annual = (
+              <PricingCard
+                key="annual"
+                plan="annual"
+                plans={plans}
+                highlighted={true}
+                badgeOverride={showPromo ? '25% OFF · first year' : undefined}
+                note={showPromo ? '+ 25% to the PTA — applied at checkout' : undefined}
+                currentPlan={currentPlan}
+                submitting={submitting === 'annual'}
+                disabled={submitting !== null}
+                onSubscribe={() => handleSubscribe('annual')}
+              />
+            );
+            const monthly = (
+              <PricingCard
+                key="monthly"
+                plan="monthly"
+                plans={plans}
+                highlighted={false}
+                note={showPromo ? 'Full price · no discount' : undefined}
+                currentPlan={currentPlan}
+                submitting={submitting === 'monthly'}
+                disabled={submitting !== null}
+                onSubscribe={() => handleSubscribe('monthly')}
+              />
+            );
+            return showPromo ? [annual, monthly] : [monthly, annual];
+          })()}
         </div>
 
         <div className="mt-10 text-center">
@@ -226,9 +257,10 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining, currentPlan
   };
 }
 
-function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabled, onSubscribe }) {
+function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabled, onSubscribe, badgeOverride, note }) {
   const p = plans[plan];
   const isCurrentPlan = currentPlan === plan;
+  const badge = badgeOverride || p.badge;
 
   return (
     <div
@@ -239,9 +271,9 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
           : 'bg-white border border-light-grey shadow-[0_2px_8px_rgba(107,63,160,0.06)]')
       }
     >
-      {p.badge && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-coral text-white text-xs font-semibold px-3 py-1 rounded-full">
-          {p.badge}
+      {badge && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-coral text-white text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">
+          {badge}
         </div>
       )}
 
@@ -251,7 +283,9 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
       >
         {p.label}
       </h2>
-      <p className="text-sm text-warm-grey mb-5">{p.tagline}</p>
+      <p className="text-sm text-warm-grey mb-1">{p.tagline}</p>
+      {note && <p className="text-xs font-semibold text-plum mb-4">{note}</p>}
+      {!note && <div className="mb-4" />}
 
       <div className="mb-5">
         <div className="flex items-baseline gap-2">

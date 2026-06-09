@@ -25,6 +25,14 @@ function generateToken() {
  * inbound request. Safe to call with a falsy req - returns an empty
  * object so callers without a request object still work.
  */
+// Normalise a campaign promo code captured at signup (uppercase, validated).
+// Returns the cleaned code or null. Shared by /register, /google, /apple.
+function sanitizePromoCode(raw) {
+  return typeof raw === 'string' && /^[A-Za-z0-9_-]{2,40}$/.test(raw.trim())
+    ? raw.trim().toUpperCase()
+    : null;
+}
+
 function sessionMetaFromReq(req) {
   if (!req) return {};
   return {
@@ -83,6 +91,9 @@ async function authResponse(user, req = null) {
       onboarded_at: user.onboarded_at || null,
       created_at: user.created_at || null,
       whatsapp_linked: !!user.whatsapp_linked,
+      // Campaign promo saved at signup - drives the "claim your discount"
+      // banner + auto-apply at annual checkout. Null for most users.
+      signup_promo_code: user.signup_promo_code || null,
     },
     // Return the full household row. The previous version returned only
     // 5 enumerated fields, which silently stripped avatar_url / address /
@@ -100,13 +111,19 @@ async function authResponse(user, req = null) {
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 
 router.post('/register', requireTurnstile, async (req, res) => {
-  const { email: userEmail, password, name, inviteToken } = req.body;
+  const { email: userEmail, password, name, inviteToken, promoCode } = req.body;
 
   if (!userEmail?.trim() || !password || !name?.trim()) {
     return res.status(400).json({ error: 'email, password, and name are required' });
   }
 
   const emailLower = userEmail.trim().toLowerCase();
+
+  // Campaign promo captured from a tagged signup link (e.g. /signup?promo=...).
+  // Stored on the account so it can be surfaced + auto-applied at the annual
+  // checkout later. Only meaningful for a new household owner (the invite
+  // branch below creates a member who joins someone else's billing).
+  const signupPromoCode = sanitizePromoCode(promoCode);
 
   // Strength gate: minimum length, no personal-info, not in HaveIBeenPwned's
   // breach corpus. See src/utils/password-strength.js for policy + rationale.
@@ -178,6 +195,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
       passwordHash,
       name: name.trim(),
       authProvider: 'email',
+      signupPromoCode,
     });
 
     const token = generateToken();
@@ -543,6 +561,7 @@ router.get('/me', requireAuth, async (req, res) => {
       role: fresh.role,
       email: fresh.email || null,
       auth_provider: fresh.auth_provider || null,
+      signup_promo_code: fresh.signup_promo_code || null,
     });
   } catch (err) {
     console.error('GET /api/auth/me error:', err);
@@ -1042,7 +1061,8 @@ router.delete('/sessions', requireAuth, async (req, res) => {
 // ─── POST /api/auth/google ──────────────────────────────────────────────────
 
 router.post('/google', async (req, res) => {
-  const { idToken, inviteToken } = req.body;
+  const { idToken, inviteToken, promoCode } = req.body;
+  const signupPromoCode = sanitizePromoCode(promoCode);
 
   if (!idToken) {
     return res.status(400).json({ error: 'idToken is required' });
@@ -1108,6 +1128,8 @@ router.post('/google', async (req, res) => {
         emailVerified: true,
         role,
         authProvider: 'google',
+        // Only the household owner (no invite) carries the campaign promo.
+        signupPromoCode: acceptedInvite ? null : signupPromoCode,
       });
 
       if (acceptedInvite) {
@@ -1138,7 +1160,8 @@ router.post('/google', async (req, res) => {
 // ─── POST /api/auth/apple ───────────────────────────────────────────────────
 
 router.post('/apple', async (req, res) => {
-  const { idToken, name: appleName, inviteToken } = req.body;
+  const { idToken, name: appleName, inviteToken, promoCode } = req.body;
+  const signupPromoCode = sanitizePromoCode(promoCode);
 
   if (!idToken) {
     return res.status(400).json({ error: 'idToken is required' });
@@ -1218,6 +1241,8 @@ router.post('/apple', async (req, res) => {
         emailVerified: true,
         role: 'member',
         authProvider: 'apple',
+        // Only the household owner (no invite) carries the campaign promo.
+        signupPromoCode: acceptedInvite ? null : signupPromoCode,
       });
 
       if (acceptedInvite) {

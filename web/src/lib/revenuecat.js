@@ -234,6 +234,19 @@ export async function restorePurchases() {
 }
 
 /**
+ * Present Apple's native offer-code redemption sheet (iOS 14+). Used to claim
+ * a campaign discount (e.g. a school-fair Apple Offer Code) on the annual
+ * subscription, in-app. Resolves void; the caller should poll subscription
+ * status afterwards since RevenueCat applies the offer asynchronously.
+ */
+export async function presentCodeRedemptionSheet() {
+  if (!isIapPlatform()) {
+    throw new Error('Code redemption not available on this platform');
+  }
+  return Purchases.presentCodeRedemptionSheet();
+}
+
+/**
  * Return RevenueCat's current view of the user's entitlement state.
  * Useful as a fast-path on app launch - if the SDK already has cached
  * state from a recent purchase, we can mark the user active locally

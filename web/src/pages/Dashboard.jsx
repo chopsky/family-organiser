@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import { DashboardSkeleton } from '../components/Skeleton';
@@ -177,6 +178,56 @@ function CalendarSetupNudge() {
         <div className="mt-3 flex items-center gap-4">
           <Link to="/settings" className="text-xs font-semibold text-primary hover:underline">
             Set up calendars →
+          </Link>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="text-xs text-cocoa hover:text-bark transition-colors"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Promo "claim your discount" nudge ───────────────────────────
+// Shown when the account signed up with a campaign promo (school-fair
+// HILLELFEST etc.) and hasn't subscribed yet. Reminds them, through the
+// trial, that a discount is waiting → /subscribe (web: auto-applied at
+// checkout; iOS: the IosSubscribe "Redeem code" button). Dismissible.
+function PromoClaimNudge() {
+  const { user } = useAuth();
+  const { isActive } = useSubscription();
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem('housemait_promo_nudge_dismissed') === '1'; } catch { return false; }
+  });
+
+  const promo = user?.signup_promo_code;
+  if (!promo || isActive || dismissed) return null;
+
+  function dismiss() {
+    try { localStorage.setItem('housemait_promo_nudge_dismissed', '1'); } catch { /* private mode */ }
+    setDismissed(true);
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-4 mb-4 flex items-start gap-3"
+      style={{ background: 'rgba(243, 237, 252, 0.7)', border: '1px solid rgba(107, 63, 160, 0.22)' }}
+    >
+      <div className="text-2xl leading-none mt-0.5" aria-hidden="true">🎁</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-bark">
+          Your {promo} discount is ready
+        </p>
+        <p className="text-xs text-cocoa mt-1 leading-relaxed">
+          Get 25% off your first year — plus 25% to the PTA — when you subscribe to the annual plan.
+        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <Link to="/subscribe" className="text-xs font-semibold text-primary hover:underline">
+            Claim my discount →
           </Link>
           <button
             type="button"
@@ -643,6 +694,7 @@ export default function Dashboard() {
           the user dismisses. Sits above the 2-column grid so it's the
           first thing a brand-new user sees but doesn't push existing
           content off the fold. */}
+      <PromoClaimNudge />
       <CalendarSetupNudge />
 
       {/* 2-column grid */}

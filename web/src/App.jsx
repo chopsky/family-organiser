@@ -19,6 +19,7 @@ import Login from './pages/Login';
 
 // Lazy load everything else - only downloaded when the route is visited
 const Signup          = lazy(() => import('./pages/Signup'));
+const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
 const CheckEmail      = lazy(() => import('./pages/CheckEmail'));
@@ -179,6 +180,8 @@ function AppRoutes() {
             user, and the new account row ends up half-created (no verification
             email sent, wrong household, etc). Bounce authed users to /dashboard. */}
         <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
+        {/* School-fair smart link: iPhone → App Store, others → web signup with promo. */}
+        <Route path="/fair" element={<FairRedirect />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />

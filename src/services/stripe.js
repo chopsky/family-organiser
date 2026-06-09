@@ -149,17 +149,24 @@ async function planFromPriceId(priceId) {
  * customer.subscription.updated) can resolve back to the household
  * without a round-trip through the customers table.
  */
-async function createCheckoutSession({ plan, currency, householdId, customerEmail, successUrl, cancelUrl }) {
+async function createCheckoutSession({ plan, currency, householdId, customerEmail, successUrl, cancelUrl, promoCodeId }) {
   const stripe = getStripe();
   const cur = (currency || 'gbp').toLowerCase();
   const priceId = await priceIdForPlan(plan, cur);
+
+  // Stripe forbids `discounts` and `allow_promotion_codes` together. When a
+  // promotion code is pre-applied (e.g. a campaign code saved at signup), pass
+  // it via `discounts` and drop the manual box; otherwise keep the manual box.
+  const promoParams = promoCodeId
+    ? { discounts: [{ promotion_code: promoCodeId }] }
+    : { allow_promotion_codes: true };
 
   return stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
     client_reference_id: householdId,
     customer_email: customerEmail,
-    allow_promotion_codes: true,
+    ...promoParams,
     success_url: successUrl,
     cancel_url: cancelUrl,
     // Metadata is repeated on both the session and the subscription so
@@ -298,6 +305,18 @@ async function listDiscountCodes({ limit = 50 } = {}) {
   }));
 }
 
+/**
+ * Look up an ACTIVE promotion code by its human string (e.g. "HILLELFEST").
+ * Returns the promotion-code object ({ id, code, active, coupon, … }) or null.
+ * Used to pre-apply a campaign code at checkout.
+ */
+async function getPromotionCodeByString(code) {
+  if (!code) return null;
+  const stripe = getStripe();
+  const res = await stripe.promotionCodes.list({ code: String(code), active: true, limit: 1 });
+  return res.data?.[0] || null;
+}
+
 /** Enable/disable a promotion code (Stripe can't delete an active one). */
 async function setDiscountCodeActive(promotionCodeId, active) {
   const stripe = getStripe();
@@ -320,6 +339,7 @@ module.exports = {
   constructWebhookEvent,
   createDiscountCode,
   listDiscountCodes,
+  getPromotionCodeByString,
   setDiscountCodeActive,
   _resetForTests,
 };

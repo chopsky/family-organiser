@@ -122,12 +122,29 @@ router.post('/checkout', requireAuth, requireHousehold, async (req, res) => {
       return res.status(400).json({ error: 'Account has no email on file' });
     }
 
+    // Campaign code pre-apply: if this account signed up with a promo code
+    // (e.g. a school-fair flyer) and is taking the ANNUAL plan, resolve it to a
+    // Stripe promotion code and pre-apply the discount so they don't have to
+    // type it. Annual-only by design (the codes are restricted to annual); on
+    // monthly we leave the manual box. Any lookup failure degrades gracefully
+    // to the manual promo box rather than blocking checkout.
+    let promoCodeId = null;
+    if (plan === 'annual' && user.signup_promo_code) {
+      try {
+        const promo = await stripeService.getPromotionCodeByString(user.signup_promo_code);
+        if (promo?.id) promoCodeId = promo.id;
+      } catch (e) {
+        console.warn('[checkout] promo lookup failed, falling back to manual box:', e.message);
+      }
+    }
+
     const webUrl = resolveWebUrl();
     const session = await stripeService.createCheckoutSession({
       plan,
       currency,
       householdId: req.householdId,
       customerEmail: user.email,
+      promoCodeId,
       successUrl: `${webUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${webUrl}/subscription/cancel`,
     });

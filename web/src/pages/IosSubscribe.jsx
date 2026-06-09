@@ -38,6 +38,8 @@ import {
   getCurrentOffering,
   purchasePackage,
   restorePurchases,
+  presentCodeRedemptionSheet,
+  getCustomerInfo,
   hasActivePremium,
 } from '../lib/revenuecat';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -146,6 +148,42 @@ export default function IosSubscribe() {
     }
   }, [submitting, navigate, refresh]);
 
+  // ── Redeem an offer code ───────────────────────────────────────
+  // Opens Apple's native code-redemption sheet (e.g. a school-fair Apple Offer
+  // Code for 25% off annual). The offer attaches asynchronously, so after the
+  // sheet closes we poll the entitlement; if it becomes active we proceed,
+  // otherwise (sheet dismissed / no code) we quietly return to the paywall.
+  const handleRedeemCode = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting('redeem');
+    setError('');
+    try {
+      await presentCodeRedemptionSheet();
+      setConfirming(true);
+      let active = false;
+      for (let i = 0; i < 8 && !active; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          const info = await getCustomerInfo();
+          if (hasActivePremium(info)) active = true;
+        } catch { /* transient - retry */ }
+      }
+      if (active) {
+        await refresh();
+        navigate('/dashboard', { replace: true });
+        return;
+      }
+      setConfirming(false);
+      setSubmitting(null);
+    } catch (err) {
+      if (err?.userCancelled) { setSubmitting(null); setConfirming(false); return; }
+      console.error('[IosSubscribe] redeem failed:', err);
+      setError(err?.message || 'Could not open the redeem sheet. Please try again.');
+      setSubmitting(null);
+      setConfirming(false);
+    }
+  }, [submitting, navigate, refresh]);
+
   // ── Render ─────────────────────────────────────────────────────
   const copy = buildCopy({ isExpired, isTrialing, isActive, daysRemaining });
 
@@ -231,10 +269,23 @@ export default function IosSubscribe() {
           </div>
         )}
 
+        {/* Redeem an offer code - prominent so flyer/campaign users can claim
+            an Apple Offer Code (e.g. 25% off annual) without us tagging them. */}
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={handleRedeemCode}
+            disabled={submitting !== null}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl border-[1.5px] border-plum text-plum font-semibold py-3 active:scale-[0.99] transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {submitting === 'redeem' ? 'Opening…' : '🎁 Have a code? Redeem your discount'}
+          </button>
+        </div>
+
         {/* Restore Purchases - required by App Review Guideline 3.1.1.
             Always present, even before offerings load (a returning user
             with a previous purchase needs this to recover access). */}
-        <div className="mt-8 text-center">
+        <div className="mt-5 text-center">
           <button
             type="button"
             onClick={handleRestore}

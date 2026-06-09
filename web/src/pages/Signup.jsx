@@ -23,6 +23,17 @@ export default function Signup() {
   const [searchParams]          = useSearchParams();
   const inviteToken             = searchParams.get('invite');
 
+  // Campaign promo from a tagged link (e.g. /signup?promo=HILLELFEST, reached
+  // via the /fair QR redirect). Persist to localStorage so it survives the
+  // email-verification round trip, and read it back on later visits/SSO.
+  const promoCode = (() => {
+    const fromUrl = searchParams.get('promo');
+    try {
+      if (fromUrl) localStorage.setItem('housemait_signup_promo', fromUrl);
+      return fromUrl || localStorage.getItem('housemait_signup_promo') || undefined;
+    } catch { return fromUrl || undefined; }
+  })();
+
   useEffect(() => {
     document.title = 'Sign up | Housemait';
   }, []);
@@ -45,6 +56,7 @@ export default function Signup() {
         password,
         name: name.trim(),
         inviteToken: inviteToken || undefined,
+        promoCode,
         turnstile_token: turnstileToken,
       });
 
@@ -168,7 +180,7 @@ export default function Signup() {
           <ErrorBanner message={error} onDismiss={() => setError('')} />
 
           <div className="signup-concierge-auth">
-            <SocialButtons inviteToken={inviteToken} onSuccess={handleSocialSuccess} onError={setError} />
+            <SocialButtons inviteToken={inviteToken} promoCode={promoCode} onSuccess={handleSocialSuccess} onError={setError} />
 
             {!showEmailForm ? (
               <button
