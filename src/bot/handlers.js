@@ -880,6 +880,57 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
   }
 }
 
+/**
+ * Answer a "what's on the calendar?" question by fetching the requested date
+ * range DIRECTLY from the database, with no window/count limit. The classifier
+ * pre-load (used only for disambiguation) is capped for speed, so calendar
+ * QUERIES must not rely on it - they'd miss far-future events. The classifier
+ * supplies query_start / query_end (YYYY-MM-DD); we default to the next 14 days.
+ */
+async function handleCalendarQuery(result, household, user, userTz, actions) {
+  const { formatEventWhen } = require('../utils/event-when');
+  const isYmd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz }); // YYYY-MM-DD
+  const start = isYmd(result.query_start) ? result.query_start : todayStr;
+  let end = isYmd(result.query_end) ? result.query_end : null;
+  if (!end || end < start) {
+    const d = new Date(`${start}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 14);
+    end = d.toISOString().slice(0, 10);
+  }
+
+  let events = [];
+  try {
+    events = await db.getCalendarEvents(
+      household.id,
+      `${start}T00:00:00Z`,
+      `${end}T23:59:59Z`,
+      { userId: user.id, birthdays: true }
+    );
+  } catch (err) {
+    console.error('[handlers] calendar query failed:', err.message);
+    return { response: "I couldn't pull up your calendar just now. Please try again in a moment.", actions };
+  }
+
+  if (!events.length) {
+    return { response: result.response_message?.trim() || "Looks like there's nothing on for that period. 🎉", actions };
+  }
+
+  const MAX = 30;
+  const lines = events.slice(0, MAX).map((ev) => {
+    const when = formatEventWhen(ev, userTz);
+    const who = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length
+      ? ` (${ev.assigned_to_names.join(', ')})`
+      : '';
+    return `• ${when ? `${when} — ` : ''}${ev.title}${who}`;
+  });
+  const intro = result.response_message?.trim() || "Here's what's on:";
+  let body = `${intro}\n${lines.join('\n')}`;
+  if (events.length > MAX) body += `\n…and ${events.length - MAX} more.`;
+  return { response: body, actions };
+}
+
 async function handleTextMessage(text, user, household, ctx = {}) {
   // ctx is an OUT parameter the caller can use to retrieve the resolved
   // intent for telemetry / logging. We set ctx.intent at each decision
@@ -1172,7 +1223,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
 
   // Handle calendar queries - AI already has calendar context and answered in response_message
   if (result.intent === 'query_calendar') {
-    return { response: result.response_message || "I couldn't find that event. Try checking the calendar in the app.", actions };
+    return await handleCalendarQuery(result, household, user, userTz, actions);
   }
 
   // Handle web search - real-time questions the classifier can't
