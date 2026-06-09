@@ -1,4 +1,32 @@
-const { normalizeWhatsAppMarkdown } = require('./whatsapp');
+const { normalizeWhatsAppMarkdown, splitForWhatsApp } = require('./whatsapp');
+
+describe('splitForWhatsApp', () => {
+  it('returns a single chunk for short text', () => {
+    expect(splitForWhatsApp('hello')).toEqual(['hello']);
+  });
+
+  it('never returns a chunk over the limit, and keeps the content', () => {
+    const long = Array.from({ length: 50 }, (_, i) => `Paragraph ${i} with some words here.`).join('\n\n');
+    const parts = splitForWhatsApp(long, 200);
+    expect(parts.length).toBeGreaterThan(1);
+    for (const p of parts) expect(p.length).toBeLessThanOrEqual(200);
+    const joined = parts.join(' ');
+    expect(joined).toContain('Paragraph 0');
+    expect(joined).toContain('Paragraph 49');
+  });
+
+  it('hard-cuts a single unbroken string with no boundaries', () => {
+    const blob = 'x'.repeat(450);
+    const parts = splitForWhatsApp(blob, 100);
+    expect(parts.every((p) => p.length <= 100)).toBe(true);
+    expect(parts.join('').length).toBe(450);
+  });
+
+  it('handles empty / null input', () => {
+    expect(splitForWhatsApp('')).toEqual(['']);
+    expect(splitForWhatsApp(null)).toEqual(['']);
+  });
+});
 
 describe('normalizeWhatsAppMarkdown', () => {
   describe('double-asterisk markdown bold', () => {

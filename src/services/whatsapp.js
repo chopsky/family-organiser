@@ -87,20 +87,42 @@ function getBotNumberForWaLink() {
  * @param {string} body  - Message text
  * @returns {Promise<object>} Twilio message SID
  */
-async function sendMessage(phone, body) {
+// Twilio rejects any single WhatsApp body over 1600 characters
+// ("The concatenated message body exceeds the 1600 character limit"). We
+// split below that with headroom so a long AI answer (recommendations,
+// web-search results, a packed calendar list) goes out as several messages
+// instead of failing the whole reply.
+const WHATSAPP_MAX_CHARS = 1500;
+
+/**
+ * Split text into WhatsApp-sized chunks, breaking on the nicest boundary that
+ * fits (paragraph → line → sentence → space → hard cut). Never returns a chunk
+ * longer than `limit`. Returns [''] for empty input.
+ */
+function splitForWhatsApp(text, limit = WHATSAPP_MAX_CHARS) {
+  const t = (text == null ? '' : String(text));
+  if (t.length <= limit) return [t];
+  const chunks = [];
+  let rest = t;
+  while (rest.length > limit) {
+    let cut = -1;
+    for (const sep of ['\n\n', '\n', '. ', ' ']) {
+      const idx = rest.lastIndexOf(sep, limit);
+      if (idx > limit * 0.5) { cut = sep === '. ' ? idx + 1 : idx; break; }
+    }
+    if (cut <= 0) cut = limit; // no good boundary - hard cut
+    const piece = rest.slice(0, cut).trim();
+    if (piece) chunks.push(piece);
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) chunks.push(rest);
+  return chunks;
+}
+
+async function sendOneMessage(to, bodyText, msid) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!accountSid || !authToken) throw new Error('Twilio not configured');
-
-  const to = formatPhone(phone);
-  const msid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-
-  // Normalise leaked markdown (**bold** / __bold__) into WhatsApp's
-  // native *bold* before sending - centralised here so every caller
-  // benefits, regardless of which handler produced the text.
-  const normalisedBody = normalizeWhatsAppMarkdown(body);
-
-  const params = { To: to, Body: normalisedBody };
+  const params = { To: to, Body: bodyText };
   if (msid) {
     params.MessagingServiceSid = msid;
   } else {
@@ -122,16 +144,37 @@ async function sendMessage(phone, body) {
   );
 
   const data = await response.json();
-
   if (!response.ok) {
     console.error('[WhatsApp] REST API error:', data);
     const err = new Error(data.message || 'Twilio API error');
     err.code = data.code;
     throw err;
   }
-
   console.log('[WhatsApp] Message sent:', data.sid, data.status);
   return data;
+}
+
+async function sendMessage(phone, body) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) throw new Error('Twilio not configured');
+
+  const to = formatPhone(phone);
+  const msid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+  // Normalise leaked markdown (**bold** / __bold__) into WhatsApp's native
+  // *bold* before sending - centralised here so every caller benefits.
+  const normalisedBody = normalizeWhatsAppMarkdown(body);
+
+  // Split anything over the 1600-char Twilio limit into ordered messages.
+  const parts = splitForWhatsApp(normalisedBody);
+  let last;
+  for (let i = 0; i < parts.length; i++) {
+    last = await sendOneMessage(to, parts[i], msid);
+    // Small gap between parts so WhatsApp keeps them in order.
+    if (i < parts.length - 1) await new Promise((r) => setTimeout(r, 400));
+  }
+  return last;
 }
 
 /**
@@ -308,4 +351,5 @@ module.exports = {
   getBotNumberForWaLink,
   getClient,
   normalizeWhatsAppMarkdown,
+  splitForWhatsApp,
 };
