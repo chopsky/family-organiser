@@ -2364,6 +2364,7 @@ function formatRecipeResponse(recipe) {
 
 module.exports = {
   handleTextMessage,
+  handleCalendarQuery,
   handleVoiceNote,
   handlePhoto,
   handleDocument,
