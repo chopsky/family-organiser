@@ -8,8 +8,23 @@
  *
  * Backed by /api/admin/promo-codes (GET list, POST create, PATCH enable/disable).
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import api from '../../lib/api';
+import { APP_STORE_ID } from '../../lib/app-store';
+
+// The flyer QR / printed link. Routes by device: iPhone → App Store (redeem the
+// Apple Offer Code in-app), Android/desktop → web signup with the Stripe code
+// pre-applied at annual checkout. See web/src/pages/FairRedirect.jsx.
+function fairLink(code) {
+  return `https://housemait.com/fair?promo=${encodeURIComponent(code)}`;
+}
+
+// Deep link that opens Apple's redemption sheet straight onto our listing with
+// the Offer Code pre-filled. Only works once you've created a matching Offer
+// Code (same string) on the annual subscription in App Store Connect.
+function appleRedeemLink(code) {
+  return `https://apps.apple.com/redeem?ctx=offercodes&id=${APP_STORE_ID}&code=${encodeURIComponent(code)}`;
+}
 
 function fmtDate(iso) {
   if (!iso) return '—';
@@ -18,6 +33,27 @@ function fmtDate(iso) {
   } catch {
     return iso;
   }
+}
+
+/** A label + truncated URL with a one-click "Copy" button that flips to
+ *  "Copied!" once used. Keeps the printable campaign links one tap away. */
+function CopyLink({ label, url, copyKey, copiedKey, onCopy }) {
+  const copied = copiedKey === copyKey;
+  return (
+    <div className="flex items-center gap-2 max-w-[260px]">
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-warm-grey font-semibold">{label}</div>
+        <div className="text-xs text-cocoa truncate" title={url}>{url}</div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onCopy(url, copyKey)}
+        className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors ${copied ? 'border-sage text-sage' : 'border-plum/30 text-plum hover:border-plum'}`}
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  );
 }
 
 function discountLabel(c) {
@@ -49,6 +85,24 @@ export default function AdminPromoCodes() {
   const [createdMsg, setCreatedMsg] = useState('');
 
   const [togglingId, setTogglingId] = useState(null);
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  async function copyToClipboard(text, key) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for non-secure contexts / older browsers.
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* noop */ }
+      document.body.removeChild(ta);
+    }
+    setCopiedKey(key);
+  }
 
   async function loadCodes() {
     setLoading(true);
@@ -118,7 +172,9 @@ export default function AdminPromoCodes() {
         <strong>How it works:</strong> this creates a Stripe coupon + promotion code for <strong>web checkout</strong> (customers
         type it on the Stripe page). For the <strong>iOS app</strong>, create a matching <strong>Apple Offer Code</strong> with the
         same string in App Store Connect — Stripe and Apple don’t share codes. Percentage discounts only. Use <strong>100%</strong>
-        for a free period (e.g. 100% off + Annual = a free first year).
+        for a free period (e.g. 100% off + Annual = a free first year). Each code below has a ready-to-print
+        <strong> Flyer / QR link</strong> (routes iPhone → App Store, everyone else → web signup) and an
+        <strong> Apple redeem link</strong> that opens the in-app redemption sheet with the Offer Code pre-filled.
       </div>
 
       {/* Create */}
@@ -201,23 +257,33 @@ export default function AdminPromoCodes() {
                   const exhausted = c.max_redemptions != null && c.times_redeemed >= c.max_redemptions;
                   const live = c.active && !expired && !exhausted;
                   return (
-                    <tr key={c.id} className="border-b border-cream-border/60">
-                      <td className="py-2.5 pr-3 font-semibold text-charcoal uppercase tracking-wide">{c.code}</td>
-                      <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{discountLabel(c)}</td>
-                      <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{c.restricted_products ? 'restricted' : 'any'}</td>
-                      <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{c.times_redeemed}{c.max_redemptions != null ? ` / ${c.max_redemptions}` : ''}</td>
-                      <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{fmtDate(c.expires_at)}</td>
-                      <td className="py-2.5 pr-3">
-                        <span style={{ background: live ? '#EDF5EE' : '#FDF0EB', color: live ? '#3C7842' : '#B14828', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap' }}>
-                          {!c.active ? 'Disabled' : exhausted ? 'Fully claimed' : expired ? 'Expired' : 'Live'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right whitespace-nowrap">
-                        <button type="button" onClick={() => handleToggle(c)} disabled={togglingId === c.id} className="text-xs font-medium text-plum hover:underline disabled:opacity-50">
-                          {togglingId === c.id ? '…' : c.active ? 'Disable' : 'Enable'}
-                        </button>
-                      </td>
-                    </tr>
+                    <Fragment key={c.id}>
+                      <tr className="border-b border-cream-border/40">
+                        <td className="py-2.5 pr-3 font-semibold text-charcoal uppercase tracking-wide">{c.code}</td>
+                        <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{discountLabel(c)}</td>
+                        <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{c.restricted_products ? 'restricted' : 'any'}</td>
+                        <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{c.times_redeemed}{c.max_redemptions != null ? ` / ${c.max_redemptions}` : ''}</td>
+                        <td className="py-2.5 pr-3 text-cocoa whitespace-nowrap">{fmtDate(c.expires_at)}</td>
+                        <td className="py-2.5 pr-3">
+                          <span style={{ background: live ? '#EDF5EE' : '#FDF0EB', color: live ? '#3C7842' : '#B14828', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap' }}>
+                            {!c.active ? 'Disabled' : exhausted ? 'Fully claimed' : expired ? 'Expired' : 'Live'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right whitespace-nowrap">
+                          <button type="button" onClick={() => handleToggle(c)} disabled={togglingId === c.id} className="text-xs font-medium text-plum hover:underline disabled:opacity-50">
+                            {togglingId === c.id ? '…' : c.active ? 'Disable' : 'Enable'}
+                          </button>
+                        </td>
+                      </tr>
+                      <tr className="border-b border-cream-border/60">
+                        <td colSpan={7} className="pb-3 pt-0 pl-0">
+                          <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 bg-cream/60 rounded-lg px-3 py-2">
+                            <CopyLink label="Flyer / QR link" url={fairLink(c.code)} copyKey={`${c.id}:fair`} copiedKey={copiedKey} onCopy={copyToClipboard} />
+                            <CopyLink label="Apple redeem link" url={appleRedeemLink(c.code)} copyKey={`${c.id}:apple`} copiedKey={copiedKey} onCopy={copyToClipboard} />
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
                   );
                 })}
               </tbody>
