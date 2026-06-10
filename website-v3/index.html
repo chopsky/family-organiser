@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
   <title>Housemait | The AI that runs the household, so you don't have to</title>
   <meta name="description" content="Housemait is the AI family organiser. Calendar, meals, shopping, tasks and school dates, held in one place and answered on WhatsApp." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -99,6 +100,8 @@
     }
     .btn-plum { background: var(--plum); color: #fff; box-shadow: var(--pop); }
     .btn-plum:hover { transform: translate(-2px, -2px); background: var(--plum-deep); box-shadow: 7px 7px 0 var(--sun); }
+    .btn-dark { background: var(--ink); color: #fff; box-shadow: 5px 5px 0 rgba(20, 19, 16, .25); }
+    .btn-dark:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--plum); }
     .btn-paper { background: #fff; color: var(--ink); box-shadow: var(--pop); }
     .btn-paper:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--plum); }
     .btn-bare { border: 0; padding: 15px 6px; font-family: var(--display); font-weight: 600; }
@@ -193,6 +196,43 @@
     .bub.you { align-self: flex-end; background: #E7FFE0; border-bottom-right-radius: 3px; }
     .bub.bot { align-self: flex-start; background: var(--paper); border-bottom-left-radius: 3px; }
     .bub.bot b { color: var(--mint); }
+
+    /* The phone on the fridge - an ink-outline iPhone showing the app's
+     * Today view. The single strongest "this is a mobile app" signal on
+     * the page, drawn in the same stuck-on style as everything else. */
+    .phone {
+      position: absolute; right: 34px; top: 44px; bottom: 44px; width: 238px;
+      background: var(--paper);
+      border: 3px solid var(--ink); border-radius: 34px;
+      box-shadow: var(--pop);
+      rotate: 2deg;
+      padding: 14px 14px 56px;
+      overflow: hidden;
+    }
+    .phone .island { width: 72px; height: 19px; background: var(--ink); border-radius: 999px; margin: 0 auto 14px; }
+    .phone .pdate { font-family: var(--display); font-weight: 600; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-60); }
+    .phone .pgreet { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: -.02em; margin: 2px 0 10px; }
+    .phone .pgreet em { font-style: normal; color: var(--plum); }
+    .phone .prow {
+      display: flex; gap: 8px; align-items: center;
+      background: #fff; border: 2px solid var(--ink); border-radius: 10px;
+      box-shadow: 2px 2px 0 var(--ink);
+      padding: 7px 9px; font-size: 12px; margin-top: 8px;
+    }
+    .phone .prow .bar { width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0; }
+    .phone .prow .t { font-family: var(--display); font-weight: 600; font-size: 11px; }
+    .phone .pmeal {
+      margin-top: 12px; display: flex; gap: 8px; align-items: center;
+      background: var(--sun-soft); border: 2px solid var(--ink); border-radius: 12px;
+      box-shadow: 2px 2px 0 var(--ink);
+      padding: 9px 10px; font-size: 12px; font-weight: 600;
+    }
+    .phone .ptab {
+      position: absolute; bottom: 12px; left: 14px; right: 14px; height: 36px;
+      background: #fff; border: 2px solid var(--ink); border-radius: 999px;
+      display: flex; align-items: center; justify-content: space-around;
+      font-size: 14px;
+    }
 
     /* gentle float for collage pieces */
     @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
@@ -431,37 +471,47 @@
   <header class="hero">
     <div class="wrap hero-grid">
       <div>
-        <span class="kicker"><span class="magnet"></span>AI family organiser</span>
+        <span class="kicker"><span class="magnet"></span>The AI family organiser app</span>
         <h1>Stop being the family's <span class="hl">operating system.</span></h1>
-        <p class="sub">The dates, the dinners, the dentist, the PE kit. <strong>Housemait is the AI that holds it all</strong> and answers on WhatsApp, so the whole week stops living in your head.</p>
+        <p class="sub">The dates, the dinners, the dentist, the PE kit. <strong>Housemait is the AI app that holds it all</strong> and answers on WhatsApp, so the whole week stops living in your head.</p>
         <div class="hero-ctas">
-          <a class="btn btn-plum" href="/signup">Start free trial</a>
-          <a class="btn btn-paper" href="#how">See how it works</a>
+          <a class="btn btn-dark" href="https://apps.apple.com/gb/app/housemait/id6762131562">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.54c-.03-3.05 2.49-4.51 2.6-4.58-1.42-2.07-3.62-2.36-4.4-2.39-1.87-.19-3.66 1.1-4.6 1.1-.95 0-2.42-1.07-3.98-1.04-2.05.03-3.94 1.19-4.99 3.02-2.13 3.7-.54 9.17 1.53 12.17 1.02 1.47 2.23 3.12 3.81 3.06 1.54-.06 2.12-.99 3.97-.99 1.85 0 2.38.99 3.99.96 1.65-.03 2.7-1.5 3.7-2.97 1.17-1.7 1.65-3.35 1.67-3.43-.04-.02-3.2-1.23-3.3-4.91zM14.02 3.6c.84-1.02 1.41-2.43 1.25-3.85-1.21.05-2.68.81-3.55 1.83-.78.9-1.46 2.35-1.28 3.73 1.36.11 2.74-.69 3.58-1.71z"/></svg>
+            Download on the App Store
+          </a>
+          <a class="btn btn-paper" href="/signup">Try it on the web</a>
         </div>
-        <p class="hero-note">Free for 30 days. No card to start. <span class="hand">cancel anytime, obviously</span></p>
+        <p class="hero-note">Free for 30 days on iPhone and web. No card to start. <span class="hand">cancel anytime, obviously</span></p>
       </div>
 
-      <!-- The fridge door -->
+      <!-- The fridge door: the app (on an iPhone) magneted front and
+           centre, with the polaroid, a sticky note and a WhatsApp chat
+           around it. The phone is what says "mobile app" at a glance. -->
       <div class="door" aria-hidden="true">
-        <div class="polaroid float-1" style="top: 42px; right: 38px; rotate: 3deg;">
-          <div class="photo"><img src="family-photo.jpeg" alt="" /></div>
+        <div class="phone float-1">
+          <div class="island"></div>
+          <div class="pdate">Tuesday 21 April</div>
+          <div class="pgreet">Good morning, <em>Sarah.</em></div>
+          <div class="prow"><span class="bar" style="background: var(--plum);"></span><span class="t">08:30</span><span>School run · Ben</span></div>
+          <div class="prow"><span class="bar" style="background: var(--mint);"></span><span class="t">15:45</span><span>Swimming · Sofia</span></div>
+          <div class="prow"><span class="bar" style="background: var(--tomato);"></span><span class="t">16:00</span><span>Dentist · Finn</span></div>
+          <div class="pmeal"><span>🍝</span><span>Tonight: one-pot pasta</span></div>
+          <div class="ptab"><span>🏠</span><span>📅</span><span>🛒</span><span>🍽️</span><span>👨‍👩‍👧</span></div>
+        </div>
+        <div class="polaroid float-2" style="top: 40px; left: 52px; rotate: -4deg; width: 178px;">
+          <div class="photo" style="height: 136px;"><img src="family-photo.jpeg" alt="" /></div>
           <div class="cap">the chaos crew ✌️</div>
         </div>
-        <div class="note float-2" style="top: 76px; left: 66px; rotate: -4deg; background: var(--sun);">
+        <div class="note float-3" style="top: 268px; left: 64px; rotate: 3deg; background: var(--sun); width: 158px;">
           <span class="pin" style="background: var(--tomato);"></span>
           swimming kit<br />THURSDAY!!
         </div>
-        <div class="wa-card float-3" style="bottom: 44px; right: 30px; rotate: -2deg;">
+        <div class="wa-card" style="bottom: 40px; left: 44px; rotate: -2deg; width: 232px;">
           <div class="head"><span class="ava">h</span>housemait · online</div>
           <div class="body">
             <div class="bub you">dentist for Finn thurs 4pm + we're out of milk</div>
             <div class="bub bot"><b>✓ Done.</b> Calendar updated, milk's on the list.</div>
           </div>
-        </div>
-        <div class="note" style="top: 262px; left: 48px; rotate: 2deg; background: var(--lilac); width: 150px;">
-          <span class="pin" style="background: var(--plum);"></span>
-          bins out tonight
-          <span style="text-decoration: line-through; opacity: .55; display: block;">ask Dad again</span>
         </div>
       </div>
     </div>
@@ -564,7 +614,7 @@
         <div class="cell b-meal rv">
           <span class="pain-q">"It's 5pm. What's for dinner?"</span>
           <h3>Dinner, decided on Sunday</h3>
-          <p>Plan the week in minutes. The shopping list builds itself from the ingredients.</p>
+          <p>Plan the week in minutes. Housemait gives you meal ideas and recipes. The shopping list builds itself from the ingredients.</p>
         </div>
 
         <div class="cell b-task rv">
@@ -581,7 +631,7 @@
       </div>
 
       <div class="strip2">
-        <div class="chiplet rv"><span class="emo">🧾</span><div><b>Receipt scanner</b><span>Snap it, list updates itself</span></div></div>
+        <div class="chiplet rv"><span class="emo">🧾</span><div><b>Receipt scanner</b><span>Snap it, the list updates itself</span></div></div>
         <div class="chiplet rv"><span class="emo">📁</span><div><b>Document vault</b><span>School letters, findable forever</span></div></div>
         <div class="chiplet rv"><span class="emo">📬</span><div><b>Email forwarding</b><span>Forward it, it becomes events + tasks</span></div></div>
         <div class="chiplet rv"><span class="emo">📊</span><div><b>Weekly digest</b><span>The week ahead, every Sunday</span></div></div>
@@ -680,8 +730,11 @@
       <h2>Get your <span class="hl">head</span> back.</h2>
       <p>Set up in five minutes. By Sunday, the week plans itself.</p>
       <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
-        <a class="btn btn-plum" href="/signup">Start free trial</a>
-        <a class="btn btn-paper" href="#">Download on the App Store</a>
+        <a class="btn btn-plum" href="https://apps.apple.com/gb/app/housemait/id6762131562">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.54c-.03-3.05 2.49-4.51 2.6-4.58-1.42-2.07-3.62-2.36-4.4-2.39-1.87-.19-3.66 1.1-4.6 1.1-.95 0-2.42-1.07-3.98-1.04-2.05.03-3.94 1.19-4.99 3.02-2.13 3.7-.54 9.17 1.53 12.17 1.02 1.47 2.23 3.12 3.81 3.06 1.54-.06 2.12-.99 3.97-.99 1.85 0 2.38.99 3.99.96 1.65-.03 2.7-1.5 3.7-2.97 1.17-1.7 1.65-3.35 1.67-3.43-.04-.02-3.2-1.23-3.3-4.91zM14.02 3.6c.84-1.02 1.41-2.43 1.25-3.85-1.21.05-2.68.81-3.55 1.83-.78.9-1.46 2.35-1.28 3.73 1.36.11 2.74-.69 3.58-1.71z"/></svg>
+          Download on the App Store
+        </a>
+        <a class="btn btn-paper" href="/signup">Try it on the web</a>
       </div>
     </div>
   </section>
