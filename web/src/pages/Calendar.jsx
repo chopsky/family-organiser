@@ -819,6 +819,25 @@ export default function Calendar() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!formTitle.trim()) return;
+
+    // Guard against an end that lands at or before the start (e.g. start
+    // 15:00, end 10:00 on the same day). Compare the actual instants we'd
+    // persist so the rule is identical for all-day and timed events. The
+    // date pickers already stop the end DATE preceding the start date; this
+    // closes the same-day time gap they can't catch.
+    const startAt = formAllDay
+      ? new Date(`${formDate}T00:00:00`)
+      : new Date(`${formDate}T${formStart}:00`);
+    const endAt = formAllDay
+      ? new Date(`${formEndDate || formDate}T23:59:59`)
+      : new Date(`${formEndDate || formDate}T${formEnd}:00`);
+    if (endAt <= startAt) {
+      setError(formAllDay
+        ? 'The end date can’t be before the start date.'
+        : 'The end time must be after the start time.');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -2112,7 +2131,20 @@ export default function Calendar() {
                         <input
                           type="time"
                           value={formStart}
-                          onChange={e => setFormStart(e.target.value)}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setFormStart(v);
+                            // Keep the end ahead of the start on a same-day event,
+                            // mirroring the start-date bump above. Nudge the end to
+                            // one hour later (capped at 23:59) when it would now sit
+                            // at or before the new start time.
+                            if ((formEndDate || formDate) === formDate && formEnd <= v) {
+                              const [h, m] = v.split(':').map(Number);
+                              setFormEnd(h >= 23
+                                ? '23:59'
+                                : `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                            }
+                          }}
                           style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
                           className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                         />
