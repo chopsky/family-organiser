@@ -56,6 +56,27 @@ const VALID_COLORS = [
 const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
 /**
+ * Defence-in-depth guard against an event whose end falls before its start
+ * (e.g. start 15:00, end 10:00 on the same day). The web form already blocks
+ * this, but the AI / email / bulk-paste ingestion paths hit these routes
+ * directly, so we enforce it server-side too.
+ *
+ * Returns an error string when the range is inverted, else null. We compare
+ * strictly (`end < start`) rather than `<=` so a legitimate all-day event
+ * stored with equal start/end timestamps (some sources use midnight for both)
+ * is never rejected. Absent or unparseable timestamps are left to the
+ * existing required-field checks.
+ */
+function timeRangeError(start_time, end_time) {
+  if (!start_time || !end_time) return null;
+  const start = new Date(start_time);
+  const end = new Date(end_time);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  if (end < start) return 'The event end can’t be before its start.';
+  return null;
+}
+
+/**
  * Parse a "YYYY-MM" month string into start and end date strings.
  * Returns { startDate, endDate } where endDate is the last day of the month.
  */
@@ -337,6 +358,10 @@ router.post('/events', async (req, res) => {
   if (!end_time) {
     return res.status(400).json({ error: '"end_time" is required' });
   }
+  const postRangeError = timeRangeError(start_time, end_time);
+  if (postRangeError) {
+    return res.status(400).json({ error: postRangeError });
+  }
   if (color && !VALID_COLORS.includes(color)) {
     return res.status(400).json({ error: `Invalid color "${color}". Must be one of: ${VALID_COLORS.join(', ')}` });
   }
@@ -467,6 +492,18 @@ router.patch('/events/:id', async (req, res) => {
   }
 
   try {
+    // When a time is being changed, validate the resulting range against the
+    // unchanged side too - a PATCH may move only the start or only the end.
+    if (rest.start_time !== undefined || rest.end_time !== undefined) {
+      const existing = await db.getCalendarEventById(req.params.id, req.householdId);
+      const effStart = rest.start_time !== undefined ? rest.start_time : existing?.start_time;
+      const effEnd = rest.end_time !== undefined ? rest.end_time : existing?.end_time;
+      const patchRangeError = timeRangeError(effStart, effEnd);
+      if (patchRangeError) {
+        return res.status(400).json({ error: patchRangeError });
+      }
+    }
+
     const updates = { ...rest };
     if (color) updates.color = color;
     if (recurrence !== undefined) updates.recurrence = recurrence;
@@ -898,3 +935,5 @@ router.delete('/attachments/:attachmentId', async (req, res) => {
 });
 
 module.exports = router;
+// Exposed for unit tests - pure helper, no Express/db dependency.
+module.exports.timeRangeError = timeRangeError;
