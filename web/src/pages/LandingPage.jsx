@@ -361,7 +361,7 @@ const SHOWCASE = [
     id: 'cal',
     eyebrow: <div className="eyebrow-sec">Shared Calendar</div>,
     title: (<>Every date, <em>every&nbsp;body</em>, on one&nbsp;page.</>),
-    desc: "See the whole month for the whole family. Filter by person, add shared events in one tap, and get a heads up when two people are double-booked.",
+    desc: "No more surprise birthday parties you found out about the night before. See the whole month for the whole family, add shared events in one tap, and get a heads-up when two people are double-booked.",
     bullets: ['Colour-coded per family member', 'Connects with Google, Apple, Outlook', 'Forward a school email and it becomes an event', '"What\'s on today" widget for the fridge tablet'],
     mock: <CalendarMock />,
   },
@@ -369,7 +369,7 @@ const SHOWCASE = [
     id: 'tasks',
     eyebrow: <div className="eyebrow-sec">Tasks</div>,
     title: (<>The mental load, <em>finally</em> split fairly.</>),
-    desc: "Columns per family member, so nothing lives in one person's head. Recurring chores repeat themselves. Overdue items nudge gently, not naggingly.",
+    desc: "Columns per family member, so nothing lives in one person's head. Recurring chores repeat themselves, and Housemait does the chasing, so nobody has to be the nag.",
     bullets: ['Assign by name, not by guilt', 'Recurring tasks (bins, vet, MOT)', 'Kid-safe view for younger family members', 'Weekly digest: who did what'],
     mock: <TasksMock />,
   },
@@ -377,7 +377,7 @@ const SHOWCASE = [
     id: 'meals',
     eyebrow: <div className="eyebrow-sec">Meal Plan</div>,
     title: (<>Sunday planning, <em>finally&nbsp;fun.</em></>),
-    desc: "Drag recipes onto the week. Housemait builds the shopping list from the ingredients and remembers what your family keeps coming back to.",
+    desc: "No more staring into the fridge at 5pm. Drag recipes onto the week, and Housemait builds the shopping list from the ingredients and remembers the meals your family actually eats.",
     bullets: ['Breakfast, lunch, dinner + snacks', 'One-tap: ingredients to shopping list', 'Recipe box remembers the family favourites', 'Drag & drop meals across the week'],
     mock: <MealsMock />,
   },
@@ -385,7 +385,7 @@ const SHOWCASE = [
     id: 'shop',
     eyebrow: <div className="eyebrow-sec">Shopping</div>,
     title: (<>A list that <em>sorts</em> itself.</>),
-    desc: "Items auto-group into sensible categories like produce, dairy and meat, so the list reads in the order you shop. Snap a receipt and Housemait automatically checks off everything you've bought.",
+    desc: "No more doubling back to the dairy aisle. Items auto-group into categories so the list reads in the order you shop, and snapping the receipt checks off everything you've bought.",
     bullets: ['Create as many lists as your family needs', 'Smart categories keep items grouped sensibly', 'Receipt scanning in 2 seconds', '"Previously purchased" memory'],
     mock: <ShoppingMock />,
   },
@@ -524,13 +524,13 @@ function DownloadQR() {
       onMouseEnter={recompute}
       onFocus={recompute}
     >
-      <button
-        type="button"
+      <a
+        href={APP_STORE_URL}
         className="btn btn-primary download-pill"
-        aria-label="Show QR code to download Housemait on the App Store"
+        aria-label="Download Housemait on the App Store, or hover to scan the QR code"
       >
-        Download App
-      </button>
+        Download on the App Store
+      </a>
       <span className="qr-popover" role="tooltip">
         <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="150" height="150" />
       </span>
@@ -592,6 +592,30 @@ export default function LandingPage() {
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Scroll-reveal: elements tagged .reveal fade-up the first time they
+  // enter the viewport, then unobserve (one-shot, no re-animation on
+  // scroll-back). The showcase section is deliberately untagged — it has
+  // its own IntersectionObserver choreography and a position:sticky pin
+  // that shouldn't gain ancestors with transforms. prefers-reduced-motion
+  // is handled in CSS (reveal elements render fully visible, no
+  // transition), so this observer is a harmless no-op there.
+  useEffect(() => {
+    const els = document.querySelectorAll('.lp-v2 .reveal')
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('in')
+            obs.unobserve(e.target)
+          }
+        })
+      },
+      { threshold: 0.12 }
+    )
+    els.forEach(el => obs.observe(el))
+    return () => obs.disconnect()
   }, [])
 
   return (
@@ -659,7 +683,7 @@ export default function LandingPage() {
               made easy&nbsp;with&nbsp;AI.
             </h1>
             <p className="lede">
-              Housemait is the AI that holds your family's calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
+              Housemait is the AI assistant that restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
             </p>
             <div className="hero-cta">
               {/* Hero CTA — on iOS phones/tablets the App Store badge
@@ -686,7 +710,7 @@ export default function LandingPage() {
                     <DownloadQR />
                   )}
                   <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
-                    Try Housemait Online
+                    Try it on the web
                   </a>
                 </>
               )}
@@ -763,7 +787,7 @@ export default function LandingPage() {
       {/* FEATURE STRIP */}
       <section className="strip" id="features">
         <div className="wrap">
-          <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', marginBottom: 40, flexWrap: 'wrap', gap: 20 }}>
+          <div className="reveal" style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', marginBottom: 40, flexWrap: 'wrap', gap: 20 }}>
             <div>
               <div className="eyebrow-sec">Everything in one place</div>
               <h2 className="sec" style={{ margin: 0 }}>
@@ -771,37 +795,44 @@ export default function LandingPage() {
               </h2>
             </div>
             <p style={{ maxWidth: 360, color: 'var(--ink-soft)', margin: 0 }}>
-              From Sunday meal plans to Friday dentist reminders, Housemait keeps the whole house in sync.
+              One parent holding every date, list and dinner plan in their head isn't a system. Housemait is.
             </p>
           </div>
+          {/* Pain-led feature cards: each opens with the thing families
+              actually say out loud (the pain), then the one-line fix.
+              The kicker keeps the feature name for scannability. */}
           <div className="feat-grid">
-            <div className="feat c1">
+            <div className="feat c1 reveal">
               <div className="ic">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
               </div>
-              <h3>Shared calendar</h3>
-              <p>One month view for everyone in the house. Layer events by person, colour-coded, with conflict detection.</p>
+              <div className="kicker">Shared calendar</div>
+              <h3>"You never told me about that."</h3>
+              <p>Now everyone sees the same month: colour-coded per person, with a heads-up the moment two plans collide.</p>
             </div>
-            <div className="feat c2">
+            <div className="feat c2 reveal">
               <div className="ic">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" /></svg>
               </div>
-              <h3>Smart shopping</h3>
-              <p>Auto-sorted into categories and shared with the whole household in real time. Add items by voice, photo or meal plan.</p>
+              <div className="kicker">Smart shopping</div>
+              <h3>"We're out of milk. Again."</h3>
+              <p>One live list everyone adds to, sorted into aisles, and checked off by snapping the receipt.</p>
             </div>
-            <div className="feat c3">
+            <div className="feat c3 reveal">
               <div className="ic">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
               </div>
-              <h3>Family tasks</h3>
-              <p>Columns per person, recurring chores, and gentle nudges. The laundry never gets lost in a group&nbsp;chat again.</p>
+              <div className="kicker">Family tasks</div>
+              <h3>"Why am I the one who remembers the bins?"</h3>
+              <p>Chores assigned by name, repeating on schedule, with Housemait doing the chasing instead of you.</p>
             </div>
-            <div className="feat c4">
+            <div className="feat c4 reveal">
               <div className="ic">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01M11 15h.01M16 16h.01M3 3h7v7H3z" /><path d="M14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /></svg>
               </div>
-              <h3>Meal planning</h3>
-              <p>Drag from your recipe box, auto-generate the shop, reuse last week's favourites. Dinner sorted by Sunday.</p>
+              <div className="kicker">Meal planning</div>
+              <h3>"It's 5pm. What's for dinner?"</h3>
+              <p>Plan the week in minutes on Sunday. The shopping list builds itself from the ingredients.</p>
             </div>
           </div>
         </div>
@@ -810,17 +841,17 @@ export default function LandingPage() {
       {/* AI PROMPT SHOWCASE */}
       <section className="sec-block">
         <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <div className="eyebrow-sec">The AI that gets the brief</div>
             <h2 className="sec" style={{ margin: '0 auto 16px' }}>
               Just tell it what's happening. <em>It&nbsp;does&nbsp;the&nbsp;rest.</em>
             </h2>
             <p className="sec-lede" style={{ margin: '0 auto' }}>
-              Type, snap, or forward an email. Housemait turns real life into the right calendar entry, shopping line, task, or meal.
+              No forms, no dropdowns, no retyping. Type it, snap it, or forward the email, and Housemait files real life into the right calendar entry, shopping line, task or meal.
             </p>
           </div>
 
-          <div className="ai-demo">
+          <div className="ai-demo reveal">
             <div className="ai-input">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
               <div className="txt">"Finn has a dentist on Thursday at 4, we're out of milk, and let's plan three easy dinners this week"</div>
@@ -881,7 +912,7 @@ export default function LandingPage() {
       {/* WHATSAPP */}
       <section id="whatsapp" className="section-white sec-block">
         <div className="wrap">
-          <div className="wa-section">
+          <div className="wa-section reveal">
             <div className="wa-grid">
               <div>
                 <span className="wa-badge">
@@ -894,7 +925,7 @@ export default function LandingPage() {
                   Your family's AI assistant, <em style={{ fontStyle: 'italic', color: 'var(--purple)' }}>right in WhatsApp.</em>
                 </h3>
                 <p style={{ color: 'var(--ink-soft)', fontSize: 17, maxWidth: 480, margin: 0 }}>
-                  No new app to learn. Just message the Housemait bot on WhatsApp and it takes care of the rest. It's like having a personal assistant that never sleeps.
+                  Your family already lives in WhatsApp, so Housemait does too. No new app for the household to ignore: message the bot the way you'd message each other, and everything lands in the right place, filed and remembered.
                 </p>
                 <ul className="bullets" style={{ marginTop: 28 }}>
                   <li><span className="check">✓</span> Add items to your shopping list by just texting</li>
@@ -955,7 +986,7 @@ export default function LandingPage() {
       {/* TESTIMONIALS */}
       <section id="stories" className="section-cream sec-block">
         <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <div className="eyebrow-sec">Loved by actual parents</div>
             <h2 className="sec" style={{ margin: '0 auto' }}>
               A little more <em>calm,</em><br />a lot fewer group&nbsp;chats.
@@ -963,7 +994,7 @@ export default function LandingPage() {
           </div>
           <div className="testis">
             {locale.reviews.map((r, i) => (
-              <div key={r.name} className={`testi${i === 1 ? ' hl' : ''}`}>
+              <div key={r.name} className={`testi reveal${i === 1 ? ' hl' : ''}`}>
                 <div className="stars">★★★★★</div>
                 <blockquote>"{REVIEW_QUOTES[i]}"</blockquote>
                 <div className="who">
@@ -989,7 +1020,7 @@ export default function LandingPage() {
               Less than <em>{locale.pricing.compareReference}</em> a month.
             </h2>
             <p className="sec-lede" style={{ margin: '14px auto 0' }}>
-              30-day free trial. Cancel any time. One plan covers your whole household.
+              One plan with everything in it, covering your whole household. No tiers to compare, nothing to unlock. 30-day free trial, cancel any time.
             </p>
           </div>
 
@@ -1012,7 +1043,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="single-plan">
+          <div className="single-plan reveal">
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Housemait</div>
               <div style={{ color: 'var(--ink-soft)', fontSize: 14.5 }}>Everything your household needs</div>
@@ -1066,7 +1097,7 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="sec-block" style={{ paddingTop: 0 }}>
         <div className="wrap">
-          <div className="cta">
+          <div className="cta reveal">
             <div className="bg1" />
             <div className="bg2" />
             <div style={{ position: 'relative', zIndex: 1 }}>

@@ -270,12 +270,21 @@ h1.display em { font-style: italic; color: var(--purple); }
   border: 1px solid rgba(27, 20, 36, .06);
 }
 .collage .sticker .ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; }
-.collage .s1 { top: 18%; right: 6%; transform: rotate(4deg); }
+/* Stickers gently bob, staggered so they never move in unison. The
+ * rotation lives in a custom property because the float animation owns
+ * the transform — keyframes recombine rotate(var(--rot)) + translateY
+ * each frame. Reduced-motion kills the animation, letting the static
+ * transform fall through. */
+.collage .s1 { top: 18%; right: 6%; --rot: 4deg; transform: rotate(var(--rot)); animation: sticker-float 6s ease-in-out infinite; }
 .collage .s1 .ic { background: var(--sage-soft); color: #3f6b3a; }
-.collage .s2 { bottom: 24%; left: -2%; transform: rotate(-5deg); }
+.collage .s2 { bottom: 24%; left: -2%; --rot: -5deg; transform: rotate(var(--rot)); animation: sticker-float 7s ease-in-out 1.4s infinite; }
 .collage .s2 .ic { background: var(--coral-soft); color: #a84522; }
-.collage .s3 { top: 6%; left: 32%; transform: rotate(-2deg); }
+.collage .s3 { top: 6%; left: 32%; --rot: -2deg; transform: rotate(var(--rot)); animation: sticker-float 6.5s ease-in-out 2.8s infinite; }
 .collage .s3 .ic { background: var(--purple-soft); color: var(--purple-deep); }
+@keyframes sticker-float {
+  0%, 100% { transform: rotate(var(--rot)) translateY(0); }
+  50% { transform: rotate(var(--rot)) translateY(-9px); }
+}
 .collage .blob {
   position: absolute; width: 340px; height: 340px; border-radius: 50%;
   background: radial-gradient(circle at 30% 30%, #F4C4C2 0%, #F4C4C2 35%, transparent 70%);
@@ -315,20 +324,26 @@ h2.sec em { font-style: italic; color: var(--purple); }
 .feat {
   padding: 28px; border-radius: var(--radius);
   background: var(--cream);
-  display: flex; flex-direction: column; gap: 14px;
-  transition: transform .2s ease;
+  display: flex; flex-direction: column; gap: 12px;
+  transition: transform .2s ease, box-shadow .2s ease;
 }
-.feat:hover { transform: translateY(-4px); }
+.feat:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .feat .ic {
   width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
   font-size: 20px;
 }
-.feat h3 { margin: 0; font-size: 17px; font-weight: 600; }
+/* Feature-name kicker above the pain-quote headline. Per-card colour
+ * matches the icon tint so the card reads as one colour family. */
+.feat .kicker {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .14em; margin-top: 2px;
+}
+.feat h3 { margin: 0; font-size: 18.5px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
 .feat p { margin: 0; color: var(--ink-soft); font-size: 14.5px; line-height: 1.55; }
-.feat.c1 { background: var(--purple-soft); } .feat.c1 .ic { background: #fff; color: var(--purple); }
-.feat.c2 { background: var(--sage-soft); } .feat.c2 .ic { background: #fff; color: #3f6b3a; }
-.feat.c3 { background: var(--coral-soft); } .feat.c3 .ic { background: #fff; color: #a84522; }
-.feat.c4 { background: var(--butter-soft); } .feat.c4 .ic { background: #fff; color: #8a5c1a; }
+.feat.c1 { background: var(--purple-soft); } .feat.c1 .ic { background: #fff; color: var(--purple); } .feat.c1 .kicker { color: var(--purple-deep); }
+.feat.c2 { background: var(--sage-soft); } .feat.c2 .ic { background: #fff; color: #3f6b3a; } .feat.c2 .kicker { color: #3f6b3a; }
+.feat.c3 { background: var(--coral-soft); } .feat.c3 .ic { background: #fff; color: #a84522; } .feat.c3 .kicker { color: #a84522; }
+.feat.c4 { background: var(--butter-soft); } .feat.c4 .ic { background: #fff; color: #8a5c1a; } .feat.c4 .kicker { color: #8a5c1a; }
 
 /* big rows */
 .bigrow { display: grid; grid-template-columns: 1fr 1.2fr; gap: 72px; align-items: center; }
@@ -393,6 +408,18 @@ h2.sec em { font-style: italic; color: var(--purple); }
 
 /* testimonials */
 .testis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+/* Oversized serif open-quote in the card corner. Decorative only -
+ * pointer-events none, aria-irrelevant (it's CSS content). */
+.testi { position: relative; }
+.testi::before {
+  content: '\201C';
+  position: absolute; top: 6px; right: 22px;
+  font-family: 'Instrument Serif', serif;
+  font-size: 84px; line-height: 1;
+  color: var(--purple-soft);
+  pointer-events: none;
+}
+.testi.hl::before { color: rgba(255, 255, 255, .22); }
 .testi {
   background: #fff; border-radius: var(--radius); padding: 28px;
   border: 1px solid rgba(27, 20, 36, .06);
@@ -715,4 +742,55 @@ section.showcase { padding: 0; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─── Scroll-reveal ───
+ * Elements tagged .reveal start slightly translated + transparent and
+ * ease in the first time they cross the viewport (one-shot; the
+ * IntersectionObserver in LandingPage.jsx adds .in and unobserves).
+ * Cards inside the feature grid and the testimonial row stagger via
+ * transition-delay so the row cascades rather than thudding in at once.
+ * The showcase section is deliberately never tagged - its sticky pin
+ * must not gain transformed ancestors.
+ */
+.lp-v2 .reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity .6s cubic-bezier(.22, .61, .36, 1), transform .6s cubic-bezier(.22, .61, .36, 1);
+}
+.lp-v2 .reveal.in { opacity: 1; transform: none; }
+.feat-grid .reveal:nth-child(2) { transition-delay: .08s; }
+.feat-grid .reveal:nth-child(3) { transition-delay: .16s; }
+.feat-grid .reveal:nth-child(4) { transition-delay: .24s; }
+.testis .reveal:nth-child(2) { transition-delay: .1s; }
+.testis .reveal:nth-child(3) { transition-delay: .2s; }
+
+/* Reduced motion: render everything in place, no animation. The JS
+ * observer still runs but adding .in is a visual no-op. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-v2 .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ─── CTA ambient glow ───
+ * The two radial blobs inside the closing CTA card drift and breathe
+ * slowly so the card feels alive without distracting from the button. */
+.cta .bg1 { animation: cta-drift 9s ease-in-out infinite alternate; }
+.cta .bg2 { animation: cta-drift 12s ease-in-out infinite alternate-reverse; }
+@keyframes cta-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-26px, 20px) scale(1.14); }
+}
+
+/* Hero CTA pills: more presence than the standard .btn size. */
+.download-pill,
+.try-online-pill {
+  padding: 14px 26px;
+  font-size: 15.5px;
+}
+
+/* Reduced motion: stop the ambient animations outright. */
+@media (prefers-reduced-motion: reduce) {
+  .cta .bg1,
+  .cta .bg2,
+  .collage .s1, .collage .s2, .collage .s3 { animation: none; }
 }
