@@ -10,7 +10,7 @@ import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { pickPhoto } from '../lib/photo-picker';
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // ── Term-aware weekly activities helpers ──
 const todayYmd = () => new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
@@ -3349,7 +3349,7 @@ export default function FamilySetup() {
 
                   {loadingActivities ? <Spinner /> : (
                     <>
-                      <div className="grid grid-cols-5 gap-1.5 mt-2">
+                      <div className="grid grid-cols-7 gap-1.5 mt-2">
                         {DAY_LABELS.map((day, idx) => {
                           const dayActivities = editActivities.filter(a => a.day_of_week === idx && activityInSelectedTerm(a));
                           return (

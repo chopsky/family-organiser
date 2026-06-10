@@ -77,7 +77,7 @@ create table if not exists school_term_dates (
 create table if not exists child_weekly_schedule (
   id              uuid primary key default gen_random_uuid(),
   child_id        uuid references users(id) on delete cascade,
-  day_of_week     integer not null check (day_of_week between 0 and 4),
+  day_of_week     integer not null check (day_of_week between 0 and 6),
   activity        text not null,
   time_start      time,
   time_end        time,

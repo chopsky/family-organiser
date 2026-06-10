@@ -436,7 +436,7 @@ Respond only with valid JSON matching this schema:
   "school_activity": {
     "child_name": string,
     "activity": string,
-    "day_of_week": integer (0=Monday...4=Friday),
+    "day_of_week": integer (0=Monday...6=Sunday),
     "time_end": "HH:MM" | null,
     "action": "add" | "remove"
   } | null,

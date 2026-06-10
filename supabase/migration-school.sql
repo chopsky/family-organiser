@@ -50,7 +50,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS year_group TEXT;
 CREATE TABLE IF NOT EXISTS child_weekly_schedule (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   child_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 4),
+  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
   activity TEXT NOT NULL,
   time_start TIME,
   time_end TIME,

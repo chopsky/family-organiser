@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
-const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 // color_theme -> hex (mirrors Tasks.jsx MEMBER_COLORS / the brand avatar
 // palette). Drives the tinted icon tile + glyph colour.
@@ -134,18 +134,16 @@ export default function AfterSchoolCard({ members = [] }) {
     return map;
   }, [members]);
 
-  // Days (0=Mon..4=Fri) that have at least one activity.
+  // Days (0=Mon..6=Sun) that have at least one activity.
   const daysWithClubs = useMemo(() => {
     const set = new Set();
-    for (const a of (activities || [])) if (a.day_of_week >= 0 && a.day_of_week <= 4) set.add(a.day_of_week);
+    for (const a of (activities || [])) if (a.day_of_week >= 0 && a.day_of_week <= 6) set.add(a.day_of_week);
     return set;
   }, [activities]);
 
-  // Default selected day: today if Mon-Fri, else Monday.
-  const [dayIdx, setDayIdx] = useState(() => {
-    const d = (new Date().getDay() + 6) % 7; // 0=Mon..6=Sun
-    return d <= 4 ? d : 0;
-  });
+  // Default selected day: today (all 7 days are selectable now that
+  // weekends have their own columns).
+  const [dayIdx, setDayIdx] = useState(() => (new Date().getDay() + 6) % 7); // 0=Mon..6=Sun
 
   if (!isMobile) return null;
   if (!activities || activities.length === 0) return null; // hide when no clubs at all

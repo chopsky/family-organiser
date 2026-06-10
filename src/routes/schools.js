@@ -422,8 +422,8 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
     return res.status(400).json({ error: 'child_id, day_of_week, and activity are required.' });
   }
 
-  if (day_of_week < 0 || day_of_week > 4) {
-    return res.status(400).json({ error: 'day_of_week must be 0 (Monday) to 4 (Friday).' });
+  if (day_of_week < 0 || day_of_week > 6) {
+    return res.status(400).json({ error: 'day_of_week must be 0 (Monday) to 6 (Sunday).' });
   }
 
   try {
@@ -453,8 +453,8 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
  */
 router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   const { day_of_week, activity, time_start, time_end, pickup_member_id } = req.body;
-  if (day_of_week !== undefined && (day_of_week < 0 || day_of_week > 4)) {
-    return res.status(400).json({ error: 'day_of_week must be 0 (Monday) to 4 (Friday).' });
+  if (day_of_week !== undefined && (day_of_week < 0 || day_of_week > 6)) {
+    return res.status(400).json({ error: 'day_of_week must be 0 (Monday) to 6 (Sunday).' });
   }
   if (activity !== undefined && !activity.trim()) {
     return res.status(400).json({ error: 'activity cannot be empty.' });
