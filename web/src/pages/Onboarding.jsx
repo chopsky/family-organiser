@@ -15,6 +15,7 @@ import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
+import { isIos as isIosBrowser, APP_STORE_CONFIGURED } from '../lib/app-store';
 
 const Welcome           = lazy(() => import('./onboarding/Welcome'));
 const InviteFamily      = lazy(() => import('./onboarding/InviteFamily'));
@@ -26,6 +27,7 @@ const ConnectWhatsApp   = lazy(() => import('./onboarding/ConnectWhatsApp'));
 // Dashboard now surfaces a single nudge banner when no external feed
 // exists, deferring the calendar setup to a moment the user chooses.
 const Notifications     = lazy(() => import('./onboarding/Notifications'));
+const GetApp            = lazy(() => import('./onboarding/GetApp'));
 const Done              = lazy(() => import('./onboarding/Done'));
 
 export default function Onboarding() {
@@ -83,11 +85,17 @@ export default function Onboarding() {
   // After this reorder the user goes Welcome → WhatsApp pairing → first
   // chat with the bot before any social or technical commitment.
   const includeNotifications = isIOS && pushStatus && pushStatus !== 'granted' && pushStatus !== 'skip';
+  // "Get the app" nudge: only for someone finishing onboarding in a BROWSER
+  // on an iPhone (isIosBrowser is UA-based, distinct from `isIOS` above which
+  // is the native-Capacitor check). Hidden in the native app (already there),
+  // on Android/desktop (no app / dead link), and if no live App Store listing.
+  const includeGetApp = !isIOS && isIosBrowser() && APP_STORE_CONFIGURED;
   const steps = [
     { id: 'welcome',           Component: Welcome },
     { id: 'connect-whatsapp',  Component: ConnectWhatsApp },
     { id: 'invite-family',     Component: InviteFamily },
     ...(includeNotifications ? [{ id: 'notifications', Component: Notifications }] : []),
+    ...(includeGetApp ? [{ id: 'get-app', Component: GetApp }] : []),
     { id: 'done',              Component: Done },
   ];
 
