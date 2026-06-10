@@ -197,43 +197,6 @@
     .bub.bot { align-self: flex-start; background: var(--paper); border-bottom-left-radius: 3px; }
     .bub.bot b { color: var(--mint); }
 
-    /* The phone on the fridge - an ink-outline iPhone showing the app's
-     * Today view. The single strongest "this is a mobile app" signal on
-     * the page, drawn in the same stuck-on style as everything else. */
-    .phone {
-      position: absolute; right: 34px; top: 44px; bottom: 44px; width: 238px;
-      background: var(--paper);
-      border: 3px solid var(--ink); border-radius: 34px;
-      box-shadow: var(--pop);
-      rotate: 2deg;
-      padding: 14px 14px 56px;
-      overflow: hidden;
-    }
-    .phone .island { width: 72px; height: 19px; background: var(--ink); border-radius: 999px; margin: 0 auto 14px; }
-    .phone .pdate { font-family: var(--display); font-weight: 600; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-60); }
-    .phone .pgreet { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: -.02em; margin: 2px 0 10px; }
-    .phone .pgreet em { font-style: normal; color: var(--plum); }
-    .phone .prow {
-      display: flex; gap: 8px; align-items: center;
-      background: #fff; border: 2px solid var(--ink); border-radius: 10px;
-      box-shadow: 2px 2px 0 var(--ink);
-      padding: 7px 9px; font-size: 12px; margin-top: 8px;
-    }
-    .phone .prow .bar { width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0; }
-    .phone .prow .t { font-family: var(--display); font-weight: 600; font-size: 11px; }
-    .phone .pmeal {
-      margin-top: 12px; display: flex; gap: 8px; align-items: center;
-      background: var(--sun-soft); border: 2px solid var(--ink); border-radius: 12px;
-      box-shadow: 2px 2px 0 var(--ink);
-      padding: 9px 10px; font-size: 12px; font-weight: 600;
-    }
-    .phone .ptab {
-      position: absolute; bottom: 12px; left: 14px; right: 14px; height: 36px;
-      background: #fff; border: 2px solid var(--ink); border-radius: 999px;
-      display: flex; align-items: center; justify-content: space-around;
-      font-size: 14px;
-    }
-
     /* gentle float for collage pieces */
     @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
     .door .float-1 { animation: bob 6s ease-in-out infinite; }
@@ -484,34 +447,27 @@
         <p class="hero-note">Free for 30 days on iPhone and web. No card to start. <span class="hand">cancel anytime, obviously</span></p>
       </div>
 
-      <!-- The fridge door: the app (on an iPhone) magneted front and
-           centre, with the polaroid, a sticky note and a WhatsApp chat
-           around it. The phone is what says "mobile app" at a glance. -->
+      <!-- The fridge door -->
       <div class="door" aria-hidden="true">
-        <div class="phone float-1">
-          <div class="island"></div>
-          <div class="pdate">Tuesday 21 April</div>
-          <div class="pgreet">Good morning, <em>Sarah.</em></div>
-          <div class="prow"><span class="bar" style="background: var(--plum);"></span><span class="t">08:30</span><span>School run · Ben</span></div>
-          <div class="prow"><span class="bar" style="background: var(--mint);"></span><span class="t">15:45</span><span>Swimming · Sofia</span></div>
-          <div class="prow"><span class="bar" style="background: var(--tomato);"></span><span class="t">16:00</span><span>Dentist · Finn</span></div>
-          <div class="pmeal"><span>🍝</span><span>Tonight: one-pot pasta</span></div>
-          <div class="ptab"><span>🏠</span><span>📅</span><span>🛒</span><span>🍽️</span><span>👨‍👩‍👧</span></div>
-        </div>
-        <div class="polaroid float-2" style="top: 40px; left: 52px; rotate: -4deg; width: 178px;">
-          <div class="photo" style="height: 136px;"><img src="family-photo.jpeg" alt="" /></div>
+        <div class="polaroid float-1" style="top: 42px; right: 38px; rotate: 3deg;">
+          <div class="photo"><img src="family-photo.jpeg" alt="" /></div>
           <div class="cap">the chaos crew ✌️</div>
         </div>
-        <div class="note float-3" style="top: 268px; left: 64px; rotate: 3deg; background: var(--sun); width: 158px;">
+        <div class="note float-2" style="top: 76px; left: 66px; rotate: -4deg; background: var(--sun);">
           <span class="pin" style="background: var(--tomato);"></span>
           swimming kit<br />THURSDAY!!
         </div>
-        <div class="wa-card" style="bottom: 40px; left: 44px; rotate: -2deg; width: 232px;">
+        <div class="wa-card float-3" style="bottom: 44px; right: 30px; rotate: -2deg;">
           <div class="head"><span class="ava">h</span>housemait · online</div>
           <div class="body">
             <div class="bub you">dentist for Finn thurs 4pm + we're out of milk</div>
             <div class="bub bot"><b>✓ Done.</b> Calendar updated, milk's on the list.</div>
           </div>
+        </div>
+        <div class="note" style="top: 262px; left: 48px; rotate: 2deg; background: var(--lilac); width: 150px;">
+          <span class="pin" style="background: var(--plum);"></span>
+          bins out tonight
+          <span style="text-decoration: line-through; opacity: .55; display: block;">ask Dad again</span>
         </div>
       </div>
     </div>
