@@ -118,7 +118,7 @@ export default function InviteFamily({ user, household, next, setError }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Lynn"
+            placeholder="e.g. Sarah"
             className={inputBase}
             autoComplete="off"
           />
@@ -131,7 +131,7 @@ export default function InviteFamily({ user, household, next, setError }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="lynn@example.com"
+            placeholder="sarah@example.com"
             className={inputBase}
             autoComplete="off"
             required
@@ -167,7 +167,7 @@ export default function InviteFamily({ user, household, next, setError }) {
           type="text"
           value={childName}
           onChange={(e) => setChildName(e.target.value)}
-          placeholder="e.g. Logan"
+          placeholder="e.g. Oliver"
           className={inputBase + ' flex-1'}
           autoComplete="off"
           aria-label="Child's first name"
