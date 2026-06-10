@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Housemait | The AI that runs the household, so you don't have to</title>
+  <meta name="description" content="Housemait is the AI family organiser. Calendar, meals, shopping, tasks and school dates, held in one place and answered on WhatsApp." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Caveat:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       HOUSEMAIT v3 — "The fridge door, rebuilt."
+       Design system (clean-slate, no inheritance from current site):
+         Paper   #FAF9F5   canvas
+         Ink     #141310   text, borders, hard shadows
+         Sun     #FFC940   sticky notes, marker highlights
+         Tomato  #FF5A39   urgency, accents
+         Plum    #6B3FA0   brand anchor: CTAs, links, calendar accents
+         Mint    #2EB872   success, WhatsApp-adjacent
+         Lilac   #C9B8FF   soft fills
+       Type: Space Grotesk (display) / DM Sans (body) / Caveat (handwriting)
+       Texture: 2px ink borders + hard offset shadows (tactile, stuck-on),
+       slight rotations (fridge physics), folded sticky-note corners.
+       ════════════════════════════════════════════════════════════════ */
+    :root {
+      --paper: #FAF9F5;
+      --paper-dim: #F1EFE7;
+      --ink: #141310;
+      --ink-60: rgba(20, 19, 16, .62);
+      --sun: #FFC940;
+      --sun-soft: #FFE9AE;
+      --tomato: #FF5A39;
+      --plum: #6B3FA0;
+      --plum-deep: #5A3488;
+      --mint: #2EB872;
+      --lilac: #C9B8FF;
+      --wa: #25D366;
+      --r: 18px;
+      --border: 2px solid var(--ink);
+      --pop: 5px 5px 0 var(--ink);          /* hard offset shadow */
+      --pop-sm: 3px 3px 0 var(--ink);
+      --display: 'Space Grotesk', sans-serif;
+      --body: 'DM Sans', sans-serif;
+      --hand: 'Caveat', cursive;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--body);
+      font-size: 16.5px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+    img { max-width: 100%; display: block; }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+
+    /* ── Type ── */
+    h1, h2, h3 { font-family: var(--display); font-weight: 700; letter-spacing: -.03em; margin: 0; }
+    .kicker {
+      display: inline-flex; align-items: center; gap: 9px;
+      font-family: var(--display); font-weight: 600; font-size: 13px;
+      letter-spacing: .16em; text-transform: uppercase;
+    }
+    .kicker .magnet {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: var(--border);
+      background: radial-gradient(circle at 32% 30%, #fff 0 18%, var(--tomato) 20%);
+    }
+    /* Marker highlight: skewed sun-yellow swipe behind key words */
+    .hl {
+      background-image: linear-gradient(100deg, var(--sun) 0%, var(--sun) 100%);
+      background-repeat: no-repeat;
+      background-size: 100% 42%;
+      background-position: 0 78%;
+    }
+    .hand { font-family: var(--hand); font-weight: 600; }
+    /* On dark (ink) sections the partial marker swipe leaves the top of
+     * the glyphs ink-on-ink. Use a full-block highlight there instead. */
+    .pain .hl, .final .hl {
+      background-size: 100% 94%;
+      background-position: 0 55%;
+      padding: 0 12px;
+      color: var(--ink);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--display); font-weight: 600; font-size: 16px;
+      padding: 15px 28px; border-radius: 999px;
+      border: var(--border); cursor: pointer;
+      transition: transform .14s ease, box-shadow .14s ease;
+    }
+    .btn-plum { background: var(--plum); color: #fff; box-shadow: var(--pop); }
+    .btn-plum:hover { transform: translate(-2px, -2px); background: var(--plum-deep); box-shadow: 7px 7px 0 var(--sun); }
+    .btn-paper { background: #fff; color: var(--ink); box-shadow: var(--pop); }
+    .btn-paper:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--plum); }
+    .btn-bare { border: 0; padding: 15px 6px; font-family: var(--display); font-weight: 600; }
+    .btn-bare:hover { color: var(--plum); }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250, 249, 245, .88);
+      backdrop-filter: blur(10px);
+      border-bottom: var(--border);
+    }
+    nav .bar { display: flex; align-items: center; justify-content: space-between; height: 74px; }
+    .logo { font-family: var(--display); font-weight: 700; font-size: 23px; letter-spacing: -.04em; display: flex; align-items: center; gap: 9px; }
+    .logo .dot { width: 15px; height: 15px; border-radius: 50%; border: var(--border); background: radial-gradient(circle at 32% 30%, #fff 0 18%, var(--sun) 20%); }
+    nav ul { display: flex; gap: 30px; list-style: none; margin: 0; padding: 0; font-weight: 500; font-size: 15px; }
+    nav ul a:hover { color: var(--plum); }
+    nav .cta { display: flex; gap: 12px; align-items: center; }
+    nav .btn { padding: 10px 20px; font-size: 14.5px; box-shadow: var(--pop-sm); }
+    @media (max-width: 880px) { nav ul, nav .ghost { display: none; } }
+
+    /* ── Hero ── */
+    .hero { padding: 84px 0 96px; position: relative; }
+    .hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 56px; align-items: center; }
+    h1 {
+      font-size: clamp(50px, 7vw, 96px);
+      line-height: .98;
+      margin: 26px 0 24px;
+    }
+    .sub {
+      font-size: 19px; color: var(--ink-60); max-width: 480px; margin: 0 0 34px;
+    }
+    .sub strong { color: var(--ink); font-weight: 600; }
+    .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    .hero-note { margin-top: 16px; font-size: 14.5px; color: var(--ink-60); }
+    .hero-note .hand { font-size: 19px; color: var(--ink); margin-left: 6px; }
+
+    /* Fridge-door collage */
+    .door {
+      position: relative;
+      border: var(--border); border-radius: 26px;
+      background:
+        radial-gradient(140% 100% at 20% 0%, #fff 0%, #F4F2EA 100%);
+      box-shadow: var(--pop);
+      min-height: 560px;
+    }
+    .door::before { /* fridge handle */
+      content: ''; position: absolute; left: 26px; top: 60px; bottom: 60px; width: 10px;
+      border: var(--border); border-radius: 999px; background: #fff;
+    }
+    .note {
+      position: absolute;
+      font-family: var(--hand); font-size: 19px; line-height: 1.25;
+      padding: 16px 18px 20px;
+      width: 175px;
+      border: var(--border);
+      box-shadow: var(--pop-sm);
+    }
+    .note .pin {
+      position: absolute; top: -11px; left: 50%; margin-left: -8px;
+      width: 16px; height: 16px; border-radius: 50%;
+      border: var(--border);
+    }
+    .polaroid {
+      position: absolute;
+      background: #fff; border: var(--border);
+      padding: 10px 10px 8px; box-shadow: var(--pop);
+      width: 196px;
+    }
+    .polaroid .photo {
+      height: 150px; border: var(--border); border-radius: 4px;
+      overflow: hidden;
+    }
+    .polaroid .photo img { width: 100%; height: 100%; object-fit: cover; }
+    .polaroid .cap { font-family: var(--hand); font-size: 20px; text-align: center; padding-top: 8px; }
+    .wa-card {
+      position: absolute;
+      background: #fff; border: var(--border); border-radius: 16px;
+      box-shadow: var(--pop); width: 250px; overflow: hidden;
+    }
+    .wa-card .head {
+      display: flex; align-items: center; gap: 9px;
+      padding: 10px 14px; border-bottom: var(--border);
+      font-family: var(--display); font-weight: 600; font-size: 14px;
+    }
+    .wa-card .head .ava {
+      width: 26px; height: 26px; border-radius: 50%; border: var(--border);
+      background: var(--wa); display: grid; place-items: center; color: #fff; font-size: 12px;
+    }
+    .wa-card .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
+    .bub { padding: 8px 12px; border: var(--border); border-radius: 12px; max-width: 88%; }
+    .bub.you { align-self: flex-end; background: #E7FFE0; border-bottom-right-radius: 3px; }
+    .bub.bot { align-self: flex-start; background: var(--paper); border-bottom-left-radius: 3px; }
+    .bub.bot b { color: var(--mint); }
+
+    /* gentle float for collage pieces */
+    @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
+    .door .float-1 { animation: bob 6s ease-in-out infinite; }
+    .door .float-2 { animation: bob 7s ease-in-out 1.2s infinite; }
+    .door .float-3 { animation: bob 6.4s ease-in-out 2.4s infinite; }
+
+    /* ── Pain wall ── */
+    .pain { padding: 96px 0 90px; background: var(--ink); color: var(--paper); }
+    .pain .kicker { color: var(--sun); }
+    .pain h2 { font-size: clamp(38px, 4.6vw, 64px); line-height: 1.02; margin: 18px 0 12px; }
+    /* Three-class selector so this beats the generic .sec-head .lede
+     * rule defined later in the sheet - without it the paragraph
+     * renders ink-on-ink and disappears. */
+    .pain .sec-head .lede, .pain .lede { color: rgba(250, 249, 245, .68); font-size: 18px; max-width: 560px; }
+    .wall { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 48px; }
+    .sticky {
+      font-family: var(--hand); font-size: 22px; line-height: 1.2;
+      padding: 20px 22px 26px; width: 165px;
+      color: var(--ink); border: var(--border); box-shadow: 4px 4px 0 rgba(0, 0, 0, .55);
+      position: relative;
+    }
+    .sticky::after { /* folded corner */
+      content: ''; position: absolute; right: 0; bottom: 0;
+      border-style: solid; border-width: 0 0 22px 22px;
+      border-color: transparent transparent rgba(0, 0, 0, .18) transparent;
+    }
+    .pain .punch {
+      margin-top: 52px; font-family: var(--display); font-weight: 700;
+      font-size: clamp(24px, 3vw, 36px); letter-spacing: -.02em;
+    }
+    .pain .punch .hl { color: var(--ink); }
+
+    /* ── How it works ── */
+    .how { padding: 100px 0; }
+    .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 54px; }
+    .step {
+      border: var(--border); border-radius: var(--r); background: #fff;
+      box-shadow: var(--pop); padding: 30px 26px 32px; position: relative;
+    }
+    .step .num {
+      font-family: var(--display); font-weight: 700; font-size: 64px;
+      line-height: 1; letter-spacing: -.04em;
+      color: transparent; -webkit-text-stroke: 2px var(--ink);
+    }
+    .step h3 { font-size: 23px; margin: 16px 0 10px; letter-spacing: -.02em; }
+    .step p { margin: 0; color: var(--ink-60); font-size: 15.5px; }
+    .step .tag {
+      position: absolute; top: -14px; right: 20px;
+      font-family: var(--hand); font-size: 19px;
+      background: var(--sun); border: var(--border); box-shadow: var(--pop-sm);
+      padding: 2px 12px; rotate: 3deg;
+    }
+
+    /* ── Bento ── */
+    .bento-sec { padding: 30px 0 110px; }
+    .bento {
+      display: grid; gap: 22px; margin-top: 54px;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 142px;
+    }
+    .cell {
+      border: var(--border); border-radius: var(--r);
+      background: #fff; box-shadow: var(--pop);
+      padding: 26px; overflow: hidden; position: relative;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+    .cell:hover { transform: translate(-3px, -3px); box-shadow: 8px 8px 0 var(--ink); }
+    .cell .pain-q { font-family: var(--hand); font-size: 21px; color: var(--tomato); display: block; }
+    .cell h3 { font-size: 22px; letter-spacing: -.02em; margin: 6px 0 8px; }
+    .cell p { margin: 0; color: var(--ink-60); font-size: 15px; max-width: 420px; }
+    .b-cal  { grid-column: span 4; grid-row: span 2; }
+    .b-wa   { grid-column: span 2; grid-row: span 3; background: var(--mint); }
+    .b-shop { grid-column: span 2; grid-row: span 2; background: var(--sun); }
+    .b-meal { grid-column: span 2; grid-row: span 2; }
+    /* Spans 2 rows so it fills the column under the WhatsApp cell -
+     * at span 1 the grid left an empty hole bottom-right and the
+     * school cell floated alone on its row. */
+    .b-task { grid-column: span 2; grid-row: span 2; background: var(--lilac); }
+    .b-school { grid-column: span 4; grid-row: span 1; }
+    .b-wa .pain-q { color: var(--ink); }
+    .b-wa h3, .b-wa p { color: var(--ink); }
+    .b-wa p, .b-shop p { color: rgba(20, 19, 16, .68); }
+
+    /* mini calendar inside the big cell */
+    .mini-cal { margin-top: 18px; border: var(--border); border-radius: 12px; overflow: hidden; background: #fff; }
+    .mini-cal .mhead { display: flex; justify-content: space-between; padding: 9px 14px; border-bottom: var(--border); font-family: var(--display); font-weight: 600; font-size: 13.5px; }
+    .mini-cal .mgrid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .mini-cal .mgrid span {
+      padding: 8px 0 7px; text-align: center; font-size: 12.5px;
+      border-right: 1px solid rgba(20, 19, 16, .08); border-top: 1px solid rgba(20, 19, 16, .08);
+    }
+    .mini-cal .mgrid span:nth-child(7n) { border-right: 0; }
+    .mini-cal .ev1 { background: #EDE5F8; font-weight: 600; }
+    .mini-cal .ev2 { background: var(--sun-soft); font-weight: 600; }
+    .mini-cal .ev3 { background: #E2F7EC; font-weight: 600; }
+    .mini-cal .clash { background: #FFE3DC; font-weight: 700; color: var(--tomato); }
+
+    /* WhatsApp tall cell chat */
+    .wa-mini { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
+    .wa-mini .bub { box-shadow: var(--pop-sm); background: #fff; }
+    .wa-mini .bub.you { background: #fff; }
+
+    /* shopping list mini */
+    .list-mini { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; }
+    .list-mini .row { display: flex; align-items: center; gap: 9px; background: #fff; border: var(--border); border-radius: 9px; padding: 6px 10px; box-shadow: var(--pop-sm); }
+    .list-mini .cb { width: 15px; height: 15px; border: var(--border); border-radius: 4px; flex-shrink: 0; }
+    .list-mini .cb.done { background: var(--mint); position: relative; }
+    .list-mini .done-txt { text-decoration: line-through; color: var(--ink-60); }
+
+    /* ── Receipts strip ── */
+    .strip2 { display: flex; gap: 22px; margin-top: 22px; flex-wrap: wrap; }
+    .chiplet {
+      flex: 1; min-width: 230px;
+      border: var(--border); border-radius: var(--r); background: #fff;
+      box-shadow: var(--pop); padding: 20px 22px;
+      display: flex; gap: 14px; align-items: center;
+    }
+    .chiplet .emo { font-size: 30px; }
+    .chiplet b { font-family: var(--display); display: block; font-size: 16px; letter-spacing: -.01em; }
+    .chiplet span { font-size: 13.5px; color: var(--ink-60); }
+
+    /* ── Quotes ── */
+    .quotes { padding: 100px 0; background: var(--paper-dim); border-top: var(--border); border-bottom: var(--border); }
+    .q-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 52px; }
+    .q-note {
+      border: var(--border); box-shadow: var(--pop); padding: 28px 26px;
+      background: #fff; position: relative;
+    }
+    .q-note .pin {
+      position: absolute; top: -12px; left: 28px;
+      width: 18px; height: 18px; border-radius: 50%; border: var(--border);
+    }
+    .q-note blockquote { margin: 0 0 18px; font-size: 16.5px; line-height: 1.55; }
+    .q-note .who { font-family: var(--hand); font-size: 21px; }
+    .q-note .who span { color: var(--ink-60); font-size: 17px; }
+
+    /* ── Pricing ── */
+    .price-sec { padding: 110px 0; }
+    .price-card {
+      max-width: 520px; margin: 50px auto 0;
+      border: var(--border); border-radius: 24px; background: #fff;
+      box-shadow: 8px 8px 0 var(--ink); padding: 44px 44px 40px;
+      text-align: center; position: relative;
+    }
+    .price-card .badge {
+      position: absolute; top: -18px; right: 34px; rotate: 4deg;
+      font-family: var(--hand); font-size: 21px;
+      background: var(--sun); border: var(--border); box-shadow: var(--pop-sm);
+      padding: 3px 14px;
+    }
+    .amount { font-family: var(--display); font-weight: 700; font-size: 84px; letter-spacing: -.05em; line-height: 1; }
+    .amount sub { font-size: 20px; font-weight: 500; letter-spacing: 0; vertical-align: baseline; color: var(--ink-60); }
+    .price-card ul { list-style: none; padding: 0; margin: 30px 0 32px; text-align: left; display: grid; gap: 11px; }
+    .price-card li { display: flex; gap: 10px; align-items: start; font-size: 15.5px; }
+    .price-card li::before { content: '✓'; font-weight: 700; color: var(--mint); }
+    .trust { margin-top: 18px; font-size: 14px; color: var(--ink-60); }
+
+    /* ── FAQ ── */
+    .faq-sec { padding: 0 0 110px; }
+    .faq { max-width: 760px; margin: 50px auto 0; display: grid; gap: 14px; }
+    details {
+      border: var(--border); border-radius: 14px; background: #fff;
+      box-shadow: var(--pop-sm); padding: 0 22px;
+    }
+    summary {
+      cursor: pointer; list-style: none;
+      font-family: var(--display); font-weight: 600; font-size: 17px;
+      padding: 18px 0; display: flex; justify-content: space-between; align-items: center;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: '+'; font-size: 24px; font-weight: 500; }
+    details[open] summary::after { content: '–'; }
+    details .a { padding: 0 0 20px; color: var(--ink-60); font-size: 15.5px; }
+
+    /* ── Final CTA ── */
+    .final { padding: 110px 0; background: var(--ink); color: var(--paper); text-align: center; }
+    .final h2 { font-size: clamp(44px, 6vw, 86px); line-height: .98; letter-spacing: -.035em; }
+    .final .hl { color: var(--ink); }
+    .final p { color: rgba(250, 249, 245, .65); font-size: 18px; margin: 22px auto 38px; max-width: 460px; }
+    .final .btn-plum { background: var(--sun); color: var(--ink); box-shadow: 5px 5px 0 rgba(255, 255, 255, .25); }
+    .final .btn-plum:hover { box-shadow: 7px 7px 0 var(--tomato); }
+    .final .btn-paper { background: transparent; color: var(--paper); border-color: var(--paper); box-shadow: 5px 5px 0 rgba(255, 255, 255, .25); }
+
+    footer { padding: 36px 0; }
+    footer .row { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--ink-60); }
+    footer .links { display: flex; gap: 22px; }
+    footer .links a:hover { color: var(--plum); }
+
+    /* ── Section headers ── */
+    .sec-head { max-width: 720px; }
+    .sec-head.center { margin: 0 auto; text-align: center; }
+    .sec-head h2 { font-size: clamp(36px, 4.4vw, 60px); line-height: 1.02; margin: 18px 0 14px; }
+    .sec-head .lede { color: var(--ink-60); font-size: 18px; margin: 0; }
+
+    /* ── Reveal ── */
+    .rv { opacity: 0; translate: 0 24px; transition: opacity .6s cubic-bezier(.22,.61,.36,1), translate .6s cubic-bezier(.22,.61,.36,1); }
+    .rv.in { opacity: 1; translate: 0 0; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rv { opacity: 1; translate: none; transition: none; }
+      .door .float-1, .door .float-2, .door .float-3 { animation: none; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 980px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .door { min-height: 520px; }
+      .how-grid { grid-template-columns: 1fr; }
+      .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: auto; }
+      .b-cal, .b-wa, .b-shop, .b-meal, .b-task, .b-school { grid-column: span 2; grid-row: auto; }
+      .q-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="wrap bar">
+      <a class="logo" href="#"><img src="housemait-logomark.png" alt="" style="height: 30px; width: auto;" />housemait</a>
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <div class="cta">
+        <a class="btn-bare ghost" href="/login">Sign in</a>
+        <a class="btn btn-plum" href="/signup">Start free trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="kicker"><span class="magnet"></span>AI family organiser</span>
+        <h1>Stop being the family's <span class="hl">operating system.</span></h1>
+        <p class="sub">The dates, the dinners, the dentist, the PE kit. <strong>Housemait is the AI that holds it all</strong> and answers on WhatsApp, so the whole week stops living in your head.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-plum" href="/signup">Start free trial</a>
+          <a class="btn btn-paper" href="#how">See how it works</a>
+        </div>
+        <p class="hero-note">Free for 30 days. No card to start. <span class="hand">cancel anytime, obviously</span></p>
+      </div>
+
+      <!-- The fridge door -->
+      <div class="door" aria-hidden="true">
+        <div class="polaroid float-1" style="top: 42px; right: 38px; rotate: 3deg;">
+          <div class="photo"><img src="family-photo.jpeg" alt="" /></div>
+          <div class="cap">the chaos crew ✌️</div>
+        </div>
+        <div class="note float-2" style="top: 76px; left: 66px; rotate: -4deg; background: var(--sun);">
+          <span class="pin" style="background: var(--tomato);"></span>
+          swimming kit<br />THURSDAY!!
+        </div>
+        <div class="wa-card float-3" style="bottom: 44px; right: 30px; rotate: -2deg;">
+          <div class="head"><span class="ava">h</span>housemait · online</div>
+          <div class="body">
+            <div class="bub you">dentist for Finn thurs 4pm + we're out of milk</div>
+            <div class="bub bot"><b>✓ Done.</b> Calendar updated, milk's on the list.</div>
+          </div>
+        </div>
+        <div class="note" style="top: 262px; left: 48px; rotate: 2deg; background: var(--lilac); width: 150px;">
+          <span class="pin" style="background: var(--plum);"></span>
+          bins out tonight
+          <span style="text-decoration: line-through; opacity: .55; display: block;">ask Dad again</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- PAIN WALL -->
+  <section class="pain">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="kicker"><span class="magnet" style="background: radial-gradient(circle at 32% 30%, #fff 0 18%, var(--sun) 20%);"></span>Sound familiar?</span>
+        <h2>The family group chat wasn't built for this.</h2>
+        <p class="lede">Every one of these is a real Tuesday. They don't need a better whiteboard. They need a brain that catches them.</p>
+      </div>
+      <div class="wall">
+        <div class="sticky rv" style="background: var(--sun); rotate: -3deg;">who's got swimming kit today??</div>
+        <div class="sticky rv" style="background: #FFD9CF; rotate: 2deg;">we're out of milk. again.</div>
+        <div class="sticky rv" style="background: var(--lilac); rotate: -1deg;">the school form was due YESTERDAY</div>
+        <div class="sticky rv" style="background: #D9F4E5; rotate: 3deg;">"what's for dinner?" ×4 a day</div>
+        <div class="sticky rv" style="background: #DCE7FF; rotate: -2deg;">did anyone feed the dog?</div>
+        <div class="sticky rv" style="background: var(--sun-soft); rotate: 1deg;">inset day. surprise.</div>
+      </div>
+      <p class="punch rv">Housemait catches <span class="hl">all of it.</span></p>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how" id="how">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="kicker"><span class="magnet"></span>How it works</span>
+        <h2>Say it once. It's handled.</h2>
+        <p class="lede">No forms. No dropdowns. No "I'll add it later" that never happens.</p>
+      </div>
+      <div class="how-grid">
+        <div class="step rv">
+          <div class="num">01</div>
+          <h3>Say it however it comes out</h3>
+          <p>A text, a voice note while driving, a photo of the school letter, a forwarded email. Housemait speaks fluent parent.</p>
+          <div class="tag">zero typing forms</div>
+        </div>
+        <div class="step rv">
+          <div class="num">02</div>
+          <h3>Housemait files it</h3>
+          <p>The right calendar, the right list, the right person, the right reminder. Dentist to the calendar, milk to the shop, form to a task.</p>
+        </div>
+        <div class="step rv">
+          <div class="num">03</div>
+          <h3>Everyone just knows</h3>
+          <p>One shared view for the household, answers on WhatsApp, and a weekly digest of what's coming. Nobody has to ask you.</p>
+          <div class="tag" style="background: var(--lilac);">no more nagging</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENTO FEATURES -->
+  <section class="bento-sec" id="features">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="kicker"><span class="magnet" style="background: radial-gradient(circle at 32% 30%, #fff 0 18%, var(--plum) 20%);"></span>What it fixes</span>
+        <h2>Built around the things families actually say.</h2>
+      </div>
+
+      <div class="bento">
+        <div class="cell b-cal rv">
+          <span class="pain-q">"You never told me about that."</span>
+          <h3>One calendar. Every body.</h3>
+          <p>Colour-coded per person, synced with Google, Apple and Outlook, with a warning the moment two plans collide.</p>
+          <div class="mini-cal">
+            <div class="mhead"><span>April</span><span>Week 17</span></div>
+            <div class="mgrid">
+              <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+              <span class="ev1">Swim</span><span></span><span class="ev2">Vet</span><span class="clash">×2!</span><span></span><span class="ev3">Party</span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cell b-wa rv">
+          <span class="pain-q">"Not another app to check..."</span>
+          <h3>It lives in WhatsApp</h3>
+          <p>Your family already opens WhatsApp 40 times a day. Housemait answers there.</p>
+          <div class="wa-mini">
+            <div class="bub you">what's on tomorrow?</div>
+            <div class="bub bot">School run 8:30, swimming 4pm, and it's bin night 🗑️</div>
+            <div class="bub you">🎤 voice note</div>
+            <div class="bub bot">Got it. "Buy birthday present for Saturday" added to your tasks.</div>
+          </div>
+        </div>
+
+        <div class="cell b-shop rv">
+          <span class="pain-q" style="color: var(--ink);">"Out of milk. Again."</span>
+          <h3>The list that fills itself</h3>
+          <p>Everyone adds to one live list, sorted by aisle. Snap the receipt and it ticks off what you bought.</p>
+          <div class="list-mini">
+            <div class="row"><span class="cb done"></span><span class="done-txt">Milk · 2L</span></div>
+            <div class="row"><span class="cb"></span>Bread</div>
+          </div>
+        </div>
+
+        <div class="cell b-meal rv">
+          <span class="pain-q">"It's 5pm. What's for dinner?"</span>
+          <h3>Dinner, decided on Sunday</h3>
+          <p>Plan the week in minutes. The shopping list builds itself from the ingredients.</p>
+        </div>
+
+        <div class="cell b-task rv">
+          <span class="pain-q" style="color: var(--ink);">"Why do I remember the bins?"</span>
+          <h3>Chores that chase themselves</h3>
+          <p>Assigned by name, repeating on schedule. Housemait does the reminding, so nobody has to be the nag.</p>
+        </div>
+
+        <div class="cell b-school rv">
+          <span class="pain-q">"Inset day. Surprise."</span>
+          <h3>School dates, imported</h3>
+          <p>Term dates and inset days, straight into the calendar.</p>
+        </div>
+      </div>
+
+      <div class="strip2">
+        <div class="chiplet rv"><span class="emo">🧾</span><div><b>Receipt scanner</b><span>Snap it, list updates itself</span></div></div>
+        <div class="chiplet rv"><span class="emo">📁</span><div><b>Document vault</b><span>School letters, findable forever</span></div></div>
+        <div class="chiplet rv"><span class="emo">📬</span><div><b>Email forwarding</b><span>Forward it, it becomes events + tasks</span></div></div>
+        <div class="chiplet rv"><span class="emo">📊</span><div><b>Weekly digest</b><span>The week ahead, every Sunday</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUOTES -->
+  <section class="quotes">
+    <div class="wrap">
+      <div class="sec-head center rv">
+        <span class="kicker"><span class="magnet" style="background: radial-gradient(circle at 32% 30%, #fff 0 18%, var(--mint) 20%);"></span>From the door of real fridges</span>
+        <h2>Parents notice the quiet first.</h2>
+      </div>
+      <div class="q-grid">
+        <div class="q-note rv" style="rotate: -1deg;">
+          <span class="pin" style="background: var(--sun);"></span>
+          <blockquote>"The Sunday planning argument is over. We do it in 12 minutes with a coffee. I didn't realise how much of it I was carrying alone."</blockquote>
+          <div class="who">Sarah K. <span>· Mum of 3, Bristol</span></div>
+        </div>
+        <div class="q-note rv" style="rotate: 1.5deg;">
+          <span class="pin" style="background: var(--tomato);"></span>
+          <blockquote>"I forwarded a school PDF to Housemait at 10pm. By morning every date was on the calendar, and the permission slip was on my task list. Magic."</blockquote>
+          <div class="who">James M. <span>· Dad of 2, Manchester</span></div>
+        </div>
+        <div class="q-note rv" style="rotate: -2deg;">
+          <span class="pin" style="background: var(--plum);"></span>
+          <blockquote>"We were the 14-apps-and-a-whiteboard family. Now it's one app and we actually sit down at dinner together. That's the real review."</blockquote>
+          <div class="who">Priya R. <span>· Mum of 2, London</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="price-sec" id="pricing">
+    <div class="wrap">
+      <div class="sec-head center rv">
+        <span class="kicker"><span class="magnet"></span>Pricing</span>
+        <h2>One plan. The whole household.</h2>
+        <p class="lede">No tiers to compare, nothing to unlock, no per-person maths.</p>
+      </div>
+      <div class="price-card rv">
+        <div class="badge">less than a takeaway!</div>
+        <div class="amount">£5.99<sub>/month</sub></div>
+        <p style="color: var(--ink-60); margin: 6px 0 0;">or £59.99/year, roughly 2 months free</p>
+        <ul>
+          <li>Unlimited household members</li>
+          <li>Shared calendar, lists, tasks and meals</li>
+          <li>AI assistant on WhatsApp</li>
+          <li>School term dates and inset days</li>
+          <li>Receipt scanner and document vault</li>
+          <li>Weekly family digest</li>
+        </ul>
+        <a class="btn btn-plum" href="/signup" style="width: 100%; justify-content: center;">Start your free 30 days</a>
+        <p class="trust">No card to start · Cancel anytime · GDPR compliant</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-sec" id="faq">
+    <div class="wrap">
+      <div class="sec-head center rv">
+        <span class="kicker"><span class="magnet" style="background: radial-gradient(circle at 32% 30%, #fff 0 18%, var(--lilac) 20%);"></span>FAQ</span>
+        <h2>Fair questions.</h2>
+      </div>
+      <div class="faq rv">
+        <details open>
+          <summary>How does the free trial work?</summary>
+          <div class="a">Full access to everything for 30 days, no card required. If you do nothing at the end, your account simply pauses. No surprise charges, ever.</div>
+        </details>
+        <details>
+          <summary>Does the whole family need to learn a new app?</summary>
+          <div class="a">No. That's the point. Anyone in the household can just message Housemait on WhatsApp like they'd message you. The app is there for whoever wants the full view.</div>
+        </details>
+        <details>
+          <summary>Can I use it without WhatsApp?</summary>
+          <div class="a">Absolutely. The app has everything. WhatsApp is the shortcut, not the requirement.</div>
+        </details>
+        <details>
+          <summary>How many people can join?</summary>
+          <div class="a">No limit. Parents, grandparents, older kids, au pairs. One subscription covers everyone who helps run the household.</div>
+        </details>
+        <details>
+          <summary>Is our family's data safe?</summary>
+          <div class="a">Fully GDPR compliant, encrypted, never sold, never shared with advertisers. Your family's life is not a product.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="final">
+    <div class="wrap rv">
+      <h2>Get your <span class="hl">head</span> back.</h2>
+      <p>Set up in five minutes. By Sunday, the week plans itself.</p>
+      <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+        <a class="btn btn-plum" href="/signup">Start free trial</a>
+        <a class="btn btn-paper" href="#">Download on the App Store</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap row">
+      <span>© 2026 Housemait. Made with care for tired parents.</span>
+      <div class="links">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/support">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // One-shot scroll reveal.
+    const io = new IntersectionObserver((es) => {
+      es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.rv').forEach(el => io.observe(el));
+  </script>
+</body>
+</html>

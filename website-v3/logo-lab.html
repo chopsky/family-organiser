@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Housemait | Logo lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=Caveat:wght@600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --paper: #FAF9F5; --paper-dim: #F1EFE7; --ink: #141310; --ink-60: rgba(20,19,16,.62);
+      --sun: #FFC940; --tomato: #FF5A39; --cobalt: #2B5CFF; --mint: #2EB872; --lilac: #C9B8FF;
+      --border: 2px solid var(--ink); --pop: 5px 5px 0 var(--ink); --pop-sm: 3px 3px 0 var(--ink);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'DM Sans', sans-serif; padding: 56px 32px 120px; }
+    .wrap { max-width: 1080px; margin: 0 auto; }
+    h1 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -.03em; font-size: clamp(38px, 5vw, 62px); margin: 0 0 8px; }
+    .lede { color: var(--ink-60); font-size: 17px; margin: 0 0 56px; max-width: 640px; }
+    .concept { margin-bottom: 72px; }
+    .concept > h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: -.02em; font-size: 24px; margin: 0 0 4px; }
+    .concept > p { color: var(--ink-60); font-size: 15px; margin: 0 0 24px; max-width: 620px; }
+    .board { display: flex; gap: 22px; flex-wrap: wrap; align-items: stretch; }
+    .swatch {
+      border: var(--border); border-radius: 18px; background: #fff; box-shadow: var(--pop);
+      padding: 30px; display: flex; align-items: center; justify-content: center; gap: 16px;
+      min-height: 150px;
+    }
+    .swatch.dark { background: var(--ink); }
+    .swatch.grow { flex: 1; min-width: 280px; }
+    .navdemo {
+      flex-basis: 100%;
+      border: var(--border); border-radius: 14px; background: #fff; box-shadow: var(--pop-sm);
+      padding: 16px 22px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .navdemo .links { font-size: 14px; color: var(--ink-60); display: flex; gap: 18px; font-weight: 500; }
+    .sizerow { display: flex; align-items: center; gap: 22px; }
+    .cap { font-size: 12.5px; color: var(--ink-60); text-align: center; margin-top: 10px; }
+    .stack { display: flex; flex-direction: column; align-items: center; }
+    .wordmark { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -.04em; display: inline-flex; align-items: baseline; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Logo lab</h1>
+  <p class="lede">Five directions translating the Housemait mark into the v3 "fridge door" language. Each shown in context: nav bar, app-icon tile, and small sizes. The house + two-figures "m" DNA from the current mark survives in A and B; C to E push further.</p>
+
+  <!-- ════ CONCEPT A — Letter magnet ════ -->
+  <div class="concept">
+    <h2>A. The letter magnet</h2>
+    <p>A lowercase "h" as a kids' alphabet fridge magnet. The most on-concept mark possible: every parent has lived with these letters. Reads instantly at any size.</p>
+    <div class="board">
+      <div class="navdemo">
+        <span style="display:inline-flex;align-items:center;gap:10px;">
+          <svg width="34" height="34" viewBox="0 0 64 64">
+            <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58"
+                  fill="#141310" transform="translate(4,4)">h</text>
+            <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58"
+                  fill="#FFC940" stroke="#141310" stroke-width="2.5" paint-order="stroke">h</text>
+          </svg>
+          <span class="wordmark" style="font-size:22px;">housemait</span>
+        </span>
+        <span class="links"><span>How it works</span><span>Features</span><span>Pricing</span></span>
+      </div>
+      <div class="stack">
+        <div class="swatch" style="width:150px;height:150px;border-radius:32px;background:var(--paper-dim);">
+          <svg width="92" height="92" viewBox="0 0 64 64">
+            <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58"
+                  fill="#141310" transform="translate(4,4)">h</text>
+            <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58"
+                  fill="#FFC940" stroke="#141310" stroke-width="2.5" paint-order="stroke">h</text>
+          </svg>
+        </div>
+        <div class="cap">app icon</div>
+      </div>
+      <div class="stack">
+        <div class="swatch dark" style="width:150px;height:150px;border-radius:32px;">
+          <svg width="92" height="92" viewBox="0 0 64 64">
+            <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58"
+                  fill="rgba(255,255,255,.3)" transform="translate(4,4)">h</text>
+            <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58"
+                  fill="#FFC940" stroke="#141310" stroke-width="2.5" paint-order="stroke">h</text>
+          </svg>
+        </div>
+        <div class="cap">on ink</div>
+      </div>
+      <div class="stack">
+        <div class="swatch" style="width:150px;height:150px;">
+          <div class="sizerow">
+            <svg width="48" height="48" viewBox="0 0 64 64">
+              <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58" fill="#141310" transform="translate(3,3)">h</text>
+              <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58" fill="#FFC940" stroke="#141310" stroke-width="2.5" paint-order="stroke">h</text>
+            </svg>
+            <svg width="24" height="24" viewBox="0 0 64 64">
+              <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58" fill="#FFC940" stroke="#141310" stroke-width="3" paint-order="stroke">h</text>
+            </svg>
+            <svg width="16" height="16" viewBox="0 0 64 64">
+              <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58" fill="#FFC940" stroke="#141310" stroke-width="3.5" paint-order="stroke">h</text>
+            </svg>
+          </div>
+        </div>
+        <div class="cap">48 / 24 / 16 px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CONCEPT B — House magnet (legacy DNA) ════ -->
+  <div class="concept">
+    <h2>B. The house magnet</h2>
+    <p>Your current mark's DNA, re-rendered: the house keeps its two-figures "m", but plum gradients become flat sun yellow with an ink outline and stuck-on shadow.</p>
+    <div class="board">
+      <div class="navdemo">
+        <span style="display:inline-flex;align-items:center;gap:10px;">
+          <svg width="36" height="36" viewBox="0 0 72 72">
+            <g transform="translate(4,4)">
+              <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#141310"/>
+            </g>
+            <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#FFC940" stroke="#141310" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M18 52 V40 a5 5 0 0 1 10 0 V52 M28 52 V42 M28 46 a5 5 0 0 1 10 0 V52" fill="none" stroke="#141310" stroke-width="4.5" stroke-linecap="round"/>
+            <circle cx="23" cy="32" r="3.4" fill="#141310"/>
+            <circle cx="38" cy="34" r="3.4" fill="#141310"/>
+          </svg>
+          <span class="wordmark" style="font-size:22px;">housemait</span>
+        </span>
+        <span class="links"><span>How it works</span><span>Features</span><span>Pricing</span></span>
+      </div>
+      <div class="stack">
+        <div class="swatch" style="width:150px;height:150px;border-radius:32px;background:var(--paper-dim);">
+          <svg width="100" height="100" viewBox="0 0 72 72">
+            <g transform="translate(4,4)">
+              <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#141310"/>
+            </g>
+            <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#FFC940" stroke="#141310" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M18 52 V40 a5 5 0 0 1 10 0 V52 M28 52 V42 M28 46 a5 5 0 0 1 10 0 V52" fill="none" stroke="#141310" stroke-width="4.5" stroke-linecap="round"/>
+            <circle cx="23" cy="32" r="3.4" fill="#141310"/>
+            <circle cx="38" cy="34" r="3.4" fill="#141310"/>
+          </svg>
+        </div>
+        <div class="cap">app icon</div>
+      </div>
+      <div class="stack">
+        <div class="swatch" style="width:150px;height:150px;">
+          <div class="sizerow">
+            <svg width="44" height="44" viewBox="0 0 72 72">
+              <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#FFC940" stroke="#141310" stroke-width="3.5" stroke-linejoin="round"/>
+              <path d="M18 52 V40 a5 5 0 0 1 10 0 V52 M28 52 V42 M28 46 a5 5 0 0 1 10 0 V52" fill="none" stroke="#141310" stroke-width="5" stroke-linecap="round"/>
+            </svg>
+            <svg width="22" height="22" viewBox="0 0 72 72">
+              <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#FFC940" stroke="#141310" stroke-width="4.5" stroke-linejoin="round"/>
+              <path d="M18 52 V40 a5 5 0 0 1 10 0 V52 M28 52 V42 M28 46 a5 5 0 0 1 10 0 V52" fill="none" stroke="#141310" stroke-width="6" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="cap">44 / 22 px (figures simplify)</div>
+      </div>
+      <div class="stack">
+        <div class="swatch" style="width:150px;height:150px;background:var(--lilac);">
+          <svg width="100" height="100" viewBox="0 0 72 72">
+            <path d="M8 30 L32 10 L44 20 L44 12 L52 12 L52 27 L56 30 L56 56 L8 56 Z" fill="#fff" stroke="#141310" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M18 52 V40 a5 5 0 0 1 10 0 V52 M28 52 V42 M28 46 a5 5 0 0 1 10 0 V52" fill="none" stroke="#141310" stroke-width="4.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="cap">white variant</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CONCEPT C — Magnet-dot wordmark ════ -->
+  <div class="concept">
+    <h2>C. The magnet-dot wordmark</h2>
+    <p>Type-only. "housemait" in Space Grotesk with the dot of the "i" swapped for a fridge magnet. The quietest option, and the easiest to roll out.</p>
+    <div class="board">
+      <div class="navdemo">
+        <span class="wordmark" style="font-size:26px;position:relative;">
+          housema<span style="position:relative;">i<span style="position:absolute;top:-1px;left:50%;translate:-50% 0;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 32% 30%, #fff 0 18%, var(--tomato) 20%);border:2px solid var(--ink);"></span></span>t
+        </span>
+        <span class="links"><span>How it works</span><span>Features</span><span>Pricing</span></span>
+      </div>
+      <div class="swatch grow">
+        <span class="wordmark" style="font-size:54px;position:relative;">
+          housema<span style="position:relative;">i<span style="position:absolute;top:-3px;left:50%;translate:-50% 0;width:17px;height:17px;border-radius:50%;background:radial-gradient(circle at 32% 30%, #fff 0 18%, var(--tomato) 20%);border:2.5px solid var(--ink);"></span></span>t
+        </span>
+      </div>
+      <div class="swatch dark grow">
+        <span class="wordmark" style="font-size:54px;position:relative;color:#fff;">
+          housema<span style="position:relative;">i<span style="position:absolute;top:-3px;left:50%;translate:-50% 0;width:17px;height:17px;border-radius:50%;background:radial-gradient(circle at 32% 30%, #fff 0 18%, var(--sun) 20%);border:2.5px solid #fff;"></span></span>t
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CONCEPT D — Sticky-note h ════ -->
+  <div class="concept">
+    <h2>D. The sticky note</h2>
+    <p>A sun-yellow sticky note, folded corner, with a marker-written "h". Leans hardest into the handwriting layer of the site. Risk: reads "notes app" more than "family HQ".</p>
+    <div class="board">
+      <div class="stack">
+        <div class="swatch" style="width:150px;height:150px;background:var(--paper-dim);border-radius:32px;">
+          <div style="position:relative;width:88px;height:88px;background:var(--sun);border:var(--border);box-shadow:var(--pop-sm);rotate:-4deg;display:grid;place-items:center;">
+            <span style="font-family:'Caveat';font-weight:600;font-size:62px;line-height:1;">h</span>
+            <span style="position:absolute;right:0;bottom:0;border-style:solid;border-width:0 0 20px 20px;border-color:transparent transparent rgba(0,0,0,.18) transparent;"></span>
+          </div>
+        </div>
+        <div class="cap">app icon</div>
+      </div>
+      <div class="navdemo" style="flex:1;min-width:300px;flex-basis:auto;">
+        <span style="display:inline-flex;align-items:center;gap:11px;">
+          <div style="position:relative;width:32px;height:32px;background:var(--sun);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);rotate:-4deg;display:grid;place-items:center;">
+            <span style="font-family:'Caveat';font-weight:600;font-size:24px;line-height:1;">h</span>
+          </div>
+          <span class="wordmark" style="font-size:22px;">housemait</span>
+        </span>
+        <span class="links"><span>Pricing</span><span>FAQ</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CONCEPT E — Full lockup ════ -->
+  <div class="concept">
+    <h2>E. Recommended lockup: A + C</h2>
+    <p>The letter-magnet "h" beside the magnet-dot wordmark. Mark works alone (app icon, favicon, WhatsApp avatar); wordmark works alone (email footers); together they're the full signature.</p>
+    <div class="board">
+      <div class="swatch grow" style="min-height:170px;">
+        <svg width="58" height="58" viewBox="0 0 64 64">
+          <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58" fill="#141310" transform="translate(4,4)">h</text>
+          <text x="32" y="50" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="58" fill="#FFC940" stroke="#141310" stroke-width="2.5" paint-order="stroke">h</text>
+        </svg>
+        <span class="wordmark" style="font-size:44px;position:relative;">
+          housema<span style="position:relative;">i<span style="position:absolute;top:-2px;left:50%;translate:-50% 0;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 32% 30%, #fff 0 18%, var(--tomato) 20%);border:2.5px solid var(--ink);"></span></span>t
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

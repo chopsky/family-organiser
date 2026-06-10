@@ -70,6 +70,7 @@ const SKIP_PREFIXES = [
   '/onboarding',
   '/admin',
   '/.well-known',
+  '/v3',          // static v3 redesign preview in public/v3 — never geo-redirect
 ];
 
 // User-agent patterns for crawlers and link-preview fetchers. Includes
