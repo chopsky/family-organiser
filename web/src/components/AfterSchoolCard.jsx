@@ -203,15 +203,27 @@ export default function AfterSchoolCard({ members = [] }) {
             const picker = a.pickup_member_id ? memberById[a.pickup_member_id] : null;
             const kidColor = hexFor(kid);
             const Icon = AS_ICONS[iconFor(a.activity)] || AS_ICONS.star;
-            const t = timeOf(a);
+            // Show start over end as a compact two-line range. Falls back to
+            // whichever single time exists (start preferred) when only one is
+            // set, so a club with no end time still reads cleanly.
+            const start = a.time_start ? a.time_start.substring(0, 5) : '';
+            const end = a.time_end ? a.time_end.substring(0, 5) : '';
+            const topTime = start || end;
+            const showEnd = start && end; // only stack the end line when both exist
+            const timeLabel = showEnd ? `${start} to ${end}` : topTime;
             return (
               <div
                 key={a.id}
                 className="flex items-center"
                 style={{ gap: 12 }}
-                aria-label={`${a.activity}${kid ? `, ${kid.name}` : ''}${t ? `, ${t}` : ''}${picker ? `, pickup ${picker.name}` : ''}`}
+                aria-label={`${a.activity}${kid ? `, ${kid.name}` : ''}${timeLabel ? `, ${timeLabel}` : ''}${picker ? `, pickup ${picker.name}` : ''}`}
               >
-                <div style={{ width: 42, flexShrink: 0, fontSize: 13, fontWeight: 600, color: INK3, fontVariantNumeric: 'tabular-nums' }}>{t}</div>
+                <div style={{ width: 48, flexShrink: 0, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: INK3 }}>{topTime}</div>
+                  {showEnd && (
+                    <div style={{ fontSize: 11, fontWeight: 500, color: INK3, opacity: 0.6 }}>– {end}</div>
+                  )}
+                </div>
                 <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: kidColor + '1F', color: kidColor }}>
                   <Icon size={20} color={kidColor} />
                 </div>
