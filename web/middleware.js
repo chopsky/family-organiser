@@ -45,6 +45,10 @@ const SKIP_PATHS = new Set([
   '/privacy',
   '/terms',
   '/support',
+  // Campaign smart-link: must reach the SPA (FairRedirect) which routes
+  // iPhone -> App Store and everyone else -> /signup?promo=... Without this
+  // the geo redirect bounces /fair to the locale landing page instead.
+  '/fair',
 ]);
 
 // Prefix-match paths - anything starting with one of these is bypassed.
