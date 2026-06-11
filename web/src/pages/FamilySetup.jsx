@@ -321,6 +321,14 @@ export default function FamilySetup() {
   const [importingTermIcal, setImportingTermIcal] = useState(false);
   const [importError, setImportError] = useState('');
   const [showAllDates, setShowAllDates] = useState(false);
+  // Add-a-school modal (household-level Schools section — create a school
+  // without first adding a child).
+  const [addSchoolOpen, setAddSchoolOpen] = useState(false);
+  const [addSchoolSearch, setAddSchoolSearch] = useState('');
+  const [addSchoolResults, setAddSchoolResults] = useState([]);
+  const [addSchoolSelected, setAddSchoolSelected] = useState(null);
+  const [addSchoolSaName, setAddSchoolSaName] = useState('');
+  const [addingSchool, setAddingSchool] = useState(false);
   const [editingTermDate, setEditingTermDate] = useState(null);
   const [editTermDateFields, setEditTermDateFields] = useState({});
   const [savingTermDateEdit, setSavingTermDateEdit] = useState(false);
@@ -1140,8 +1148,8 @@ export default function FamilySetup() {
     return nextYearDates.length === 0;
   }
 
-  function openUpdateTermDates() {
-    const school = householdSchools.find(s => s.id === editingMember?.school_id);
+  function openUpdateTermDates(schoolArg) {
+    const school = schoolArg || householdSchools.find(s => s.id === editingMember?.school_id);
     if (!school) return;
     setTermDateSchoolId(school.id);
     setTermDateSchoolName(school.school_name);
@@ -1152,13 +1160,79 @@ export default function FamilySetup() {
     setShowTermDateOptions(true);
   }
 
+  // Open the read/edit "all term dates" modal for a specific school (used by
+  // the household-level Schools card). Loads that school's dates into the
+  // shared editTermDates state and keys the modal by termDateSchoolId.
+  function openViewDates(school) {
+    if (!school) return;
+    setTermDateSchoolId(school.id);
+    setTermDateSchoolName(school.school_name);
+    setEditTermDates(school.term_dates || []);
+    setShowAllDates(true);
+  }
+
+  // --- Add-a-school flow (household-level Schools card) -----------------
+  // Create a school WITHOUT first adding a child. UK searches the GIAS
+  // directory; SA takes a free-text name. After create we refresh and drop
+  // the user straight into the term-date import flow for the new school.
+  async function handleAddSchoolSearch(query) {
+    setAddSchoolSearch(query);
+    setAddSchoolSelected(null);
+    if (query.trim().length < 2) { setAddSchoolResults([]); return; }
+    try {
+      const { data } = await api.get(`/schools/search?q=${encodeURIComponent(query.trim())}`);
+      setAddSchoolResults(data.schools || []);
+    } catch { setAddSchoolResults([]); }
+  }
+
+  function openAddSchool() {
+    setAddSchoolSearch('');
+    setAddSchoolResults([]);
+    setAddSchoolSelected(null);
+    setAddSchoolSaName('');
+    setError('');
+    setAddSchoolOpen(true);
+  }
+
+  async function handleCreateSchool() {
+    setAddingSchool(true);
+    setError('');
+    try {
+      let body;
+      if (isSa) {
+        if (!addSchoolSaName.trim()) { setAddingSchool(false); return; }
+        body = { school_name: addSchoolSaName.trim() };
+      } else {
+        if (!addSchoolSelected) { setAddingSchool(false); return; }
+        body = {
+          school_name: addSchoolSelected.name,
+          school_urn: addSchoolSelected.urn,
+          school_type: addSchoolSelected.type,
+          local_authority: addSchoolSelected.local_authority,
+          postcode: addSchoolSelected.postcode,
+        };
+      }
+      const { data } = await api.post('/schools', body);
+      const createdId = data.school?.id;
+      const fresh = await api.get('/schools').then(r => r.data.schools || []);
+      setHouseholdSchools(fresh);
+      setAddSchoolOpen(false);
+      const newSchool = fresh.find(s => s.id === createdId) || data.school;
+      if (newSchool?.id) openUpdateTermDates(newSchool);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not add the school.');
+    } finally {
+      setAddingSchool(false);
+    }
+  }
+
   async function handleUpdateTermDate(dateId) {
     if (!editTermDateFields.date) return;
     setSavingTermDateEdit(true);
     try {
-      await api.patch(`/schools/${editingMember.school_id}/term-dates/${dateId}`, editTermDateFields);
+      await api.patch(`/schools/${termDateSchoolId}/term-dates/${dateId}`, editTermDateFields);
       // Refresh term dates
-      const { data } = await api.get(`/schools/${editingMember.school_id}/term-dates`);
+      const { data } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
       setEditTermDates(data.term_dates || []);
       setEditingTermDate(null);
       setEditTermDateFields({});
@@ -1194,8 +1268,8 @@ export default function FamilySetup() {
     }
   }
 
-  async function handleSyncIcal() {
-    const school = householdSchools.find(s => s.id === editingMember?.school_id);
+  async function handleSyncIcal(schoolArg) {
+    const school = schoolArg || householdSchools.find(s => s.id === editingMember?.school_id);
     if (!school?.ical_url) return;
     setSyncingIcal(true);
     try {
@@ -2084,10 +2158,87 @@ export default function FamilySetup() {
         )}
       </div>
 
-      {/* Schools coming-soon placeholder - only for countries we don't
-          yet support (UK and SA each have their own flow inline in the
-          member modals; everywhere else sees this card). */}
-      {!showSchools && (
+      {/* Schools - household-level section. Manage each school and its term
+          dates here (decoupled from individual children, for privacy). For
+          UK/SA households this is a real directory + term-date importer;
+          everywhere else it's a coming-soon card. */}
+      {showSchools ? (
+        <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-base md:text-medium font-semibold text-bark">Schools</h2>
+            {isAdmin && (
+              <button onClick={openAddSchool} className="text-xs font-semibold text-primary hover:text-primary-pressed">+ Add a school</button>
+            )}
+          </div>
+          <p className="text-sm text-cocoa mb-4">
+            Import term dates once and Housemait keeps half-term reminders and
+            term-only activities in sync for everyone at that school.
+          </p>
+          {householdSchools.length === 0 ? (
+            <div className="border-2 border-dashed border-cream-border rounded-2xl p-6 text-center">
+              <p className="text-sm text-cocoa mb-3">No schools added yet.</p>
+              {isAdmin ? (
+                <button onClick={openAddSchool} className="text-sm font-semibold text-primary hover:text-primary-pressed">+ Add a school</button>
+              ) : (
+                <p className="text-xs text-warm-grey">Ask a household admin to add one.</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {householdSchools.map((school) => {
+                const dates = school.term_dates || [];
+                const summary = getTermSummary(dates);
+                const childNames = (school.children || []).map(c => c.name).filter(Boolean);
+                const sourceLabel = { local_authority: 'Local authority', school_website: 'School website', website_scrape: 'School website', ical: 'iCal feed', ical_import: 'iCal feed', sa_national: 'National calendar', 'sa-national': 'National calendar', whatsapp_import: 'WhatsApp', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source;
+                return (
+                  <div key={school.id} className="bg-white rounded-xl border border-cream-border p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-bark truncate">{school.school_name}</p>
+                        {school.local_authority && <p className="text-xs text-cocoa">{school.local_authority}</p>}
+                      </div>
+                      {isAdmin && (
+                        <button onClick={() => handleRemoveHouseholdSchool(school.id)} className="text-xs text-coral hover:underline shrink-0">Remove</button>
+                      )}
+                    </div>
+                    {childNames.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {childNames.map(n => (
+                          <span key={n} className="text-[11px] bg-cream text-cocoa rounded-full px-2 py-0.5">{n}</span>
+                        ))}
+                      </div>
+                    )}
+                    {dates.length > 0 ? (
+                      <p className="text-xs text-cocoa mt-2">
+                        {summary.start && summary.end ? `Term: ${formatDateShort(summary.start)} – ${formatDateShort(summary.end)}` : `${dates.length} date${dates.length === 1 ? '' : 's'} saved`}
+                        {sourceLabel ? ` · ${sourceLabel}` : ''}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-warm-grey mt-2">No term dates imported yet.</p>
+                    )}
+                    {isAdmin && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3">
+                        <button onClick={() => openUpdateTermDates(school)} className="text-xs font-semibold text-primary hover:text-primary-pressed">
+                          {dates.length > 0 ? 'Update dates' : 'Import dates'}
+                        </button>
+                        {dates.length > 0 && (
+                          <button onClick={() => openViewDates(school)} className="text-xs font-medium text-cocoa hover:text-bark">View all dates</button>
+                        )}
+                        {school.ical_url && (
+                          <button onClick={() => handleSyncIcal(school)} disabled={syncingIcal} className="text-xs font-medium text-cocoa hover:text-bark disabled:opacity-50">{syncingIcal ? 'Syncing…' : 'Sync iCal'}</button>
+                        )}
+                        {dates.length > 0 && (
+                          <button onClick={() => handleClearAllTermDates(school.id)} className="text-xs font-medium text-cocoa hover:text-coral">Clear all</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Schools</h2>
           <p className="text-sm text-cocoa">
@@ -2095,6 +2246,69 @@ export default function FamilySetup() {
             in the UK and South Africa. Coming soon to more countries -
             until then, the rest of Housemait works the same.
           </p>
+        </div>
+      )}
+
+      {/* Add-a-school modal (household-level - create a school without first
+          adding a child). UK = GIAS directory search; SA = free-text name. */}
+      {addSchoolOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setAddSchoolOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-5 sm:p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base md:text-medium font-semibold text-bark mb-1">Add a school</h2>
+            <p className="text-xs text-cocoa mb-4">{isSa ? 'Enter the school name. You can import term dates next.' : 'Search the UK schools directory. You can import term dates next.'}</p>
+            {isSa ? (
+              <div>
+                <label className="block text-xs font-medium text-cocoa mb-1">School name</label>
+                <input
+                  type="text"
+                  value={addSchoolSaName}
+                  onChange={(e) => setAddSchoolSaName(e.target.value)}
+                  placeholder="e.g. Sandown Primary"
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                />
+              </div>
+            ) : (
+              <div className="relative">
+                <label className="block text-xs font-medium text-cocoa mb-1">Search for your school</label>
+                <input
+                  type="text"
+                  value={addSchoolSearch}
+                  onChange={(e) => handleAddSchoolSearch(e.target.value)}
+                  placeholder="Search by name or postcode..."
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                />
+                {addSchoolResults.length > 0 && !addSchoolSelected && (
+                  <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-56 overflow-y-auto shadow-lg">
+                    {addSchoolResults.map((s) => (
+                      <li key={s.urn}>
+                        <button
+                          onClick={() => { setAddSchoolSelected(s); setAddSchoolSearch(s.name); setAddSchoolResults([]); }}
+                          className="w-full text-left px-4 py-2 hover:bg-sand transition-colors"
+                        >
+                          <p className="text-sm text-bark">{s.name}</p>
+                          <p className="text-xs text-cocoa">{[s.local_authority, s.postcode].filter(Boolean).join(' · ')}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {addSchoolSelected && (
+                  <p className="text-xs text-sage mt-2">Selected: {addSchoolSelected.name}</p>
+                )}
+              </div>
+            )}
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setAddSchoolOpen(false)} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors text-sm">Cancel</button>
+              <button
+                onClick={handleCreateSchool}
+                disabled={addingSchool || (isSa ? !addSchoolSaName.trim() : !addSchoolSelected)}
+                className="flex-1 bg-primary text-white font-semibold py-2.5 rounded-2xl hover:bg-primary-pressed transition-colors disabled:opacity-50 text-sm"
+              >
+                {addingSchool ? 'Adding…' : 'Add school'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3555,7 +3769,7 @@ export default function FamilySetup() {
                             <div className="text-[11px] text-cocoa space-y-0.5">
                               {school?.term_dates_source && (
                                 <p>Source: {
-                                  { local_authority: `Local authority (${school.local_authority || ''})`, school_website: 'School website', ical: 'iCal feed', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source
+                                  { local_authority: `Local authority (${school.local_authority || ''})`, school_website: 'School website', website_scrape: 'School website', ical: 'iCal feed', ical_import: 'iCal feed', sa_national: 'National calendar', 'sa-national': 'National calendar', whatsapp_import: 'WhatsApp', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source
                                 }</p>
                               )}
                               {school?.term_dates_last_updated && (
@@ -3598,7 +3812,7 @@ export default function FamilySetup() {
                                 </button>
                               )}
                               <span className="text-cream-border">|</span>
-                              <button onClick={() => setShowAllDates(true)} className="text-xs font-medium text-primary hover:text-primary-pressed">
+                              <button onClick={() => openViewDates(householdSchools.find(s => s.id === editingMember?.school_id))} className="text-xs font-medium text-primary hover:text-primary-pressed">
                                 View & edit all dates
                               </button>
                               <span className="text-cream-border">|</span>
@@ -3798,7 +4012,7 @@ export default function FamilySetup() {
       )}
 
       {/* View & Edit All Dates Panel */}
-      {showAllDates && editingMember?.school_id && (
+      {showAllDates && termDateSchoolId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowAllDates(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -3810,7 +4024,7 @@ export default function FamilySetup() {
                 </svg>
               </button>
             </div>
-            <p className="text-xs text-cocoa mb-4">{householdSchools.find(s => s.id === editingMember.school_id)?.school_name}</p>
+            <p className="text-xs text-cocoa mb-4">{termDateSchoolName}</p>
 
             {(() => {
               const grouped = groupDatesByTerm(editTermDates, household?.country);
