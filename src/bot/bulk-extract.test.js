@@ -1,4 +1,32 @@
-const { looksLikeBulkPaste } = require('./bulk-extract');
+const { looksLikeBulkPaste, looksLikeSchoolTermDates } = require('./bulk-extract');
+
+describe('looksLikeSchoolTermDates', () => {
+  test('fires on the explicit "term dates" phrase', () => {
+    expect(looksLikeSchoolTermDates('Wolfson Hillel — term dates 2026/27')).toBe(true);
+  });
+
+  test('fires on a multi-marker term calendar (named term + half-term + INSET)', () => {
+    const doc = `Autumn term: 4 Sep – 20 Dec
+Half term: 21–25 Oct
+INSET day: 2 Sep
+Spring term: 6 Jan – 28 Mar`;
+    expect(looksLikeSchoolTermDates(doc)).toBe(true);
+  });
+
+  test('does NOT fire on a single passing marker (one INSET line in a fixture list)', () => {
+    const fixtures = `U11 Cricket fixtures
+01/06 v The Hall
+08/06 v Highgate
+(INSET day 15/06 — no match)`;
+    expect(looksLikeSchoolTermDates(fixtures)).toBe(false);
+  });
+
+  test('does NOT fire on ordinary text or empty/non-string input', () => {
+    expect(looksLikeSchoolTermDates('Can you add milk and eggs to the list?')).toBe(false);
+    expect(looksLikeSchoolTermDates('')).toBe(false);
+    expect(looksLikeSchoolTermDates(null)).toBe(false);
+  });
+});
 
 describe('looksLikeBulkPaste', () => {
   // The actual U11 cricket team sheet that the bot failed to extract

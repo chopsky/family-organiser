@@ -54,6 +54,31 @@ function looksLikeBulkPaste(text) {
   return hasDate || hasKeyword || (hasTime && lineCount >= 4);
 }
 
+// Strong signal that pasted/uploaded content is a school TERM-DATES calendar
+// (term boundaries, half-terms, INSET days) rather than a normal schedule.
+// These belong in the app's dedicated "Import term dates" feature (per-child,
+// per-school, with term/half-term/INSET semantics) - NOT dumped as loose
+// calendar events - so the bot redirects there instead of extracting. We
+// require either the explicit phrase "term dates" OR >= 2 distinct term-
+// calendar markers, so a single passing mention (e.g. one INSET line in a
+// fixture list) doesn't trip it.
+const TERM_DATE_PHRASE_RE = /\bterm\s?dates?\b/i;
+const TERM_DATE_MARKERS = [
+  /\bhalf.?term\b/i,
+  /\binset\b/i,
+  /\bacademic\s+year\b/i,
+  /\b(?:autumn|spring|summer)\s+term\b/i,
+  /\bterm\s?[1-4]\b/i,
+  /\b(?:first|second|third|fourth)\s+term\b/i,
+];
+function looksLikeSchoolTermDates(text) {
+  if (typeof text !== 'string' || !text.trim()) return false;
+  if (TERM_DATE_PHRASE_RE.test(text)) return true;
+  let signals = 0;
+  for (const re of TERM_DATE_MARKERS) if (re.test(text)) signals += 1;
+  return signals >= 2;
+}
+
 // ── Apply ──────────────────────────────────────────────────────────
 // Mirrors routes/inbound-email.js event/task creation so paste +
 // document behave identically to a forwarded email.
@@ -185,4 +210,4 @@ async function extractAndApply(text, subject, user, household) {
   return { response: summarise(actions, household), actions, count };
 }
 
-module.exports = { looksLikeBulkPaste, applyExtraction, extractAndApply, summarise };
+module.exports = { looksLikeBulkPaste, looksLikeSchoolTermDates, applyExtraction, extractAndApply, summarise };

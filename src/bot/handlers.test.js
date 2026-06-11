@@ -17,11 +17,13 @@ jest.mock('../services/ai-client', () => ({ callWithFailover: jest.fn(), REASONI
 jest.mock('../services/push', () => ({ sendToHousehold: jest.fn(() => Promise.resolve()) }));
 jest.mock('../services/broadcast', () => ({ toHousehold: jest.fn() }));
 jest.mock('./calendar-url', () => ({ detectCalendarFeedUrl: jest.fn(() => null), subscribeCalendarFeed: jest.fn() }));
-jest.mock('./bulk-extract', () => ({ looksLikeBulkPaste: jest.fn(() => false), extractAndApply: jest.fn() }));
+jest.mock('./bulk-extract', () => ({ looksLikeBulkPaste: jest.fn(() => false), looksLikeSchoolTermDates: jest.fn(() => false), extractAndApply: jest.fn() }));
 jest.mock('../services/document-extract', () => ({ extractTextFromDocument: jest.fn() }));
 
 const handlers = require('./handlers');
 const db = require('../db/queries');
+const bulk = require('./bulk-extract');
+const docExtract = require('../services/document-extract');
 
 const household = { id: 'h1', timezone: 'Europe/London' };
 const user = { id: 'u1', name: 'Grant' };
@@ -159,5 +161,27 @@ describe('buildValueReceipt', () => {
 
   test('no family-visibility line in a single-member household', () => {
     expect(handlers.buildValueReceipt({ ...base, eventsAdded: [{ assigned_to_names: [] }] }, user, soloHh)).toBeNull();
+  });
+});
+
+describe('handleDocument — school term-dates redirect', () => {
+  test('redirects a term-dates document to the app Import feature, without extracting', async () => {
+    docExtract.extractTextFromDocument.mockResolvedValue({ text: 'Autumn term ... half term ... INSET ...' });
+    bulk.looksLikeSchoolTermDates.mockReturnValue(true);
+    const ctx = {};
+    const res = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'terms.pdf', user, household, ctx);
+    expect(res.response).toMatch(/import term dates/i);
+    expect(res.response).toMatch(/\/family/);
+    expect(bulk.extractAndApply).not.toHaveBeenCalled();
+    expect(ctx.intent).toBe('term_dates_redirect');
+  });
+
+  test('a normal (non term-dates) document still goes through extraction', async () => {
+    docExtract.extractTextFromDocument.mockResolvedValue({ text: 'Cricket fixtures 01/06 v The Hall' });
+    bulk.looksLikeSchoolTermDates.mockReturnValue(false);
+    bulk.extractAndApply.mockResolvedValue({ count: 1, response: 'Added 1 event.', actions: { eventsAdded: [{ title: 'Cricket' }] } });
+    const res = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'fixtures.pdf', user, household, {});
+    expect(bulk.extractAndApply).toHaveBeenCalled();
+    expect(res.response).toMatch(/Added 1 event/);
   });
 });

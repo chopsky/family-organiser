@@ -16,7 +16,7 @@ const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
 const { detectCalendarFeedUrl, subscribeCalendarFeed } = require('./calendar-url');
-const { looksLikeBulkPaste, extractAndApply } = require('./bulk-extract');
+const { looksLikeBulkPaste, looksLikeSchoolTermDates, extractAndApply } = require('./bulk-extract');
 const { extractTextFromDocument } = require('../services/document-extract');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
@@ -1077,6 +1077,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // classifier, so ordinary long chat messages aren't hijacked.
   if (looksLikeBulkPaste(text)) {
     console.log('[handlers] Bulk-paste detected, running extraction:', text.slice(0, 60));
+    // School term-dates calendars belong in the app's Import-term-dates
+    // feature, not dumped as loose events - redirect instead of extracting.
+    if (looksLikeSchoolTermDates(text)) {
+      ctx.intent = 'term_dates_redirect';
+      return { response: termDatesGuidance(process.env.WEB_URL), actions };
+    }
     const extracted = await extractAndApply(text, null, user, household);
     if (extracted.count > 0) {
       ctx.intent = 'bulk_extract';
@@ -2061,6 +2067,23 @@ async function handleVoiceNote(audioBuffer, filename, user, household, ctx = {})
  * @param {object} [ctx]     - OUT param for intent telemetry
  * @returns {Promise<{response: string, actions: object}>}
  */
+// Guidance shown when a parent pastes/uploads a school TERM-DATES calendar.
+// We deliberately DON'T dump these as loose calendar events - they belong in
+// the app's dedicated Import-term-dates feature (per-child, per-school), which
+// saves them as proper terms and powers half-term reminders + activity term
+// windows. Point them there instead.
+function termDatesGuidance(webUrl) {
+  const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
+  return [
+    "📅 Those look like your school's term dates!",
+    '',
+    "Best to import them under Family in the app rather than add them as one-off calendar events — that way they're saved as proper terms and power half-term reminders and your kids' activity term windows.",
+    '',
+    "In Housemait: Family → your child's school → Import term dates.",
+    `→ ${base}/family`,
+  ].join('\n');
+}
+
 async function handleDocument(buffer, mediaType, filename, user, household, ctx = {}) {
   const emptyActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
 
@@ -2073,6 +2096,14 @@ async function handleDocument(buffer, mediaType, filename, user, household, ctx 
     // type, scanned/empty, legacy .doc). Relay verbatim.
     ctx.intent = 'document_unsupported';
     return { response: `📄 ${err.message}`, actions: emptyActions };
+  }
+
+  // A school term-dates PDF/letter belongs in the app's Import-term-dates
+  // feature (proper terms, half-term reminders, activity windows), not dumped
+  // as loose calendar events - so redirect there rather than extracting.
+  if (looksLikeSchoolTermDates(extractedText)) {
+    ctx.intent = 'term_dates_redirect';
+    return { response: termDatesGuidance(process.env.WEB_URL), actions: emptyActions };
   }
 
   const extracted = await extractAndApply(extractedText, filename || null, user, household);
