@@ -7,8 +7,11 @@
  * each row: start time, child-coloured activity glyph, activity name,
  * "{child}" sub-line, and PICKUP {parent} + avatar on the right.
  *
- * Data: GET /api/schools (children + their child_weekly_schedule rows,
- * which carry day_of_week, activity, time_start/end, pickup_member_id).
+ * Data: GET /api/schools/activities (every child's child_weekly_schedule
+ * rows for the household, which carry day_of_week, activity, time_start/end,
+ * pickup_member_id). This household-wide endpoint is used instead of
+ * GET /api/schools because, after the schools decoupling, a child can have no
+ * school_id and so wouldn't appear under any school's children there.
  * Child + pickup names/colours are resolved from the dashboard's members
  * list (passed in). Mobile-only and hidden entirely when the household
  * has no after-school activities at all - the per-day "No clubs" empty
@@ -110,19 +113,14 @@ export default function AfterSchoolCard({ members = [] }) {
   useEffect(() => {
     if (!isMobile) return undefined; // mobile-only: skip the fetch on desktop
     let cancelled = false;
-    api.get('/schools')
+    // Source from the household-wide activities endpoint, NOT GET /schools.
+    // After the schools decoupling a child can have no school_id (single-school
+    // household), so they no longer appear under any school's children in
+    // GET /schools - their clubs would silently vanish from this card.
+    api.get('/schools/activities')
       .then((res) => {
         if (cancelled) return;
-        const schools = res.data?.schools || [];
-        const flat = [];
-        for (const s of schools) {
-          for (const child of (s.children || [])) {
-            for (const a of (child.activities || [])) {
-              flat.push({ ...a, child_id: a.child_id || child.id });
-            }
-          }
-        }
-        setActivities(flat);
+        setActivities(res.data?.activities || []);
       })
       .catch(() => { if (!cancelled) setActivities([]); });
     return () => { cancelled = true; };
