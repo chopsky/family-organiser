@@ -2084,8 +2084,12 @@ export default function FamilySetup() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[15px] font-semibold text-bark">{m.name}</p>
                         {m.family_role && <p className="text-[13px] text-cocoa">{m.family_role}</p>}
-                        {/* School badge */}
-                        {m.school_id && (() => {
+                        {/* School badge - a child's school is sensitive, so we
+                            only surface it when the household has 2+ schools and
+                            it actually disambiguates which term calendar applies.
+                            With one (or no) school it's redundant + private, so
+                            it stays hidden. */}
+                        {m.school_id && householdSchools.length >= 2 && (() => {
                           const school = householdSchools.find(s => s.id === m.school_id);
                           return school ? (
                             <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
