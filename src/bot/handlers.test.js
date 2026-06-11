@@ -4,7 +4,13 @@
  * that whole chain to a no-op surface. The handler under test takes its db via
  * the module mock, which is all we control here.
  */
-jest.mock('../db/queries', () => ({ getCalendarEvents: jest.fn() }));
+jest.mock('../db/queries', () => ({
+  getCalendarEvents: jest.fn(),
+  getHouseholdSchools: jest.fn(() => Promise.resolve([])),
+  addSchoolTermDates: jest.fn(() => Promise.resolve([])),
+  deleteTermDatesBySchoolAndAcademicYear: jest.fn(() => Promise.resolve()),
+  updateHouseholdSchoolMeta: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
   scanImage: jest.fn(), runWebSearch: jest.fn(),
@@ -19,13 +25,18 @@ jest.mock('../services/broadcast', () => ({ toHousehold: jest.fn() }));
 jest.mock('./calendar-url', () => ({ detectCalendarFeedUrl: jest.fn(() => null), subscribeCalendarFeed: jest.fn() }));
 jest.mock('./bulk-extract', () => ({ looksLikeBulkPaste: jest.fn(() => false), looksLikeSchoolTermDates: jest.fn(() => false), extractAndApply: jest.fn() }));
 jest.mock('../services/document-extract', () => ({ extractTextFromDocument: jest.fn() }));
+jest.mock('../services/term-date-extract', () => ({
+  extractTermDatesPreview: jest.fn(),
+  academicYearsForCountry: jest.fn(() => ({ currentAY: '2025-2026', nextAY: '2026-2027' })),
+}));
 
 const handlers = require('./handlers');
 const db = require('../db/queries');
 const bulk = require('./bulk-extract');
 const docExtract = require('../services/document-extract');
+const termExtract = require('../services/term-date-extract');
 
-const household = { id: 'h1', timezone: 'Europe/London' };
+const household = { id: 'h1', timezone: 'Europe/London', members: [] };
 const user = { id: 'u1', name: 'Grant' };
 const TZ = 'Europe/London';
 
@@ -164,16 +175,63 @@ describe('buildValueReceipt', () => {
   });
 });
 
-describe('handleDocument — school term-dates redirect', () => {
-  test('redirects a term-dates document to the app Import feature, without extracting', async () => {
-    docExtract.extractTextFromDocument.mockResolvedValue({ text: 'Autumn term ... half term ... INSET ...' });
+describe('handleDocument — school term-dates import', () => {
+  const DATES = [
+    { event_type: 'term_start', date: '2025-09-04', label: 'Autumn term', academic_year: '2025-2026' },
+    { event_type: 'term_end', date: '2025-12-20', label: 'Autumn term', academic_year: '2025-2026' },
+  ];
+
+  beforeEach(() => {
+    docExtract.extractTextFromDocument.mockResolvedValue({ text: 'Autumn term 4 Sep – 20 Dec, half term 21 Oct, INSET 2 Sep' });
     bulk.looksLikeSchoolTermDates.mockReturnValue(true);
+    termExtract.extractTermDatesPreview.mockResolvedValue({ ok: true, status: 200, body: { dates: DATES } });
+  });
+
+  test('one school → imports directly (per-year merge), no event dump', async () => {
+    db.getHouseholdSchools.mockResolvedValue([{ id: 's1', school_name: 'Wolfson Hillel' }]);
     const ctx = {};
     const res = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'terms.pdf', user, household, ctx);
-    expect(res.response).toMatch(/import term dates/i);
-    expect(res.response).toMatch(/\/family/);
+    expect(db.deleteTermDatesBySchoolAndAcademicYear).toHaveBeenCalledWith('s1', '2025-2026');
+    expect(db.addSchoolTermDates).toHaveBeenCalledWith('s1', expect.arrayContaining([
+      expect.objectContaining({ event_type: 'term_start', source: 'whatsapp_import' }),
+    ]));
+    expect(db.updateHouseholdSchoolMeta).toHaveBeenCalled();
+    expect(res.response).toMatch(/Wolfson Hillel/);
     expect(bulk.extractAndApply).not.toHaveBeenCalled();
-    expect(ctx.intent).toBe('term_dates_redirect');
+    expect(ctx.intent).toBe('term_dates_import');
+  });
+
+  test('multiple schools → asks which, then the reply resolves + imports', async () => {
+    db.getHouseholdSchools.mockResolvedValue([
+      { id: 's1', school_name: 'Wolfson Hillel' },
+      { id: 's2', school_name: 'St Johns' },
+    ]);
+    const ctx = {};
+    const ask = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'terms.pdf', user, household, ctx);
+    expect(ask.response).toMatch(/which school/i);
+    expect(ask.response).toMatch(/Wolfson Hillel/);
+    expect(db.addSchoolTermDates).not.toHaveBeenCalled();
+    expect(ctx.intent).toBe('term_dates_import_disambiguation');
+
+    const reply = await handlers.handleTextMessage('2', user, household, {});
+    expect(db.addSchoolTermDates).toHaveBeenCalledWith('s2', expect.any(Array));
+    expect(reply.response).toMatch(/St Johns/);
+  });
+
+  test('no schools → guidance to add one first, no import', async () => {
+    db.getHouseholdSchools.mockResolvedValue([]);
+    const res = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'terms.pdf', user, household, {});
+    expect(res.response).toMatch(/add (one|a school)/i);
+    expect(db.addSchoolTermDates).not.toHaveBeenCalled();
+  });
+
+  test('extractor finds no dates → graceful message, no import, no event dump', async () => {
+    db.getHouseholdSchools.mockResolvedValue([{ id: 's1', school_name: 'Wolfson Hillel' }]);
+    termExtract.extractTermDatesPreview.mockResolvedValue({ ok: true, status: 200, body: { dates: [] } });
+    const res = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'terms.pdf', user, household, {});
+    expect(db.addSchoolTermDates).not.toHaveBeenCalled();
+    expect(bulk.extractAndApply).not.toHaveBeenCalled();
+    expect(res.response).toMatch(/Family → Schools/);
   });
 
   test('a normal (non term-dates) document still goes through extraction', async () => {

@@ -18,6 +18,7 @@ const broadcast = require('../services/broadcast');
 const { detectCalendarFeedUrl, subscribeCalendarFeed } = require('./calendar-url');
 const { looksLikeBulkPaste, looksLikeSchoolTermDates, extractAndApply } = require('./bulk-extract');
 const { extractTextFromDocument } = require('../services/document-extract');
+const { extractTermDatesPreview, academicYearsForCountry } = require('../services/term-date-extract');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -180,6 +181,39 @@ function parseAffirmative(text) {
   if (/^(y|ye|yes|yep|yeah|yup|sure|ok|okay|please|yes please|do it|go on|every year|annually|repeat|repeat it|each year)$/.test(t)) return 'yes';
   if (/^(n|no|nope|nah|no thanks|no thank you|dont|don't|leave it|just once|one off|one-off|once|no need)$/.test(t)) return 'no';
   return null;
+}
+
+// ─── Pending "which school?" for a term-dates import (in-memory, 5-min TTL) ──
+const pendingTermDatesImport = new Map(); // userId → { dates, sourceLabel, country, householdId, schools:[{id,name}], timestamp }
+function rememberTermDatesImport(userId, entry) {
+  if (!userId || !Array.isArray(entry?.dates)) return;
+  pendingTermDatesImport.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popPendingTermDatesImport(userId) {
+  const entry = pendingTermDatesImport.get(userId);
+  if (!entry) return null;
+  pendingTermDatesImport.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+// Resolve which school the user picked from a stored {id,name}[] list:
+// "1" / "first" / a unique substring of a school name. Returns the school or null.
+function resolveSchoolChoice(text, schools) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  if (!t || !Array.isArray(schools) || !schools.length) return null;
+  const numMatch = t.match(/^(?:#|option\s+|number\s+)?(\d+)\.?$/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    return (n >= 1 && n <= schools.length) ? schools[n - 1] : null;
+  }
+  const ordinals = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5 };
+  const ordMatch = t.match(/^(?:the\s+)?(first|second|third|fourth|fifth)(?:\s+one)?$/);
+  if (ordMatch) {
+    const n = ordinals[ordMatch[1]];
+    return n <= schools.length ? schools[n - 1] : null;
+  }
+  const matches = schools.filter((s) => (s.name || '').toLowerCase().includes(t));
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /**
@@ -1018,6 +1052,20 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
   }
 
+  // Pending "which school?" reply for a term-dates import - resolve against the
+  // schools we listed, then import the stored dates onto the chosen school.
+  const pendingTerms = popPendingTermDatesImport(user.id);
+  if (pendingTerms && pendingTerms.householdId === household.id) {
+    const chosen = resolveSchoolChoice(text, pendingTerms.schools);
+    if (chosen) {
+      ctx.intent = 'term_dates_import';
+      const n = await saveTermDatesToSchool(chosen.id, pendingTerms.dates, pendingTerms.country);
+      const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+      return { response: `📅 Imported ${n} term date${n === 1 ? '' : 's'} for ${chosen.name} — review them under Family → Schools.`, actions: noActions };
+    }
+    // Couldn't map to a school - drop and classify normally.
+  }
+
   // Trivial messages - greetings, thanks, emoji-only - get canned replies.
   const trivial = matchTrivialMessage(text);
   if (trivial) {
@@ -1077,11 +1125,11 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // classifier, so ordinary long chat messages aren't hijacked.
   if (looksLikeBulkPaste(text)) {
     console.log('[handlers] Bulk-paste detected, running extraction:', text.slice(0, 60));
-    // School term-dates calendars belong in the app's Import-term-dates
-    // feature, not dumped as loose events - redirect instead of extracting.
+    // School term-dates calendars go into the dedicated term-dates feature, not
+    // dumped as loose events - the bot imports them itself (asking which school
+    // if the household has more than one).
     if (looksLikeSchoolTermDates(text)) {
-      ctx.intent = 'term_dates_redirect';
-      return { response: termDatesGuidance(process.env.WEB_URL), actions };
+      return await handleTermDatesImport(text, 'WhatsApp message', user, household, ctx, actions);
     }
     const extracted = await extractAndApply(text, null, user, household);
     if (extracted.count > 0) {
@@ -2067,21 +2115,76 @@ async function handleVoiceNote(audioBuffer, filename, user, household, ctx = {})
  * @param {object} [ctx]     - OUT param for intent telemetry
  * @returns {Promise<{response: string, actions: object}>}
  */
-// Guidance shown when a parent pastes/uploads a school TERM-DATES calendar.
-// We deliberately DON'T dump these as loose calendar events - they belong in
-// the app's dedicated Import-term-dates feature (per-child, per-school), which
-// saves them as proper terms and powers half-term reminders + activity term
-// windows. Point them there instead.
-function termDatesGuidance(webUrl) {
-  const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
-  return [
-    "📅 Those look like your school's term dates!",
-    '',
-    "Best to import them under Family in the app rather than add them as one-off calendar events — that way they're saved as proper terms and power half-term reminders and your kids' activity term windows.",
-    '',
-    "In Housemait: Family → your child's school → Import term dates.",
-    `→ ${base}/family`,
-  ].join('\n');
+// Import a school TERM-DATES calendar a parent pasted/uploaded. We deliberately
+// DON'T dump these as loose calendar events - they go into the dedicated
+// term-dates feature (proper terms, half-term reminders, activity windows).
+// Merges per academic year so re-sending the same calendar replaces rather
+// than duplicates.
+async function saveTermDatesToSchool(schoolId, dates, country) {
+  const { currentAY } = academicYearsForCountry(country || 'GB');
+  const rows = (dates || [])
+    .filter((d) => d && d.event_type && d.date)
+    .map((d) => ({
+      event_type: d.event_type,
+      date: d.date,
+      end_date: d.end_date || null,
+      label: d.label || null,
+      academic_year: d.academic_year || currentAY,
+      source: 'whatsapp_import',
+    }));
+  if (!rows.length) return 0;
+  for (const ay of [...new Set(rows.map((r) => r.academic_year))]) {
+    await db.deleteTermDatesBySchoolAndAcademicYear(schoolId, ay).catch(() => {});
+  }
+  await db.addSchoolTermDates(schoolId, rows);
+  await db.updateHouseholdSchoolMeta(schoolId, {
+    term_dates_source: 'whatsapp_import',
+    term_dates_last_updated: new Date().toISOString(),
+  }).catch(() => {});
+  return rows.length;
+}
+
+// Extract term dates from pasted/uploaded text and import them onto the
+// household's school - asking "which school?" when there's more than one.
+async function handleTermDatesImport(pageText, sourceLabel, user, household, ctx, actions) {
+  const country = household.country || 'GB';
+  const { currentAY, nextAY } = academicYearsForCountry(country);
+  let result;
+  try {
+    result = await extractTermDatesPreview({
+      pageText: String(pageText || '').slice(0, 16000),
+      country, currentAY, nextAY,
+      householdId: household.id, userId: user.id, sourceLabel,
+    });
+  } catch (err) {
+    console.error('[handlers] term-dates extraction failed:', err.message);
+    return { response: "I spotted term dates but couldn't read them just now — you can import them under Family → Schools.", actions };
+  }
+
+  const dates = result?.body?.dates || [];
+  if (!result?.ok || dates.length === 0) {
+    ctx.intent = 'term_dates_import_empty';
+    return { response: "Those looked like school term dates, but I couldn't pull specific dates out of them. You can import them under Family → Schools.", actions };
+  }
+
+  const schools = (await db.getHouseholdSchools(household.id).catch(() => [])) || [];
+  if (schools.length === 0) {
+    ctx.intent = 'term_dates_import_no_school';
+    return { response: "I found term dates, but you haven't added a school yet. Add one under Family → Schools, then send these again and I'll import them.", actions };
+  }
+  if (schools.length === 1) {
+    const n = await saveTermDatesToSchool(schools[0].id, dates, country);
+    ctx.intent = 'term_dates_import';
+    return { response: `📅 Imported ${n} term date${n === 1 ? '' : 's'} for ${schools[0].school_name} — review them under Family → Schools.`, actions };
+  }
+
+  rememberTermDatesImport(user.id, {
+    dates, sourceLabel, country, householdId: household.id,
+    schools: schools.map((s) => ({ id: s.id, name: s.school_name })),
+  });
+  ctx.intent = 'term_dates_import_disambiguation';
+  const list = schools.map((s, i) => `${i + 1}. ${s.school_name}`).join('\n');
+  return { response: `📅 I found term dates — which school are they for?\n${list}\n\nReply with the number or the name.`, actions };
 }
 
 async function handleDocument(buffer, mediaType, filename, user, household, ctx = {}) {
@@ -2098,12 +2201,11 @@ async function handleDocument(buffer, mediaType, filename, user, household, ctx 
     return { response: `📄 ${err.message}`, actions: emptyActions };
   }
 
-  // A school term-dates PDF/letter belongs in the app's Import-term-dates
-  // feature (proper terms, half-term reminders, activity windows), not dumped
-  // as loose calendar events - so redirect there rather than extracting.
+  // A school term-dates PDF/letter goes into the dedicated term-dates feature
+  // (proper terms, half-term reminders, activity windows), NOT dumped as loose
+  // calendar events - the bot imports it itself (asking which school if >1).
   if (looksLikeSchoolTermDates(extractedText)) {
-    ctx.intent = 'term_dates_redirect';
-    return { response: termDatesGuidance(process.env.WEB_URL), actions: emptyActions };
+    return await handleTermDatesImport(extractedText, filename || 'WhatsApp document', user, household, ctx, emptyActions);
   }
 
   const extracted = await extractAndApply(extractedText, filename || null, user, household);
