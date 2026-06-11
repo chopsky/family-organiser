@@ -521,13 +521,17 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       if (dayOfWeek <= 4) { // Only Mon-Fri
         const todayStr = new Date().toISOString().split('T')[0];
         const allMembers = await db.getHouseholdMembers(householdId);
-        const dependents = allMembers.filter(m => m.member_type === 'dependent' && m.school_id);
+        const dependents = allMembers.filter(m => m.member_type === 'dependent');
+        const householdSchools = await db.getHouseholdSchools(householdId).catch(() => []);
 
         for (const child of dependents) {
-          // Check if today is during term time for this child's school
-          const { isSchoolInSession, activityActiveOn } = require('../utils/school-terms');
-          const inSession = await isSchoolInSession(child.school_id, todayStr);
-          if (!inSession) continue; // Skip - school holiday, inset day, half term, etc.
+          // Resolve which school's term calendar applies to this child (their
+          // own school_id, or the household's single school). Only gate on
+          // term-in-session when a school resolves; with no school the activity's
+          // own term window is the only gate.
+          const { isSchoolInSession, activityActiveOn, resolveTermSchoolForChild } = require('../utils/school-terms');
+          const termSchoolId = resolveTermSchoolForChild(child, householdSchools);
+          if (termSchoolId && !(await isSchoolInSession(termSchoolId, todayStr))) continue; // school holiday/inset/half-term
 
           const activities = await db.getChildActivities(child.id);
           // Honour the activity's term window: an activity only shows when

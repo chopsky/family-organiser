@@ -117,6 +117,22 @@ function activityActiveOn(activity, dateStr) {
   return true;
 }
 
+/**
+ * Resolve which school's term calendar applies to a child. A child carries a
+ * school_id only as a disambiguator - we only ask "which school?" when a
+ * household has 2+ schools. So: prefer the child's explicit school_id; else, if
+ * the household has exactly one school, use it; else null (ambiguous / none).
+ *
+ * @param {object} child - user row (may have school_id)
+ * @param {Array} householdSchools - household_schools rows
+ * @returns {string|null} schoolId
+ */
+function resolveTermSchoolForChild(child, householdSchools = []) {
+  if (child?.school_id) return child.school_id;
+  const schools = Array.isArray(householdSchools) ? householdSchools : [];
+  return schools.length === 1 ? schools[0].id : null;
+}
+
 /** Fetch + derive the terms for a school. */
 async function getSchoolTerms(schoolId) {
   try {
@@ -134,5 +150,6 @@ module.exports = {
   currentTerm,
   activityActiveOn,
   getSchoolTerms,
+  resolveTermSchoolForChild,
   seasonLabel,
 };

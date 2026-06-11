@@ -1,7 +1,25 @@
 jest.mock('../db/queries', () => ({ getSchoolTermDates: jest.fn() }));
 jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
 
-const { deriveTerms, currentTerm, activityActiveOn, seasonLabel } = require('./school-terms');
+const { deriveTerms, currentTerm, activityActiveOn, seasonLabel, resolveTermSchoolForChild } = require('./school-terms');
+
+describe('resolveTermSchoolForChild', () => {
+  test('prefers the child\'s explicit school_id', () => {
+    const child = { school_id: 's-child' };
+    expect(resolveTermSchoolForChild(child, [{ id: 's1' }, { id: 's2' }])).toBe('s-child');
+  });
+
+  test('falls back to the household\'s single school when the child has none', () => {
+    expect(resolveTermSchoolForChild({ school_id: null }, [{ id: 's1' }])).toBe('s1');
+    expect(resolveTermSchoolForChild({}, [{ id: 's1' }])).toBe('s1');
+  });
+
+  test('returns null when ambiguous (2+ schools) or no schools', () => {
+    expect(resolveTermSchoolForChild({}, [{ id: 's1' }, { id: 's2' }])).toBeNull();
+    expect(resolveTermSchoolForChild({}, [])).toBeNull();
+    expect(resolveTermSchoolForChild({})).toBeNull();
+  });
+});
 
 describe('deriveTerms', () => {
   const rows = [

@@ -12,7 +12,7 @@ const { checkAiHealth } = require('./ai-health');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
-const { isSchoolInSession } = require('../utils/school-terms');
+const { isSchoolInSession, resolveTermSchoolForChild } = require('../utils/school-terms');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -222,8 +222,9 @@ async function runEveningSchoolPrepCheck() {
       if (!acquired) continue;
 
       const members = await db.getHouseholdMembers(household.id);
-      const dependents = members.filter(m => m.member_type === 'dependent' && m.school_id);
+      const dependents = members.filter(m => m.member_type === 'dependent');
       if (dependents.length === 0) continue;
+      const householdSchools = await db.getHouseholdSchools(household.id).catch(() => []);
 
       // Get tomorrow's day of week (0=Mon...4=Fri)
       const tomorrow = new Date(now);
@@ -238,9 +239,12 @@ async function runEveningSchoolPrepCheck() {
       let hasActivities = false;
 
       for (const child of dependents) {
-        // Skip if the child's school is NOT in session tomorrow (holidays, inset days, half terms)
-        const inSession = await isSchoolInSession(child.school_id, tomorrowStr);
-        if (!inSession) {
+        // Skip if this child's school is NOT in session tomorrow (holidays,
+        // inset days, half terms). Resolve the school via the child's own
+        // school_id or the household's single school; with none resolved, the
+        // activity's own term window is the only gate.
+        const termSchoolId = resolveTermSchoolForChild(child, householdSchools);
+        if (termSchoolId && !(await isSchoolInSession(termSchoolId, tomorrowStr))) {
           console.log(`[scheduler] Skipping ${child.name}'s activities - school not in session on ${tomorrowStr}`);
           continue;
         }

@@ -76,7 +76,12 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const activeSchools = [];
     for (const school of schools) {
       const children = members.filter(m => m.school_id === school.id);
-      if (children.length === 0) {
+      // Auto-clean only schools the user clearly never set up: no linked
+      // children AND no imported term dates AND no iCal feed. Under the
+      // household-level model a deliberately-added school (term dates imported,
+      // or a feed configured, but no child linked yet) must NOT be silently
+      // deleted on the next load.
+      if (children.length === 0 && !school.ical_url && !school.term_dates_source) {
         db.deleteHouseholdSchool(school.id, req.householdId).catch(e =>
           console.error('Auto-cleanup failed:', e.message)
         );
@@ -378,9 +383,11 @@ router.get('/terms/:childId', requireAuth, requireHousehold, async (req, res) =>
       return res.json({ terms: [] });
     }
     const child = await db.getUserByIdAdmin(req.params.childId);
-    if (!child || !child.school_id) return res.json({ terms: [] });
-    const { getSchoolTerms } = require('../utils/school-terms');
-    const terms = await getSchoolTerms(child.school_id);
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const { getSchoolTerms, resolveTermSchoolForChild } = require('../utils/school-terms');
+    const schoolId = resolveTermSchoolForChild(child, schools);
+    if (!schoolId) return res.json({ terms: [] });
+    const terms = await getSchoolTerms(schoolId);
     return res.json({ terms });
   } catch (err) {
     console.error('GET /api/schools/terms/:childId error:', err);
