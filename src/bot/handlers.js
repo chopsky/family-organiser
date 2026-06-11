@@ -15,6 +15,7 @@ const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotificati
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
+const cache = require('../services/cache');
 const { detectCalendarFeedUrl, subscribeCalendarFeed } = require('./calendar-url');
 const { looksLikeBulkPaste, looksLikeSchoolTermDates, extractAndApply } = require('./bulk-extract');
 const { extractTextFromDocument } = require('../services/document-extract');
@@ -1059,7 +1060,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     const chosen = resolveSchoolChoice(text, pendingTerms.schools);
     if (chosen) {
       ctx.intent = 'term_dates_import';
-      const n = await saveTermDatesToSchool(chosen.id, pendingTerms.dates, pendingTerms.country);
+      const n = await saveTermDatesToSchool(chosen.id, pendingTerms.dates, pendingTerms.country, household.id);
       const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
       return { response: `📅 Imported ${n} term date${n === 1 ? '' : 's'} for ${chosen.name} — review them under Family → Schools.`, actions: noActions };
     }
@@ -2120,7 +2121,7 @@ async function handleVoiceNote(audioBuffer, filename, user, household, ctx = {})
 // term-dates feature (proper terms, half-term reminders, activity windows).
 // Merges per academic year so re-sending the same calendar replaces rather
 // than duplicates.
-async function saveTermDatesToSchool(schoolId, dates, country) {
+async function saveTermDatesToSchool(schoolId, dates, country, householdId) {
   const { currentAY } = academicYearsForCountry(country || 'GB');
   const rows = (dates || [])
     .filter((d) => d && d.event_type && d.date)
@@ -2141,6 +2142,14 @@ async function saveTermDatesToSchool(schoolId, dates, country) {
     term_dates_source: 'whatsapp_import',
     term_dates_last_updated: new Date().toISOString(),
   }).catch(() => {});
+  // The bot writes straight to the DB, bypassing the schools route. Without
+  // this the Schools card (served from the schools: cache, 30-min TTL) keeps
+  // showing "No term dates imported yet" until the cache expires, even though
+  // the import succeeded.
+  if (householdId) {
+    cache.invalidate(`schools:${householdId}`);
+    cache.invalidate(`digest:${householdId}`);
+  }
   return rows.length;
 }
 
@@ -2173,7 +2182,7 @@ async function handleTermDatesImport(pageText, sourceLabel, user, household, ctx
     return { response: "I found term dates, but you haven't added a school yet. Add one under Family → Schools, then send these again and I'll import them.", actions };
   }
   if (schools.length === 1) {
-    const n = await saveTermDatesToSchool(schools[0].id, dates, country);
+    const n = await saveTermDatesToSchool(schools[0].id, dates, country, household.id);
     ctx.intent = 'term_dates_import';
     return { response: `📅 Imported ${n} term date${n === 1 ? '' : 's'} for ${schools[0].school_name} — review them under Family → Schools.`, actions };
   }

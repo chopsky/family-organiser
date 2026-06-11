@@ -29,12 +29,14 @@ jest.mock('../services/term-date-extract', () => ({
   extractTermDatesPreview: jest.fn(),
   academicYearsForCountry: jest.fn(() => ({ currentAY: '2025-2026', nextAY: '2026-2027' })),
 }));
+jest.mock('../services/cache', () => ({ invalidate: jest.fn(), get: jest.fn(), set: jest.fn() }));
 
 const handlers = require('./handlers');
 const db = require('../db/queries');
 const bulk = require('./bulk-extract');
 const docExtract = require('../services/document-extract');
 const termExtract = require('../services/term-date-extract');
+const cache = require('../services/cache');
 
 const household = { id: 'h1', timezone: 'Europe/London', members: [] };
 const user = { id: 'u1', name: 'Grant' };
@@ -196,6 +198,9 @@ describe('handleDocument — school term-dates import', () => {
       expect.objectContaining({ event_type: 'term_start', source: 'whatsapp_import' }),
     ]));
     expect(db.updateHouseholdSchoolMeta).toHaveBeenCalled();
+    // The schools cache must be invalidated so the Schools card shows the
+    // imported dates immediately instead of a stale "No term dates yet".
+    expect(cache.invalidate).toHaveBeenCalledWith('schools:h1');
     expect(res.response).toMatch(/Wolfson Hillel/);
     expect(bulk.extractAndApply).not.toHaveBeenCalled();
     expect(ctx.intent).toBe('term_dates_import');
