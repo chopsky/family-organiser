@@ -2162,28 +2162,58 @@ export default function FamilySetup() {
           modal below. */}
       {showSchools && (() => {
         const activityKids = members.filter(m => m.member_type === 'dependent' || m.school_id);
-        const renderActivityRow = (kid, a, dim) => {
-          const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
+        // Merge identical activities that differ ONLY by weekday into one row
+        // (e.g. "Wraparound Care" Mon/Tue/Wed -> one row with three day chips),
+        // so a repeated club doesn't eat three rows. Editing stays per-day:
+        // each chip is its own tap target. Groups sort by earliest day + time.
+        const groupActivities = (list) => {
+          const groups = new Map();
+          list.forEach((a) => {
+            const key = [a.activity, a.time_start || '', a.time_end || '', a.pickup_member_id || '', a.start_date || '', a.end_date || ''].join('|');
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(a);
+          });
+          return [...groups.values()]
+            .map((items) => items.slice().sort((x, y) => x.day_of_week - y.day_of_week))
+            .sort((g1, g2) => (g1[0].day_of_week - g2[0].day_of_week) || ((g1[0].time_start || '').localeCompare(g2[0].time_start || '')));
+        };
+        const activityMeta = (a, dim) => {
           const s = a.time_start ? a.time_start.substring(0, 5) : '';
           const e = a.time_end ? a.time_end.substring(0, 5) : '';
           const time = s && e ? `${s}–${e}` : s ? `from ${s}` : e ? `until ${e}` : '';
-          const meta = [time, pickup ? `🚗 ${pickup.name}` : '', dim && a.term_label ? a.term_label : '']
-            .filter(Boolean).join(' · ');
+          const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
+          return [time, pickup ? `🚗 ${pickup.name}` : '', dim && a.term_label ? a.term_label : ''].filter(Boolean).join(' · ');
+        };
+        const dayChip = (kid, it, interactive) => interactive ? (
+          <button key={it.id} type="button" onClick={() => openEditActivity(kid, it)} title={`Edit ${DAY_LABELS[it.day_of_week]}`}
+            className="text-[11px] font-medium text-cocoa bg-cream rounded-md px-1.5 py-0.5 hover:text-primary hover:bg-primary/10 transition-colors">
+            {DAY_LABELS[it.day_of_week]}
+          </button>
+        ) : (
+          <span key={it.id} className="text-[11px] font-medium text-cocoa bg-cream rounded-md px-1.5 py-0.5">{DAY_LABELS[it.day_of_week]}</span>
+        );
+        // One dense row per merge-group. A single session is one big tap target;
+        // a merged group makes each weekday chip the (per-day) tap target.
+        const renderActivityRow = (kid, items, dim) => {
+          const a = items[0];
+          const meta = activityMeta(a, dim);
+          if (items.length === 1) {
+            return (
+              <button key={a.id} type="button" onClick={isAdmin ? () => openEditActivity(kid, a) : undefined} disabled={!isAdmin}
+                className={`w-full flex items-center gap-2.5 py-1.5 text-left transition-colors ${isAdmin ? 'hover:text-primary' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
+                title={isAdmin ? 'Tap to edit' : undefined}>
+                {dayChip(kid, a, false)}
+                <span className="flex-1 min-w-0 text-sm text-bark truncate">{a.activity}</span>
+                {meta && <span className="text-[11px] text-cocoa shrink-0 whitespace-nowrap">{meta}</span>}
+              </button>
+            );
+          }
           return (
-            <button
-              key={a.id}
-              type="button"
-              onClick={isAdmin ? () => openEditActivity(kid, a) : undefined}
-              disabled={!isAdmin}
-              className={`w-full flex items-center gap-2 text-left rounded-lg border border-cream-border bg-white px-3 py-2 transition-colors ${isAdmin ? 'hover:border-primary' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
-              title={isAdmin ? 'Tap to edit' : undefined}
-            >
-              <span className="text-[11px] font-semibold text-cocoa w-9 shrink-0">{DAY_LABELS[a.day_of_week]}</span>
-              <span className="flex-1 min-w-0">
-                <span className="text-sm text-bark font-medium truncate block">{a.activity}</span>
-                {meta && <span className="text-[11px] text-cocoa">{meta}</span>}
-              </span>
-            </button>
+            <div key={a.id} className={`flex items-center gap-2.5 py-1.5 ${dim ? 'opacity-60' : ''}`}>
+              <span className="flex gap-1 shrink-0">{items.map(it => dayChip(kid, it, isAdmin))}</span>
+              <span className="flex-1 min-w-0 text-sm text-bark truncate">{a.activity}</span>
+              {meta && <span className="text-[11px] text-cocoa shrink-0 whitespace-nowrap">{meta}</span>}
+            </div>
           );
         };
         return (
@@ -2196,13 +2226,13 @@ export default function FamilySetup() {
               <div className="space-y-3">
                 {activityKids.map((kid) => {
                   const avatarClass = AVATAR_COLOURS[kid.color_theme] || AVATAR_COLOURS.teal;
-                  const acts = (childActivities[kid.id] || []).slice()
-                    .sort((a, b) => (a.day_of_week - b.day_of_week) || ((a.time_start || '').localeCompare(b.time_start || '')));
-                  const active = acts.filter(activityActiveToday);
-                  const other = acts.filter(a => !activityActiveToday(a));
+                  const acts = childActivities[kid.id] || [];
+                  const active = groupActivities(acts.filter(activityActiveToday));
+                  const other = groupActivities(acts.filter(a => !activityActiveToday(a)));
+                  const clubCount = active.length + other.length;
                   return (
                     <div key={kid.id} className="border border-cream-border rounded-xl p-3.5 bg-white/40">
-                      <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           {kid.avatar_url ? (
                             <img src={kid.avatar_url} alt={kid.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
@@ -2210,20 +2240,21 @@ export default function FamilySetup() {
                             <div className={`w-7 h-7 rounded-full ${avatarClass} flex items-center justify-center font-bold text-xs shrink-0`}>{kid.name[0]?.toUpperCase()}</div>
                           )}
                           <span className="text-sm font-semibold text-bark truncate">{kid.name}</span>
+                          {clubCount > 0 && <span className="text-[11px] text-warm-grey shrink-0">{clubCount} club{clubCount === 1 ? '' : 's'}</span>}
                         </div>
                         {isAdmin && (
                           <button onClick={() => openAddActivity(kid)} className="text-xs font-semibold text-primary hover:text-primary-pressed shrink-0">+ Add</button>
                         )}
                       </div>
                       {active.length > 0 ? (
-                        <div className="space-y-1.5">{active.map(a => renderActivityRow(kid, a, false))}</div>
+                        <div className="divide-y divide-cream-border border-t border-cream-border">{active.map(items => renderActivityRow(kid, items, false))}</div>
                       ) : (
-                        <p className="text-xs text-warm-grey">No activities running this term.</p>
+                        <p className="text-xs text-warm-grey pt-1">No activities running this term.</p>
                       )}
                       {other.length > 0 && (
-                        <div className="mt-2.5">
-                          <p className="text-[11px] font-medium text-cocoa uppercase tracking-wide mb-1">Other terms</p>
-                          <div className="space-y-1.5">{other.map(a => renderActivityRow(kid, a, true))}</div>
+                        <div className="mt-2">
+                          <p className="text-[11px] font-medium text-warm-grey uppercase tracking-wide mb-0.5">Other terms</p>
+                          <div className="divide-y divide-cream-border border-t border-cream-border">{other.map(items => renderActivityRow(kid, items, true))}</div>
                         </div>
                       )}
                     </div>
