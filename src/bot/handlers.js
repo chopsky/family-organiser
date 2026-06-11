@@ -1686,13 +1686,14 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         }
       }
       const saved = await db.addTasks(household.id, toAdd, user.id, household.members);
-      // Keep title + assignee names so the household summary line
-      // downstream can include a "(for X)" bracket. Previously this
-      // was titles-only and the broadcast was opaque about who the
-      // task was actually for.
-      actions.tasksAdded = toAdd.map((t) => ({
-        title: t.title,
-        assigned_to_names: Array.isArray(t.assigned_to_names) ? t.assigned_to_names : [],
+      // Source from the SAVED rows, not raw toAdd, so assigned_to_names are the
+      // roster-RESOLVED names that were actually persisted. addTasks drops any
+      // name that isn't a household member (resolveAssignees), so using toAdd
+      // here would let a hallucinated/non-member assignee surface as a false
+      // "(for X)" broadcast bracket and a false "Assigned to X" value receipt.
+      actions.tasksAdded = (Array.isArray(saved) ? saved : []).map((s) => ({
+        title: s.title,
+        assigned_to_names: Array.isArray(s.assigned_to_names) ? s.assigned_to_names : [],
       }));
       const savedIds = Array.isArray(saved) ? saved.map((s) => s?.id).filter(Boolean) : [];
       if (savedIds.length) {
@@ -1826,6 +1827,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   if (claimedAReminder && !reminderWasSaved && actions.eventsAdded?.length) {
     console.warn('[handlers] Reminder reconciliation hit: response mentioned a reminder but none was saved. Response:', response.slice(0, 200));
     response += "\n\n(I couldn't quite catch the reminder timing — could you tell me again how many minutes/hours before you want the nudge?)";
+    actions.reminderReconciled = true;
   }
 
   // ── Task notification snap addendum ────────────────────────────────────
@@ -1860,6 +1862,25 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // is a paren.
   const trailingTrim = response.replace(/[\s)*_~`.!]+$/g, '');
   const alreadyAsks = /\?$/.test(trailingTrim);
+
+  // ── Value-confirming receipt ───────────────────────────────────────────
+  // Surface the shared-family value this action already delivered (now on
+  // everyone's shared calendar / assigned to a named person), so WhatsApp-
+  // primary users feel the "shared brain" worth, not just a notepad. Appended
+  // AFTER alreadyAsks is computed so it can't mask a trailing "?" and trigger a
+  // duplicate reminder-ask, BEFORE the follow-up so the order reads
+  // confirmation → receipt → question, and SKIPPED when a reminder
+  // reconciliation already crowded the turn. buildValueReceipt only returns a
+  // line when it's genuinely true + high-signal, so routine personal captures
+  // get nothing.
+  if (!actions.reminderReconciled) {
+    const valueReceipt = buildValueReceipt(actions, user, household);
+    if (valueReceipt) {
+      response += `\n\n${valueReceipt}`;
+      actions.valueReceiptAppended = true;
+    }
+  }
+
   // A just-added birthday event that isn't already recurring - offer to
   // repeat it yearly (birthdays aren't auto-recurred; the user opts in).
   const birthdayEvent = (actions.eventsAdded || []).find(
@@ -1891,6 +1912,48 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     response,
     actions,
   };
+}
+
+function joinNames(arr) {
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return `${arr[0]} and ${arr[1]}`;
+  return `${arr.slice(0, -1).join(', ')} and ${arr[arr.length - 1]}`;
+}
+
+/**
+ * Build a short "value receipt" appended to a bot confirmation. It surfaces
+ * the shared-family value the action ALREADY delivered, so WhatsApp-primary
+ * users perceive Housemait as a shared family brain rather than a personal
+ * notepad. Returns null when there's nothing high-signal AND true to say, so
+ * routine personal captures (a solo task, a shopping item) get no nagging tag.
+ *
+ * Every branch is gated on real, in-scope data:
+ *   - assignee names come straight from the saved events/tasks
+ *     (assigned_to_names), minus the sender, so we only claim an assignment
+ *     that actually happened;
+ *   - the family-visibility line fires only for a genuinely shared household
+ *     (>1 member) and only on a new EVENT (the shared coordination surface) -
+ *     never on personal tasks/shopping.
+ */
+function buildValueReceipt(actions, user, household) {
+  const a = actions || {};
+  const names = new Set();
+  for (const e of (a.eventsAdded || [])) {
+    for (const n of (e?.assigned_to_names || [])) if (n) names.add(n);
+  }
+  for (const t of (a.tasksAdded || [])) {
+    for (const n of (t?.assigned_to_names || [])) if (n) names.add(n);
+  }
+  const sender = (user?.name || '').trim().toLowerCase();
+  const others = [...names].filter((n) => n && n.trim().toLowerCase() !== sender);
+  if (others.length > 0) {
+    return `👉 Assigned to ${joinNames(others)}.`;
+  }
+  const memberCount = Array.isArray(household?.members) ? household.members.length : 0;
+  if ((a.eventsAdded?.length) && memberCount > 1) {
+    return '👀 The whole family can see it on your shared calendar now.';
+  }
+  return null;
 }
 
 /**
@@ -2372,6 +2435,7 @@ module.exports = {
   handleTasks,
   handleMyTasks,
   buildBroadcastMessage,
+  buildValueReceipt,
   formatShoppingList,
   formatTaskList,
   generateAndSaveRecipe,

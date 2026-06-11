@@ -92,3 +92,48 @@ describe('handleCalendarQuery', () => {
     expect(res.response).toMatch(/couldn't pull up your calendar/i);
   });
 });
+
+describe('buildValueReceipt', () => {
+  // `user` (Grant) is defined at the top of this file.
+  const sharedHh = { id: 'h1', members: [{ id: 'u1' }, { id: 'u2' }, { id: 'u3' }] };
+  const soloHh = { id: 'h1', members: [{ id: 'u1' }] };
+  const base = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+
+  test('names an event assignee other than the sender', () => {
+    expect(handlers.buildValueReceipt({ ...base, eventsAdded: [{ assigned_to_names: ['Mason'] }] }, user, sharedHh))
+      .toBe('👉 Assigned to Mason.');
+  });
+
+  test('names a task assignee', () => {
+    expect(handlers.buildValueReceipt({ ...base, tasksAdded: [{ title: 'Dentist', assigned_to_names: ['Lynn'] }] }, user, sharedHh))
+      .toBe('👉 Assigned to Lynn.');
+  });
+
+  test('joins multiple assignees and excludes the sender', () => {
+    expect(handlers.buildValueReceipt({ ...base, eventsAdded: [{ assigned_to_names: ['Mason', 'Grant', 'Lynn'] }] }, user, sharedHh))
+      .toBe('👉 Assigned to Mason and Lynn.');
+  });
+
+  test('shared-event visibility line when not assigned and the household has others', () => {
+    expect(handlers.buildValueReceipt({ ...base, eventsAdded: [{ assigned_to_names: [] }] }, user, sharedHh))
+      .toMatch(/whole family can see it/i);
+  });
+
+  test('event assigned only to the sender falls back to the visibility line', () => {
+    expect(handlers.buildValueReceipt({ ...base, eventsAdded: [{ assigned_to_names: ['Grant'] }] }, user, sharedHh))
+      .toMatch(/whole family can see it/i);
+  });
+
+  test('no receipt for a solo personal task (no nag)', () => {
+    expect(handlers.buildValueReceipt({ ...base, tasksAdded: [{ title: 'Buy milk', assigned_to_names: [] }] }, user, sharedHh))
+      .toBeNull();
+  });
+
+  test('no receipt for shopping-only adds', () => {
+    expect(handlers.buildValueReceipt({ ...base, shoppingAdded: ['milk'] }, user, sharedHh)).toBeNull();
+  });
+
+  test('no family-visibility line in a single-member household', () => {
+    expect(handlers.buildValueReceipt({ ...base, eventsAdded: [{ assigned_to_names: [] }] }, user, soloHh)).toBeNull();
+  });
+});

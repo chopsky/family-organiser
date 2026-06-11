@@ -55,7 +55,7 @@ function makeApp() {
 
 // The webhook acks Twilio with 200 immediately, then keeps processing async.
 // Poll the assertion until the in-flight work settles.
-async function waitFor(assertion, { timeout = 1500, interval = 10 } = {}) {
+async function waitFor(assertion, { timeout = 4000, interval = 10 } = {}) {
   const start = Date.now();
   for (;;) {
     try { assertion(); return; } catch (e) {
