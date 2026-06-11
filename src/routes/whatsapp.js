@@ -97,6 +97,14 @@ router.post('/webhook', async (req, res) => {
     // Look up user by WhatsApp phone
     const user = await db.getUserByWhatsAppPhone(phone);
 
+    // Media count for this turn. Declared up here (not lower down) so the
+    // expired-subscription gate below can reference it WITHOUT a temporal-
+    // dead-zone ReferenceError. Previously it was a `const` declared further
+    // down; the gate read it early, threw, and the gate's fail-open catch
+    // swallowed the throw - so expired/cancelled households skipped the
+    // paywall and fell through to a free (billable) AI reply.
+    const numMedia = parseInt(NumMedia || '0', 10);
+
     // ── Pull-push pairing: an unlinked sender sending "CONNECT XXXXXX" (or
     // just the code on its own) is trying to link their WhatsApp to their
     // app account. We match the code in their message body against the
@@ -232,9 +240,9 @@ router.post('/webhook', async (req, res) => {
       ? { ...householdRow, members }
       : { id: user.household_id, members };
 
-    const numMedia = parseInt(NumMedia || '0', 10);
-
-    // Handle media attachments (voice notes, photos)
+    // Handle media attachments (voice notes, photos). numMedia was computed
+    // near the top of the handler (single source of truth, also used by the
+    // expired-subscription gate above).
     if (numMedia > 0) {
       const mediaUrl = req.body.MediaUrl0;
       const mediaType = req.body.MediaContentType0 || '';
