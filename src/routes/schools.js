@@ -5,6 +5,7 @@ const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { callWithFailover, LONG_TIMEOUT_MS, REASONING_TIMEOUT_MS } = require('../services/ai-client');
 const saTermDates = require('../services/saTermDates');
+const externalFeed = require('../services/externalFeed');
 const { validateTermDates } = require('../services/termDateValidator');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
@@ -22,6 +23,23 @@ const pdfUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB cap — way more than any real school PDF
 });
+
+// ── IDOR guards ────────────────────────────────────────────────────────────
+// child_weekly_schedule and school_term_dates are keyed by child_id / school_id
+// with no household_id column of their own, so we confirm ownership by
+// resolving the caller's household members + schools. Without these, an
+// authenticated user could read or modify another household's child schedule
+// or term dates just by guessing a UUID.
+async function childInHousehold(childId, householdId) {
+  if (!childId) return false;
+  const members = await db.getHouseholdMembers(householdId);
+  return members.some((m) => m.id === childId);
+}
+async function schoolInHousehold(schoolId, householdId) {
+  if (!schoolId) return false;
+  const schools = await db.getHouseholdSchools(householdId);
+  return schools.some((s) => s.id === schoolId);
+}
 
 /**
  * Shared AI extractor used by both /import-website/preview and
@@ -339,6 +357,9 @@ router.post('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin
   }
 
   try {
+    if (!(await schoolInHousehold(req.params.schoolId, req.householdId))) {
+      return res.status(404).json({ error: 'School not found.' });
+    }
     const created = await db.addSchoolTermDates(req.params.schoolId, dates);
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
@@ -355,6 +376,9 @@ router.post('/:schoolId/term-dates', requireAuth, requireHousehold, requireAdmin
  */
 router.get('/:schoolId/term-dates', requireAuth, requireHousehold, async (req, res) => {
   try {
+    if (!(await schoolInHousehold(req.params.schoolId, req.householdId))) {
+      return res.status(404).json({ error: 'School not found.' });
+    }
     const termDates = await db.getSchoolTermDates(req.params.schoolId);
     return res.json({ term_dates: termDates });
   } catch (err) {
@@ -369,6 +393,10 @@ router.get('/:schoolId/term-dates', requireAuth, requireHousehold, async (req, r
  */
 router.delete('/term-dates/:dateId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
+    const row = await db.getSchoolTermDateById(req.params.dateId);
+    if (!row || !(await schoolInHousehold(row.school_id, req.householdId))) {
+      return res.status(404).json({ error: 'Term date not found.' });
+    }
     await db.deleteSchoolTermDate(req.params.dateId);
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
@@ -427,6 +455,9 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
   }
 
   try {
+    if (!(await childInHousehold(child_id, req.householdId))) {
+      return res.status(404).json({ error: 'Child not found.' });
+    }
     const created = await db.addChildActivity({
       child_id,
       day_of_week,
@@ -460,6 +491,10 @@ router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAd
     return res.status(400).json({ error: 'activity cannot be empty.' });
   }
   try {
+    const existing = await db.getChildActivityById(req.params.activityId);
+    if (!existing || !(await childInHousehold(existing.child_id, req.householdId))) {
+      return res.status(404).json({ error: 'Activity not found.' });
+    }
     const fields = {};
     if (day_of_week !== undefined) fields.day_of_week = day_of_week;
     if (activity !== undefined) fields.activity = activity.trim();
@@ -485,6 +520,9 @@ router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAd
  */
 router.get('/activities/:childId', requireAuth, requireHousehold, async (req, res) => {
   try {
+    if (!(await childInHousehold(req.params.childId, req.householdId))) {
+      return res.status(404).json({ error: 'Child not found.' });
+    }
     const activities = await db.getChildActivities(req.params.childId);
     return res.json({ activities });
   } catch (err) {
@@ -502,6 +540,12 @@ router.get('/activities/:childId', requireAuth, requireHousehold, async (req, re
  */
 router.get('/terms/:childId', requireAuth, requireHousehold, async (req, res) => {
   try {
+    // Ownership guard: only resolve terms for a child in the caller's
+    // household. Returns the same empty shape as the no-school case rather
+    // than leaking existence of another household's child.
+    if (!(await childInHousehold(req.params.childId, req.householdId))) {
+      return res.json({ terms: [] });
+    }
     const child = await db.getUserByIdAdmin(req.params.childId);
     if (!child || !child.school_id) return res.json({ terms: [] });
     const { getSchoolTerms } = require('../utils/school-terms');
@@ -519,6 +563,10 @@ router.get('/terms/:childId', requireAuth, requireHousehold, async (req, res) =>
  */
 router.delete('/activities/:activityId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
+    const existing = await db.getChildActivityById(req.params.activityId);
+    if (!existing || !(await childInHousehold(existing.child_id, req.householdId))) {
+      return res.status(404).json({ error: 'Activity not found.' });
+    }
     await db.deleteChildActivity(req.params.activityId);
     cache.invalidate(`schools:${req.householdId}`);
     return res.json({ message: 'Activity removed.' });
@@ -540,8 +588,15 @@ router.post('/:schoolId/import-ical', requireAuth, requireHousehold, requireAdmi
   }
 
   try {
-    // Fetch and parse the iCal feed
-    const events = await ical.async.fromURL(ical_url.trim());
+    if (!(await schoolInHousehold(req.params.schoolId, req.householdId))) {
+      return res.status(404).json({ error: 'School not found.' });
+    }
+    // Fetch (SSRF-guarded) and parse the iCal feed. We resolve the text via
+    // the shared safe fetcher - which blocks private/loopback/link-local
+    // targets - then hand it to node-ical's string parser, rather than letting
+    // node-ical fetch an arbitrary user URL itself.
+    const icalText = await externalFeed.fetchFeed(ical_url.trim());
+    const events = await ical.async.parseICS(icalText);
     const eventList = Object.values(events)
       .filter(e => e.type === 'VEVENT')
       .map(e => ({

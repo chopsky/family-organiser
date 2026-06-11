@@ -65,55 +65,19 @@ describe('GET /health', () => {
   });
 });
 
-// ─── POST /api/auth/join ──────────────────────────────────────────────────────
+// ─── POST /api/auth/join (removed for security) ────────────────────────────────
+// The legacy unauthenticated /join endpoint was deleted - it minted a full
+// session from just a household join code + a member name (account takeover).
+// Joining now goes through the authenticated /auth/attach-to-household flow.
 
-describe('POST /api/auth/join', () => {
+describe('POST /api/auth/join (removed)', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('returns token and user when joining with valid code', async () => {
-    db.getHouseholdByCode.mockResolvedValue(HOUSEHOLD);
-    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
-    // authResponse() now resolves the household + issues a refresh token
-    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
-    db.createRefreshToken.mockResolvedValue({ id: 'rt-1' });
-
+  test('endpoint no longer exists and never mints a session', async () => {
     const res = await request(app).post('/api/auth/join').send({ code: 'ABC123', name: 'Sarah' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.token).toBeTruthy();
-    expect(res.body.refreshToken).toBeTruthy();
-    expect(res.body.household.name).toBe('The Smiths');
-    expect(res.body.user.name).toBe('Sarah');
-  });
-
-  test('creates a new user if name not in household', async () => {
-    db.getHouseholdByCode.mockResolvedValue(HOUSEHOLD);
-    db.getHouseholdMembers.mockResolvedValue([]);
-    db.createUser.mockResolvedValue({ id: 'u-new', name: 'Grandma', role: 'admin', household_id: 'hh-1' });
-    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
-    db.createRefreshToken.mockResolvedValue({ id: 'rt-1' });
-
-    const res = await request(app).post('/api/auth/join').send({ code: 'ABC123', name: 'Grandma' });
-
-    expect(res.status).toBe(200);
-    expect(db.createUser).toHaveBeenCalled();
-    expect(res.body.user.name).toBe('Grandma');
-  });
-
-  test('returns 404 for unknown code', async () => {
-    db.getHouseholdByCode.mockResolvedValue(null);
-    const res = await request(app).post('/api/auth/join').send({ code: 'XXXXXX', name: 'Sarah' });
     expect(res.status).toBe(404);
-  });
-
-  test('returns 400 when name is missing', async () => {
-    const res = await request(app).post('/api/auth/join').send({ code: 'ABC123' });
-    expect(res.status).toBe(400);
-  });
-
-  test('returns 400 when code is missing', async () => {
-    const res = await request(app).post('/api/auth/join').send({ name: 'Sarah' });
-    expect(res.status).toBe(400);
+    expect(res.body.token).toBeUndefined();
+    expect(db.createUser).not.toHaveBeenCalled();
   });
 });
 

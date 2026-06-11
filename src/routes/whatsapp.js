@@ -7,6 +7,7 @@
  */
 
 const { Router } = require('express');
+const twilio = require('twilio');
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
 const broadcast = require('../services/broadcast');
@@ -15,6 +16,42 @@ const cache = require('../services/cache');
 const { isSupportedDocument } = require('../services/document-extract');
 
 const router = Router();
+
+/**
+ * Verify an inbound webhook was actually signed by Twilio. Without this,
+ * anyone could POST a forged `{ From, Body }` to /whatsapp/webhook and drive
+ * the bot to read, add, or delete a household's data (and burn AI credits) -
+ * the handler trusts `From` to identify the sender.
+ *
+ * Twilio signs each request with our auth token over the exact webhook URL +
+ * POST params (X-Twilio-Signature). When TWILIO_AUTH_TOKEN is set (always in
+ * production) we require a valid signature. When it's unset we allow in
+ * non-production (local dev / tests) but FAIL CLOSED in production so a
+ * missing env var can't silently reopen the webhook to forgery.
+ */
+function verifyTwilioSignature(req) {
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!token) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[whatsapp] TWILIO_AUTH_TOKEN unset - rejecting webhook (fail closed)');
+      return false;
+    }
+    return true; // dev/test convenience only
+  }
+  const signature = req.headers['x-twilio-signature'];
+  if (!signature) return false;
+  // Twilio signs the full external URL it POSTed to. `trust proxy` is set
+  // (app.js), so req.protocol/host reflect Railway's X-Forwarded-* headers.
+  // TWILIO_WEBHOOK_URL overrides if the reconstructed URL ever drifts.
+  const url = process.env.TWILIO_WEBHOOK_URL
+    || `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+  try {
+    return twilio.validateRequest(token, signature, url, req.body || {});
+  } catch (err) {
+    console.error('[whatsapp] Twilio signature check threw:', err.message);
+    return false;
+  }
+}
 
 /**
  * POST /whatsapp/webhook
@@ -28,6 +65,13 @@ const router = Router();
  *   - ProfileName: sender's WhatsApp display name
  */
 router.post('/webhook', async (req, res) => {
+  // SECURITY: reject anything not signed by Twilio BEFORE the 200 ack or any
+  // processing. Real Twilio traffic always carries a valid signature, so this
+  // only blocks forged requests.
+  if (!verifyTwilioSignature(req)) {
+    return res.status(403).send('Invalid signature');
+  }
+
   // Respond immediately with 200 to acknowledge receipt (Twilio expects this)
   res.status(200).send('');
 

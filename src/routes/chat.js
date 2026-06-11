@@ -285,7 +285,7 @@ router.get('/conversations', requireAuth, requireHousehold, async (req, res) => 
     const conversations = await db.getConversations(req.user.id);
     // Get last message preview for each conversation
     const withPreviews = await Promise.all(conversations.map(async (conv) => {
-      const msgs = await db.getChatHistory(conv.id, 1);
+      const msgs = await db.getChatHistory(conv.id, 1, req.householdId);
       return { ...conv, lastMessage: msgs[0]?.content?.substring(0, 80) || null };
     }));
     return res.json({ conversations: withPreviews });
@@ -326,7 +326,7 @@ router.get('/history', requireAuth, requireHousehold, async (req, res) => {
   try {
     const { conversation_id } = req.query;
     if (conversation_id) {
-      const messages = await db.getChatHistory(conversation_id, 50);
+      const messages = await db.getChatHistory(conversation_id, 50, req.householdId);
       return res.json({ messages });
     }
     return res.json({ messages: [] });
@@ -343,7 +343,7 @@ router.get('/history', requireAuth, requireHousehold, async (req, res) => {
 router.delete('/history', requireAuth, requireHousehold, async (req, res) => {
   try {
     const { conversation_id } = req.body;
-    await db.clearChatHistory(conversation_id);
+    await db.clearChatHistory(conversation_id, req.householdId);
     return res.json({ message: 'Chat history cleared.' });
   } catch (err) {
     console.error('DELETE /api/chat/history error:', err);
@@ -385,7 +385,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id, message, deviceCoords);
 
     // Get recent conversation history for context
-    const history = await db.getChatHistory(conversationId, 30);
+    const history = await db.getChatHistory(conversationId, 30, req.householdId);
 
     // Build messages array
     const messages = [

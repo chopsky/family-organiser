@@ -2,6 +2,7 @@ const axios = require('axios');
 const db = require('../db/queries');
 const cache = require('./cache');
 const { parseVEvent, expandRecurrence } = require('./providers/apple');
+const { ssrfSafeAgents, assertFetchableUrl } = require('../utils/ssrf-guard');
 
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 25 * 1024 * 1024; // 25 MB - sane upper bound for iCal feeds
@@ -32,11 +33,21 @@ function normaliseFeedUrl(raw) {
  */
 async function fetchFeed(feedUrl) {
   const url = normaliseFeedUrl(feedUrl);
+  // SSRF guard: reject non-http(s) / credentialed / literal-private URLs up
+  // front, and route the request through agents whose DNS lookup refuses to
+  // connect to private/loopback/link-local addresses (incl. on redirects).
+  assertFetchableUrl(url);
+  const { httpAgent, httpsAgent } = ssrfSafeAgents();
   const response = await axios.get(url, {
     timeout: FETCH_TIMEOUT_MS,
     maxContentLength: MAX_RESPONSE_BYTES,
     maxBodyLength: MAX_RESPONSE_BYTES,
     responseType: 'text',
+    httpAgent,
+    httpsAgent,
+    // A few redirects are fine for real feeds; each hop re-resolves through
+    // the SSRF-safe lookup above, so it can't be bounced to an internal host.
+    maxRedirects: 3,
     headers: {
       Accept: 'text/calendar, text/plain, */*',
       // Identify ourselves so feed providers can attribute traffic.

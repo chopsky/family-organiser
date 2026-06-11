@@ -178,14 +178,18 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
         .from('shopping_items')
         .select('completed')
         .eq('id', req.params.id)
+        .eq('household_id', req.householdId)
         .single();
       wasCompleted = prior?.completed ?? false;
     }
 
+    // Scope the update to the caller's household so one household can't modify
+    // another's item by guessing its id (IDOR).
     const { data, error } = await userDb
       .from('shopping_items')
       .update(updateData)
       .eq('id', req.params.id)
+      .eq('household_id', req.householdId)
       .select()
       .single();
 

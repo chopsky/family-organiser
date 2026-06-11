@@ -594,11 +594,15 @@ async function deleteDependent(id, householdId, db = supabase) {
 
 // ─── Chat message helpers ────────────────────────────────────────────────────
 
-async function getChatHistory(conversationId, limit = 50, db = supabase) {
-  const { data, error } = await db
+async function getChatHistory(conversationId, limit = 50, householdId = null, db = supabase) {
+  let query = db
     .from('chat_messages')
     .select()
-    .eq('conversation_id', conversationId)
+    .eq('conversation_id', conversationId);
+  // Scope to the household so a guessed conversation id can't read another
+  // household's chat history (IDOR). Callers always pass req.householdId.
+  if (householdId) query = query.eq('household_id', householdId);
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -615,11 +619,13 @@ async function saveChatMessage(householdId, userId, role, content, conversationI
   return data;
 }
 
-async function clearChatHistory(conversationId, db = supabase) {
-  const { error } = await db
+async function clearChatHistory(conversationId, householdId = null, db = supabase) {
+  let query = db
     .from('chat_messages')
     .delete()
     .eq('conversation_id', conversationId);
+  if (householdId) query = query.eq('household_id', householdId);
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -834,6 +840,18 @@ async function getSchoolTermDates(schoolId, db = supabase) {
   return data || [];
 }
 
+// Fetch a single term-date row by id (used by the route to resolve its
+// school_id for household-ownership checks before delete).
+async function getSchoolTermDateById(dateId, db = supabase) {
+  const { data, error } = await db
+    .from('school_term_dates')
+    .select('*')
+    .eq('id', dateId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 async function getTermDatesBySchoolIds(schoolIds, db = supabase) {
   if (!schoolIds.length) return [];
   const { data, error } = await db
@@ -978,6 +996,18 @@ async function getChildActivities(childId, db = supabase) {
     .order('day_of_week');
   if (error) throw error;
   return data || [];
+}
+
+// Fetch a single activity by id (used by the routes to resolve its child_id
+// for household-ownership checks before edit/delete).
+async function getChildActivityById(activityId, db = supabase) {
+  const { data, error } = await db
+    .from('child_weekly_schedule')
+    .select('*')
+    .eq('id', activityId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
 }
 
 async function deleteChildActivity(activityId, db = supabase) {
@@ -6659,6 +6689,7 @@ module.exports = {
   cacheLATermDates,
   addSchoolTermDates,
   getSchoolTermDates,
+  getSchoolTermDateById,
   getTermDatesBySchoolIds,
   deleteSchoolTermDate,
   updateSchoolTermDate,
@@ -6667,6 +6698,7 @@ module.exports = {
   deleteAllTermDatesBySchool,
   getSchoolsWithIcalUrls,
   addChildActivity,
+  getChildActivityById,
   updateChildActivity,
   getChildActivities,
   getActivitiesByChildIds,

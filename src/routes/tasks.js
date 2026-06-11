@@ -51,6 +51,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       const { data, error } = await userDb
         .from('tasks')
         .select()
+        .eq('household_id', req.householdId)
         .eq('completed', true)
         .order('completed_at', { ascending: false })
         .limit(50);
@@ -166,12 +167,14 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 
   try {
-    // Fetch the task first (and verify household ownership)
+    // Fetch the task first, scoped to the caller's household so one household
+    // can't read or modify another's task by guessing its id (IDOR).
     const userDb = supabaseAdmin;
     const { data: task, error: fetchErr } = await userDb
       .from('tasks')
       .select()
       .eq('id', req.params.id)
+      .eq('household_id', req.householdId)
       .single();
 
     if (fetchErr || !task) return res.status(404).json({ error: 'Task not found' });
@@ -214,6 +217,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       .from('tasks')
       .update(updateData)
       .eq('id', req.params.id)
+      .eq('household_id', req.householdId)
       .select()
       .single();
 

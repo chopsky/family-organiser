@@ -1492,39 +1492,11 @@ router.post('/whatsapp-disconnect', requireAuth, async (req, res) => {
   }
 });
 
-// ─── POST /api/auth/join (legacy - kept for backwards compatibility) ────────
-
-router.post('/join', async (req, res) => {
-  const { code, name } = req.body;
-
-  if (!code || !name?.trim()) {
-    return res.status(400).json({ error: 'code and name are required' });
-  }
-
-  try {
-    const household = await db.getHouseholdByCode(code.trim().toUpperCase());
-    if (!household) {
-      return res.status(404).json({ error: 'No household found with that code' });
-    }
-
-    const members = await db.getHouseholdMembers(household.id);
-    let user = members.find((m) => m.name.toLowerCase() === name.trim().toLowerCase());
-
-    if (!user) {
-      user = await db.createUser({
-        householdId: household.id,
-        name: name.trim(),
-        role: members.length === 0 ? 'admin' : 'member',
-      });
-    }
-
-    // Use authResponse for consistency (includes refresh token)
-    const response = await authResponse({ ...user, household_id: household.id }, req);
-    return res.json(response);
-  } catch (err) {
-    console.error('POST /api/auth/join error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// NOTE: the legacy unauthenticated `POST /api/auth/join` endpoint was removed
+// (security). It minted a full session from just a household join code + a
+// member name, with no password/email check - a complete account/household
+// takeover. Joining a household now goes through the authenticated
+// `POST /api/auth/attach-to-household` flow (see SetupHousehold.jsx), which
+// requires a logged-in user and links the caller's own account.
 
 module.exports = router;
