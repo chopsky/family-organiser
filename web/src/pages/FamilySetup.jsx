@@ -343,6 +343,13 @@ export default function FamilySetup() {
   const [addSchoolSelected, setAddSchoolSelected] = useState(null);
   const [addSchoolSaName, setAddSchoolSaName] = useState('');
   const [addingSchool, setAddingSchool] = useState(false);
+  // UK custom-school fallback for the Add-a-school modal: GIAS doesn't list
+  // every school (independent / online / alternative-provision / very new).
+  // No URN, so the local-authority term-date import stays gated off and the
+  // user imports from the school website / PDF / iCal / manually instead.
+  const [addSchoolManual, setAddSchoolManual] = useState(false);
+  const [addSchoolManualName, setAddSchoolManualName] = useState('');
+  const [addSchoolManualPostcode, setAddSchoolManualPostcode] = useState('');
   // A child's school link is now ONLY a term-calendar disambiguator,
   // surfaced as a dropdown when the household has 2+ schools. A child
   // carries no school otherwise (term context resolves from the
@@ -1135,6 +1142,9 @@ export default function FamilySetup() {
     setAddSchoolResults([]);
     setAddSchoolSelected(null);
     setAddSchoolSaName('');
+    setAddSchoolManual(false);
+    setAddSchoolManualName('');
+    setAddSchoolManualPostcode('');
     setError('');
     setAddSchoolOpen(true);
   }
@@ -1143,10 +1153,20 @@ export default function FamilySetup() {
     setAddingSchool(true);
     setError('');
     try {
-      let body;
+      let body = null;
+      let reuseSchool = null;
       if (isSa) {
         if (!addSchoolSaName.trim()) { setAddingSchool(false); return; }
         body = { school_name: addSchoolSaName.trim() };
+      } else if (addSchoolManual) {
+        const name = addSchoolManualName.trim();
+        if (!name) { setAddingSchool(false); return; }
+        // Re-use an existing custom (no-URN) school of the same name rather
+        // than creating a duplicate.
+        reuseSchool = householdSchools.find(
+          s => !s.school_urn && s.school_name.toLowerCase() === name.toLowerCase()
+        );
+        if (!reuseSchool) body = { school_name: name, postcode: addSchoolManualPostcode.trim() || null };
       } else {
         if (!addSchoolSelected) { setAddingSchool(false); return; }
         body = {
@@ -1157,12 +1177,15 @@ export default function FamilySetup() {
           postcode: addSchoolSelected.postcode,
         };
       }
-      const { data } = await api.post('/schools', body);
-      const createdId = data.school?.id;
+      let createdId = reuseSchool?.id;
+      if (body) {
+        const { data } = await api.post('/schools', body);
+        createdId = data.school?.id;
+      }
       const fresh = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(fresh);
       setAddSchoolOpen(false);
-      const newSchool = fresh.find(s => s.id === createdId) || data.school;
+      const newSchool = fresh.find(s => s.id === createdId) || reuseSchool;
       if (newSchool?.id) openUpdateTermDates(newSchool);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not add the school.');
@@ -2112,6 +2135,32 @@ export default function FamilySetup() {
                   className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
                 />
               </div>
+            ) : addSchoolManual ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-cocoa mb-1">School name</label>
+                  <input
+                    type="text"
+                    value={addSchoolManualName}
+                    onChange={(e) => setAddSchoolManualName(e.target.value)}
+                    placeholder="e.g. The Sunshine Academy"
+                    autoFocus
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-cocoa mb-1">Postcode <span className="font-normal text-cocoa/70">(optional)</span></label>
+                  <input
+                    type="text"
+                    value={addSchoolManualPostcode}
+                    onChange={(e) => setAddSchoolManualPostcode(e.target.value)}
+                    placeholder="SW1A 1AA"
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                  />
+                </div>
+                <p className="text-[11px] text-cocoa">We&apos;ll set this up as a custom school. Local-authority term dates aren&apos;t available for it, but you can import from the school&apos;s website, a PDF or iCal feed, or add term dates by hand.</p>
+                <button type="button" onClick={() => setAddSchoolManual(false)} className="text-xs text-primary hover:text-primary-pressed font-medium">← Back to search</button>
+              </div>
             ) : (
               <div className="relative">
                 <label className="block text-xs font-medium text-cocoa mb-1">Search for your school</label>
@@ -2140,13 +2189,22 @@ export default function FamilySetup() {
                 {addSchoolSelected && (
                   <p className="text-xs text-sage mt-2">Selected: {addSchoolSelected.name}</p>
                 )}
+                {!addSchoolSelected && (
+                  <button
+                    type="button"
+                    onClick={() => { setAddSchoolManual(true); setAddSchoolManualName(addSchoolSearch.trim()); setAddSchoolResults([]); }}
+                    className="mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
+                  >
+                    Can&apos;t find your school? Add it manually →
+                  </button>
+                )}
               </div>
             )}
             <div className="flex gap-3 mt-5">
               <button onClick={() => setAddSchoolOpen(false)} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors text-sm">Cancel</button>
               <button
                 onClick={handleCreateSchool}
-                disabled={addingSchool || (isSa ? !addSchoolSaName.trim() : !addSchoolSelected)}
+                disabled={addingSchool || (isSa ? !addSchoolSaName.trim() : (addSchoolManual ? !addSchoolManualName.trim() : !addSchoolSelected))}
                 className="flex-1 bg-primary text-white font-semibold py-2.5 rounded-2xl hover:bg-primary-pressed transition-colors disabled:opacity-50 text-sm"
               >
                 {addingSchool ? 'Adding…' : 'Add school'}
