@@ -1109,3 +1109,30 @@ describe('GET /api/schools/activities (household-wide)', () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ─── GET /api/schools must not delete brand-new schools ─────────────────────────
+// A school just added via "Add a school" has no children, no term dates and no
+// iCal feed yet. GET is a pure read - it must return it (so the add-then-import
+// flow works), never auto-delete it on the way out. Uses a dedicated household
+// id so the route's schools: cache can't collide with other tests.
+describe('GET /api/schools does not auto-delete a brand-new school', () => {
+  const HH = 'hh-schools-read';
+  const READ_AUTH = { Authorization: `Bearer ${signToken({ userId: 'u-1', householdId: HH, name: 'Sarah', role: 'admin' })}` };
+  beforeEach(() => jest.clearAllMocks());
+
+  test('a childless school with no dates/iCal is returned, not deleted', async () => {
+    db.getHouseholdSchools.mockResolvedValue([
+      { id: 'S-new', school_name: 'The Sunshine Academy', school_urn: null, ical_url: null, term_dates_source: null },
+    ]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'u-1', household_id: HH }]); // no child links S-new
+    db.getTermDatesBySchoolIds.mockResolvedValue([]);
+    db.getActivitiesByChildIds.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/schools').set(READ_AUTH);
+
+    expect(res.status).toBe(200);
+    expect(res.body.schools).toHaveLength(1);
+    expect(res.body.schools[0].id).toBe('S-new');
+    expect(db.deleteHouseholdSchool).not.toHaveBeenCalled();
+  });
+});

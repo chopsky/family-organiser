@@ -72,23 +72,17 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       db.getHouseholdMembers(req.householdId),
     ]);
 
-    // Auto-cleanup orphaned schools (no children linked)
-    const activeSchools = [];
-    for (const school of schools) {
-      const children = members.filter(m => m.school_id === school.id);
-      // Auto-clean only schools the user clearly never set up: no linked
-      // children AND no imported term dates AND no iCal feed. Under the
-      // household-level model a deliberately-added school (term dates imported,
-      // or a feed configured, but no child linked yet) must NOT be silently
-      // deleted on the next load.
-      if (children.length === 0 && !school.ical_url && !school.term_dates_source) {
-        db.deleteHouseholdSchool(school.id, req.householdId).catch(e =>
-          console.error('Auto-cleanup failed:', e.message)
-        );
-        continue;
-      }
-      activeSchools.push({ ...school, _children: children });
-    }
+    // GET is a pure read - it must NOT delete anything. Schools are
+    // first-class household entities now: created explicitly via "Add a
+    // school" and removed explicitly (the Remove button) or by the guarded
+    // orphan-cleanup on the profile-PATCH / member-DELETE paths. A read-time
+    // delete here used to bin a school the moment it was added (no child
+    // linked + term dates not imported yet), which broke the add-then-import
+    // flow - the school vanished before you could even import its dates.
+    const activeSchools = schools.map(school => ({
+      ...school,
+      _children: members.filter(m => m.school_id === school.id),
+    }));
 
     // Batch-fetch all term dates and activities in 2 queries (not N+1)
     const schoolIds = activeSchools.map(s => s.id);
