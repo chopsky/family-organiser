@@ -1080,3 +1080,32 @@ describe('PATCH /api/household/profile orphan-school cleanup', () => {
     expect(db.deleteHouseholdSchool).toHaveBeenCalledWith('S1', 'hh-1');
   });
 });
+
+// ─── GET /api/schools/activities (household-wide) ───────────────────────────────
+// Powers the Activities card. Must return EVERY child's activities scoped to the
+// household, including school-less children (so it can't be derived from
+// GET /schools, which is school-centric). The bare /activities path must not be
+// shadowed by /activities/:childId.
+describe('GET /api/schools/activities (household-wide)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns all household activities, scoped by householdId', async () => {
+    db.getHouseholdActivities.mockResolvedValue([
+      { id: 'a1', child_id: 'c-1', day_of_week: 1, activity: 'Swimming' },
+      { id: 'a2', child_id: 'c-2', day_of_week: 3, activity: 'Football' },
+    ]);
+
+    const res = await request(app).get('/api/schools/activities').set(AUTH);
+
+    expect(res.status).toBe(200);
+    expect(res.body.activities).toHaveLength(2);
+    expect(db.getHouseholdActivities).toHaveBeenCalledWith('hh-1');
+    // Bare path must NOT fall through to the per-child handler.
+    expect(db.getChildActivities).not.toHaveBeenCalled();
+  });
+
+  test('requires authentication', async () => {
+    const res = await request(app).get('/api/schools/activities');
+    expect(res.status).toBe(401);
+  });
+});

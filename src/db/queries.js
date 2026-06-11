@@ -998,6 +998,23 @@ async function getChildActivities(childId, db = supabase) {
   return data || [];
 }
 
+// All weekly activities across every child in a household, regardless of
+// whether the child is linked to a school. The household-level Activities card
+// needs this because, under the household-level Schools model, a child in a
+// single-school household carries no school_id and so wouldn't appear under any
+// school's children in GET /schools. Joins child_weekly_schedule -> users to
+// scope by household_id (IDOR-safe).
+async function getHouseholdActivities(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('child_weekly_schedule')
+    .select('*, users!inner(household_id)')
+    .eq('users.household_id', householdId)
+    .order('day_of_week');
+  if (error) throw error;
+  // Strip the joined users object so callers get clean activity rows.
+  return (data || []).map(({ users, ...activity }) => activity);
+}
+
 // Fetch a single activity by id (used by the routes to resolve its child_id
 // for household-ownership checks before edit/delete).
 async function getChildActivityById(activityId, db = supabase) {
@@ -6776,6 +6793,7 @@ module.exports = {
   getChildActivityById,
   updateChildActivity,
   getChildActivities,
+  getHouseholdActivities,
   getActivitiesByChildIds,
   deleteChildActivity,
   addChildSchoolEvent,

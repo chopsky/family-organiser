@@ -26,6 +26,16 @@ const fmtTermRange = (t) => {
   const f = (d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return `${f(t.start_date)} – ${f(t.end_date)}`;
 };
+// Is an activity running right now? Ongoing activities (no window) always are;
+// term-bound ones are active only when today falls inside their window. Drives
+// the Activities card's "this week" view.
+const activityActiveToday = (a) => {
+  if (isOngoingActivity(a)) return true;
+  const today = new Date().toLocaleDateString('en-CA');
+  if (a.start_date && a.start_date > today) return false;
+  if (a.end_date && a.end_date < today) return false;
+  return true;
+};
 
 const COLOUR_OPTIONS = [
   { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
@@ -276,8 +286,6 @@ export default function FamilySetup() {
   // step before that link is persisted.
   const [profileSaSchoolName, setProfileSaSchoolName] = useState('');
   const [profileSaSchoolExistingId, setProfileSaSchoolExistingId] = useState(null);
-  const [editActivities, setEditActivities] = useState([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
   const [addActivityDay, setAddActivityDay] = useState(0);
   const [addActivityName, setAddActivityName] = useState('');
   const [addActivityStart, setAddActivityStart] = useState('');
@@ -289,8 +297,14 @@ export default function FamilySetup() {
   const [selectedTermKey, setSelectedTermKey] = useState('ongoing');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [showAddActivity, setShowAddActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null); // activity being edited, or null = add mode
+  // Standalone activity editor (driven by the Activities card). activityChild
+  // is the child whose activity is being added/edited - decoupled from the
+  // Edit-Profile modal's editingMember so activities can be managed in one
+  // place for the whole household.
+  const [activityChild, setActivityChild] = useState(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [activityTermsLoading, setActivityTermsLoading] = useState(false);
   const [savingActivity, setSavingActivity] = useState(false);
   const [editTermDates, setEditTermDates] = useState([]);
   const [showAddTermDate, setShowAddTermDate] = useState(false);
@@ -353,22 +367,28 @@ export default function FamilySetup() {
       .finally(() => setLoadingMembers(false));
   }
 
-  useEffect(() => { loadMembers(); loadSchools(); }, []);
+  useEffect(() => { loadMembers(); loadSchools(); loadActivities(); }, []);
 
   function loadSchools() {
     loadCached(
       'schools',
       () => api.get('/schools').then(r => Array.isArray(r.data?.schools) ? r.data.schools : []),
-      (sch) => {
-        setHouseholdSchools(sch);
-        // Build activities map from school data
-        const actMap = {};
-        sch.forEach(s => {
-          (s.children || []).forEach(c => {
-            if (c.activities?.length) actMap[c.id] = c.activities;
-          });
-        });
-        setChildActivities(actMap);
+      (sch) => setHouseholdSchools(sch),
+    ).catch(() => {});
+  }
+
+  // Household-wide activities, grouped by child_id. Sourced from the dedicated
+  // /schools/activities endpoint (not GET /schools) so a child with no school
+  // link - the common case after the schools decoupling - still has their
+  // after-school clubs surfaced in the Activities card + the dependents pills.
+  function loadActivities() {
+    return loadCached(
+      'household:activities',
+      () => api.get('/schools/activities').then(r => Array.isArray(r.data?.activities) ? r.data.activities : []),
+      (rows) => {
+        const map = {};
+        rows.forEach((a) => { (map[a.child_id] ??= []).push(a); });
+        setChildActivities(map);
       },
     ).catch(() => {});
   }
@@ -555,43 +575,37 @@ export default function FamilySetup() {
     // The UK GIAS-search inputs above are simply unused on SA households.
     setProfileSaSchoolName(school?.school_name || '');
     setProfileSaSchoolExistingId(school?.id || null);
-    setShowAddActivity(false);
     setShowAddTermDate(false);
     setEditTermDates([]);
-    // Weekly activities load for any child (dependent), plus any full
-    // member explicitly linked to a school. Crucially this is NO LONGER
-    // gated on member.school_id alone: under the household-level Schools
-    // model a child in a single-school household carries no school_id,
-    // yet still has after-school activities. Term context resolves from
-    // the household's single school (or the child's explicit school when
-    // 2+ exist) on the backend's /schools/terms/:childId. Term-date
-    // *management* now lives in the Schools card, so we no longer load a
-    // per-member term-dates editor here.
-    const canHaveActivities = showSchools && (member.member_type === 'dependent' || Boolean(member.school_id));
-    if (canHaveActivities) {
-      setLoadingActivities(true);
-      api.get(`/schools/activities/${member.id}`)
-        .then(({ data }) => setEditActivities(data.activities || []))
-        .catch(() => setEditActivities([]))
-        .finally(() => setLoadingActivities(false));
-      // Load the child's school terms so the grid can default to the current
-      // term and offer real terms when adding. Falls back to 'ongoing'.
-      api.get(`/schools/terms/${member.id}`)
-        .then(({ data }) => {
-          const terms = data.terms || [];
-          setActivityTerms(terms);
-          const today = todayYmd();
-          const cur = terms.find(t => today >= t.start_date && today <= t.end_date);
-          setSelectedTermKey(cur ? cur.start_date : 'ongoing');
-        })
-        .catch(() => { setActivityTerms([]); setSelectedTermKey('ongoing'); });
-    } else {
-      setEditActivities([]);
-    }
+    // Activities + term dates are no longer managed inside the profile modal -
+    // they live in the household-level Schools and Activities cards now. So
+    // there's nothing school-related to pre-load here.
   }
 
   // Open the form to ADD a new activity (clears any edit state).
-  function openAddActivity() {
+  // Load a child's school terms so the activity modal's term selector can
+  // default to the current term and offer real terms (with auto-filled date
+  // windows). Falls back to 'ongoing' when the child has no resolvable
+  // school / terms.
+  function loadActivityTerms(childId) {
+    setActivityTermsLoading(true);
+    api.get(`/schools/terms/${childId}`)
+      .then(({ data }) => {
+        const terms = data.terms || [];
+        setActivityTerms(terms);
+        const today = todayYmd();
+        const cur = terms.find(t => today >= t.start_date && today <= t.end_date);
+        setSelectedTermKey(cur ? cur.start_date : 'ongoing');
+      })
+      .catch(() => { setActivityTerms([]); setSelectedTermKey('ongoing'); })
+      .finally(() => setActivityTermsLoading(false));
+  }
+
+  // Open the activity modal in ADD mode for a specific child.
+  function openAddActivity(child) {
+    const c = child || activityChild;
+    if (!c) return;
+    setActivityChild(c);
     setEditingActivity(null);
     setAddActivityDay(0);
     setAddActivityName('');
@@ -600,38 +614,33 @@ export default function FamilySetup() {
     setAddActivityPickup('');
     setCustomStart('');
     setCustomEnd('');
-    setShowAddActivity(true);
+    loadActivityTerms(c.id);
+    setActivityModalOpen(true);
   }
 
-  // Open the form to EDIT an existing activity (pre-filled).
-  function openEditActivity(a) {
+  // Open the activity modal in EDIT mode (pre-filled) for a child's activity.
+  function openEditActivity(child, a) {
+    const c = child || activityChild;
+    if (!c) return;
+    setActivityChild(c);
     setEditingActivity(a);
     setAddActivityDay(a.day_of_week ?? 0);
     setAddActivityName(a.activity || '');
     setAddActivityStart(a.time_start ? a.time_start.substring(0, 5) : '');
     setAddActivityEnd(a.time_end ? a.time_end.substring(0, 5) : '');
     setAddActivityPickup(a.pickup_member_id || '');
-    setShowAddActivity(true);
+    loadActivityTerms(c.id);
+    setActivityModalOpen(true);
   }
 
   function closeActivityForm() {
-    setShowAddActivity(false);
+    setActivityModalOpen(false);
     setEditingActivity(null);
-  }
-
-  // Which activities the grid shows for the currently-selected term view.
-  // Ongoing activities (no window) show in every term view.
-  function activityInSelectedTerm(a) {
-    if (selectedTermKey === 'ongoing') return isOngoingActivity(a);
-    if (selectedTermKey === 'custom') return true; // manage everything
-    const t = activityTerms.find(x => x.start_date === selectedTermKey);
-    if (!t) return true;
-    return activityInTerm(a, t);
   }
 
   // Handles both add (POST) and edit (PATCH) depending on editingActivity.
   async function handleAddActivity() {
-    if (!addActivityName.trim() || !editingMember) return;
+    if (!addActivityName.trim() || !activityChild) return;
     setSavingActivity(true);
     try {
       const body = {
@@ -656,14 +665,12 @@ export default function FamilySetup() {
         }
       }
       if (editingActivity) {
-        const { data } = await api.patch(`/schools/activities/${editingActivity.id}`, body);
-        setEditActivities(prev => prev.map(a => (a.id === editingActivity.id ? data.activity : a)));
+        await api.patch(`/schools/activities/${editingActivity.id}`, body);
       } else {
-        const { data } = await api.post('/schools/activities', { ...body, child_id: editingMember.id });
-        setEditActivities(prev => [...prev, data.activity]);
+        await api.post('/schools/activities', { ...body, child_id: activityChild.id });
       }
       closeActivityForm();
-      await loadSchools(); // refresh activity pills
+      await loadActivities(); // refresh childActivities (the card + pills read from it)
     } catch (err) {
       setError(err.response?.data?.error || 'Could not save activity.');
     } finally {
@@ -1227,8 +1234,7 @@ export default function FamilySetup() {
   async function handleDeleteActivity(activityId) {
     try {
       await api.delete(`/schools/activities/${activityId}`);
-      setEditActivities(prev => prev.filter(a => a.id !== activityId));
-      await loadSchools();
+      await loadActivities();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not remove activity.');
     }
@@ -2150,6 +2156,172 @@ export default function FamilySetup() {
         </div>
       )}
 
+      {/* Activities - household-level. Everyone's after-school clubs in one
+          place (data stays per-child; this is just one front door). UK/SA only,
+          like the rest of the school features. Add/edit happens in the activity
+          modal below. */}
+      {showSchools && (() => {
+        const activityKids = members.filter(m => m.member_type === 'dependent' || m.school_id);
+        const renderActivityRow = (kid, a, dim) => {
+          const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
+          const s = a.time_start ? a.time_start.substring(0, 5) : '';
+          const e = a.time_end ? a.time_end.substring(0, 5) : '';
+          const time = s && e ? `${s}–${e}` : s ? `from ${s}` : e ? `until ${e}` : '';
+          const meta = [time, pickup ? `🚗 ${pickup.name}` : '', dim && a.term_label ? a.term_label : '']
+            .filter(Boolean).join(' · ');
+          return (
+            <button
+              key={a.id}
+              type="button"
+              onClick={isAdmin ? () => openEditActivity(kid, a) : undefined}
+              disabled={!isAdmin}
+              className={`w-full flex items-center gap-2 text-left rounded-lg border border-cream-border bg-white px-3 py-2 transition-colors ${isAdmin ? 'hover:border-primary' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
+              title={isAdmin ? 'Tap to edit' : undefined}
+            >
+              <span className="text-[11px] font-semibold text-cocoa w-9 shrink-0">{DAY_LABELS[a.day_of_week]}</span>
+              <span className="flex-1 min-w-0">
+                <span className="text-sm text-bark font-medium truncate block">{a.activity}</span>
+                {meta && <span className="text-[11px] text-cocoa">{meta}</span>}
+              </span>
+            </button>
+          );
+        };
+        return (
+          <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+            <h2 className="text-base md:text-medium font-semibold text-bark mb-1">Activities</h2>
+            <p className="text-sm text-cocoa mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
+            {activityKids.length === 0 ? (
+              <p className="text-sm text-cocoa">Add a child to start tracking after-school activities.</p>
+            ) : (
+              <div className="space-y-3">
+                {activityKids.map((kid) => {
+                  const avatarClass = AVATAR_COLOURS[kid.color_theme] || AVATAR_COLOURS.teal;
+                  const acts = (childActivities[kid.id] || []).slice()
+                    .sort((a, b) => (a.day_of_week - b.day_of_week) || ((a.time_start || '').localeCompare(b.time_start || '')));
+                  const active = acts.filter(activityActiveToday);
+                  const other = acts.filter(a => !activityActiveToday(a));
+                  return (
+                    <div key={kid.id} className="border border-cream-border rounded-xl p-3.5 bg-white/40">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {kid.avatar_url ? (
+                            <img src={kid.avatar_url} alt={kid.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                          ) : (
+                            <div className={`w-7 h-7 rounded-full ${avatarClass} flex items-center justify-center font-bold text-xs shrink-0`}>{kid.name[0]?.toUpperCase()}</div>
+                          )}
+                          <span className="text-sm font-semibold text-bark truncate">{kid.name}</span>
+                        </div>
+                        {isAdmin && (
+                          <button onClick={() => openAddActivity(kid)} className="text-xs font-semibold text-primary hover:text-primary-pressed shrink-0">+ Add</button>
+                        )}
+                      </div>
+                      {active.length > 0 ? (
+                        <div className="space-y-1.5">{active.map(a => renderActivityRow(kid, a, false))}</div>
+                      ) : (
+                        <p className="text-xs text-warm-grey">No activities running this term.</p>
+                      )}
+                      {other.length > 0 && (
+                        <div className="mt-2.5">
+                          <p className="text-[11px] font-medium text-cocoa uppercase tracking-wide mb-1">Other terms</p>
+                          <div className="space-y-1.5">{other.map(a => renderActivityRow(kid, a, true))}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Activity add/edit modal - child-scoped via activityChild, opened from
+          the Activities card. Reuses the shared activity form state. */}
+      {activityModalOpen && activityChild && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => closeActivityForm()}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-5 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base md:text-medium font-semibold text-bark">{editingActivity ? 'Edit activity' : 'Add activity'}</h2>
+              <button onClick={() => closeActivityForm()} className="text-cocoa hover:text-bark p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-cocoa mb-4">For {activityChild.name}</p>
+
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <select value={addActivityDay} onChange={(e) => setAddActivityDay(Number(e.target.value))} className="border border-cream-border rounded-lg px-2 py-2 text-sm bg-white">
+                  {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                </select>
+                <input type="text" value={addActivityName} onChange={(e) => setAddActivityName(e.target.value)} placeholder="e.g. Swimming" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" autoFocus />
+              </div>
+              <div className="flex gap-2 items-center flex-wrap">
+                <label className="text-xs text-cocoa">Starts at:</label>
+                <input type="time" value={addActivityStart} onChange={(e) => setAddActivityStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                <label className="text-xs text-cocoa">Ends at:</label>
+                <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+              </div>
+
+              {/* Term window applies only to NEW activities. Edits keep their
+                  existing window (the term concept is per-activity, not a move). */}
+              {!editingActivity && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs text-cocoa font-medium">Term:</label>
+                    <select value={selectedTermKey} onChange={(e) => setSelectedTermKey(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
+                      {activityTerms.map(t => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
+                      <option value="ongoing">Ongoing (every term)</option>
+                      <option value="custom">Custom dates…</option>
+                    </select>
+                    {activityTermsLoading && <span className="text-[11px] text-cocoa">Loading…</span>}
+                  </div>
+                  {selectedTermKey === 'custom' ? (
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <label className="text-xs text-cocoa">Runs:</label>
+                      <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                      <span className="text-xs text-cocoa">to</span>
+                      <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-cocoa">
+                      {selectedTermKey === 'ongoing'
+                        ? 'Will show every term, until you remove it.'
+                        : `Will be set for ${(activityTerms.find(t => t.start_date === selectedTermKey)?.label) || 'this term'} only.`}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 items-center">
+                <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
+                <select value={addActivityPickup} onChange={(e) => setAddActivityPickup(e.target.value)} className="flex-1 border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
+                  <option value="">No pickup set</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-5">
+              {editingActivity && (
+                <button
+                  onClick={() => { const id = editingActivity.id; closeActivityForm(); handleDeleteActivity(id); }}
+                  className="text-xs font-medium text-coral hover:text-coral/80 mr-auto"
+                >
+                  Delete
+                </button>
+              )}
+              <button onClick={() => closeActivityForm()} className="text-sm font-medium text-cocoa hover:text-bark px-4 py-2">Cancel</button>
+              <button onClick={handleAddActivity} disabled={savingActivity || !addActivityName.trim()} className="text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-lg px-4 py-2">
+                {savingActivity ? 'Saving…' : (editingActivity ? 'Save' : 'Add')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Allergies & Dietary Requirements */}
       <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Allergies & Dietary Requirements</h2>
@@ -2863,164 +3035,6 @@ export default function FamilySetup() {
                   <p className="text-xs text-cocoa mt-1">Sets which school&apos;s term calendar applies for term-only activities and reminders.</p>
                 </div>
               )}
-
-
-              {/* Weekly activities - a UK/SA-only feature (term windows derive
-                  from school terms). Shown for any child (dependent), plus any
-                  full member explicitly linked to a school. NOT gated on
-                  school_id alone: under the household-level Schools model a
-                  child in a single-school household carries no school_id but
-                  still has after-school activities (term context resolves from
-                  the household on the backend). */}
-              {showSchools && (editingMember?.member_type === 'dependent' || editingMember?.school_id) && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-plum">Extracurricular activities</h3>
-                  <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule. Pick a term to view or set it up - you can prepare next term without changing this one. Tap an activity to edit it.</p>
-
-                  {/* Term selector: real school terms (default the current one),
-                      plus Ongoing (every term) and Custom dates. */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-cocoa font-medium">Term:</label>
-                    <select
-                      value={selectedTermKey}
-                      onChange={(e) => setSelectedTermKey(e.target.value)}
-                      className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white"
-                    >
-                      {activityTerms.map(t => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
-                      <option value="ongoing">Ongoing (every term)</option>
-                      <option value="custom">Custom dates…</option>
-                    </select>
-                    {(() => {
-                      const t = activityTerms.find(x => x.start_date === selectedTermKey);
-                      return t ? <span className="text-[11px] text-cocoa">{fmtTermRange(t)}</span> : null;
-                    })()}
-                  </div>
-                  {activityTerms.length === 0 && (
-                    <p className="text-[11px] text-cocoa">
-                      Tip: import this school&apos;s term dates from the Schools section and we&apos;ll offer real terms here automatically.
-                    </p>
-                  )}
-
-                  {loadingActivities ? <Spinner /> : (
-                    <>
-                      <div className="grid grid-cols-7 gap-1.5 mt-2">
-                        {DAY_LABELS.map((day, idx) => {
-                          const dayActivities = editActivities.filter(a => a.day_of_week === idx && activityInSelectedTerm(a));
-                          return (
-                            <div key={day} className="text-center">
-                              <div className="text-[11px] font-semibold text-cocoa mb-1">{day}</div>
-                              {dayActivities.length > 0 ? (
-                                <div className="space-y-1">
-                                  {dayActivities.map(a => {
-                                    const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
-                                    return (
-                                      <button
-                                        key={a.id}
-                                        type="button"
-                                        onClick={() => openEditActivity(a)}
-                                        className="w-full text-left bg-white rounded-lg px-1.5 py-1.5 text-[11px] text-bark border border-cream-border relative group hover:border-primary transition-colors"
-                                        title="Tap to edit"
-                                      >
-                                        <div className="font-medium truncate">{a.activity}</div>
-                                        {(a.time_start || a.time_end) && (
-                                          <div className="text-cocoa text-[10px]">
-                                            {a.time_start && a.time_end
-                                              ? `${a.time_start.substring(0, 5)} - ${a.time_end.substring(0, 5)}`
-                                              : a.time_start
-                                                ? `from ${a.time_start.substring(0, 5)}`
-                                                : `til ${a.time_end.substring(0, 5)}`}
-                                          </div>
-                                        )}
-                                        {pickup && <div className="text-primary text-[10px] truncate">🚗 {pickup.name}</div>}
-                                        {isOngoingActivity(a) && selectedTermKey !== 'ongoing' && selectedTermKey !== 'custom' && (
-                                          <div className="text-cocoa text-[9px] italic">every term</div>
-                                        )}
-                                        <span
-                                          role="button"
-                                          tabIndex={0}
-                                          onClick={(e) => { e.stopPropagation(); handleDeleteActivity(a.id); }}
-                                          className="absolute -top-1 -right-1 w-4 h-4 bg-error text-white rounded-full text-[9px] hidden group-hover:flex items-center justify-center cursor-pointer"
-                                          title="Remove"
-                                        >×</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="text-cocoa text-sm py-2">-</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Add / edit activity form */}
-                      {showAddActivity ? (
-                        <div className="bg-white rounded-lg border border-cream-border p-3 mt-2 space-y-2">
-                          <div className="flex gap-2">
-                            <select value={addActivityDay} onChange={(e) => setAddActivityDay(Number(e.target.value))} className="border border-cream-border rounded-lg px-2 py-2 text-sm bg-white">
-                              {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                            </select>
-                            <input type="text" value={addActivityName} onChange={(e) => setAddActivityName(e.target.value)} placeholder="e.g. PE, Swimming" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" />
-                          </div>
-                          <div className="flex gap-2 items-center flex-wrap">
-                            <label className="text-xs text-cocoa">Starts at:</label>
-                            <input type="time" value={addActivityStart} onChange={(e) => setAddActivityStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                            <label className="text-xs text-cocoa">Ends at:</label>
-                            <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                          </div>
-
-                          {/* Term window for NEW activities. Edits keep their
-                              existing window, so this only shows when adding. */}
-                          {!editingActivity && selectedTermKey === 'custom' && (
-                            <div className="flex gap-2 items-center flex-wrap">
-                              <label className="text-xs text-cocoa">Runs:</label>
-                              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                              <span className="text-xs text-cocoa">to</span>
-                              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                            </div>
-                          )}
-                          {!editingActivity && selectedTermKey !== 'custom' && (
-                            <p className="text-[11px] text-cocoa">
-                              {selectedTermKey === 'ongoing'
-                                ? 'Will show every term, until you remove it.'
-                                : `Will be set for ${(activityTerms.find(t => t.start_date === selectedTermKey)?.label) || 'this term'} only.`}
-                            </p>
-                          )}
-
-                          <div className="flex gap-2 items-center">
-                            <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
-                            <select
-                              value={addActivityPickup}
-                              onChange={(e) => setAddActivityPickup(e.target.value)}
-                              className="flex-1 border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white"
-                            >
-                              <option value="">No pickup set</option>
-                              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex gap-2 items-center">
-                            <div className="flex-1" />
-                            <button onClick={closeActivityForm} className="text-xs text-cocoa">Cancel</button>
-                            <button onClick={handleAddActivity} disabled={savingActivity || !addActivityName.trim()} className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
-                              {savingActivity ? 'Saving...' : (editingActivity ? 'Save' : 'Add')}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={openAddActivity}
-                          className="mt-2 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-2 rounded-xl text-xs transition-colors"
-                        >
-                          + Add activity
-                        </button>
-                      )}
-                    </>
-                  )}
-
-                </div>
-              )}
-
 
               {editingMember?.member_type !== 'dependent' && (
                 <div className="min-w-0 overflow-hidden">

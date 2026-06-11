@@ -351,6 +351,22 @@ router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAd
 });
 
 /**
+ * GET /api/schools/activities
+ * All weekly activities across every child in the household, regardless of
+ * whether the child is linked to a school. Powers the household-level
+ * Activities card (a school-less child still has after-school clubs).
+ */
+router.get('/activities', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const activities = await db.getHouseholdActivities(req.householdId);
+    return res.json({ activities });
+  } catch (err) {
+    console.error('GET /api/schools/activities error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/schools/activities/:childId
  * Get weekly schedule for a child.
  */
