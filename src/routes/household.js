@@ -159,14 +159,23 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
 
     const updated = await db.updateUser(targetUserId, updates);
 
-    // Clean up orphaned schools - if this was the last child at the old school, delete it
+    // Clean up orphaned schools - but ONLY when the old school is genuinely
+    // empty: no remaining children AND no imported term dates AND no iCal
+    // feed. Schools are household-level entities now (managed + removed
+    // explicitly in the Schools card), so unlinking the last child must
+    // never silently bin a school that still holds imported dates. Mirrors
+    // the GET /schools auto-clean rule (schools.js).
     if (oldSchoolId && oldSchoolId !== (school_id || null)) {
       try {
-        const members = await db.getHouseholdMembers(req.householdId);
+        const [members, schools] = await Promise.all([
+          db.getHouseholdMembers(req.householdId),
+          db.getHouseholdSchools(req.householdId),
+        ]);
         const stillLinked = members.some(m => m.school_id === oldSchoolId);
-        if (!stillLinked) {
+        const oldSchool = schools.find(s => s.id === oldSchoolId);
+        if (!stillLinked && oldSchool && !oldSchool.ical_url && !oldSchool.term_dates_source) {
           await db.deleteHouseholdSchool(oldSchoolId, req.householdId);
-          console.log(`[orphan-cleanup] Deleted orphaned school ${oldSchoolId} - no children remaining`);
+          console.log(`[orphan-cleanup] Deleted empty orphaned school ${oldSchoolId}`);
         }
       } catch (cleanupErr) {
         console.error('School orphan cleanup failed (non-fatal):', cleanupErr.message);
@@ -179,6 +188,10 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
 
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
+    // A school_id change re-parents the child between schools (and may have
+    // just orphan-deleted one), so the cached /schools list - which embeds
+    // each school's children - is now stale. Drop it.
+    cache.invalidate(`schools:${req.householdId}`);
     return res.json({ user: updated });
   } catch (err) {
     console.error('PATCH /api/household/profile error:', err);
@@ -286,14 +299,21 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
     const removedSchoolId = target.school_id;
     await db.deleteUser(userId, req.householdId);
 
-    // Clean up orphaned school if this was the last child linked to it
+    // Clean up orphaned school - but ONLY when it's genuinely empty: no
+    // remaining children AND no imported term dates AND no iCal feed (same
+    // rule as the profile-PATCH path + GET /schools auto-clean). Removing a
+    // child must never bin a school that still holds imported dates.
     if (removedSchoolId) {
       try {
-        const remaining = await db.getHouseholdMembers(req.householdId);
+        const [remaining, schools] = await Promise.all([
+          db.getHouseholdMembers(req.householdId),
+          db.getHouseholdSchools(req.householdId),
+        ]);
         const stillLinked = remaining.some(m => m.school_id === removedSchoolId);
-        if (!stillLinked) {
+        const oldSchool = schools.find(s => s.id === removedSchoolId);
+        if (!stillLinked && oldSchool && !oldSchool.ical_url && !oldSchool.term_dates_source) {
           await db.deleteHouseholdSchool(removedSchoolId, req.householdId);
-          console.log(`[orphan-cleanup] Deleted orphaned school ${removedSchoolId} after member removal`);
+          console.log(`[orphan-cleanup] Deleted empty orphaned school ${removedSchoolId} after member removal`);
         }
       } catch (e) {
         console.error('School orphan cleanup failed (non-fatal):', e.message);
@@ -302,6 +322,9 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
 
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
+    // Removing a member can re-shape (or delete) a school, so the cached
+    // /schools list is stale.
+    cache.invalidate(`schools:${req.householdId}`);
     return res.json({ message: 'Member removed.' });
   } catch (err) {
     console.error('DELETE /api/household/members error:', err);

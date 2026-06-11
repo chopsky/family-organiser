@@ -329,12 +329,19 @@ export default function FamilySetup() {
   const [addSchoolSelected, setAddSchoolSelected] = useState(null);
   const [addSchoolSaName, setAddSchoolSaName] = useState('');
   const [addingSchool, setAddingSchool] = useState(false);
+  // A child's school link is now ONLY a term-calendar disambiguator,
+  // surfaced as a dropdown when the household has 2+ schools. A child
+  // carries no school otherwise (term context resolves from the
+  // household's single school on the backend). These hold the dropdown
+  // selection for the add-dependent / add-member modals; edit-profile
+  // reuses the existing profileSchoolId.
+  const [depSchoolId, setDepSchoolId] = useState(null);
+  const [newSchoolId, setNewSchoolId] = useState(null);
   const [editingTermDate, setEditingTermDate] = useState(null);
   const [editTermDateFields, setEditTermDateFields] = useState({});
   const [savingTermDateEdit, setSavingTermDateEdit] = useState(false);
   const [syncingIcal, setSyncingIcal] = useState(false);
   const [clearingTermDates, setClearingTermDates] = useState(false);
-  const [newYearNudgeDismissed, setNewYearNudgeDismissed] = useState(false);
 
   function loadMembers() {
     return loadCached(
@@ -419,6 +426,7 @@ export default function FamilySetup() {
     setDepCustomSchoolMode(false);
     setDepCustomSchoolName('');
     setDepCustomSchoolPostcode('');
+    setDepSchoolId(null);
     setShowAddDependent(true);
   }
 
@@ -427,53 +435,13 @@ export default function FamilySetup() {
     setAddingDependent(true);
     setError('');
     try {
-      // If school is selected, ensure it exists in household first.
-      // Two paths: UK uses the GIAS-shaped depSelectedSchool object;
-      // SA uses the free-text depSaSchoolName (+ optional existing-row
-      // pointer when the user clicked a chip for a sibling's school).
-      let schoolId = null;
-      if (depAttendsSchool && isSa && depSaSchoolName.trim()) {
-        if (depSaSchoolExistingId) {
-          schoolId = depSaSchoolExistingId;
-        } else {
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: depSaSchoolName.trim(),
-          });
-          schoolId = schoolData.school.id;
-        }
-      } else if (depAttendsSchool && depCustomSchoolMode && depCustomSchoolName.trim()) {
-        // UK custom-school fallback — GIAS didn't have it. No URN, no
-        // LA. LA-dates import will be disabled for this school (the
-        // import modal already gates on local_authority); user uses
-        // website / PDF / iCal / manual instead.
-        const existingCustom = householdSchools.find(
-          s => !s.school_urn && s.school_name.toLowerCase() === depCustomSchoolName.trim().toLowerCase()
-        );
-        if (existingCustom) {
-          schoolId = existingCustom.id;
-        } else {
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: depCustomSchoolName.trim(),
-            postcode: depCustomSchoolPostcode.trim() || null,
-          });
-          schoolId = schoolData.school.id;
-        }
-      } else if (depAttendsSchool && depSelectedSchool) {
-        // UK path - match by GIAS URN.
-        const existingSchool = householdSchools.find(s => s.school_urn === depSelectedSchool.urn);
-        if (existingSchool) {
-          schoolId = existingSchool.id;
-        } else {
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: depSelectedSchool.name,
-            school_urn: depSelectedSchool.urn,
-            school_type: depSelectedSchool.type,
-            local_authority: depSelectedSchool.local_authority,
-            postcode: depSelectedSchool.postcode,
-          });
-          schoolId = schoolData.school.id;
-        }
-      }
+      // School is only a term-calendar disambiguator now, picked from the
+      // existing household schools via the dropdown that appears when the
+      // household has 2+ schools. Schools are created/managed in the
+      // Schools card, never inline here. With 0/1 schools the child
+      // carries no school_id (term context resolves from the household's
+      // single school on the backend).
+      const schoolId = (showSchools && householdSchools.length >= 2) ? (depSchoolId || null) : null;
 
       await api.post('/household/dependents', {
         name: depName.trim(),
@@ -486,19 +454,6 @@ export default function FamilySetup() {
       await loadMembers();
       const updatedSchools = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(updatedSchools);
-
-      // If a NEW school was just created (not existing), show term date import options
-      if (schoolId && !householdSchools.find(s => s.id === schoolId)) {
-        const newSchool = updatedSchools.find(s => s.id === schoolId);
-        if (newSchool) {
-          setTermDateSchoolId(schoolId);
-          setTermDateSchoolName(newSchool.school_name);
-          setTermDateSchoolLA(newSchool.local_authority || '');
-          setImportError('');
-          setShowTermDateOptions(true);
-          return; // Don't show generic success - the term date flow will handle it
-        }
-      }
       setSuccess('Member added!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (err) {
@@ -603,12 +558,17 @@ export default function FamilySetup() {
     setShowAddActivity(false);
     setShowAddTermDate(false);
     setEditTermDates([]);
-    // Weekly activities AND term dates load for any member with a
-    // school linked, regardless of whether they're a dependent or a
-    // full Family Member. A teen with their own login can have an
-    // after-school schedule the same way a younger sibling can -
-    // it's just personal-schedule data tied to a school day.
-    if (member.school_id) {
+    // Weekly activities load for any child (dependent), plus any full
+    // member explicitly linked to a school. Crucially this is NO LONGER
+    // gated on member.school_id alone: under the household-level Schools
+    // model a child in a single-school household carries no school_id,
+    // yet still has after-school activities. Term context resolves from
+    // the household's single school (or the child's explicit school when
+    // 2+ exist) on the backend's /schools/terms/:childId. Term-date
+    // *management* now lives in the Schools card, so we no longer load a
+    // per-member term-dates editor here.
+    const canHaveActivities = showSchools && (member.member_type === 'dependent' || Boolean(member.school_id));
+    if (canHaveActivities) {
       setLoadingActivities(true);
       api.get(`/schools/activities/${member.id}`)
         .then(({ data }) => setEditActivities(data.activities || []))
@@ -625,11 +585,6 @@ export default function FamilySetup() {
           setSelectedTermKey(cur ? cur.start_date : 'ongoing');
         })
         .catch(() => { setActivityTerms([]); setSelectedTermKey('ongoing'); });
-      api.get(`/schools/${member.school_id}/term-dates`)
-        .then(({ data }) => setEditTermDates(data.term_dates || []))
-        .catch(() => setEditTermDates([]));
-      const school = householdSchools.find(s => s.id === member.school_id);
-      setIcalUrl(school?.ical_url || '');
     } else {
       setEditActivities([]);
     }
@@ -1131,23 +1086,6 @@ export default function FamilySetup() {
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  function shouldShowNewYearNudge(school) {
-    if (newYearNudgeDismissed) return false;
-    const today = new Date();
-    const currentYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
-    const ayStart = new Date(currentYear, 8, 1);
-    const ayEnd = new Date(currentYear + 1, 7, 31);
-    const totalDays = (ayEnd - ayStart) / (1000 * 60 * 60 * 24);
-    const daysPassed = (today - ayStart) / (1000 * 60 * 60 * 24);
-    if (daysPassed / totalDays < 0.75) return false;
-    const nextAY = `${currentYear + 1}/${currentYear + 2}`;
-    const nextYearDates = (school?.term_dates || []).filter(d => {
-      const ay = d.academic_year || getAcademicYear(d.date);
-      return ay === nextAY || ay === `${currentYear + 1}-${currentYear + 2}`;
-    });
-    return nextYearDates.length === 0;
-  }
-
   function openUpdateTermDates(schoolArg) {
     const school = schoolArg || householdSchools.find(s => s.id === editingMember?.school_id);
     if (!school) return;
@@ -1366,65 +1304,16 @@ export default function FamilySetup() {
         reminder_time: profileReminderTime || null,
       };
 
-      // Handle school assignment. The /household/profile endpoint accepts
-      // school_id for any member (it's a column on the users table, used by
-      // both full Family Members and dependents) so we always send it. This
-      // lets parents associate a teen's user account with a school the same
-      // way they'd associate a younger child as a dependent.
-      //
-      // Three flows feed into payload.school_id:
-      //   • UK new school: profileSchoolId starts with 'new:' (GIAS-search
-      //     hasn't been linked yet) - create from editSelectedSchoolData.
-      //   • SA: branch on profileAttendsSchool + the SA name/existingId
-      //     state. Existing id wins; otherwise create-by-name.
-      //   • Existing link (either country): just use profileSchoolId.
-      let createdNewSchool = false;
-      if (isSa && profileAttendsSchool) {
-        if (profileSaSchoolExistingId) {
-          payload.school_id = profileSaSchoolExistingId;
-        } else if (profileSaSchoolName.trim()) {
-          const { data: created } = await api.post('/schools', {
-            school_name: profileSaSchoolName.trim(),
-          });
-          payload.school_id = created.school.id;
-          createdNewSchool = !created.existing;
-        } else {
-          payload.school_id = null;
-        }
-      } else if (isSa && !profileAttendsSchool) {
-        payload.school_id = null;
-      } else if (profileAttendsSchool && editCustomSchoolMode && editCustomSchoolName.trim()) {
-        // UK custom-school fallback — GIAS didn't have it. No URN/LA, so the
-        // LA-dates import stays gated off; user imports term dates from the
-        // school website / PDF / iCal instead. Reuse an existing custom school
-        // of the same name if one is already linked to the household.
-        const existingCustom = householdSchools.find(
-          s => !s.school_urn && s.school_name.toLowerCase() === editCustomSchoolName.trim().toLowerCase()
-        );
-        if (existingCustom) {
-          payload.school_id = existingCustom.id;
-        } else {
-          const { data: created } = await api.post('/schools', {
-            school_name: editCustomSchoolName.trim(),
-            postcode: editCustomSchoolPostcode.trim() || null,
-          });
-          payload.school_id = created.school.id;
-          createdNewSchool = !created.existing;
-        }
-      } else if (profileSchoolId && String(profileSchoolId).startsWith('new:')) {
-        // UK: need to create the school in household first
-        const schoolData = editSelectedSchoolData || {};
-        const { data: created } = await api.post('/schools', {
-          school_name: schoolData.name || editSchoolSearch,
-          school_urn: schoolData.urn || profileSchoolId.replace('new:', ''),
-          school_type: schoolData.type,
-          local_authority: schoolData.local_authority,
-          postcode: schoolData.postcode,
-        });
-        payload.school_id = created.school.id;
-        createdNewSchool = !created.existing;
-      } else {
+      // School link is only a term-calendar disambiguator now, surfaced as
+      // a per-child dropdown that appears when the household has 2+ schools.
+      // With 0/1 schools the picker is hidden, so we preserve the member's
+      // existing link (legacy values stay valid; term context resolves from
+      // the household's single school on the backend). Schools are
+      // created/managed in the Schools card, never inline here.
+      if (showSchools && householdSchools.length >= 2) {
         payload.school_id = profileSchoolId || null;
+      } else {
+        payload.school_id = editingMember?.school_id ?? null;
       }
 
       // Check if school changed (new school linked that may need term dates)
@@ -1435,25 +1324,13 @@ export default function FamilySetup() {
         payload.user_id = targetId;
       }
 
-      const oldSchoolId = editingMember?.school_id;
-
       await api.patch('/household/profile', payload);
       await loadMembers();
 
-      // If the school was removed or changed, check if old school is now orphaned (no children left)
-      if (oldSchoolId && oldSchoolId !== payload.school_id) {
-        const schoolsAfterSave = await api.get('/schools').then(r => r.data.schools || []);
-        const oldSchool = schoolsAfterSave.find(s => s.id === oldSchoolId);
-        if (oldSchool && (!oldSchool.children || oldSchool.children.length === 0)) {
-          try {
-            await api.delete(`/schools/${oldSchoolId}`);
-          } catch (e) {
-            console.warn('Could not auto-remove orphaned school:', e);
-          }
-        }
-      }
-
-      // Fetch the definitive school list (after any orphan cleanup)
+      // Orphan cleanup is owned by the backend now (PATCH /household/profile
+      // safely deletes the old school only when it has no children AND no
+      // term dates AND no iCal feed, and invalidates the schools cache), so
+      // we just re-fetch the definitive, freshly-invalidated list here.
       const freshSchools = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(freshSchools);
 
@@ -1687,6 +1564,7 @@ export default function FamilySetup() {
     setNewCustomSchoolMode(false);
     setNewCustomSchoolName('');
     setNewCustomSchoolPostcode('');
+    setNewSchoolId(null);
     setShowAddMember(true);
   }
 
@@ -1716,49 +1594,11 @@ export default function FamilySetup() {
     setAddingMember(true);
     setError('');
     try {
-      // If a school is selected, ensure it exists as a household_schools row
-      // before the invite is created - the invites table FK references that
-      // table. Two paths mirror handleAddDependent: UK by GIAS URN, SA by
-      // free-text name (with optional existing-row pointer for siblings).
-      let schoolId = null;
-      if (newAttendsSchool && isSa && newSaSchoolName.trim()) {
-        if (newSaSchoolExistingId) {
-          schoolId = newSaSchoolExistingId;
-        } else {
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: newSaSchoolName.trim(),
-          });
-          schoolId = schoolData.school.id;
-        }
-      } else if (newAttendsSchool && newCustomSchoolMode && newCustomSchoolName.trim()) {
-        // UK custom-school fallback (GIAS doesn't list this school).
-        const existingCustom = householdSchools.find(
-          s => !s.school_urn && s.school_name.toLowerCase() === newCustomSchoolName.trim().toLowerCase()
-        );
-        if (existingCustom) {
-          schoolId = existingCustom.id;
-        } else {
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: newCustomSchoolName.trim(),
-            postcode: newCustomSchoolPostcode.trim() || null,
-          });
-          schoolId = schoolData.school.id;
-        }
-      } else if (newAttendsSchool && newSelectedSchool) {
-        const existing = householdSchools.find(s => s.school_urn === newSelectedSchool.urn);
-        if (existing) {
-          schoolId = existing.id;
-        } else {
-          const { data: schoolData } = await api.post('/schools', {
-            school_name: newSelectedSchool.name,
-            school_urn: newSelectedSchool.urn,
-            school_type: newSelectedSchool.type,
-            local_authority: newSelectedSchool.local_authority,
-            postcode: newSelectedSchool.postcode,
-          });
-          schoolId = schoolData.school.id;
-        }
-      }
+      // School is only a term-calendar disambiguator now, picked from the
+      // existing household schools via the dropdown shown when there are
+      // 2+ schools. No inline school creation - that lives in the Schools
+      // card.
+      const schoolId = (showSchools && householdSchools.length >= 2) ? (newSchoolId || null) : null;
 
       await api.post('/household/invite', {
         email: newEmail.trim(),
@@ -1769,13 +1609,7 @@ export default function FamilySetup() {
         school_id: schoolId,
       });
       setShowAddMember(false);
-      // Reset invite-flow school state for the next time the modal opens.
-      setNewAttendsSchool(false);
-      setNewSchoolSearch('');
-      setNewSelectedSchool(null);
-      setNewSchoolResults([]);
-      setNewSaSchoolName('');
-      setNewSaSchoolExistingId(null);
+      setNewSchoolId(null);
       setSuccess(`Invite sent to ${newEmail.trim()}`);
       setTimeout(() => setSuccess(''), 3000);
       const { data } = await api.get('/household/invites');
@@ -2562,194 +2396,25 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle - only shown for countries we support. UK
-                  gets the GIAS search; SA gets a free-text name input
-                  plus chips for any existing household schools. Other
-                  countries see the Schools coming-soon card up top
-                  instead. */}
-              {showSchools && (
-              <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-bark">Do they attend school?</span>
-                <button
-                  type="button"
-                  onClick={() => setDepAttendsSchool(!depAttendsSchool)}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${depAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
-                >
-                  <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${depAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-              )}
-
-              {/* UK: GIAS school search (with custom-school fallback) */}
-              {isUk && depAttendsSchool && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  {depCustomSchoolMode ? (
-                    // Custom-school manual entry. Shown when the user
-                    // hits "Can't find your school?" because GIAS
-                    // doesn't list them (independent / online /
-                    // alternative provision / very new schools).
-                    // school_urn stays null so the LA-dates import is
-                    // correctly gated off and the user is steered to
-                    // website / PDF / iCal / manual import.
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-bark mb-1">School name</label>
-                        <input
-                          type="text"
-                          value={depCustomSchoolName}
-                          onChange={(e) => setDepCustomSchoolName(e.target.value)}
-                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="e.g. The Sunshine Academy"
-                          autoFocus
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-bark mb-1">Postcode <span className="text-xs text-cocoa font-normal">(optional)</span></label>
-                        <input
-                          type="text"
-                          value={depCustomSchoolPostcode}
-                          onChange={(e) => setDepCustomSchoolPostcode(e.target.value)}
-                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="SW1A 1AA"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDepCustomSchoolMode(false);
-                          setDepCustomSchoolName('');
-                          setDepCustomSchoolPostcode('');
-                        }}
-                        className="text-xs text-cocoa hover:text-bark underline"
-                      >
-                        ← Back to search
-                      </button>
-                      <p className="text-xs text-cocoa">
-                        We&apos;ll set this up as a custom school. You can import term dates from the school&apos;s website or PDF afterwards.
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex gap-3">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-bark mb-1">School</label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={depSchoolSearch}
-                              onChange={(e) => handleSchoolSearch(e.target.value)}
-                              className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                              placeholder="Search by name or postcode..."
-                            />
-                            {searchingSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
-                            {depSchoolResults.length > 0 && (
-                              <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                                {depSchoolResults.map(s => (
-                                  <li key={s.urn}>
-                                    <button type="button" onClick={() => selectSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                      <span className="font-medium text-bark">{s.name}</span>
-                                      <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                          {/* Same-school detection */}
-                          {depSelectedSchool && householdSchools.find(s => s.school_urn === depSelectedSchool.urn) && (
-                            <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
-                              <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === depSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
-                              <p className="text-xs text-plum/70">Term dates already set up - just add {depName || 'their'} activities below.</p>
-                            </div>
-                          )}
-                          {/* Fallback: "Can't find your school?" — shown
-                              once the user has typed enough to expect
-                              results but nothing matches, OR
-                              persistently as a small link so they can
-                              always reach it. */}
-                          {!depSelectedSchool && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDepCustomSchoolMode(true);
-                                setDepCustomSchoolName(depSchoolSearch.trim());
-                                setDepSchoolResults([]);
-                              }}
-                              className="mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
-                            >
-                              Can&apos;t find your school? Add it manually →
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
+              {/* School — now ONLY a term-calendar disambiguator, shown
+                  only when the household has 2+ schools (otherwise the
+                  single school is inferred and the child carries none).
+                  Schools are added/managed in the Schools section above. */}
+              {showSchools && householdSchools.length >= 2 && (
+                <div>
+                  <label className="block text-sm font-medium text-bark mb-1">School <span className="text-xs text-cocoa font-normal">(optional)</span></label>
+                  <select
+                    value={depSchoolId || ''}
+                    onChange={(e) => setDepSchoolId(e.target.value || null)}
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                  >
+                    <option value="">Not sure / not applicable</option>
+                    {householdSchools.map(s => <option key={s.id} value={s.id}>{s.school_name}</option>)}
+                  </select>
+                  <p className="text-xs text-cocoa mt-1">Sets which school&apos;s term calendar applies to {depName.trim() || 'this child'} for term-only activities and reminders.</p>
                 </div>
               )}
 
-              {/* SA: free-text school name + existing-school chips. SA
-                  doesn't have a public school directory like GIAS, so we
-                  let parents type the name and pick from their household's
-                  already-linked schools (typical case: second child at
-                  the same school as their sibling). */}
-              {isSa && depAttendsSchool && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-bark mb-1">School name</label>
-                    <input
-                      type="text"
-                      value={depSaSchoolName}
-                      onChange={(e) => {
-                        setDepSaSchoolName(e.target.value);
-                        setDepSaSchoolExistingId(null);
-                      }}
-                      className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                      placeholder="e.g. Sandown Primary"
-                    />
-                  </div>
-                  {householdSchools.length > 0 && (
-                    <div>
-                      <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {householdSchools.map((s) => {
-                          const selected = depSaSchoolExistingId === s.id;
-                          return (
-                            <div
-                              key={s.id}
-                              className={`inline-flex items-stretch rounded-lg border overflow-hidden transition-colors ${
-                                selected
-                                  ? 'bg-plum-light border-plum text-plum'
-                                  : 'bg-white border-cream-border text-bark hover:border-plum'
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDepSaSchoolName(s.school_name);
-                                  setDepSaSchoolExistingId(s.id);
-                                }}
-                                className="text-xs px-2.5 py-1.5"
-                              >
-                                {s.school_name}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveHouseholdSchool(s.id)}
-                                aria-label={`Remove ${s.school_name}`}
-                                className={`px-2 text-xs border-l hover:bg-coral-light hover:text-coral ${
-                                  selected ? 'border-plum' : 'border-cream-border'
-                                }`}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -2822,188 +2487,24 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle - same pattern as the add-dependent flow.
-                  Pre-fills the school + year group on the invite so the
-                  fields are already set when the invitee accepts.
-                  Only shown for countries with a school flow (UK + SA). */}
-              {showSchools && (
-              <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-bark">
-                  {`Does ${newName.trim() || 'this member'} attend school?`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !newAttendsSchool;
-                    setNewAttendsSchool(next);
-                    if (!next) {
-                      setNewSchoolSearch('');
-                      setNewSchoolResults([]);
-                      setNewSelectedSchool(null);
-                      setNewSaSchoolName('');
-                      setNewSaSchoolExistingId(null);
-                    }
-                  }}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${newAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
-                >
-                  <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${newAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-              )}
-
-              {isUk && newAttendsSchool && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  {newCustomSchoolMode ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-bark mb-1">School name</label>
-                        <input
-                          type="text"
-                          value={newCustomSchoolName}
-                          onChange={(e) => setNewCustomSchoolName(e.target.value)}
-                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="e.g. The Sunshine Academy"
-                          autoFocus
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-bark mb-1">Postcode <span className="text-xs text-cocoa font-normal">(optional)</span></label>
-                        <input
-                          type="text"
-                          value={newCustomSchoolPostcode}
-                          onChange={(e) => setNewCustomSchoolPostcode(e.target.value)}
-                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="SW1A 1AA"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewCustomSchoolMode(false);
-                          setNewCustomSchoolName('');
-                          setNewCustomSchoolPostcode('');
-                        }}
-                        className="text-xs text-cocoa hover:text-bark underline"
-                      >
-                        ← Back to search
-                      </button>
-                      <p className="text-xs text-cocoa">
-                        We&apos;ll set this up as a custom school. You can import term dates from the school&apos;s website or PDF afterwards.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-bark mb-1">School</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={newSchoolSearch}
-                            onChange={(e) => handleNewMemberSchoolSearch(e.target.value)}
-                            className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                            placeholder="Search by name or postcode..."
-                          />
-                          {searchingNewSchools && <span className="absolute right-3 top-3 text-xs text-cocoa">Searching...</span>}
-                          {newSchoolResults.length > 0 && (
-                            <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                              {newSchoolResults.map(s => (
-                                <li key={s.urn}>
-                                  <button type="button" onClick={() => selectNewMemberSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                    <span className="font-medium text-bark">{s.name}</span>
-                                    <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode} · {s.type}</span>
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                        {/* Surface 'same school as Tom' hint when relevant */}
-                        {newSelectedSchool && householdSchools.find(s => s.school_urn === newSelectedSchool.urn) && (
-                          <div className="mt-2 bg-plum-light rounded-lg px-3 py-2">
-                            <p className="text-xs font-semibold text-plum">SAME SCHOOL AS {householdSchools.find(s => s.school_urn === newSelectedSchool.urn)?.children?.map(c => c.name.toUpperCase()).join(' AND ')}</p>
-                            <p className="text-xs text-plum/70">Term dates already set up.</p>
-                          </div>
-                        )}
-                        {/* Fallback — see dep-flow equivalent. */}
-                        {!newSelectedSchool && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNewCustomSchoolMode(true);
-                              setNewCustomSchoolName(newSchoolSearch.trim());
-                              setNewSchoolResults([]);
-                            }}
-                            className="mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
-                          >
-                            Can&apos;t find your school? Add it manually →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
+              {/* School — only a term-calendar disambiguator, shown when the
+                  household has 2+ schools. Lets you point an invited member
+                  (e.g. a teen with their own login) at the right school's
+                  term calendar. Schools are managed in the Schools section. */}
+              {showSchools && householdSchools.length >= 2 && (
+                <div>
+                  <label className="block text-sm font-medium text-bark mb-1">School <span className="text-xs text-cocoa font-normal">(optional)</span></label>
+                  <select
+                    value={newSchoolId || ''}
+                    onChange={(e) => setNewSchoolId(e.target.value || null)}
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                  >
+                    <option value="">Not sure / not applicable</option>
+                    {householdSchools.map(s => <option key={s.id} value={s.id}>{s.school_name}</option>)}
+                  </select>
                 </div>
               )}
 
-              {/* SA: free-text + existing-school chips - see Add Dependent
-                  modal above for the same pattern + rationale. */}
-              {isSa && newAttendsSchool && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-bark mb-1">School name</label>
-                    <input
-                      type="text"
-                      value={newSaSchoolName}
-                      onChange={(e) => {
-                        setNewSaSchoolName(e.target.value);
-                        setNewSaSchoolExistingId(null);
-                      }}
-                      className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                      placeholder="e.g. Sandown Primary"
-                    />
-                  </div>
-                  {householdSchools.length > 0 && (
-                    <div>
-                      <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {householdSchools.map((s) => {
-                          const selected = newSaSchoolExistingId === s.id;
-                          return (
-                            <div
-                              key={s.id}
-                              className={`inline-flex items-stretch rounded-lg border overflow-hidden transition-colors ${
-                                selected
-                                  ? 'bg-plum-light border-plum text-plum'
-                                  : 'bg-white border-cream-border text-bark hover:border-plum'
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setNewSaSchoolName(s.school_name);
-                                  setNewSaSchoolExistingId(s.id);
-                                }}
-                                className="text-xs px-2.5 py-1.5"
-                              >
-                                {s.school_name}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveHouseholdSchool(s.id)}
-                                aria-label={`Remove ${s.school_name}`}
-                                className={`px-2 text-xs border-l hover:bg-coral-light hover:text-coral ${
-                                  selected ? 'border-plum' : 'border-cream-border'
-                                }`}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               <div className="pt-2 border-t border-cream-border">
                 <label className="block text-sm font-medium text-bark mb-1">Email address <span className="text-error">*</span></label>
@@ -3343,200 +2844,35 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School toggle - same pattern as the add-dependent form.
-                  Hidden by default for members without a school; defaulted on
-                  if the member already has a school attached (so existing data
-                  isn't surprise-hidden). Toggling off clears the selection so
-                  the save persists null. Shown for UK + SA. */}
-              {showSchools && (
-              <div className="bg-cream rounded-xl p-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-bark">
-                  {editingMember?.member_type === 'dependent'
-                    ? 'Do they attend school?'
-                    : `Does ${profileName || 'this member'} attend school?`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !profileAttendsSchool;
-                    setProfileAttendsSchool(next);
-                    if (!next) {
-                      setProfileSchoolId(null);
-                      setEditSchoolSearch('');
-                      setEditSchoolResults([]);
-                      setEditSelectedSchoolData(null);
-                      setProfileSaSchoolName('');
-                      setProfileSaSchoolExistingId(null);
-                    }
-                  }}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${profileAttendsSchool ? 'bg-primary' : 'bg-cream-border'}`}
-                >
-                  <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${profileAttendsSchool ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-              )}
-
-              {/* School details - only shown when the toggle above is on. The
-                  activities + term-dates card below is still dependent-only
-                  because those are the bits a parent manages on a younger
-                  child's behalf. */}
-              {isUk && profileAttendsSchool && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-bark mb-1">School</label>
-                      {editCustomSchoolMode ? (
-                        // Custom-school manual entry. Same fallback the
-                        // add-child / invite flows offer: school_urn stays
-                        // null so the LA-dates import is gated off and the
-                        // user imports term dates from website / PDF / iCal.
-                        <div className="space-y-3">
-                          <input
-                            type="text"
-                            value={editCustomSchoolName}
-                            onChange={(e) => setEditCustomSchoolName(e.target.value)}
-                            className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                            placeholder="School name, e.g. The Sunshine Academy"
-                            autoFocus
-                          />
-                          <input
-                            type="text"
-                            value={editCustomSchoolPostcode}
-                            onChange={(e) => setEditCustomSchoolPostcode(e.target.value)}
-                            className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                            placeholder="Postcode (optional), e.g. SW1A 1AA"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditCustomSchoolMode(false);
-                              setEditCustomSchoolName('');
-                              setEditCustomSchoolPostcode('');
-                            }}
-                            className="text-xs text-cocoa hover:text-bark underline"
-                          >
-                            ← Back to search
-                          </button>
-                          <p className="text-xs text-cocoa">
-                            We&apos;ll set this up as a custom school. You can import term dates from the school&apos;s website or PDF afterwards.
-                          </p>
-                        </div>
-                      ) : (
-                      <>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={editSchoolSearch}
-                          onChange={(e) => handleEditSchoolSearch(e.target.value)}
-                          className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                          placeholder="Search by name or postcode..."
-                        />
-                        {editSchoolResults.length > 0 && (
-                          <ul className="absolute z-10 w-full bg-white border border-cream-border rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
-                            {editSchoolResults.map(s => (
-                              <li key={s.urn}>
-                                <button type="button" onClick={() => selectEditSchool(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-cream transition-colors">
-                                  <span className="font-medium text-bark">{s.name}</span>
-                                  <span className="text-xs text-cocoa block">{s.local_authority} · {s.postcode}</span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      {profileSchoolId && editSchoolSearch && (
-                        <button type="button" onClick={() => { setProfileSchoolId(null); setEditSchoolSearch(''); }} className="text-xs text-error mt-1">Remove school</button>
-                      )}
-                      {/* Manual fallback — parity with the add-child / invite
-                          flows so a school missing from GIAS can still be added. */}
-                      {!profileSchoolId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditCustomSchoolMode(true);
-                            setEditCustomSchoolName(editSchoolSearch.trim());
-                            setEditSchoolResults([]);
-                          }}
-                          className="block mt-2 text-xs text-primary hover:text-primary-pressed font-medium"
-                        >
-                          Can&apos;t find your school? Add it manually →
-                        </button>
-                      )}
-                      </>
-                      )}
-                    </div>
-                  </div>
+              {/* School — only a term-calendar disambiguator, shown when the
+                  household has 2+ schools. Lets you pick which school's term
+                  calendar applies to this member. With 0/1 schools it's
+                  inferred from the household, so no picker is shown. Schools
+                  are added/managed in the Schools section. */}
+              {showSchools && householdSchools.length >= 2 && (
+                <div>
+                  <label className="block text-sm font-medium text-bark mb-1">School <span className="text-xs text-cocoa font-normal">(optional)</span></label>
+                  <select
+                    value={profileSchoolId || ''}
+                    onChange={(e) => setProfileSchoolId(e.target.value || null)}
+                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                  >
+                    <option value="">Not sure / not applicable</option>
+                    {householdSchools.map(s => <option key={s.id} value={s.id}>{s.school_name}</option>)}
+                  </select>
+                  <p className="text-xs text-cocoa mt-1">Sets which school&apos;s term calendar applies for term-only activities and reminders.</p>
                 </div>
               )}
 
-              {/* SA: free-text + existing-school chips, same pattern as the
-                  add-dependent and invite modals. */}
-              {isSa && profileAttendsSchool && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-bark mb-1">School name</label>
-                    <input
-                      type="text"
-                      value={profileSaSchoolName}
-                      onChange={(e) => {
-                        setProfileSaSchoolName(e.target.value);
-                        setProfileSaSchoolExistingId(null);
-                      }}
-                      className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                      placeholder="e.g. Sandown Primary"
-                    />
-                  </div>
-                  {householdSchools.length > 0 && (
-                    <div>
-                      <p className="text-xs text-cocoa mb-2">Or use a school you&apos;ve already added:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {householdSchools.map((s) => {
-                          const selected = profileSaSchoolExistingId === s.id;
-                          return (
-                            <div
-                              key={s.id}
-                              className={`inline-flex items-stretch rounded-lg border overflow-hidden transition-colors ${
-                                selected
-                                  ? 'bg-plum-light border-plum text-plum'
-                                  : 'bg-white border-cream-border text-bark hover:border-plum'
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setProfileSaSchoolName(s.school_name);
-                                  setProfileSaSchoolExistingId(s.id);
-                                }}
-                                className="text-xs px-2.5 py-1.5"
-                              >
-                                {s.school_name}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveHouseholdSchool(s.id)}
-                                aria-label={`Remove ${s.school_name}`}
-                                className={`px-2 text-xs border-l hover:bg-coral-light hover:text-coral ${
-                                  selected ? 'border-plum' : 'border-cream-border'
-                                }`}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* Weekly activities - any member with a school linked.
-                  Previously gated to dependents only, but the data model
-                  has no such restriction and a teen with their own login
-                  is just as likely to want their schedule tracked as a
-                  younger sibling. Term dates render in a sibling block
-                  below under the same any-member-with-a-school rule. */}
-              {editingMember?.school_id && (
+              {/* Weekly activities - a UK/SA-only feature (term windows derive
+                  from school terms). Shown for any child (dependent), plus any
+                  full member explicitly linked to a school. NOT gated on
+                  school_id alone: under the household-level Schools model a
+                  child in a single-school household carries no school_id but
+                  still has after-school activities (term context resolves from
+                  the household on the backend). */}
+              {showSchools && (editingMember?.member_type === 'dependent' || editingMember?.school_id) && (
                 <div className="border border-cream-border rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-plum">Extracurricular activities</h3>
                   <p className="text-xs text-cocoa">{profileName || 'Their'} regular weekly schedule. Pick a term to view or set it up - you can prepare next term without changing this one. Tap an activity to edit it.</p>
@@ -3561,7 +2897,7 @@ export default function FamilySetup() {
                   </div>
                   {activityTerms.length === 0 && (
                     <p className="text-[11px] text-cocoa">
-                      Tip: import this school&apos;s term dates (below) and we&apos;ll offer real terms here automatically.
+                      Tip: import this school&apos;s term dates from the Schools section and we&apos;ll offer real terms here automatically.
                     </p>
                   )}
 
@@ -3685,166 +3021,6 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {/* Term dates - shown for any member who has a school, not
-                  just dependents. Without this lift, an adult member who
-                  was added with a school would land in a dead-end where
-                  they could see the linked school but had no UI to
-                  trigger the import-term-dates modal. */}
-              {editingMember?.school_id && (
-                <div className="border border-cream-border rounded-xl p-4 space-y-3">
-                  {(() => {
-                    const school = householdSchools.find(s => s.id === editingMember.school_id);
-                    const grouped = groupDatesByTerm(editTermDates, household?.country);
-                    const academicYears = Object.keys(grouped).sort();
-                    const siblings = members.filter(m => m.school_id === editingMember.school_id && m.id !== editingMember.id);
-
-                    return (
-                      <>
-                        <h3 className="text-sm font-semibold text-plum">Term dates</h3>
-                        {school && <p className="text-xs text-cocoa">{school.school_name}</p>}
-
-                        {/* Sibling note */}
-                        {siblings.length > 0 && (
-                          <div className="bg-plum/5 border border-plum/15 rounded-lg px-3 py-2 mt-1">
-                            <p className="text-[11px] text-plum">These dates apply to all children at {school?.school_name}.</p>
-                          </div>
-                        )}
-
-                        {/* New year nudge */}
-                        {school && shouldShowNewYearNudge(school) && (
-                          <div className="bg-amber/10 border border-amber/30 rounded-lg px-3 py-2 mt-2 flex items-center justify-between">
-                            <p className="text-xs text-bark">💡 Next year's term dates may be available.</p>
-                            <div className="flex gap-2 shrink-0">
-                              <button onClick={openUpdateTermDates} className="text-xs font-medium text-primary hover:text-primary-pressed">Update</button>
-                              <button onClick={() => setNewYearNudgeDismissed(true)} className="text-xs text-cocoa hover:text-bark">Dismiss</button>
-                            </div>
-                          </div>
-                        )}
-
-                        {editTermDates.length > 0 ? (
-                          <div className="mt-2 space-y-3">
-                            {/* Compact term summary per academic year.
-                                grouped[ay] is now a country-aware array
-                                of { key, label, dates } so the render is
-                                identical for UK (Autumn/Spring/Summer)
-                                and SA (Term 1-4). */}
-                            {academicYears.map(ay => {
-                              const termGroups = grouped[ay];
-                              return (
-                                <div key={ay} className="bg-white rounded-lg border border-cream-border p-3">
-                                  <div className="text-[11px] font-semibold text-cocoa uppercase tracking-wide mb-1.5">{ay}</div>
-                                  {termGroups.map(({ key, label, dates: termDates }) => {
-                                    if (termDates.length === 0) return null;
-                                    const summary = getTermSummary(termDates);
-                                    return (
-                                      <div key={key} className="mb-1.5 last:mb-0">
-                                        <div className="flex items-baseline gap-2">
-                                          <span className="text-xs font-semibold text-bark w-16">{label}</span>
-                                          <span className="text-[11px] text-cocoa">
-                                            {summary.start && summary.end
-                                              ? `${formatDateShort(summary.start)} – ${formatDateShort(summary.end)}`
-                                              : termDates.map(d => formatDateShort(d.date)).join(', ')
-                                            }
-                                          </span>
-                                        </div>
-                                        {/* "Half term" is UK-only terminology - SA schools don't
-                                            use this concept (four discrete terms with breaks
-                                            between, not within). Even if legacy data has half_term_*
-                                            rows, we suppress the sub-line for SA. The dates
-                                            themselves still appear in the full View-and-edit list. */}
-                                        {!isSa && summary.htStart && (
-                                          <div className="ml-16 text-[11px] text-cocoa">
-                                            Half term: {formatDateShort(summary.htStart)}{summary.htEnd && summary.htEnd !== summary.htStart ? ` – ${formatDateShort(summary.htEnd)}` : ''}
-                                          </div>
-                                        )}
-                                        {summary.insets.length > 0 && (
-                                          <div className="ml-16 text-[11px] text-cocoa">
-                                            INSET: {summary.insets.map(d => formatDateShort(d.date)).join(', ')}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })}
-
-                            {/* Source & last updated */}
-                            <div className="text-[11px] text-cocoa space-y-0.5">
-                              {school?.term_dates_source && (
-                                <p>Source: {
-                                  { local_authority: `Local authority (${school.local_authority || ''})`, school_website: 'School website', website_scrape: 'School website', ical: 'iCal feed', ical_import: 'iCal feed', sa_national: 'National calendar', 'sa-national': 'National calendar', whatsapp_import: 'WhatsApp', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source
-                                }</p>
-                              )}
-                              {school?.term_dates_last_updated && (
-                                <p>Last updated: {new Date(school.term_dates_last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                              )}
-                            </div>
-
-                            {/* iCal sync status */}
-                            {school?.ical_url && (
-                              <div className="text-[11px] text-cocoa">
-                                {school.ical_last_sync_status === 'failed' ? (
-                                  <div className="flex items-center gap-1 text-amber">
-                                    <span>⚠️ Sync failed</span>
-                                    {school.ical_last_sync && <span>· Last successful sync: {new Date(school.ical_last_sync).toLocaleDateString('en-GB')}</span>}
-                                  </div>
-                                ) : school.ical_last_sync ? (
-                                  <div className="flex items-center gap-1 text-sage">
-                                    <span>✅ Auto-syncing daily</span>
-                                    <span>· Last sync: {new Date(school.ical_last_sync).toLocaleDateString('en-GB')}</span>
-                                  </div>
-                                ) : null}
-                              </div>
-                            )}
-
-                            {/* Action buttons */}
-                            <div className="flex gap-2 mt-1">
-                              {school?.ical_url ? (
-                                <>
-                                  <button onClick={handleSyncIcal} disabled={syncingIcal} className="text-xs font-medium text-primary hover:text-primary-pressed disabled:opacity-50">
-                                    🔄 {syncingIcal ? 'Syncing...' : 'Sync now'}
-                                  </button>
-                                  <span className="text-cream-border">|</span>
-                                  <button onClick={openUpdateTermDates} className="text-xs font-medium text-primary hover:text-primary-pressed">
-                                    Change source
-                                  </button>
-                                </>
-                              ) : (
-                                <button onClick={openUpdateTermDates} className="text-xs font-medium text-primary hover:text-primary-pressed">
-                                  🔄 Update term dates
-                                </button>
-                              )}
-                              <span className="text-cream-border">|</span>
-                              <button onClick={() => openViewDates(householdSchools.find(s => s.id === editingMember?.school_id))} className="text-xs font-medium text-primary hover:text-primary-pressed">
-                                View & edit all dates
-                              </button>
-                              <span className="text-cream-border">|</span>
-                              <button
-                                onClick={() => handleClearAllTermDates(editingMember.school_id)}
-                                disabled={clearingTermDates}
-                                className="text-xs font-medium text-coral hover:text-coral/80 disabled:opacity-50"
-                              >
-                                {clearingTermDates ? 'Clearing…' : 'Clear all'}
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2">
-                            <p className="text-xs text-cocoa mb-2">No term dates added yet.</p>
-                            <button
-                              onClick={openUpdateTermDates}
-                              className="w-full bg-primary text-white text-xs font-medium py-2.5 rounded-xl hover:bg-primary-pressed transition-colors"
-                            >
-                              Import term dates
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
 
               {editingMember?.member_type !== 'dependent' && (
                 <div className="min-w-0 overflow-hidden">

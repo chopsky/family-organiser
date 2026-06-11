@@ -1013,3 +1013,70 @@ describe('GET /api/household/invites', () => {
     expect(res.status).not.toBe(403);
   });
 });
+
+// ─── PATCH /api/household/profile - orphaned-school cleanup guard ───────────────
+// When a child's school link changes, the route auto-removes the OLD school only
+// if it's genuinely empty: no remaining children AND no imported term dates AND
+// no iCal feed. Schools are household-level entities now, so unlinking the last
+// child must never silently bin a school that still holds imported dates.
+describe('PATCH /api/household/profile orphan-school cleanup', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const CHILD = { id: 'c-1', name: 'Oliver', member_type: 'dependent', household_id: 'hh-1', school_id: 'S1' };
+  // Membership AFTER the school_id change - no member links S1 any more, so S1
+  // is now childless and a naive cleanup would delete it.
+  const MEMBERS_AFTER = [USER, { ...CHILD, school_id: 'S2' }];
+
+  function armMembers() {
+    db.getHouseholdMembers
+      .mockResolvedValueOnce([USER, CHILD]) // targetUserId resolution (editing a dependent)
+      .mockResolvedValueOnce([USER, CHILD]) // oldSchoolId capture
+      .mockResolvedValue(MEMBERS_AFTER);    // cleanup re-fetch (+ any extra calls)
+    db.updateUser.mockResolvedValue({ ...CHILD, school_id: 'S2' });
+  }
+
+  test('does NOT delete the old school when it still has imported term dates', async () => {
+    armMembers();
+    db.getHouseholdSchools.mockResolvedValue([
+      { id: 'S1', school_name: 'Oakwood', ical_url: null, term_dates_source: 'whatsapp_import' },
+    ]);
+
+    const res = await request(app)
+      .patch('/api/household/profile')
+      .set(AUTH)
+      .send({ user_id: 'c-1', school_id: 'S2' });
+
+    expect(res.status).toBe(200);
+    expect(db.deleteHouseholdSchool).not.toHaveBeenCalled();
+  });
+
+  test('does NOT delete the old school when it has an iCal feed', async () => {
+    armMembers();
+    db.getHouseholdSchools.mockResolvedValue([
+      { id: 'S1', school_name: 'Oakwood', ical_url: 'https://school/cal.ics', term_dates_source: null },
+    ]);
+
+    const res = await request(app)
+      .patch('/api/household/profile')
+      .set(AUTH)
+      .send({ user_id: 'c-1', school_id: 'S2' });
+
+    expect(res.status).toBe(200);
+    expect(db.deleteHouseholdSchool).not.toHaveBeenCalled();
+  });
+
+  test('DOES delete a genuinely-empty orphaned school (no children, no dates, no iCal)', async () => {
+    armMembers();
+    db.getHouseholdSchools.mockResolvedValue([
+      { id: 'S1', school_name: 'Oakwood', ical_url: null, term_dates_source: null },
+    ]);
+
+    const res = await request(app)
+      .patch('/api/household/profile')
+      .set(AUTH)
+      .send({ user_id: 'c-1', school_id: 'S2' });
+
+    expect(res.status).toBe(200);
+    expect(db.deleteHouseholdSchool).toHaveBeenCalledWith('S1', 'hh-1');
+  });
+});
