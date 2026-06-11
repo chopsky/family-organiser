@@ -82,6 +82,30 @@ describe('handleCalendarQuery', () => {
       { query_start: '2026-12-01', query_end: '2026-12-31' }, household, user, TZ, {},
     );
     expect(res.response).toMatch(/and 5 more/);
+    expect(res.response).toMatch(/\/calendar/); // overflow always links (text is incomplete)
+  });
+
+  test('appends a calendar deep-link for a week-sized result', async () => {
+    const week = Array.from({ length: 5 }, (_, i) => ({
+      title: `Event ${i}`, start_time: '2026-12-15T09:00:00Z', end_time: '2026-12-15T10:00:00Z', assigned_to_names: [],
+    }));
+    db.getCalendarEvents.mockResolvedValue(week);
+    const res = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-01', query_end: '2026-12-31' }, household, user, TZ, {},
+    );
+    expect(res.response).toMatch(/see it on your calendar/i);
+    expect(res.response).toMatch(/\/calendar/);
+  });
+
+  test('no deep-link for a small (1-2 event) result', async () => {
+    db.getCalendarEvents.mockResolvedValue([
+      { title: 'Dentist', start_time: '2026-12-15T09:00:00Z', end_time: '2026-12-15T09:30:00Z', assigned_to_names: [] },
+      { title: 'School run', start_time: '2026-12-15T15:30:00Z', end_time: '2026-12-15T16:00:00Z', assigned_to_names: [] },
+    ]);
+    const res = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-15', query_end: '2026-12-15' }, household, user, TZ, {},
+    );
+    expect(res.response).not.toMatch(/\/calendar/);
   });
 
   test('degrades gracefully when the DB query throws', async () => {
