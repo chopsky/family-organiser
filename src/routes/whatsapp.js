@@ -54,6 +54,26 @@ function verifyTwilioSignature(req) {
 }
 
 /**
+ * Message an expired/cancelled household sees when it messages the bot.
+ * Beyond "your trial ended", it states the price and gives a direct link to
+ * checkout so a willing buyer can subscribe in a tap - the WhatsApp channel
+ * was previously the weakest paywall in the product (a single bare line).
+ * The £ figures are GBP (the primary market) for display only; the /subscribe
+ * page localises the real amount and handles the actual checkout + any
+ * pre-applied promo.
+ */
+function buildExpiredUpgradeMessage(webUrl) {
+  const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
+  return [
+    'Your Housemait free trial has ended.',
+    '',
+    'Keep your shared family calendar, lists, meal planner and me (your WhatsApp assistant) for £5.99/month — or £59.99/year (2 months free).',
+    '',
+    `Subscribe in under a minute: ${base}/subscribe`,
+  ].join('\n');
+}
+
+/**
  * POST /whatsapp/webhook
  * Twilio sends incoming WhatsApp messages here.
  *
@@ -200,10 +220,7 @@ router.post('/webhook', async (req, res) => {
         && (householdRow.subscription_status === 'expired'
           || householdRow.subscription_status === 'cancelled');
       if (expired) {
-        await whatsapp.sendMessage(
-          phone,
-          "Your Housemait trial has ended. Subscribe at housemait.com to keep using me!"
-        );
+        await whatsapp.sendMessage(phone, buildExpiredUpgradeMessage(process.env.WEB_URL));
         db.logWhatsAppMessage({
           householdId: user.household_id,
           userId: user.id,
@@ -396,3 +413,5 @@ router.get('/webhook', (req, res) => {
 });
 
 module.exports = router;
+// Exposed for unit tests - pure helper, no Express/Twilio dependency.
+module.exports.buildExpiredUpgradeMessage = buildExpiredUpgradeMessage;

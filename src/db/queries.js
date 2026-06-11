@@ -3714,6 +3714,81 @@ async function getPlatformsByUserIds(userIds, db = supabase) {
   return map;
 }
 
+/**
+ * Pure aggregation behind getChannelCohortStats - separated so it can be
+ * unit-tested without a DB. Classifies each non-internal household by the
+ * channels its members actually use, then tallies subscription outcomes.
+ *
+ *   - app          → at least one member registered a native iOS device token
+ *                    (the definitive "installed the app" signal). May ALSO use
+ *                    WhatsApp; "app" wins because the question is app vs not.
+ *   - whatsapp_only→ no app install, but at least one member linked WhatsApp.
+ *   - web_only     → neither (pure browser users).
+ *
+ *   conversionPct = active / (active + expired + cancelled)  — of households
+ *                   that reached a decision (trial resolved), the % that pay.
+ *   retentionPct  = active / (active + cancelled)            — of households
+ *                   that ever subscribed, the % still active.
+ */
+function computeChannelCohorts({ households, members, appUserIds }) {
+  const appSet = appUserIds instanceof Set ? appUserIds : new Set(appUserIds || []);
+  const hhHasApp = new Set();
+  const hhHasWa = new Set();
+  for (const m of members || []) {
+    if (!m.household_id) continue;
+    if (appSet.has(m.id)) hhHasApp.add(m.household_id);
+    if (m.whatsapp_linked) hhHasWa.add(m.household_id);
+  }
+
+  const blank = () => ({ total: 0, trialing: 0, active: 0, expired: 0, cancelled: 0, other: 0 });
+  const cohorts = { app: blank(), whatsapp_only: blank(), web_only: blank() };
+
+  for (const h of households || []) {
+    const key = hhHasApp.has(h.id) ? 'app' : (hhHasWa.has(h.id) ? 'whatsapp_only' : 'web_only');
+    const c = cohorts[key];
+    c.total += 1;
+    const s = h.subscription_status;
+    if (s === 'trialing') c.trialing += 1;
+    else if (s === 'active') c.active += 1;
+    else if (s === 'expired') c.expired += 1;
+    else if (s === 'cancelled') c.cancelled += 1;
+    else c.other += 1;
+  }
+
+  for (const c of Object.values(cohorts)) {
+    const resolved = c.active + c.expired + c.cancelled;
+    const everPaid = c.active + c.cancelled;
+    c.resolved = resolved;
+    c.conversionPct = resolved > 0 ? Math.round((c.active / resolved) * 1000) / 10 : null;
+    c.retentionPct = everPaid > 0 ? Math.round((c.active / everPaid) * 1000) / 10 : null;
+  }
+  return cohorts;
+}
+
+/**
+ * Channel-cohort breakdown for the admin analytics page: do WhatsApp-only
+ * households convert / retain better or worse than app households? The user
+ * base is small (hundreds), so we pull the three relevant tables and classify
+ * in memory rather than maintaining an RPC.
+ */
+async function getChannelCohortStats(db = supabase) {
+  const [hhRes, memRes, devRes] = await Promise.all([
+    db.from('households').select('id, subscription_status').eq('is_internal', false),
+    db.from('users').select('id, household_id, whatsapp_linked'),
+    db.from('device_tokens').select('user_id').eq('platform', 'ios'),
+  ]);
+  if (hhRes.error) throw hhRes.error;
+  if (memRes.error) throw memRes.error;
+  if (devRes.error) throw devRes.error;
+
+  const appUserIds = new Set((devRes.data || []).map((d) => d.user_id).filter(Boolean));
+  return computeChannelCohorts({
+    households: hhRes.data || [],
+    members: memRes.data || [],
+    appUserIds,
+  });
+}
+
 async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc' } = {}, db = supabase) {
   // Sorting by last_active_at can't be done in a single SQL query because
   // it's a derived value (MAX refresh_tokens.last_used_at). For that sort
@@ -6746,6 +6821,8 @@ module.exports = {
   getWhatsAppTimeline,
   getAnalytics,
   getRetentionCohorts,
+  getChannelCohortStats,
+  computeChannelCohorts,
   getRevenueStats,
   getAiUsageTopHouseholds,
   getAiUsageTopUsers,

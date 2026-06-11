@@ -361,11 +361,12 @@ router.get('/analytics', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
     const cohortWeeks = Math.min(parseInt(req.query.cohortWeeks, 10) || 12, 26);
-    const [analytics, retention] = await Promise.all([
+    const [analytics, retention, channelCohorts] = await Promise.all([
       db.getAnalytics({ days }),
       db.getRetentionCohorts({ weeks: cohortWeeks }),
+      db.getChannelCohortStats(),
     ]);
-    return res.json({ ...analytics, retention });
+    return res.json({ ...analytics, retention, channelCohorts });
   } catch (err) {
     console.error('GET /api/admin/analytics error:', err);
     return res.status(500).json({ error: 'Internal server error' });

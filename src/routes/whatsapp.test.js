@@ -122,3 +122,18 @@ describe('WhatsApp webhook subscription gate', () => {
     expect(whatsapp.sendMessage).not.toHaveBeenCalledWith(PHONE, expect.stringMatching(TRIAL_ENDED));
   });
 });
+
+describe('buildExpiredUpgradeMessage', () => {
+  test('states the price and a one-tap /subscribe link, keeping the trial-ended phrase', () => {
+    const msg = whatsappRouter.buildExpiredUpgradeMessage('https://housemait.com');
+    expect(msg).toMatch(/trial has ended/i);
+    expect(msg).toMatch(/£5\.99/);
+    expect(msg).toMatch(/£59\.99/);
+    expect(msg).toContain('https://housemait.com/subscribe');
+  });
+
+  test('falls back to the default domain and strips a trailing slash', () => {
+    expect(whatsappRouter.buildExpiredUpgradeMessage()).toContain('https://housemait.com/subscribe');
+    expect(whatsappRouter.buildExpiredUpgradeMessage('https://www.housemait.com/')).toContain('https://www.housemait.com/subscribe');
+  });
+});

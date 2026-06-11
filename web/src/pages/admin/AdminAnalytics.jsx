@@ -24,7 +24,7 @@ export default function AdminAnalytics() {
 
   if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
-  const { dau = [], featureUsage = {}, funnel = {}, wau = 0, retention = null } = data || {};
+  const { dau = [], featureUsage = {}, funnel = {}, wau = 0, retention = null, channelCohorts = null } = data || {};
 
   // Calculate DAU average
   const recentDau = dau.slice(-7);
@@ -128,6 +128,19 @@ export default function AdminAnalytics() {
         <RetentionGrid retention={retention} />
       </div>
 
+      {/* Channel cohorts: WhatsApp-only vs app */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Channel cohorts: WhatsApp-only vs app</h2>
+        <p className="text-xs text-warm-grey mb-3">
+          Households grouped by how their members actually use Housemait. <strong>App installed</strong> = at
+          least one member registered the native iOS app; <strong>WhatsApp only</strong> = no app, but WhatsApp
+          linked; <strong>Web only</strong> = neither. <strong>Conversion</strong> = of households past trial,
+          the % subscribed. <strong>Retention</strong> = of households that ever subscribed, the % still active.
+          Shows whether WhatsApp-primary households are worth more or less than app households.
+        </p>
+        <ChannelCohorts channelCohorts={channelCohorts} />
+      </div>
+
       {/* DAU Timeline */}
       <div className="mt-8">
         <h2 className="font-display text-lg font-medium text-charcoal mb-3">Daily Active Users</h2>
@@ -168,6 +181,57 @@ function FunnelStep({ label, value, total }) {
       <div className="h-2 bg-cream rounded-full overflow-hidden">
         <div className="h-full bg-plum rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  );
+}
+
+const COHORT_LABELS = { app: 'App installed', whatsapp_only: 'WhatsApp only', web_only: 'Web only' };
+const COHORT_ORDER = ['app', 'whatsapp_only', 'web_only'];
+
+function ChannelCohorts({ channelCohorts }) {
+  if (!channelCohorts) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">No cohort data yet.</p>
+      </div>
+    );
+  }
+  const fmtPct = (v) => (v === null || v === undefined ? '—' : `${v}%`);
+  const th = 'px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider';
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-light-grey text-left">
+            <th className={th}>Cohort</th>
+            <th className={`${th} text-right`}>Households</th>
+            <th className={`${th} text-right`}>Trialing</th>
+            <th className={`${th} text-right`}>Active</th>
+            <th className={`${th} text-right`}>Expired</th>
+            <th className={`${th} text-right`}>Cancelled</th>
+            <th className={`${th} text-right`}>Conversion</th>
+            <th className={`${th} text-right`}>Retention</th>
+          </tr>
+        </thead>
+        <tbody>
+          {COHORT_ORDER.map((key) => {
+            const c = channelCohorts[key];
+            if (!c) return null;
+            return (
+              <tr key={key} className="border-b border-light-grey last:border-0">
+                <td className="px-4 py-3 font-medium text-charcoal">{COHORT_LABELS[key]}</td>
+                <td className="px-4 py-3 text-right text-charcoal">{c.total}</td>
+                <td className="px-4 py-3 text-right text-warm-grey">{c.trialing}</td>
+                <td className="px-4 py-3 text-right text-charcoal">{c.active}</td>
+                <td className="px-4 py-3 text-right text-warm-grey">{c.expired}</td>
+                <td className="px-4 py-3 text-right text-warm-grey">{c.cancelled}</td>
+                <td className="px-4 py-3 text-right font-semibold text-charcoal">{fmtPct(c.conversionPct)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-charcoal">{fmtPct(c.retentionPct)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
