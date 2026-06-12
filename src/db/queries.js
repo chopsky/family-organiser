@@ -2874,6 +2874,9 @@ async function getDeletedCalendarEvents(householdId, db = supabase) {
     .from('calendar_events')
     .select()
     .eq('household_id', householdId)
+    // Feed-pruned synced copies are sync bookkeeping, not user deletions -
+    // restoring one would resurrect an event its source calendar cancelled.
+    .is('external_feed_id', null)
     .not('deleted_at', 'is', null)
     .order('deleted_at', { ascending: false });
   if (error) throw error;
@@ -2886,9 +2889,10 @@ async function restoreCalendarEvent(eventId, householdId, db = supabase) {
     .update({ deleted_at: null })
     .eq('id', eventId)
     .eq('household_id', householdId)
+    .is('external_feed_id', null)
     .not('deleted_at', 'is', null)
     .select()
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -3081,6 +3085,17 @@ async function findHouseholdUidsUnderOtherFeeds(householdId, uids, excludeFeedId
   return found;
 }
 
+// Remove every event a feed/device link produced (used when tombstoning a
+// device link from the web - the row stays as a sync_enabled=false marker so
+// the owning phone is told to stop, but the copies disappear immediately).
+async function deleteEventsForFeed(feedId, db = supabase) {
+  const { error } = await db
+    .from('calendar_events')
+    .delete()
+    .eq('external_feed_id', feedId);
+  if (error) throw error;
+}
+
 // Replace one link's events within a window: delete then chunked UPSERT.
 //
 // Two subtleties, both learned the hard way (adversarial review):
@@ -3172,6 +3187,25 @@ async function recordExternalFeedSuccess(feedId, db = supabase) {
     .update({
       last_synced_at: new Date().toISOString(),
       last_error: null,
+      consecutive_failures: 0,
+    })
+    .eq('id', feedId);
+  if (error) throw error;
+}
+
+// A pull that landed but had its deletions withheld (suspected partial
+// response). Not a success - that would clear the pending-shrink marker the
+// next refresh needs - and not a failure - the upserts committed, so
+// consecutive_failures must not creep towards alerting.
+async function recordExternalFeedPartial(feedId, message, db = supabase) {
+  const { error } = await db
+    .from('external_calendar_feeds')
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_error: (message || '').slice(0, 1000),
+      // The fetch SUCCEEDED (upserts committed) - without this a feed
+      // recovering from an outage via a shrunken pull would keep its old
+      // failure streak and could cross the auto-disable threshold.
       consecutive_failures: 0,
     })
     .eq('id', feedId);
@@ -3405,13 +3439,21 @@ async function getCalendarSyncHealthAdmin(db = supabase) {
   return { feeds: enrichedFeeds, outboundTokens: enrichedTokens };
 }
 
-async function getAllEventsForFeed(householdId, db = supabase) {
+async function getAllEventsForFeed(householdId, userId, db = supabase) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const oneYearAhead = new Date();
   oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
-  const [{ data: events }, { data: tasks }] = await Promise.all([
+  // Visibility mirrors the in-app read rule (getCalendarEvents): family-wide
+  // events, the token owner's own events, and legacy NULL-visibility rows.
+  // Without this, a member's PRIVATE events were broadcast to anyone holding
+  // a feed URL. Feed tokens are per-user, so userId is always present.
+  let eventsQuery = db
+    .from('calendar_events')
+    .select()
+    .eq('household_id', householdId)
+    .is('deleted_at', null)
     // Exclude events that came in via an inbound external feed. Without
     // this filter, a user who subscribes to (a) an external calendar IN
     // Housemait via the inbound iCal feed feature AND (b) the Housemait
@@ -3419,15 +3461,16 @@ async function getAllEventsForFeed(householdId, db = supabase) {
     // event TWICE in their external calendar - once as the native
     // original, once re-broadcast through Housemait. Outbound should
     // only ever ship events that originated in Housemait.
-    db
-      .from('calendar_events')
-      .select()
-      .eq('household_id', householdId)
-      .is('deleted_at', null)
-      .is('external_feed_id', null)
-      .gte('start_time', thirtyDaysAgo.toISOString())
-      .lte('start_time', oneYearAhead.toISOString())
-      .order('start_time'),
+    .is('external_feed_id', null)
+    .gte('start_time', thirtyDaysAgo.toISOString())
+    .lte('start_time', oneYearAhead.toISOString())
+    .order('start_time');
+  if (userId) {
+    eventsQuery = eventsQuery.or(`visibility.eq.family,source_user_id.eq.${userId},visibility.is.null`);
+  }
+
+  const [{ data: events }, { data: tasks }] = await Promise.all([
+    eventsQuery,
     db
       .from('tasks')
       .select()
@@ -6896,11 +6939,13 @@ module.exports = {
   updateDeviceCalendarLink,
   findHouseholdUidsUnderOtherFeeds,
   replaceFeedEventsInWindow,
+  deleteEventsForFeed,
   getExternalFeedById,
   createExternalFeed,
   deleteExternalFeed,
   updateExternalFeed,
   recordExternalFeedSuccess,
+  recordExternalFeedPartial,
   recordExternalFeedFailure,
   getExternalFeedEvents,
   createExternalFeedEvent,

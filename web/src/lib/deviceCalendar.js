@@ -187,13 +187,14 @@ async function cleanupDeselected(allCalendars, selectedIds) {
     const stale = (feedData?.feeds || []).filter((f) => (
       f.source === 'device'
       && f.device_owner_user_id === uid
+      && f.sync_enabled !== false // already tombstoned - nothing to do
       && deselectedIds.has(f.device_calendar_id)
     ));
     await Promise.all(stale.map((f) => api.delete(`/calendar/external-feeds/${f.id}`).catch(() => {})));
   } catch { /* cleanup is best-effort; next sync retries */ }
 }
 
-export async function syncDeviceCalendars() {
+export async function syncDeviceCalendars({ reenableIds = [] } = {}) {
   if (!isDeviceCalendarSupported()) return null;
   if (!currentUserId()) return null;
   const selected = getSelectedCalendarIds();
@@ -244,6 +245,12 @@ export async function syncDeviceCalendars() {
       hash: hashString(JSON.stringify(list)),
       windowStart: start.toISOString(),
       windowEnd: end.toISOString(),
+      // Only a calendar the user EXPLICITLY ticked in this picker session
+      // may resurrect a web-tombstoned link. A blanket flag would also ride
+      // on calendars that are merely still-selected (stale localStorage, or
+      // pre-ticked on a first run/new phone) and silently undo a removal
+      // another household member made on the web.
+      ...(reenableIds.includes(c.id) ? { reenable: true } : {}),
     };
     full.set(c.id, { ...base, events: list });
     // Hash already acknowledged → hash-only ping; otherwise send everything.
@@ -267,6 +274,22 @@ export async function syncDeviceCalendars() {
     const retryResults = retry.data?.results || [];
     let r = 0;
     results = results.map((res) => (res?.needsEvents ? retryResults[r++] || res : res));
+  }
+
+  // Server says a link was tombstoned from the web ("stop syncing this") -
+  // honour it by dropping the calendar from this device's selection, so the
+  // removal sticks instead of resurrecting on the next sync.
+  const disabledIds = payloads
+    .filter((p, i) => results[i]?.disabled)
+    .map((p) => p.deviceCalendarId);
+  if (disabledIds.length > 0) {
+    const uid = currentUserId();
+    if (uid) {
+      try {
+        const kept = getSelectedCalendarIds().filter((id) => !disabledIds.includes(id));
+        localStorage.setItem(selectedKey(uid), JSON.stringify(kept));
+      } catch { /* selection prune is best-effort */ }
+    }
   }
 
   // Ack hashes the server accepted - EXCEPT dedupe-coupled calendars (the

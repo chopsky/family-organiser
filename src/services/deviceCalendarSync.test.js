@@ -5,6 +5,7 @@ jest.mock('../db/queries', () => ({
   createExternalFeed: jest.fn(),
   findHouseholdUidsUnderOtherFeeds: jest.fn().mockResolvedValue([]),
   replaceFeedEventsInWindow: jest.fn().mockResolvedValue(),
+  deleteEventsForFeed: jest.fn().mockResolvedValue(),
   getExternalFeedById: jest.fn(),
 }));
 
@@ -49,6 +50,29 @@ describe('sanitizeEvents', () => {
     const bare = events.find((e) => e.uid === 'bare');
     expect(bare.title).toBe('Untitled event');
     expect(bare.end).toBe(bare.start);
+  });
+
+  test('all-day events with device-local date-only strings pin to the display day (BST fix)', () => {
+    const { events } = sanitizeEvents([
+      { uid: 'ad1', title: 'Sports day', start: '2026-06-15', end: '2026-06-15', allDay: true },
+      { uid: 'ad2', title: 'Half term', start: '2026-10-26', end: '2026-10-30', allDay: true },
+    ]);
+    const [single, multi] = events;
+    // Date portion of the stored string IS the display day - no UTC shift.
+    expect(single.start).toBe('2026-06-15T00:00:00.000Z');
+    expect(single.end).toBe('2026-06-15T23:59:59.000Z');
+    expect(multi.start).toBe('2026-10-26T00:00:00.000Z');
+    expect(multi.end).toBe('2026-10-30T23:59:59.000Z');
+  });
+
+  test('all-day dates from a non-Gregorian device calendar are dropped, not stored', () => {
+    const { events, invalidDropped } = sanitizeEvents([
+      { uid: 'buddhist', title: 'Songkran', start: '2569-06-12', end: '2569-06-12', allDay: true },
+      { uid: 'japanese', title: 'Reiwa', start: '0008-06-12', end: '0008-06-12', allDay: true },
+      { uid: 'fine', title: 'Sports day', start: '2026-06-12', end: '2026-06-12', allDay: true },
+    ]);
+    expect(events.map((e) => e.uid)).toEqual(['fine']);
+    expect(invalidDropped).toBe(2);
   });
 
   test('caps at MAX_EVENTS_PER_CALENDAR and reports truncation', () => {
@@ -160,6 +184,28 @@ describe('syncDeviceCalendar', () => {
   test('rejects a calendar without id or window', async () => {
     expect((await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: { name: 'x' } })).ok).toBe(false);
     expect((await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: CAL({ windowStart: 'nope' }) })).ok).toBe(false);
+  });
+
+  test('tombstoned link (web removal) answers disabled and applies nothing', async () => {
+    db.findDeviceCalendarLink.mockResolvedValue({
+      id: 'L1', household_id: 'hh-1', sync_enabled: false, device_owner_user_id: 'u-1', display_name: 'Family',
+    });
+    const res = await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: CAL() });
+    expect(res).toMatchObject({ ok: false, disabled: true });
+    expect(db.replaceFeedEventsInWindow).not.toHaveBeenCalled();
+    // Sweeps leftovers from a sync that raced the web removal.
+    expect(db.deleteEventsForFeed).toHaveBeenCalledWith('L1');
+  });
+
+  test('explicit picker save (reenable) resurrects a tombstoned link and applies', async () => {
+    db.findDeviceCalendarLink.mockResolvedValue({
+      id: 'L1', household_id: 'hh-1', sync_enabled: false, device_owner_user_id: 'u-1',
+      display_name: 'Family', last_sync_hash: null, color: 'sky',
+    });
+    const res = await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: CAL({ reenable: true }) });
+    expect(res.ok).toBe(true);
+    expect(db.updateDeviceCalendarLink).toHaveBeenCalledWith('L1', { sync_enabled: true });
+    expect(db.replaceFeedEventsInWindow).toHaveBeenCalled();
   });
 
   test('hash-only ping with a MISMATCHED hash asks for the full payload, never wipes', async () => {

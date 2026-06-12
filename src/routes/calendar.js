@@ -123,7 +123,7 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
     }
 
     const household = await db.getHouseholdById(tokenData.household_id);
-    const { events, tasks } = await db.getAllEventsForFeed(tokenData.household_id);
+    const { events, tasks } = await db.getAllEventsForFeed(tokenData.household_id, tokenData.user_id);
 
     const ical = await getIcal();
     const calendar = ical({ name: household.name + ' \u2014 Housemait' });
@@ -502,10 +502,21 @@ router.patch('/events/:id', async (req, res) => {
   }
 
   try {
+    const existing = await db.getCalendarEventById(req.params.id, req.householdId);
+
+    // Synced copies are read-only: an edit would "succeed" and then be
+    // silently overwritten by the next sync/refresh of the source calendar -
+    // the most confusing possible outcome. Push the user to the source.
+    if (existing?.external_feed_id) {
+      return res.status(409).json({
+        error: 'This event syncs from an external calendar. Edit it in the source calendar and the change will appear here automatically.',
+        synced: true,
+      });
+    }
+
     // When a time is being changed, validate the resulting range against the
     // unchanged side too - a PATCH may move only the start or only the end.
     if (rest.start_time !== undefined || rest.end_time !== undefined) {
-      const existing = await db.getCalendarEventById(req.params.id, req.householdId);
       const effStart = rest.start_time !== undefined ? rest.start_time : existing?.start_time;
       const effEnd = rest.end_time !== undefined ? rest.end_time : existing?.end_time;
       const patchRangeError = timeRangeError(effStart, effEnd);
@@ -562,6 +573,17 @@ router.patch('/events/:id', async (req, res) => {
  */
 router.delete('/events/:id', async (req, res) => {
   try {
+    // Synced copies are read-only: a "delete" would resurrect on the next
+    // sync/refresh of the source calendar. Removing the whole calendar is
+    // done from Settings; removing one event is done in the source calendar.
+    const existing = await db.getCalendarEventById(req.params.id, req.householdId);
+    if (existing?.external_feed_id) {
+      return res.status(409).json({
+        error: 'This event syncs from an external calendar. Delete it in the source calendar and it will disappear here automatically.',
+        synced: true,
+      });
+    }
+
     // Clean up assignees before soft-deleting
     await db.saveEventAssignees(req.params.id, req.householdId, [], []).catch(() => {});
     await db.deleteCalendarEvent(req.params.id, req.householdId);
@@ -602,6 +624,10 @@ router.get('/deleted', async (req, res) => {
 router.post('/:id/restore', async (req, res) => {
   try {
     const event = await db.restoreCalendarEvent(req.params.id, req.householdId);
+    // Null covers not-found, not-deleted AND synced (external_feed_id) rows -
+    // restoring a feed-pruned copy would resurrect an event its source
+    // calendar cancelled, so the query refuses to match them.
+    if (!event) return res.status(404).json({ error: 'Event not found or cannot be restored.' });
     return res.json({ event });
   } catch (err) {
     console.error('POST /api/calendar/:id/restore error:', err);
@@ -825,7 +851,24 @@ router.delete('/external-feeds/:id', async (req, res) => {
     return res.status(404).json({ error: 'Feed not found.' });
   }
   try {
-    await db.deleteExternalFeed(feed.id, req.householdId);
+    if (feed.source === 'device') {
+      // TOMBSTONE, don't delete: the owning phone still has this calendar in
+      // its local selection, and a hard delete would just be recreated on its
+      // next foreground sync (adopt-or-create), silently undoing the removal.
+      // sync_enabled=false makes the next sync answer {disabled:true}, which
+      // tells the phone to drop the calendar from its selection; the events
+      // disappear now. Re-ticking in the picker re-enables explicitly.
+      // Events FIRST: if the tombstone write committed but the event delete
+      // failed, the feed would vanish from the Settings roster (it filters
+      // sync_enabled) while its read-only events stayed - unremovable from
+      // any surface. This order leaves every failure mode retryable.
+      await db.deleteEventsForFeed(feed.id);
+      await db.updateDeviceCalendarLink(feed.id, { sync_enabled: false, last_sync_hash: null });
+    } else {
+      await db.deleteExternalFeed(feed.id, req.householdId);
+    }
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
+    cache.invalidate(`digest:${req.householdId}`);
     return res.json({ success: true });
   } catch (err) {
     console.error(`DELETE /api/calendar/external-feeds/${feed.id} error:`, err);
@@ -867,6 +910,9 @@ router.post('/device-sync', async (req, res) => {
         siblingCalendarIds: allIds.filter((id) => id !== calendar?.deviceCalendarId),
       });
       if (result.ok && !result.skipped) changed = true;
+      // The disabled branch sweeps leftover events (race with a web
+      // removal), so the cached month view may have changed too.
+      if (result.disabled) changed = true;
       results.push(result);
     } catch (err) {
       // One calendar failing must not abort the batch NOR mask the others'

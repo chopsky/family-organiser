@@ -302,6 +302,7 @@ export default function Calendar() {
   // which made it impossible to tell at a glance which events were
   // 'yours' vs 'pulled from someone else's calendar'.
   const [externalFeeds, setExternalFeeds] = useState([]);
+  const [syncedEvent, setSyncedEvent] = useState(null); // read-only detail sheet for synced events
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Form state
@@ -816,6 +817,14 @@ export default function Calendar() {
   }
 
   function openEditForm(ev) {
+    // Synced copies (device sync / URL feeds) are READ-ONLY: an edit here
+    // would silently revert on the next sync and a delete would resurrect -
+    // the most confusing possible outcome. Show a detail sheet with
+    // provenance instead of the edit modal.
+    if (ev.external_feed_id) {
+      setSyncedEvent(ev);
+      return;
+    }
     setEditingEvent(ev);
     setEventAttachments([]);
     if (ev.id) loadAttachments(ev.id);
@@ -2613,6 +2622,47 @@ export default function Calendar() {
           </div>
         </div>
       )}
+
+      {/* Read-only detail sheet for SYNCED events (device sync / URL feeds).
+          Editing happens in the source calendar; changes flow in on the next
+          sync - which is also why there is deliberately no Delete button. */}
+      {syncedEvent && (() => {
+        const feed = externalFeeds.find((f) => f.id === syncedEvent.external_feed_id);
+        const owner = feed?.device_owner_user_id
+          ? members.find((m) => m.id === feed.device_owner_user_id)?.name
+          : null;
+        const sourceLine = feed
+          ? (feed.source === 'device'
+            ? `Synced from ${owner ? `${owner}'s iPhone` : 'a family iPhone'} · ${feed.display_name}`
+            : `Subscribed calendar · ${feed.display_name}`)
+          : 'Synced from an external calendar';
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSyncedEvent(null)}>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative bg-white rounded-2xl shadow-lg border border-light-grey p-5 sm:p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <h2 className="text-base md:text-lg font-medium text-charcoal">{syncedEvent.title}</h2>
+                <button onClick={() => setSyncedEvent(null)} className="text-warm-grey hover:text-charcoal p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-warm-grey">
+                {new Date(syncedEvent.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                {syncedEvent.all_day ? ' · All day' : ` · ${formatTime(syncedEvent.start_time)} – ${formatTime(syncedEvent.end_time)}`}
+              </p>
+              {syncedEvent.location && <p className="text-sm text-warm-grey mt-1">📍 {syncedEvent.location}</p>}
+              <div className="mt-4 bg-plum-light rounded-xl px-3 py-2.5">
+                <p className="text-xs font-medium text-plum">🔄 {sourceLine}</p>
+                <p className="text-[11px] text-plum/70 mt-0.5">
+                  Read-only here - edit or delete it in that calendar and Housemait updates automatically.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

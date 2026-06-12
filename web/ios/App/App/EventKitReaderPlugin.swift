@@ -75,16 +75,42 @@ public class EventKitReaderPlugin: CAPPlugin, CAPBridgedPlugin {
         // sync window (3 years) stays inside it.
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: cals)
         let iso = ISO8601DateFormatter()
+        // All-day events are serialised as DEVICE-LOCAL date-only strings.
+        // A UTC ISO timestamp would shift them across midnight whenever the
+        // device isn't on UTC (all of British Summer Time): "12 June" becomes
+        // 2026-06-11T23:00:00Z and renders a day early. The server maps the
+        // date-only form onto the app's all-day convention.
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+        dayFormatter.timeZone = TimeZone.current
+        // Fixed-format output must be pinned to POSIX/Gregorian: without
+        // this the formatter inherits the device's region calendar, and a
+        // phone set to the Buddhist or Japanese calendar renders 2026 as
+        // "2569" / "0008" - dates the server would store verbatim.
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.calendar = Calendar(identifier: .gregorian)
         let events = store.events(matching: predicate).compactMap { ev -> [String: Any]? in
             guard let startDate = ev.startDate else { return nil }
             let seriesId = ev.calendarItemExternalIdentifier ?? ev.eventIdentifier ?? ""
             guard !seriesId.isEmpty else { return nil }
+            let startString: String
+            let endString: String
+            if ev.isAllDay {
+                startString = dayFormatter.string(from: startDate)
+                // EventKit's all-day endDate is EXCLUSIVE (midnight after the
+                // last day) - step back one second for the inclusive last day.
+                let inclusiveEnd = (ev.endDate ?? startDate).addingTimeInterval(-1)
+                endString = dayFormatter.string(from: max(startDate, inclusiveEnd))
+            } else {
+                startString = iso.string(from: startDate)
+                endString = iso.string(from: ev.endDate ?? startDate)
+            }
             return [
                 "calendarId": ev.calendar.calendarIdentifier,
                 "uid": seriesId + "#" + iso.string(from: startDate),
                 "title": ev.title ?? "",
-                "start": iso.string(from: startDate),
-                "end": iso.string(from: ev.endDate ?? startDate),
+                "start": startString,
+                "end": endString,
                 "allDay": ev.isAllDay,
                 "location": ev.location ?? "",
                 "isRecurring": ev.hasRecurrenceRules,

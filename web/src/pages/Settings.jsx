@@ -1625,14 +1625,14 @@ export default function Settings() {
             the iPhone app's picker, but the WEB must still show evidence of
             the sync and allow unlink - that's the recovery path when the
             phone that fed a calendar is lost or the app was deleted. */}
-        {externalFeeds.some((f) => f.source === 'device') && (
+        {externalFeeds.some((f) => f.source === 'device' && f.sync_enabled !== false) && (
           <div className="mt-5 pt-5 border-t border-cream-border">
             <p className="text-base font-medium text-bark mb-1">Synced from phones</p>
             <p className="text-sm text-cocoa mb-3">
               Calendars syncing automatically from family iPhones. Choose which in the Housemait app on that phone.
             </p>
             <ul className="space-y-2">
-              {externalFeeds.filter((f) => f.source === 'device').map((feed) => {
+              {externalFeeds.filter((f) => f.source === 'device' && f.sync_enabled !== false).map((feed) => {
                 const owner = members.find((m) => m.id === feed.device_owner_user_id)?.name;
                 return (
                   <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2 flex items-center gap-2.5">
@@ -1785,7 +1785,9 @@ export default function Settings() {
                         {feed.last_synced_at
                           ? `Last refreshed ${new Date(feed.last_synced_at).toLocaleString()}`
                           : 'Never refreshed'}
-                        {feed.last_error && ' · last error: ' + feed.last_error}
+                        {/* "partial-pull:" markers are delete-confirmation
+                            bookkeeping (sync is healthy), not errors. */}
+                        {feed.last_error && !feed.last_error.startsWith('partial-pull:') && ' · last error: ' + feed.last_error}
                       </p>
                     </div>
                     <div className="flex gap-1 shrink-0">

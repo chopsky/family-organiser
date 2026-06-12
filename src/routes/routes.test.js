@@ -1234,6 +1234,48 @@ describe('POST /api/calendar/device-sync', () => {
   });
 });
 
+// ─── Synced events are read-only via the API ────────────────────────────────────
+// A PATCH or DELETE on a feed/device-sourced event would "succeed" and then be
+// silently reverted by the next sync - the API must refuse instead.
+describe('synced calendar events are read-only', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('PATCH on a synced event is refused with 409', async () => {
+    db.getCalendarEventById.mockResolvedValue({ id: 'e1', external_feed_id: 'F1', start_time: 'x', end_time: 'y' });
+    const res = await request(app).patch('/api/calendar/events/e1').set(AUTH).send({ title: 'New title' });
+    expect(res.status).toBe(409);
+    expect(db.updateCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  test('DELETE on a synced event is refused with 409', async () => {
+    db.getCalendarEventById.mockResolvedValue({ id: 'e1', external_feed_id: 'F1' });
+    const res = await request(app).delete('/api/calendar/events/e1').set(AUTH);
+    expect(res.status).toBe(409);
+    expect(db.deleteCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  test('native events still update normally', async () => {
+    db.getCalendarEventById.mockResolvedValue({ id: 'e2', external_feed_id: null, start_time: '2026-06-15T09:00:00Z', end_time: '2026-06-15T10:00:00Z' });
+    db.updateCalendarEvent.mockResolvedValue({ id: 'e2', title: 'Renamed', start_time: '2026-06-15T09:00:00Z' });
+    const res = await request(app).patch('/api/calendar/events/e2').set(AUTH).send({ title: 'Renamed' });
+    expect(res.status).toBe(200);
+    expect(db.updateCalendarEvent).toHaveBeenCalled();
+  });
+
+  test('restore refuses synced/missing rows with 404 (query matches only user-deleted events)', async () => {
+    db.restoreCalendarEvent.mockResolvedValue(null);
+    const res = await request(app).post('/api/calendar/e1/restore').set(AUTH);
+    expect(res.status).toBe(404);
+  });
+
+  test('restore returns the row for a genuine user deletion', async () => {
+    db.restoreCalendarEvent.mockResolvedValue({ id: 'e9', title: 'Picnic' });
+    const res = await request(app).post('/api/calendar/e9/restore').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.event).toMatchObject({ id: 'e9' });
+  });
+});
+
 // ─── GET /api/calendar/feed/:token.ics - stable UIDs ────────────────────────────
 // Without explicit ids, ical-generator mints RANDOM UIDs per request, so
 // subscribers' calendar apps saw the whole feed deleted + recreated on every

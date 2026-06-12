@@ -126,6 +126,13 @@ async function refreshFeed(feed) {
   let icalText;
   try {
     icalText = await fetchFeed(feed.feed_url);
+    // Providers serve HTML login/challenge/maintenance pages with HTTP 200
+    // (Cloudflare, lapsed O365 auth). Parsed as iCal that reads as "the feed
+    // now has zero events" and would wipe every synced copy - so a body
+    // without a VCALENDAR envelope is a fetch FAILURE, not an empty feed.
+    if (!/BEGIN:VCALENDAR/i.test(icalText)) {
+      throw new Error('Feed response is not an iCalendar document');
+    }
   } catch (err) {
     await db.recordExternalFeedFailure(feed.id, err.message || String(err));
     throw err;
@@ -133,10 +140,15 @@ async function refreshFeed(feed) {
 
   const vevents = extractVEvents(icalText);
   const rawRecords = [];
+  // UIDs of VEVENTs our parser choked on: the provider still publishes
+  // them, so their existing rows must NOT be treated as stale and deleted.
+  const unparseableUids = [];
   for (const v of vevents) {
     try {
       rawRecords.push(...vEventToRecords(v));
     } catch (err) {
+      const uid = (v.match(/^UID[^:]*:(.*)$/m) || [])[1];
+      if (uid && uid.trim()) unparseableUids.push(uid.trim());
       console.warn(`[external-feed ${feed.id}] failed to parse a VEVENT:`, err.message);
     }
   }
@@ -219,20 +231,50 @@ async function refreshFeed(feed) {
     await db.batchUpsertExternalFeedEvents(rows.slice(i, i + CHUNK));
   }
 
-  // Anything still in existingByUid wasn't in this pull = candidate
-  // delete. Apply the 7-day guard: if the event ended less than 7 days
-  // ago (or is in the future), skip - protects against a feed provider
-  // serving a partial response. Then batch-soft-delete the rest in one
-  // round-trip.
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // Anything still in existingByUid wasn't in this pull = candidate delete.
+  // Deletions MUST propagate - including FUTURE ones: when a school removes a
+  // cancelled fixture from its published feed, the event has to disappear
+  // here too. (The old guard skipped anything ending "less than 7 days ago
+  // or in the future", so future cancellations never propagated and families
+  // could turn up to cancelled events.) The failure that guard existed for
+  // is a provider serving a PARTIAL response, so detect that directly with a
+  // TWO-CYCLE confirmation: a pull that lost more than half the held events
+  // (or all of them) has its deletes withheld, and they only apply when the
+  // NEXT pull returns the same shrunken size - a transient partial response
+  // doesn't repeat at an identical size, a real shrink does. The pending
+  // size rides on last_error (visible in sync health) so a one-shot bad
+  // pull can never wipe a feed, while legitimate mass removals settle on
+  // the following refresh instead of deadlocking forever.
+  const heldBefore = stats.updated + existingByUid.size;
+  const prevPartial = typeof feed.last_error === 'string'
+    ? feed.last_error.match(/^partial-pull:(\d+)\b/)
+    : null;
+  // Small tolerance so an actively-edited feed whose count drifts a row or
+  // two between refreshes still confirms instead of re-arming forever.
+  const prevCount = prevPartial ? Number(prevPartial[1]) : null;
+  const shrinkConfirmed = prevCount !== null
+    && Math.abs(prevCount - rows.length) <= Math.max(2, Math.ceil(prevCount * 0.05));
+  const looksShrunk = existingByUid.size > 0
+    && (rows.length === 0 || rows.length < heldBefore * 0.5);
+  const looksPartial = looksShrunk && !shrinkConfirmed;
+  const isUnparseable = (extUid) => unparseableUids.some(
+    (u) => extUid === u || extUid.startsWith(`${u}_`)
+  );
   const toDelete = [];
-  for (const stale of existingByUid.values()) {
-    const eventEnd = new Date(stale.end_time || stale.start_time);
-    if (eventEnd > sevenDaysAgo) {
-      stats.skipped_recent_delete += 1;
-      continue;
+  if (looksPartial) {
+    stats.skipped_recent_delete = existingByUid.size;
+    console.warn(
+      `[external-feed ${feed.id}] pull looks partial (${rows.length} fetched vs ${heldBefore} held) - withholding ${existingByUid.size} deletes until confirmed`
+    );
+  } else {
+    for (const stale of existingByUid.values()) {
+      // Still published, we just couldn't parse it - keep its row.
+      if (unparseableUids.length > 0 && isUnparseable(stale.external_uid)) {
+        stats.skipped_recent_delete += 1;
+        continue;
+      }
+      toDelete.push(stale.id);
     }
-    toDelete.push(stale.id);
   }
   if (toDelete.length > 0) {
     // Same chunk size as upsert for consistency.
@@ -242,7 +284,17 @@ async function refreshFeed(feed) {
     stats.deleted = toDelete.length;
   }
 
-  await db.recordExternalFeedSuccess(feed.id);
+  if (looksPartial) {
+    // Not a success (would clear the pending marker) and not a failure
+    // (the upserts landed): stamp last_synced_at + the marker the next
+    // refresh checks to confirm or discard the shrink.
+    await db.recordExternalFeedPartial(
+      feed.id,
+      `partial-pull:${rows.length} (provider returned ${rows.length} of ${heldBefore} held events - deletions withheld until the next refresh confirms)`
+    );
+  } else {
+    await db.recordExternalFeedSuccess(feed.id);
+  }
 
   // Invalidate the month-of-events cache so the calendar view picks up
   // newly-pulled events on the next read. Without this, the local API's

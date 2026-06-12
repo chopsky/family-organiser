@@ -38,6 +38,10 @@ export default function DeviceCalendarSync({ onSynced }) {
   const [stage, setStage] = useState(() => (getSelectedCalendarIds().length > 0 ? 'summary' : 'intro'));
   const [calendars, setCalendars] = useState([]);
   const [selected, setSelected] = useState(new Set(getSelectedCalendarIds()));
+  // Calendars the user explicitly ticked ON in this picker session. Only
+  // these may resurrect a web-tombstoned link - a calendar that is merely
+  // still-ticked (stale selection, first-run pre-tick) must not.
+  const [userTicked, setUserTicked] = useState(() => new Set());
   const [error, setError] = useState('');
   const [savedNote, setSavedNote] = useState('');
   // URL-feed subscriptions the server detected as covering the SAME calendar
@@ -55,11 +59,17 @@ export default function DeviceCalendarSync({ onSynced }) {
       // Likely-wanted calendars first; subscribed/birthday/holiday noise last.
       list.sort((a, b) => (a.defaultOff === b.defaultOff ? a.title.localeCompare(b.title) : a.defaultOff ? 1 : -1));
       setCalendars(list);
-      // First run: pre-tick everything that isn't default-off, up to the cap.
-      setSelected((prev) => {
-        if (prev.size > 0) return prev;
+      // Re-seed from storage each time the picker opens: a sync may have
+      // pruned a web-tombstoned calendar from the stored selection since
+      // mount, and stale component state would show it still ticked (and
+      // write it back on Save). First run: pre-tick everything that isn't
+      // default-off, up to the cap.
+      setSelected(() => {
+        const ids = getSelectedCalendarIds();
+        if (ids.length > 0) return new Set(ids);
         return new Set(list.filter((c) => !c.defaultOff).slice(0, MAX_CALENDARS).map((c) => c.id));
       });
+      setUserTicked(new Set()); // fresh picker session - no explicit ticks yet
       setStage('picking');
     } catch {
       setError('Could not read the device calendars.');
@@ -71,7 +81,9 @@ export default function DeviceCalendarSync({ onSynced }) {
     setError('');
     try {
       setSelectedCalendarIds([...selected]);
-      const results = await syncDeviceCalendars();
+      // Only calendars the user deliberately ticked in THIS session may
+      // resurrect a web-tombstoned link; still-ticked leftovers may not.
+      const results = await syncDeviceCalendars({ reenableIds: [...userTicked].filter((id) => selected.has(id)) });
       const found = new Map();
       for (const r of results || []) {
         for (const f of r?.overlappingFeeds || []) found.set(f.id, f);
@@ -86,11 +98,19 @@ export default function DeviceCalendarSync({ onSynced }) {
     }
   }
 
-  const toggle = (id) => setSelected((prev) => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const toggle = (id) => {
+    const turningOn = !selected.has(id);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+    setUserTicked((prev) => {
+      const next = new Set(prev);
+      turningOn ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
 
   return (
     <div className="border border-cream-border rounded-2xl p-4 space-y-3">

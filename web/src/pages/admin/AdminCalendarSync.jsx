@@ -5,12 +5,16 @@ import { IconRefresh } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
+// A "partial-pull:" marker is the two-cycle delete-confirmation bookkeeping
+// (deletions withheld pending the next refresh), not a fetch failure.
+const hasRealError = (f) => !!f.last_error && !f.last_error.startsWith('partial-pull:');
+
 // Status badge for an inbound feed. Precedence: disabled > failing > never-synced > stale > healthy.
 function feedStatus(f) {
   if (!f.sync_enabled) {
     return <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-warm-grey text-xs font-semibold">Disabled</span>;
   }
-  if ((f.consecutive_failures ?? 0) >= 3 || f.last_error) {
+  if ((f.consecutive_failures ?? 0) >= 3 || hasRealError(f)) {
     return (
       <span
         className="inline-flex items-center px-2 py-0.5 rounded-md bg-coral-light text-coral text-xs font-semibold"
@@ -56,11 +60,11 @@ export default function AdminCalendarSync() {
   const total = feeds.length;
   const healthy = feeds.filter((f) => {
     if (!f.sync_enabled) return false;
-    if ((f.consecutive_failures ?? 0) >= 3 || f.last_error) return false;
+    if ((f.consecutive_failures ?? 0) >= 3 || hasRealError(f)) return false;
     if (!f.last_synced_at) return false;
     return (Date.now() - new Date(f.last_synced_at).getTime()) / (1000 * 60 * 60) <= 24;
   }).length;
-  const failing = feeds.filter((f) => (f.consecutive_failures ?? 0) >= 3 || !!f.last_error).length;
+  const failing = feeds.filter((f) => (f.consecutive_failures ?? 0) >= 3 || hasRealError(f)).length;
   const outbound = outboundTokens.length;
 
   return (

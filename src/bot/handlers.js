@@ -523,6 +523,15 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
 
   try {
     if (isEvent) {
+      // Synced copies (device sync / URL feeds) are read-only: a bot edit or
+      // cancel would silently revert on the next sync, which reads as the bot
+      // "not working". Point the user at the source calendar instead.
+      if (hit.external_feed_id) {
+        return {
+          response: `📅 "${hit.title}" syncs from an external calendar, so I can't change it here. Edit it in that calendar and it'll update in Housemait automatically.`,
+          actions,
+        };
+      }
       if (isDelete) {
         await db.softDeleteCalendarEvent(hit.id, household.id);
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);

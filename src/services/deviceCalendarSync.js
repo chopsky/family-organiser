@@ -33,6 +33,7 @@ const MAX_TEXT = 300;
 
 const trim = (v, n = MAX_TEXT) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Validate + bound a raw event payload from the device. Returns the kept
@@ -51,11 +52,32 @@ function sanitizeEvents(rawEvents) {
     if (uid.startsWith(HOUSEMAIT_UID_PREFIX)) { echoDropped += 1; continue; }
     if (seen.has(uid)) { invalidDropped += 1; continue; } // in-batch dupe
     seen.add(uid);
+    // All-day events arrive as device-LOCAL date-only strings (the bridge
+    // formats them in the phone's timezone), because a UTC timestamp shifts
+    // them across midnight outside UTC - "12 June" became 11 June for the
+    // whole of British Summer Time. Pin them to the app's all-day convention:
+    // the date portion of the stored string IS the display day, with the end
+    // inclusive so multi-day banners span correctly.
+    let start;
+    let end;
+    if (e.allDay && DATE_ONLY.test(e.start)) {
+      // Year sanity: a device formatter that slipped off the Gregorian
+      // calendar (Buddhist 2569, Japanese era 0008) produces a date the
+      // regex accepts but that would persist centuries away under a stable
+      // UID. Better to drop the event than store a corrupt row.
+      const year = Number(e.start.slice(0, 4));
+      if (year < 1900 || year > 2200) { invalidDropped += 1; continue; }
+      start = `${e.start}T00:00:00.000Z`;
+      end = DATE_ONLY.test(e.end) ? `${e.end}T23:59:59.000Z` : `${e.start}T23:59:59.000Z`;
+    } else {
+      start = new Date(e.start).toISOString();
+      end = isIso(e.end) ? new Date(e.end).toISOString() : start;
+    }
     events.push({
       uid,
       title: trim(e.title) || 'Untitled event',
-      start: new Date(e.start).toISOString(),
-      end: isIso(e.end) ? new Date(e.end).toISOString() : new Date(e.start).toISOString(),
+      start,
+      end,
       allDay: !!e.allDay,
       location: trim(e.location) || null,
     });
@@ -137,6 +159,28 @@ async function syncDeviceCalendar({ householdId, userId, calendar, siblingCalend
   const link = await adoptOrCreateLink({
     householdId, userId, deviceCalendarId: trim(deviceCalendarId, 400), name, color, siblingCalendarIds,
   });
+
+  // TOMBSTONED link (removed from the web): tell the phone to drop this
+  // calendar from its local selection instead of resurrecting it. The quiet
+  // sync right after a web removal still contains the calendar - it must NOT
+  // re-enable. Only an EXPLICIT picker save (calendar.reenable === true) can
+  // turn a tombstoned link back on, because by then the client has already
+  // dropped the id and a re-tick is a deliberate user choice.
+  if (link.sync_enabled === false) {
+    if (calendar.reenable === true) {
+      await db.updateDeviceCalendarLink(link.id, { sync_enabled: true });
+      link.sync_enabled = true;
+    } else {
+      // Sweep any leftover events. A sync that was already in flight when
+      // the web removal landed can re-insert the full event set AFTER the
+      // removal deleted it - those rows would be stranded forever (the
+      // phone drops the calendar from its selection, so no later sync
+      // touches them, and synced events are read-only everywhere else).
+      // Idempotent, and self-heals previously stranded rows.
+      await db.deleteEventsForFeed(link.id);
+      return { ok: false, linkId: link.id, disabled: true };
+    }
+  }
 
   const payloadHash = trim(hash, 128) || null;
   if (payloadHash && link.last_sync_hash === payloadHash) {
