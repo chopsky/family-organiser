@@ -3983,6 +3983,82 @@ function computeChannelCohorts({ households, members, appUserIds }) {
 }
 
 /**
+ * Pure aggregation behind getCalendarConnectionStats - separated so it can be
+ * unit-tested without a DB. Calendar connection is the activation keystone:
+ * once a household has a live calendar, the dashboard, daily brief and
+ * reminders all have something to show. Counts a household as "connected" if
+ * it has at least one external_calendar_feeds row that isn't tombstoned
+ * (sync_enabled !== false), whether device-synced or a URL subscription.
+ *
+ *   connectedPct   - of all non-internal households, the % with a live calendar
+ *   device/url     - how connected households got there (a household can be both)
+ *   activation7d   - of households old enough for a 7-day window to have
+ *                    elapsed, the % whose FIRST live feed landed within 7 days
+ *                    of signup (the activation metric: are new households
+ *                    connecting quickly, not eventually?)
+ */
+function computeCalendarConnectionStats({ households, feeds, now }) {
+  const DAY = 24 * 60 * 60 * 1000;
+  const nowMs = new Date(now).getTime();
+  const hh = new Map(
+    (households || []).map((h) => [h.id, {
+      created: h.created_at ? new Date(h.created_at).getTime() : null,
+      earliestFeed: null, device: false, url: false,
+    }]),
+  );
+  for (const f of feeds || []) {
+    if (f.sync_enabled === false) continue; // tombstoned / disabled = not live
+    const rec = hh.get(f.household_id);
+    if (!rec) continue; // feed for an internal/unknown household - ignore
+    const t = f.created_at ? new Date(f.created_at).getTime() : null;
+    if (t != null && (rec.earliestFeed == null || t < rec.earliestFeed)) rec.earliestFeed = t;
+    if (f.source === 'device') rec.device = true;
+    else rec.url = true;
+  }
+  let total = 0; let connected = 0; let deviceConnected = 0; let urlConnected = 0;
+  let eligible7d = 0; let activated7d = 0;
+  for (const rec of hh.values()) {
+    total += 1;
+    if (rec.device || rec.url) connected += 1;
+    if (rec.device) deviceConnected += 1;
+    if (rec.url) urlConnected += 1;
+    if (rec.created != null && nowMs - rec.created >= 7 * DAY) {
+      eligible7d += 1;
+      if (rec.earliestFeed != null && rec.earliestFeed - rec.created <= 7 * DAY) activated7d += 1;
+    }
+  }
+  const pct = (n, d) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
+  return {
+    total,
+    connected,
+    connectedPct: pct(connected, total),
+    deviceConnected,
+    urlConnected,
+    eligible7d,
+    activated7d,
+    activation7dPct: pct(activated7d, eligible7d),
+  };
+}
+
+/**
+ * Calendar-connection rate for the admin analytics page. Small user base, so
+ * pull households + feeds and aggregate in memory rather than an RPC.
+ */
+async function getCalendarConnectionStats(db = supabase) {
+  const [hhRes, feedRes] = await Promise.all([
+    db.from('households').select('id, created_at').eq('is_internal', false),
+    db.from('external_calendar_feeds').select('household_id, source, sync_enabled, created_at'),
+  ]);
+  if (hhRes.error) throw hhRes.error;
+  if (feedRes.error) throw feedRes.error;
+  return computeCalendarConnectionStats({
+    households: hhRes.data || [],
+    feeds: feedRes.data || [],
+    now: new Date().toISOString(),
+  });
+}
+
+/**
  * Channel-cohort breakdown for the admin analytics page: do WhatsApp-only
  * households convert / retain better or worse than app households? The user
  * base is small (hundreds), so we pull the three relevant tables and classify
@@ -7055,6 +7131,8 @@ module.exports = {
   getAnalytics,
   getRetentionCohorts,
   getChannelCohortStats,
+  computeCalendarConnectionStats,
+  getCalendarConnectionStats,
   computeChannelCohorts,
   getRevenueStats,
   getAiUsageTopHouseholds,

@@ -24,7 +24,10 @@ export default function AdminAnalytics() {
 
   if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
-  const { dau = [], featureUsage = {}, funnel = {}, wau = 0, retention = null, channelCohorts = null } = data || {};
+  const {
+    dau = [], featureUsage = {}, funnel = {}, wau = 0,
+    retention = null, channelCohorts = null, calendarConnection = null,
+  } = data || {};
 
   // Calculate DAU average
   const recentDau = dau.slice(-7);
@@ -66,6 +69,10 @@ export default function AdminAnalytics() {
           <p className="text-xs text-warm-grey font-medium mt-0.5">Registered Users</p>
         </div>
       </div>
+
+      {/* Calendar connection - the activation keystone. Once a household has a
+          live calendar, the dashboard/brief/reminders all have content. */}
+      <CalendarConnection stats={calendarConnection} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         {/* Feature Usage */}
@@ -180,6 +187,40 @@ function FunnelStep({ label, value, total }) {
       </div>
       <div className="h-2 bg-cream rounded-full overflow-hidden">
         <div className="h-full bg-plum rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function CalendarConnection({ stats }) {
+  const fmtPct = (v) => (v === null || v === undefined ? '—' : `${v}%`);
+  return (
+    <div className="mt-8">
+      <h2 className="font-display text-lg font-medium text-charcoal mb-1">Calendar connection</h2>
+      <p className="text-sm text-warm-grey mb-3">
+        The activation keystone — a household with a live calendar gets a populated dashboard, daily brief and reminders.
+      </p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-charcoal">{fmtPct(stats?.connectedPct)}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">
+            Households connected{stats ? ` (${stats.connected}/${stats.total})` : ''}
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-charcoal">{fmtPct(stats?.activation7dPct)}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">
+            Connected within 7 days{stats ? ` (${stats.activated7d}/${stats.eligible7d})` : ''}
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-charcoal">{stats?.deviceConnected ?? '—'}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">via iPhone sync</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-2xl font-bold text-charcoal">{stats?.urlConnected ?? '—'}</p>
+          <p className="text-xs text-warm-grey font-medium mt-0.5">via calendar link</p>
+        </div>
       </div>
     </div>
   );

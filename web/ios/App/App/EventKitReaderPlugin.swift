@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import EventKit
+import UIKit
 
 /**
  * EventKitReader - a deliberately READ-ONLY bridge to the device calendar.
@@ -9,9 +10,12 @@ import EventKit
  * no read-only calendar permission (full access technically includes write
  * capability), so the guarantee is enforced by construction instead:
  *
- *   - This plugin exposes exactly three methods: requestAccess,
- *     listCalendars, fetchEvents. There is NO save/remove/commit path,
- *     no EKEvent construction, and no other EventKit code in the app.
+ *   - This plugin exposes three EventKit methods: requestAccess,
+ *     listCalendars, fetchEvents (all read-only). There is NO save/remove/
+ *     commit path, no EKEvent construction, and no other EventKit code in the
+ *     app. A fourth method, openSettings, only deep-links to the OS Settings
+ *     app so a user who declined the permission can re-grant it - it touches
+ *     no calendar data.
  *   - A jest guard (src/ios-no-calendar-write.test.js) fails the suite if a
  *     calendar-write symbol ever appears in the iOS sources.
  *
@@ -27,9 +31,26 @@ public class EventKitReaderPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "listCalendars", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "fetchEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
     ]
 
     private let store = EKEventStore()
+
+    // Deep-link to this app's page in the OS Settings, so a user who declined
+    // the calendar permission can re-grant it without hunting through Settings.
+    // Read-only by nature - it opens a URL, it never touches EventKit.
+    @objc func openSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openSettingsURLString),
+                  UIApplication.shared.canOpenURL(url) else {
+                call.reject("Settings URL unavailable")
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { opened in
+                call.resolve(["opened": opened])
+            }
+        }
+    }
 
     @objc func requestAccess(_ call: CAPPluginCall) {
         if #available(iOS 17.0, *) {

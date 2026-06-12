@@ -94,6 +94,19 @@ export async function requestCalendarAccess() {
   return !!granted;
 }
 
+// Deep-link to Housemait's page in the OS Settings app so a user who declined
+// the calendar permission can re-grant it. Best-effort - returns false if the
+// native bridge or the URL is unavailable rather than throwing.
+export async function openAppSettings() {
+  try {
+    if (!isDeviceCalendarSupported()) return false;
+    const { opened } = await EventKitReader.openSettings();
+    return !!opened;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * List device calendars for the picker, pre-classifying which should be
  * default-off (subscribed feeds, Birthdays/Holidays) and hiding Housemait's

@@ -47,10 +47,13 @@ describe('iOS sources contain no calendar-write code', () => {
     },
   );
 
-  test('the bridge declares only the three read methods', () => {
+  test('the bridge declares only the three read methods + openSettings', () => {
     const bridge = files.find((f) => f.endsWith('EventKitReaderPlugin.swift'));
     const source = fs.readFileSync(bridge, 'utf8');
     const declared = [...source.matchAll(/CAPPluginMethod\(name:\s*"(\w+)"/g)].map((m) => m[1]).sort();
-    expect(declared).toEqual(['fetchEvents', 'listCalendars', 'requestAccess']);
+    // The three EventKit methods are all read-only; openSettings only deep-links
+    // to the OS Settings app (no EventKit access). Any OTHER new method must be
+    // justified here - the FORBIDDEN write-symbol scan above is the real guard.
+    expect(declared).toEqual(['fetchEvents', 'listCalendars', 'openSettings', 'requestAccess']);
   });
 });

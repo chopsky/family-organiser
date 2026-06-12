@@ -8,7 +8,7 @@
  * device; syncs run on save and every app-foreground.
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import api from '../lib/api';
 import {
   isDeviceCalendarSupported,
@@ -18,8 +18,10 @@ import {
   setSelectedCalendarIds,
   syncDeviceCalendars,
   getLastSyncAt,
+  openAppSettings,
   MAX_CALENDARS,
 } from '../lib/deviceCalendar';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 
 function lastSyncLabel() {
   const iso = getLastSyncAt();
@@ -49,9 +51,10 @@ export default function DeviceCalendarSync({ onSynced }) {
   // users don't have to figure out the old subscription is now redundant.
   const [overlaps, setOverlaps] = useState([]);
 
-  if (!isDeviceCalendarSupported()) return null;
-
-  async function loadCalendars() {
+  // A useCallback (not a hoisted declaration) so the foreground re-check hook
+  // below can reference it cleanly. Stable, empty deps: it only closes over
+  // state setters and module imports.
+  const loadCalendars = useCallback(async () => {
     try {
       const granted = await requestCalendarAccess();
       if (!granted) { setStage('denied'); return; }
@@ -74,7 +77,16 @@ export default function DeviceCalendarSync({ onSynced }) {
     } catch {
       setError('Could not read the device calendars.');
     }
-  }
+  }, []);
+
+  // If the user left to flip the permission in Settings, re-check when they
+  // come back so they don't have to tap "Try again". Both the callback and the
+  // hook sit above the platform early-return to keep hook order stable.
+  useAppForegroundRefresh(() => {
+    if (stage === 'denied') loadCalendars();
+  }, { throttleMs: 0 });
+
+  if (!isDeviceCalendarSupported()) return null;
 
   async function handleSave() {
     setStage('syncing');
@@ -183,9 +195,25 @@ export default function DeviceCalendarSync({ onSynced }) {
       )}
 
       {stage === 'denied' && (
-        <p className="text-xs text-cocoa bg-coral/10 rounded-xl px-3 py-2">
-          Calendar access is off for Housemait. Enable it in iPhone Settings → Privacy &amp; Security → Calendars, then come back.
-        </p>
+        <div className="space-y-2.5 bg-coral/10 rounded-xl px-3 py-3">
+          <p className="text-xs text-cocoa">
+            Calendar access is off for Housemait. Turn on <strong>Calendars</strong> in Settings, then come back — your events will appear automatically.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => openAppSettings()}
+              className="bg-primary hover:bg-primary-pressed text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+            >
+              Open Settings
+            </button>
+            <button
+              onClick={loadCalendars}
+              className="text-xs font-semibold text-primary hover:text-primary-pressed px-2 py-2"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
       )}
 
       {(stage === 'picking' || stage === 'syncing') && (

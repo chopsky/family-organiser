@@ -12,6 +12,8 @@
 
 import { useState } from 'react';
 import WhatsAppPairing from '../../components/WhatsAppPairing';
+import DeviceCalendarSync from '../../components/DeviceCalendarSync';
+import { isDeviceCalendarSupported } from '../../lib/deviceCalendar';
 import {
   serifHeading, serifHeadingStyle, kicker, primaryBtn, skipLink,
 } from './_styles';
@@ -115,9 +117,22 @@ export default function ConnectWhatsApp({ next, setError }) {
         We&apos;ve sent you a welcome message. Pin the chat so it stays at the top.
       </p>
 
+      {/* Peak-momentum calendar offer (iPhone only - the component self-gates
+          to iOS and renders nothing on web). This is the moment to connect a
+          calendar: it's what makes the dashboard and daily brief actually
+          show something. NOT a gate - "Continue" always proceeds. */}
+      {isDeviceCalendarSupported() && (
+        <div className="mt-8 max-w-md mx-auto text-left">
+          <p className="text-sm text-bark text-center mb-3">
+            One more thing — connect your calendar so your dashboard and daily brief fill in with your real plans.
+          </p>
+          <DeviceCalendarSync />
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col items-center gap-3">
         <button type="button" onClick={next} className={primaryBtn}>
-          Continue →
+          {isDeviceCalendarSupported() ? 'Done →' : 'Continue →'}
         </button>
       </div>
     </div>
