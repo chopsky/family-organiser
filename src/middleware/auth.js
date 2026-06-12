@@ -26,7 +26,9 @@ function requireAuth(req, res, next) {
   const token = header.slice(7);
   req.token = token;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    // Pin the algorithm: tokens are always signed HS256 (symmetric secret), so
+    // refusing any other alg closes the algorithm-confusion / alg:none class.
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     req.user = { id: payload.userId, name: payload.name, role: payload.role, isPlatformAdmin: payload.isPlatformAdmin || false };
     req.householdId = payload.householdId;
     return next();

@@ -88,6 +88,10 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/api/auth/forgot-password', sensitiveAuthLimiter);
   app.use('/api/auth/reset-password', sensitiveAuthLimiter);
   app.use('/api/auth/resend-verification', sensitiveAuthLimiter);
+  // SSO sign-in endpoints are auth surfaces too - rate-limit them against
+  // token-spraying / account-probing the same as password login.
+  app.use('/api/auth/google', sensitiveAuthLimiter);
+  app.use('/api/auth/apple', sensitiveAuthLimiter);
 
   // Stricter limiter for the public contact form (anti-spam)
   const contactLimiter = rateLimit({

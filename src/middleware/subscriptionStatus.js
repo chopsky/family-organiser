@@ -85,7 +85,7 @@ async function requireActiveSubscription(req, res, next) {
 
   let payload;
   try {
-    payload = jwt.verify(header.slice(7), JWT_SECRET);
+    payload = jwt.verify(header.slice(7), JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return next(); // bad/expired token - downstream requireAuth will surface the 401
   }

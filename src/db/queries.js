@@ -1,6 +1,16 @@
 const { supabaseAdmin: supabase } = require('./client');
 const crypto = require('crypto');
 
+// Sanitise a free-text value before embedding it in a PostgREST `.or()` filter
+// STRING. PostgREST parses that whole string, so commas / parentheses (its
+// condition + group delimiters) and backslashes in user input could break out
+// of an `ilike` value and inject extra filter conditions. Strip those
+// structural metacharacters; `%` and `_` stay (harmless ilike wildcards that
+// only ever over-match). Safe to interpolate into `col.ilike.%VALUE%`.
+function sanitizeOrFilterValue(value) {
+  return String(value == null ? '' : value).replace(/[,()\\]/g, ' ').trim();
+}
+
 // ─── Households ───────────────────────────────────────────────────────────────
 
 function generateJoinCode() {
@@ -2625,10 +2635,11 @@ async function searchCalendar(householdId, query, { limit = 50 } = {}, db = supa
 
   const cap = Math.min(Math.max(1, limit), 100);
   // ILIKE pattern: surround in % so it matches the term anywhere in
-  // the field. PostgREST passes the raw value through to Postgres so
-  // % and _ act as wildcards - fine for our use case (a stray %
-  // someone typed just over-matches; not a security concern).
-  const pattern = `%${trimmed}%`;
+  // the field. % and _ act as wildcards - fine for our use case (a
+  // stray % someone typed just over-matches). sanitizeOrFilterValue
+  // strips PostgREST .or() structural chars so the term can't break
+  // out of the ilike value (the .or() at line below embeds it).
+  const pattern = `%${sanitizeOrFilterValue(trimmed)}%`;
 
   // school_term_dates is joined to household_schools to filter by
   // household. We embed the parent so we can return the school name
@@ -3822,7 +3833,8 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
     .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    const s = sanitizeOrFilterValue(search);
+    query = query.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
   }
 
   // Whitelist sort columns to prevent injection
@@ -3861,7 +3873,10 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
 async function getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db) {
   // 1. All matching IDs (no range, no full payload yet)
   let idQuery = db.from('users').select('id', { count: 'exact' });
-  if (search) idQuery = idQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  if (search) {
+    const s = sanitizeOrFilterValue(search);
+    idQuery = idQuery.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
+  }
   const { data: idRows, error: idErr, count } = await idQuery;
   if (idErr) throw idErr;
   const allIds = (idRows || []).map((r) => r.id);
@@ -6611,6 +6626,7 @@ async function updateSubscriptionRenewal(id, nextRenewalAt, remindedForDate, db 
 }
 
 module.exports = {
+  sanitizeOrFilterValue,
   getAllHouseholds,
   getTasksDueNextWeek,
   createHousehold,

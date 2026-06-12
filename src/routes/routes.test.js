@@ -1136,3 +1136,29 @@ describe('GET /api/schools does not auto-delete a brand-new school', () => {
     expect(db.deleteHouseholdSchool).not.toHaveBeenCalled();
   });
 });
+
+// ─── JWT algorithm pinning ──────────────────────────────────────────────────────
+// Tokens are always minted HS256. The auth middleware pins algorithms:['HS256']
+// so a token forged with any other algorithm (the alg-confusion / alg:none class)
+// is rejected even though it's signed with the same secret string.
+describe('JWT algorithm pinning', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('rejects a token signed with a non-HS256 algorithm', async () => {
+    const jwt = require('jsonwebtoken');
+    const forged = jwt.sign(
+      { userId: 'u-1', householdId: 'hh-1', name: 'Sarah', role: 'admin' },
+      process.env.JWT_SECRET,
+      { algorithm: 'HS512' },
+    );
+    const res = await request(app).get('/api/household').set({ Authorization: `Bearer ${forged}` });
+    expect(res.status).toBe(401);
+  });
+
+  test('still accepts a normally-signed HS256 token (control)', async () => {
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+    const res = await request(app).get('/api/household').set(AUTH);
+    expect(res.status).toBe(200);
+  });
+});
