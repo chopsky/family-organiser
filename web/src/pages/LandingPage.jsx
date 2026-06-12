@@ -108,20 +108,6 @@ const ArrowRight = () => (
   </svg>
 )
 
-/** "Download on the App Store" badge — Apple's official UK/US English
- *  badge SVG, served from /assets/app-store-badge.svg. Using Apple's
- *  exact asset (rather than a recreation) keeps us inside their brand
- *  guidelines for app marketing. Aspect ratio is 119.66 × 40 — the
- *  CSS sizes by height so the width follows naturally. */
-const AppStoreBadge = () => (
-  <img
-    src="/assets/app-store-badge.svg"
-    alt="Download on the App Store"
-    width="120"
-    height="40"
-  />
-)
-
 /** Calendar mock for the showcase. parentTerm is locale-dependent
  *  (Mum vs Mom) and only appears on the assignee meta line of two of
  *  the sample events. Default keeps the historical UK wording. */
@@ -529,6 +515,9 @@ function DownloadQR() {
         className="btn btn-primary download-pill"
         aria-label="Download Housemait on the App Store, or hover to scan the QR code"
       >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}>
+          <path d="M17.05 12.54c-.03-3.05 2.49-4.51 2.6-4.58-1.42-2.07-3.62-2.36-4.4-2.39-1.87-.19-3.66 1.1-4.6 1.1-.95 0-2.42-1.07-3.98-1.04-2.05.03-3.94 1.19-4.99 3.02-2.13 3.7-.54 9.17 1.53 12.17 1.02 1.47 2.23 3.12 3.81 3.06 1.54-.06 2.12-.99 3.97-.99 1.85 0 2.38.99 3.99.96 1.65-.03 2.7-1.5 3.7-2.97 1.17-1.7 1.65-3.35 1.67-3.43-.04-.02-3.2-1.23-3.3-4.91zM14.02 3.6c.84-1.02 1.41-2.43 1.25-3.85-1.21.05-2.68.81-3.55 1.83-.78.9-1.46 2.35-1.28 3.73 1.36.11 2.74-.69 3.58-1.71z" />
+        </svg>
         Download on the App Store
       </a>
       <span className="qr-popover" role="tooltip">
@@ -686,37 +675,21 @@ export default function LandingPage() {
               Housemait is the AI assistant that restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
             </p>
             <div className="hero-cta">
-              {/* Hero CTA — on iOS phones/tablets the App Store badge
-                  becomes the primary action and the web trial demotes
-                  to secondary, because phone visitors will want the
-                  native app rather than to sign up in Safari and
-                  re-authenticate in the app later. Every other visitor
-                  sees the original trial-first treatment. The App Store
-                  badge is only rendered at all when the App Store ID
-                  has been configured in lib/app-store.js. */}
-              {iosVisitor ? (
-                // iOS phone/iPad: one tap installs from the App Store —
-                // no QR detour needed, the Apple badge does its job.
-                <a href={APP_STORE_URL} className="app-store-cta" aria-label="Download Housemait on the App Store">
-                  <AppStoreBadge />
-                </a>
-              ) : (
-                // Desktop + Android: give two paths. "Download App"
-                // shows a QR popover on hover so a desktop visitor can
-                // scan with their phone and install in one motion. "Try
-                // Housemait Online" stays as the no-install fallback.
-                <>
-                  {APP_STORE_CONFIGURED && (
-                    <DownloadQR />
-                  )}
-                  <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
-                    Try it on the web
-                  </a>
-                </>
-              )}
+              {/* Hero CTA — every visitor (desktop, Android, and iPhone)
+                  gets the same pair: the styled "Download on the App
+                  Store" pill plus the "Try it on the web" fallback. On
+                  desktop the pill reveals a QR popover on hover so you can
+                  scan straight to your phone; on a touch device there's no
+                  hover, so tapping just opens the App Store directly. The
+                  pill is only rendered when the App Store ID has been
+                  configured in lib/app-store.js. */}
+              {APP_STORE_CONFIGURED && <DownloadQR />}
+              <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
+                Try it on the web
+              </a>
             </div>
             <div className="hero-price">
-              Free 30-day trial. Cancel anytime.
+              Free 30-day trial. No card to start. Cancel anytime.
             </div>
             <div className="quicks">
               {QUICK_CHIPS.map(c => (
@@ -1104,7 +1077,10 @@ export default function LandingPage() {
               <h2>Try Housemait <em>free</em><br />for 30&nbsp;days.</h2>
               <p>Set Housemait up in under 5 minutes. Your calmer family life starts here.</p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a href={SIGNUP_URL} className="btn btn-primary">Start 30-day free trial</a>
+                {APP_STORE_CONFIGURED && <DownloadQR />}
+                <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
+                  Try it on the web
+                </a>
               </div>
             </div>
           </div>
