@@ -600,7 +600,7 @@ export default function Calendar() {
   // Init member filters when members load
   useEffect(() => {
     if (members.length > 0 && activeMemberFilters === null) {
-      setActiveMemberFilters(new Set(members.map(m => m.name)));
+      setActiveMemberFilters(new Set(members.map(m => m.id)));
     }
   }, [members]);
 
@@ -664,9 +664,36 @@ export default function Calendar() {
 
   // ── Items for a given date ─────────────────────────────
 
+  // Resolve an item's assignees to a Set of CURRENT member IDs, drawing from
+  // every source: the event_assignees-derived `assignees` (member_id - the same
+  // source the dashboard avatars use), the assigned_to_ids column, and any
+  // assigned_to_names mapped onto current members. Matching on identity rather
+  // than text means a stale/drifted stored name can never cause a mismatch.
+  // Only current members are included, so the result is empty when an item
+  // resolves to nobody in the household - the filter then treats it as
+  // household-wide.
+  function assigneeMemberIds(item, nameToId, memberIdSet) {
+    const ids = new Set();
+    for (const a of (item.assignees || [])) {
+      if (a?.member_id && memberIdSet.has(a.member_id)) ids.add(a.member_id);
+    }
+    for (const id of (item.assigned_to_ids || [])) {
+      if (memberIdSet.has(id)) ids.add(id);
+    }
+    const names = Array.isArray(item.assigned_to_names) && item.assigned_to_names.length > 0
+      ? item.assigned_to_names
+      : (item.assigned_to_name ? [item.assigned_to_name] : []);
+    for (const n of names) {
+      const id = nameToId.get(n);
+      if (id) ids.add(id);
+    }
+    return ids;
+  }
+
   function eventsForDate(date) {
     const ds = toDateStr(date);
-    const memberNames = new Set(members.map((m) => m.name));
+    const memberIdSet = new Set(members.map((m) => m.id));
+    const nameToId = new Map(members.map((m) => [m.name, m.id]));
     return events.filter(e => {
       const start = e.start_time?.split('T')[0];
       const end = e.end_time?.split('T')[0];
@@ -677,19 +704,13 @@ export default function Calendar() {
       if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
       if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
       if (cat === 'school' && !activeFilters.has('school')) return false;
-      // Apply member filter, but FAIL OPEN: an item is hidden only when it's
-      // assigned to a RECOGNISED household member who is currently toggled off.
-      // If an assignee name resolves to no current member (a renamed/removed
-      // member, or a name set by the bot that doesn't exactly match), the item
-      // is treated as household-wide and shown - a name drift must never
-      // silently hide an event from the calendar while it still shows on the
-      // dashboard. Items with no assignee always pass.
+      // Member filter by IDENTITY (member id), and FAIL OPEN: hide only when the
+      // item is assigned to current member(s) who are ALL toggled off. An item
+      // resolving to no current member is treated as household-wide and shown -
+      // so a drifted/stale stored name can never silently hide it.
       if (activeMemberFilters) {
-        const names = Array.isArray(e.assigned_to_names) && e.assigned_to_names.length > 0
-          ? e.assigned_to_names
-          : (e.assigned_to_name ? [e.assigned_to_name] : []);
-        const known = names.filter((n) => memberNames.has(n));
-        if (known.length > 0 && !known.some((n) => activeMemberFilters.has(n))) return false;
+        const ids = assigneeMemberIds(e, nameToId, memberIdSet);
+        if (ids.size > 0 && ![...ids].some((id) => activeMemberFilters.has(id))) return false;
       }
       return true;
     });
@@ -698,15 +719,13 @@ export default function Calendar() {
   function tasksForDate(date) {
     if (!activeFilters.has('tasks')) return [];
     const ds = toDateStr(date);
-    const memberNames = new Set(members.map((m) => m.name));
+    const memberIdSet = new Set(members.map((m) => m.id));
+    const nameToId = new Map(members.map((m) => [m.name, m.id]));
     return tasks.filter(t => {
       if (t.due_date !== ds) return false;
       if (activeMemberFilters) {
-        const names = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length > 0
-          ? t.assigned_to_names
-          : (t.assigned_to_name ? [t.assigned_to_name] : []);
-        const known = names.filter((n) => memberNames.has(n));
-        if (known.length > 0 && !known.some((n) => activeMemberFilters.has(n))) return false;
+        const ids = assigneeMemberIds(t, nameToId, memberIdSet);
+        if (ids.size > 0 && ![...ids].some((id) => activeMemberFilters.has(id))) return false;
       }
       return true;
     });
@@ -1443,14 +1462,14 @@ export default function Calendar() {
                   <div className="flex flex-wrap gap-1.5">
                     {members.map(m => {
                       const hex = COLOR_HEX[m.color_theme] || COLOR_HEX.sage;
-                      const isOn = activeMemberFilters === null || activeMemberFilters.has(m.name);
+                      const isOn = activeMemberFilters === null || activeMemberFilters.has(m.id);
                       return (
                         <button
-                          key={m.name}
+                          key={m.id}
                           onClick={() => {
                             setActiveMemberFilters(prev => {
-                              const next = new Set(prev || members.map(x => x.name));
-                              next.has(m.name) ? next.delete(m.name) : next.add(m.name);
+                              const next = new Set(prev || members.map(x => x.id));
+                              next.has(m.id) ? next.delete(m.id) : next.add(m.id);
                               return next;
                             });
                           }}
