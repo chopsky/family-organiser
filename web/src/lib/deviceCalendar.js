@@ -69,6 +69,17 @@ function currentUserId() {
 
 const selectedKey = (uid) => `housemait:deviceCalendars:selected:${uid}`;
 const ackedKey = (uid) => `housemait:deviceCalendars:acked:${uid}`;
+const lastSyncKey = (uid) => `housemait:deviceCalendars:lastSync:${uid}`;
+
+export function getLastSyncAt() {
+  const uid = currentUserId();
+  if (!uid) return null;
+  try {
+    return localStorage.getItem(lastSyncKey(uid)) || null;
+  } catch {
+    return null;
+  }
+}
 
 export function isDeviceCalendarSupported() {
   try {
@@ -164,16 +175,38 @@ function syncWindow(now = new Date()) {
  * server asks for (needsEvents). Returns per-calendar results or null when
  * there's nothing to do.
  */
+// Remove MY device links for calendars visible on THIS device but no longer
+// selected (delete cascades the synced copies). Scoped to this device's
+// EventKit ids so links fed by the user's other devices are never touched.
+async function cleanupDeselected(allCalendars, selectedIds) {
+  const deselectedIds = new Set(allCalendars.filter((c) => !selectedIds.includes(c.id)).map((c) => c.id));
+  if (deselectedIds.size === 0) return;
+  try {
+    const uid = currentUserId();
+    const { data: feedData } = await api.get('/calendar/external-feeds');
+    const stale = (feedData?.feeds || []).filter((f) => (
+      f.source === 'device'
+      && f.device_owner_user_id === uid
+      && deselectedIds.has(f.device_calendar_id)
+    ));
+    await Promise.all(stale.map((f) => api.delete(`/calendar/external-feeds/${f.id}`).catch(() => {})));
+  } catch { /* cleanup is best-effort; next sync retries */ }
+}
+
 export async function syncDeviceCalendars() {
   if (!isDeviceCalendarSupported()) return null;
   if (!currentUserId()) return null;
   const selected = getSelectedCalendarIds();
-  if (selected.length === 0) return null;
 
   const { start, end, recurringEnd } = syncWindow();
   const all = await listDeviceCalendars();
   const chosen = all.filter((c) => selected.includes(c.id)).slice(0, MAX_CALENDARS);
-  if (chosen.length === 0) return null;
+  if (chosen.length === 0) {
+    // Deselect-all is a real action: removing the last calendar must still
+    // clean up its link (and synced events) rather than silently no-op.
+    await cleanupDeselected(all, selected);
+    return [];
+  }
 
   const { events } = await EventKitReader.fetchEvents({
     calendarIds: chosen.map((c) => c.id),
@@ -217,24 +250,7 @@ export async function syncDeviceCalendars() {
     return acked[c.id] === base.hash ? base : full.get(c.id);
   });
 
-  // Deselection cleanup: remove MY device links for calendars that exist on
-  // THIS device but are no longer selected (deleting the link cascades its
-  // synced copies). Scoped to ids visible in this device's EventKit list so
-  // links fed by the user's OTHER devices (e.g. an iPad) are never touched.
-  // Re-selecting a calendar later simply re-creates the link + events.
-  const deselectedIds = new Set(all.filter((c) => !selected.includes(c.id)).map((c) => c.id));
-  if (deselectedIds.size > 0) {
-    try {
-      const uid = currentUserId();
-      const { data: feedData } = await api.get('/calendar/external-feeds');
-      const stale = (feedData?.feeds || []).filter((f) => (
-        f.source === 'device'
-        && f.device_owner_user_id === uid
-        && deselectedIds.has(f.device_calendar_id)
-      ));
-      await Promise.all(stale.map((f) => api.delete(`/calendar/external-feeds/${f.id}`).catch(() => {})));
-    } catch { /* cleanup is best-effort; next sync retries */ }
-  }
+  await cleanupDeselected(all, selected);
 
   const { data } = await api.post('/calendar/device-sync', { calendars: payloads });
   let results = data?.results || [];
@@ -262,6 +278,10 @@ export async function syncDeviceCalendars() {
     if (res?.ok && !(res.dedupedInHousehold > 0)) nextAcked[p.deviceCalendarId] = p.hash;
   });
   setAckedHashes(nextAcked);
+  try {
+    const uid = currentUserId();
+    if (uid) localStorage.setItem(lastSyncKey(uid), new Date().toISOString());
+  } catch { /* cosmetic only */ }
 
   return results;
 }

@@ -1087,7 +1087,10 @@ export default function Settings() {
     setLoadingExternalFeeds(true);
     try {
       const { data } = await api.get('/calendar/external-feeds');
-      setExternalFeeds(data?.feeds || []);
+      // Device-synced calendars (source='device') are managed in the iPhone
+      // picker above, not here - listing them too showed every calendar twice
+      // and offered a Refresh button that doesn't apply to them.
+      setExternalFeeds((data?.feeds || []).filter((f) => f.source !== 'device'));
     } catch {
       // Non-fatal: leave the list empty
     } finally {
@@ -1524,45 +1527,51 @@ export default function Settings() {
               Opens the iOS or macOS Calendar app with a one-tap confirm.
             </p>
 
-            <div className="pt-3 border-t border-cream-border">
-              <p className="text-xs font-medium text-bark mb-2">Google Calendar or Outlook? Copy the URL:</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={feedUrl}
-                  className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-xs bg-oat text-cocoa select-all"
-                  onClick={(e) => e.target.select()}
-                />
-                <button
-                  onClick={handleCopyFeed}
-                  className="border border-cream-border text-bark hover:bg-cream font-medium px-3 py-2 rounded-2xl text-xs transition-colors whitespace-nowrap"
-                >
-                  {feedCopied ? 'Copied!' : 'Copy'}
-                </button>
+            {/* The copy-URL flow + feed admin are the rare path (Google /
+                Outlook / power users) - folded behind a disclosure so the
+                section stays one button tall for the typical Apple user. */}
+            <details className="pt-2 border-t border-cream-border">
+              <summary className="text-xs font-medium text-primary cursor-pointer select-none py-1">
+                Using Google Calendar or Outlook? More options
+              </summary>
+              <div className="pt-2 space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={feedUrl}
+                    className="flex-1 border border-cream-border rounded-2xl px-3 py-2 text-xs bg-oat text-cocoa select-all"
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    onClick={handleCopyFeed}
+                    className="border border-cream-border text-bark hover:bg-cream font-medium px-3 py-2 rounded-2xl text-xs transition-colors whitespace-nowrap"
+                  >
+                    {feedCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <div className="text-xs text-cocoa space-y-1">
+                  <p><span className="font-medium">Google:</span> Settings &rarr; Add calendar &rarr; From URL.</p>
+                  <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleRegenerateFeed}
+                    disabled={loadingFeed}
+                    className="text-xs text-cocoa hover:text-error transition-colors"
+                  >
+                    {loadingFeed ? 'Regenerating…' : 'Regenerate URL'}
+                  </button>
+                  <button
+                    onClick={handleRemoveFeed}
+                    disabled={loadingFeed}
+                    className="text-xs text-cocoa hover:text-error transition-colors"
+                  >
+                    Disable feed
+                  </button>
+                </div>
               </div>
-              <div className="text-xs text-cocoa mt-2 space-y-1">
-                <p><span className="font-medium">Google:</span> Settings &rarr; Add calendar &rarr; From URL.</p>
-                <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-3 border-t border-cream-border">
-              <button
-                onClick={handleRegenerateFeed}
-                disabled={loadingFeed}
-                className="text-xs text-cocoa hover:text-error transition-colors"
-              >
-                {loadingFeed ? 'Regenerating…' : 'Regenerate URL'}
-              </button>
-              <button
-                onClick={handleRemoveFeed}
-                disabled={loadingFeed}
-                className="text-xs text-cocoa hover:text-error transition-colors"
-              >
-                Disable feed
-              </button>
-            </div>
+            </details>
           </div>
         ) : (
           <button

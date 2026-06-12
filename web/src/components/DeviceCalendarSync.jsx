@@ -16,23 +16,29 @@ import {
   getSelectedCalendarIds,
   setSelectedCalendarIds,
   syncDeviceCalendars,
+  getLastSyncAt,
   MAX_CALENDARS,
 } from '../lib/deviceCalendar';
 
+function lastSyncLabel() {
+  const iso = getLastSyncAt();
+  if (!iso) return null;
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const d = new Date(iso);
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 export default function DeviceCalendarSync({ onSynced }) {
-  const [stage, setStage] = useState('intro'); // intro | denied | picking | syncing | done
+  // intro | summary | denied | picking | syncing. Once configured, the
+  // section is a ONE-LINE summary - the 15-row picker only appears on
+  // "Manage" (it was permanently expanded before, dominating the page).
+  const [stage, setStage] = useState(() => (getSelectedCalendarIds().length > 0 ? 'summary' : 'intro'));
   const [calendars, setCalendars] = useState([]);
   const [selected, setSelected] = useState(new Set(getSelectedCalendarIds()));
   const [error, setError] = useState('');
-  const [result, setResult] = useState(null);
-
-  useEffect(() => {
-    // Already configured on this device? Jump straight to the picker so the
-    // section doubles as "manage connected calendars".
-    if (getSelectedCalendarIds().length > 0) {
-      loadCalendars();
-    }
-  }, []);
+  const [savedNote, setSavedNote] = useState('');
 
   if (!isDeviceCalendarSupported()) return null;
 
@@ -41,6 +47,8 @@ export default function DeviceCalendarSync({ onSynced }) {
       const granted = await requestCalendarAccess();
       if (!granted) { setStage('denied'); return; }
       const list = await listDeviceCalendars();
+      // Likely-wanted calendars first; subscribed/birthday/holiday noise last.
+      list.sort((a, b) => (a.defaultOff === b.defaultOff ? a.title.localeCompare(b.title) : a.defaultOff ? 1 : -1));
       setCalendars(list);
       // First run: pre-tick everything that isn't default-off, up to the cap.
       setSelected((prev) => {
@@ -58,10 +66,9 @@ export default function DeviceCalendarSync({ onSynced }) {
     setError('');
     try {
       setSelectedCalendarIds([...selected]);
-      const results = await syncDeviceCalendars();
-      const applied = (results || []).reduce((n, r) => n + (r.applied || 0), 0);
-      setResult({ calendars: (results || []).length, applied });
-      setStage('done');
+      await syncDeviceCalendars();
+      setSavedNote('Synced. Your selected calendars stay up to date automatically.');
+      setStage(selected.size > 0 ? 'summary' : 'intro');
       onSynced?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Sync failed. Please try again.');
@@ -100,6 +107,21 @@ export default function DeviceCalendarSync({ onSynced }) {
         </div>
       )}
 
+      {stage === 'summary' && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-cocoa">
+            ✅ {getSelectedCalendarIds().length} calendar{getSelectedCalendarIds().length === 1 ? '' : 's'} syncing
+            {lastSyncLabel() ? ` · last sync ${lastSyncLabel()}` : ''}
+          </p>
+          <button onClick={loadCalendars} className="text-xs font-semibold text-primary hover:text-primary-pressed shrink-0">
+            Manage
+          </button>
+        </div>
+      )}
+      {stage === 'summary' && savedNote && (
+        <p className="text-[11px] text-sage">{savedNote}</p>
+      )}
+
       {stage === 'denied' && (
         <p className="text-xs text-cocoa bg-coral/10 rounded-xl px-3 py-2">
           Calendar access is off for Housemait. Enable it in iPhone Settings → Privacy &amp; Security → Calendars, then come back.
@@ -131,21 +153,14 @@ export default function DeviceCalendarSync({ onSynced }) {
           ))}
           <button
             onClick={handleSave}
-            disabled={stage === 'syncing' || selected.size === 0}
+            disabled={stage === 'syncing'}
             className="w-full bg-primary hover:bg-primary-pressed disabled:opacity-50 text-white font-medium px-4 py-3 rounded-2xl text-sm transition-colors"
           >
-            {stage === 'syncing' ? 'Syncing…' : `Sync ${selected.size} calendar${selected.size === 1 ? '' : 's'}`}
-          </button>
-        </div>
-      )}
-
-      {stage === 'done' && (
-        <div className="space-y-2">
-          <p className="text-xs text-sage bg-sage-light rounded-xl px-3 py-2">
-            ✅ Connected {result?.calendars} calendar{result?.calendars === 1 ? '' : 's'}. Your events now appear in the family calendar and stay in sync automatically.
-          </p>
-          <button onClick={() => setStage('picking')} className="text-xs font-medium text-primary hover:text-primary-pressed">
-            Change calendars
+            {stage === 'syncing'
+              ? 'Syncing…'
+              : selected.size === 0
+                ? 'Disconnect all calendars'
+                : `Sync ${selected.size} calendar${selected.size === 1 ? '' : 's'}`}
           </button>
         </div>
       )}
