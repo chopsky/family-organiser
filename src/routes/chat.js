@@ -4,6 +4,7 @@ const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
+const { formatPreferenceLines } = require('../services/preferences-format');
 const { scanImage, scanReceipt, matchReceiptToList, classify } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation, reverseGeocode } = require('../services/weather');
@@ -104,7 +105,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-  const [members, notes, shopping, tasks, events, household, schools, recipes] = await Promise.all([
+  const [members, notes, shopping, tasks, events, household, schools, recipes, rawPreferences] = await Promise.all([
     db.getHouseholdMembers(householdId),
     db.getHouseholdNotes(householdId),
     db.getShoppingList(householdId),
@@ -113,6 +114,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     db.getHouseholdById(householdId),
     db.getHouseholdSchools(householdId),
     db.getRecipes(householdId).catch(() => []),
+    db.getHouseholdPreferences(householdId).catch(() => []),
   ]);
 
   // Fetch term dates for the household's schools so the AI can answer
@@ -216,6 +218,17 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
       }).join('\n')
     : '(empty)';
 
+  // Learned family preferences - the same block the WhatsApp classifier sees,
+  // so the web/app assistant honours allergies, dietary rules, dislikes and
+  // schedule anchors instead of only the legacy household.allergies field.
+  // Resolve member_id -> name up front (the formatter reads member_name).
+  const preferencesStr = formatPreferenceLines(
+    (rawPreferences || []).map((p) => ({
+      ...p,
+      member_name: p.member_id ? (members.find((m) => m.id === p.member_id)?.name || null) : null,
+    })),
+  );
+
   let prompt = CHAT_ASSISTANT_SYSTEM
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
@@ -227,6 +240,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     .replace(/{{EVENTS}}/g, eventsStr)
     .replace(/{{SCHOOLS}}/g, schoolsStr)
     .replace(/{{NOTES}}/g, notesStr)
+    .replace(/{{PREFERENCES}}/g, preferencesStr)
     .replace(/{{RECIPES}}/g, recipesStr);
 
   if (allergiesStr) {

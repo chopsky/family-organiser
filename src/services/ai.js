@@ -2,6 +2,7 @@ require('dotenv').config();
 const { callWithFailover, callClaude, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { getCityFromTimezone } = require('./weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
+const { formatPreferenceLines } = require('./preferences-format');
 const {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
@@ -38,29 +39,13 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     ? notes.map(n => `- ${n.key}: ${n.value}`).join('\n')
     : '(none saved yet)';
 
-  // Family preferences - structured AI-consulted facts (allergies,
-  // dietary stances, member-specific likes/dislikes, schedule anchors).
-  // Format groups by member so the model can see at a glance what
-  // belongs to whom. Allergies and dietary rules render first because
-  // they're hard constraints.
-  const KEY_PRIORITY = { allergy: 0, dietary: 1, dislike: 2, like: 3, schedule: 4, preference: 5 };
-  const sortedPrefs = (preferences || []).slice().sort((a, b) => {
-    const ap = KEY_PRIORITY[a.key] ?? 99;
-    const bp = KEY_PRIORITY[b.key] ?? 99;
-    if (ap !== bp) return ap - bp;
-    return (a.value || '').localeCompare(b.value || '');
-  });
-  // Helper to look up member name from id (uses memberNames + a parallel
-  // id list would be cleaner; caller hands us already-resolved member
-  // info via the preference rows below if needed).
-  function preferenceLine(p) {
-    const who = p.member_name || (p.member_id ? '(member)' : 'Everyone');
-    const tag = p.key.toUpperCase();
-    return `- [${tag}] ${who}: ${p.value}`;
-  }
-  const preferencesStr = sortedPrefs.length > 0
-    ? sortedPrefs.map(preferenceLine).join('\n')
-    : '(none saved yet)';
+  // Family preferences - structured AI-consulted facts (allergies, dietary
+  // stances, member-specific likes/dislikes, schedule anchors). The shared
+  // formatter groups hardest-first and attributes each to its member, and is
+  // reused by the chat assistant + recipe generator so all three surfaces
+  // honour the same learned data identically. Rows arrive already enriched
+  // with member_name (the caller resolves member_id).
+  const preferencesStr = formatPreferenceLines(preferences);
   // Cap at 100 events to keep the prompt size reasonable.
   // CRITICAL: format in the user's timezone, not the server's. Railway runs
   // in UTC, so without timeZone: userTz a 2PM BST event (stored as 13:00Z)

@@ -20,6 +20,7 @@ const { detectCalendarFeedUrl, subscribeCalendarFeed } = require('./calendar-url
 const { looksLikeBulkPaste, looksLikeSchoolTermDates, extractAndApply } = require('./bulk-extract');
 const { extractTextFromDocument } = require('../services/document-extract');
 const { extractTermDatesPreview, academicYearsForCountry } = require('../services/term-date-extract');
+const { formatRecipeConstraints } = require('../services/preferences-format');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -2480,9 +2481,18 @@ async function handleSubscriptionsList(household) {
  * Generate a recipe via AI and save it to the Recipe Box.
  */
 async function generateAndSaveRecipe(householdId, description, dietary, servings) {
+  // Surface the household's LEARNED preferences (allergies, dietary rules,
+  // dislikes, likes) so a generated recipe honours them automatically - the
+  // classifier already knows "Lynn is allergic to nuts", but this sub-call is
+  // a separate LLM request that would otherwise be blind to it. Allergies are
+  // the safety-critical case. Soft-fail: a lookup error must not block the
+  // recipe (it just generates without the standing constraints).
+  const prefs = await db.getHouseholdPreferences(householdId).catch(() => []);
+  const constraints = formatRecipeConstraints(prefs);
+
   const prompt = `Create a simple, family-friendly recipe based on: ${description}
 ${dietary ? `Dietary requirements: ${dietary}` : ''}
-${servings ? `Servings: ${servings}` : 'Servings: 4'}
+${constraints ? `\n${constraints}\n` : ''}${servings ? `Servings: ${servings}` : 'Servings: 4'}
 
 Keep it simple - families are busy. Use common British supermarket ingredients.
 
@@ -2505,7 +2515,9 @@ Rules:
 - Infer dietary tags from ingredients`;
 
   const { text } = await callWithFailover({
-    system: 'You are a family recipe creator for busy UK households. Create simple, practical recipes. Return ONLY valid JSON.',
+    system: 'You are a family recipe creator for busy UK households. Create simple, practical recipes. '
+      + 'Never include an ingredient the family is allergic to or that breaks a stated dietary rule - '
+      + 'these are hard safety constraints, even if the request seems to ask for them. Return ONLY valid JSON.',
     messages: [{ role: 'user', content: prompt }],
     useThinking: false,
     maxTokens: 2048,

@@ -10,6 +10,8 @@ jest.mock('../db/queries', () => ({
   addSchoolTermDates: jest.fn(() => Promise.resolve([])),
   deleteTermDatesBySchoolAndAcademicYear: jest.fn(() => Promise.resolve()),
   updateHouseholdSchoolMeta: jest.fn(() => Promise.resolve()),
+  getHouseholdPreferences: jest.fn(() => Promise.resolve([])),
+  createRecipe: jest.fn((hid, r) => Promise.resolve({ id: 'r-1', ...r })),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -246,5 +248,39 @@ describe('handleDocument — school term-dates import', () => {
     const res = await handlers.handleDocument(Buffer.from('x'), 'application/pdf', 'fixtures.pdf', user, household, {});
     expect(bulk.extractAndApply).toHaveBeenCalled();
     expect(res.response).toMatch(/Added 1 event/);
+  });
+});
+
+describe('generateAndSaveRecipe - learned preferences', () => {
+  const aiClient = require('../services/ai-client');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('injects learned allergies/dislikes into the prompt as hard constraints', async () => {
+    db.getHouseholdPreferences.mockResolvedValue([
+      { key: 'allergy', value: 'peanuts', member_name: 'Lynn' },
+      { key: 'dislike', value: 'mushrooms', member_name: 'Mason' },
+    ]);
+    aiClient.callWithFailover.mockResolvedValue({
+      text: JSON.stringify({ name: 'Tomato pasta', category: 'dinner', ingredients: [], method: ['Boil pasta'], servings: 4, dietary_tags: [] }),
+    });
+    await handlers.generateAndSaveRecipe('hh-1', 'easy pasta', null, 4);
+
+    const call = aiClient.callWithFailover.mock.calls[0][0];
+    expect(call.messages[0].content).toMatch(/ALLERGIES[^\n]*peanuts/);
+    expect(call.messages[0].content).toMatch(/mushrooms/);
+    // The system prompt reinforces allergies as a hard safety constraint.
+    expect(call.system).toMatch(/allergic/i);
+  });
+
+  test('a preferences lookup failure does not block recipe generation', async () => {
+    db.getHouseholdPreferences.mockRejectedValue(new Error('db down'));
+    aiClient.callWithFailover.mockResolvedValue({
+      text: JSON.stringify({ name: 'Toast', category: 'breakfast', ingredients: [], method: ['Toast bread'], servings: 2, dietary_tags: [] }),
+    });
+    const recipe = await handlers.generateAndSaveRecipe('hh-1', 'quick breakfast', null, 2);
+    expect(recipe.name).toBe('Toast');
+    // No constraint block when prefs couldn't be read.
+    expect(aiClient.callWithFailover.mock.calls[0][0].messages[0].content).not.toMatch(/ALLERGIES/);
   });
 });
