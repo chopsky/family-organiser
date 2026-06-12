@@ -1,11 +1,13 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
-// Lazy-load ical-generator via dynamic import - it's ESM-only
+// Lazy-load ical-generator. v10 is dual-format (the old "ESM-only" dynamic
+// import was stale and also broke under Jest's CJS runtime), so a plain
+// require works; kept lazy + async-shaped so call sites are unchanged.
 let _ical = null;
 async function getIcal() {
   if (!_ical) {
-    const mod = await import('ical-generator');
-    _ical = mod.default;
+    const mod = require('ical-generator');
+    _ical = mod.default || mod;
   }
   return _ical;
 }
@@ -125,9 +127,15 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
     const ical = await getIcal();
     const calendar = ical({ name: household.name + ' \u2014 Housemait' });
 
-    // Add calendar events
+    // Add calendar events. The explicit, row-id-based UID is load-bearing:
+    // without it ical-generator mints a RANDOM UID on every request, so
+    // subscribers' calendar apps saw the entire Housemait calendar deleted
+    // and recreated on each refresh (breaking their caching/busy-time
+    // handling). Stable UIDs also let future inbound integrations recognise
+    // and skip Housemait's own events (echo-loop guard).
     for (const event of events) {
       const vevent = {
+        id: `housemait-evt-${event.id}@housemait.com`,
         start: new Date(event.start_time),
         end: new Date(event.end_time),
         summary: event.title,
@@ -142,6 +150,7 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
     for (const task of tasks) {
       if (task.due_date) {
         calendar.createEvent({
+          id: `housemait-task-${task.id}@housemait.com`,
           start: new Date(task.due_date),
           summary: task.title,
           allDay: true,

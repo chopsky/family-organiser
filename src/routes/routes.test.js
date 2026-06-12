@@ -1186,3 +1186,34 @@ describe('GET /api/admin/audit-log', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ─── GET /api/calendar/feed/:token.ics - stable UIDs ────────────────────────────
+// Without explicit ids, ical-generator mints RANDOM UIDs per request, so
+// subscribers' calendar apps saw the whole feed deleted + recreated on every
+// refresh. UIDs must be row-id-based and identical across renders.
+describe('outbound calendar feed emits stable UIDs', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function armFeed() {
+    db.getFeedTokenData.mockResolvedValue({ household_id: 'hh-1' });
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.getAllEventsForFeed.mockResolvedValue({
+      events: [{ id: 'e1', title: 'Swimming', start_time: '2026-06-12T09:00:00Z', end_time: '2026-06-12T10:00:00Z', all_day: false }],
+      tasks: [{ id: 't1', title: 'Garden bin', due_date: '2026-06-13', completed: false }],
+    });
+  }
+  const uidsOf = (ics) => ics.split(/\r?\n/).filter((l) => l.startsWith('UID:')).sort();
+
+  test('UIDs are row-id-based and identical across two renders', async () => {
+    armFeed();
+    const first = await request(app).get('/api/calendar/feed/tok123.ics');
+    armFeed();
+    const second = await request(app).get('/api/calendar/feed/tok123.ics');
+
+    expect(first.status).toBe(200);
+    const uids1 = uidsOf(first.text);
+    expect(uids1).toContain('UID:housemait-evt-e1@housemait.com');
+    expect(uids1).toContain('UID:housemait-task-t1@housemait.com');
+    expect(uidsOf(second.text)).toEqual(uids1);
+  });
+});
