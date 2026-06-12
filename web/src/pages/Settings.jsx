@@ -1087,10 +1087,11 @@ export default function Settings() {
     setLoadingExternalFeeds(true);
     try {
       const { data } = await api.get('/calendar/external-feeds');
-      // Device-synced calendars (source='device') are managed in the iPhone
-      // picker above, not here - listing them too showed every calendar twice
-      // and offered a Refresh button that doesn't apply to them.
-      setExternalFeeds((data?.feeds || []).filter((f) => f.source !== 'device'));
+      // Keep ALL feeds: URL subscriptions render in the Subscribed-calendars
+      // list; device-synced rows render in their own read-only "Synced from
+      // phones" block (so the web shows evidence of device sync and offers
+      // unlink - the recovery path when a phone is lost).
+      setExternalFeeds(data?.feeds || []);
     } catch {
       // Non-fatal: leave the list empty
     } finally {
@@ -1168,7 +1169,11 @@ export default function Settings() {
   }
 
   async function handleRemoveExternalFeed(id) {
-    if (!window.confirm('Remove this calendar subscription? Its events will disappear from Housemait. You can re-add the URL anytime.')) return;
+    const feed = externalFeeds.find((f) => f.id === id);
+    const msg = feed?.source === 'device'
+      ? 'Stop syncing this calendar from the phone? Its events will disappear from Housemait. Re-tick it in the app’s calendar picker to bring it back.'
+      : 'Remove this calendar subscription? Its events will disappear from Housemait. You can re-add the URL anytime.';
+    if (!window.confirm(msg)) return;
     setFeedActionId(id);
     setError('');
     try {
@@ -1616,6 +1621,46 @@ export default function Settings() {
         )}
         </div>
 
+        {/* Device-synced calendars (read-only roster). Connection happens in
+            the iPhone app's picker, but the WEB must still show evidence of
+            the sync and allow unlink - that's the recovery path when the
+            phone that fed a calendar is lost or the app was deleted. */}
+        {externalFeeds.some((f) => f.source === 'device') && (
+          <div className="mt-5 pt-5 border-t border-cream-border">
+            <p className="text-base font-medium text-bark mb-1">Synced from phones</p>
+            <p className="text-sm text-cocoa mb-3">
+              Calendars syncing automatically from family iPhones. Choose which in the Housemait app on that phone.
+            </p>
+            <ul className="space-y-2">
+              {externalFeeds.filter((f) => f.source === 'device').map((feed) => {
+                const owner = members.find((m) => m.id === feed.device_owner_user_id)?.name;
+                return (
+                  <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2 flex items-center gap-2.5">
+                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: FEED_COLOR_HEX[feed.color] || FEED_COLOR_HEX.sky }} />
+                    <span className="flex-1 min-w-0">
+                      <span className="text-sm text-bark truncate block">{feed.display_name}</span>
+                      <span className="text-[11px] text-cocoa">
+                        {owner ? `${owner}'s iPhone` : 'Family iPhone'}
+                        {feed.last_synced_at ? ` · synced ${new Date(feed.last_synced_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => handleRemoveExternalFeed(feed.id)}
+                      disabled={feedActionId === feed.id}
+                      className="text-error/70 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10 disabled:opacity-50"
+                      title="Stop syncing this calendar"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {/* External feed subscriptions (read-only inbound) */}
         <div className="mt-5 pt-5 border-t border-cream-border">
           <div className="flex items-center justify-between mb-3">
@@ -1715,13 +1760,13 @@ export default function Settings() {
             </form>
           )}
 
-          {!showAddFeed && externalFeeds.length === 0 && !loadingExternalFeeds && (
-            <p className="text-xs text-cocoa italic">No calendars subscribed yet.</p>
+          {!showAddFeed && externalFeeds.every((f) => f.source === 'device') && !loadingExternalFeeds && (
+            <p className="text-xs text-cocoa italic">No link subscriptions yet.</p>
           )}
 
-          {externalFeeds.length > 0 && (
+          {externalFeeds.some((f) => f.source !== 'device') && (
             <ul className="space-y-2">
-              {externalFeeds.map((feed) => (
+              {externalFeeds.filter((f) => f.source !== 'device').map((feed) => (
                 <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
                     {/* Clickable colour swatch - tap to expand the inline
