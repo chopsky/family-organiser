@@ -52,6 +52,101 @@ const FEED_COLOR_HEX = {
 };
 
 /**
+ * Live paste feedback for the add-calendar wizard: spot the URLs people
+ * paste when they meant the iCal address. Client-side mirror of the
+ * server's classifyFeedUrlMistake (src/services/externalFeed.js) - keep the
+ * two in step - so the hint appears as they paste instead of after submit.
+ * Returns { level: 'block' | 'warn', message } or null.
+ */
+function feedUrlHint(rawUrl) {
+  const url = (rawUrl || '').trim().replace(/^webcal:\/\//i, 'https://');
+  if (!url) return null;
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  const host = u.hostname.toLowerCase();
+  const path = u.pathname;
+  if (host === 'calendar.google.com') {
+    if (path.startsWith('/calendar/embed')) {
+      return { level: 'block', message: 'That\'s Google\'s embed link (for websites). Copy "Secret address in iCal format" instead - it\'s under Integrate calendar on the same page.' };
+    }
+    if (/^\/calendar(\/u\/\d+)?\/r(\/|$)/.test(path)) {
+      return { level: 'block', message: 'That\'s the settings page\'s own URL. On that page, scroll to Integrate calendar and copy "Secret address in iCal format".' };
+    }
+    if (/\/public\/basic\.ics$/i.test(path)) {
+      return { level: 'warn', message: 'Heads-up: this is the Public address, which only works if the calendar is made public. The "Secret address in iCal format" (just below it) works without that.' };
+    }
+    return null;
+  }
+  if ((host === 'outlook.live.com' || host === 'outlook.office.com' || host === 'outlook.office365.com')
+      && path.startsWith('/calendar') && !/\.ics$/i.test(path)) {
+    return { level: 'block', message: 'That\'s the Outlook page\'s own URL. Use "Publish a calendar" in Outlook\'s Shared calendars settings and copy the ICS link it shows.' };
+  }
+  if (host === 'icloud.com' || host === 'www.icloud.com') {
+    return { level: 'block', message: 'That\'s the iCloud website URL. In iCloud Calendar, click the share icon next to the calendar, tick "Public Calendar", and copy the webcal:// link.' };
+  }
+  return null;
+}
+
+// Per-provider wizard steps for the add-calendar form. `link` deep-links as
+// close to the page holding the address as each provider allows - Outlook
+// lands EXACTLY on the publish page; Google can only deep-link to settings
+// (the per-calendar page needs an id we can't know).
+const FEED_PROVIDERS = [
+  {
+    id: 'google',
+    label: 'Google',
+    link: 'https://calendar.google.com/calendar/u/0/r/settings',
+    linkLabel: 'Open Google Calendar settings',
+    steps: [
+      'Pick your calendar on the left, under "Settings for my calendars".',
+      'Scroll to "Integrate calendar".',
+      'Copy "Secret address in iCal format" and paste it below.',
+    ],
+    placeholder: 'https://calendar.google.com/calendar/ical/…/basic.ics',
+    iosTip: 'On a phone, tap AA in Safari\'s address bar → Request Desktop Website first.',
+  },
+  {
+    id: 'outlook',
+    label: 'Outlook',
+    link: 'https://outlook.live.com/calendar/0/options/calendar/SharedCalendars',
+    linkLabel: 'Open Outlook\'s publish page',
+    steps: [
+      'Under "Publish a calendar", choose the calendar and "Can view all details", then click Publish.',
+      'Copy the ICS link it shows and paste it below.',
+    ],
+    placeholder: 'https://outlook.live.com/owa/calendar/…/calendar.ics',
+    iosTip: 'On a phone, tap AA in Safari\'s address bar → Request Desktop Website first.',
+  },
+  {
+    id: 'apple',
+    label: 'Apple (iCloud)',
+    link: 'https://www.icloud.com/calendar',
+    linkLabel: 'Open iCloud Calendar',
+    steps: [
+      'Click the share icon next to the calendar in the left sidebar.',
+      'Tick "Public Calendar" and copy the webcal:// link.',
+      'Paste it below.',
+    ],
+    placeholder: 'webcal://p12-caldav.icloud.com/published/…',
+    // On the iPhone the Calendar app beats iCloud.com - swapped in at render.
+    iosSteps: [
+      'Open the iPhone Calendar app → tap "Calendars" at the bottom.',
+      'Tap (i) next to the calendar → turn on "Public Calendar".',
+      'Tap "Share Link…" → Copy, then paste it below.',
+    ],
+  },
+  {
+    id: 'other',
+    label: 'School or club',
+    link: null,
+    steps: [
+      'Paste the calendar link the school or club shared - webcal:// and https:// links ending in .ics both work.',
+    ],
+    placeholder: 'https://… or webcal://… (iCal feed URL)',
+  },
+];
+
+/**
  * Settings → Plan card. Renders subscription state + the right CTA for
  * the current status. Extracted into its own component so the Settings
  * page layout stays readable; it only reads from SubscriptionContext
@@ -654,6 +749,9 @@ export default function Settings() {
   const [newFeedUrl, setNewFeedUrl] = useState('');
   const [newFeedName, setNewFeedName] = useState('');
   const [newFeedColor, setNewFeedColor] = useState('sky'); // default matches backend
+  // Which provider the user picked in the add-calendar wizard. Drives the
+  // step-by-step panel + deep link; null until they choose.
+  const [newFeedProvider, setNewFeedProvider] = useState(null);
   const [colorPickerOpenId, setColorPickerOpenId] = useState(null); // id of feed whose inline colour picker is expanded
   const [addingFeed, setAddingFeed] = useState(false);
   const [feedActionId, setFeedActionId] = useState(null); // id of feed currently being refreshed/removed
@@ -1148,6 +1246,7 @@ export default function Settings() {
       setNewFeedUrl('');
       setNewFeedName('');
       setNewFeedColor('sky');
+      setNewFeedProvider(null);
       setShowAddFeed(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not add calendar feed.');
@@ -1720,20 +1819,83 @@ export default function Settings() {
             Show your third-party calendar events in your Housemait calendar. Read-only - edits happen in the source calendar.
           </p>
 
-          {showAddFeed && (
-            <form onSubmit={handleAddExternalFeed} className="border border-cream-border rounded-2xl p-3 space-y-2 mb-3">
+          {showAddFeed && (() => {
+            const isNative = Capacitor.isNativePlatform();
+            const provider = FEED_PROVIDERS.find((p) => p.id === newFeedProvider) || null;
+            const steps = provider ? ((isNative && provider.iosSteps) || provider.steps) : null;
+            const hint = feedUrlHint(newFeedUrl);
+            return (
+            <form onSubmit={handleAddExternalFeed} className="border border-cream-border rounded-2xl p-3 space-y-3 mb-3">
+              {/* Step 1: where does the calendar live? The picked provider
+                  drives a SHORT step list + a deep link as close to the page
+                  holding the address as the provider allows - replacing the
+                  old wall of all-three-providers prose. */}
+              <div>
+                <p className="text-xs text-cocoa mb-1.5">Where is the calendar?</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {FEED_PROVIDERS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setNewFeedProvider(p.id)}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                        newFeedProvider === p.id
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-white text-bark border-cream-border hover:border-primary'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {isNative && (
+                <p className="text-[11px] text-cocoa italic">
+                  Your own iPhone calendars sync automatically via &ldquo;Bring your events into Housemait&rdquo; above - this form is for links from schools, clubs, or people outside the household.
+                </p>
+              )}
+
+              {provider && (
+                <div className="bg-oat rounded-xl px-3 py-2.5 space-y-2">
+                  {provider.link && !(isNative && provider.iosSteps) && (
+                    <a
+                      href={provider.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block text-xs font-semibold text-primary hover:text-primary-pressed underline"
+                    >
+                      {provider.linkLabel} →
+                    </a>
+                  )}
+                  <ol className="text-xs text-cocoa space-y-1 list-decimal list-inside">
+                    {steps.map((s) => <li key={s}>{s}</li>)}
+                  </ol>
+                  {isNative && provider.iosTip && !provider.iosSteps && (
+                    <p className="text-[11px] text-cocoa italic">{provider.iosTip}</p>
+                  )}
+                </div>
+              )}
+
+              <input
+                type="url"
+                placeholder={provider?.placeholder || 'https://… or webcal://… (iCal feed URL)'}
+                value={newFeedUrl}
+                onChange={(e) => setNewFeedUrl(e.target.value)}
+                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              {/* Live wrong-paste feedback - same patterns the server enforces,
+                  surfaced as they paste instead of after a failed submit. */}
+              {hint && (
+                <p className={`text-[11px] rounded-xl px-3 py-2 ${hint.level === 'block' ? 'bg-coral/10 text-bark' : 'bg-amber/10 text-bark'}`}>
+                  {hint.level === 'block' ? '✋ ' : '💡 '}{hint.message}
+                </p>
+              )}
               <input
                 type="text"
                 placeholder="Calendar name (e.g. Work, School, Sasha's iCloud)"
                 value={newFeedName}
                 onChange={(e) => setNewFeedName(e.target.value)}
-                className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-              <input
-                type="url"
-                placeholder="https://… or webcal://… (iCal feed URL)"
-                value={newFeedUrl}
-                onChange={(e) => setNewFeedUrl(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
               {/* Colour picker - 16-swatch palette matching the member-theme
@@ -1755,52 +1917,25 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
-              {/* Instructions adapt to platform - the desktop iCloud.com /
-                  Google Calendar / Outlook publish flows are completely
-                  different (and mostly impossible) on a phone. iOS users
-                  get a much simpler Apple path via the Calendar app;
-                  Google + Outlook honestly tell them they need a desktop
-                  for those two. Web users see the desktop instructions. */}
-              {Capacitor.isNativePlatform() ? (
-                <div className="text-xs text-cocoa space-y-2">
-                  <p>
-                    <span className="font-medium">Apple:</span> open the iPhone <span className="font-medium">Calendar</span> app &rarr; tap <span className="font-medium">Calendars</span> at the bottom &rarr; tap <span className="font-medium">(i)</span> next to a calendar &rarr; turn on <span className="font-medium">Public Calendar</span> &rarr; tap <span className="font-medium">Share Link…</span> &rarr; <span className="font-medium">Copy</span>.
-                  </p>
-                  <p>
-                    <span className="font-medium">Google:</span> open <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> in Safari, tap <span className="font-medium">AA</span> in the address bar &rarr; <span className="font-medium">Request Desktop Website</span>. Sign in &rarr; gear icon &rarr; <span className="font-medium">Settings</span> &rarr; pick your calendar under &ldquo;Settings for my calendars&rdquo; &rarr; scroll to <span className="font-medium">Integrate calendar</span> &rarr; copy <span className="font-medium">Secret address in iCal format</span>.
-                  </p>
-                  <p>
-                    <span className="font-medium">Outlook:</span> open <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> in Safari, tap <span className="font-medium">AA</span> &rarr; <span className="font-medium">Request Desktop Website</span>. Sign in &rarr; <span className="font-medium">Settings</span> &rarr; <span className="font-medium">Shared calendars</span> &rarr; <span className="font-medium">Publish a calendar</span> &rarr; choose &ldquo;Can view all details&rdquo; &rarr; copy the ICS URL.
-                  </p>
-                  <p style={{ fontStyle: 'italic' }}>
-                    Both are fiddly on a small screen - if you have a computer handy, it&apos;s easier there.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-cocoa">
-                  <span className="font-medium">Apple:</span> sign in at <a href="https://www.icloud.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">iCloud.com</a> &rarr; Calendar &rarr; click the share icon next to your calendar &rarr; tick &ldquo;Public Calendar&rdquo; &rarr; copy URL.<br />
-                  <span className="font-medium">Google:</span> <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">calendar.google.com</a> &rarr; Settings for my calendars &rarr; pick a calendar &rarr; Integrate calendar &rarr; copy &ldquo;Secret address in iCal format&rdquo;.<br />
-                  <span className="font-medium">Outlook:</span> <a href="https://outlook.live.com/calendar" target="_blank" rel="noopener noreferrer" className="text-primary underline">outlook.live.com/calendar</a> &rarr; Settings &rarr; Shared calendars &rarr; Publish a calendar &rarr; pick &ldquo;Can view all details&rdquo; &rarr; copy ICS URL.
-                </p>
-              )}
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  disabled={addingFeed}
+                  disabled={addingFeed || hint?.level === 'block'}
                   className="bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-medium px-4 py-2 rounded-2xl text-sm transition-colors"
                 >
                   {addingFeed ? 'Adding…' : 'Subscribe'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowAddFeed(false); setNewFeedUrl(''); setNewFeedName(''); }}
+                  onClick={() => { setShowAddFeed(false); setNewFeedUrl(''); setNewFeedName(''); setNewFeedProvider(null); }}
                   className="text-sm text-cocoa hover:text-bark px-3"
                 >
                   Cancel
                 </button>
               </div>
             </form>
-          )}
+            );
+          })()}
 
           {!showAddFeed && externalFeeds.every((f) => f.source === 'device') && !loadingExternalFeeds && (
             <p className="text-xs text-cocoa italic">No link subscriptions yet.</p>

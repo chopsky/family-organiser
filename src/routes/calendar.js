@@ -733,9 +733,12 @@ router.get('/external-feeds', async (req, res) => {
  * Body: { feed_url, display_name, color? }
  *
  * Returns: { feed, refresh: stats } on success.
+ *   - 400 if the URL is a known wrong-paste shape, or the initial pull
+ *     proves the address can never work (the row is removed - the user
+ *     should fix the paste, not keep a forever-failing subscription).
  *   - 409 if the URL is already subscribed in this household.
- *   - 502 if the initial pull fails (the feed row is still created;
- *     the user can hit "Refresh" once the source comes back).
+ *   - 502 if the initial pull fails transiently (the feed row is kept;
+ *     the cron retries once the source comes back).
  */
 router.post('/external-feeds', async (req, res) => {
   const { feed_url, display_name, color } = req.body || {};
@@ -745,6 +748,13 @@ router.post('/external-feeds', async (req, res) => {
   const normalisedUrl = externalFeed.normaliseFeedUrl(feed_url);
   if (!/^https?:\/\//i.test(normalisedUrl)) {
     return res.status(400).json({ error: 'Feed URL must start with https://, http://, or webcal://.' });
+  }
+  // Known wrong-paste shapes (the provider's web page / embed link instead
+  // of the iCal address) - reject with "copy this instead" guidance rather
+  // than creating a row that can never pull.
+  const mistake = externalFeed.classifyFeedUrlMistake(normalisedUrl);
+  if (mistake) {
+    return res.status(400).json({ error: mistake });
   }
 
   let feed;
@@ -765,19 +775,29 @@ router.post('/external-feeds', async (req, res) => {
     return res.status(500).json({ error: err.message || 'Could not add feed.' });
   }
 
-  // Initial pull. If it fails, we still return the feed so the user can
-  // see it in their list and retry later - they shouldn't lose the URL
-  // they pasted just because the source is temporarily down.
+  // Initial pull. A TRANSIENT failure (source briefly down) keeps the feed
+  // row so the cron retries - the user shouldn't lose the URL they pasted.
+  // A PERMANENT-shape failure (they pasted the wrong KIND of address - a web
+  // page, or Google's public address on a non-public calendar) instead drops
+  // the row and returns 400 with copy-this-instead guidance, so they fix the
+  // paste rather than keeping a subscription that fails every cron forever.
   let refresh = null;
   let refreshError = null;
   try {
     refresh = await externalFeed.refreshFeed(feed);
   } catch (err) {
-    refreshError = err.message || String(err);
+    refreshError = externalFeed.friendlyPullError(normalisedUrl, err.message || String(err));
   }
 
   if (refreshError) {
-    return res.status(502).json({ feed, refresh: null, error: refreshError });
+    if (refreshError.permanent) {
+      // If this delete fails we still 400, but a zombie row remains and will
+      // fail every cron - log it so that state is at least diagnosable.
+      await db.deleteExternalFeed(feed.id, req.householdId)
+        .catch((e) => console.error('POST /external-feeds: cleanup of bad-URL row failed:', e.message));
+      return res.status(400).json({ error: refreshError.message });
+    }
+    return res.status(502).json({ feed, refresh: null, error: refreshError.message });
   }
   return res.json({ feed, refresh });
 });

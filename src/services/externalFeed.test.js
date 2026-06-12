@@ -31,7 +31,7 @@ jest.mock('./providers/apple', () => ({
 
 const axios = require('axios');
 const db = require('../db/queries');
-const { refreshFeed } = require('./externalFeed');
+const { refreshFeed, classifyFeedUrlMistake, friendlyPullError } = require('./externalFeed');
 
 const FEED = (over = {}) => ({
   id: 'F1', household_id: 'hh-1', feed_url: 'https://example.com/cal.ics',
@@ -130,4 +130,72 @@ test('rows whose VEVENT failed to parse are NOT treated as stale (still publishe
   expect(stats.deleted).toBe(0);
   expect(stats.skipped_recent_delete).toBe(2);
   expect(db.recordExternalFeedSuccess).toHaveBeenCalledWith('F1');
+});
+
+describe('classifyFeedUrlMistake - catches page-URLs pasted instead of iCal addresses', () => {
+  test('Google embed + web-app/settings URLs are rejected with copy-this-instead guidance', () => {
+    expect(classifyFeedUrlMistake('https://calendar.google.com/calendar/embed?src=abc%40gmail.com'))
+      .toMatch(/Secret address in iCal format/);
+    expect(classifyFeedUrlMistake('https://calendar.google.com/calendar/u/0/r/settings/calendar/YWJj'))
+      .toMatch(/Secret address in iCal format/);
+    expect(classifyFeedUrlMistake('https://calendar.google.com/calendar/r'))
+      .toMatch(/Secret address/);
+  });
+
+  test('real Google secret/public ical addresses pass', () => {
+    expect(classifyFeedUrlMistake('https://calendar.google.com/calendar/ical/abc%40gmail.com/private-0123abc/basic.ics')).toBeNull();
+    expect(classifyFeedUrlMistake('https://calendar.google.com/calendar/ical/abc%40gmail.com/public/basic.ics')).toBeNull();
+  });
+
+  test('Outlook web-app URL rejected; published calendar.ics passes', () => {
+    expect(classifyFeedUrlMistake('https://outlook.live.com/calendar/0/view/month'))
+      .toMatch(/Publish a calendar/);
+    expect(classifyFeedUrlMistake('https://outlook.live.com/owa/calendar/abc123/def456/calendar.ics')).toBeNull();
+  });
+
+  test('iCloud website URL rejected; published webcal passes', () => {
+    expect(classifyFeedUrlMistake('https://www.icloud.com/calendar/')).toMatch(/Public Calendar/);
+    expect(classifyFeedUrlMistake('webcal://p123-caldav.icloud.com/published/2/abc')).toBeNull();
+  });
+
+  test('school/club feeds and arbitrary hosts pass untouched', () => {
+    expect(classifyFeedUrlMistake('https://www.stmarys.school/calendar.ics')).toBeNull();
+    expect(classifyFeedUrlMistake('webcal://fixtures.pitchero.com/team/123.ics')).toBeNull();
+  });
+});
+
+describe('friendlyPullError - actionable guidance for permanent wrong-paste failures', () => {
+  test('Google PUBLIC address + 404 explains the secret address (permanent)', () => {
+    const r = friendlyPullError(
+      'https://calendar.google.com/calendar/ical/abc%40gmail.com/public/basic.ics',
+      'Feed returned HTTP 404',
+    );
+    expect(r.permanent).toBe(true);
+    expect(r.message).toMatch(/Secret address in iCal format/);
+  });
+
+  test('non-iCal response explains what to copy (permanent)', () => {
+    const r = friendlyPullError('https://example.com/cal', 'Feed response is not an iCalendar document');
+    expect(r.permanent).toBe(true);
+    expect(r.message).toMatch(/web page, not calendar data/);
+  });
+
+  test('transient failures pass through unchanged (row kept for retry)', () => {
+    const r = friendlyPullError('https://example.com/cal.ics', 'Feed returned HTTP 503');
+    expect(r.permanent).toBe(false);
+    expect(r.message).toBe('Feed returned HTTP 503');
+  });
+
+  test('a rate-limited (429) Google public address is NOT treated as permanent', () => {
+    const r = friendlyPullError(
+      'https://calendar.google.com/calendar/ical/abc%40gmail.com/public/basic.ics',
+      'Feed returned HTTP 429',
+    );
+    expect(r.permanent).toBe(false);
+  });
+
+  test('an .ics path serving HTML reads as a transient challenge page, not a wrong paste', () => {
+    const r = friendlyPullError('https://www.stmarys.school/calendar.ics', 'Feed response is not an iCalendar document');
+    expect(r.permanent).toBe(false);
+  });
 });

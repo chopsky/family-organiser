@@ -24,6 +24,82 @@ function normaliseFeedUrl(raw) {
 }
 
 /**
+ * Detect the URLs people ACTUALLY paste when they meant the iCal address -
+ * the provider's web-app page, embed link, or site URL. Returning the
+ * specific mistake lets the add-feed route reject with "here's what to copy
+ * instead" rather than a generic failure after the pull 404s.
+ * Returns a user-facing message, or null when the URL looks plausible.
+ */
+function classifyFeedUrlMistake(rawUrl) {
+  let u;
+  try {
+    u = new URL(normaliseFeedUrl(rawUrl));
+  } catch {
+    return null; // not a URL at all - the route's protocol check reports that
+  }
+  const host = u.hostname.toLowerCase();
+  const path = u.pathname;
+
+  if (host === 'calendar.google.com') {
+    if (path.startsWith('/calendar/embed')) {
+      return "That's Google's embed link (for websites), not the calendar's address. In Google Calendar settings, scroll to \"Integrate calendar\" and copy \"Secret address in iCal format\" instead.";
+    }
+    // The web app / settings UI lives under /calendar/r or /calendar/u/<n>/r.
+    if (/^\/calendar(\/u\/\d+)?\/r(\/|$)/.test(path)) {
+      return "That's the Google Calendar page URL, not the calendar's address. On that settings page, scroll to \"Integrate calendar\" and copy \"Secret address in iCal format\".";
+    }
+    return null; // /calendar/ical/... is the real thing
+  }
+  if (host === 'outlook.live.com' || host === 'outlook.office.com' || host === 'outlook.office365.com') {
+    // Published feeds live under /owa/calendar/.../calendar.ics; anything
+    // under /calendar that isn't an .ics is the web app itself.
+    if (path.startsWith('/calendar') && !/\.ics$/i.test(path)) {
+      return "That's the Outlook web page URL, not a calendar address. In Outlook: Settings → Calendar → Shared calendars → \"Publish a calendar\" → pick \"Can view all details\" → Publish, then copy the ICS link it shows.";
+    }
+    return null;
+  }
+  if (host === 'icloud.com' || host === 'www.icloud.com') {
+    return "That's the iCloud website URL, not a calendar address. In iCloud Calendar, click the share icon next to the calendar, tick \"Public Calendar\", and copy the webcal:// link it shows.";
+  }
+  return null;
+}
+
+/**
+ * Turn an initial-pull failure into actionable guidance where the URL shape
+ * tells us what went wrong. Returns { message, permanent } - permanent=true
+ * means the URL will NEVER work as pasted (wrong address kind), so the
+ * caller should drop the feed row instead of leaving a forever-failing
+ * subscription behind.
+ */
+function friendlyPullError(rawUrl, errMessage) {
+  const msg = errMessage || 'Could not fetch the calendar.';
+  const url = normaliseFeedUrl(rawUrl);
+  // Google's PUBLIC address only resolves when the calendar is made public -
+  // people copy it because it sits right above the secret one. Only the
+  // auth/not-found statuses mean "wrong address kind"; 429/408 etc. are
+  // transient and must NOT delete a working feed on a rate-limited first pull.
+  if (/calendar\.google\.com\/calendar\/ical\/.+\/public\/basic\.ics/i.test(url) && /HTTP (401|403|404|410)\b/.test(msg)) {
+    return {
+      message: 'This is Google\'s "Public address", which only works if the calendar is made public. Copy the "Secret address in iCal format" instead - it\'s just below it on the same settings page and needs no other changes.',
+      permanent: true,
+    };
+  }
+  if (/not an iCalendar document/i.test(msg)) {
+    // An .ics-looking path serving HTML is usually a TRANSIENT challenge/
+    // maintenance page in front of a real feed - keep the row and let the
+    // cron retry. A non-.ics path serving HTML is a pasted page URL.
+    if (/\.ics(\?|$)/i.test(url)) {
+      return { message: msg, permanent: false };
+    }
+    return {
+      message: 'That address returns a web page, not calendar data. Make sure you copied the calendar\'s iCal/ICS address - for Google it\'s "Secret address in iCal format" under Integrate calendar; for Outlook it\'s the ICS link under "Publish a calendar".',
+      permanent: true,
+    };
+  }
+  return { message: msg, permanent: false };
+}
+
+/**
  * GET the iCal feed and return the response body as text.
  *
  * Bounded by a 30s timeout and a 25MB max-content-length so a malicious
@@ -310,6 +386,8 @@ async function refreshFeed(feed) {
 
 module.exports = {
   normaliseFeedUrl,
+  classifyFeedUrlMistake,
+  friendlyPullError,
   fetchFeed,
   extractVEvents,
   vEventToRecords,

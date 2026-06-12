@@ -1276,6 +1276,29 @@ describe('synced calendar events are read-only', () => {
   });
 });
 
+// ─── POST /external-feeds rejects page-URLs with copy-this-instead guidance ────
+// People paste the provider's web page instead of the iCal address; without
+// this the row was created and failed every pull forever.
+describe('add external feed - wrong-paste detection', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('Google Calendar settings-page URL is rejected before any row is created', async () => {
+    const res = await request(app).post('/api/calendar/external-feeds').set(AUTH)
+      .send({ feed_url: 'https://calendar.google.com/calendar/u/0/r/settings/calendar/YWJj', display_name: 'Work' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Secret address in iCal format/);
+    expect(db.createExternalFeed).not.toHaveBeenCalled();
+  });
+
+  test('iCloud website URL is rejected with the Public Calendar steps', async () => {
+    const res = await request(app).post('/api/calendar/external-feeds').set(AUTH)
+      .send({ feed_url: 'https://www.icloud.com/calendar/', display_name: 'Home' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Public Calendar/);
+    expect(db.createExternalFeed).not.toHaveBeenCalled();
+  });
+});
+
 // ─── GET /api/calendar/feed/:token.ics - stable UIDs ────────────────────────────
 // Without explicit ids, ical-generator mints RANDOM UIDs per request, so
 // subscribers' calendar apps saw the whole feed deleted + recreated on every
