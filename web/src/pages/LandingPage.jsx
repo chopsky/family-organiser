@@ -675,18 +675,20 @@ export default function LandingPage() {
               Housemait is the AI assistant that restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
             </p>
             <div className="hero-cta">
-              {/* Hero CTA — every visitor (desktop, Android, and iPhone)
-                  gets the same pair: the styled "Download on the App
-                  Store" pill plus the "Try it on the web" fallback. On
-                  desktop the pill reveals a QR popover on hover so you can
-                  scan straight to your phone; on a touch device there's no
-                  hover, so tapping just opens the App Store directly. The
+              {/* Hero CTA — the styled "Download on the App Store" pill
+                  shows on every device (on desktop it reveals a QR popover
+                  on hover to scan straight to a phone; on touch it opens
+                  the App Store directly). The "Try it on the web" fallback
+                  is shown to desktop/Android but hidden for iPhone visitors
+                  — they're already on the device the app installs to. The
                   pill is only rendered when the App Store ID has been
                   configured in lib/app-store.js. */}
               {APP_STORE_CONFIGURED && <DownloadQR />}
-              <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
-                Try it on the web
-              </a>
+              {!iosVisitor && (
+                <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
+                  Try it on the web
+                </a>
+              )}
             </div>
             <div className="hero-price">
               Free 30-day trial. No card to start. Cancel anytime.
@@ -1078,9 +1080,11 @@ export default function LandingPage() {
               <p>Set Housemait up in under 5 minutes. Your calmer family life starts here.</p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {APP_STORE_CONFIGURED && <DownloadQR />}
-                <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
-                  Try it on the web
-                </a>
+                {!iosVisitor && (
+                  <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
+                    Try it on the web
+                  </a>
+                )}
               </div>
             </div>
           </div>
