@@ -131,9 +131,20 @@ export default function ConnectWhatsApp({ next, setError }) {
       )}
 
       <div className="mt-8 flex flex-col items-center gap-3">
-        <button type="button" onClick={next} className={primaryBtn}>
-          {isDeviceCalendarSupported() ? 'Done →' : 'Continue →'}
-        </button>
+        {/* When the calendar offer is on screen, "Choose calendars" must be
+            the ONE primary action (brand rule: single main action per view -
+            and the whole point is nudging the connect). Proceeding is a quiet
+            text link, same treatment as the other steps' skip links. On web
+            there's no offer, so Continue stays the primary button. */}
+        {isDeviceCalendarSupported() ? (
+          <button type="button" onClick={next} className={skipLink}>
+            Continue →
+          </button>
+        ) : (
+          <button type="button" onClick={next} className={primaryBtn}>
+            Continue →
+          </button>
+        )}
       </div>
     </div>
   );
