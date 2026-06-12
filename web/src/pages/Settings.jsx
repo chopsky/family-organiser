@@ -179,15 +179,10 @@ const FEED_PROVIDERS = [
       'Tap "Share Link…" → Copy, then paste it below.',
     ],
   },
-  {
-    id: 'other',
-    label: 'School or club link',
-    link: null,
-    steps: [
-      'Paste the calendar link the school or club shared - webcal:// and https:// links ending in .ics both work.',
-    ],
-    placeholder: 'https://… or webcal://… (iCal feed URL)',
-  },
+  // NOTE: a generic "school or club link" row used to live here. Removed for
+  // now - it muddied the picker next to the Family → Schools term-dates
+  // import, and pasting a feed link to the WhatsApp bot subscribes it
+  // directly anyway. Existing link subscriptions are unaffected.
 ];
 
 /**
@@ -1878,7 +1873,7 @@ export default function Settings() {
                 <div className="border border-cream-border rounded-2xl overflow-hidden mb-3">
                   {isNative && (
                     <p className="text-[11px] text-cocoa italic px-4 pt-3">
-                      Your own iPhone calendars sync automatically via &ldquo;Bring your events into Housemait&rdquo; above - this is for links from schools, clubs, or people outside the household.
+                      Your own iPhone calendars sync automatically via &ldquo;Bring your events into Housemait&rdquo; above - use this to pull in a calendar from another account.
                     </p>
                   )}
                   {FEED_PROVIDERS.map((p) => (
