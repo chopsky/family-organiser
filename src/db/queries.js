@@ -1099,14 +1099,45 @@ async function getUserByWhatsAppPhone(phone, db = supabase) {
   const clean = phone.replace(/^whatsapp:/, '').trim();
   const normalised = clean.startsWith('+') ? clean : `+${clean}`;
 
+  // A phone identifies exactly ONE account (last-write-wins linking + the
+  // partial unique index enforce it), but legacy rows may predate both.
+  // .single() would error on duplicates and the bot would treat a paying
+  // family as a stranger - instead serve the most recently linked account
+  // and log loudly so the state gets cleaned up.
   const { data, error } = await db
     .from('users')
     .select()
     .eq('whatsapp_phone', normalised)
     .eq('whatsapp_linked', true)
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
+    .order('whatsapp_linked_at', { ascending: false, nullsFirst: false })
+    .limit(2);
+  if (error) throw error;
+  const rows = data || [];
+  if (rows.length > 1) {
+    console.error(
+      `[whatsapp] DUPLICATE linked accounts for ${normalised} - serving the most recently linked (user ${rows[0].id}). Apply supabase/migration-whatsapp-unique-phone.sql.`
+    );
+  }
+  return rows[0] || null;
+}
+
+// Last-write-wins number handover: linking a number to one account must
+// unlink it everywhere else FIRST (the inbound webhook routes purely by
+// number, so two linked rows would blind the bot for both households).
+// Returns the displaced users so callers can invalidate their household
+// caches and word the welcome message honestly.
+async function unlinkWhatsAppNumberFromOthers(phone, exceptUserId, db = supabase) {
+  const clean = phone.replace(/^whatsapp:/, '').trim();
+  const normalised = clean.startsWith('+') ? clean : `+${clean}`;
+  const { data, error } = await db
+    .from('users')
+    .update({ whatsapp_linked: false })
+    .eq('whatsapp_phone', normalised)
+    .eq('whatsapp_linked', true)
+    .neq('id', exceptUserId)
+    .select('id, household_id, name');
+  if (error) throw error;
+  return data || [];
 }
 
 async function createWhatsAppVerificationCode(userId, phone, code, expiresAt, db = supabase) {
@@ -1168,6 +1199,12 @@ async function findUnusedPairingCode(code, db = supabase) {
     .select()
     .ilike('code', code)
     .eq('used', false)
+    // Pairing rows are created with NO phone (consume stamps it); legacy
+    // typed-OTP rows set phone at insert. Without this filter, a bare
+    // numeric chat message ("the gate code is 482913") could collide with
+    // a stranger's live 6-digit OTP and link the sender's number to THEIR
+    // account - digits 2-9 sit inside the pairing-code alphabet.
+    .is('phone', null)
     .gt('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false })
     .limit(1)
@@ -6950,6 +6987,7 @@ module.exports = {
   deleteHouseholdPreference,
   // WhatsApp
   getUserByWhatsAppPhone,
+  unlinkWhatsAppNumberFromOthers,
   createWhatsAppVerificationCode,
   getWhatsAppVerificationCode,
   markWhatsAppVerificationCodeUsed,

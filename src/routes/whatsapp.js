@@ -125,19 +125,28 @@ router.post('/webhook', async (req, res) => {
     // paywall and fell through to a free (billable) AI reply.
     const numMedia = parseInt(NumMedia || '0', 10);
 
-    // ── Pull-push pairing: an unlinked sender sending "CONNECT XXXXXX" (or
-    // just the code on its own) is trying to link their WhatsApp to their
-    // app account. We match the code in their message body against the
-    // whatsapp_verification_codes table, and if it's still valid, link
-    // the From phone to the owning user. See /api/auth/whatsapp-init-pairing.
+    // ── Pull-push pairing: a sender sending "CONNECT XXXXXX" (or just the
+    // code on its own) is trying to link their WhatsApp to an app account.
+    // We match the code against whatsapp_verification_codes and, if valid,
+    // link the From phone to the owning user. See /whatsapp-init-pairing.
     //
-    // Done BEFORE the "unknown user" reply below so first-time pairers
-    // don't get the "sign up first" message.
-    if (!user && typeof Body === 'string' && Body.trim()) {
-      // Pull a 5-10 char alphanumeric token from the message. Matches
-      // both "CONNECT K3X9P2" and the bare code.
-      const tokenMatch = Body.toUpperCase().match(/\b([23456789ABCDEFGHJKMNPQRSTVWXYZ]{5,10})\b/);
-      const token = tokenMatch ? tokenMatch[1] : null;
+    // Two sender states reach this:
+    //   - UNKNOWN number: the original first-time pairing. Loose token
+    //     match (a code-looking word anywhere in the message). Done BEFORE
+    //     the "unknown user" reply so first-timers don't get "sign up first".
+    //   - ALREADY-LINKED number with a valid code for a DIFFERENT account:
+    //     a deliberate "move my number" (they signed up fresh / switched
+    //     household). STRICT match only - the whole message must be the code
+    //     (optionally prefixed CONNECT) - so ordinary chat words that happen
+    //     to fit the code alphabet ("THANKS") can't divert a real message.
+    //     LAST-WRITE-WINS: the number is unlinked from every other account,
+    //     because the webhook routes purely by number and duplicates would
+    //     blind the bot for both households.
+    if (typeof Body === 'string' && Body.trim()) {
+      const upper = Body.toUpperCase();
+      const looseMatch = upper.match(/\b([23456789ABCDEFGHJKMNPQRSTVWXYZ]{5,10})\b/);
+      const strictMatch = upper.trim().match(/^(?:CONNECT\s+)?([23456789ABCDEFGHJKMNPQRSTVWXYZ]{5,10})$/);
+      const token = user ? (strictMatch ? strictMatch[1] : null) : (looseMatch ? looseMatch[1] : null);
       if (token) {
         try {
           const row = await db.findUnusedPairingCode(token);
@@ -147,36 +156,61 @@ router.post('/webhook', async (req, res) => {
             // null back and just falls through.
             const consumed = await db.consumePairingCode(row.id, phone);
             if (consumed) {
+              const sameAccount = !!user && row.user_id === user.id;
+              // Displace any other account holding this number BEFORE
+              // linking, so a unique index can never be violated and the
+              // lookup stays unambiguous.
+              const displaced = sameAccount
+                ? []
+                : await db.unlinkWhatsAppNumberFromOthers(phone, row.user_id);
               await db.updateUser(row.user_id, {
                 whatsapp_phone: phone,
                 whatsapp_linked: true,
                 whatsapp_linked_at: new Date().toISOString(),
               });
               const linkedUser = await db.getUserById(row.user_id).catch(() => null);
-              const greetingName = linkedUser?.name ? ` ${linkedUser.name}` : '';
-              const welcome = [
-                `👋 Hey${greetingName} - Housemait here.`,
-                '',
-                `Your WhatsApp is now linked! Just message me like a friend:`,
-                '',
-                `  🛒 "We need milk and eggs"`,
-                `  📋 "Remind me to book the dentist"`,
-                `  📅 "Sofia football Saturday 10am"`,
-                '',
-                `I can also help with recipes, weather, school dates, receipts, and lots more. I'll show you new tricks over the next few days.`,
-                '',
-                `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
-              ].join('\n');
-              await whatsapp.sendMessage(phone, welcome).catch((e) =>
-                console.error('[whatsapp-pair] welcome failed:', e.message)
-              );
+              if (sameAccount) {
+                // Re-pairing a number that's already on this account: the
+                // code is consumed (so the app's polling flips to linked)
+                // and a short confirmation beats a second full welcome.
+                await whatsapp.sendMessage(phone, `✅ This number is already connected to your account - you're all set.`).catch((e) =>
+                  console.error('[whatsapp-pair] confirm failed:', e.message)
+                );
+              } else {
+                const greetingName = linkedUser?.name ? ` ${linkedUser.name}` : '';
+                const welcomeLines = [
+                  `👋 Hey${greetingName} - Housemait here.`,
+                  '',
+                  `Your WhatsApp is now linked! Just message me like a friend:`,
+                  '',
+                  `  🛒 "We need milk and eggs"`,
+                  `  📋 "Remind me to book the dentist"`,
+                  `  📅 "Sofia football Saturday 10am"`,
+                  '',
+                  `I can also help with recipes, weather, school dates, receipts, and lots more. I'll show you new tricks over the next few days.`,
+                  '',
+                  `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
+                ];
+                if (displaced.length > 0) {
+                  welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);
+                }
+                await whatsapp.sendMessage(phone, welcomeLines.join('\n')).catch((e) =>
+                  console.error('[whatsapp-pair] welcome failed:', e.message)
+                );
+              }
               if (linkedUser?.household_id) cache.invalidate(`members:${linkedUser.household_id}`);
+              for (const d of displaced) {
+                if (d.household_id) cache.invalidate(`members:${d.household_id}`);
+              }
               return;
             }
           }
+          // Token didn't match a live pairing code: for a linked sender
+          // this was just a normal message (fall through to chat); for an
+          // unknown sender, fall through to the "sign up first" reply.
         } catch (err) {
           console.error('[whatsapp-pair] consume failed:', err.message);
-          // Fall through to "unknown user" reply
+          // Fall through to "unknown user" reply / normal handling
         }
       }
     }

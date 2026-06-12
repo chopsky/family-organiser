@@ -24,6 +24,7 @@ jest.mock('../db/queries', () => ({
   consumePairingCode: jest.fn(),
   updateUser: jest.fn(),
   getUserById: jest.fn(),
+  unlinkWhatsAppNumberFromOthers: jest.fn(() => Promise.resolve([])),
 }));
 jest.mock('../services/whatsapp', () => ({
   sendMessage: jest.fn(() => Promise.resolve()),
@@ -120,6 +121,87 @@ describe('WhatsApp webhook subscription gate', () => {
 
     await waitFor(() => expect(handlers.handleTextMessage).toHaveBeenCalled());
     expect(whatsapp.sendMessage).not.toHaveBeenCalledWith(PHONE, expect.stringMatching(TRIAL_ENDED));
+  });
+});
+
+// ─── Number handover: same phone, new account ───────────────────────────────
+// A linked sender sending a VALID pairing code for a different account is
+// deliberately moving their number (fresh signup / new household). The old
+// account must be unlinked (last-write-wins) - and code-shaped chat words
+// must never trigger any of this.
+describe('WhatsApp pairing - number handover', () => {
+  const ACTIVE_HH = { id: 'h1', is_internal: false, subscription_status: 'active', timezone: 'Europe/London' };
+
+  test('linked sender + valid code for ANOTHER account → unlink old, link new, welcome notes the move', async () => {
+    db.getHouseholdById.mockResolvedValue(ACTIVE_HH);
+    db.findUnusedPairingCode.mockResolvedValue({ id: 'code-1', user_id: 'u2' });
+    db.consumePairingCode.mockResolvedValue({ id: 'code-1' });
+    db.unlinkWhatsAppNumberFromOthers.mockResolvedValue([{ id: 'u1', household_id: 'h1', name: 'Grant' }]);
+    db.getUserById.mockResolvedValue({ id: 'u2', household_id: 'h2', name: 'Grant' });
+
+    await postText('CONNECT K3X9P2');
+
+    await waitFor(() => expect(db.updateUser).toHaveBeenCalledWith('u2', expect.objectContaining({ whatsapp_phone: PHONE, whatsapp_linked: true })));
+    expect(db.unlinkWhatsAppNumberFromOthers).toHaveBeenCalledWith(PHONE, 'u2');
+    expect(whatsapp.sendMessage).toHaveBeenCalledWith(PHONE, expect.stringMatching(/replaced/i));
+    expect(handlers.handleTextMessage).not.toHaveBeenCalled();
+  });
+
+  test('linked sender + bare valid code (no CONNECT prefix) also moves the number', async () => {
+    db.getHouseholdById.mockResolvedValue(ACTIVE_HH);
+    db.findUnusedPairingCode.mockResolvedValue({ id: 'code-1', user_id: 'u2' });
+    db.consumePairingCode.mockResolvedValue({ id: 'code-1' });
+    db.getUserById.mockResolvedValue({ id: 'u2', household_id: 'h2', name: 'Grant' });
+
+    await postText('K3X9P2');
+
+    await waitFor(() => expect(db.updateUser).toHaveBeenCalledWith('u2', expect.anything()));
+    expect(handlers.handleTextMessage).not.toHaveBeenCalled();
+  });
+
+  test('code-shaped chat word ("THANKS") with no live code is a normal message', async () => {
+    db.getHouseholdById.mockResolvedValue(ACTIVE_HH);
+    db.findUnusedPairingCode.mockResolvedValue(null);
+
+    await postText('THANKS');
+
+    await waitFor(() => expect(handlers.handleTextMessage).toHaveBeenCalled());
+    expect(db.consumePairingCode).not.toHaveBeenCalled();
+  });
+
+  test('a code buried mid-sentence from a LINKED sender is never treated as pairing', async () => {
+    db.getHouseholdById.mockResolvedValue(ACTIVE_HH);
+
+    await postText('tell dad the gate code is K3X9P2 thanks');
+
+    await waitFor(() => expect(handlers.handleTextMessage).toHaveBeenCalled());
+    // Strict gate: the lookup is never even attempted for mid-sentence tokens.
+    expect(db.findUnusedPairingCode).not.toHaveBeenCalled();
+  });
+
+  test('linked sender re-pairing their OWN account gets a short confirm, no displacement', async () => {
+    db.getHouseholdById.mockResolvedValue(ACTIVE_HH);
+    db.findUnusedPairingCode.mockResolvedValue({ id: 'code-1', user_id: 'u1' });
+    db.consumePairingCode.mockResolvedValue({ id: 'code-1' });
+    db.getUserById.mockResolvedValue(LINKED_USER);
+
+    await postText('CONNECT K3X9P2');
+
+    await waitFor(() => expect(whatsapp.sendMessage).toHaveBeenCalledWith(PHONE, expect.stringMatching(/already connected/i)));
+    expect(db.unlinkWhatsAppNumberFromOthers).not.toHaveBeenCalled();
+    expect(handlers.handleTextMessage).not.toHaveBeenCalled();
+  });
+
+  test('unknown sender still pairs with a code buried in a longer message (original flow)', async () => {
+    db.getUserByWhatsAppPhone.mockResolvedValue(null);
+    db.findUnusedPairingCode.mockResolvedValue({ id: 'code-1', user_id: 'u2' });
+    db.consumePairingCode.mockResolvedValue({ id: 'code-1' });
+    db.getUserById.mockResolvedValue({ id: 'u2', household_id: 'h2', name: 'Grant' });
+
+    await postText('hi here is my code K3X9P2');
+
+    await waitFor(() => expect(db.updateUser).toHaveBeenCalledWith('u2', expect.objectContaining({ whatsapp_linked: true })));
+    expect(whatsapp.sendMessage).toHaveBeenCalledWith(PHONE, expect.stringMatching(/now linked/i));
   });
 });
 

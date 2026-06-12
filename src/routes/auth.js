@@ -1334,6 +1334,15 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid or expired code. Please request a new one.' });
     }
 
+    // LAST-WRITE-WINS: a phone number identifies exactly one Housemait
+    // account (the inbound webhook routes purely by number). Linking here
+    // must displace any other account holding this number - two linked
+    // rows would make the bot treat BOTH households as strangers.
+    const displaced = await db.unlinkWhatsAppNumberFromOthers(record.phone, req.user.id);
+    for (const d of displaced) {
+      if (d.household_id) cache.invalidate(`members:${d.household_id}`);
+    }
+
     // Link the phone number. whatsapp_linked_at lets the morning-digest
     // job calculate "days since linked" so it can surface a rotating
     // tip footer for the first ~14 days.
@@ -1354,7 +1363,7 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     // "💡 Did you know…" footer on the morning digest for the first 14
     // days - see src/utils/whatsapp-tips.js + src/jobs/reminders.js.
     const whatsapp = require('../services/whatsapp');
-    const welcome = [
+    const welcomeLines = [
       `👋 Hey ${req.user.name} - Housemait here.`,
       '',
       `I'm your family's calm second brain. Just message me like a friend:`,
@@ -1366,7 +1375,11 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
       `I can also help with recipes, weather, school dates, receipts, and lots more - but no rush. I'll show you new tricks over the next few days.`,
       '',
       `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
-    ].join('\n');
+    ];
+    if (displaced.length > 0) {
+      welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);
+    }
+    const welcome = welcomeLines.join('\n');
 
     whatsapp.sendMessage(record.phone, welcome).catch((err) => {
       console.error('[whatsapp-verify] welcome message failed:', err.message);
