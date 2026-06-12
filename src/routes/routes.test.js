@@ -1187,6 +1187,53 @@ describe('GET /api/admin/audit-log', () => {
   });
 });
 
+// ─── POST /api/calendar/device-sync ─────────────────────────────────────────────
+// EventKit device sync: auth'd members upload window snapshots of selected
+// device calendars. The service must drop Housemait-prefixed UIDs (echo
+// guard) and report per-calendar results.
+describe('POST /api/calendar/device-sync', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.findDeviceCalendarLink.mockResolvedValue({
+      id: 'L1', household_id: 'hh-1', color: 'sky', device_owner_user_id: 'u-1',
+      display_name: 'Family', last_sync_hash: null,
+    });
+    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue([]);
+    db.replaceFeedEventsInWindow.mockResolvedValue();
+    db.updateDeviceCalendarLink.mockResolvedValue();
+  });
+
+  const BODY = {
+    calendars: [{
+      deviceCalendarId: 'DC1', name: 'Family', hash: 'h1',
+      windowStart: '2026-05-13T00:00:00Z', windowEnd: '2029-06-12T00:00:00Z',
+      events: [
+        { uid: 'u-real', title: 'Swim', start: '2026-06-15T09:00:00Z', end: '2026-06-15T10:00:00Z' },
+        { uid: 'housemait-evt-x@housemait.com', title: 'Echo', start: '2026-06-16T09:00:00Z' },
+      ],
+    }],
+  };
+
+  test('requires auth', async () => {
+    const res = await request(app).post('/api/calendar/device-sync').send(BODY);
+    expect(res.status).toBe(401);
+  });
+
+  test('applies real events and drops Housemait echoes', async () => {
+    const res = await request(app).post('/api/calendar/device-sync').set(AUTH).send(BODY);
+    expect(res.status).toBe(200);
+    expect(res.body.results[0]).toMatchObject({ ok: true, applied: 1, echoDropped: 1 });
+    const rows = db.replaceFeedEventsInWindow.mock.calls[0][3];
+    expect(rows.map((r) => r.external_uid)).toEqual(['u-real']);
+  });
+
+  test('rejects an empty body and >10 calendars', async () => {
+    expect((await request(app).post('/api/calendar/device-sync').set(AUTH).send({})).status).toBe(400);
+    const many = { calendars: Array.from({ length: 11 }, (_, i) => ({ deviceCalendarId: `c${i}` })) };
+    expect((await request(app).post('/api/calendar/device-sync').set(AUTH).send(many)).status).toBe(400);
+  });
+});
+
 // ─── GET /api/calendar/feed/:token.ics - stable UIDs ────────────────────────────
 // Without explicit ids, ical-generator mints RANDOM UIDs per request, so
 // subscribers' calendar apps saw the whole feed deleted + recreated on every

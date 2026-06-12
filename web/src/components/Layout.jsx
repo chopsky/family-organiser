@@ -9,6 +9,8 @@ import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
 import { tap as hapticTap } from '../lib/haptics';
 import { onShortcutTapped } from '../lib/app-shortcuts';
+import { syncDeviceCalendarsQuietly } from '../lib/deviceCalendar';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 const mainNav = [
@@ -152,6 +154,13 @@ export default function Layout({ children }) {
     });
     return unsubscribe;
   }, [navigate]);
+
+  // Device calendar sync (iOS app only; no-op elsewhere / when no calendars
+  // are selected). Runs once at launch and again on each foreground, so the
+  // household's copy of the user's device calendars stays fresh whenever the
+  // app is actually used. Server-side hash-skip makes repeats nearly free.
+  useEffect(() => { syncDeviceCalendarsQuietly(); }, []);
+  useAppForegroundRefresh(syncDeviceCalendarsQuietly, { throttleMs: 5 * 60 * 1000 });
 
   // Esc-to-close + body-scroll-lock while the More sheet is open. The
   // sheet itself eats taps via stopPropagation; the backdrop click is

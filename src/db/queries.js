@@ -2988,14 +2988,123 @@ async function getExternalFeedsByHousehold(householdId, db = supabase) {
 const EXTERNAL_FEED_MAX_FAILURES = 10;
 
 async function getAllActiveExternalFeeds(db = supabase) {
-  const { data, error } = await db
+  // ONLY URL feeds. Device-sourced rows (EventKit) have synthetic device://
+  // URLs that the HTTP poller can't fetch - polling them would rack up
+  // consecutive_failures until the link auto-disabled. Falls back to an
+  // unfiltered query while the source column's migration hasn't run yet.
+  let res = await db
     .from('external_calendar_feeds')
     .select()
     .eq('sync_enabled', true)
+    .eq('source', 'ical')
     .lt('consecutive_failures', EXTERNAL_FEED_MAX_FAILURES)
     .order('last_synced_at', { ascending: true, nullsFirst: true });
+  // Fall back to the unfiltered query ONLY when the source column doesn't
+  // exist yet (42703 = undefined column, pre-migration). A blanket fallback
+  // would hand device:// rows to the HTTP poller on any transient error and
+  // walk their consecutive_failures toward auto-disable.
+  if (res.error && res.error.code === '42703') {
+    res = await db
+      .from('external_calendar_feeds')
+      .select()
+      .eq('sync_enabled', true)
+      .lt('consecutive_failures', EXTERNAL_FEED_MAX_FAILURES)
+      .order('last_synced_at', { ascending: true, nullsFirst: true });
+  }
+  if (res.error) throw res.error;
+  return res.data || [];
+}
+
+// ─── Device calendar links (EventKit sync) ──────────────────────────────────────
+
+async function findDeviceCalendarLink(householdId, userId, deviceCalendarId, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('household_id', householdId)
+    .eq('device_owner_user_id', userId)
+    .eq('source', 'device')
+    .eq('device_calendar_id', deviceCalendarId)
+    .maybeSingle();
   if (error) throw error;
-  return data || [];
+  return data || null;
+}
+
+// Adopt-on-reconnect lookup: device calendar ids are device-local, so a new
+// phone presents new ids. Match the user's existing device link by calendar
+// display name instead, so the old row (events, colour, history) carries over.
+async function findDeviceLinkByOwnerAndName(householdId, userId, displayName, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('household_id', householdId)
+    .eq('device_owner_user_id', userId)
+    .eq('source', 'device')
+    .eq('display_name', displayName)
+    .limit(1);
+  if (error) throw error;
+  return (data || [])[0] || null;
+}
+
+// Internal update by id - callers resolve the link via the household-scoped
+// finders above first.
+async function updateDeviceCalendarLink(linkId, fields, db = supabase) {
+  const { error } = await db
+    .from('external_calendar_feeds')
+    .update(fields)
+    .eq('id', linkId);
+  if (error) throw error;
+}
+
+// Household-level UID dedupe: which of these uids already exist on calendar
+// events under a DIFFERENT feed/link in this household? (Two parents syncing
+// the same shared calendar, or a device calendar overlapping a URL feed.)
+async function findHouseholdUidsUnderOtherFeeds(householdId, uids, excludeFeedId, db = supabase) {
+  const found = [];
+  // Small chunks: uids can be 400 chars (Exchange/Google external identifiers
+  // run long) and .in() encodes them into the GET query string - 200 per
+  // chunk could exceed proxy URL caps and fail the whole sync.
+  for (let i = 0; i < uids.length; i += 50) {
+    const chunk = uids.slice(i, i + 50);
+    const { data, error } = await db
+      .from('calendar_events')
+      .select('external_uid')
+      .eq('household_id', householdId)
+      .neq('external_feed_id', excludeFeedId)
+      .not('external_feed_id', 'is', null)
+      .in('external_uid', chunk);
+    if (error) throw error;
+    for (const r of data || []) found.push(r.external_uid);
+  }
+  return found;
+}
+
+// Replace one link's events within a window: delete then chunked UPSERT.
+//
+// Two subtleties, both learned the hard way (adversarial review):
+//   - The delete must match by OVERLAP (end_time >= start AND start_time <=
+//     end), not by start_time-in-window. EventKit's predicate returns events
+//     that OVERLAP the window, so a long/multi-day event that began before
+//     windowStart arrives in the payload with its real (earlier) start_time.
+//     A start_time-bounded delete would miss its old row and the re-insert
+//     would hit the (external_feed_id, external_uid) unique index.
+//   - Upsert (not insert) as the second belt: even if some residual row
+//     escapes the delete bound, the apply merges instead of throwing - a
+//     thrown apply would leave the window deleted but not repopulated.
+async function replaceFeedEventsInWindow(feedId, windowStartIso, windowEndIso, rows, db = supabase) {
+  const del = await db
+    .from('calendar_events')
+    .delete()
+    .eq('external_feed_id', feedId)
+    .gte('end_time', windowStartIso)
+    .lte('start_time', windowEndIso);
+  if (del.error) throw del.error;
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await db
+      .from('calendar_events')
+      .upsert(rows.slice(i, i + 500), { onConflict: 'external_feed_id,external_uid' });
+    if (error) throw error;
+  }
 }
 
 async function getExternalFeedById(feedId, db = supabase) {
@@ -6780,6 +6889,11 @@ module.exports = {
   deleteFeedToken,
   getExternalFeedsByHousehold,
   getAllActiveExternalFeeds,
+  findDeviceCalendarLink,
+  findDeviceLinkByOwnerAndName,
+  updateDeviceCalendarLink,
+  findHouseholdUidsUnderOtherFeeds,
+  replaceFeedEventsInWindow,
   getExternalFeedById,
   createExternalFeed,
   deleteExternalFeed,

@@ -18,6 +18,10 @@
 	<string>Housemait uses your location to show local weather on your home screen and to answer questions that depend on where you are. You can also set a home address instead under Family Setup.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Housemait uses your location to show local weather on your home screen and to answer questions that depend on where you are. You can also set a home address instead under Family Setup.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Housemait reads the calendars you choose so your existing events appear in your family calendar. Housemait never changes, adds or deletes anything in your calendars.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Housemait reads the calendars you choose so your existing events appear in your family calendar. Housemait never changes, adds or deletes anything in your calendars.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>

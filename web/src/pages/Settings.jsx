@@ -6,6 +6,7 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
+import DeviceCalendarSync from '../components/DeviceCalendarSync';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import {
@@ -1494,6 +1495,11 @@ export default function Settings() {
 
       {/* Connect Calendars */}
       <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar}>
+        {/* Inbound: device calendars via the read-only EventKit bridge.
+            Renders null outside the iOS app. */}
+        <div className="mb-4">
+          <DeviceCalendarSync />
+        </div>
         <p className="text-sm text-cocoa mb-3">
           Show your Housemait calendar events in your third-party calendars. One-way - events you create here appear there automatically.
         </p>

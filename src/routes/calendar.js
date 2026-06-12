@@ -13,6 +13,7 @@ async function getIcal() {
 }
 const db = require('../db/queries');
 const { requireAuth } = require('../middleware/auth');
+const deviceCalendarSync = require('../services/deviceCalendarSync');
 const cache = require('../services/cache');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -766,6 +767,11 @@ router.post('/external-feeds/:id/refresh', async (req, res) => {
   if (!feed || feed.household_id !== req.householdId) {
     return res.status(404).json({ error: 'Feed not found.' });
   }
+  // Device-sourced links have synthetic device:// URLs - there is nothing
+  // server-side to fetch. Freshness comes from the owner's phone syncing.
+  if (feed.source === 'device') {
+    return res.status(400).json({ error: "This calendar syncs from a phone, not a URL. Open Housemait on the connected iPhone to refresh it." });
+  }
   try {
     const refresh = await externalFeed.refreshFeed(feed);
     return res.json({ refresh });
@@ -825,6 +831,56 @@ router.delete('/external-feeds/:id', async (req, res) => {
     console.error(`DELETE /api/calendar/external-feeds/${feed.id} error:`, err);
     return res.status(500).json({ error: err.message || 'Could not remove feed.' });
   }
+});
+
+/**
+ * POST /api/calendar/device-sync
+ * The iOS app uploads window snapshots of the user's SELECTED device
+ * calendars, read via the read-only EventKit bridge. Each calendar becomes
+ * (or adopts) an external_calendar_feeds row with source='device'; events
+ * flow through the same pipeline as URL-feed events. The service layer
+ * enforces the echo guard (Housemait-prefixed UIDs dropped), household
+ * dedupe, hash-skip and the replace-window apply.
+ *
+ * Body: { calendars: [{ deviceCalendarId, name, color?, hash?, windowStart,
+ *         windowEnd, events: [{uid, title, start, end?, allDay?, location?}] }] }
+ */
+router.post('/device-sync', async (req, res) => {
+  const calendars = Array.isArray(req.body?.calendars) ? req.body.calendars : null;
+  if (!calendars || calendars.length === 0) {
+    return res.status(400).json({ error: 'calendars array is required.' });
+  }
+  if (calendars.length > 10) {
+    return res.status(400).json({ error: 'At most 10 calendars per sync.' });
+  }
+  const results = [];
+  let changed = false;
+  const allIds = calendars.map((c) => c?.deviceCalendarId).filter(Boolean);
+  for (const calendar of calendars) {
+    try {
+      const result = await deviceCalendarSync.syncDeviceCalendar({
+        householdId: req.householdId,
+        userId: req.user.id,
+        calendar,
+        // The other calendar ids in this request - the adopt-by-name path
+        // must not cannibalise a sibling's link.
+        siblingCalendarIds: allIds.filter((id) => id !== calendar?.deviceCalendarId),
+      });
+      if (result.ok && !result.skipped) changed = true;
+      results.push(result);
+    } catch (err) {
+      // One calendar failing must not abort the batch NOR mask the others'
+      // committed writes (cache invalidation below still runs).
+      console.error('POST /api/calendar/device-sync calendar error:', err);
+      results.push({ ok: false, error: 'Sync failed for this calendar.' });
+      changed = true; // a partial apply may have written rows - play it safe
+    }
+  }
+  if (changed) {
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
+    cache.invalidate(`digest:${req.householdId}`);
+  }
+  return res.json({ results });
 });
 
 // ─── POST /api/calendar/seed-holidays ─────────────────────────────────────────
