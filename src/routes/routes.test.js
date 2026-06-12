@@ -1162,3 +1162,27 @@ describe('JWT algorithm pinning', () => {
     expect(res.status).toBe(200);
   });
 });
+
+// ─── GET /api/admin/audit-log ────────────────────────────────────────────────────
+describe('GET /api/admin/audit-log', () => {
+  const PLATFORM_AUTH = {
+    Authorization: `Bearer ${signToken({ userId: 'u-1', householdId: 'hh-1', name: 'Sarah', role: 'admin', isPlatformAdmin: true })}`,
+  };
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns the paginated log for a platform admin', async () => {
+    db.getAdminAuditLog.mockResolvedValue({
+      entries: [{ id: 'a1', method: 'POST', path: '/api/admin/users/:id', status_code: 200 }],
+      total: 1,
+    });
+    const res = await request(app).get('/api/admin/audit-log').set(PLATFORM_AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.entries).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+  });
+
+  test('forbids a non-platform-admin', async () => {
+    const res = await request(app).get('/api/admin/audit-log').set(AUTH);
+    expect(res.status).toBe(403);
+  });
+});

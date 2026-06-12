@@ -17,6 +17,7 @@ const adminNav = [
   { to: '/admin/calendar-sync',  label: 'Calendar Sync',  Icon: IconRefresh },
   { to: '/admin/analytics',      label: 'Analytics',      Icon: IconTrendingUp },
   { to: '/admin/promo-codes',    label: 'Discount codes', Icon: IconGift },
+  { to: '/admin/audit-log',      label: 'Audit log',      Icon: IconShield },
 ];
 
 export default function AdminLayout({ children }) {

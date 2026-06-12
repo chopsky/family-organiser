@@ -58,6 +58,7 @@ const AdminCalendarSync    = lazy(() => import('./pages/admin/AdminCalendarSync'
 const AdminAnalytics       = lazy(() => import('./pages/admin/AdminAnalytics'));
 const AdminAnnouncements   = lazy(() => import('./pages/admin/AdminAnnouncements'));
 const AdminPromoCodes      = lazy(() => import('./pages/admin/AdminPromoCodes'));
+const AdminAuditLog        = lazy(() => import('./pages/admin/AdminAuditLog'));
 
 /** Skeleton loading screen shown while a lazy chunk downloads */
 function PageLoader() {
@@ -231,6 +232,7 @@ function AppRoutes() {
         <Route path="/admin/calendar-sync" element={<RequirePlatformAdmin><AdminLayout><AdminCalendarSync /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/analytics" element={<RequirePlatformAdmin><AdminLayout><AdminAnalytics /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/promo-codes" element={<RequirePlatformAdmin><AdminLayout><AdminPromoCodes /></AdminLayout></RequirePlatformAdmin>} />
+        <Route path="/admin/audit-log" element={<RequirePlatformAdmin><AdminLayout><AdminAuditLog /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </RouteTransition>

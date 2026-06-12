@@ -11,6 +11,26 @@ function sanitizeOrFilterValue(value) {
   return String(value == null ? '' : value).replace(/[,()\\]/g, ' ').trim();
 }
 
+// ─── Admin audit log ────────────────────────────────────────────────────────────
+// Insert one record of a platform-admin action. Called fire-and-forget by the
+// adminAudit middleware, so it throws on error and the caller swallows it -
+// auditing must never break the underlying admin request.
+async function recordAdminAction(entry, db = supabase) {
+  const { error } = await db.from('admin_audit_log').insert(entry);
+  if (error) throw error;
+}
+
+// Newest-first page of the audit log for the admin viewer.
+async function getAdminAuditLog({ limit = 100, offset = 0 } = {}, db = supabase) {
+  const { data, error, count } = await db
+    .from('admin_audit_log')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return { entries: data || [], total: count || 0 };
+}
+
 // ─── Households ───────────────────────────────────────────────────────────────
 
 function generateJoinCode() {
@@ -6627,6 +6647,8 @@ async function updateSubscriptionRenewal(id, nextRenewalAt, remindedForDate, db 
 
 module.exports = {
   sanitizeOrFilterValue,
+  recordAdminAction,
+  getAdminAuditLog,
   getAllHouseholds,
   getTasksDueNextWeek,
   createHousehold,

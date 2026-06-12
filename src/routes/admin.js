@@ -6,11 +6,30 @@ const { invalidateHouseholdWeatherCache } = require('../services/digest-weather'
 const push = require('../services/push');
 const { sendBroadcastToMember } = require('../services/whatsapp-templates');
 const { detectSetupGaps, buildWhatsAppNudge, buildPushNudge } = require('../services/setup-nudge');
+const { adminAudit } = require('../middleware/adminAudit');
 
 const router = Router();
 
 // All admin routes require platform admin access
 router.use(requireAuth, requirePlatformAdmin);
+// Record every successful mutating admin action (audit trail). GET requests
+// (incl. the audit-log viewer below) are skipped, so reading the log doesn't
+// pollute it.
+router.use(adminAudit);
+
+// ─── GET /api/admin/audit-log ───────────────────────────────────────────────
+// Newest-first page of recorded platform-admin actions.
+router.get('/audit-log', async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || 100), 200);
+    const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+    const result = await db.getAdminAuditLog({ limit, offset });
+    return res.json(result);
+  } catch (err) {
+    console.error('GET /api/admin/audit-log error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // ─── GET /api/admin/stats ───────────────────────────────────────────────────
 
