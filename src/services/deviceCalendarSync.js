@@ -164,9 +164,24 @@ async function syncDeviceCalendar({ householdId, userId, calendar, siblingCalend
   // the overlap-replace prompt steers users off duplicate sources.
   const bare = (uid) => uid.split('#')[0];
   const lookupUids = [...new Set(events.flatMap((e) => [e.uid, bare(e.uid)]))];
-  const claimed = new Set(await db.findHouseholdUidsUnderOtherFeeds(householdId, lookupUids, link.id));
+  const claimedRows = await db.findHouseholdUidsUnderOtherFeeds(householdId, lookupUids, link.id);
+  const claimed = new Set(claimedRows.map((r) => r.uid));
   const fresh = events.filter((e) => !claimed.has(e.uid) && !claimed.has(bare(e.uid)));
   const dedupedInHousehold = events.length - fresh.length;
+
+  // Migration aid: when the duplicates live under a URL-FEED link, the user
+  // is subscribed to this calendar twice (the old copy-a-URL flow + device
+  // sync). Surface those feeds so the app can offer one-tap removal of the
+  // obsolete subscription. Device-vs-device overlap (two parents, one shared
+  // calendar) is normal and intentionally NOT surfaced.
+  const overlappingFeeds = [];
+  const overlapFeedIds = [...new Set(claimedRows.map((r) => r.feedId))];
+  for (const feedId of overlapFeedIds.slice(0, 5)) {
+    const feed = await db.getExternalFeedById(feedId);
+    if (feed && feed.source !== 'device') {
+      overlappingFeeds.push({ id: feed.id, displayName: feed.display_name });
+    }
+  }
 
   await db.replaceFeedEventsInWindow(link.id, windowStart, windowEnd, buildEventRows(link, fresh));
   await db.updateDeviceCalendarLink(link.id, {
@@ -185,6 +200,7 @@ async function syncDeviceCalendar({ householdId, userId, calendar, siblingCalend
     linkId: link.id,
     applied: fresh.length,
     dedupedInHousehold,
+    overlappingFeeds,
     echoDropped,
     invalidDropped,
     truncated,

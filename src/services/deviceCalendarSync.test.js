@@ -5,6 +5,7 @@ jest.mock('../db/queries', () => ({
   createExternalFeed: jest.fn(),
   findHouseholdUidsUnderOtherFeeds: jest.fn().mockResolvedValue([]),
   replaceFeedEventsInWindow: jest.fn().mockResolvedValue(),
+  getExternalFeedById: jest.fn(),
 }));
 
 const db = require('../db/queries');
@@ -138,12 +139,22 @@ describe('syncDeviceCalendar', () => {
   });
 
   test('household dedupe: uids claimed by another link are not re-inserted', async () => {
-    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue(['a']);
+    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue([{ uid: 'a', feedId: 'L-other' }]);
+    db.getExternalFeedById.mockResolvedValue({ id: 'L-other', display_name: 'Shared', source: 'device' });
     const res = await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: CAL() });
     expect(res.applied).toBe(1);
     expect(res.dedupedInHousehold).toBe(1);
     const rows = db.replaceFeedEventsInWindow.mock.calls[0][3];
     expect(rows.map((r) => r.external_uid)).toEqual(['b']);
+    // Device-vs-device overlap is normal (two parents) - no prompt.
+    expect(res.overlappingFeeds).toEqual([]);
+  });
+
+  test('surfaces an overlapping URL-FEED subscription for one-tap removal', async () => {
+    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue([{ uid: 'a', feedId: 'F-url' }]);
+    db.getExternalFeedById.mockResolvedValue({ id: 'F-url', display_name: 'Family (Google link)', source: 'ical' });
+    const res = await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: CAL() });
+    expect(res.overlappingFeeds).toEqual([{ id: 'F-url', displayName: 'Family (Google link)' }]);
   });
 
   test('rejects a calendar without id or window', async () => {
@@ -161,14 +172,16 @@ describe('syncDeviceCalendar', () => {
   });
 
   test('stores a NULL hash when household dedupe dropped events (so the skip can self-heal)', async () => {
-    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue(['a']);
+    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue([{ uid: 'a', feedId: 'F-url' }]);
+    db.getExternalFeedById.mockResolvedValue({ id: 'F-url', display_name: 'Family', source: 'ical' });
     await syncDeviceCalendar({ householdId: 'hh-1', userId: 'u-1', calendar: CAL() });
     expect(db.updateDeviceCalendarLink).toHaveBeenCalledWith('L1', expect.objectContaining({ last_sync_hash: null }));
   });
 
   test('dedupes against URL-feed rows via the bare series id (device uid carries #occurrence)', async () => {
     // Device uid 'series-1#2026-06-15T09:00:00Z'; URL feed stores bare 'series-1'.
-    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue(['series-1']);
+    db.findHouseholdUidsUnderOtherFeeds.mockResolvedValue([{ uid: 'series-1', feedId: 'F-url' }]);
+    db.getExternalFeedById.mockResolvedValue({ id: 'F-url', display_name: 'Family', source: 'ical' });
     const res = await syncDeviceCalendar({
       householdId: 'hh-1', userId: 'u-1',
       calendar: CAL({ events: [EV('series-1#2026-06-15T09:00:00Z'), EV('other#2026-06-16T09:00:00Z')] }),

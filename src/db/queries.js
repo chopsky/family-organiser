@@ -3057,8 +3057,10 @@ async function updateDeviceCalendarLink(linkId, fields, db = supabase) {
 }
 
 // Household-level UID dedupe: which of these uids already exist on calendar
-// events under a DIFFERENT feed/link in this household? (Two parents syncing
-// the same shared calendar, or a device calendar overlapping a URL feed.)
+// events under a DIFFERENT feed/link in this household, and under WHICH link?
+// (Two parents syncing the same shared calendar, or a device calendar
+// overlapping a URL feed - the feedId lets the caller surface "you're
+// subscribed to this twice" to the user.) Returns [{ uid, feedId }].
 async function findHouseholdUidsUnderOtherFeeds(householdId, uids, excludeFeedId, db = supabase) {
   const found = [];
   // Small chunks: uids can be 400 chars (Exchange/Google external identifiers
@@ -3068,13 +3070,13 @@ async function findHouseholdUidsUnderOtherFeeds(householdId, uids, excludeFeedId
     const chunk = uids.slice(i, i + 50);
     const { data, error } = await db
       .from('calendar_events')
-      .select('external_uid')
+      .select('external_uid, external_feed_id')
       .eq('household_id', householdId)
       .neq('external_feed_id', excludeFeedId)
       .not('external_feed_id', 'is', null)
       .in('external_uid', chunk);
     if (error) throw error;
-    for (const r of data || []) found.push(r.external_uid);
+    for (const r of data || []) found.push({ uid: r.external_uid, feedId: r.external_feed_id });
   }
   return found;
 }

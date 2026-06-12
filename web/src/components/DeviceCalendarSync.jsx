@@ -8,7 +8,8 @@
  * device; syncs run on save and every app-foreground.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import api from '../lib/api';
 import {
   isDeviceCalendarSupported,
   requestCalendarAccess,
@@ -39,6 +40,10 @@ export default function DeviceCalendarSync({ onSynced }) {
   const [selected, setSelected] = useState(new Set(getSelectedCalendarIds()));
   const [error, setError] = useState('');
   const [savedNote, setSavedNote] = useState('');
+  // URL-feed subscriptions the server detected as covering the SAME calendar
+  // we now sync from this device - offered for one-tap removal so migrating
+  // users don't have to figure out the old subscription is now redundant.
+  const [overlaps, setOverlaps] = useState([]);
 
   if (!isDeviceCalendarSupported()) return null;
 
@@ -66,7 +71,12 @@ export default function DeviceCalendarSync({ onSynced }) {
     setError('');
     try {
       setSelectedCalendarIds([...selected]);
-      await syncDeviceCalendars();
+      const results = await syncDeviceCalendars();
+      const found = new Map();
+      for (const r of results || []) {
+        for (const f of r?.overlappingFeeds || []) found.set(f.id, f);
+      }
+      setOverlaps([...found.values()]);
       setSavedNote('Synced. Your selected calendars stay up to date automatically.');
       setStage(selected.size > 0 ? 'summary' : 'intro');
       onSynced?.();
@@ -120,6 +130,36 @@ export default function DeviceCalendarSync({ onSynced }) {
       )}
       {stage === 'summary' && savedNote && (
         <p className="text-[11px] text-sage">{savedNote}</p>
+      )}
+
+      {/* Migration prompt: the old copy-a-URL subscription now duplicates a
+          device-synced calendar. One tap retires it; the device sync
+          re-supplies any events the old feed was credited with. */}
+      {overlaps.length > 0 && (
+        <div className="bg-amber/10 border border-amber/30 rounded-xl px-3 py-2 space-y-2">
+          <p className="text-xs text-bark">
+            💡 You&apos;re also subscribed to {overlaps.length === 1 ? 'a calendar' : 'calendars'} by link that your iPhone now syncs directly — keeping both shows duplicates.
+          </p>
+          {overlaps.map((f) => (
+            <div key={f.id} className="flex items-center justify-between gap-2">
+              <span className="text-xs text-cocoa truncate">{f.displayName}</span>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.delete(`/calendar/external-feeds/${f.id}`);
+                    setOverlaps((prev) => prev.filter((o) => o.id !== f.id));
+                    onSynced?.();
+                  } catch {
+                    setError('Could not remove the old subscription.');
+                  }
+                }}
+                className="text-xs font-semibold text-primary hover:text-primary-pressed shrink-0"
+              >
+                Remove old subscription
+              </button>
+            </div>
+          ))}
+        </div>
       )}
 
       {stage === 'denied' && (

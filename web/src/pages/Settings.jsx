@@ -1501,7 +1501,7 @@ export default function Settings() {
         {/* Inbound: device calendars via the read-only EventKit bridge.
             Renders null outside the iOS app. */}
         <div className="mb-4">
-          <DeviceCalendarSync />
+          <DeviceCalendarSync onSynced={loadExternalFeeds} />
         </div>
         <p className="text-sm text-cocoa mb-3">
           Show your Housemait calendar events in your third-party calendars. One-way - events you create here appear there automatically.
