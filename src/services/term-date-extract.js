@@ -57,17 +57,20 @@ Use only these event_types for SA:
       userIntro: 'Extract all school term dates and closures from this South African school year planner. Emit one JSON entry per date you find - terms, holidays, and closures all go into the same array. Do not emit half_term_start or half_term_end events:',
     },
     GB: {
-      intro: `You are an expert at extracting UK school term dates from website content. Extract ALL term dates you can find - for both the ${currentAY} academic year and the ${nextAY} academic year if available.`,
+      intro: `You are an expert at extracting UK school term dates and closures from website or PDF content. Be EXHAUSTIVE: extract EVERY individual dated entry you can find - for both the ${currentAY} academic year and the ${nextAY} academic year if available. Emit one entry per dated line. Do not summarise, group, or skip any closure.
+
+Faith schools (Jewish, Muslim, Christian and others) list MANY religious festival closures - you MUST extract every single one. Common Jewish-school closures include Rosh Hashanah, Yom Kippur, Succot / Sukkot, Shemini Atzeret, Simchat Torah, Chanukah / Hanukkah, Purim, Pesach / Passover and Shavuot; spellings vary - treat every named festival as a closure. Each named festival closure is a bank_holiday; use end_date for multi-day spans (e.g. "Saturday 26th & Sunday 27th September ... Succot" → one bank_holiday from the 26th to the 27th).`,
       lookFor: [
         'Dates in any UK format (e.g. "3rd September 2025", "3 Sep 2025", "03/09/2025")',
-        'Term names (Autumn, Spring, Summer)',
+        'Term names (Autumn, Spring, Summer) - emit a term_start and a term_end for each',
         'Half term breaks',
-        'INSET/training days',
+        'INSET / training / staff days',
         'Bank holidays',
-        'School-specific closures (e.g. religious holidays)',
+        'EVERY named religious / festival closure and any "School Closed - X" day - one bank_holiday entry each, with end_date for multi-day ranges. A label (e.g. "Succot") may sit on a SEPARATE line from its date - associate them by proximity and still extract it.',
+        'A row that says "early close ... <festival>" is still that festival\'s closure - extract the festival as a bank_holiday.',
       ],
       ayFormat: `"${currentAY}" or "${nextAY}"`,
-      userIntro: 'Extract all school term dates from this UK school website page content:',
+      userIntro: 'Extract EVERY school term date and closure from this UK school calendar - terms, half terms, INSET days, bank holidays AND every religious/festival closure. Do not skip any:',
     },
   };
   const cfg = promptByCountry[country] || promptByCountry.GB;
@@ -89,6 +92,10 @@ Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_d
 For half terms / mid-term breaks, use half_term_start with an end_date spanning the break.
 For school-specific closures (religious holidays etc), use bank_holiday with a descriptive label.
 Include the academic_year field (${cfg.ayFormat}) for each entry.
+
+BE EXHAUSTIVE. Go line by line through the source and emit an entry for EVERY individual dated closure - it is far better to include a borderline one than to miss it (the user can delete extras, but cannot recover a date you skipped). Multi-day closures ("Saturday 26th & Sunday 27th September") become ONE entry with a date and an end_date.
+
+DO skip only RECURRING WEEKLY patterns that have no single calendar date - e.g. "Shabbat closing - Fridays in November", "Fridays in Summer term school closes at 2.30pm". Those are weekly rules, not dated closures. Everything with a specific date stays in.
 
 CRITICAL - source_quote field:
 - For every entry, include a "source_quote" field with the EXACT substring from the source text (10–80 characters) that contains this date.
