@@ -217,6 +217,25 @@ export async function syncDeviceCalendars() {
     return acked[c.id] === base.hash ? base : full.get(c.id);
   });
 
+  // Deselection cleanup: remove MY device links for calendars that exist on
+  // THIS device but are no longer selected (deleting the link cascades its
+  // synced copies). Scoped to ids visible in this device's EventKit list so
+  // links fed by the user's OTHER devices (e.g. an iPad) are never touched.
+  // Re-selecting a calendar later simply re-creates the link + events.
+  const deselectedIds = new Set(all.filter((c) => !selected.includes(c.id)).map((c) => c.id));
+  if (deselectedIds.size > 0) {
+    try {
+      const uid = currentUserId();
+      const { data: feedData } = await api.get('/calendar/external-feeds');
+      const stale = (feedData?.feeds || []).filter((f) => (
+        f.source === 'device'
+        && f.device_owner_user_id === uid
+        && deselectedIds.has(f.device_calendar_id)
+      ));
+      await Promise.all(stale.map((f) => api.delete(`/calendar/external-feeds/${f.id}`).catch(() => {})));
+    } catch { /* cleanup is best-effort; next sync retries */ }
+  }
+
   const { data } = await api.post('/calendar/device-sync', { calendars: payloads });
   let results = data?.results || [];
 
