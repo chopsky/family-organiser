@@ -1535,6 +1535,30 @@ export default function Settings() {
               Opens the iOS or macOS Calendar app with a one-tap confirm.
             </p>
 
+            {/* Google + Outlook get the same one-tap treatment via their
+                add-by-URL deep links - each opens the provider's own
+                "Add calendar?" confirm, replacing the old copy-the-URL-and-
+                find-the-setting instructions (still available below for
+                anyone it doesn't work for, e.g. Office 365 work accounts). */}
+            <div className="flex gap-2">
+              <a
+                href={`https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl.replace(/^https?:\/\//, 'webcal://'))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 border-[1.5px] border-primary text-primary hover:bg-plum-light font-medium px-3 py-2.5 rounded-2xl text-xs text-center transition-colors"
+              >
+                Add to Google Calendar
+              </a>
+              <a
+                href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feedUrl)}&name=${encodeURIComponent('Housemait')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 border-[1.5px] border-primary text-primary hover:bg-plum-light font-medium px-3 py-2.5 rounded-2xl text-xs text-center transition-colors"
+              >
+                Add to Outlook
+              </a>
+            </div>
+
             {/* The copy-URL flow + feed admin are the rare path (Google /
                 Outlook / power users) - folded behind a disclosure so the
                 section stays one button tall for the typical Apple user. */}
