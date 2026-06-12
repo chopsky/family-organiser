@@ -1496,15 +1496,23 @@ export default function Settings() {
         )}
       </SectionWrapper>
 
-      {/* Connect Calendars */}
+      {/* Connect Calendars - two DIRECTIONS, framed explicitly because the
+          actions otherwise read as the same thing. Most families set up both:
+          1) bring their existing events IN (device sync / URL feeds), and
+          2) see Housemait events OUT in their usual calendar app. */}
       <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar}>
+        <p className="text-xs text-cocoa mb-3">
+          Two directions — most families set up both.
+        </p>
         {/* Inbound: device calendars via the read-only EventKit bridge.
             Renders null outside the iOS app. */}
         <div className="mb-4">
           <DeviceCalendarSync onSynced={loadExternalFeeds} />
         </div>
-        <p className="text-sm text-cocoa mb-3">
-          Show your Housemait calendar events in your third-party calendars. One-way - events you create here appear there automatically.
+        <div className="border border-cream-border rounded-2xl p-4 mb-4">
+        <h3 className="text-sm font-semibold text-bark">See Housemait in your calendar app</h3>
+        <p className="text-xs text-cocoa mt-1 mb-3">
+          Housemait events appear alongside everything else in Apple Calendar (or Google/Outlook). One-way — nothing in your calendar is ever changed.
         </p>
 
 
@@ -1582,6 +1590,7 @@ export default function Settings() {
             {loadingFeed ? 'Generating…' : 'Generate Calendar Feed'}
           </button>
         )}
+        </div>
 
         {/* External feed subscriptions (read-only inbound) */}
         <div className="mt-5 pt-5 border-t border-cream-border">

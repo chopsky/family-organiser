@@ -95,9 +95,9 @@ export default function DeviceCalendarSync({ onSynced }) {
   return (
     <div className="border border-cream-border rounded-2xl p-4 space-y-3">
       <div>
-        <h3 className="text-sm font-semibold text-bark">Connect your iPhone calendar</h3>
+        <h3 className="text-sm font-semibold text-bark">Bring your events into Housemait</h3>
         <p className="text-xs text-cocoa mt-1">
-          See your existing events inside Housemait — no URLs, no setup.
+          Events from your iPhone&apos;s calendars — iCloud, Google, Outlook — appear in the family calendar. No URLs, no setup.
         </p>
       </div>
 
