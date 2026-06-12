@@ -443,8 +443,13 @@ export default function Calendar() {
       // Prefetch adjacent months in background
       prefetchAdjacent(viewMode === 'month' ? currentMonth : selectedDate);
 
-      // Dedup by ID first, then by title+date
-      const byId = [...new Map(allEvents.map(e => [e.id, e])).values()];
+      // Dedup by occurrence first, then by title+date. Recurring events reuse
+      // their base row id across EVERY expanded occurrence (only occurrence_key
+      // is unique), so keying the Map on e.id alone collapsed a whole series to
+      // a single day - which is why a recurring event showed on the dashboard
+      // (single-day window) but vanished from the calendar's month grid. Key on
+      // the unique occurrence_key when present, falling back to id.
+      const byId = [...new Map(allEvents.map(e => [e.occurrence_key || e.id, e])).values()];
       const seen = new Set();
       const uniqueEvents = byId.filter(e => {
         const key = `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}|${(e.end_time || '').split('T')[0]}`;
@@ -1723,7 +1728,7 @@ export default function Calendar() {
                   const eventMembers = getEventMembers(item);
                   return (
                     <div
-                      key={item.id}
+                      key={item.occurrence_key || `${item._type}-${item.id}`}
                       className="flex items-center gap-2.5 p-3 bg-white rounded-r-xl mb-2"
                       style={{ borderLeft: `4px solid ${hex}` }}
                       onClick={() => {
