@@ -183,7 +183,13 @@ export default function DeviceCalendarSync({ onSynced }) {
                 className="h-4 w-4 accent-[var(--plum)]"
               />
               <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.color || '#7DAE82' }} />
-              <span className="flex-1 min-w-0 text-sm text-bark truncate">{c.title}</span>
+              <span className="flex-1 min-w-0 truncate">
+                <span className="text-sm text-bark">{c.title}</span>
+                {/* Account subtitle - two calendars can share a name (e.g. an
+                    iCloud "Family" and a Google "Family"); the source account
+                    is what tells them apart. */}
+                {c.sourceTitle && <span className="text-[11px] text-warm-grey"> · {c.sourceTitle}</span>}
+              </span>
               {c.defaultOff && (
                 <span className="text-[10px] text-warm-grey shrink-0">
                   {c.type === 'subscription' ? 'subscribed feed' : c.type === 'birthday' ? 'birthdays' : 'holidays'}
