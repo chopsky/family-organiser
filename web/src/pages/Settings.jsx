@@ -131,6 +131,35 @@ function ProviderLogo({ id, size = 28 }) {
   );
 }
 
+/**
+ * One quiet disclosure row for the Connect Calendars section. Everything
+ * that isn't the primary "get your events in" action sits behind one of
+ * these - visible and one tap away, but never competing with the hero.
+ * Expanding is local state, so each row remembers nothing across visits
+ * (deliberate: the screen should always reopen calm).
+ */
+function CollapsibleRow({ icon, label, sub, defaultOpen = false, className = '', children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`bg-white border border-cream-border rounded-2xl overflow-hidden ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-oat transition-colors text-left"
+      >
+        <span className="text-base" aria-hidden="true">{icon}</span>
+        <span className="flex-1 text-sm text-bark">
+          {label}
+          {sub != null && <span className="text-cocoa"> · {sub}</span>}
+        </span>
+        <span className={`text-cocoa transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true">›</span>
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
 // Per-provider wizard steps for the add-calendar form. `link` deep-links as
 // close to the page holding the address as each provider allows - Outlook
 // lands EXACTLY on the publish page; Google can only deep-link to settings
@@ -1669,17 +1698,23 @@ export default function Settings() {
           1) bring their existing events IN (device sync / URL feeds), and
           2) see Housemait events OUT in their usual calendar app. */}
       <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar}>
-        <p className="text-xs text-cocoa mb-3">
-          Two directions — most families set up both.
-        </p>
-        {/* Inbound: device calendars via the read-only EventKit bridge.
-            Renders null outside the iOS app. */}
+        {/* ONE hero: getting your events in. On iOS that's the device-sync
+            card below (renders null on web, where the add-by-link row is
+            expanded by default and plays hero instead). Everything else -
+            phone roster, link subscriptions, the outbound feed - sits in
+            quiet disclosure rows so a first visit reads as one card and
+            three lines, not four competing sections. Direction lives in the
+            row LABELS ("Show Housemait in...") so the two Apple-related
+            actions can't be mistaken for each other. */}
         <div className="mb-4">
           <DeviceCalendarSync onSynced={loadExternalFeeds} />
         </div>
-        <div className="border border-cream-border rounded-2xl p-4 mb-4">
-        <h3 className="text-sm font-semibold text-bark">See Housemait in your calendar app</h3>
-        <p className="text-xs text-cocoa mt-1 mb-3">
+
+        {/* The rows keep their code order but display roster → link →
+            outbound via CSS order, so the big JSX blocks don't move. */}
+        <div className="flex flex-col gap-2">
+        <CollapsibleRow icon="📤" label="Show Housemait in Apple, Google or Outlook" className="order-3">
+        <p className="text-xs text-cocoa mb-3">
           Housemait events appear alongside everything else in Apple Calendar (or Google/Outlook). One-way — nothing in your calendar is ever changed.
         </p>
 
@@ -1782,15 +1817,22 @@ export default function Settings() {
             {loadingFeed ? 'Generating…' : 'Generate Calendar Feed'}
           </button>
         )}
-        </div>
+        </CollapsibleRow>
 
         {/* Device-synced calendars (read-only roster). Connection happens in
             the iPhone app's picker, but the WEB must still show evidence of
             the sync and allow unlink - that's the recovery path when the
             phone that fed a calendar is lost or the app was deleted. */}
         {externalFeeds.some((f) => f.source === 'device' && f.sync_enabled !== false) && (
-          <div className="mt-5 pt-5 border-t border-cream-border">
-            <p className="text-base font-medium text-bark mb-1">Synced from phones</p>
+          <CollapsibleRow
+            icon="📱"
+            label="Synced from phones"
+            sub={(() => {
+              const n = externalFeeds.filter((f) => f.source === 'device' && f.sync_enabled !== false).length;
+              return `${n} calendar${n === 1 ? '' : 's'}`;
+            })()}
+            className="order-1"
+          >
             <p className="text-sm text-cocoa mb-3">
               Calendars syncing automatically from family iPhones. Choose which in the Housemait app on that phone.
             </p>
@@ -1838,27 +1880,34 @@ export default function Settings() {
                 );
               })}
             </ul>
-          </div>
+          </CollapsibleRow>
         )}
 
-        {/* External feed subscriptions (read-only inbound) */}
-        <div className="mt-5 pt-5 border-t border-cream-border">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-base font-medium text-bark">Subscribed calendars</p>
-            {/* The header button only earns its place once subscriptions
-                exist - the empty state's own card IS the add affordance. */}
+        {/* External feed subscriptions (read-only inbound). On the web this
+            row is the inbound hero (device sync doesn't exist there), so it
+            opens expanded; on iOS it stays a quiet collapsed line. */}
+        <CollapsibleRow
+          icon="🔗"
+          label={externalFeeds.some((f) => f.source !== 'device') ? 'Calendars by link' : 'Add a calendar by link'}
+          sub={externalFeeds.some((f) => f.source !== 'device') ? String(externalFeeds.filter((f) => f.source !== 'device').length) : null}
+          defaultOpen={!Capacitor.isNativePlatform()}
+          className="order-2"
+        >
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <p className="text-sm text-cocoa">
+              Show your third-party calendar events in your Housemait calendar. Read-only - edits happen in the source calendar.
+            </p>
+            {/* The button only earns its place once subscriptions exist -
+                the empty state's own card IS the add affordance. */}
             {!showAddFeed && externalFeeds.some((f) => f.source !== 'device') && (
               <button
                 onClick={() => setShowAddFeed(true)}
-                className="text-xs text-primary hover:text-primary-pressed font-medium"
+                className="text-xs text-primary hover:text-primary-pressed font-medium whitespace-nowrap shrink-0"
               >
                 + Add calendar
               </button>
             )}
           </div>
-          <p className="text-sm text-cocoa mb-3">
-            Show your third-party calendar events in your Housemait calendar. Read-only - edits happen in the source calendar.
-          </p>
 
           {showAddFeed && (() => {
             const isNative = Capacitor.isNativePlatform();
@@ -2084,6 +2133,7 @@ export default function Settings() {
               ))}
             </ul>
           )}
+        </CollapsibleRow>
         </div>
 
       </SectionWrapper>
