@@ -3060,6 +3060,21 @@ async function updateDeviceCalendarLink(linkId, fields, db = supabase) {
   if (error) throw error;
 }
 
+// Device links whose owning phone hasn't synced recently. Device calendars
+// only update on app-foreground, so a quiet phone silently freezes its
+// calendars while the family keeps seeing stale events - the daily nudge
+// cron uses this to prompt the owner.
+async function getStaleDeviceLinks(cutoffIso, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('source', 'device')
+    .eq('sync_enabled', true)
+    .lt('last_synced_at', cutoffIso);
+  if (error) throw error;
+  return data || [];
+}
+
 // Household-level UID dedupe: which of these uids already exist on calendar
 // events under a DIFFERENT feed/link in this household, and under WHICH link?
 // (Two parents syncing the same shared calendar, or a device calendar
@@ -6937,6 +6952,7 @@ module.exports = {
   findDeviceCalendarLink,
   findDeviceLinkByOwnerAndName,
   updateDeviceCalendarLink,
+  getStaleDeviceLinks,
   findHouseholdUidsUnderOtherFeeds,
   replaceFeedEventsInWindow,
   deleteEventsForFeed,

@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const ical = require('node-ical');
 const db = require('../db/queries');
 const externalFeed = require('../services/externalFeed');
+const staleDeviceNudge = require('../services/stale-device-nudge');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
@@ -625,6 +626,18 @@ function startScheduler() {
   // ── Yearly public holiday refresh: Dec 1 at midnight ───────────────────────
   cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
+
+  // ── Stale device-calendar nudge: daily at 17:30 Europe/London ──────────────
+  // Pushes the OWNER of a device-synced calendar whose phone hasn't synced
+  // for 3+ days - opening the app is itself the fix (foreground sync).
+  // Early evening = the moment people actually check their phone. Throttle
+  // rules (one per stale period, weekly repeat, 30-day give-up) live in the
+  // service. Pre-migration the throttle column is missing; the service then
+  // skips sending rather than risking a daily nag.
+  cron.schedule('30 17 * * *', () => staleDeviceNudge.runStaleDeviceNudgeCheck()
+    .catch((err) => console.error('[stale-device-nudge] run failed:', err.message)),
+  { timezone: 'Europe/London' });
+  console.log('✓ Stale device-calendar nudge scheduled (17:30 Europe/London daily)');
 
   // ── Trial lifecycle emails: daily at 09:00 Europe/London ───────────────────
   // Days 20/25/28 (nudges) + day 30 (trial_expired). Welcome email is

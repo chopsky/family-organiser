@@ -9,6 +9,7 @@ import WhatsAppPairing from '../components/WhatsAppPairing';
 import DeviceCalendarSync from '../components/DeviceCalendarSync';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 import {
   IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
@@ -491,6 +492,25 @@ export default function Settings() {
     if (!isIosPlatform && popupSlug) setPopupSlug(null);
   }, [isIosPlatform, popupSlug]);
 
+  // Deep link: /settings?section=<slug> opens that section directly - the
+  // dashboard calendar nudge and stale-sync pushes land people on Connect
+  // Calendars without hunting for it. iOS opens the section popup; web
+  // scrolls to the card once the page has rendered.
+  useEffect(() => {
+    const section = new URLSearchParams(window.location.search).get('section');
+    if (!section || !IOS_SECTIONS.some((s) => s.slug === section)) return undefined;
+    if (isIosPlatform) {
+      setPopupSlug(section);
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      document.getElementById(`settings-section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+    return () => clearTimeout(t);
+    // Mount-only by design: the param is consumed once on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Per-section wrapper picker. Three rendering paths:
   //   1. iOS list mode (popup closed) - section is represented by a
   //      row in the list above, so this returns null.
@@ -548,10 +568,15 @@ export default function Settings() {
         </div>
       );
     }
+    // The id anchors the ?section=<slug> deep link's scroll target on web.
+    // The accordion wrapper carries the between-rows divider the inner
+    // AccordionItem used to draw: each <details> is now the only child of
+    // its wrapper, so ITS `last:border-b-0` always fires - without the
+    // border here the grouped card's hairlines would vanish.
     if (accordion) {
-      return <AccordionItem title={title} icon={icon} danger={danger}>{children}</AccordionItem>;
+      return <div id={`settings-section-${slug}`} className="border-b border-cream-border last:border-b-0"><AccordionItem title={title} icon={icon} danger={danger}>{children}</AccordionItem></div>;
     }
-    return <SettingsCard title={title} icon={icon} danger={danger}>{children}</SettingsCard>;
+    return <div id={`settings-section-${slug}`}><SettingsCard title={title} icon={icon} danger={danger}>{children}</SettingsCard></div>;
   }, [iosListMode, iosPopupOpen, popupSlug, setPopupSlug]);
 
   const [success, setSuccess]         = useState('');
@@ -1634,14 +1659,31 @@ export default function Settings() {
             <ul className="space-y-2">
               {externalFeeds.filter((f) => f.source === 'device' && f.sync_enabled !== false).map((feed) => {
                 const owner = members.find((m) => m.id === feed.device_owner_user_id)?.name;
+                // Device calendars only refresh when the owning phone opens
+                // the app - surface a quiet phone so the family knows this
+                // calendar may be showing old events (and whose phone fixes it).
+                const hoursSinceSync = feed.last_synced_at
+                  ? (Date.now() - new Date(feed.last_synced_at).getTime()) / (1000 * 60 * 60)
+                  : Infinity;
+                const isStale = hoursSinceSync > 48;
                 return (
                   <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2 flex items-center gap-2.5">
                     <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: FEED_COLOR_HEX[feed.color] || FEED_COLOR_HEX.sky }} />
                     <span className="flex-1 min-w-0">
-                      <span className="text-sm text-bark truncate block">{feed.display_name}</span>
+                      {/* Badge OUTSIDE the truncating span: long calendar
+                          names must shorten, never the staleness signal. */}
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm text-bark truncate">{feed.display_name}</span>
+                        {isStale && (
+                          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber/15 text-amber text-[10px] font-semibold">
+                            Not syncing
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[11px] text-cocoa">
                         {owner ? `${owner}'s iPhone` : 'Family iPhone'}
-                        {feed.last_synced_at ? ` · synced ${new Date(feed.last_synced_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+                        {` · last synced ${formatRelativeTime(feed.last_synced_at)}`}
+                        {isStale && ` — opening Housemait on ${owner ? `${owner}'s` : 'that'} iPhone brings it up to date`}
                       </span>
                     </span>
                     <button
