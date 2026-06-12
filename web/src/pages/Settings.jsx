@@ -87,6 +87,50 @@ function feedUrlHint(rawUrl) {
   return null;
 }
 
+/**
+ * Small provider tiles for the add-calendar picker - simplified,
+ * brand-evocative glyphs drawn inline (no external logo assets). Used at
+ * 28px in the menu rows and the empty-state card.
+ */
+function ProviderLogo({ id, size = 28 }) {
+  const s = { width: size, height: size, flexShrink: 0 };
+  if (id === 'google') {
+    return (
+      <svg viewBox="0 0 24 24" style={s} aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="5" fill="#4285F4" />
+        <rect x="4.5" y="6" width="15" height="14" rx="2.5" fill="#fff" />
+        <text x="12" y="16.6" textAnchor="middle" fontSize="9" fontWeight="700" fill="#4285F4" fontFamily="Arial, sans-serif">31</text>
+      </svg>
+    );
+  }
+  if (id === 'apple') {
+    return (
+      <svg viewBox="0 0 24 24" style={s} aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="5" fill="#fff" stroke="#E8E5EC" strokeWidth="1" />
+        <text x="12" y="7.8" textAnchor="middle" fontSize="4.4" fontWeight="700" fill="#E25555" fontFamily="Arial, sans-serif">MON</text>
+        <text x="12" y="18.4" textAnchor="middle" fontSize="10.5" fontWeight="500" fill="#2D2A33" fontFamily="Arial, sans-serif">25</text>
+      </svg>
+    );
+  }
+  if (id === 'outlook') {
+    return (
+      <svg viewBox="0 0 24 24" style={s} aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="5" fill="#0F6CBD" />
+        <rect x="9.5" y="6" width="10" height="12" rx="1.5" fill="#fff" opacity="0.9" />
+        <circle cx="9" cy="12" r="5.2" fill="#0F6CBD" stroke="#fff" strokeWidth="1.6" />
+        <circle cx="9" cy="12" r="2.1" fill="none" stroke="#fff" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  // School / club link
+  return (
+    <svg viewBox="0 0 24 24" style={s} aria-hidden="true">
+      <rect x="1" y="1" width="22" height="22" rx="5" fill="#7DAE82" />
+      <path d="M10.2 13.8 13.8 10.2 M9 11.5l-2 2a2.6 2.6 0 0 0 3.7 3.7l2-2 M15 12.5l2-2a2.6 2.6 0 0 0-3.7-3.7l-2 2" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Per-provider wizard steps for the add-calendar form. `link` deep-links as
 // close to the page holding the address as each provider allows - Outlook
 // lands EXACTLY on the publish page; Google can only deep-link to settings
@@ -94,7 +138,7 @@ function feedUrlHint(rawUrl) {
 const FEED_PROVIDERS = [
   {
     id: 'google',
-    label: 'Google',
+    label: 'Google calendar',
     link: 'https://calendar.google.com/calendar/u/0/r/settings',
     linkLabel: 'Open Google Calendar settings',
     steps: [
@@ -107,7 +151,7 @@ const FEED_PROVIDERS = [
   },
   {
     id: 'outlook',
-    label: 'Outlook',
+    label: 'Outlook calendar',
     link: 'https://outlook.live.com/calendar/0/options/calendar/SharedCalendars',
     linkLabel: 'Open Outlook\'s publish page',
     steps: [
@@ -119,7 +163,7 @@ const FEED_PROVIDERS = [
   },
   {
     id: 'apple',
-    label: 'Apple (iCloud)',
+    label: 'Apple calendar',
     link: 'https://www.icloud.com/calendar',
     linkLabel: 'Open iCloud Calendar',
     steps: [
@@ -137,7 +181,7 @@ const FEED_PROVIDERS = [
   },
   {
     id: 'other',
-    label: 'School or club',
+    label: 'School or club link',
     link: null,
     steps: [
       'Paste the calendar link the school or club shared - webcal:// and https:// links ending in .ics both work.',
@@ -1806,7 +1850,9 @@ export default function Settings() {
         <div className="mt-5 pt-5 border-t border-cream-border">
           <div className="flex items-center justify-between mb-3">
             <p className="text-base font-medium text-bark">Subscribed calendars</p>
-            {!showAddFeed && (
+            {/* The header button only earns its place once subscriptions
+                exist - the empty state's own card IS the add affordance. */}
+            {!showAddFeed && externalFeeds.some((f) => f.source !== 'device') && (
               <button
                 onClick={() => setShowAddFeed(true)}
                 className="text-xs text-primary hover:text-primary-pressed font-medium"
@@ -1824,37 +1870,52 @@ export default function Settings() {
             const provider = FEED_PROVIDERS.find((p) => p.id === newFeedProvider) || null;
             const steps = provider ? ((isNative && provider.iosSteps) || provider.steps) : null;
             const hint = feedUrlHint(newFeedUrl);
-            return (
-            <form onSubmit={handleAddExternalFeed} className="border border-cream-border rounded-2xl p-3 space-y-3 mb-3">
-              {/* Step 1: where does the calendar live? The picked provider
-                  drives a SHORT step list + a deep link as close to the page
-                  holding the address as the provider allows - replacing the
-                  old wall of all-three-providers prose. */}
-              <div>
-                <p className="text-xs text-cocoa mb-1.5">Where is the calendar?</p>
-                <div className="flex flex-wrap gap-1.5">
+            // Step 1 is a quiet provider MENU, not a form: pick where the
+            // calendar lives, see nothing else until you have. The fields
+            // and steps only appear for the chosen provider.
+            if (!provider) {
+              return (
+                <div className="border border-cream-border rounded-2xl overflow-hidden mb-3">
+                  {isNative && (
+                    <p className="text-[11px] text-cocoa italic px-4 pt-3">
+                      Your own iPhone calendars sync automatically via &ldquo;Bring your events into Housemait&rdquo; above - this is for links from schools, clubs, or people outside the household.
+                    </p>
+                  )}
                   {FEED_PROVIDERS.map((p) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => setNewFeedProvider(p.id)}
-                      className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
-                        newFeedProvider === p.id
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-white text-bark border-cream-border hover:border-primary'
-                      }`}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-oat transition-colors border-b border-cream-border last:border-b-0 text-left"
                     >
-                      {p.label}
+                      <ProviderLogo id={p.id} />
+                      <span className="flex-1 text-sm text-bark">{p.label}</span>
+                      <span className="text-cocoa" aria-hidden="true">›</span>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowAddFeed(false)}
+                    className="w-full text-xs text-cocoa hover:text-bark py-2.5 bg-white border-t border-cream-border"
+                  >
+                    Cancel
+                  </button>
                 </div>
+              );
+            }
+            return (
+            <form onSubmit={handleAddExternalFeed} className="border border-cream-border rounded-2xl p-3 space-y-3 mb-3">
+              <div className="flex items-center gap-2.5">
+                <ProviderLogo id={provider.id} size={24} />
+                <span className="flex-1 text-sm font-medium text-bark">{provider.label}</span>
+                <button
+                  type="button"
+                  onClick={() => setNewFeedProvider(null)}
+                  className="text-xs font-medium text-primary hover:text-primary-pressed"
+                >
+                  Change
+                </button>
               </div>
-
-              {isNative && (
-                <p className="text-[11px] text-cocoa italic">
-                  Your own iPhone calendars sync automatically via &ldquo;Bring your events into Housemait&rdquo; above - this form is for links from schools, clubs, or people outside the household.
-                </p>
-              )}
 
               {provider && (
                 <div className="bg-oat rounded-xl px-3 py-2.5 space-y-2">
@@ -1937,8 +1998,21 @@ export default function Settings() {
             );
           })()}
 
+          {/* Calm empty state: the provider tiles ARE the invitation - one
+              tap opens the provider menu. */}
           {!showAddFeed && externalFeeds.every((f) => f.source === 'device') && !loadingExternalFeeds && (
-            <p className="text-xs text-cocoa italic">No link subscriptions yet.</p>
+            <button
+              type="button"
+              onClick={() => setShowAddFeed(true)}
+              className="w-full bg-white border border-cream-border rounded-2xl py-8 flex flex-col items-center gap-3 hover:border-primary transition-colors"
+            >
+              <span className="flex items-center">
+                <span className="-mr-1.5 rotate-[-6deg]"><ProviderLogo id="google" size={30} /></span>
+                <span className="z-10"><ProviderLogo id="apple" size={32} /></span>
+                <span className="-ml-1.5 rotate-[6deg]"><ProviderLogo id="outlook" size={30} /></span>
+              </span>
+              <span className="text-sm font-medium text-bark">+ Add calendar</span>
+            </button>
           )}
 
           {externalFeeds.some((f) => f.source !== 'device') && (
