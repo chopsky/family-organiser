@@ -666,6 +666,7 @@ export default function Calendar() {
 
   function eventsForDate(date) {
     const ds = toDateStr(date);
+    const memberNames = new Set(members.map((m) => m.name));
     return events.filter(e => {
       const start = e.start_time?.split('T')[0];
       const end = e.end_time?.split('T')[0];
@@ -676,15 +677,19 @@ export default function Calendar() {
       if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
       if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
       if (cat === 'school' && !activeFilters.has('school')) return false;
-      // Apply member filter. An item passes if ANY of its assignees are
-      // in the active filter set (e.g. a task assigned to {Lynn, Grant}
-      // shows when filtering to either Lynn or Grant). Items with no
-      // assignee always pass - they belong to the household at large.
+      // Apply member filter, but FAIL OPEN: an item is hidden only when it's
+      // assigned to a RECOGNISED household member who is currently toggled off.
+      // If an assignee name resolves to no current member (a renamed/removed
+      // member, or a name set by the bot that doesn't exactly match), the item
+      // is treated as household-wide and shown - a name drift must never
+      // silently hide an event from the calendar while it still shows on the
+      // dashboard. Items with no assignee always pass.
       if (activeMemberFilters) {
         const names = Array.isArray(e.assigned_to_names) && e.assigned_to_names.length > 0
           ? e.assigned_to_names
           : (e.assigned_to_name ? [e.assigned_to_name] : []);
-        if (names.length > 0 && !names.some((n) => activeMemberFilters.has(n))) return false;
+        const known = names.filter((n) => memberNames.has(n));
+        if (known.length > 0 && !known.some((n) => activeMemberFilters.has(n))) return false;
       }
       return true;
     });
@@ -693,13 +698,15 @@ export default function Calendar() {
   function tasksForDate(date) {
     if (!activeFilters.has('tasks')) return [];
     const ds = toDateStr(date);
+    const memberNames = new Set(members.map((m) => m.name));
     return tasks.filter(t => {
       if (t.due_date !== ds) return false;
       if (activeMemberFilters) {
         const names = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length > 0
           ? t.assigned_to_names
           : (t.assigned_to_name ? [t.assigned_to_name] : []);
-        if (names.length > 0 && !names.some((n) => activeMemberFilters.has(n))) return false;
+        const known = names.filter((n) => memberNames.has(n));
+        if (known.length > 0 && !known.some((n) => activeMemberFilters.has(n))) return false;
       }
       return true;
     });
