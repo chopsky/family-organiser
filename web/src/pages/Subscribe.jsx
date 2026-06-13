@@ -75,6 +75,20 @@ function buildPlans(locale) {
   };
 }
 
+// HILLELFEST campaign: 25% off the FIRST YEAR, annual plan only. The percent
+// is hardcoded because the matching Stripe coupon is fixed for the campaign;
+// keep this in step with the coupon if it ever changes.
+const PROMO_PERCENT = 25;
+
+// Split a locale price string ("£59.99", "A$99.99") into symbol + amount so we
+// can show the actual discounted figure rather than the full price under a
+// "25% off" badge. Returns null on an unexpected format (card then falls back
+// to full-price display - no worse than before).
+function parsePrice(display) {
+  const m = String(display || '').match(/^(\D+)([\d.]+)$/);
+  return m ? { symbol: m[1], amount: parseFloat(m[2]) } : null;
+}
+
 export default function Subscribe() {
   const navigate = useNavigate();
   const { isActive, isTrialing, isExpired, daysRemaining, trialEndsAt, plan: currentPlan } = useSubscription();
@@ -100,6 +114,21 @@ export default function Subscribe() {
   const locale = resolveLocale(household);
   const plans = buildPlans(locale);
   const currency = locale.stripeCurrency;
+
+  // When a promo is pending, work out the actual discounted first-year figures
+  // so the Annual card shows the real price (strikethrough + new) instead of
+  // advertising "25% off" over the full price. annual-only; renews at full.
+  const annualPrice = parsePrice(locale.pricing.annual);
+  const promoPricing = showPromo && annualPrice ? (() => {
+    const fmt = (n) => `${annualPrice.symbol}${n.toFixed(2)}`;
+    const discounted = annualPrice.amount * (1 - PROMO_PERCENT / 100);
+    return {
+      originalDisplay: locale.pricing.annual,
+      discountedDisplay: fmt(discounted),
+      monthlyEquivalent: fmt(discounted / 12),
+      savedDisplay: fmt(annualPrice.amount - discounted),
+    };
+  })() : null;
 
   async function handleSubscribe(plan) {
     if (submitting) return;
@@ -161,7 +190,7 @@ export default function Subscribe() {
               🎁 Your {pendingPromo} discount is ready
             </p>
             <p className="text-xs text-plum/80 mt-0.5">
-              25% off your first year, plus 25% to the PTA — applied automatically when you choose Annual.
+              {PROMO_PERCENT}% off your first year{promoPricing ? ` (${promoPricing.discountedDisplay} instead of ${promoPricing.originalDisplay})` : ''}, plus {PROMO_PERCENT}% to the PTA — applied automatically when you choose Annual.
             </p>
           </div>
         )}
@@ -177,8 +206,9 @@ export default function Subscribe() {
                 plan="annual"
                 plans={plans}
                 highlighted={true}
-                badgeOverride={showPromo ? '25% OFF · first year' : undefined}
-                note={showPromo ? '+ 25% to the PTA — applied at checkout' : undefined}
+                badgeOverride={showPromo ? `${PROMO_PERCENT}% OFF · first year` : undefined}
+                note={showPromo ? `+ ${PROMO_PERCENT}% to the PTA — applied at checkout` : undefined}
+                discount={promoPricing}
                 currentPlan={currentPlan}
                 submitting={submitting === 'annual'}
                 disabled={submitting !== null}
@@ -257,10 +287,14 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining, currentPlan
   };
 }
 
-function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabled, onSubscribe, badgeOverride, note }) {
+function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabled, onSubscribe, badgeOverride, note, discount }) {
   const p = plans[plan];
   const isCurrentPlan = currentPlan === plan;
   const badge = badgeOverride || p.badge;
+  // When a first-year discount applies, the headline figures are the
+  // discounted ones; the full price is shown struck through.
+  const tagline = discount ? `That's just ${discount.monthlyEquivalent} a month for the first year.` : p.tagline;
+  const buttonPrice = discount ? `${discount.discountedDisplay} first year` : `${p.priceDisplay}/${plan === 'monthly' ? 'mo' : 'yr'}`;
 
   return (
     <div
@@ -283,18 +317,28 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
       >
         {p.label}
       </h2>
-      <p className="text-sm text-warm-grey mb-1">{p.tagline}</p>
+      <p className="text-sm text-warm-grey mb-1">{tagline}</p>
       {note && <p className="text-xs font-semibold text-plum mb-4">{note}</p>}
       {!note && <div className="mb-4" />}
 
       <div className="mb-5">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          {discount && (
+            <span className="text-warm-grey line-through leading-none" style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, fontSize: 30 }}>
+              {discount.originalDisplay}
+            </span>
+          )}
           <span className="text-charcoal leading-none" style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, fontSize: 46 }}>
-            {p.priceDisplay}
+            {discount ? discount.discountedDisplay : p.priceDisplay}
           </span>
-          <span className="text-sm text-warm-grey">{p.periodDisplay}</span>
+          <span className="text-sm text-warm-grey">{p.periodDisplay}{discount ? ' · first year' : ''}</span>
         </div>
-        {p.savings && (
+        {discount ? (
+          <>
+            <p className="text-sm font-semibold text-coral mt-2">{discount.savedDisplay} off your first year</p>
+            <p className="text-xs text-warm-grey mt-0.5">Renews at {discount.originalDisplay}/yr · cancel anytime</p>
+          </>
+        ) : p.savings && (
           <p className="text-sm font-semibold text-coral mt-2">{p.savings}</p>
         )}
       </div>
@@ -333,7 +377,7 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
           ? 'Current plan'
           : submitting
             ? 'Starting checkout…'
-            : `Subscribe - ${p.priceDisplay}/${plan === 'monthly' ? 'mo' : 'yr'}`}
+            : `Subscribe - ${buttonPrice}`}
       </button>
     </div>
   );
