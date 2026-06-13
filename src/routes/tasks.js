@@ -14,8 +14,8 @@ const VALID_NOTIFICATIONS = ['at_time', '5_min', '15_min', '30_min', '1_hour', '
 
 /**
  * GET /api/tasks/recent
- * Returns tasks completed in the last 60 days - kept visible under "Done"
- * for undo/restore until explicitly deleted (the query default is 60 days).
+ * Returns tasks completed in the last 7 days - kept visible under "Done"
+ * for undo/restore until explicitly deleted (the query default is 1 week).
  */
 router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
   try {
