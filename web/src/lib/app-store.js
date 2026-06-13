@@ -16,6 +16,16 @@ export const APP_STORE_ID = '6762131562';
 /** Direct link to the App Store product page. */
 export const APP_STORE_URL = `https://apps.apple.com/app/housemait/id${APP_STORE_ID}`;
 
+/**
+ * Deep link that opens Apple's offer-code redemption straight onto our
+ * listing with the code PRE-FILLED. Only works once a matching Custom Offer
+ * Code (same string) exists on the annual subscription in App Store Connect.
+ * Used by the iOS paywall (one-tap promo claim) and the admin campaign tool.
+ */
+export function appleOfferCodeRedeemUrl(code) {
+  return `https://apps.apple.com/redeem?ctx=offercodes&id=${APP_STORE_ID}&code=${encodeURIComponent(code)}`;
+}
+
 /** True when the App Store ID has been configured for production. The
  *  landing page uses this to hide the App Store badge until the live
  *  ID is in place — we'd rather show no badge than a broken link. */

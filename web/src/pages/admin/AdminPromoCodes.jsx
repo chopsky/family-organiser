@@ -10,20 +10,13 @@
  */
 import { Fragment, useEffect, useState } from 'react';
 import api from '../../lib/api';
-import { APP_STORE_ID } from '../../lib/app-store';
+import { appleOfferCodeRedeemUrl } from '../../lib/app-store';
 
 // The flyer QR / printed link. Routes by device: iPhone → App Store (redeem the
 // Apple Offer Code in-app), Android/desktop → web signup with the Stripe code
 // pre-applied at annual checkout. See web/src/pages/FairRedirect.jsx.
 function fairLink(code) {
   return `https://housemait.com/fair?promo=${encodeURIComponent(code)}`;
-}
-
-// Deep link that opens Apple's redemption sheet straight onto our listing with
-// the Offer Code pre-filled. Only works once you've created a matching Offer
-// Code (same string) on the annual subscription in App Store Connect.
-function appleRedeemLink(code) {
-  return `https://apps.apple.com/redeem?ctx=offercodes&id=${APP_STORE_ID}&code=${encodeURIComponent(code)}`;
 }
 
 function fmtDate(iso) {
@@ -279,7 +272,7 @@ export default function AdminPromoCodes() {
                         <td colSpan={7} className="pb-3 pt-0 pl-0">
                           <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 bg-cream/60 rounded-lg px-3 py-2">
                             <CopyLink label="Flyer / QR link" url={fairLink(c.code)} copyKey={`${c.id}:fair`} copiedKey={copiedKey} onCopy={copyToClipboard} />
-                            <CopyLink label="Apple redeem link" url={appleRedeemLink(c.code)} copyKey={`${c.id}:apple`} copiedKey={copiedKey} onCopy={copyToClipboard} />
+                            <CopyLink label="Apple redeem link" url={appleOfferCodeRedeemUrl(c.code)} copyKey={`${c.id}:apple`} copiedKey={copiedKey} onCopy={copyToClipboard} />
                           </div>
                         </td>
                       </tr>

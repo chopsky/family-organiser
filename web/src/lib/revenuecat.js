@@ -265,6 +265,22 @@ export async function getCustomerInfo() {
 }
 
 /**
+ * Drop RevenueCat's cached CustomerInfo so the NEXT getCustomerInfo() hits
+ * the network. Required after an entitlement change that happened OUTSIDE
+ * this process - e.g. an offer-code redemption in the App Store app - where
+ * the in-app SDK never observed the transaction and would otherwise keep
+ * serving a stale (non-premium) cache, stranding a user who just paid.
+ */
+export async function invalidateCustomerInfoCache() {
+  if (!isIapPlatform()) return;
+  try {
+    await Purchases.invalidateCustomerInfoCache();
+  } catch (err) {
+    console.warn('[revenuecat] invalidateCustomerInfoCache failed:', err?.message || err);
+  }
+}
+
+/**
  * True if the cached CustomerInfo carries an active "premium"
  * entitlement. Cheap helper for UI decisions ("show paywall vs.
  * dashboard") without re-hitting RevenueCat.

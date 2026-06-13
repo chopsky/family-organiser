@@ -32,7 +32,7 @@
  *   SubscriptionContext catches up later.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   getCurrentOffering,
@@ -40,9 +40,13 @@ import {
   restorePurchases,
   presentCodeRedemptionSheet,
   getCustomerInfo,
+  invalidateCustomerInfoCache,
   hasActivePremium,
 } from '../lib/revenuecat';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useAuth } from '../context/AuthContext';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
+import { appleOfferCodeRedeemUrl, APP_STORE_CONFIGURED } from '../lib/app-store';
 import ErrorBanner from '../components/ErrorBanner';
 
 const FEATURES = [
@@ -58,12 +62,18 @@ const FEATURES = [
 export default function IosSubscribe() {
   const navigate = useNavigate();
   const { isExpired, isTrialing, isActive, daysRemaining, refresh } = useSubscription();
+  const { user } = useAuth();
+  // A campaign promo captured at signup (e.g. school-fair HILLELFEST). On iOS
+  // the discount is an Apple Custom Offer Code with the SAME string; we surface
+  // a one-tap claim that opens Apple's redemption with the code pre-filled.
+  const pendingPromo = !isActive && APP_STORE_CONFIGURED ? (user?.signup_promo_code || null) : null;
 
   const [offering, setOffering] = useState(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
   const [submitting, setSubmitting] = useState(null); // package.identifier | 'restore' | null
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false); // post-purchase server sync
+  const [claimingPromo, setClaimingPromo] = useState(false); // left to App Store to redeem
 
   // ── Load offering ──────────────────────────────────────────────
   useEffect(() => {
@@ -184,6 +194,52 @@ export default function IosSubscribe() {
     }
   }, [submitting, navigate, refresh]);
 
+  // ── Claim the pending campaign promo (one tap, code pre-filled) ────────
+  // Opens Apple's redemption with the offer code already entered, via the
+  // app's proven external-URL path (window.open '_system' - see lib/location.js).
+  // The app backgrounds to the App Store; on return, the foreground hook below
+  // re-checks the entitlement.
+  const handleClaimPromo = useCallback(() => {
+    if (submitting || !pendingPromo) return;
+    setError('');
+    setClaimingPromo(true);
+    const url = appleOfferCodeRedeemUrl(pendingPromo);
+    try { window.open(url, '_system'); } catch { window.location.href = url; }
+  }, [submitting, pendingPromo]);
+
+  // When the user returns from redeeming in the App Store, the entitlement
+  // changed in ANOTHER process - so invalidate RevenueCat's cache first
+  // (a stale cached read would never see the new purchase and would strand
+  // a paying user), then poll. The ref guards against a second foreground
+  // event stacking a parallel poll loop.
+  const pollingRef = useRef(false);
+  useAppForegroundRefresh(() => {
+    if (!claimingPromo || pollingRef.current) return;
+    pollingRef.current = true;
+    (async () => {
+      try {
+        setConfirming(true);
+        await invalidateCustomerInfoCache();
+        for (let i = 0; i < 8; i++) {
+          try {
+            const info = await getCustomerInfo();
+            if (hasActivePremium(info)) {
+              await refresh();
+              navigate('/dashboard', { replace: true });
+              return;
+            }
+          } catch { /* transient - retry */ }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        // Not detected (didn't redeem, or webhook slow) - drop back to the paywall.
+        setConfirming(false);
+        setClaimingPromo(false);
+      } finally {
+        pollingRef.current = false;
+      }
+    })();
+  }, { throttleMs: 0 });
+
   // ── Render ─────────────────────────────────────────────────────
   const copy = buildCopy({ isExpired, isTrialing, isActive, daysRemaining });
 
@@ -236,6 +292,28 @@ export default function IosSubscribe() {
         {confirming && (
           <div className="text-center mb-6 text-sm text-warm-grey">
             Confirming your subscription…
+          </div>
+        )}
+
+        {/* Pending campaign promo - one-tap claim that pre-fills the Apple
+            Offer Code in the App Store. 25% matches the configured offer; keep
+            this in step with the App Store Connect Custom Offer Code. */}
+        {pendingPromo && (
+          <div className="mb-6 rounded-2xl bg-plum-light border border-plum/20 px-5 py-4 text-center">
+            <p className="text-sm font-semibold text-plum">
+              🎁 Your {pendingPromo} discount — 25% off the annual plan
+            </p>
+            <p className="text-xs text-plum/80 mt-1">
+              One tap — your code is entered for you in the App Store.
+            </p>
+            <button
+              type="button"
+              onClick={handleClaimPromo}
+              disabled={submitting !== null || claimingPromo}
+              className="mt-3 w-full rounded-2xl bg-plum hover:bg-plum-pressed text-white font-semibold py-3 active:scale-[0.99] transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {claimingPromo ? 'Opening App Store…' : 'Claim 25% off →'}
+            </button>
           </div>
         )}
 
