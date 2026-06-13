@@ -6,6 +6,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
 import { localeHomePath } from '../hooks/useLocale';
+import { resolveSignupPromo, clearSignupPromo } from '../lib/signupPromo';
 
 export default function Signup() {
   const [email, setEmail]       = useState('');
@@ -24,15 +25,12 @@ export default function Signup() {
   const inviteToken             = searchParams.get('invite');
 
   // Campaign promo from a tagged link (e.g. /signup?promo=HILLELFEST, reached
-  // via the /fair QR redirect). Persist to localStorage so it survives the
-  // email-verification round trip, and read it back on later visits/SSO.
-  const promoCode = (() => {
-    const fromUrl = searchParams.get('promo');
-    try {
-      if (fromUrl) localStorage.setItem('housemait_signup_promo', fromUrl);
-      return fromUrl || localStorage.getItem('housemait_signup_promo') || undefined;
-    } catch { return fromUrl || undefined; }
-  })();
+  // via the /fair QR redirect). Captured once at mount: a URL code persists
+  // (with a timestamp) so it survives the verification round trip; a stored
+  // code is honoured only within its window. It's CLEARED on a successful
+  // signup (below) so a one-off campaign scan can't roll onto the next
+  // account created in this browser. See lib/signupPromo.js.
+  const [promoCode] = useState(() => resolveSignupPromo(searchParams));
 
   useEffect(() => {
     document.title = 'Sign up | Housemait';
@@ -60,6 +58,10 @@ export default function Signup() {
         turnstile_token: turnstileToken,
       });
 
+      // Account created (the server already captured promoCode on the user
+      // row). Consume the stored promo so it can't attach to a later signup
+      // on this browser - whether we auto-join or go verify email next.
+      clearSignupPromo();
       if (data.token) {
         // Invite flow - auto-joined
         login(data);
@@ -83,6 +85,7 @@ export default function Signup() {
   }
 
   function handleSocialSuccess(data) {
+    clearSignupPromo(); // SSO account created with the promo - consume it.
     login(data);
     navigate(data.household ? '/dashboard' : '/setup');
   }
