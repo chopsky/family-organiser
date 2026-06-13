@@ -1767,7 +1767,7 @@ export default function Settings() {
                 section stays one button tall for the typical Apple user. */}
             <details className="pt-2 border-t border-cream-border">
               <summary className="text-xs font-medium text-primary cursor-pointer select-none py-1">
-                Using Google Calendar or Outlook? More options
+                Buttons didn&apos;t work, or using another app? Copy the link
               </summary>
               <div className="pt-2 space-y-3">
                 <div className="flex gap-2">
@@ -1786,6 +1786,7 @@ export default function Settings() {
                   </button>
                 </div>
                 <div className="text-xs text-cocoa space-y-1">
+                  <p>Paste it into your calendar app&apos;s &ldquo;subscribe from URL&rdquo; option:</p>
                   <p><span className="font-medium">Google:</span> Settings &rarr; Add calendar &rarr; From URL.</p>
                   <p><span className="font-medium">Outlook:</span> Add calendar &rarr; Subscribe from web.</p>
                 </div>
