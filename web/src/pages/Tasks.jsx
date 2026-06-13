@@ -289,19 +289,35 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
           </div>
         )}
 
-        {/* Completed: restore button */}
+        {/* Completed: delete (bin) + restore. Bin sits LEFT of Undo. Delete
+            goes through onDelete (confirmDelete), which asks for confirmation
+            and hard-deletes - so it drops out of the 60-day Done list. */}
         {completed && (
-          <button
-            onClick={() => onRestore && onRestore(task)}
-            disabled={restoring?.has(task.id)}
-            className="shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-colors cursor-pointer"
-            style={{
-              color: 'var(--plum, #6B3FA0)',
-              background: 'var(--plum-light, #F3EDFC)',
-            }}
-          >
-            {restoring?.has(task.id) ? '...' : 'Undo'}
-          </button>
+          <div className="shrink-0 flex items-center gap-1">
+            <button
+              onClick={() => onDelete && onDelete(task)}
+              disabled={deleting?.has(task.id)}
+              aria-label="Delete task"
+              title="Delete task"
+              className="shrink-0 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+              style={{ color: 'var(--warm-grey, #6B6774)', background: 'transparent' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#A32D2D'; e.currentTarget.style.background = '#FCEBEB'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--warm-grey, #6B6774)'; e.currentTarget.style.background = 'transparent'; }}
+            >
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onRestore && onRestore(task)}
+              disabled={restoring?.has(task.id)}
+              className="shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-colors cursor-pointer"
+              style={{
+                color: 'var(--plum, #6B3FA0)',
+                background: 'var(--plum-light, #F3EDFC)',
+              }}
+            >
+              {restoring?.has(task.id) ? '...' : 'Undo'}
+            </button>
+          </div>
         )}
       </div>
     </div>

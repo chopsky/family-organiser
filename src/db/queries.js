@@ -2061,7 +2061,11 @@ async function getCompletedThisWeek(householdId, db = supabase) {
   return { tasks: tasks || [], shoppingItems: items || [] };
 }
 
-async function getRecentlyCompletedTasks(householdId, hours = 24, db = supabase) {
+// Default 60 days: completed tasks stay visible (struck through, under "Done")
+// for ~2 months so families keep a sense of what's been done, until they
+// explicitly delete one. Deleting is a hard delete, so deleted tasks simply
+// fall out of this result.
+async function getRecentlyCompletedTasks(householdId, hours = 24 * 60, db = supabase) {
   const since = new Date();
   since.setHours(since.getHours() - hours);
   const { data, error } = await db
