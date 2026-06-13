@@ -315,7 +315,7 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
   const bgTint = COLOR_TINTS[colorTheme] || '#F3EDFC';
   const avatarColor = MEMBER_COLORS[colorTheme] || '#6B3FA0';
   const initial = (member?.name || 'U').charAt(0).toUpperCase();
-  const displayName = member?.name || 'Unassigned';
+  const displayName = member?.name || 'Anyone';
   const totalCount = incompleteTasks.length;
 
   return (
@@ -469,7 +469,7 @@ export default function Tasks() {
   const [dueDate, setDueDate] = useState(today());
   const [dueTime, setDueTime] = useState('');
   // Multi-assignee: an array of canonical member names. Empty array means
-  // "everyone" (the existing semantic - shown as the Unassigned column).
+  // "everyone" (the existing semantic - shown as the Anyone column).
   const [assignees, setAssignees] = useState([]);
   const [recurrence, setRecurrence] = useState('');
   const [description, setDescription] = useState('');
@@ -656,13 +656,13 @@ export default function Tasks() {
     const allTasks = [...tasks, ...recentDone];
     const groups = {};
     for (const name of sorted) groups[name] = { incomplete: [], completed: [] };
-    groups['Unassigned'] = { incomplete: [], completed: [] };
+    groups['Anyone'] = { incomplete: [], completed: [] };
 
     for (const task of allTasks) {
       const names = Array.isArray(task.assigned_to_names) && task.assigned_to_names.length > 0
         ? task.assigned_to_names.filter(Boolean)
         : task.assigned_to_name ? [task.assigned_to_name] : [];
-      const keys = names.length > 0 ? names : ['Unassigned'];
+      const keys = names.length > 0 ? names : ['Anyone'];
       for (const key of keys) {
         if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
         if (task.completed) {
@@ -679,9 +679,9 @@ export default function Tasks() {
       return { name, member, ...groups[name] };
     });
 
-    const unassigned = groups['Unassigned'];
+    const unassigned = groups['Anyone'];
     if (unassigned.incomplete.length > 0 || unassigned.completed.length > 0) {
-      columns.push({ name: 'Unassigned', member: null, ...unassigned });
+      columns.push({ name: 'Anyone', member: null, ...unassigned });
     }
 
     return columns;
@@ -994,7 +994,7 @@ export default function Tasks() {
               <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Assign to</label>
                 {/* Multi-select chip picker. Tap a name to toggle; empty
-                    selection = "everyone" (shows in the Unassigned column). */}
+                    selection = "everyone" (shows in the Anyone column). */}
                 <div
                   className="flex flex-wrap gap-2"
                   style={{
@@ -1196,7 +1196,7 @@ export default function Tasks() {
                   member={col.member}
                   incompleteTasks={col.incomplete}
                   completedTasks={col.completed}
-                  onAddTask={() => openAddForm(col.name !== 'Unassigned' ? col.name : '')}
+                  onAddTask={() => openAddForm(col.name !== 'Anyone' ? col.name : '')}
                   onToggle={toggle}
                   toggling={toggling}
                   openMenuId={openMenuId}
@@ -1269,7 +1269,7 @@ export default function Tasks() {
                     member={col.member}
                     incompleteTasks={col.incomplete}
                     completedTasks={col.completed}
-                    onAddTask={() => openAddForm(col.name !== 'Unassigned' ? col.name : '')}
+                    onAddTask={() => openAddForm(col.name !== 'Anyone' ? col.name : '')}
                     onToggle={toggle}
                     toggling={toggling}
                     openMenuId={openMenuId}
