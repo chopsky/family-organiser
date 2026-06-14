@@ -365,7 +365,7 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
           {initial}
         </div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 500, fontFamily: 'var(--font-display, "Instrument Serif", serif)', color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-display, "Instrument Serif", serif)', color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.02em' }}>
             {displayName}
           </div>
           <div style={{ fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
@@ -483,7 +483,6 @@ export default function Tasks() {
   // Form fields
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState(today());
-  const [dueTime, setDueTime] = useState('');
   // Multi-assignee: an array of canonical member names. Empty array means
   // "everyone" (the existing semantic - shown as the Anyone column).
   const [assignees, setAssignees] = useState([]);
@@ -503,7 +502,6 @@ export default function Tasks() {
   function resetForm() {
     setTitle('');
     setDueDate(today());
-    setDueTime('');
     setAssignees([]);
     setRecurrence('');
     setDescription('');
@@ -539,7 +537,6 @@ export default function Tasks() {
   function openEditForm(task) {
     setTitle(task.title);
     setDueDate(task.due_date || today());
-    setDueTime(task.due_time ? task.due_time.substring(0, 5) : '');
     // Accept both the new array column and the legacy single-name field
     // so this still works during the transition (and against any cached
     // older task rows the client may still hold).
@@ -714,7 +711,9 @@ export default function Tasks() {
         const payload = {
           title: title.trim(),
           due_date: dueDate,
-          due_time: dueTime || null,
+          // Time was removed from the product - clear any time a legacy task
+          // still carries so editing it drops the time too.
+          due_time: null,
           assigned_to_names: assignees,
           recurrence: recurrence || null,
           description: description || null,
@@ -724,7 +723,6 @@ export default function Tasks() {
         await api.patch(`/tasks/${editingTask.id}`, payload);
       } else {
         const payload = { title: title.trim(), due_date: dueDate };
-        if (dueTime) payload.due_time = dueTime;
         if (assignees.length > 0) payload.assigned_to_names = assignees;
         if (recurrence) payload.recurrence = recurrence;
         if (description) payload.description = description;
@@ -948,10 +946,10 @@ export default function Tasks() {
               />
             </div>
 
-            {/* min-w-0 on each grid child is critical - without it, native iOS
-                <input type="date"> and <input type="time"> report an intrinsic
-                min-width that exceeds the grid track on narrow phones, causing
-                the right column to overflow the modal. Grid items default to
+            {/* min-w-0 on each grid child is critical - without it, the native
+                iOS <input type="date"> reports an intrinsic min-width that
+                exceeds the grid track on narrow phones, causing the right
+                column to overflow the modal. Grid items default to
                 min-width:auto, so they refuse to shrink below content width. */}
             <div className="grid grid-cols-2 gap-3">
               <div className="min-w-0 overflow-hidden">
@@ -983,31 +981,30 @@ export default function Tasks() {
                   }}
                 />
               </div>
-              <div className="min-w-0 overflow-hidden">
-                <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Time (optional)</label>
-                <input
-                  type="time"
-                  value={dueTime}
-                  onChange={(e) => setDueTime(e.target.value)}
+              <div className="min-w-0">
+                <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Priority</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
                   className="w-full focus:outline-none"
                   style={{
                     border: '1.5px solid var(--light-grey, #E8E5EC)',
                     borderRadius: 10,
                     height: 48,
-                    lineHeight: '48px', // see note on the date input above
                     padding: '0 14px',
                     fontSize: 14,
-                    background: '#FFFFFF',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    boxSizing: 'border-box',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                    display: 'block',
+                    background: '#fff',
                   }}
-                />
+                >
+                  <option value="">None</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
               </div>
-              <div className="min-w-0">
+              {/* Assign to gets its own full-width row (col-span-2) so the
+                  member chips have room to wrap and stay easy to scan. */}
+              <div className="min-w-0 col-span-2">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Assign to</label>
                 {/* Multi-select chip picker. Tap a name to toggle; empty
                     selection = "everyone" (shows in the Anyone column). */}
@@ -1057,27 +1054,6 @@ export default function Tasks() {
                 <p style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)', marginTop: 4 }}>
                   {assignees.length === 0 ? 'Leave empty for everyone.' : `Assigned to ${assignees.length} ${assignees.length === 1 ? 'person' : 'people'}.`}
                 </p>
-              </div>
-              <div className="min-w-0">
-                <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Priority</label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="w-full focus:outline-none"
-                  style={{
-                    border: '1.5px solid var(--light-grey, #E8E5EC)',
-                    borderRadius: 10,
-                    height: 48,
-                    padding: '0 14px',
-                    fontSize: 14,
-                    background: '#fff',
-                  }}
-                >
-                  <option value="">None</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
               </div>
               <div className="min-w-0">
                 <label className="block mb-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--charcoal, #2D2A33)' }}>Repeats</label>
