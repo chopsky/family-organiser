@@ -33,19 +33,42 @@ function PickupCar({ className = 'h-3.5 w-3.5' }) {
   );
 }
 
-// role_meta: map our data (role + member_type) to the design's role pill.
+// Render the household name as "The {X} family", tolerating names that already
+// carry "The " and/or "family" so we never double them up.
+function familyTitle(name) {
+  const raw = (name || '').trim();
+  if (!raw) return 'Your household';
+  const core = raw.replace(/^the\s+/i, '').replace(/\s+family$/i, '').trim();
+  return core ? `The ${core} family` : raw;
+}
+
+// Role pill: colour by tier (admin / parent / dependent), but the LABEL comes
+// from the member's own family_role (Father, Mother, Child, Gran…) so we don't
+// assume "Kid"/"Parent" - a grandparent added under dependents reads "Gran",
+// not "Kid". Falls back to the tier name only when family_role is blank.
+// Admins keep an "· Admin" suffix so the badge still flags them.
 function roleMeta(m) {
-  if (m.role === 'admin') return { label: 'Admin', cls: 'bg-plum-light text-plum' };
-  if (m.member_type === 'dependent') return { label: 'Kid', cls: 'text-warm-grey', style: { background: SOFT } };
-  return { label: 'Parent', cls: 'bg-sage-light text-sage' };
+  const isAdmin = m.role === 'admin';
+  const tier = isAdmin
+    ? { cls: 'bg-plum-light text-plum' }
+    : (m.member_type === 'dependent'
+      ? { cls: 'text-warm-grey', style: { background: SOFT } }
+      : { cls: 'bg-sage-light text-sage' });
+  const fallback = isAdmin ? 'Admin' : (m.member_type === 'dependent' ? 'Kid' : 'Parent');
+  const role = (m.family_role || '').trim();
+  let label;
+  if (isAdmin) {
+    label = role && !/admin/i.test(role) ? `${role} · Admin` : (role || 'Admin');
+  } else {
+    label = role || fallback;
+  }
+  return { label, ...tier };
 }
 
 // Centred member card (avatar + name + role + role pill), with edit/remove
 // on hover. The role pill carries a text label (not colour alone) for a11y.
 function MemberCard({ m, canEdit, canRemove, onEdit, onRemove, removing }) {
   const rm = roleMeta(m);
-  const roleLine = m.family_role
-    || (m.member_type === 'dependent' ? 'Child' : (m.role === 'admin' ? 'Admin' : 'Member'));
   return (
     <div
       className="group relative bg-white rounded-[18px] border border-light-grey px-5 py-[22px] flex flex-col items-center text-center gap-3"
@@ -68,9 +91,9 @@ function MemberCard({ m, canEdit, canRemove, onEdit, onRemove, removing }) {
       <Avatar member={m} size={72} style={{ boxShadow: '0 0 0 2px #fff' }} />
       <div>
         <div className="text-base font-bold text-charcoal">{m.name}</div>
-        <div className="text-xs text-warm-grey mt-0.5">
-          {roleLine}{m.whatsapp_linked ? ' · WhatsApp' : ''}
-        </div>
+        {m.whatsapp_linked && (
+          <div className="text-xs text-warm-grey mt-0.5">WhatsApp</div>
+        )}
       </div>
       <span
         className={`text-[11px] font-bold tracking-[0.04em] px-2.5 py-1 rounded-full ${rm.cls}`}
@@ -1744,7 +1767,7 @@ export default function FamilySetup() {
     <div className="max-w-[1080px] mx-auto space-y-6 pb-24">
       <PageHeader
         kicker={`${members.length} ${members.length === 1 ? 'member' : 'members'}`}
-        title={household?.name || 'Your household'}
+        title={familyTitle(household?.name)}
         subtitle="Manage who's in your household and how Housemait works for everyone."
         actions={isAdmin ? (
           <PillBtn primary icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddMember}>
