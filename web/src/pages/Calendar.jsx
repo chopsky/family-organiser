@@ -1333,6 +1333,41 @@ export default function Calendar() {
     return { label: 'Event', bg: '#F3EDFC', color: '#6B3FA0' };
   }
 
+  // Shared search-results renderer, used by both the desktop popover and the
+  // mobile full-width search bar. jumpToSearchResult already clears the query,
+  // so a tapped result self-closes either dropdown.
+  function renderSearchResults() {
+    if (searchQuery.trim().length < 2) return <p className="text-sm text-warm-grey p-3 text-center">Type at least 2 characters…</p>;
+    if (searchLoading && searchResults.length === 0) return <p className="text-sm text-warm-grey p-3 text-center">Searching…</p>;
+    if (searchResults.length === 0) return <p className="text-sm text-warm-grey p-3 text-center">No results found</p>;
+    return searchResults.map((result, i) => {
+      const dateLabel = result.date
+        ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+        : 'No date';
+      const typeLabel = result.type === 'event' ? 'Event' : result.type === 'task' ? 'Task' : 'School';
+      // Dot colour: events get their own colour; tasks and school-term-dates
+      // each get a category tint.
+      const dotColor = result.type === 'event'
+        ? getEventHex(result.item)
+        : result.type === 'school_date'
+          ? '#6B3FA0'
+          : '#7A8694';
+      return (
+        <button
+          key={`${result.type}-${result.item.id}-${i}`}
+          onClick={() => jumpToSearchResult(result)}
+          className="w-full text-left px-3 py-2 hover:bg-cream transition-colors flex items-start gap-3 rounded-lg"
+        >
+          <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: dotColor }} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-charcoal truncate">{result.title}</p>
+            <p className="text-xs text-warm-grey">{dateLabel} · {typeLabel}</p>
+          </div>
+        </button>
+      );
+    });
+  }
+
   // ── Render ─────────────────────────────────────────────
 
   return (
@@ -1345,8 +1380,21 @@ export default function Calendar() {
         kicker={navigationLabel}
         title="Calendar"
         actions={
-
-        <div className="flex items-center gap-2">
+        <>
+        {/* Mobile: a single round add button. The full toolbar below is
+            desktop-only; mobile gets a stacked search + view + nav block
+            rendered under the header. */}
+        {canWrite && (
+          <button
+            onClick={() => openAddForm(selectedDate)}
+            aria-label="New event"
+            className="md:hidden w-12 h-12 rounded-full bg-plum hover:bg-plum-dark text-white flex items-center justify-center shrink-0 transition-colors"
+            style={{ boxShadow: '0 8px 20px rgba(107,63,160,0.32)' }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          </button>
+        )}
+        <div className="hidden md:flex items-center gap-2">
           {/* Search button */}
           <div ref={searchRef} className="relative">
             <button
@@ -1373,40 +1421,7 @@ export default function Calendar() {
                 />
                 {searchQuery.trim() && (
                   <div className="mt-2 max-h-64 overflow-y-auto">
-                    {searchQuery.trim().length < 2 ? (
-                      <p className="text-sm text-warm-grey p-3 text-center">Type at least 2 characters…</p>
-                    ) : searchLoading && searchResults.length === 0 ? (
-                      <p className="text-sm text-warm-grey p-3 text-center">Searching…</p>
-                    ) : searchResults.length === 0 ? (
-                      <p className="text-sm text-warm-grey p-3 text-center">No results found</p>
-                    ) : (
-                      searchResults.map((result, i) => {
-                        const dateLabel = result.date
-                          ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-                          : 'No date';
-                        const typeLabel = result.type === 'event' ? 'Event' : result.type === 'task' ? 'Task' : 'School';
-                        // Dot colour: events get their own colour; tasks
-                        // and school-term-dates each get a category tint.
-                        const dotColor = result.type === 'event'
-                          ? getEventHex(result.item)
-                          : result.type === 'school_date'
-                            ? '#6B3FA0' // plum - matches the school chips/avatars
-                            : '#7A8694';
-                        return (
-                          <button
-                            key={`${result.type}-${result.item.id}-${i}`}
-                            onClick={() => jumpToSearchResult(result)}
-                            className="w-full text-left px-3 py-2 hover:bg-cream transition-colors flex items-start gap-3 rounded-lg"
-                          >
-                            <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: dotColor }} />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-charcoal truncate">{result.title}</p>
-                              <p className="text-xs text-warm-grey">{dateLabel} · {typeLabel}</p>
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
+                    {renderSearchResults()}
                   </div>
                 )}
               </div>
@@ -1554,8 +1569,59 @@ export default function Calendar() {
             )}
           </div>
         </div>
+        </>
         }
       />
+
+      {/* ── Mobile controls: full-width search, view switcher, month nav.
+            Desktop keeps these inline in the header toolbar above. ── */}
+      <div className="md:hidden flex flex-col gap-3">
+        {/* Search */}
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-grey pointer-events-none">
+            <IconSearch className="w-[18px] h-[18px]" />
+          </span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search events, people, places…"
+            className="w-full h-12 rounded-2xl pl-11 pr-4 text-[15px] text-charcoal bg-white border border-light-grey outline-none focus:border-plum placeholder:text-warm-grey"
+          />
+          {searchQuery.trim() && (
+            <div className="absolute left-0 right-0 top-[54px] bg-white rounded-2xl border border-light-grey z-30 p-2 max-h-72 overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
+              {renderSearchResults()}
+            </div>
+          )}
+        </div>
+
+        {/* View switcher - full width */}
+        <Segmented
+          fluid
+          ariaLabel="Calendar view"
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: 'month', label: 'Month' },
+            { value: 'week', label: 'Week' },
+            { value: 'day', label: 'Day' },
+          ]}
+        />
+
+        {/* Month navigation */}
+        <div className="flex items-center justify-between">
+          <button onClick={navigatePrev} aria-label="Previous" className="w-9 h-9 rounded-full border border-light-grey bg-white flex items-center justify-center text-charcoal active:bg-plum-light">
+            <ChevronLeft />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <span className="text-base font-semibold text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>{navigationLabel}</span>
+            <button onClick={goToday} className="px-3 py-1 rounded-full bg-plum-light text-plum text-xs font-semibold">Today</button>
+          </div>
+          <button onClick={navigateNext} aria-label="Next" className="w-9 h-9 rounded-full border border-light-grey bg-white flex items-center justify-center text-charcoal active:bg-plum-light">
+            <ChevronRight />
+          </button>
+        </div>
+      </div>
 
       {/* ── Month View ──────────────────────────────────────── */}
       {viewMode === 'month' && (
@@ -1680,32 +1746,41 @@ export default function Calendar() {
 
           {/* Mobile mini calendar */}
           <div className="md:hidden">
-            <div className="grid grid-cols-7 gap-0 mb-3.5">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-[10px] font-semibold text-warm-grey uppercase py-1">{d}</div>
-              ))}
-              {calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
-                const isToday_ = isSameDay(date, today);
-                const isSelected = selectedDate && isSameDay(date, selectedDate);
-                const dayEvts = eventsForDate(date);
-                const dayTasks_ = tasksForDate(date);
-                const hasEvents = dayEvts.length > 0 || dayTasks_.length > 0;
-
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedDate(new Date(date))}
-                    className={`relative text-center text-xs font-medium py-2.5 rounded-full transition-colors ${
-                      !isCurrent ? 'text-light-grey' : isToday_ ? 'bg-plum text-white font-bold' : isSelected ? 'bg-plum-light text-plum' : 'hover:bg-plum-light'
-                    }`}
-                  >
-                    {date.getDate()}
-                    {hasEvents && !isToday_ && (
-                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-coral" />
-                    )}
-                  </button>
-                );
-              })}
+            <div className="bg-white rounded-2xl border border-light-grey p-3 mb-4" style={{ boxShadow: 'var(--shadow-sm)' }}>
+              <div className="grid grid-cols-7 gap-1">
+                {DAY_HEADERS.map((d, i) => (
+                  <div key={i} className="text-center text-[11px] font-semibold text-warm-grey uppercase tracking-wider pb-1">{d.toUpperCase()}</div>
+                ))}
+                {calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
+                  // Blank leading/trailing cells (no prev/next-month numbers), per the design.
+                  if (!isCurrent) return <div key={idx} />;
+                  const isToday_ = isSameDay(date, today);
+                  const isSelected = selectedDate && isSameDay(date, selectedDate);
+                  // Up to three coloured dots: each event in its own colour, tasks coral.
+                  const dots = [
+                    ...eventsForDate(date).map(e => getEventHex(e)),
+                    ...tasksForDate(date).map(() => '#E8724A'),
+                  ].slice(0, 3);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedDate(new Date(date))}
+                      className={`aspect-square flex flex-col items-center justify-center gap-1 rounded-2xl transition-colors ${
+                        isToday_ ? 'bg-plum' : isSelected ? 'bg-plum-light' : 'active:bg-plum-light'
+                      }`}
+                    >
+                      <span className={`text-sm leading-none ${isToday_ ? 'text-white font-bold' : isSelected ? 'text-plum font-semibold' : 'text-charcoal font-medium'}`}>
+                        {date.getDate()}
+                      </span>
+                      <span className="flex items-center justify-center gap-[3px] h-1.5">
+                        {dots.map((c, di) => (
+                          <span key={di} className="w-1.5 h-1.5 rounded-full" style={{ background: isToday_ ? 'rgba(255,255,255,0.92)' : c }} />
+                        ))}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Selected day events list for mobile */}

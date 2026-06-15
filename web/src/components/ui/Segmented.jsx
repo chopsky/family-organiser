@@ -12,12 +12,12 @@
  */
 const SOFT = '#F3EEE5';
 
-export default function Segmented({ value, onChange, options, ariaLabel, className = '' }) {
+export default function Segmented({ value, onChange, options, ariaLabel, className = '', fluid = false }) {
   return (
     <div
       role="group"
       aria-label={ariaLabel}
-      className={`inline-flex flex-wrap gap-1 p-1 rounded-xl ${className}`}
+      className={`${fluid ? 'flex w-full' : 'inline-flex flex-wrap'} gap-1 p-1 rounded-xl ${className}`}
       style={{ background: SOFT }}
     >
       {options.map((opt) => {
@@ -29,7 +29,7 @@ export default function Segmented({ value, onChange, options, ariaLabel, classNa
             type="button"
             aria-pressed={on}
             onClick={() => onChange(opt.value)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-colors cursor-pointer"
+            className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${fluid ? 'flex-1' : ''}`}
             style={{
               background: on ? '#fff' : 'transparent',
               color: danger ? '#A04257' : (on ? 'var(--color-charcoal)' : 'var(--ink-2)'),
