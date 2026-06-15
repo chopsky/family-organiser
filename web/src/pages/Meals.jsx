@@ -107,7 +107,7 @@ export default function Meals() {
       />
 
       {activeTab === 'plan' ? (
-        <MealPlanView error={error} setError={setError} onSwitchToRecipes={() => setActiveTab('recipes')} />
+        <MealPlanView error={error} setError={setError} />
       ) : (
         <RecipeBoxView error={error} setError={setError} />
       )}
@@ -119,7 +119,7 @@ export default function Meals() {
 // Meal Plan View
 // ══════════════════════════════════════════════════════════════════
 
-function MealPlanView({ setError, onSwitchToRecipes }) {
+function MealPlanView({ setError }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => {
@@ -1157,7 +1157,9 @@ function RecipeBoxView({ setError }) {
       const params = {};
       if (search) params.search = search;
       if (catFilter) params.category = catFilter.toLowerCase();
-      if (tagFilter) params.tag = tagFilter;
+      // Dietary tags are filtered client-side (see shownRecipes) - the server
+      // does an exact, case-sensitive array match, but stored tags vary in
+      // case/hyphenation ("Gluten Free" vs "Gluten-free"), so it never matched.
       if (favOnly) params.favourites = 'true';
       const res = await api.get('/recipes', { params });
       { const r = res.data?.recipes ?? res.data; setRecipes(Array.isArray(r) ? r : []); }
@@ -1166,9 +1168,16 @@ function RecipeBoxView({ setError }) {
     } finally {
       setLoading(false);
     }
-  }, [search, catFilter, tagFilter, favOnly, setError]);
+  }, [search, catFilter, favOnly, setError]);
 
   useEffect(() => { setLoading(true); loadRecipes(); }, [loadRecipes]);
+
+  // Dietary-tag filter, applied client-side so it tolerates case/hyphen/space
+  // differences between the filter label and however the tag was stored.
+  const normTag = (t) => (t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const shownRecipes = tagFilter
+    ? recipes.filter((r) => (r.dietary_tags || r.tags || []).some((t) => normTag(t) === normTag(tagFilter)))
+    : recipes;
 
   // Toggle favourite
   async function toggleFavourite(recipe, e) {
@@ -1326,7 +1335,7 @@ function RecipeBoxView({ setError }) {
         <>
           {/* Recipe grid - coloured banner + serif monogram + heart */}
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
-            {recipes.map(recipe => {
+            {shownRecipes.map(recipe => {
               const c = planMealColour(recipe.category);
               const fav = recipe.is_favourite || recipe.favourite;
               const mins = (recipe.prep_time_mins || 0) + (recipe.cook_time_mins || 0);
@@ -1367,7 +1376,7 @@ function RecipeBoxView({ setError }) {
             })}
           </div>
 
-          {recipes.length === 0 && (
+          {shownRecipes.length === 0 && (
             <div className="text-center py-8">
               <p className="text-cocoa text-sm mb-4">No recipes found. Add your first recipe!</p>
               <button
