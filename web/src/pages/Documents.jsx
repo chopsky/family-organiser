@@ -335,8 +335,11 @@ export default function Documents() {
               <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey mb-3.5">
                 {atRoot ? 'Recently added' : 'Files'}
               </div>
+              {/* No overflow-hidden here - it would clip a row's ⋯ menu when
+                  it drops below a short card. First/last rows round their own
+                  corners instead so the hover tint still matches the card. */}
               <div
-                className="bg-white rounded-[18px] border border-light-grey overflow-hidden"
+                className="bg-white rounded-[18px] border border-light-grey"
                 style={{ boxShadow: CARD_SHADOW }}
               >
                 {files.map((doc, i) => (
@@ -344,6 +347,7 @@ export default function Documents() {
                     key={doc.id}
                     doc={doc}
                     showFolder={atRoot}
+                    isFirst={i === 0}
                     isLast={i === files.length - 1}
                     onPreview={() => handlePreview(doc)}
                     onDownload={() => handleDownload(doc)}
@@ -517,7 +521,7 @@ function FileGlyph({ doc }) {
 
 /* ─── Document Row ─────────────────────────────────────────────────────────── */
 
-function DocumentRow({ doc, showFolder, isLast, onPreview, onDownload, onRename, onDelete }) {
+function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, onRename, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const folderName = doc.folder?.name;
   const sub = showFolder && folderName
@@ -526,7 +530,7 @@ function DocumentRow({ doc, showFolder, isLast, onPreview, onDownload, onRename,
 
   return (
     <div
-      className="flex items-center gap-3.5 px-5 py-3.5 transition-colors"
+      className={`flex items-center gap-3.5 px-5 py-3.5 transition-colors ${isFirst ? 'rounded-t-[18px]' : ''} ${isLast ? 'rounded-b-[18px]' : ''}`}
       style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-light-grey)' }}
       onMouseOver={(e) => { e.currentTarget.style.background = SOFT; }}
       onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
