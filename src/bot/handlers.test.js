@@ -12,6 +12,11 @@ jest.mock('../db/queries', () => ({
   updateHouseholdSchoolMeta: jest.fn(() => Promise.resolve()),
   getHouseholdPreferences: jest.fn(() => Promise.resolve([])),
   createRecipe: jest.fn((hid, r) => Promise.resolve({ id: 'r-1', ...r })),
+  resolveAssignees: jest.fn(() => ({ ids: [], names: [] })),
+  findSimilarEvent: jest.fn(() => Promise.resolve(null)),
+  createCalendarEvent: jest.fn((hid, data) => Promise.resolve({ id: 'e-1', ...data })),
+  saveEventAssignees: jest.fn(() => Promise.resolve()),
+  saveEventReminders: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -131,6 +136,32 @@ describe('handleCalendarQuery', () => {
       { query_start: '2026-12-01', query_end: '2026-12-31' }, household, user, TZ, {},
     );
     expect(res.response).toMatch(/couldn't pull up your calendar/i);
+  });
+});
+
+describe('createCalendarEventFromResult — recurrence', () => {
+  it('passes the parsed recurrence through to createCalendarEvent', async () => {
+    await handlers.createCalendarEventFromResult(
+      { title: 'Mason Piano', date: '2026-06-15', start_time: '17:30', recurrence: 'weekly' },
+      user, household, {}, 'Mason has Piano on Mondays at 17:30 every week',
+    );
+    expect(db.createCalendarEvent).toHaveBeenCalledWith(
+      'h1',
+      expect.objectContaining({ recurrence: 'weekly' }),
+      'u1',
+    );
+  });
+
+  it('defaults recurrence to null for a one-off event', async () => {
+    await handlers.createCalendarEventFromResult(
+      { title: 'Dentist', date: '2026-06-16', start_time: '09:00' },
+      user, household, {}, 'Dentist on the 16th at 9am',
+    );
+    expect(db.createCalendarEvent).toHaveBeenCalledWith(
+      'h1',
+      expect.objectContaining({ recurrence: null }),
+      'u1',
+    );
   });
 });
 

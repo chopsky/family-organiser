@@ -569,7 +569,9 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         body: `${user.name} updated "${updated.title}"${eventTail}`,
         category: 'calendar_reminders',
       }).catch((err) => console.error('[handlers] update_event push failed:', err.message));
-      return { response: `✏️ Updated "${updated.title}".`, actions };
+      // Tell the user exactly what changed, not just "updated" - e.g.
+      // 'Updated "Mason Piano" - moved to Thu 18 Jun at 16:00.'
+      return { response: `✏️ Updated "${updated.title}"${eventTail}.`, actions };
     }
 
     if (isTask) {
@@ -587,7 +589,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       const taskDiff = summariseTaskChanges(hit, taskUpdates, household.timezone || 'Europe/London');
       const taskTail = taskDiff ? ` - ${taskDiff}` : '';
       broadcast.toHousehold(user.id, household.members, `📋 ${user.name} updated task: ${updated.title}${taskTail}`);
-      return { response: `✏️ Updated "${updated.title}".`, actions };
+      return { response: `✏️ Updated "${updated.title}"${taskTail}.`, actions };
     }
 
     // shopping
@@ -854,6 +856,10 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
       start_time: startTime,
       end_time: endTime,
       all_day: !!ev.all_day,
+      // Carry the recurrence the classifier parsed ("every week" → "weekly").
+      // Without this it was dropped and the event became a one-off, so a
+      // recurring activity never showed on later weeks.
+      recurrence: ev.recurrence || null,
       assigned_to_ids: assigneeIds,
       assigned_to_names: assigneeNames,
       color: firstAssignee?.color_theme || 'lavender',
@@ -2603,6 +2609,7 @@ function formatRecipeResponse(recipe) {
 
 module.exports = {
   handleTextMessage,
+  createCalendarEventFromResult,
   handleCalendarQuery,
   handleVoiceNote,
   handlePhoto,
