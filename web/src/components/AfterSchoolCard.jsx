@@ -163,7 +163,7 @@ export default function AfterSchoolCard({ members = [] }) {
                 <div style={{ width: 48, flexShrink: 0, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: INK3 }}>{topTime}</div>
                   {showEnd && (
-                    <div style={{ fontSize: 11, fontWeight: 500, color: INK3, opacity: 0.6 }}>– {end}</div>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: INK3, opacity: 0.6 }}>{end}</div>
                   )}
                 </div>
                 <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: kidColor + '1F', color: kidColor }}>
