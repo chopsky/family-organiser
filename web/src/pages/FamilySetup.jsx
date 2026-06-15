@@ -1774,118 +1774,138 @@ export default function FamilySetup() {
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {!canWrite && <SubscribePrompt message="Subscribe to invite family members and edit profiles" />}
 
-      {/* Household identity card.
-          Left: circular avatar (placeholder or uploaded image) - clickable
-          for admins to open the edit modal. Middle: name (display heading)
-          and street address with pin icon (or an "Add address" link for
-          admins when blank). Right: pencil-edit button (admins only).
-          The edit modal handles name + address + avatar upload in one
-          place - replaces the older inline "household name" textfield. */}
-      <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        {success && (
-          <p className="text-sm text-success bg-success/10 rounded-xl px-3 py-2 mb-3">{success}</p>
-        )}
-        <div className="flex items-center gap-5">
-          {/* Clicking the avatar triggers the file picker directly via
-              the wrapping <label> + hidden input - no modal in the way.
-              The Edit button to the right of the household name still
-              opens the modal for changing name + address. */}
+      {/* Household card (design handoff: photo + members + address | invite
+          zone). One responsive component - two zones side-by-side on desktop,
+          stacked below the `sm` breakpoint. The household NAME is deliberately
+          not repeated here; it lives in the PageHeader <h1> above. */}
+      {success && (
+        <p className="text-sm text-sage bg-sage-light rounded-xl px-3 py-2">{success}</p>
+      )}
+      <div
+        className="flex flex-col sm:flex-row sm:items-stretch overflow-hidden bg-white"
+        style={{ borderRadius: 22, border: '1px solid var(--color-light-grey)', boxShadow: '0 1px 0 rgba(26,22,32,0.03), 0 6px 20px rgba(26,22,32,0.05)' }}
+      >
+        {/* Identity zone */}
+        <div className="flex-1 min-w-0 flex items-center gap-5 sm:gap-6 px-5 py-5 sm:px-[30px] sm:py-[26px]">
           <button
             type="button"
             disabled={!isAdmin || uploadingHouseholdAvatar}
             onClick={async () => {
               if (!isAdmin || uploadingHouseholdAvatar) return;
-              // On iOS: native photo picker (Photo Library / Take Photo).
-              // On web: hidden <input type="file"> click. Same return shape.
               const blob = await pickPhoto();
               if (blob) await handleDirectHouseholdAvatarUpload(blob);
             }}
-            className={`shrink-0 relative group ${isAdmin && !uploadingHouseholdAvatar ? 'cursor-pointer' : 'cursor-default'}`}
-            aria-label={isAdmin ? 'Change household photo' : 'Household photo'}
-            title={isAdmin ? 'Click to change photo' : ''}
+            className={`shrink-0 relative group rounded-[20px] overflow-hidden ${isAdmin && !uploadingHouseholdAvatar ? 'cursor-pointer' : 'cursor-default'}`}
+            aria-label={isAdmin ? 'Upload a family photo' : 'Family photo'}
+            title={isAdmin ? 'Upload a family photo' : ''}
           >
-            <img
-              src={household?.avatar_url || '/family-placeholder2.png'}
-              alt={household?.name ? `${household.name} household` : 'Household'}
-              className={`w-20 h-20 md:w-28 md:h-28 rounded-full object-cover ring-2 ring-white transition-opacity ${uploadingHouseholdAvatar ? 'opacity-60' : ''}`}
-            />
+            {household?.avatar_url ? (
+              <img
+                src={household.avatar_url}
+                alt=""
+                className={`w-[76px] h-[76px] sm:w-[104px] sm:h-[104px] object-cover transition-opacity ${uploadingHouseholdAvatar ? 'opacity-60' : ''}`}
+              />
+            ) : (
+              <div
+                className="w-[76px] h-[76px] sm:w-[104px] sm:h-[104px] flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #EFE9FB 0%, #F3EEE5 52%, #FBE6EA 100%)' }}
+              >
+                <span className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white flex items-center justify-center" style={{ boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
+                  <IconCameraSimple className="h-5 w-5 text-plum" />
+                </span>
+              </div>
+            )}
             {isAdmin && (
-              <span className={`absolute inset-0 rounded-full bg-bark/0 ${uploadingHouseholdAvatar ? 'bg-bark/30' : 'group-hover:bg-bark/30'} transition-colors flex items-center justify-center ${uploadingHouseholdAvatar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                {uploadingHouseholdAvatar ? (
-                  <span className="text-white text-xs font-medium">Uploading…</span>
-                ) : (
-                  <IconCameraSimple className="h-5 w-5 text-white" />
-                )}
+              <span className={`absolute inset-0 transition-colors flex items-center justify-center ${uploadingHouseholdAvatar ? 'bg-black/30 opacity-100' : 'bg-black/0 group-hover:bg-black/30 opacity-0 group-hover:opacity-100'}`}>
+                {uploadingHouseholdAvatar
+                  ? <span className="text-white text-xs font-medium">Uploading…</span>
+                  : <IconCameraSimple className="h-5 w-5 text-white" />}
               </span>
             )}
           </button>
 
-          <div className="flex-1 min-w-0">
-            {/* Name + edit share one row, so the pencil sits top-right
-                in line with the household name. Address and join code
-                then get the full column width below, each on a single
-                line. */}
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-[15px] font-semibold text-bark truncate">
-                Household details
-              </h2>
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={openHouseholdEdit}
-                  className="shrink-0 inline-flex items-center gap-1.5 text-sm text-cocoa hover:text-bark transition-colors px-2 py-1 -mr-2"
-                  title="Edit household"
-                >
-                  <IconEdit className="h-4 w-4" />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-              )}
+          <div className="min-w-0">
+            {/* Members: avatar stack + count */}
+            <div className="flex items-center gap-3">
+              <div className="flex" role="img" aria-label={`${members.length} member${members.length === 1 ? '' : 's'}: ${members.map(m => m.name).join(', ')}`}>
+                {members.slice(0, 5).map((m, i) => (
+                  <span
+                    key={m.id}
+                    aria-hidden="true"
+                    className="rounded-full flex items-center justify-center text-white"
+                    style={{ width: 32, height: 32, fontSize: 13, fontWeight: 600, background: hexFor(m), border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
+                  >
+                    {m.name?.[0]?.toUpperCase()}
+                  </span>
+                ))}
+              </div>
+              <span className="text-[15px] font-semibold text-charcoal">
+                {members.length} {members.length === 1 ? 'member' : 'members'}
+              </span>
             </div>
+
+            {/* Address: filled (pin + text + edit) or empty (dashed prompt) */}
             {household?.address ? (
-              <p className="text-sm text-cocoa flex items-center gap-1.5 mt-1 min-w-0">
-                <IconMapPin className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{household.address}</span>
-              </p>
+              <div className="flex items-start gap-2 mt-4">
+                <IconMapPin className="h-4 w-4 shrink-0 mt-0.5 text-[var(--ink-2)]" />
+                <span className="flex-1 text-sm text-warm-grey leading-snug">{household.address}</span>
+                {isAdmin && (
+                  <button type="button" onClick={openHouseholdEdit} aria-label="Edit home address" className="shrink-0 p-1 -m-1 text-[var(--ink-2)] hover:text-plum transition-colors">
+                    <IconEdit className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             ) : isAdmin ? (
               <button
                 type="button"
                 onClick={openHouseholdEdit}
-                className="text-sm text-plum hover:underline flex items-center gap-1.5 mt-1 whitespace-nowrap"
+                className="inline-flex items-center gap-2 mt-4 px-3.5 py-2 rounded-[10px] text-[13.5px] font-semibold text-plum transition-colors hover:bg-plum-light"
+                style={{ border: '1.5px dashed var(--color-light-grey)' }}
               >
-                <IconMapPin className="h-3.5 w-3.5 shrink-0" />
-                Add your home address
+                <IconMapPin className="h-4 w-4" /> Add your home address
               </button>
             ) : (
-              <p className="text-xs text-cocoa mt-1">No address set.</p>
-            )}
-            {/* Join code - full-width row under the address; nowrap keeps
-                the label and the code+Copy chip together on one line. */}
-            {household?.join_code && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-cocoa whitespace-nowrap">
-                <span>Join code</span>
-                <button
-                  type="button"
-                  onClick={handleCopyJoinCode}
-                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-cream-border hover:border-plum/40 transition-colors"
-                  style={{ background: '#faf9f7' }}
-                  title="Copy join code"
-                >
-                  <span className="font-semibold tracking-wider text-bark uppercase" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace', fontSize: 13 }}>
-                    {household.join_code}
-                  </span>
-                  <span className="text-cocoa text-xs">
-                    {joinCodeCopied ? 'Copied!' : 'Copy'}
-                  </span>
-                </button>
-              </div>
+              <p className="text-xs text-warm-grey mt-4">No address set.</p>
             )}
           </div>
         </div>
 
-        {!isAdmin && (
-          <p className="text-xs text-cocoa mt-3">Only admins can change household details.</p>
+        {/* Invite zone */}
+        {household?.join_code && (
+          <div
+            className="flex flex-col justify-center gap-3.5 px-5 py-[18px] sm:px-7 sm:py-[26px] sm:w-[296px] sm:shrink-0 border-t border-light-grey sm:border-t-0 sm:border-l"
+            style={{ background: SOFT }}
+          >
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-2)] mb-2">Invite code</div>
+              <div className="inline-flex items-center gap-3">
+                <span style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace', fontWeight: 700, fontSize: 24, letterSpacing: '0.18em', color: 'var(--color-charcoal)' }}>
+                  {household.join_code}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyJoinCode}
+                  aria-label="Copy invite code"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] text-[12.5px] font-semibold bg-white text-warm-grey transition-colors hover:border-plum/40"
+                  style={{ border: '1px solid var(--color-light-grey)' }}
+                >
+                  {joinCodeCopied ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-sage)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5" /></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M5 15V5.5A1.5 1.5 0 0 1 6.5 4H15" /></svg>
+                  )}
+                  {joinCodeCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <span aria-live="polite" className="sr-only">{joinCodeCopied ? 'Invite code copied' : ''}</span>
+            </div>
+            <p className="text-xs text-[var(--ink-2)] leading-snug m-0">New members enter this code to join your household.</p>
+          </div>
         )}
       </div>
+      {!isAdmin && (
+        <p className="text-xs text-warm-grey">Only admins can change household details.</p>
+      )}
 
       {/* Members - one card per household member (accounts), role pill
           distinguishes Admin / Parent. Edit + remove on hover. */}
