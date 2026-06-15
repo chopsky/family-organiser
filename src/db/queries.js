@@ -6066,6 +6066,29 @@ async function getDocuments(householdId, userId, folderId = null) {
   });
 }
 
+/**
+ * Newest documents across the WHOLE household (any folder), for the
+ * Documents page "Recently added" list. Unlike getDocuments (scoped to a
+ * single folder) this spans every folder and joins the folder name so the
+ * UI can show "{folder} · {size}". Private-folder docs stay hidden from
+ * non-creators - we over-fetch then filter, then trim to `limit`.
+ */
+async function getRecentDocuments(householdId, userId, limit = 8) {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*, folder:document_folders(id, name, visibility, created_by)')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(limit * 4);
+  if (error) throw error;
+
+  const visible = (data || []).filter((doc) => {
+    if (!doc.folder) return true; // root-level docs visible to all
+    return doc.folder.visibility === 'shared' || doc.folder.created_by === userId;
+  });
+  return visible.slice(0, limit);
+}
+
 async function getDocumentById(docId, householdId) {
   const { data, error } = await supabase
     .from('documents')
@@ -7221,6 +7244,7 @@ module.exports = {
   deleteDocumentFolder,
   createDocument,
   getDocuments,
+  getRecentDocuments,
   getDocumentById,
   updateDocument,
   deleteDocument,

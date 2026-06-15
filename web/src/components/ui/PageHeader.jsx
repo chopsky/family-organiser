@@ -1,0 +1,38 @@
+/**
+ * PageHeader - the opening block every redesigned desktop page shares:
+ * a brand-coloured kicker, a large Instrument Serif title, an optional
+ * subtitle, and right-aligned action buttons.
+ *
+ * Ported from the desktop design handoff and mapped to our theme tokens
+ * (plum kicker, charcoal title, warm-grey subtitle). Instrument Serif is
+ * loaded in web/index.html.
+ *
+ * Props:
+ *   kicker   - small uppercase line above the title (e.g. "12 files · 6 folders")
+ *   title    - the page title (serif)
+ *   subtitle - one-line description under the title
+ *   actions  - node(s) rendered top-right (usually PillBtn)
+ */
+export default function PageHeader({ kicker, title, subtitle, actions }) {
+  return (
+    <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
+      <div className="min-w-0">
+        {kicker && (
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
+            {kicker}
+          </div>
+        )}
+        <h1
+          className="m-0 text-[34px] md:text-[44px] leading-[1.05] font-normal text-charcoal"
+          style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.01em' }}
+        >
+          {title}
+        </h1>
+        {subtitle && (
+          <div className="text-sm text-warm-grey mt-1.5">{subtitle}</div>
+        )}
+      </div>
+      {actions && <div className="flex gap-2.5 shrink-0">{actions}</div>}
+    </div>
+  );
+}

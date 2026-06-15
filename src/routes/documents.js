@@ -180,6 +180,36 @@ router.get('/activity', requireAuth, requireHousehold, async (req, res) => {
 });
 
 /**
+ * GET /api/documents/recent?limit=N
+ * Newest files across the whole household (any folder), for the Documents
+ * page "Recently added" list. Each row carries its folder (id + name) so
+ * the UI can show "{folder} · {size}". Image rows get a signed preview URL.
+ */
+router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 8, 1), 24);
+    const docs = await db.getRecentDocuments(req.householdId, req.user.id, limit);
+
+    const withPreviews = await Promise.all(docs.map(async (doc) => {
+      if (doc.mime_type?.startsWith('image/')) {
+        try {
+          const preview_url = await r2.getSignedDownloadUrl(doc.file_path);
+          return { ...doc, preview_url };
+        } catch {
+          return doc;
+        }
+      }
+      return doc;
+    }));
+
+    return res.json(withPreviews);
+  } catch (err) {
+    console.error('GET /api/documents/recent error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/documents?folder_id=<uuid>
  * List documents in a folder (root if no folder_id).
  */

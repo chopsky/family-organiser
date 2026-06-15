@@ -23,19 +23,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import { hexFor } from '../lib/memberColors';
+import { ACTIVITY_ICONS, iconFor } from '../lib/activityIcons';
+import Avatar from './ui/Avatar';
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
-// color_theme -> hex (mirrors Tasks.jsx MEMBER_COLORS / the brand avatar
-// palette). Drives the tinted icon tile + glyph colour.
-const MEMBER_HEX = {
-  red: '#E25555', 'burnt-orange': '#E07A3A', amber: '#E8A040', gold: '#C5A833',
-  leaf: '#7BAE4E', emerald: '#3A9E6E', teal: '#3AADA0', sky: '#4A9FCC',
-  cobalt: '#3A6FD4', indigo: '#6558C7', purple: '#9050B5', magenta: '#C74E95',
-  rose: '#E06888', terracotta: '#C47A5E', moss: '#7C8A6E', slate: '#7A8694',
-  coral: '#E8724A', plum: '#6B3FA0', sage: '#7DAE82',
-};
-const hexFor = (m) => MEMBER_HEX[m?.color_theme] || '#7DAE82';
 
 const INK = '#1A1620';
 const INK2 = '#4A4453';
@@ -43,57 +35,9 @@ const INK3 = '#8A8493';
 const BRAND = 'var(--color-plum)';
 const SOFT = '#F3EEE5';
 
-// ── Activity glyphs (line icons, 24px viewBox, 1.7px stroke) ──
-const wrap = (children, p) => (
-  <svg width={p.size || 20} height={p.size || 20} viewBox="0 0 24 24" fill="none" stroke={p.color || 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
-);
-const AS_ICONS = {
-  ball: (p = {}) => wrap(<><circle cx="12" cy="12" r="9" /><path d="M12 3l2.6 4.5h-5.2L12 3zM3.3 9.6l4.8.6 1.6 5-4 2.6-2.4-8.2zM20.7 9.6l-2.4 8.2-4-2.6 1.6-5 4.8-.6zM8.5 19.5L12 16l3.5 3.5" /></>, p),
-  tennis: (p = {}) => wrap(<><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6a13 13 0 0 0 0 12.8M18.4 5.6a13 13 0 0 1 0 12.8" /></>, p),
-  art: (p = {}) => wrap(<><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-1 2-2 0-1.4-1-1.6-1-2.8 0-.8.7-1.2 1.6-1.2H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z" /><circle cx="7.5" cy="11" r="1" /><circle cx="11" cy="7.5" r="1" /><circle cx="15.5" cy="8.5" r="1" /></>, p),
-  ballet: (p = {}) => wrap(<><circle cx="12" cy="4.5" r="2" /><path d="M12 7v6M12 13l-4 8M12 13l4 8M7 10l5 3 5-3" /></>, p),
-  code: (p = {}) => wrap(<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />, p),
-  swim: (p = {}) => wrap(<><circle cx="15" cy="7" r="2" /><path d="M5 13l4-2.5 3 2 2.5-1.5M3 17.5c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M8.5 11.5L12 8l-2-1.5" /></>, p),
-  music: (p = {}) => wrap(<><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M9 17.5V6l11-2v9.5" /><path d="M9 9l11-2" /></>, p),
-  gym: (p = {}) => wrap(<path d="M2 9v6M5 7v10M19 7v10M22 9v6M5 12h14" />, p),
-  // chef's hat - cooking / baking
-  chef: (p = {}) => wrap(<><path d="M6 13.5h12V18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-4.5z" /><path d="M6 13.5a3 3 0 0 1-.8-5.9A3.5 3.5 0 0 1 12 6a3.5 3.5 0 0 1 6.8 1.6 3 3 0 0 1-.8 5.9" /></>, p),
-  // generic fallback
-  star: (p = {}) => wrap(<path d="M12 3l2.5 5.6 6 .6-4.5 4 1.3 6L12 16.8 6.7 19.2l1.3-6-4.5-4 6-.6L12 3z" />, p),
-};
-
-// Map a free-text activity name to a glyph key.
-function iconFor(name) {
-  const n = (name || '').toLowerCase();
-  if (/foot|soccer|rugby|netball|hockey|cricket|\bball\b/.test(n)) return 'ball';
-  if (/tennis|badminton|squash/.test(n)) return 'tennis';
-  if (/art|paint|draw|craft|pottery/.test(n)) return 'art';
-  if (/ballet|dance|dancing/.test(n)) return 'ballet';
-  if (/cod(e|ing)|computer|ict|programming|robot/.test(n)) return 'code';
-  if (/swim|water polo|diving/.test(n)) return 'swim';
-  if (/choir|music|sing|band|orchestra|instrument/.test(n)) return 'music';
-  if (/cook|bak(e|ing)|chef|cuisine|culinary|food/.test(n)) return 'chef';
-  if (/gym|\bpe\b|sport|athletic|fitness/.test(n)) return 'gym';
-  return 'star';
-}
-
 function timeOf(a) {
   const t = a.time_start || a.time_end || null;
   return t ? t.substring(0, 5) : '';
-}
-
-function Avatar({ member, size = 26 }) {
-  if (!member) return null;
-  if (member.avatar_url) {
-    return <img src={member.avatar_url} alt={member.name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
-  }
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', background: hexFor(member), color: '#fff',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontWeight: 600, fontSize: size * 0.42, letterSpacing: -0.2, flexShrink: 0,
-    }}>{member.name?.[0]?.toUpperCase()}</div>
-  );
 }
 
 export default function AfterSchoolCard({ members = [] }) {
@@ -200,7 +144,7 @@ export default function AfterSchoolCard({ members = [] }) {
             const kid = memberById[a.child_id];
             const picker = a.pickup_member_id ? memberById[a.pickup_member_id] : null;
             const kidColor = hexFor(kid);
-            const Icon = AS_ICONS[iconFor(a.activity)] || AS_ICONS.star;
+            const Icon = ACTIVITY_ICONS[iconFor(a.activity)] || ACTIVITY_ICONS.star;
             // Show start over end as a compact two-line range. Falls back to
             // whichever single time exists (start preferred) when only one is
             // set, so a club with no end time still reads cleanly.
