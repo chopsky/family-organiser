@@ -26,7 +26,7 @@ function Sparkle({ className = 'h-3.5 w-3.5' }) {
 
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack'];
 // Meal plan shows only the daily meal slots - desserts stay in the Recipes library
-const PLAN_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const PLAN_CATEGORIES = ['Breakfast', 'Lunch', 'Snack', 'Dinner'];
 const CATEGORY_COLOURS_MAP = {
   breakfast: { bg: 'bg-[#F5CBA7]', text: 'text-[#8B5E2B]', light: 'bg-[#F5CBA7]/20', border: 'border-[#F5CBA7]' },
   lunch:     { bg: 'bg-[#A9DFBF]', text: 'text-[#2E7D46]', light: 'bg-[#A9DFBF]/20', border: 'border-[#A9DFBF]' },
@@ -601,7 +601,6 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               the printed sheet via no-print. */}
           <div className="flex flex-wrap items-center justify-between gap-3 no-print">
             <div className="flex flex-wrap gap-2.5">
-              <PillBtn onClick={onSwitchToRecipes} icon={<IconUtensils className="h-3.5 w-3.5" />}>Recipe box</PillBtn>
               <PillBtn onClick={addWeekToShoppingList} icon={<IconCart className="h-3.5 w-3.5" />}>Add to shopping list</PillBtn>
               <PillBtn primary onClick={suggestMeals} icon={<Sparkle />}>Plan with AI</PillBtn>
             </div>
@@ -1335,11 +1334,11 @@ function RecipeBoxView({ setError }) {
                 <button
                   key={recipe.id}
                   onClick={() => setDetailRecipe(recipe)}
-                  className="bg-white rounded-[14px] border border-light-grey overflow-hidden text-left transition-transform"
+                  className="flex flex-col bg-white rounded-[14px] border border-light-grey overflow-hidden text-left transition-transform"
                   onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(26,22,32,0.08)'; }}
                   onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
-                  <div className="relative flex items-center justify-center" style={{ height: 110, background: c.bg }}>
+                  <div className="relative shrink-0 flex items-center justify-center" style={{ height: 110, background: c.bg }}>
                     <span style={{ fontFamily: '"Instrument Serif", serif', fontSize: 40, color: 'rgba(0,0,0,0.15)' }}>
                       {recipe.name?.charAt(0)?.toUpperCase()}
                     </span>
