@@ -2235,14 +2235,14 @@ export default function FamilySetup() {
               <span className="w-[46px] shrink-0 text-center py-[5px] rounded-lg text-[11px] font-bold tracking-[0.04em] text-warm-grey" style={{ background: SOFT }}>
                 {dayLabel}
               </span>
-              <span className="w-[38px] h-[38px] rounded-[11px] shrink-0 flex items-center justify-center" style={{ background: kidColor + '1F' }}>
+              <span className="w-[35px] h-[35px] rounded-[11px] shrink-0 flex items-center justify-center" style={{ background: kidColor + '1F' }}>
                 <Glyph size={20} color={kidColor} />
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-semibold text-charcoal truncate">{a.activity}</span>
                 {dim && a.term_label && <span className="block text-xs text-warm-grey truncate">{a.term_label}</span>}
               </span>
-              {time && <span className="text-[13px] font-semibold text-warm-grey shrink-0 whitespace-nowrap" style={{ fontVariantNumeric: 'tabular-nums' }}>{time}</span>}
+              {time && <span className="text-[12px] font-semibold text-warm-grey shrink-0 whitespace-nowrap" style={{ fontVariantNumeric: 'tabular-nums' }}>{time}</span>}
               {pickup && (
                 <span className="flex items-center gap-2 pl-3 shrink-0" style={{ borderLeft: '1px solid var(--color-light-grey)' }}>
                   <PickupCar className="h-3.5 w-3.5 text-warm-grey" />
