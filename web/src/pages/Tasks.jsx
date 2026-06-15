@@ -340,6 +340,9 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
   const avatarColor = MEMBER_COLORS[colorTheme] || '#7A8694';
   const displayName = name || member?.name || 'Anyone';
   const initial = displayName.charAt(0).toUpperCase();
+  // Fall back to the initial if the photo URL fails to load (keyed on the URL
+  // so a re-upload retries instead of staying stuck on the fallback).
+  const [avatarErrUrl, setAvatarErrUrl] = useState(null);
 
   return (
     <div
@@ -355,10 +358,11 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
     >
       {/* Column header */}
       <div className="flex items-center gap-2.5" style={{ padding: '4px 4px 6px' }}>
-        {member?.avatar_url ? (
+        {member?.avatar_url && avatarErrUrl !== member.avatar_url ? (
           <img
             src={member.avatar_url}
             alt=""
+            onError={() => setAvatarErrUrl(member.avatar_url)}
             className="shrink-0 rounded-full object-cover"
             style={{ width: 45, height: 45, border: '2px solid #fff' }}
           />

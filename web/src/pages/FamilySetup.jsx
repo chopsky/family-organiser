@@ -364,6 +364,9 @@ export default function FamilySetup() {
   // loading state on the household photo without colliding with a
   // simultaneous member-profile upload.
   const [uploadingHouseholdAvatar, setUploadingHouseholdAvatar] = useState(false);
+  // Household photo URL that failed to load - falls back to the placeholder
+  // instead of a broken-image icon. Keyed on the URL so a re-upload retries.
+  const [householdPhotoErrUrl, setHouseholdPhotoErrUrl] = useState(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSchoolId, setProfileSchoolId] = useState(null);
   // Edit-modal mirror of the add-dependent flow's `depAttendsSchool` toggle.
@@ -1798,10 +1801,11 @@ export default function FamilySetup() {
             aria-label={isAdmin ? 'Upload a family photo' : 'Family photo'}
             title={isAdmin ? 'Upload a family photo' : ''}
           >
-            {household?.avatar_url ? (
+            {household?.avatar_url && householdPhotoErrUrl !== household.avatar_url ? (
               <img
                 src={household.avatar_url}
                 alt=""
+                onError={() => setHouseholdPhotoErrUrl(household.avatar_url)}
                 className={`w-[76px] h-[76px] sm:w-[104px] sm:h-[104px] object-cover transition-opacity ${uploadingHouseholdAvatar ? 'opacity-60' : ''}`}
               />
             ) : (
@@ -1828,25 +1832,13 @@ export default function FamilySetup() {
             <div className="flex items-center gap-3">
               <div className="flex" role="img" aria-label={`${members.length} member${members.length === 1 ? '' : 's'}: ${members.map(m => m.name).join(', ')}`}>
                 {members.slice(0, 5).map((m, i) => (
-                  m.avatar_url ? (
-                    <img
-                      key={m.id}
-                      src={m.avatar_url}
-                      alt=""
-                      aria-hidden="true"
-                      className="rounded-full object-cover"
-                      style={{ width: 32, height: 32, border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
-                    />
-                  ) : (
-                    <span
-                      key={m.id}
-                      aria-hidden="true"
-                      className="rounded-full flex items-center justify-center text-white"
-                      style={{ width: 32, height: 32, fontSize: 13, fontWeight: 600, background: hexFor(m), border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
-                    >
-                      {m.name?.[0]?.toUpperCase()}
-                    </span>
-                  )
+                  <Avatar
+                    key={m.id}
+                    member={m}
+                    size={32}
+                    className="object-cover"
+                    style={{ border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
+                  />
                 ))}
               </div>
               <span className="text-[15px] font-semibold text-charcoal">

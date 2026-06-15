@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { hexFor } from '../../lib/memberColors';
 
 /**
@@ -12,6 +13,11 @@ import { hexFor } from '../../lib/memberColors';
  *   className / style - merged onto the root
  */
 export default function Avatar({ member, size = 40, className = '', style = {} }) {
+  // Track the URL that failed to load so a broken photo falls back to the
+  // coloured initial instead of the browser's broken-image icon. Keyed on the
+  // URL (not a boolean) so a later re-upload - a new URL - is retried rather
+  // than staying stuck on the fallback.
+  const [erroredUrl, setErroredUrl] = useState(null);
   if (!member) return null;
 
   const base = {
@@ -22,13 +28,14 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
     ...style,
   };
 
-  if (member.avatar_url) {
+  if (member.avatar_url && erroredUrl !== member.avatar_url) {
     return (
       <img
         src={member.avatar_url}
         alt={member.name || ''}
         className={className}
         style={{ ...base, objectFit: 'cover' }}
+        onError={() => setErroredUrl(member.avatar_url)}
       />
     );
   }
