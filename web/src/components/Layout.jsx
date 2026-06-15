@@ -13,22 +13,28 @@ import { syncDeviceCalendarsQuietly } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
-const mainNav = [
-  { to: '/dashboard',  label: 'Home',     Icon: IconHome     },
-  { to: '/shopping',   label: 'Shopping',  Icon: IconCart      },
-  { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
-  { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
-  { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
-  { to: '/receipt',    label: 'Receipts',  Icon: IconCamera    },
-  { to: '/documents',  label: 'Documents', Icon: IconFileText  },
-];
-
-// Household / account group - rendered below a thin divider in the
-// desktop sidebar, set apart from the everyday tools above.
-const accountNav = [
-  { to: '/family',     label: 'Family Setup', Icon: IconUsers    },
-  { to: '/help',       label: 'Help Centre', Icon: IconHelp      },
-  { to: '/settings',   label: 'Settings',    Icon: IconSettings  },
+// Desktop sidebar nav, split into labelled groups (the "Grouped" design).
+// Mobile uses its own arrays (mobileNav / moreNav / moreTiles) below - this
+// only drives the desktop <aside>.
+const navGroups = [
+  { label: 'Overview', items: [
+    { to: '/dashboard', label: 'Home', Icon: IconHome },
+  ] },
+  { label: 'Plan', items: [
+    { to: '/calendar', label: 'Calendar',  Icon: IconCalendar },
+    { to: '/tasks',    label: 'Tasks',     Icon: IconCheck    },
+    { to: '/meals',    label: 'Meal Plan', Icon: IconUtensils },
+    { to: '/shopping', label: 'Shopping',  Icon: IconCart     },
+  ] },
+  { label: 'Household', items: [
+    { to: '/receipt',   label: 'Receipts',  Icon: IconCamera   },
+    { to: '/documents', label: 'Documents', Icon: IconFileText },
+    { to: '/family',    label: 'Family',    Icon: IconUsers    },
+  ] },
+  { label: 'Account', items: [
+    { to: '/help',     label: 'Help',     Icon: IconHelp     },
+    { to: '/settings', label: 'Settings', Icon: IconSettings },
+  ] },
 ];
 
 // Mobile bottom-tab order from the iOS design handoff: Home · Calendar ·
@@ -235,14 +241,18 @@ export default function Layout({ children }) {
         key={to}
         to={to}
         className={({ isActive }) =>
-          `flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-150 ${
+          `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-sm transition-colors duration-150 ${
             isActive
-              ? 'bg-plum-light text-plum'
-              : 'text-warm-grey hover:bg-cream hover:text-charcoal'
+              ? 'text-white font-semibold'
+              : 'font-medium text-warm-grey hover:bg-[#F3EEE5] hover:text-charcoal'
           }`
         }
+        style={({ isActive }) => (isActive
+          ? { background: 'var(--color-plum)', boxShadow: '0 2px 8px rgba(109,56,173,0.3)' }
+          : undefined)}
       >
-        <Icon className="h-5 w-5" />
+        {/* Icon inherits currentColor: white when active, warm-grey otherwise. */}
+        <Icon className="h-[18px] w-[18px]" />
         {label}
       </NavLink>
     );
@@ -259,15 +269,18 @@ export default function Layout({ children }) {
           <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
         </div>
 
-        {/* Household pill */}
-        {/* Main nav */}
-        <nav className="flex-1 px-3 flex flex-col gap-0.5">
-          {mainNav.map(renderNavLink)}
-          {/* Account group anchored to the bottom of the sidebar (mt-auto),
-              set apart from the everyday tools by the empty space above. */}
-          <div className="mt-auto flex flex-col gap-0.5 pb-3">
-            {accountNav.map(renderNavLink)}
-          </div>
+        {/* Grouped nav - labelled sections; active item is a solid-brand pill. */}
+        <nav className="flex-1 px-3 flex flex-col gap-[18px] overflow-y-auto">
+          {navGroups.map((g) => (
+            <div key={g.label}>
+              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-2)]">
+                {g.label}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {g.items.map(renderNavLink)}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User footer - top border uses a warmer grey than the global
