@@ -355,12 +355,21 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
     >
       {/* Column header */}
       <div className="flex items-center gap-2.5" style={{ padding: '4px 4px 6px' }}>
-        <div
-          className="shrink-0 flex items-center justify-center"
-          style={{ width: 32, height: 32, borderRadius: '50%', background: avatarColor, color: '#fff', fontSize: 14, fontWeight: 600, border: '2px solid #fff' }}
-        >
-          {initial}
-        </div>
+        {member?.avatar_url ? (
+          <img
+            src={member.avatar_url}
+            alt=""
+            className="shrink-0 rounded-full object-cover"
+            style={{ width: 40, height: 40, border: '2px solid #fff' }}
+          />
+        ) : (
+          <div
+            className="shrink-0 flex items-center justify-center"
+            style={{ width: 40, height: 40, borderRadius: '50%', background: avatarColor, color: '#fff', fontSize: 16, fontWeight: 600, border: '2px solid #fff' }}
+          >
+            {initial}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="truncate" style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-charcoal)' }}>{displayName}</div>
           <div style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)' }}>

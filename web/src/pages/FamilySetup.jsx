@@ -1829,14 +1829,25 @@ export default function FamilySetup() {
             <div className="flex items-center gap-3">
               <div className="flex" role="img" aria-label={`${members.length} member${members.length === 1 ? '' : 's'}: ${members.map(m => m.name).join(', ')}`}>
                 {members.slice(0, 5).map((m, i) => (
-                  <span
-                    key={m.id}
-                    aria-hidden="true"
-                    className="rounded-full flex items-center justify-center text-white"
-                    style={{ width: 32, height: 32, fontSize: 13, fontWeight: 600, background: hexFor(m), border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
-                  >
-                    {m.name?.[0]?.toUpperCase()}
-                  </span>
+                  m.avatar_url ? (
+                    <img
+                      key={m.id}
+                      src={m.avatar_url}
+                      alt=""
+                      aria-hidden="true"
+                      className="rounded-full object-cover"
+                      style={{ width: 32, height: 32, border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
+                    />
+                  ) : (
+                    <span
+                      key={m.id}
+                      aria-hidden="true"
+                      className="rounded-full flex items-center justify-center text-white"
+                      style={{ width: 32, height: 32, fontSize: 13, fontWeight: 600, background: hexFor(m), border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
+                    >
+                      {m.name?.[0]?.toUpperCase()}
+                    </span>
+                  )
                 ))}
               </div>
               <span className="text-[15px] font-semibold text-charcoal">
