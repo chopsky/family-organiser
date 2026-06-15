@@ -7,6 +7,10 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconCheck, IconPlus, IconTrash } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
+import PageHeader from '../components/ui/PageHeader';
+import PillBtn from '../components/ui/PillBtn';
+import Segmented from '../components/ui/Segmented';
+import Avatar from '../components/ui/Avatar';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
@@ -28,14 +32,6 @@ const NOTIFICATION_OPTIONS = [
   { value: '2_days', label: '2 days before' },
 ];
 
-const COLOR_TINTS = {
-  red: '#FDF0EB', 'burnt-orange': '#FDF0EB', amber: '#FFF6E9', gold: '#FFF6E9',
-  leaf: '#EDF5EE', emerald: '#EDF5EE', teal: '#E6F5F3', sky: '#E6F1FB',
-  cobalt: '#E6F1FB', indigo: '#F3EDFC', purple: '#F3EDFC', magenta: '#FDF0EB',
-  rose: '#FDF0EB', terracotta: '#FDF0EB', moss: '#EDF5EE', slate: '#F0F0F2',
-  coral: '#FDF0EB', plum: '#F3EDFC', sage: '#EDF5EE',
-};
-
 const MEMBER_COLORS = {
   red: '#E25555', 'burnt-orange': '#E07A3A', amber: '#E8A040', gold: '#C5A833',
   leaf: '#7BAE4E', emerald: '#3A9E6E', teal: '#3AADA0', sky: '#4A9FCC',
@@ -45,11 +41,23 @@ const MEMBER_COLORS = {
 };
 
 const PRIORITY_COLORS = { high: '#E24B4A', medium: '#E0A458', low: '#7DAE82' };
+const PRIORITY_LABELS = { high: 'High', medium: 'Medium', low: 'Low' };
+
+// Soft warm sand for column backgrounds / inset chips (the design's
+// --bg-app-soft); shared literal across the redesigned pages.
+const SOFT = '#F3EEE5';
+const CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
 
 /* ─── Helpers ─── */
 
 function today() {
   return new Date().toISOString().split('T')[0];
+}
+
+function tomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
 }
 
 function getDueBadge(task) {
@@ -142,16 +150,18 @@ function useMediaQuery(query) {
 
 /* ─── TaskCard Component ─── */
 
-function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId, onEdit, onDelete, deleting, onRestore, restoring, isMobile }) {
+function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId, onEdit, onDelete, deleting, onRestore, restoring }) {
   const badge = getDueBadge(task);
   const menuRef = useRef(null);
 
   return (
     <div className="relative group">
       <div
-        className="bg-white flex items-start gap-2.5 p-3"
-        style={{ borderRadius: 12, padding: '12px 14px', cursor: completed ? 'default' : 'pointer' }}
+        className="bg-white flex items-start gap-2.5 p-3 transition-shadow"
+        style={{ borderRadius: 12, padding: '12px 14px', border: '1px solid var(--color-light-grey)', cursor: completed ? 'default' : 'pointer' }}
         onClick={() => !completed && onEdit(task)}
+        onMouseEnter={(e) => { if (!completed) e.currentTarget.style.boxShadow = '0 4px 12px rgba(26,22,32,0.08)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
       >
         {/* Checkbox */}
         <button
@@ -159,12 +169,12 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
           disabled={toggling?.has(task.id) || restoring?.has(task.id)}
           className="mt-0.5 shrink-0 flex items-center justify-center transition-colors cursor-pointer"
           style={{
-            width: 20,
-            height: 20,
-            borderRadius: 6,
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
             border: completed ? 'none' : '2px solid var(--light-grey, #E8E5EC)',
-            background: completed ? 'var(--sage, #7DAE82)' : 'transparent',
-            opacity: completed ? 0.5 : 1,
+            background: completed ? 'var(--plum, #6B3FA0)' : 'transparent',
+            opacity: completed ? 0.6 : 1,
           }}
         >
           {completed && <CheckmarkSVG />}
@@ -203,14 +213,13 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
                 </span>
               )}
               {task.priority && (
-                <span
-                  className="inline-block rounded-full"
-                  style={{
-                    width: 7,
-                    height: 7,
-                    background: PRIORITY_COLORS[task.priority] || 'transparent',
-                  }}
-                />
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="inline-block rounded-full"
+                    style={{ width: 6, height: 6, background: PRIORITY_COLORS[task.priority] || 'transparent' }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)' }}>{PRIORITY_LABELS[task.priority]}</span>
+                </span>
               )}
               {task.notification && (
                 <span className="text-[var(--warm-grey,#6B6774)]" title={notificationLabel(task.notification)}>
@@ -326,13 +335,11 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
 
 /* ─── MemberColumn Component ─── */
 
-function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onToggle, toggling, openMenuId, onOpenMenu, onEdit, onDelete, deleting, onRestore, restoring, isMobile }) {
-  const colorTheme = member?.color_theme || 'plum';
-  const bgTint = COLOR_TINTS[colorTheme] || '#F3EDFC';
-  const avatarColor = MEMBER_COLORS[colorTheme] || '#6B3FA0';
-  const initial = (member?.name || 'U').charAt(0).toUpperCase();
-  const displayName = member?.name || 'Anyone';
-  const totalCount = incompleteTasks.length;
+function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle, toggling, openMenuId, onOpenMenu, onEdit, onDelete, deleting, onRestore, restoring, isMobile }) {
+  const colorTheme = member?.color_theme || 'slate';
+  const avatarColor = MEMBER_COLORS[colorTheme] || '#7A8694';
+  const displayName = name || member?.name || 'Anyone';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <div
@@ -340,36 +347,24 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
       style={{
         minWidth: isMobile ? '100%' : 300,
         width: isMobile ? '100%' : 300,
-        background: bgTint,
+        background: SOFT,
         borderRadius: 16,
-        padding: 16,
+        padding: 14,
         gap: 10,
       }}
     >
       {/* Column header */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5" style={{ padding: '4px 4px 6px' }}>
         <div
           className="shrink-0 flex items-center justify-center"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background: avatarColor,
-            color: '#fff',
-            fontSize: 15,
-            fontWeight: 600,
-            fontFamily: 'var(--font-sans, system-ui, sans-serif)',
-            border: '2px solid #fff',
-          }}
+          style={{ width: 32, height: 32, borderRadius: '50%', background: avatarColor, color: '#fff', fontSize: 14, fontWeight: 600, border: '2px solid #fff' }}
         >
           {initial}
         </div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-display, "Instrument Serif", serif)', color: 'var(--charcoal, #2D2A33)', letterSpacing: '-0.02em' }}>
-            {displayName}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
-            {totalCount} task{totalCount !== 1 ? 's' : ''}
+        <div className="flex-1 min-w-0">
+          <div className="truncate" style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-charcoal)' }}>{displayName}</div>
+          <div style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)' }}>
+            {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
           </div>
         </div>
       </div>
@@ -378,34 +373,21 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
       <button
         onClick={onAddTask}
         className="w-full flex items-center justify-center gap-1.5 py-2.5 transition-colors"
-        style={{
-          border: '1.5px dashed var(--light-grey, #E8E5EC)',
-          borderRadius: 10,
-          background: 'transparent',
-          fontSize: 12,
-          fontWeight: 600,
-          color: 'var(--warm-grey, #6B6774)',
-          cursor: 'pointer',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--plum, #6B3FA0)';
-          e.currentTarget.style.color = 'var(--plum, #6B3FA0)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--light-grey, #E8E5EC)';
-          e.currentTarget.style.color = 'var(--warm-grey, #6B6774)';
-        }}
+        style={{ border: '1px dashed var(--color-light-grey)', borderRadius: 10, background: '#fff', fontSize: 13, fontWeight: 500, color: 'var(--warm-grey, #6B6774)', cursor: 'pointer' }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--plum, #6B3FA0)'; e.currentTarget.style.color = 'var(--plum, #6B3FA0)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-light-grey)'; e.currentTarget.style.color = 'var(--warm-grey, #6B6774)'; }}
       >
         <IconPlus className="h-3.5 w-3.5" /> Add a task
       </button>
 
-      {/* Incomplete tasks */}
-      <div className="flex flex-col gap-2">
-        {incompleteTasks.map((task) => (
+      {/* Task cards - a single bucket (the active filter): incomplete cards
+          under the date filters, completed cards under "Complete". */}
+      <div className="flex flex-col gap-2.5">
+        {tasks.map((task) => (
           <TaskCard
             key={task.id}
             task={task}
-            completed={false}
+            completed={viewCompleted}
             onToggle={onToggle}
             toggling={toggling}
             openMenuId={openMenuId}
@@ -413,42 +395,102 @@ function MemberColumn({ member, incompleteTasks, completedTasks, onAddTask, onTo
             onEdit={onEdit}
             onDelete={onDelete}
             deleting={deleting}
+            onRestore={onRestore}
+            restoring={restoring}
             isMobile={isMobile}
           />
         ))}
       </div>
+    </div>
+  );
+}
 
-      {/* Completed divider + tasks */}
-      {completedTasks.length > 0 && (
-        <>
-          <div className="flex items-center gap-2 my-1">
-            <div className="flex-1" style={{ height: 1, background: 'var(--light-grey, #E8E5EC)' }} />
-            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--warm-grey, #6B6774)' }}>
-              Done &middot; {completedTasks.length}
-            </span>
-            <div className="flex-1" style={{ height: 1, background: 'var(--light-grey, #E8E5EC)' }} />
+/* ─── List view (time-grouped) ─── */
+
+// A single column, tasks grouped into Overdue → Today → Tomorrow → Upcoming →
+// Completed (a section is omitted when empty), derived from real due dates.
+function TasksListView({
+  tasks, recentDone, members, isOverdue, isToday, isTomorrow,
+  onToggle, toggling, onEdit, onDelete, deleting, onRestore, restoring, onAdd,
+}) {
+  const memberByName = (name) => members.find((m) => m.name === name) || null;
+  const firstAssignee = (t) => {
+    const names = Array.isArray(t.assigned_to_names) && t.assigned_to_names.length
+      ? t.assigned_to_names.filter(Boolean)
+      : (t.assigned_to_name ? [t.assigned_to_name] : []);
+    return names.length ? memberByName(names[0]) : null;
+  };
+  const byDue = (a, b) => (a.due_date || '').localeCompare(b.due_date || '');
+
+  const buckets = [
+    { k: 'overdue',  label: 'Overdue',   accent: '#A04257',              items: tasks.filter(isOverdue).sort(byDue) },
+    { k: 'today',    label: 'Today',     accent: 'var(--color-plum)',    items: tasks.filter(isToday).sort(byDue) },
+    { k: 'tomorrow', label: 'Tomorrow',  accent: 'var(--color-warm-grey)', items: tasks.filter(isTomorrow).sort(byDue) },
+    { k: 'upcoming', label: 'Upcoming',  accent: 'var(--color-warm-grey)', items: tasks.filter((t) => !isToday(t) && !isTomorrow(t) && !isOverdue(t)).sort(byDue) },
+    { k: 'done',     label: 'Completed', accent: 'var(--color-sage)',    items: recentDone },
+  ];
+
+  return (
+    <div style={{ maxWidth: 760 }} className="flex flex-col gap-6">
+      {buckets.map((b) => b.items.length === 0 ? null : (
+        <div key={b.k}>
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="rounded-full" style={{ width: 8, height: 8, background: b.accent }} />
+            <h2 className="m-0 text-sm font-bold text-charcoal">{b.label}</h2>
+            <span className="text-xs font-semibold text-warm-grey">{b.items.length}</span>
           </div>
-          <div className="flex flex-col gap-2">
-            {completedTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                completed={true}
-                onToggle={onToggle}
-                toggling={toggling}
-                openMenuId={openMenuId}
-                onOpenMenu={onOpenMenu}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                deleting={deleting}
-                onRestore={onRestore}
-                restoring={restoring}
-                isMobile={isMobile}
-              />
-            ))}
+          <div className="bg-white rounded-2xl border border-light-grey overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+            {b.items.map((t, i) => {
+              const done = b.k === 'done';
+              const od = isOverdue(t);
+              const m = firstAssignee(t);
+              const badge = getDueBadge(t);
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3.5 px-4 py-3.5 transition-colors"
+                  style={{ borderBottom: i < b.items.length - 1 ? '1px solid var(--color-light-grey)' : 'none' }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = SOFT; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <button
+                    onClick={() => (done ? onRestore(t) : onToggle(t))}
+                    disabled={toggling?.has(t.id) || restoring?.has(t.id)}
+                    aria-label={done ? `Restore ${t.title}` : `Complete ${t.title}`}
+                    className="shrink-0 flex items-center justify-center rounded-full"
+                    style={{ width: 22, height: 22, border: done ? 'none' : '2px solid var(--color-light-grey)', background: done ? 'var(--color-plum)' : 'transparent', opacity: done ? 0.6 : 1, cursor: 'pointer' }}
+                  >
+                    {done && <CheckmarkSVG />}
+                  </button>
+                  <button onClick={() => !done && onEdit(t)} className="flex-1 min-w-0 text-left" style={{ cursor: done ? 'default' : 'pointer' }}>
+                    <span className="block truncate" style={{ fontSize: 14, fontWeight: 600, color: done ? 'var(--color-warm-grey)' : 'var(--color-charcoal)', textDecoration: done ? 'line-through' : 'none' }}>{t.title}</span>
+                  </button>
+                  {t.priority && (
+                    <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap" style={{ fontSize: 12, color: 'var(--warm-grey, #6B6774)' }}>
+                      <span className="rounded-full" style={{ width: 6, height: 6, background: PRIORITY_COLORS[t.priority] }} />
+                      {PRIORITY_LABELS[t.priority]}
+                    </span>
+                  )}
+                  {badge && (
+                    <span className="shrink-0 text-center" style={{ width: 86, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '4px 0', borderRadius: 7, background: od ? '#FBE6EA' : SOFT, color: od ? '#A04257' : 'var(--color-warm-grey)' }}>{badge.label}</span>
+                  )}
+                  {m
+                    ? <Avatar member={m} size={26} />
+                    : <div className="shrink-0 rounded-full" style={{ width: 26, height: 26, border: '1.5px dashed var(--color-light-grey)' }} title="Anyone" />}
+                  {done && (
+                    <button onClick={() => onDelete(t)} disabled={deleting?.has(t.id)} aria-label={`Delete ${t.title}`} className="shrink-0 p-1.5 rounded-lg text-warm-grey hover:text-coral hover:bg-coral-light transition-colors disabled:opacity-50">
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </>
-      )}
+        </div>
+      ))}
+      <button onClick={onAdd} className="self-start inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-light-grey text-warm-grey text-sm font-semibold hover:border-plum/40 hover:text-plum transition-colors">
+        <IconPlus className="h-3.5 w-3.5" /> Add a task
+      </button>
     </div>
   );
 }
@@ -468,8 +510,16 @@ export default function Tasks() {
   const [members, setMembers] = useState([]);
 
   // UI state
-  // Date-scope filter for active tasks. Default 'all'.
-  const [scope, setScope] = useState('all'); // 'all' | 'overdue' | 'today' | 'upcoming'
+  // Board-view filter. 'all' | 'today' | 'upcoming' | 'overdue' | 'complete'.
+  const [filter, setFilter] = useState('all');
+  // Board vs List view - persisted across visits.
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem('tasksView') === 'list' ? 'list' : 'board'; } catch { return 'board'; }
+  });
+  const setViewPersist = (v) => {
+    setView(v);
+    try { localStorage.setItem('tasksView', v); } catch { /* ignore */ }
+  };
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -564,9 +614,10 @@ export default function Tasks() {
 
   const load = useCallback(async () => {
     try {
-      // Always fetch active tasks; the date scope is filtered client-side so
-      // switching chips is instant and the counts are always accurate.
-      const params = {};
+      // Fetch ALL incomplete tasks (all=true), not just today+overdue, so the
+      // client-side filter buckets (incl. Upcoming) and their live counts are
+      // accurate. Filtering happens client-side so switching is instant.
+      const params = { all: true };
       const tasksKey = 'tasks:active';
       await Promise.all([
         loadCached(
@@ -635,68 +686,71 @@ export default function Tasks() {
     return () => document.removeEventListener('click', handler);
   }, [openMenuId]);
 
-  /* ─ Group tasks by member ─ */
+  /* ─ Filter buckets (derived from real due dates) ─ */
 
-  // Classify an active task by its due date relative to today.
   const _td = today();
-  function taskScope(t) {
-    if (!t.due_date) return 'none';      // undated -> only counted under "All"
-    if (t.due_date < _td) return 'overdue';
-    if (t.due_date === _td) return 'today';
-    return 'upcoming';
-  }
-  function inScope(t) {
-    if (scope === 'all') return true;
-    return taskScope(t) === scope;
+  const _tm = tomorrow();
+  const isOverdue = (t) => !!t.due_date && t.due_date < _td;
+  const isToday = (t) => t.due_date === _td;
+  const isTomorrow = (t) => t.due_date === _tm;
+
+  // Live counts for the segmented filter. Incomplete buckets come from
+  // `tasks` (all incomplete); Complete is the 7-day `recentDone` list.
+  const counts = {
+    all: tasks.length,
+    today: tasks.filter(isToday).length,
+    upcoming: tasks.filter((t) => !isToday(t) && !isOverdue(t)).length,
+    overdue: tasks.filter(isOverdue).length,
+    complete: recentDone.length,
+  };
+
+  function matchesFilter(t) {
+    switch (filter) {
+      case 'today':    return isToday(t);
+      case 'upcoming': return !isToday(t) && !isOverdue(t);
+      case 'overdue':  return isOverdue(t);
+      default:         return true; // 'all'
+    }
   }
 
+  const viewCompleted = filter === 'complete';
+  const visibleTasks = viewCompleted ? recentDone : tasks.filter(matchesFilter);
+
+  /* ─ Group the visible tasks by assignee into columns ─ */
+
+  // A multi-assignee task appears in each assignee's column (shared completion
+  // state). All members get a column (even if empty); Anyone is appended only
+  // when it has tasks. Current user sorts first.
   const columnData = (() => {
-    const memberNames = members.map((m) => m.name);
     const currentUserName = user?.name;
-
-    // Sort: current user first, then alphabetical
-    const sorted = [...memberNames].sort((a, b) => {
+    const sorted = members.map((m) => m.name).sort((a, b) => {
       if (a === currentUserName) return -1;
       if (b === currentUserName) return 1;
       return 0;
     });
-
-    // Build groups: a task with multiple assignees appears in each
-    // assignee's column. The single shared row drives the checkbox state,
-    // so ticking it complete in one column visually completes it in every
-    // other column on the next refresh (which is the intended shared-
-    // completion behaviour).
-    const allTasks = [...tasks, ...recentDone];
     const groups = {};
-    for (const name of sorted) groups[name] = { incomplete: [], completed: [] };
-    groups['Anyone'] = { incomplete: [], completed: [] };
+    for (const name of sorted) groups[name] = [];
+    groups['Anyone'] = [];
 
-    for (const task of allTasks) {
+    for (const task of visibleTasks) {
       const names = Array.isArray(task.assigned_to_names) && task.assigned_to_names.length > 0
         ? task.assigned_to_names.filter(Boolean)
         : task.assigned_to_name ? [task.assigned_to_name] : [];
       const keys = names.length > 0 ? names : ['Anyone'];
       for (const key of keys) {
-        if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
-        if (task.completed) {
-          groups[key].completed.push(task);
-        } else if (inScope(task)) {
-          groups[key].incomplete.push(task);
-        }
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(task);
       }
     }
 
-    // Build column entries: all members first (even if empty), then unassigned if it has tasks
-    const columns = sorted.map((name) => {
-      const member = members.find((m) => m.name === name) || null;
-      return { name, member, ...groups[name] };
-    });
-
-    const unassigned = groups['Anyone'];
-    if (unassigned.incomplete.length > 0 || unassigned.completed.length > 0) {
-      columns.push({ name: 'Anyone', member: null, ...unassigned });
+    const columns = sorted.map((name) => ({
+      name,
+      member: members.find((m) => m.name === name) || null,
+      tasks: groups[name],
+    }));
+    if (groups['Anyone'].length > 0) {
+      columns.push({ name: 'Anyone', member: null, tasks: groups['Anyone'] });
     }
-
     return columns;
   })();
 
@@ -788,73 +842,43 @@ export default function Tasks() {
     <div {...ptr.bindings} className="space-y-5">
       <PullIndicator state={ptr.state} />
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1
-          className="flex items-center gap-2 text-[32px] md:text-[40px]"
-          style={{
-            fontWeight: 400,
-            lineHeight: 1,
-            fontFamily: '"Instrument Serif"',
-            color: 'var(--charcoal, #2D2A33)',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          <div
-            className="hidden"
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#f1eef8',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IconCheck className="h-5 w-5" style={{ color: 'var(--plum, #6B3FA0)' }} />
+      <PageHeader
+        kicker={`${counts.all} open · ${counts.complete} done`}
+        title="Tasks"
+        actions={
+          <div className="flex items-center gap-2.5">
+            <Segmented
+              value={view}
+              onChange={setViewPersist}
+              ariaLabel="Task view"
+              options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]}
+            />
+            {canWrite && (
+              <PillBtn primary icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => openAddForm()}>
+                Add task
+              </PillBtn>
+            )}
           </div>
-          Tasks
-        </h1>
-        <div className="flex items-center gap-3">
-          {canWrite && (
-            <button
-              onClick={() => openAddForm()}
-              className="flex items-center gap-1 text-white text-sm font-semibold px-4 transition-colors"
-              style={{
-                background: 'var(--plum, #6B3FA0)',
-                height: 40,
-                borderRadius: 12,
-              }}
-            >
-              <IconPlus className="h-4 w-4" /> Add task
-            </button>
-          )}
-        </div>
-      </div>
+        }
+      />
 
-      {/* Date-scope filter chips with live counts. Default 'All'. */}
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
-        {[
-          { key: 'all', label: 'All' },
-          { key: 'overdue', label: 'Overdue' },
-          { key: 'today', label: 'Today' },
-          { key: 'upcoming', label: 'Upcoming' },
-        ].map(({ key, label }) => {
-          const active = scope === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setScope(key)}
-              className="shrink-0 inline-flex items-center rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors border"
-              style={active
-                ? { background: 'var(--plum, #6B3FA0)', borderColor: 'var(--plum, #6B3FA0)', color: '#fff' }
-                : { background: '#fff', borderColor: 'var(--light-grey, #E8E5EC)', color: 'var(--charcoal, #2D2A33)' }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Segmented filter (board only) - live counts; Overdue turns coral. */}
+      {view === 'board' && (
+        <div className="mb-5 overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+          <Segmented
+            value={filter}
+            onChange={setFilter}
+            ariaLabel="Filter tasks"
+            options={[
+              { value: 'all', label: 'All', count: counts.all },
+              { value: 'today', label: 'Today', count: counts.today },
+              { value: 'upcoming', label: 'Upcoming', count: counts.upcoming },
+              { value: 'overdue', label: 'Overdue', count: counts.overdue, danger: true },
+              { value: 'complete', label: 'Complete', count: counts.complete },
+            ]}
+          />
+        </div>
+      )}
 
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit tasks" className="mb-4" />}
 
@@ -1120,6 +1144,23 @@ export default function Tasks() {
       {/* Main content */}
       {loading ? (
         <PageListSkeleton rows={6} />
+      ) : view === 'list' ? (
+        <TasksListView
+          tasks={tasks}
+          recentDone={recentDone}
+          members={members}
+          isOverdue={isOverdue}
+          isToday={isToday}
+          isTomorrow={isTomorrow}
+          onToggle={toggle}
+          toggling={toggling}
+          onEdit={openEditForm}
+          onDelete={confirmDelete}
+          deleting={deleting}
+          onRestore={restore}
+          restoring={restoring}
+          onAdd={() => openAddForm()}
+        />
       ) : (
         <>
           {/* ─── MOBILE: Tabbed view ─── */}
@@ -1129,8 +1170,8 @@ export default function Tasks() {
               <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                 {columnData.map((col) => {
                   const isActive = activeMobileTab === col.name;
-                  const colorTheme = col.member?.color_theme || 'plum';
-                  const avatarColor = MEMBER_COLORS[colorTheme] || '#6B3FA0';
+                  const colorTheme = col.member?.color_theme || 'slate';
+                  const avatarColor = MEMBER_COLORS[colorTheme] || '#7A8694';
                   const initial = (col.name).charAt(0).toUpperCase();
 
                   return (
@@ -1174,7 +1215,7 @@ export default function Tasks() {
                           padding: '0 5px',
                         }}
                       >
-                        {col.incomplete.length}
+                        {col.tasks.length}
                       </span>
                     </button>
                   );
@@ -1186,8 +1227,9 @@ export default function Tasks() {
                 <MemberColumn
                   key={col.name}
                   member={col.member}
-                  incompleteTasks={col.incomplete}
-                  completedTasks={col.completed}
+                  name={col.name}
+                  tasks={col.tasks}
+                  viewCompleted={viewCompleted}
                   onAddTask={() => openAddForm(col.name !== 'Anyone' ? col.name : '')}
                   onToggle={toggle}
                   toggling={toggling}
@@ -1259,8 +1301,9 @@ export default function Tasks() {
                   <MemberColumn
                     key={col.name}
                     member={col.member}
-                    incompleteTasks={col.incomplete}
-                    completedTasks={col.completed}
+                    name={col.name}
+                    tasks={col.tasks}
+                    viewCompleted={viewCompleted}
                     onAddTask={() => openAddForm(col.name !== 'Anyone' ? col.name : '')}
                     onToggle={toggle}
                     toggling={toggling}
@@ -1279,16 +1322,17 @@ export default function Tasks() {
           )}
 
           {/* Empty state */}
-          {!loading && columnData.every((col) => col.incomplete.length === 0 && col.completed.length === 0) && (
+          {!loading && columnData.every((col) => col.tasks.length === 0) && (
             <div className="text-center py-10 max-w-md mx-auto px-4">
               <p className="text-[15px] font-medium text-charcoal">
-                {scope === 'all' ? 'No tasks yet'
-                  : scope === 'overdue' ? 'Nothing overdue'
-                  : scope === 'today' ? 'Nothing due today'
+                {filter === 'complete' ? 'Nothing completed yet'
+                  : filter === 'all' ? 'No tasks yet'
+                  : filter === 'overdue' ? 'Nothing overdue'
+                  : filter === 'today' ? 'Nothing due today'
                   : 'Nothing upcoming'}
               </p>
               <p className="text-[13px] text-warm-grey mt-2 leading-relaxed">
-                {scope === 'all'
+                {filter === 'all'
                   ? <>Tap <span className="font-semibold text-plum">+</span> to add one, or message <span className="italic">"remind Sarah to book the dentist on Tuesday"</span> to the WhatsApp bot.</>
                   : <>You're all caught up here. Switch to <span className="font-medium">All</span> to see everything.</>
                 }
