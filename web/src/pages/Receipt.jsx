@@ -53,6 +53,7 @@ export default function Receipt() {
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(false);
   const [openId, setOpenId] = useState(null); // receipt id whose detail modal is open
+  const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -125,11 +126,21 @@ export default function Receipt() {
       )}
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
-        {/* Dropzone / scan tile */}
+        {/* Dropzone / scan tile - click to pick, or drag a photo onto it. */}
         <button
           onClick={() => fileRef.current?.click()}
           disabled={scanning}
-          className="min-h-[200px] rounded-[18px] border-[1.5px] border-dashed border-light-grey bg-transparent flex flex-col items-center justify-center gap-3 text-warm-grey hover:border-plum/40 transition-colors disabled:opacity-60"
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDragEnter={(e) => { e.preventDefault(); if (!scanning) setDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (scanning) return;
+            const f = e.dataTransfer.files?.[0];
+            if (f) handleFile(f);
+          }}
+          className={`min-h-[200px] rounded-[18px] border-[1.5px] border-dashed bg-transparent flex flex-col items-center justify-center gap-3 text-warm-grey transition-colors disabled:opacity-60 ${dragging ? 'border-plum bg-plum-light/40' : 'border-light-grey hover:border-plum/40'}`}
         >
           <div className="w-[52px] h-[52px] rounded-[14px] bg-plum-light text-plum flex items-center justify-center">
             <IconReceipt className="h-6 w-6" />
