@@ -90,13 +90,13 @@ function MemberCard({ m, canEdit, canRemove, onEdit, onRemove, removing }) {
       )}
       <Avatar member={m} size={72} style={{ boxShadow: '0 0 0 2px #fff' }} />
       <div>
-        <div className="text-base font-bold text-charcoal">{m.name}</div>
+        <div className="text-base font-semibold text-charcoal">{m.name}</div>
         {m.whatsapp_linked && (
           <div className="text-xs text-warm-grey mt-0.5">WhatsApp</div>
         )}
       </div>
       <span
-        className={`text-[11px] font-bold tracking-[0.04em] px-2.5 py-1 rounded-full ${rm.cls}`}
+        className={`text-[11px] font-semibold tracking-[0.04em] px-2.5 py-1 rounded-full ${rm.cls}`}
         style={rm.style}
       >
         {rm.label}
@@ -1912,7 +1912,7 @@ export default function FamilySetup() {
         {/* Pending invites */}
         {pendingInvites.length > 0 && (
           <div className="mt-5">
-            <p className="text-[11px] font-bold text-warm-grey uppercase tracking-[0.1em] mb-2">Pending invites</p>
+            <p className="text-[11px] font-semibold text-warm-grey uppercase tracking-[0.1em] mb-2">Pending invites</p>
             <div className="bg-white rounded-2xl border border-light-grey divide-y divide-light-grey overflow-hidden">
               {pendingInvites.map((inv) => {
                 // wa.me deep-link with a friendly preset, pinned to the public
@@ -2037,7 +2037,7 @@ export default function FamilySetup() {
                         <IconGraduation className="h-6 w-6" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-base font-bold text-charcoal truncate">{school.school_name}</div>
+                        <div className="text-base font-semibold text-charcoal truncate">{school.school_name}</div>
                         <div className="text-xs text-warm-grey mt-0.5 truncate">
                           {[school.local_authority, childNames.length ? childNames.join(', ') : null].filter(Boolean).join(' · ') || 'No children linked'}
                         </div>
@@ -2227,7 +2227,7 @@ export default function FamilySetup() {
               className={`w-full flex items-center gap-4 px-5 py-3 text-left transition-colors ${isAdmin ? 'hover:bg-[#F3EEE5]' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
               style={{ borderTop: '1px solid var(--color-light-grey)' }}
             >
-              <span className="w-[46px] shrink-0 text-center py-[5px] rounded-lg text-[11px] font-bold tracking-[0.04em] text-warm-grey" style={{ background: SOFT }}>
+              <span className="w-[46px] shrink-0 text-center py-[5px] rounded-lg text-[11px] font-semibold tracking-[0.04em] text-warm-grey" style={{ background: SOFT }}>
                 {dayLabel}
               </span>
               <span className="w-[35px] h-[35px] rounded-[11px] shrink-0 flex items-center justify-center" style={{ background: kidColor + '1F' }}>
@@ -2265,7 +2265,7 @@ export default function FamilySetup() {
                     <div key={kid.id} className="bg-white rounded-[18px] border border-light-grey overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
                       <div className="flex items-center gap-3 px-5 py-4">
                         <Avatar member={kid} size={36} />
-                        <span className="text-base font-bold text-charcoal truncate">{kid.name}</span>
+                        <span className="text-base font-semibold text-charcoal truncate">{kid.name}</span>
                         <span className="text-xs text-warm-grey font-medium">{clubCount} {clubCount === 1 ? 'club' : 'clubs'}</span>
                         <div className="flex-1" />
                         {isAdmin && (
@@ -2281,7 +2281,7 @@ export default function FamilySetup() {
                       )}
                       {other.length > 0 && (
                         <>
-                          <div className="px-5 pt-3 pb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-warm-grey" style={{ borderTop: '1px solid var(--color-light-grey)' }}>Other terms</div>
+                          <div className="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-warm-grey" style={{ borderTop: '1px solid var(--color-light-grey)' }}>Other terms</div>
                           {other.map(a => renderRow(kid, a, true))}
                         </>
                       )}
@@ -2600,7 +2600,7 @@ export default function FamilySetup() {
               <div className="flex justify-center">
                 <div className={`w-16 h-16 rounded-full ${
                   AVATAR_COLOURS[depColor] || AVATAR_COLOURS.teal
-                } flex items-center justify-center font-bold text-xl`}>
+                } flex items-center justify-center font-semibold text-xl`}>
                   {depName?.[0]?.toUpperCase() || '?'}
                 </div>
               </div>
@@ -2691,7 +2691,7 @@ export default function FamilySetup() {
               <div className="flex justify-center">
                 <div className={`w-16 h-16 rounded-full ${
                   AVATAR_COLOURS[newColor] || AVATAR_COLOURS.teal
-                } flex items-center justify-center font-bold text-xl`}>
+                } flex items-center justify-center font-semibold text-xl`}>
                   {newName?.[0]?.toUpperCase() || '?'}
                 </div>
               </div>
@@ -2997,7 +2997,7 @@ export default function FamilySetup() {
                 ) : (
                   <div className={`w-20 h-20 rounded-full ${
                     AVATAR_COLOURS[profileColor] || AVATAR_COLOURS.teal
-                  } flex items-center justify-center font-bold text-2xl`}>
+                  } flex items-center justify-center font-semibold text-2xl`}>
                     {profileName?.[0]?.toUpperCase() || '?'}
                   </div>
                 )}
@@ -3316,7 +3316,7 @@ export default function FamilySetup() {
                           const heading = `${label.toUpperCase()}${label.toLowerCase().includes('term') ? '' : ' TERM'} ${ay}`;
                           return (
                             <div key={key} className="mb-3">
-                              <div className="text-[10px] font-bold text-cocoa uppercase tracking-wider mb-1.5 border-b border-cream-border pb-1">{heading}</div>
+                              <div className="text-[10px] font-semibold text-cocoa uppercase tracking-wider mb-1.5 border-b border-cream-border pb-1">{heading}</div>
                               <div className="space-y-1">
                                 {termDates.map(td => (
                                   <div key={td.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white group text-xs">
