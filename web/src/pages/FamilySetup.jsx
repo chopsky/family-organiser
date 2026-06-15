@@ -3,12 +3,99 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
-import { IconUsers, IconHome, IconMail, IconEdit, IconMapPin, IconCameraSimple } from '../components/Icons';
+import {
+  IconUsers, IconHome, IconMail, IconEdit, IconMapPin, IconCameraSimple,
+  IconPlus, IconBell, IconGraduation, IconMessageCircle, IconCalendar, IconTrash,
+} from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import { isUkHousehold, isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { pickPhoto } from '../lib/photo-picker';
+import PageHeader from '../components/ui/PageHeader';
+import PillBtn from '../components/ui/PillBtn';
+import Avatar from '../components/ui/Avatar';
+import { hexFor } from '../lib/memberColors';
+import { ACTIVITY_ICONS, iconFor } from '../lib/activityIcons';
+
+// Soft warm sand for inset chips / day pills (shared literal across the
+// redesigned pages - no exact theme token for this neutral).
+const SOFT = '#F3EEE5';
+const CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
+
+// Small pickup-car glyph for the Activities rows.
+function PickupCar({ className = 'h-3.5 w-3.5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13v5h-2.5M3 13v5h2.5M3 13h18" />
+      <circle cx="7" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" />
+    </svg>
+  );
+}
+
+// role_meta: map our data (role + member_type) to the design's role pill.
+function roleMeta(m) {
+  if (m.role === 'admin') return { label: 'Admin', cls: 'bg-plum-light text-plum' };
+  if (m.member_type === 'dependent') return { label: 'Kid', cls: 'text-warm-grey', style: { background: SOFT } };
+  return { label: 'Parent', cls: 'bg-sage-light text-sage' };
+}
+
+// Centred member card (avatar + name + role + role pill), with edit/remove
+// on hover. The role pill carries a text label (not colour alone) for a11y.
+function MemberCard({ m, canEdit, canRemove, onEdit, onRemove, removing }) {
+  const rm = roleMeta(m);
+  const roleLine = m.family_role
+    || (m.member_type === 'dependent' ? 'Child' : (m.role === 'admin' ? 'Admin' : 'Member'));
+  return (
+    <div
+      className="group relative bg-white rounded-[18px] border border-light-grey px-5 py-[22px] flex flex-col items-center text-center gap-3"
+      style={{ boxShadow: CARD_SHADOW }}
+    >
+      {(canEdit || canRemove) && (
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+          {canEdit && (
+            <button onClick={onEdit} aria-label={`Edit ${m.name}`} className="p-1.5 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
+              <IconEdit className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {canRemove && (
+            <button onClick={onRemove} disabled={removing} aria-label={`Remove ${m.name}`} className="p-1.5 rounded-lg text-warm-grey hover:text-coral hover:bg-coral-light transition-colors disabled:opacity-50 disabled:cursor-wait">
+              <IconTrash className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+      <Avatar member={m} size={72} style={{ boxShadow: '0 0 0 2px #fff' }} />
+      <div>
+        <div className="text-base font-bold text-charcoal">{m.name}</div>
+        <div className="text-xs text-warm-grey mt-0.5">
+          {roleLine}{m.whatsapp_linked ? ' · WhatsApp' : ''}
+        </div>
+      </div>
+      <span
+        className={`text-[11px] font-bold tracking-[0.04em] px-2.5 py-1 rounded-full ${rm.cls}`}
+        style={rm.style}
+      >
+        {rm.label}
+      </span>
+    </div>
+  );
+}
+
+// Dashed "add" tile that mirrors the member-card footprint.
+function AddTile({ label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-[18px] border-[1.5px] border-dashed border-light-grey bg-transparent flex flex-col items-center justify-center gap-3 min-h-[184px] text-warm-grey hover:border-plum/40 hover:text-plum transition-colors"
+    >
+      <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: SOFT }}>
+        <IconPlus className="h-6 w-6" />
+      </div>
+      <div className="text-sm font-semibold">{label}</div>
+    </button>
+  );
+}
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -1654,26 +1741,17 @@ export default function FamilySetup() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <h1
-        className="flex text-[32px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif"' }}
-      >
-        <div
-          className="hidden"
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: '#f1eef8',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconUsers className="h-5 w-5 text-plum" />
-        </div>
-        Family Setup
-      </h1>
+    <div className="max-w-[1080px] mx-auto space-y-6 pb-24">
+      <PageHeader
+        kicker={`${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+        title={household?.name || 'Your household'}
+        subtitle="Manage who's in your household and how Housemait works for everyone."
+        actions={isAdmin ? (
+          <PillBtn primary icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddMember}>
+            Invite member
+          </PillBtn>
+        ) : null}
+      />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {!canWrite && <SubscribePrompt message="Subscribe to invite family members and edit profiles" />}
@@ -1730,8 +1808,8 @@ export default function FamilySetup() {
                 then get the full column width below, each on a single
                 line. */}
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-[22px] font-medium text-bark truncate">
-                {household?.name || 'Your household'}
+              <h2 className="text-[15px] font-semibold text-bark truncate">
+                Household details
               </h2>
               {isAdmin && (
                 <button
@@ -1791,99 +1869,54 @@ export default function FamilySetup() {
         )}
       </div>
 
-      {/* Members */}
-      <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Family Members</h2>
-        <p className="text-sm text-cocoa mb-3">Family members with their own accounts.</p>
+      {/* Members - one card per household member (accounts), role pill
+          distinguishes Admin / Parent. Edit + remove on hover. */}
+      <section>
+        <h2 className="text-lg font-bold text-charcoal mb-0.5">Members</h2>
+        <p className="text-sm text-warm-grey mb-4">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
-          <ul className="space-y-3">
-            {members.filter(m => m.member_type !== 'dependent').map((m) => {
-              const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
-              const cardTint = CARD_TINTS[m.color_theme] || CARD_TINTS.slate;
-              return (
-              <li key={m.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${cardTint}`}>
-                {m.avatar_url ? (
-                  <img src={m.avatar_url} alt={m.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
-                ) : (
-                  <div className={`w-10 h-10 rounded-full ${avatarClass} flex items-center justify-center font-bold text-base shrink-0`}>
-                    {m.name[0].toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-semibold text-bark">{m.name}</p>
-                  <p className="text-[13px] text-cocoa">
-                    {m.family_role ? `${m.family_role} · ` : ''}{m.role}
-                    {m.whatsapp_linked && ' · WhatsApp connected'}
-                  </p>
-                </div>
-                {canEditProfile(m) && (
-                  <button
-                    onClick={() => openEditProfile(m)}
-                    className="text-cocoa hover:text-primary p-1.5 rounded-lg transition-colors hover:bg-primary/10"
-                    title="Edit profile"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </button>
-                )}
-                {isAdmin && m.id !== user?.id && m.role !== 'admin' && (
-                  <button
-                    onClick={() => handleRemoveMember(m)}
-                    disabled={removingMemberIds.has(m.id)}
-                    className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10 disabled:opacity-50 disabled:cursor-wait"
-                    title="Remove member"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                )}
-              </li>
-              );
-            })}
-          </ul>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+            {members.filter(m => m.member_type !== 'dependent').map((m) => (
+              <MemberCard
+                key={m.id}
+                m={m}
+                canEdit={canEditProfile(m)}
+                canRemove={isAdmin && m.id !== user?.id && m.role !== 'admin'}
+                removing={removingMemberIds.has(m.id)}
+                onEdit={() => openEditProfile(m)}
+                onRemove={() => handleRemoveMember(m)}
+              />
+            ))}
+            {isAdmin && <AddTile label="Invite a member" onClick={openAddMember} />}
+          </div>
         )}
 
         {/* Pending invites */}
         {pendingInvites.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-cream-border">
-            <p className="text-xs font-medium text-cocoa uppercase tracking-wider mb-2">Pending invites</p>
-            <ul className="space-y-1">
+          <div className="mt-5">
+            <p className="text-[11px] font-bold text-warm-grey uppercase tracking-[0.1em] mb-2">Pending invites</p>
+            <div className="bg-white rounded-2xl border border-light-grey divide-y divide-light-grey overflow-hidden">
               {pendingInvites.map((inv) => {
-                // Build a wa.me deep-link with a friendly preset message
-                // so the inviter can pass the invite into a WhatsApp
-                // chat without typing the link manually. wa.me opens
-                // the recipient's WhatsApp share-sheet on tap; the
-                // user picks who to send to.
-                //
-                // Pinned to the production housemait.com hostname
-                // rather than window.location.origin. Inside the
-                // Capacitor iOS app, window.location.origin resolves
-                // to "capacitor://localhost" - exactly what an SA user
-                // hit in production when their recipient got a
-                // capacitor://localhost/signup?invite=… link they
-                // couldn't open. The invite recipient by definition
-                // doesn't have the app yet, so the URL needs to point
-                // at the public site every time, regardless of where
-                // the inviter is currently using Housemait.
+                // wa.me deep-link with a friendly preset, pinned to the public
+                // housemait.com host (window.location.origin is capacitor://
+                // inside the iOS app, which invitees can't open).
                 const inviteUrl = `https://housemait.com/signup?invite=${inv.token}`;
                 const inviteeName = (inv.name || '').trim();
                 const greeting = inviteeName ? `Hi ${inviteeName.split(' ')[0]}` : 'Hey';
                 const waText = `${greeting} - I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}`;
                 const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
                 return (
-                  <li key={inv.id} className="flex items-center justify-between text-sm text-cocoa bg-oat rounded-xl px-3 py-2">
-                    <span>{inv.name || inv.email}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-cocoa">
+                  <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <span className="text-charcoal truncate">{inv.name || inv.email}</span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs text-warm-grey hidden sm:inline">
                         {inv.name ? inv.email : ''} · expires {new Date(inv.expires_at).toLocaleDateString()}
                       </span>
                       <a
                         href={waUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-medium text-success hover:text-success/80 transition-colors"
+                        className="text-xs font-semibold text-sage hover:text-sage/80 transition-colors"
                         title="Share invite link via WhatsApp"
                       >
                         Share via WhatsApp
@@ -1897,205 +1930,138 @@ export default function FamilySetup() {
                             setError('Failed to cancel invite.');
                           }
                         }}
-                        className="text-xs text-error hover:text-error/80 transition-colors"
+                        className="text-xs font-medium text-coral hover:text-coral/80 transition-colors"
                         title="Cancel invite"
                       >
                         Cancel
                       </button>
                     </div>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           </div>
         )}
+      </section>
 
-        {/* Add new member button */}
-        {isAdmin && (
-          <button
-            onClick={openAddMember}
-            className="mt-4 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-3 rounded-2xl text-sm transition-colors flex items-center justify-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Add new member
-          </button>
-        )}
-      </div>
-
-      {/* Other Family Members (dependents) */}
-      <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Other Family Members</h2>
-        <p className="text-sm text-cocoa mb-3">Family members who don't need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
+      {/* Children & dependents - members without their own login. Same card
+          treatment; activities + school live in their own sections now. */}
+      <section>
+        <h2 className="text-lg font-bold text-charcoal mb-0.5">Children &amp; dependents</h2>
+        <p className="text-sm text-warm-grey mb-4">Family members who don&apos;t need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
-          <>
-            {members.filter(m => m.member_type === 'dependent').length > 0 ? (
-              <ul className="space-y-3">
-                {members.filter(m => m.member_type === 'dependent').map((m) => {
-                  const avatarClass = AVATAR_COLOURS[m.color_theme] || AVATAR_COLOURS.teal;
-                  const cardTint = CARD_TINTS[m.color_theme] || CARD_TINTS.slate;
-                  return (
-                    <li key={m.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${cardTint}`}>
-                      {m.avatar_url ? (
-                        <img src={m.avatar_url} alt={m.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className={`w-10 h-10 rounded-full ${avatarClass} flex items-center justify-center font-bold text-base shrink-0`}>
-                          {m.name[0].toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[15px] font-semibold text-bark">{m.name}</p>
-                        {m.family_role && <p className="text-[13px] text-cocoa">{m.family_role}</p>}
-                        {/* School badge - a child's school is sensitive, so we
-                            only surface it when the household has 2+ schools and
-                            it actually disambiguates which term calendar applies.
-                            With one (or no) school it's redundant + private, so
-                            it stays hidden. */}
-                        {m.school_id && householdSchools.length >= 2 && (() => {
-                          const school = householdSchools.find(s => s.id === m.school_id);
-                          return school ? (
-                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky/15 text-sky">
-                              <span className="w-1.5 h-1.5 rounded-full bg-sky" />
-                              {school.school_name}
-                            </span>
-                          ) : null;
-                        })()}
-                        {/* Activity pills */}
-                        {childActivities[m.id]?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {(() => {
-                              // Group activities: "PE Tue & Thu", "Swimming Fri"
-                              const grouped = {};
-                              childActivities[m.id].forEach(a => {
-                                if (!grouped[a.activity]) grouped[a.activity] = [];
-                                grouped[a.activity].push(DAY_LABELS[a.day_of_week]);
-                              });
-                              return Object.entries(grouped).map(([activity, days]) => (
-                                <span key={activity} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-cream-border/50 text-cocoa">
-                                  {activity} {days.join(' & ')}
-                                </span>
-                              ));
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                      {canEditProfile(m) && (
-                        <>
-                          <button
-                            onClick={() => openEditProfile(m)}
-                            className="text-cocoa hover:text-primary p-1.5 rounded-lg transition-colors hover:bg-primary/10"
-                            title="Edit"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleRemoveDependent(m)}
-                            disabled={removingMemberIds.has(m.id)}
-                            className="text-error/60 hover:text-error p-1.5 rounded-lg transition-colors hover:bg-error/10 disabled:opacity-50 disabled:cursor-wait"
-                            title="Remove"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        </>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-sm text-cocoa">No other family members added yet.</p>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+            {members.filter(m => m.member_type === 'dependent').map((m) => (
+              <MemberCard
+                key={m.id}
+                m={m}
+                canEdit={canEditProfile(m)}
+                canRemove={canEditProfile(m)}
+                removing={removingMemberIds.has(m.id)}
+                onEdit={() => openEditProfile(m)}
+                onRemove={() => handleRemoveDependent(m)}
+              />
+            ))}
+            {isAdmin && <AddTile label="Add a child or pet" onClick={openAddDependent} />}
+            {members.filter(m => m.member_type === 'dependent').length === 0 && !isAdmin && (
+              <p className="text-sm text-warm-grey">No other family members added yet.</p>
             )}
-            {isAdmin && (
-              <button
-                onClick={openAddDependent}
-                className="mt-4 w-full border-2 border-dashed border-cream-border text-cocoa hover:border-primary hover:text-primary font-medium py-3 rounded-2xl text-sm transition-colors flex items-center justify-center gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                Add family member
-              </button>
-            )}
-          </>
+          </div>
         )}
-      </div>
+      </section>
 
       {/* Schools - household-level section. Manage each school and its term
           dates here (decoupled from individual children, for privacy). For
           UK/SA households this is a real directory + term-date importer;
           everywhere else it's a coming-soon card. */}
       {showSchools ? (
-        <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-base md:text-medium font-semibold text-bark">Schools</h2>
+        <section>
+          <div className="flex items-end justify-between gap-3 mb-1">
+            <h2 className="text-lg font-bold text-charcoal">Schools</h2>
             {isAdmin && (
-              <button onClick={openAddSchool} className="text-xs font-semibold text-primary hover:text-primary-pressed">+ Add a school</button>
+              <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddSchool}>Add a school</PillBtn>
             )}
           </div>
-          <p className="text-sm text-cocoa mb-4">
+          <p className="text-sm text-warm-grey mb-4 max-w-[560px]">
             Import term dates once and Housemait keeps half-term reminders and
             term-only activities in sync for everyone at that school.
           </p>
           {householdSchools.length === 0 ? (
-            <div className="border-2 border-dashed border-cream-border rounded-2xl p-6 text-center">
-              <p className="text-sm text-cocoa mb-3">No schools added yet.</p>
+            <div className="rounded-[18px] border-[1.5px] border-dashed border-light-grey p-8 text-center">
+              <p className="text-sm text-warm-grey mb-3">No schools added yet.</p>
               {isAdmin ? (
-                <button onClick={openAddSchool} className="text-sm font-semibold text-primary hover:text-primary-pressed">+ Add a school</button>
+                <button onClick={openAddSchool} className="text-sm font-semibold text-plum hover:text-plum/80">+ Add a school</button>
               ) : (
                 <p className="text-xs text-warm-grey">Ask a household admin to add one.</p>
               )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(420px, 100%), 1fr))' }}>
               {householdSchools.map((school) => {
                 const dates = school.term_dates || [];
                 const summary = getTermSummary(dates);
                 const childNames = (school.children || []).map(c => c.name).filter(Boolean);
                 const sourceLabel = { local_authority: 'Local authority', school_website: 'School website', website_scrape: 'School website', ical: 'iCal feed', ical_import: 'iCal feed', sa_national: 'National calendar', 'sa-national': 'National calendar', whatsapp_import: 'WhatsApp', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source;
+                const colour = school.colour || '#6B3FA0';
+                // Next break: the soonest future half-term / holiday in the
+                // imported dates, shown as the brand-soft reminder line.
+                const todayYmdStr = new Date().toLocaleDateString('en-CA');
+                const breakRow = dates
+                  .filter(d => /half_term|holiday|break/i.test(d.event_type || '') && (d.date || '') >= todayYmdStr)
+                  .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
+                const brk = breakRow
+                  ? `${breakRow.label || 'Half-term'} ${formatDateShort(breakRow.date)}${breakRow.end_date ? `–${formatDateShort(breakRow.end_date)}` : ''}`
+                  : null;
                 return (
-                  <div key={school.id} className="bg-white rounded-xl border border-cream-border p-3.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-bark truncate">{school.school_name}</p>
-                        {school.local_authority && <p className="text-xs text-cocoa">{school.local_authority}</p>}
+                  <div key={school.id} className="bg-white rounded-[18px] border border-light-grey p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-[46px] h-[46px] rounded-[13px] shrink-0 flex items-center justify-center" style={{ background: colour + '1F', color: colour }}>
+                        <IconGraduation className="h-6 w-6" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-base font-bold text-charcoal truncate">{school.school_name}</div>
+                        <div className="text-xs text-warm-grey mt-0.5 truncate">
+                          {[school.local_authority, childNames.length ? childNames.join(', ') : null].filter(Boolean).join(' · ') || 'No children linked'}
+                        </div>
                       </div>
                       {isAdmin && (
-                        <button onClick={() => handleRemoveHouseholdSchool(school.id)} className="text-xs text-coral hover:underline shrink-0">Remove</button>
+                        <button onClick={() => handleRemoveHouseholdSchool(school.id)} className="text-xs font-semibold text-warm-grey hover:text-coral shrink-0">Remove</button>
                       )}
                     </div>
-                    {childNames.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {childNames.map(n => (
-                          <span key={n} className="text-[11px] bg-cream text-cocoa rounded-full px-2 py-0.5">{n}</span>
-                        ))}
+
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold text-charcoal whitespace-nowrap" style={{ background: SOFT }}>
+                        <IconCalendar className="h-3.5 w-3.5 text-warm-grey" />
+                        {summary.start && summary.end ? `Term · ${formatDateShort(summary.start)} – ${formatDateShort(summary.end)}` : (dates.length ? `${dates.length} date${dates.length === 1 ? '' : 's'} saved` : 'No term dates yet')}
+                      </span>
+                      {sourceLabel && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold text-charcoal whitespace-nowrap" style={{ background: SOFT }}>
+                          <IconMessageCircle className="h-3.5 w-3.5 text-warm-grey" />
+                          {sourceLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    {brk && (
+                      <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] text-xs font-semibold bg-plum-light text-plum">
+                        <IconBell className="h-3.5 w-3.5" />
+                        Next break · {brk}
                       </div>
                     )}
-                    {dates.length > 0 ? (
-                      <p className="text-xs text-cocoa mt-2">
-                        {summary.start && summary.end ? `Term: ${formatDateShort(summary.start)} – ${formatDateShort(summary.end)}` : `${dates.length} date${dates.length === 1 ? '' : 's'} saved`}
-                        {sourceLabel ? ` · ${sourceLabel}` : ''}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-warm-grey mt-2">No term dates imported yet.</p>
-                    )}
+
                     {isAdmin && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3">
-                        <button onClick={() => openUpdateTermDates(school)} className="text-xs font-semibold text-primary hover:text-primary-pressed">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <button onClick={() => openUpdateTermDates(school)} className="text-xs font-semibold text-plum hover:text-plum/80">
                           {dates.length > 0 ? 'Update dates' : 'Import dates'}
                         </button>
                         {dates.length > 0 && (
-                          <button onClick={() => openViewDates(school)} className="text-xs font-medium text-cocoa hover:text-bark">View all dates</button>
+                          <button onClick={() => openViewDates(school)} className="text-xs font-medium text-warm-grey hover:text-charcoal">View all dates</button>
                         )}
                         {school.ical_url && (
-                          <button onClick={() => handleSyncIcal(school)} disabled={syncingIcal} className="text-xs font-medium text-cocoa hover:text-bark disabled:opacity-50">{syncingIcal ? 'Syncing…' : 'Sync iCal'}</button>
+                          <button onClick={() => handleSyncIcal(school)} disabled={syncingIcal} className="text-xs font-medium text-warm-grey hover:text-charcoal disabled:opacity-50">{syncingIcal ? 'Syncing…' : 'Sync iCal'}</button>
                         )}
                         {dates.length > 0 && (
-                          <button onClick={() => handleClearAllTermDates(school.id)} className="text-xs font-medium text-cocoa hover:text-coral">Clear all</button>
+                          <button onClick={() => handleClearAllTermDates(school.id)} className="text-xs font-medium text-warm-grey hover:text-coral">Clear all</button>
                         )}
                       </div>
                     )}
@@ -2104,16 +2070,16 @@ export default function FamilySetup() {
               })}
             </div>
           )}
-        </div>
+        </section>
       ) : (
-        <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-          <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Schools</h2>
-          <p className="text-sm text-cocoa">
+        <section>
+          <h2 className="text-lg font-bold text-charcoal mb-1">Schools</h2>
+          <p className="text-sm text-warm-grey max-w-[560px]">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries -
             until then, the rest of Housemait works the same.
           </p>
-        </div>
+        </section>
       )}
 
       {/* Add-a-school modal (household-level - create a school without first
@@ -2220,107 +2186,93 @@ export default function FamilySetup() {
           modal below. */}
       {showSchools && (() => {
         const activityKids = members.filter(m => m.member_type === 'dependent' || m.school_id);
-        // Merge identical activities that differ ONLY by weekday into one row
-        // (e.g. "Wraparound Care" Mon/Tue/Wed -> one row with three day chips),
-        // so a repeated club doesn't eat three rows. Editing stays per-day:
-        // each chip is its own tap target. Groups sort by earliest day + time.
-        const groupActivities = (list) => {
-          const groups = new Map();
-          list.forEach((a) => {
-            const key = [a.activity, a.time_start || '', a.time_end || '', a.pickup_member_id || '', a.start_date || '', a.end_date || ''].join('|');
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key).push(a);
-          });
-          return [...groups.values()]
-            .map((items) => items.slice().sort((x, y) => x.day_of_week - y.day_of_week))
-            .sort((g1, g2) => (g1[0].day_of_week - g2[0].day_of_week) || ((g1[0].time_start || '').localeCompare(g2[0].time_start || '')));
-        };
-        const activityMeta = (a, dim) => {
+        const sortByDayTime = (list) => list.slice().sort(
+          (a, b) => (a.day_of_week - b.day_of_week) || ((a.time_start || '').localeCompare(b.time_start || '')),
+        );
+        // One row per club occurrence, sorted by weekday then time (matches the
+        // design). day pill + kid-colour glyph tile + name + time + pickup.
+        const renderRow = (kid, a, dim) => {
+          const kidColor = hexFor(kid);
+          const Glyph = ACTIVITY_ICONS[iconFor(a.activity)] || ACTIVITY_ICONS.star;
           const s = a.time_start ? a.time_start.substring(0, 5) : '';
           const e = a.time_end ? a.time_end.substring(0, 5) : '';
           const time = s && e ? `${s}–${e}` : s ? `from ${s}` : e ? `until ${e}` : '';
           const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
-          return [time, pickup ? `🚗 ${pickup.name}` : '', dim && a.term_label ? a.term_label : ''].filter(Boolean).join(' · ');
-        };
-        const dayChip = (kid, it, interactive) => interactive ? (
-          <button key={it.id} type="button" onClick={() => openEditActivity(kid, it)} title={`Edit ${DAY_LABELS[it.day_of_week]}`}
-            className="text-[11px] font-medium text-cocoa bg-cream rounded-md px-1.5 py-0.5 hover:text-primary hover:bg-primary/10 transition-colors">
-            {DAY_LABELS[it.day_of_week]}
-          </button>
-        ) : (
-          <span key={it.id} className="text-[11px] font-medium text-cocoa bg-cream rounded-md px-1.5 py-0.5">{DAY_LABELS[it.day_of_week]}</span>
-        );
-        // One dense row per merge-group. A single session is one big tap target;
-        // a merged group makes each weekday chip the (per-day) tap target.
-        const renderActivityRow = (kid, items, dim) => {
-          const a = items[0];
-          const meta = activityMeta(a, dim);
-          if (items.length === 1) {
-            return (
-              <button key={a.id} type="button" onClick={isAdmin ? () => openEditActivity(kid, a) : undefined} disabled={!isAdmin}
-                className={`w-full flex items-center gap-2.5 py-1.5 text-left transition-colors ${isAdmin ? 'hover:text-primary' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
-                title={isAdmin ? 'Tap to edit' : undefined}>
-                {dayChip(kid, a, false)}
-                <span className="flex-1 min-w-0 text-sm text-bark truncate">{a.activity}</span>
-                {meta && <span className="text-[11px] text-cocoa shrink-0 whitespace-nowrap">{meta}</span>}
-              </button>
-            );
-          }
+          const dayLabel = DAY_LABELS[a.day_of_week];
           return (
-            <div key={a.id} className={`flex items-center gap-2.5 py-1.5 ${dim ? 'opacity-60' : ''}`}>
-              <span className="flex gap-1 shrink-0">{items.map(it => dayChip(kid, it, isAdmin))}</span>
-              <span className="flex-1 min-w-0 text-sm text-bark truncate">{a.activity}</span>
-              {meta && <span className="text-[11px] text-cocoa shrink-0 whitespace-nowrap">{meta}</span>}
-            </div>
+            <button
+              key={a.id}
+              type="button"
+              onClick={isAdmin ? () => openEditActivity(kid, a) : undefined}
+              disabled={!isAdmin}
+              aria-label={`${a.activity}, ${dayLabel}${time ? `, ${time}` : ''}${pickup ? `, pickup ${pickup.name}` : ''}`}
+              className={`w-full flex items-center gap-4 px-5 py-3 text-left transition-colors ${isAdmin ? 'hover:bg-[#F3EEE5]' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
+              style={{ borderTop: '1px solid var(--color-light-grey)' }}
+            >
+              <span className="w-[46px] shrink-0 text-center py-[5px] rounded-lg text-[11px] font-bold tracking-[0.04em] text-warm-grey" style={{ background: SOFT }}>
+                {dayLabel}
+              </span>
+              <span className="w-[38px] h-[38px] rounded-[11px] shrink-0 flex items-center justify-center" style={{ background: kidColor + '1F' }}>
+                <Glyph size={20} color={kidColor} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold text-charcoal truncate">{a.activity}</span>
+                {dim && a.term_label && <span className="block text-xs text-warm-grey truncate">{a.term_label}</span>}
+              </span>
+              {time && <span className="text-[13px] font-semibold text-warm-grey shrink-0 whitespace-nowrap" style={{ fontVariantNumeric: 'tabular-nums' }}>{time}</span>}
+              {pickup && (
+                <span className="flex items-center gap-2 pl-3 shrink-0" style={{ borderLeft: '1px solid var(--color-light-grey)' }}>
+                  <PickupCar className="h-3.5 w-3.5 text-warm-grey" />
+                  <Avatar member={pickup} size={24} />
+                  <span className="text-xs font-semibold text-warm-grey whitespace-nowrap hidden sm:inline">{pickup.name}</span>
+                </span>
+              )}
+            </button>
           );
         };
         return (
-          <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-            <h2 className="text-base md:text-medium font-semibold text-bark mb-1">Activities</h2>
-            <p className="text-sm text-cocoa mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
+          <section>
+            <h2 className="text-lg font-bold text-charcoal mb-0.5">Activities</h2>
+            <p className="text-sm text-warm-grey mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
             {activityKids.length === 0 ? (
-              <p className="text-sm text-cocoa">Add a child to start tracking after-school activities.</p>
+              <p className="text-sm text-warm-grey">Add a child to start tracking after-school activities.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="flex flex-col gap-4">
                 {activityKids.map((kid) => {
-                  const avatarClass = AVATAR_COLOURS[kid.color_theme] || AVATAR_COLOURS.teal;
                   const acts = childActivities[kid.id] || [];
-                  const active = groupActivities(acts.filter(activityActiveToday));
-                  const other = groupActivities(acts.filter(a => !activityActiveToday(a)));
+                  const active = sortByDayTime(acts.filter(activityActiveToday));
+                  const other = sortByDayTime(acts.filter(a => !activityActiveToday(a)));
                   const clubCount = active.length + other.length;
                   return (
-                    <div key={kid.id} className="border border-cream-border rounded-xl p-3.5 bg-white/40">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {kid.avatar_url ? (
-                            <img src={kid.avatar_url} alt={kid.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
-                          ) : (
-                            <div className={`w-7 h-7 rounded-full ${avatarClass} flex items-center justify-center font-bold text-xs shrink-0`}>{kid.name[0]?.toUpperCase()}</div>
-                          )}
-                          <span className="text-sm font-semibold text-bark truncate">{kid.name}</span>
-                          {clubCount > 0 && <span className="text-[11px] text-warm-grey shrink-0">{clubCount} club{clubCount === 1 ? '' : 's'}</span>}
-                        </div>
+                    <div key={kid.id} className="bg-white rounded-[18px] border border-light-grey overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+                      <div className="flex items-center gap-3 px-5 py-4">
+                        <Avatar member={kid} size={36} />
+                        <span className="text-base font-bold text-charcoal truncate">{kid.name}</span>
+                        <span className="text-xs text-warm-grey font-medium">{clubCount} {clubCount === 1 ? 'club' : 'clubs'}</span>
+                        <div className="flex-1" />
                         {isAdmin && (
-                          <button onClick={() => openAddActivity(kid)} className="text-xs font-semibold text-primary hover:text-primary-pressed shrink-0">+ Add</button>
+                          <button onClick={() => openAddActivity(kid)} className="text-xs font-semibold text-plum hover:text-plum/80 shrink-0">+ Add</button>
                         )}
                       </div>
-                      {active.length > 0 ? (
-                        <div className="divide-y divide-cream-border border-t border-cream-border">{active.map(items => renderActivityRow(kid, items, false))}</div>
+                      {clubCount === 0 ? (
+                        <div className="px-5 pb-5 -mt-1.5 text-xs text-warm-grey italic">No clubs yet.</div>
+                      ) : active.length > 0 ? (
+                        active.map(a => renderRow(kid, a, false))
                       ) : (
-                        <p className="text-xs text-warm-grey pt-1">No activities running this term.</p>
+                        <div className="px-5 pb-2 -mt-1.5 text-xs text-warm-grey">No activities running this term.</div>
                       )}
                       {other.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-[11px] font-medium text-warm-grey uppercase tracking-wide mb-0.5">Other terms</p>
-                          <div className="divide-y divide-cream-border border-t border-cream-border">{other.map(items => renderActivityRow(kid, items, true))}</div>
-                        </div>
+                        <>
+                          <div className="px-5 pt-3 pb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-warm-grey" style={{ borderTop: '1px solid var(--color-light-grey)' }}>Other terms</div>
+                          {other.map(a => renderRow(kid, a, true))}
+                        </>
                       )}
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </section>
         );
       })()}
 
@@ -2411,11 +2363,15 @@ export default function FamilySetup() {
         </div>
       )}
 
-      {/* Allergies & Dietary Requirements */}
-      <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-        <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Allergies & Dietary Requirements</h2>
-        <p className="text-sm text-cocoa mb-4">Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.</p>
-        <div className="flex flex-wrap gap-2">
+      {/* Allergies & Dietary Requirements - a single white card. The chips are
+          a toggle group (aria-pressed) so screen readers announce on/off, not
+          colour alone. Persists to households.allergies. */}
+      <div className="bg-white rounded-[18px] border border-light-grey p-6 md:p-7" style={{ boxShadow: CARD_SHADOW }}>
+        <h2 className="text-lg font-bold text-charcoal">Allergies &amp; dietary requirements</h2>
+        <p className="text-sm text-warm-grey mt-1.5 max-w-[620px] leading-relaxed">
+          Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.
+        </p>
+        <div role="group" aria-label="Household allergens and dietary requirements" className="flex flex-wrap gap-2.5 mt-5 mb-6">
           {[
             { key: 'celery', label: 'Celery' },
             { key: 'gluten', label: 'Gluten' },
@@ -2441,14 +2397,20 @@ export default function FamilySetup() {
               <button
                 key={key}
                 type="button"
+                aria-pressed={selected}
                 onClick={() => toggleAllergy(key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
                   selected
-                    ? 'bg-coral/10 border-coral text-coral'
-                    : 'border-cream-border text-cocoa hover:border-bark'
+                    ? 'bg-coral-light border-[1.5px] border-coral'
+                    : 'bg-white text-warm-grey border border-light-grey hover:bg-[#F3EEE5]'
                 }`}
+                style={selected ? { color: '#C24E1F' } : undefined}
               >
-                {selected && <span className="mr-1">&#10003;</span>}
+                {selected && (
+                  <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M2 6.2l2.6 2.6L10 3" stroke="#E8724A" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
                 {label}
               </button>
             );
@@ -2457,7 +2419,8 @@ export default function FamilySetup() {
         <button
           onClick={handleSaveAllergies}
           disabled={savingAllergies}
-          className="mt-4 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-colors"
+          className="bg-plum hover:bg-plum/90 disabled:opacity-50 text-white font-semibold px-7 py-3 rounded-[14px] text-[15px] transition-colors"
+          style={{ boxShadow: '0 2px 8px rgba(108,61,217,0.3)' }}
         >
           {savingAllergies ? 'Saving…' : 'Save'}
         </button>
