@@ -1896,7 +1896,7 @@ export default function FamilySetup() {
           distinguishes Admin / Parent. Edit + remove on hover. */}
       <section>
         <h2 className="text-lg font-bold text-charcoal mb-0.5">Members</h2>
-        <p className="text-sm text-warm-grey mb-4">Family members with their own accounts.</p>
+        <p className="text-sm text-[var(--ink-2)] mb-4">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
             {members.filter(m => m.member_type !== 'dependent').map((m) => (
@@ -1971,7 +1971,7 @@ export default function FamilySetup() {
           treatment; activities + school live in their own sections now. */}
       <section>
         <h2 className="text-lg font-bold text-charcoal mb-0.5">Children &amp; dependents</h2>
-        <p className="text-sm text-warm-grey mb-4">Family members who don&apos;t need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
+        <p className="text-sm text-[var(--ink-2)] mb-4">Family members who don&apos;t need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
             {members.filter(m => m.member_type === 'dependent').map((m) => (
@@ -2005,7 +2005,7 @@ export default function FamilySetup() {
               <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddSchool}>Add a school</PillBtn>
             )}
           </div>
-          <p className="text-sm text-warm-grey mb-4 max-w-[560px]">
+          <p className="text-sm text-[var(--ink-2)] mb-4 max-w-[560px]">
             Import term dates once and Housemait keeps half-term reminders and
             term-only activities in sync for everyone at that school.
           </p>
@@ -2097,7 +2097,7 @@ export default function FamilySetup() {
       ) : (
         <section>
           <h2 className="text-lg font-bold text-charcoal mb-1">Schools</h2>
-          <p className="text-sm text-warm-grey max-w-[560px]">
+          <p className="text-sm text-[var(--ink-2)] max-w-[560px]">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries -
             until then, the rest of Housemait works the same.
@@ -2256,7 +2256,7 @@ export default function FamilySetup() {
         return (
           <section>
             <h2 className="text-lg font-bold text-charcoal mb-0.5">Activities</h2>
-            <p className="text-sm text-warm-grey mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
+            <p className="text-sm text-[var(--ink-2)] mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
             {activityKids.length === 0 ? (
               <p className="text-sm text-warm-grey">Add a child to start tracking after-school activities.</p>
             ) : (
@@ -2391,7 +2391,7 @@ export default function FamilySetup() {
           colour alone. Persists to households.allergies. */}
       <div className="bg-white rounded-[18px] border border-light-grey p-6 md:p-7" style={{ boxShadow: CARD_SHADOW }}>
         <h2 className="text-lg font-bold text-charcoal">Allergies &amp; dietary requirements</h2>
-        <p className="text-sm text-warm-grey mt-1.5 max-w-[620px] leading-relaxed">
+        <p className="text-sm text-[var(--ink-2)] mt-1.5 max-w-[620px] leading-relaxed">
           Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.
         </p>
         <div role="group" aria-label="Household allergens and dietary requirements" className="flex flex-wrap gap-2.5 mt-5 mb-6">
