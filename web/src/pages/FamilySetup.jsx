@@ -1769,11 +1769,6 @@ export default function FamilySetup() {
         kicker={`${members.length} ${members.length === 1 ? 'member' : 'members'}`}
         title={familyTitle(household?.name)}
         subtitle="Manage who's in your household and how Housemait works for everyone."
-        actions={isAdmin ? (
-          <PillBtn primary icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddMember}>
-            Invite member
-          </PillBtn>
-        ) : null}
       />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
