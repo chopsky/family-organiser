@@ -4,6 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
 import PageHeader from '../components/ui/PageHeader';
+import Segmented from '../components/ui/Segmented';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
@@ -1341,7 +1342,7 @@ export default function Calendar() {
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <PageHeader
-        kicker={currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+        kicker={navigationLabel}
         title="Calendar"
         actions={
 
@@ -1412,17 +1413,43 @@ export default function Calendar() {
             )}
           </div>
 
-          {/* View select */}
-          <select
+          {/* View switcher */}
+          <Segmented
+            ariaLabel="Calendar view"
             value={viewMode}
-            onChange={e => setViewMode(e.target.value)}
-            className="h-9 rounded-[10px] border-[1.5px] border-light-grey bg-white text-charcoal text-xs font-semibold px-3 pr-7 outline-none cursor-pointer hover:border-plum focus:border-plum transition-colors"
-            style={{ appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B6774' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+            onChange={setViewMode}
+            options={[
+              { value: 'month', label: 'Month' },
+              { value: 'week', label: 'Week' },
+              { value: 'day', label: 'Day' },
+            ]}
+          />
+
+          {/* Prev / next */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={navigatePrev}
+              aria-label="Previous"
+              className="w-9 h-9 rounded-[10px] border-[1.5px] border-light-grey bg-white flex items-center justify-center text-charcoal hover:border-plum hover:text-plum hover:bg-plum-light transition-all"
+            >
+              <ChevronLeft />
+            </button>
+            <button
+              onClick={navigateNext}
+              aria-label="Next"
+              className="w-9 h-9 rounded-[10px] border-[1.5px] border-light-grey bg-white flex items-center justify-center text-charcoal hover:border-plum hover:text-plum hover:bg-plum-light transition-all"
+            >
+              <ChevronRight />
+            </button>
+          </div>
+
+          {/* Today */}
+          <button
+            onClick={goToday}
+            className="h-9 px-4 rounded-[10px] border-[1.5px] border-light-grey bg-white text-charcoal text-[13px] font-semibold hover:border-plum hover:text-plum hover:bg-plum-light transition-all"
           >
-            <option value="month">Month</option>
-            <option value="week">Week</option>
-            <option value="day">Day</option>
-          </select>
+            Today
+          </button>
 
           {/* Add event button - hidden for expired households; inline
               SubscribePrompt appears below the toolbar instead. */}
@@ -1434,7 +1461,7 @@ export default function Calendar() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span className="hidden md:inline">Add</span>
+              <span className="hidden md:inline">New event</span>
             </button>
           )}
 
@@ -1529,31 +1556,6 @@ export default function Calendar() {
         </div>
         }
       />
-
-      {/* ── Nav row ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="text-base md:text-lg font-semibold" style={{ fontFamily: 'var(--font-display)' }}>{navigationLabel}</div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={navigatePrev}
-            className="w-9 h-9 rounded-[10px] border-[1.5px] border-light-grey bg-white flex items-center justify-center text-charcoal hover:border-plum hover:text-plum hover:bg-plum-light transition-all"
-          >
-            <ChevronLeft />
-          </button>
-          <button
-            onClick={goToday}
-            className="px-4 py-1.5 rounded-full border-[1.5px] border-plum bg-transparent text-plum text-xs font-semibold hover:bg-plum hover:text-white transition-all"
-          >
-            Today
-          </button>
-          <button
-            onClick={navigateNext}
-            className="w-9 h-9 rounded-[10px] border-[1.5px] border-light-grey bg-white flex items-center justify-center text-charcoal hover:border-plum hover:text-plum hover:bg-plum-light transition-all"
-          >
-            <ChevronRight />
-          </button>
-        </div>
-      </div>
 
       {/* ── Month View ──────────────────────────────────────── */}
       {viewMode === 'month' && (
