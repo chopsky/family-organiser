@@ -19,7 +19,7 @@ const mainNav = [
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar  },
   { to: '/meals',      label: 'Meal Plan', Icon: IconUtensils  },
-  { to: '/receipt',    label: 'Receipt',   Icon: IconCamera    },
+  { to: '/receipt',    label: 'Receipts',  Icon: IconCamera    },
   { to: '/documents',  label: 'Documents', Icon: IconFileText  },
 ];
 

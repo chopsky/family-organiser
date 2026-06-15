@@ -147,6 +147,10 @@ app.use('/api/tasks',    require('./routes/tasks'));
 app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/classify', require('./routes/classify'));
 app.use('/api/receipt',  require('./routes/receipt'));
+// Same router under the plural collection path: GET /api/receipts (list),
+// GET /api/receipts/:id, PATCH .../items/:itemId (reconcile), DELETE. The
+// singular /api/receipt keeps serving the scan POST for existing callers.
+app.use('/api/receipts', require('./routes/receipt'));
 app.use('/api/digest',   require('./routes/digest'));
 app.use('/api/weather',  require('./routes/weather'));
 app.use('/api/chat',     require('./routes/chat'));

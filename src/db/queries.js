@@ -6135,6 +6135,139 @@ async function getDocumentsByFolderIds(folderIds) {
   return data || [];
 }
 
+// ── Receipts ───────────────────────────────────────────────────────────────
+
+// Persist a scanned receipt + its extracted lines in one go. `items` is an
+// array of { name, original_text, price_text, matched, matched_list_item_id,
+// matched_list_item_name, confidence }. item_count / matched_count / status are
+// derived here so callers don't keep them in sync by hand.
+async function createReceiptWithItems(householdId, userId, { merchant, purchased_on, total_text, items = [] }) {
+  const itemCount = items.length;
+  const matchedCount = items.filter((i) => i.matched).length;
+  const status = itemCount > 0 && matchedCount >= itemCount ? 'matched' : 'review';
+
+  const { data: receipt, error } = await supabase
+    .from('receipts')
+    .insert({
+      household_id: householdId,
+      created_by: userId || null,
+      merchant: merchant || null,
+      purchased_on: purchased_on || null,
+      total_text: total_text || null,
+      item_count: itemCount,
+      matched_count: matchedCount,
+      status,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  if (items.length) {
+    const rows = items.map((i) => ({
+      receipt_id: receipt.id,
+      household_id: householdId,
+      name: i.name,
+      original_text: i.original_text || null,
+      price_text: i.price_text || null,
+      matched: !!i.matched,
+      matched_list_item_id: i.matched_list_item_id || null,
+      matched_list_item_name: i.matched_list_item_name || null,
+      confidence: typeof i.confidence === 'number' ? i.confidence : null,
+    }));
+    const { error: itemsErr } = await supabase.from('receipt_items').insert(rows);
+    if (itemsErr) throw itemsErr;
+  }
+  return receipt;
+}
+
+async function getReceipts(householdId) {
+  const { data, error } = await supabase
+    .from('receipts')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function getReceiptById(householdId, receiptId) {
+  const { data: receipt, error } = await supabase
+    .from('receipts')
+    .select('*')
+    .eq('id', receiptId)
+    .eq('household_id', householdId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  if (!receipt) return null;
+
+  const { data: items, error: itemsErr } = await supabase
+    .from('receipt_items')
+    .select('*')
+    .eq('receipt_id', receiptId)
+    .order('created_at', { ascending: true });
+  if (itemsErr) throw itemsErr;
+
+  return { ...receipt, items: items || [] };
+}
+
+// Toggle a receipt line's matched state (the reconcile flow), then recompute
+// the parent receipt's matched_count + status. Household-scoped throughout.
+// Returns the refreshed receipt+items, or null if the receipt isn't this
+// household's (IDOR guard).
+async function setReceiptItemMatched(householdId, receiptId, itemId, { matched, matched_list_item_id, matched_list_item_name }) {
+  const { data: receipt, error: rErr } = await supabase
+    .from('receipts')
+    .select('id')
+    .eq('id', receiptId)
+    .eq('household_id', householdId)
+    .single();
+  if (rErr || !receipt) return null;
+
+  const update = { matched: !!matched };
+  if (matched_list_item_id !== undefined) update.matched_list_item_id = matched_list_item_id || null;
+  if (matched_list_item_name !== undefined) update.matched_list_item_name = matched_list_item_name || null;
+  if (!matched) {
+    update.matched_list_item_id = null;
+    update.matched_list_item_name = null;
+    update.confidence = null;
+  }
+
+  const { error: uErr } = await supabase
+    .from('receipt_items')
+    .update(update)
+    .eq('id', itemId)
+    .eq('receipt_id', receiptId)
+    .eq('household_id', householdId);
+  if (uErr) throw uErr;
+
+  const { data: items, error: cErr } = await supabase
+    .from('receipt_items')
+    .select('matched')
+    .eq('receipt_id', receiptId);
+  if (cErr) throw cErr;
+  const itemCount = items.length;
+  const matchedCount = items.filter((i) => i.matched).length;
+  const status = itemCount > 0 && matchedCount >= itemCount ? 'matched' : 'review';
+
+  const { error: rUErr } = await supabase
+    .from('receipts')
+    .update({ matched_count: matchedCount, status })
+    .eq('id', receiptId)
+    .eq('household_id', householdId);
+  if (rUErr) throw rUErr;
+
+  return getReceiptById(householdId, receiptId);
+}
+
+async function deleteReceipt(householdId, receiptId) {
+  const { error } = await supabase
+    .from('receipts')
+    .delete()
+    .eq('id', receiptId)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
 /**
  * Append one row to the document audit log.
  *
@@ -7245,6 +7378,11 @@ module.exports = {
   createDocument,
   getDocuments,
   getRecentDocuments,
+  createReceiptWithItems,
+  getReceipts,
+  getReceiptById,
+  setReceiptItemMatched,
+  deleteReceipt,
   getDocumentById,
   updateDocument,
   deleteDocument,
