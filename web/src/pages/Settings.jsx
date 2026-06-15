@@ -408,8 +408,8 @@ function PlanSection() {
  */
 function EditProfileForm({
   profileAvatar, profileName, profileColor, profileRole, profileBirthday,
-  profileReminderTime, uploadingAvatar, savingProfile, household, avatarColors,
-  setProfileName, setProfileRole, setProfileBirthday, setProfileColor, setProfileReminderTime,
+  uploadingAvatar, savingProfile, avatarColors,
+  setProfileName, setProfileRole, setProfileBirthday, setProfileColor,
   handlePickAvatar, handleAvatarRemove, handleSaveProfile, onCancel,
 }) {
   return (
@@ -491,13 +491,6 @@ function EditProfileForm({
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
-          <input type="time" value={profileReminderTime} onChange={(e) => setProfileReminderTime(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
-          <p className="text-xs text-cocoa mt-1">
-            {profileReminderTime ? 'Your personal reminder time.' : `Using household default (${household?.reminder_time?.slice(0, 5) || '08:00'}).`}
-          </p>
-        </div>
       </div>
 
       <div className="flex gap-3 mt-6">
@@ -855,7 +848,6 @@ export default function Settings() {
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('teal');
-  const [profileReminderTime, setProfileReminderTime] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -933,7 +925,6 @@ export default function Settings() {
     setProfileRole(me?.family_role || '');
     setProfileBirthday(me?.birthday || '');
     setProfileColor(me?.color_theme || user?.color_theme || 'sage');
-    setProfileReminderTime(me?.reminder_time ? me.reminder_time.substring(0, 5) : '');
     setProfileAvatar(me?.avatar_url || user?.avatar_url || null);
     setEditingProfile(true);
   }
@@ -990,7 +981,6 @@ export default function Settings() {
         family_role: profileRole.trim(),
         birthday: profileBirthday || null,
         color_theme: profileColor,
-        reminder_time: profileReminderTime || null,
       });
       await loadMembers();
       const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
@@ -2832,16 +2822,13 @@ export default function Settings() {
                 profileColor={profileColor}
                 profileRole={profileRole}
                 profileBirthday={profileBirthday}
-                profileReminderTime={profileReminderTime}
                 uploadingAvatar={uploadingAvatar}
                 savingProfile={savingProfile}
-                household={household}
                 avatarColors={avatarColors}
                 setProfileName={setProfileName}
                 setProfileRole={setProfileRole}
                 setProfileBirthday={setProfileBirthday}
                 setProfileColor={setProfileColor}
-                setProfileReminderTime={setProfileReminderTime}
                 handlePickAvatar={handlePickAvatar}
                 handleAvatarRemove={handleAvatarRemove}
                 handleSaveProfile={handleSaveProfile}
@@ -2874,16 +2861,13 @@ export default function Settings() {
               profileColor={profileColor}
               profileRole={profileRole}
               profileBirthday={profileBirthday}
-              profileReminderTime={profileReminderTime}
               uploadingAvatar={uploadingAvatar}
               savingProfile={savingProfile}
-              household={household}
               avatarColors={avatarColors}
               setProfileName={setProfileName}
               setProfileRole={setProfileRole}
               setProfileBirthday={setProfileBirthday}
               setProfileColor={setProfileColor}
-              setProfileReminderTime={setProfileReminderTime}
               handlePickAvatar={handlePickAvatar}
               handleAvatarRemove={handleAvatarRemove}
               handleSaveProfile={handleSaveProfile}

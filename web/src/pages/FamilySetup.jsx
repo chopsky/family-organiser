@@ -262,13 +262,6 @@ export default function FamilySetup() {
 
   // (Household name + address are now edited via the modal - see
   // hhEdit* state below. The old inline-textfield setup is gone.)
-  // Household default reminder time. Previously editable on this page but
-  // removed from the UI now that each member sets their own time - the
-  // column is kept as the scheduler's fallback for users who haven't set a
-  // personal time. The seed value (set on signup) remains in the DB and is
-  // never re-edited from the client. Read here only to display in the
-  // per-member hint copy.
-  const householdReminderTime = household?.reminder_time?.slice(0, 5) ?? '08:00';
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
   const [householdAllergies, setHouseholdAllergies] = useState(() => {
@@ -364,7 +357,6 @@ export default function FamilySetup() {
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('teal');
-  const [profileReminderTime, setProfileReminderTime] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   // Separate flag for the household-card avatar quick-upload (different
@@ -678,7 +670,6 @@ export default function FamilySetup() {
     setProfileRole(member.family_role || '');
     setProfileBirthday(member.birthday || '');
     setProfileColor(member.color_theme || 'sage');
-    setProfileReminderTime(member.reminder_time ? member.reminder_time.substring(0, 5) : '');
     setProfileAvatar(member.avatar_url || null);
     setProfileSchoolId(member.school_id || null);
     setProfileAttendsSchool(Boolean(member.school_id));
@@ -1449,7 +1440,6 @@ export default function FamilySetup() {
         family_role: profileRole.trim(),
         birthday: profileBirthday || null,
         color_theme: profileColor,
-        reminder_time: profileReminderTime || null,
       };
 
       // School link is only a term-calendar disambiguator now, surfaced as
@@ -3156,21 +3146,6 @@ export default function FamilySetup() {
                 </div>
               )}
 
-              {editingMember?.member_type !== 'dependent' && (
-                <div className="min-w-0 overflow-hidden">
-                  <label className="block text-sm font-medium text-bark mb-1">Daily reminder time</label>
-                  <input
-                    type="time"
-                    value={profileReminderTime}
-                    onChange={(e) => setProfileReminderTime(e.target.value)}
-                    style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
-                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
-                  />
-                  <p className="text-xs text-cocoa mt-1">
-                    {profileReminderTime ? 'Your personal reminder time.' : `If empty, sent at ${householdReminderTime}.`}
-                  </p>
-                </div>
-              )}
             </div>
 
             <div className="flex gap-3 mt-6">

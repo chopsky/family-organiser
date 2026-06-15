@@ -42,31 +42,32 @@ function currentHHMMInTZ(timezone) {
   }
 }
 
+// The morning brief goes out at a single fixed local time for everyone. Members
+// opt out per-person via the Settings toggle (enforced inside sendDailyReminders),
+// not by picking a time - so there's no per-member/household reminder_time here.
+const DAILY_BRIEF_TIME = '07:00';
+
 /**
- * Run daily reminders - checks each member's personal reminder_time,
- * falling back to the household default. Called every minute by cron.
- * Uses DB lock to prevent duplicate sends during rolling deploys.
+ * Run daily reminders - the morning brief is sent to every member at
+ * DAILY_BRIEF_TIME in the household's timezone. Members who turned the brief
+ * off, or have no delivery channel, are skipped inside sendDailyReminders.
+ * Called every minute by cron; a per-member DB lock prevents duplicate sends
+ * during rolling deploys.
  */
 async function runDailyReminderCheck() {
   try {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       const tz = household.timezone || 'Europe/London';
-      const nowInTZ = currentHHMMInTZ(tz);
-      const householdDefault = (household.reminder_time || '08:00:00').substring(0, 5);
+      if (currentHHMMInTZ(tz) !== DAILY_BRIEF_TIME) continue;
       const members = await db.getHouseholdMembers(household.id);
       const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
 
       for (const member of members) {
-        const memberTime = member.reminder_time
-          ? (member.reminder_time).substring(0, 5)
-          : householdDefault;
-        if (memberTime === nowInTZ) {
-          const lockKey = `daily_reminder:${member.id}`;
-          const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
-          if (!acquired) continue;
-          await sendDailyReminders(household.id, member);
-        }
+        const lockKey = `daily_reminder:${member.id}`;
+        const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+        if (!acquired) continue;
+        await sendDailyReminders(household.id, member);
       }
     }
   } catch (err) {
