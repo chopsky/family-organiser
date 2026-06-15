@@ -360,12 +360,12 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
             src={member.avatar_url}
             alt=""
             className="shrink-0 rounded-full object-cover"
-            style={{ width: 40, height: 40, border: '2px solid #fff' }}
+            style={{ width: 45, height: 45, border: '2px solid #fff' }}
           />
         ) : (
           <div
             className="shrink-0 flex items-center justify-center"
-            style={{ width: 40, height: 40, borderRadius: '50%', background: avatarColor, color: '#fff', fontSize: 16, fontWeight: 600, border: '2px solid #fff' }}
+            style={{ width: 45, height: 45, borderRadius: '50%', background: avatarColor, color: '#fff', fontSize: 16, fontWeight: 600, border: '2px solid #fff' }}
           >
             {initial}
           </div>
