@@ -12,6 +12,7 @@ jest.mock('../db/queries', () => ({
   getReceiptById: jest.fn(),
   setReceiptItemMatched: jest.fn(),
   deleteReceipt: jest.fn(),
+  setReceiptStatus: jest.fn(),
 }));
 jest.mock('../services/ai', () => ({ scanReceipt: jest.fn(), matchReceiptToList: jest.fn() }));
 jest.mock('../middleware/auth', () => ({
@@ -93,6 +94,50 @@ describe('DELETE /api/receipts/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(db.deleteReceipt).toHaveBeenCalledWith('h1', 'R1');
+  });
+});
+
+describe('PATCH /api/receipts/:id (status)', () => {
+  it('rejects an invalid status', async () => {
+    const res = await request(makeApp()).patch('/api/receipts/R1').send({ status: 'nope' });
+    expect(res.status).toBe(400);
+    expect(db.setReceiptStatus).not.toHaveBeenCalled();
+  });
+
+  it('files a receipt for records', async () => {
+    db.setReceiptStatus.mockResolvedValue({ id: 'R1', status: 'filed' });
+    const res = await request(makeApp()).patch('/api/receipts/R1').send({ status: 'filed' });
+    expect(res.status).toBe(200);
+    expect(res.body.receipt.status).toBe('filed');
+    expect(db.setReceiptStatus).toHaveBeenCalledWith('h1', 'R1', 'filed');
+  });
+
+  it('404s when the receipt is not the household\'s', async () => {
+    db.setReceiptStatus.mockResolvedValue(null);
+    const res = await request(makeApp()).patch('/api/receipts/R9').send({ status: 'filed' });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('parseReceiptDate', () => {
+  const p = router.parseReceiptDate;
+  it('parses UK day-first numeric dates', () => {
+    expect(p('22/05/2025')).toBe('2025-05-22');
+    expect(p('22-05-2025')).toBe('2025-05-22');
+    expect(p('22.05.2025')).toBe('2025-05-22');
+    expect(p('22/05/25')).toBe('2025-05-22');
+  });
+  it('parses ISO and named-month dates', () => {
+    expect(p('2025-05-22')).toBe('2025-05-22');
+    expect(p('22 May 2025')).toBe('2025-05-22');
+  });
+  it('tolerates US month-first when unambiguous', () => {
+    expect(p('5/22/2025')).toBe('2025-05-22');
+  });
+  it('returns null for junk or missing input', () => {
+    expect(p('')).toBeNull();
+    expect(p(null)).toBeNull();
+    expect(p('not a date')).toBeNull();
   });
 });
 

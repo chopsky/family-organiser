@@ -6268,6 +6268,21 @@ async function deleteReceipt(householdId, receiptId) {
   if (error) throw error;
 }
 
+// Set a receipt's status ('filed' to keep it for records without matching, or
+// 'review'). Household-scoped (IDOR guard). Returns the updated row, or null
+// when the receipt isn't this household's.
+async function setReceiptStatus(householdId, receiptId, status) {
+  const { data, error } = await supabase
+    .from('receipts')
+    .update({ status })
+    .eq('id', receiptId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 /**
  * Append one row to the document audit log.
  *
@@ -7383,6 +7398,7 @@ module.exports = {
   getReceiptById,
   setReceiptItemMatched,
   deleteReceipt,
+  setReceiptStatus,
   getDocumentById,
   updateDocument,
   deleteDocument,

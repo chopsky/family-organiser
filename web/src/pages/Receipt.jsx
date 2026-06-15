@@ -32,16 +32,23 @@ function currencySymbol(totalText) {
   return m ? m[0] : '£';
 }
 
-function whenLabel(iso) {
-  if (!iso) return '';
-  const then = new Date(iso);
-  if (Number.isNaN(then.getTime())) return '';
-  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86400000);
-  if (days <= 0) return `Today · ${then.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return then.toLocaleDateString('en-GB', { weekday: 'short' });
-  return then.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+// The receipt's own purchase date (a YYYY-MM-DD, no time) is what belongs on the
+// card - not when it was uploaded. Show that; only when the scan couldn't read a
+// date do we fall back to the upload date, prefixed "Added" so it's never
+// mistaken for the receipt date. The year is shown when it isn't the current one.
+function purchasedLabel(r) {
+  const fmt = (d) => d.toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}),
+  });
+  if (r.purchased_on) {
+    const d = new Date(`${r.purchased_on}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? '' : fmt(d);
+  }
+  if (r.created_at) {
+    const d = new Date(r.created_at);
+    return Number.isNaN(d.getTime()) ? '' : `Added ${fmt(d)}`;
+  }
+  return '';
 }
 
 /* ─── Main ─── */
@@ -88,6 +95,30 @@ export default function Receipt() {
     } finally {
       setScanning(false);
       if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  // Delete a receipt from the grid (optimistic, reconciles on failure).
+  async function handleDeleteReceipt(id) {
+    const ok = await confirmDestructive({ title: 'Delete this receipt?', message: 'This removes it from your history. This cannot be undone.' });
+    if (!ok) return;
+    setReceipts(prev => prev.filter(r => r.id !== id));
+    try {
+      await api.delete(`/receipts/${id}`);
+    } catch {
+      setError('Could not delete this receipt.');
+      load();
+    }
+  }
+
+  // "Keep for records": file the receipt so it stops nudging to be matched.
+  async function handleKeep(id) {
+    setReceipts(prev => prev.map(r => (r.id === id ? { ...r, status: 'filed' } : r)));
+    try {
+      await api.patch(`/receipts/${id}`, { status: 'filed' });
+    } catch {
+      setError('Could not update this receipt.');
+      load();
     }
   }
 
@@ -152,7 +183,13 @@ export default function Receipt() {
         {loading
           ? [1, 2].map(i => <div key={i} className="min-h-[200px] rounded-[18px] animate-pulse" style={{ background: SOFT }} />)
           : receipts.map(r => (
-            <ReceiptCard key={r.id} r={r} onView={() => setOpenId(r.id)} />
+            <ReceiptCard
+              key={r.id}
+              r={r}
+              onView={() => setOpenId(r.id)}
+              onKeep={() => handleKeep(r.id)}
+              onDelete={() => handleDeleteReceipt(r.id)}
+            />
           ))}
       </div>
 
@@ -171,11 +208,18 @@ export default function Receipt() {
 
 /* ─── Receipt Card ─── */
 
-function ReceiptCard({ r, onView }) {
+function ReceiptCard({ r, onView, onKeep, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const color = colorFor(r.merchant || 'Receipt');
-  const fullyMatched = r.item_count > 0 && r.matched_count >= r.item_count;
+  const filed = r.status === 'filed';
+  const fullyMatched = !filed && r.item_count > 0 && r.matched_count >= r.item_count;
   const pct = r.item_count > 0 ? Math.round((r.matched_count / r.item_count) * 100) : 0;
   const remaining = Math.max(0, r.item_count - r.matched_count);
+  const badge = filed
+    ? { label: 'Filed', style: { background: '#ECEAF0', color: '#6B6774' } }
+    : fullyMatched
+      ? { label: 'Matched', style: { background: 'var(--color-sage-light)', color: '#3F6E3D' } }
+      : { label: 'Review', style: { background: '#FBF1DE', color: '#85622A' } };
 
   return (
     <div className="bg-white rounded-[18px] border border-light-grey p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
@@ -186,36 +230,65 @@ function ReceiptCard({ r, onView }) {
           </div>
           <div className="min-w-0">
             <div className="text-[15px] font-bold text-charcoal truncate">{r.merchant || 'Unknown shop'}</div>
-            <div className="text-xs text-warm-grey mt-0.5">{whenLabel(r.purchased_on || r.created_at)}</div>
+            <div className="text-xs text-warm-grey mt-0.5">{purchasedLabel(r)}</div>
           </div>
         </div>
-        <span
-          className="text-[11px] font-bold tracking-[0.04em] px-2.5 py-1 rounded-full shrink-0"
-          style={fullyMatched ? { background: 'var(--color-sage-light)', color: '#3F6E3D' } : { background: '#FBF1DE', color: '#85622A' }}
-        >
-          {fullyMatched ? 'Matched' : 'Review'}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[11px] font-bold tracking-[0.04em] px-2.5 py-1 rounded-full" style={badge.style}>
+            {badge.label}
+          </span>
+          {/* Overflow menu: keep-for-records + delete - the card-level actions
+              that previously lived only inside the detail modal. */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              aria-label="Receipt options"
+              className="w-7 h-7 -mr-1 rounded-lg flex items-center justify-center text-warm-grey hover:text-charcoal hover:bg-cream transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-9 z-50 w-44 bg-white rounded-xl border border-light-grey py-1 overflow-hidden" style={{ boxShadow: '0 8px 24px rgba(26,22,32,0.12)' }}>
+                  {!filed && !fullyMatched && (
+                    <button onClick={() => { setMenuOpen(false); onKeep?.(); }} className="w-full text-left px-3.5 py-2 text-[13px] font-medium text-charcoal hover:bg-cream transition-colors">
+                      Keep for records
+                    </button>
+                  )}
+                  <button onClick={() => { setMenuOpen(false); onDelete?.(); }} className="w-full text-left px-3.5 py-2 text-[13px] font-medium text-coral hover:bg-coral-light transition-colors">
+                    Delete receipt
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="text-[34px] leading-none text-charcoal" style={{ fontFamily: '"Instrument Serif", serif' }}>
         {r.total_text || '—'}
       </div>
 
-      <div>
-        <div className="flex justify-between text-xs text-warm-grey mb-1.5">
-          <span>{r.matched_count} of {r.item_count} items matched</span>
-          <span>{pct}%</span>
+      {filed ? (
+        <div className="text-xs text-warm-grey">{r.item_count} {r.item_count === 1 ? 'item' : 'items'} · kept for records</div>
+      ) : (
+        <div>
+          <div className="flex justify-between text-xs text-warm-grey mb-1.5">
+            <span>{r.matched_count} of {r.item_count} items matched</span>
+            <span>{pct}%</span>
+          </div>
+          <div className="h-[7px] rounded-full overflow-hidden" style={{ background: SOFT }}>
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: fullyMatched ? 'var(--color-sage)' : '#D89B3A' }} />
+          </div>
         </div>
-        <div className="h-[7px] rounded-full overflow-hidden" style={{ background: SOFT }}>
-          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: fullyMatched ? 'var(--color-sage)' : '#D89B3A' }} />
-        </div>
-      </div>
+      )}
 
       <div className="flex gap-2">
         <button onClick={onView} className="flex-1 py-2.5 rounded-[10px] border border-light-grey bg-white text-charcoal text-[13px] font-semibold hover:bg-cream transition-colors">
           View items
         </button>
-        {!fullyMatched && (
+        {!filed && !fullyMatched && (
           <button onClick={onView} className="flex-1 py-2.5 rounded-[10px] bg-plum text-white text-[13px] font-semibold hover:bg-plum/90 transition-colors">
             Match {remaining}
           </button>

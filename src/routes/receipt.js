@@ -19,13 +19,31 @@ const upload = multer({
 });
 
 // Best-effort parse of the freeform date the scan returns into a YYYY-MM-DD.
-// Returns null when it can't be parsed confidently (e.g. "11 Apr" with no
-// year) so we don't persist a wrong date.
+// UK receipts are day-first ("22/05/2025", "22/05/25", "22.05.2025"), which
+// Date.parse mis-reads or rejects, so we handle the common numeric shapes
+// explicitly before falling back to Date.parse for ISO + named-month formats
+// ("2025-05-22", "22 May 2025"). Returns null when nothing parses, so we never
+// persist a wrong date (the card then shows the upload date, clearly labelled).
 function parseReceiptDate(raw) {
   if (!raw || typeof raw !== 'string') return null;
-  const t = Date.parse(raw);
-  if (Number.isNaN(t)) return null;
-  return new Date(t).toISOString().slice(0, 10);
+  const s = raw.trim();
+  let y; let mo; let d;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const uk = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/);
+  if (iso) {
+    y = +iso[1]; mo = +iso[2]; d = +iso[3];
+  } else if (uk) {
+    d = +uk[1]; mo = +uk[2]; y = +uk[3];
+    if (y < 100) y += 2000;                                    // 25 -> 2025
+    if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }   // tolerate US month-first
+  } else {
+    const t = Date.parse(s);
+    if (Number.isNaN(t)) return null;
+    const dt = new Date(t);
+    y = dt.getFullYear(); mo = dt.getMonth() + 1; d = dt.getDate();
+  }
+  if (!(y >= 1900 && y <= 2100) || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 /**
@@ -170,6 +188,27 @@ router.patch('/:id/items/:itemId', requireAuth, requireHousehold, async (req, re
 });
 
 /**
+ * PATCH /api/receipts/:id
+ * Update a receipt's status: 'filed' (kept for records - stops the match
+ * nudge) or back to 'review'. Returns the refreshed receipt, 404 if it isn't
+ * this household's.
+ */
+router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
+  const { status } = req.body;
+  if (status !== 'filed' && status !== 'review') {
+    return res.status(400).json({ error: '"status" must be "filed" or "review"' });
+  }
+  try {
+    const receipt = await db.setReceiptStatus(req.householdId, req.params.id, status);
+    if (!receipt) return res.status(404).json({ error: 'Receipt not found' });
+    return res.json({ receipt });
+  } catch (err) {
+    console.error('PATCH /api/receipts/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * DELETE /api/receipts/:id
  * Permanently delete a saved receipt (and its lines, via cascade).
  */
@@ -192,3 +231,4 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
+module.exports.parseReceiptDate = parseReceiptDate; // exported for unit tests
