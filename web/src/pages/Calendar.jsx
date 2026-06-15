@@ -353,6 +353,7 @@ export default function Calendar() {
 
   // Search state
   const [showSearch, setShowSearch] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false); // mobile-only search toggle (desktop uses showSearch)
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef(null);
 
@@ -1381,9 +1382,17 @@ export default function Calendar() {
         title="Calendar"
         actions={
         <>
-        {/* Mobile: a single round add button. The full toolbar below is
-            desktop-only; mobile gets a stacked search + view + nav block
-            rendered under the header. */}
+        {/* Mobile: compact search + round add button. The full toolbar below
+            is desktop-only; mobile gets a stacked view + nav block under the
+            header, and search is revealed on demand by this button. */}
+        <button
+          onClick={() => setMobileSearchOpen(o => !o)}
+          aria-label="Search"
+          aria-expanded={mobileSearchOpen}
+          className={`md:hidden w-12 h-12 rounded-full border flex items-center justify-center shrink-0 transition-colors ${mobileSearchOpen ? 'border-plum bg-plum-light text-plum' : 'border-light-grey bg-white text-charcoal'}`}
+        >
+          <IconSearch className="w-5 h-5" />
+        </button>
         {canWrite && (
           <button
             onClick={() => openAddForm(selectedDate)}
@@ -1576,24 +1585,34 @@ export default function Calendar() {
       {/* ── Mobile controls: full-width search, view switcher, month nav.
             Desktop keeps these inline in the header toolbar above. ── */}
       <div className="md:hidden flex flex-col gap-3">
-        {/* Search */}
-        <div className="relative">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-grey pointer-events-none">
-            <IconSearch className="w-[18px] h-[18px]" />
-          </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search events, people, places…"
-            className="w-full h-12 rounded-2xl pl-11 pr-4 text-[15px] text-charcoal bg-white border border-light-grey outline-none focus:border-plum placeholder:text-warm-grey"
-          />
-          {searchQuery.trim() && (
-            <div className="absolute left-0 right-0 top-[54px] bg-white rounded-2xl border border-light-grey z-30 p-2 max-h-72 overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
-              {renderSearchResults()}
-            </div>
-          )}
-        </div>
+        {/* Search - hidden by default, revealed by the header search button */}
+        {mobileSearchOpen && (
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-grey pointer-events-none">
+              <IconSearch className="w-[18px] h-[18px]" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search events, people, places…"
+              autoFocus
+              className="w-full h-12 rounded-2xl pl-11 pr-11 text-[15px] text-charcoal bg-white border border-light-grey outline-none focus:border-plum placeholder:text-warm-grey"
+            />
+            <button
+              onClick={() => { setMobileSearchOpen(false); setSearchQuery(''); }}
+              aria-label="Close search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-warm-grey hover:text-charcoal"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+            {searchQuery.trim() && (
+              <div className="absolute left-0 right-0 top-[54px] bg-white rounded-2xl border border-light-grey z-30 p-2 max-h-72 overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                {renderSearchResults()}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* View switcher - full width */}
         <Segmented
