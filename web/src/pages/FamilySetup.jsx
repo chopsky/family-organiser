@@ -1895,7 +1895,7 @@ export default function FamilySetup() {
       {/* Members - one card per household member (accounts), role pill
           distinguishes Admin / Parent. Edit + remove on hover. */}
       <section>
-        <h2 className="text-lg font-bold text-charcoal mb-0.5">Members</h2>
+        <h2 className="text-lg font-semibold text-charcoal mb-0.5">Members</h2>
         <p className="text-sm text-[var(--ink-2)] mb-4">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
@@ -1970,7 +1970,7 @@ export default function FamilySetup() {
       {/* Children & dependents - members without their own login. Same card
           treatment; activities + school live in their own sections now. */}
       <section>
-        <h2 className="text-lg font-bold text-charcoal mb-0.5">Children &amp; dependents</h2>
+        <h2 className="text-lg font-semibold text-charcoal mb-0.5">Children &amp; dependents</h2>
         <p className="text-sm text-[var(--ink-2)] mb-4">Family members who don&apos;t need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
@@ -2000,7 +2000,7 @@ export default function FamilySetup() {
       {showSchools ? (
         <section>
           <div className="flex items-end justify-between gap-3 mb-1">
-            <h2 className="text-lg font-bold text-charcoal">Schools</h2>
+            <h2 className="text-lg font-semibold text-charcoal">Schools</h2>
             {isAdmin && (
               <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddSchool}>Add a school</PillBtn>
             )}
@@ -2096,7 +2096,7 @@ export default function FamilySetup() {
         </section>
       ) : (
         <section>
-          <h2 className="text-lg font-bold text-charcoal mb-1">Schools</h2>
+          <h2 className="text-lg font-semibold text-charcoal mb-1">Schools</h2>
           <p className="text-sm text-[var(--ink-2)] max-w-[560px]">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries -
@@ -2255,7 +2255,7 @@ export default function FamilySetup() {
         };
         return (
           <section>
-            <h2 className="text-lg font-bold text-charcoal mb-0.5">Activities</h2>
+            <h2 className="text-lg font-semibold text-charcoal mb-0.5">Activities</h2>
             <p className="text-sm text-[var(--ink-2)] mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
             {activityKids.length === 0 ? (
               <p className="text-sm text-warm-grey">Add a child to start tracking after-school activities.</p>
@@ -2390,7 +2390,7 @@ export default function FamilySetup() {
           a toggle group (aria-pressed) so screen readers announce on/off, not
           colour alone. Persists to households.allergies. */}
       <div className="bg-white rounded-[18px] border border-light-grey p-6 md:p-7" style={{ boxShadow: CARD_SHADOW }}>
-        <h2 className="text-lg font-bold text-charcoal">Allergies &amp; dietary requirements</h2>
+        <h2 className="text-lg font-semibold text-charcoal">Allergies &amp; dietary requirements</h2>
         <p className="text-sm text-[var(--ink-2)] mt-1.5 max-w-[620px] leading-relaxed">
           Select any allergens or dietary requirements for your household. The AI will avoid these when suggesting recipes and meals.
         </p>
