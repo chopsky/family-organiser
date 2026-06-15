@@ -1394,16 +1394,22 @@ export default function FamilySetup() {
   async function handleAvatarUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Always target the member being edited - not the logged-in user.
+    const targetId = editingMember?.id;
+    if (!targetId) return;
     setUploadingAvatar(true);
     try {
       const formData = new FormData();
       formData.append('avatar', file);
+      formData.append('userId', targetId);
       const { data } = await api.post('/household/profile/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setProfileAvatar(data.avatar_url);
+      setEditingMember(m => (m ? { ...m, avatar_url: data.avatar_url } : m));
       await loadMembers();
-      login({ token, user: { ...user, avatar_url: data.avatar_url }, household });
+      // Only the current user's avatar lives in the auth context.
+      if (targetId === user.id) login({ token, user: { ...user, avatar_url: data.avatar_url }, household });
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to upload image.');
     } finally {
@@ -1412,12 +1418,15 @@ export default function FamilySetup() {
   }
 
   async function handleAvatarRemove() {
+    const targetId = editingMember?.id;
+    if (!targetId) return;
     setUploadingAvatar(true);
     try {
-      await api.delete('/household/profile/avatar');
+      await api.delete(`/household/profile/avatar?userId=${encodeURIComponent(targetId)}`);
       setProfileAvatar(null);
+      setEditingMember(m => (m ? { ...m, avatar_url: null } : m));
       await loadMembers();
-      login({ token, user: { ...user, avatar_url: null }, household });
+      if (targetId === user.id) login({ token, user: { ...user, avatar_url: null }, household });
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to remove image.');
     } finally {

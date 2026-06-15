@@ -208,9 +208,21 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
     return res.status(400).json({ error: 'No image uploaded. Use field name "avatar".' });
   }
 
+  // Target the member being edited (e.g. a child's profile on the Family page),
+  // defaulting to the caller's own profile. Editing another member is fine for
+  // any household member, but the target MUST belong to this household (IDOR).
+  const targetId = req.body.userId || req.user.id;
+
   try {
+    if (targetId !== req.user.id) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      if (!members.some((m) => m.id === targetId)) {
+        return res.status(404).json({ error: 'Member not found in this household.' });
+      }
+    }
+
     const ext = path.extname(req.file.originalname || '.jpg').toLowerCase() || '.jpg';
-    const storagePath = `${req.householdId}/${req.user.id}${ext}`;
+    const storagePath = `${req.householdId}/${targetId}${ext}`;
 
     // Upload to Supabase Storage (upsert overwrites previous avatar)
     const userDb = supabaseAdmin;
@@ -235,9 +247,9 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
     const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
     // Save to DB
-    const updated = await db.updateUser(req.user.id, { avatar_url: avatarUrl });
+    const updated = await db.updateUser(targetId, { avatar_url: avatarUrl });
     cache.invalidate(`members:${req.householdId}`);
-    return res.json({ avatar_url: updated.avatar_url });
+    return res.json({ avatar_url: updated.avatar_url, userId: targetId });
   } catch (err) {
     console.error('POST /api/household/profile/avatar error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -249,20 +261,30 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
  * Remove the current user's profile image.
  */
 router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res) => {
+  // Target the edited member, defaulting to self; the target must belong to
+  // this household (matches POST /profile/avatar).
+  const targetId = req.query.userId || req.user.id;
   try {
+    if (targetId !== req.user.id) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      if (!members.some((m) => m.id === targetId)) {
+        return res.status(404).json({ error: 'Member not found in this household.' });
+      }
+    }
+
     // Try to remove files from storage (best effort - may not exist or may have different ext)
     const userDb = supabaseAdmin;
     const { data: files } = await userDb.storage.from('avatars').list(req.householdId, {
-      prefix: req.user.id,
+      prefix: targetId,
     });
     if (files?.length) {
       await userDb.storage.from('avatars').remove(files.map(f => `${req.householdId}/${f.name}`));
     }
 
     // Clear in DB
-    await db.updateUser(req.user.id, { avatar_url: null });
+    await db.updateUser(targetId, { avatar_url: null });
     cache.invalidate(`members:${req.householdId}`);
-    return res.json({ avatar_url: null });
+    return res.json({ avatar_url: null, userId: targetId });
   } catch (err) {
     console.error('DELETE /api/household/profile/avatar error:', err);
     return res.status(500).json({ error: 'Internal server error' });
