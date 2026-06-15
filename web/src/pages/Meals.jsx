@@ -6,9 +6,21 @@ import { confirmDestructive } from '../lib/action-sheet';
 import { PageListSkeleton } from '../components/Skeleton';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconUtensils, IconSearch, IconPlus } from '../components/Icons';
+import { IconUtensils, IconSearch, IconPlus, IconCart, IconChevronLeft, IconChevronRight } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
+import PageHeader from '../components/ui/PageHeader';
+import PillBtn from '../components/ui/PillBtn';
+import Segmented from '../components/ui/Segmented';
+
+// Small sparkle glyph for "Plan with AI".
+function Sparkle({ className = 'h-3.5 w-3.5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2l1.8 4.7a4 4 0 0 0 2.5 2.5L21 11l-4.7 1.8a4 4 0 0 0-2.5 2.5L12 20l-1.8-4.7a4 4 0 0 0-2.5-2.5L3 11l4.7-1.8a4 4 0 0 0 2.5-2.5L12 2z" />
+    </svg>
+  );
+}
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -26,6 +38,17 @@ function getCatColours(cat) {
   return CATEGORY_COLOURS_MAP[(cat || 'dinner').toLowerCase()] || CATEGORY_COLOURS_MAP.dinner;
 }
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Meal-plan grid colours from the desktop design handoff: a soft block bg +
+// a darker label/foreground per meal type. Keyed by lowercased category name;
+// falls back to a neutral sand for any custom categories.
+const PLAN_MEAL_COLOURS = {
+  breakfast: { bg: '#FBEFE8', fg: '#A0541F' },
+  lunch:     { bg: '#E5F0E2', fg: '#3F6E3D' },
+  dinner:    { bg: '#E2ECFA', fg: '#3B5C8C' },
+  snack:     { bg: '#FBE6EA', fg: '#A04257' },
+};
+const planMealColour = (cat) => PLAN_MEAL_COLOURS[(cat || '').toLowerCase()] || { bg: '#F3EEE5', fg: '#6B6774' };
 const DIETARY_TAGS = ['Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Nut-free', 'Low-carb', 'High-protein'];
 const UNITS = ['', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pcs', 'bunch', 'clove', 'can', 'tin', 'pack'];
 
@@ -66,49 +89,22 @@ export default function Meals() {
   const canWrite = useCanWrite();
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      <h1
-        className="text-[32px] md:text-[40px] font-normal leading-none text-bark flex items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif"' }}
-      >
-        <div
-          className="hidden"
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: '#f1eef8',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconUtensils className="h-5 w-5 text-plum" />
-        </div>
-        Meal Planner
-      </h1>
+    <div className="max-w-[1200px] mx-auto space-y-5 pb-24">
+      <PageHeader
+        kicker={activeTab === 'plan' ? 'This week' : null}
+        title={activeTab === 'plan' ? 'Meal plan' : 'Recipe box'}
+      />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {!canWrite && <SubscribePrompt message="Subscribe to plan meals, save recipes, and generate shopping lists" />}
 
-      {/* Tab toggle */}
-      <div className="flex gap-1 bg-oat rounded-xl p-1 border border-cream-border">
-        <button
-          onClick={() => setActiveTab('plan')}
-          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-            activeTab === 'plan' ? 'bg-white text-bark ' : 'text-cocoa hover:text-bark'
-          }`}
-        >
-          Meal Plan
-        </button>
-        <button
-          onClick={() => setActiveTab('recipes')}
-          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-            activeTab === 'recipes' ? 'bg-white text-bark ' : 'text-cocoa hover:text-bark'
-          }`}
-        >
-          Recipe Box
-        </button>
-      </div>
+      {/* Meal plan / Recipe box toggle */}
+      <Segmented
+        value={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="Meals view"
+        options={[{ value: 'plan', label: 'Meal plan' }, { value: 'recipes', label: 'Recipe box' }]}
+      />
 
       {activeTab === 'plan' ? (
         <MealPlanView error={error} setError={setError} onSwitchToRecipes={() => setActiveTab('recipes')} />
@@ -214,6 +210,16 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
     const ds = toDateStr(date);
     const catLower = category.toLowerCase();
     return meals.filter(m => m.date === ds && m.category?.toLowerCase() === catLower);
+  }
+
+  // Drag-to-move: re-home a planned meal into another day/meal-type cell.
+  async function moveMeal(mealId, date, category) {
+    try {
+      await api.patch(`/meals/${mealId}`, { date, category: category.toLowerCase() });
+      await loadMeals();
+    } catch {
+      setError('Could not move that meal.');
+    }
   }
 
   // Delete meal
@@ -365,22 +371,18 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
     <>
       {/* Week navigation - hidden on print (the print-only heading below
           replaces it with a clean "Weekly Meal Plan · Week of X" title). */}
-      <div className="flex items-center justify-between bg-linen rounded-2xl  border border-cream-border px-4 py-3 no-print">
-        <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-oat text-cocoa transition-colors">
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+      <div className="flex items-center justify-center gap-5 bg-white rounded-[14px] border border-light-grey px-5 py-3 no-print">
+        <button onClick={prevWeek} aria-label="Previous week" className="w-8 h-8 rounded-lg border border-light-grey text-warm-grey hover:text-plum hover:border-plum/40 flex items-center justify-center transition-colors">
+          <IconChevronLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-bark">
-            Week of {formatWeekLabel(weekStart)}
-          </span>
+          <span className="text-sm font-semibold text-charcoal">Week of {formatWeekLabel(weekStart)}</span>
           {!isCurrentWeek && (
-            <button onClick={goToday} className="text-xs font-medium text-primary hover:underline">
-              Today
-            </button>
+            <button onClick={goToday} className="text-xs font-medium text-plum hover:underline">Today</button>
           )}
         </div>
-        <button onClick={nextWeek} className="p-1.5 rounded-lg hover:bg-oat text-cocoa transition-colors">
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18" /></svg>
+        <button onClick={nextWeek} aria-label="Next week" className="w-8 h-8 rounded-lg border border-light-grey text-warm-grey hover:text-plum hover:border-plum/40 flex items-center justify-center transition-colors">
+          <IconChevronRight className="h-4 w-4" />
         </button>
       </div>
 
@@ -522,13 +524,13 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               <table className="w-full min-w-[700px] border-collapse">
                 <thead>
                   <tr>
-                    <th className="w-24 py-3 px-3 text-left text-xs font-semibold text-cocoa uppercase tracking-wide border-b border-cream-border" />
+                    <th className="w-[120px] py-3 px-3 border-b border-light-grey" />
                     {weekDates.map((date, i) => {
                       const isToday = toDateStr(date) === toDateStr(today);
                       return (
-                        <th key={i} className={`py-3 px-2 text-center border-b border-l border-cream-border ${isToday ? 'bg-oat' : ''}`}>
-                          <div className="text-xs text-cocoa font-medium">{DAY_HEADERS[i]}</div>
-                          <div className={`text-sm font-semibold mt-0.5 ${isToday ? 'bg-primary text-white w-7 h-7 rounded-full inline-flex items-center justify-center' : 'text-bark'}`}>
+                        <th key={i} className="py-3 px-2 text-center border-b border-l border-light-grey" style={{ background: isToday ? 'var(--color-plum-light)' : 'transparent' }}>
+                          <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: isToday ? 'var(--color-plum-dark)' : 'var(--color-warm-grey)' }}>{DAY_HEADERS[i]}</div>
+                          <div className="mt-0.5" style={{ fontFamily: '"Instrument Serif", serif', fontSize: 22, fontWeight: 400, color: isToday ? 'var(--color-plum)' : 'var(--color-charcoal)' }}>
                             {date.getDate()}
                           </div>
                         </th>
@@ -537,38 +539,49 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {PLAN_CATEGORIES.map((category) => {
-                    const colors = getCatColours(category);
+                  {PLAN_CATEGORIES.map((category, rowI) => {
+                    const c = planMealColour(category);
+                    const lastRow = rowI === PLAN_CATEGORIES.length - 1;
                     return (
                       <tr key={category}>
-                        <td className="py-2 px-3 border-b border-cream-border">
-                          <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-lg ${colors.bg} ${colors.text}`}>
+                        <td className="py-3 px-4 align-middle" style={{ borderBottom: lastRow ? 'none' : '1px solid var(--color-light-grey)' }}>
+                          <span className="inline-block text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1.5 rounded-lg" style={{ background: c.bg, color: c.fg }}>
                             {category}
                           </span>
                         </td>
                         {weekDates.map((date, i) => {
                           const cellMeals = getMealsForCell(date, category);
                           const isToday = toDateStr(date) === toDateStr(today);
+                          const ds = toDateStr(date);
                           return (
                             <td
                               key={i}
-                              className={`py-1.5 px-1.5 border-b border-l border-cream-border align-top min-w-[90px] ${isToday ? 'bg-oat/30' : ''}`}
+                              className="p-2.5 align-top"
+                              style={{ borderLeft: '1px solid var(--color-light-grey)', borderBottom: lastRow ? 'none' : '1px solid var(--color-light-grey)', background: isToday ? 'rgba(108,61,217,0.03)' : 'transparent', minWidth: 90 }}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) moveMeal(id, ds, category); }}
                             >
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-1.5" style={{ minHeight: 62 }}>
                                 {cellMeals.map(meal => (
                                   <button
                                     key={meal.id}
+                                    draggable
+                                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', meal.id); e.dataTransfer.effectAllowed = 'move'; }}
                                     onClick={() => setDetailMeal(meal)}
-                                    className={`w-full text-left p-1.5 rounded-lg text-xs font-medium transition-all hover: ${colors.light} ${colors.text} ${colors.border} border`}
+                                    className="w-full text-left rounded-lg text-xs font-medium leading-snug"
+                                    style={{ background: c.bg, color: c.fg, padding: '8px 10px', cursor: 'grab' }}
+                                    title="Drag to move"
                                   >
                                     <span className="line-clamp-2">{meal.meal_name}</span>
                                   </button>
                                 ))}
                                 <button
-                                  onClick={() => { setPickerCell({ date: toDateStr(date), category }); setEditingMeal(null); }}
-                                  className={`no-print w-full rounded-lg border border-dashed border-cream-border text-cocoa/40 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center ${cellMeals.length > 0 ? 'h-6' : 'h-10'}`}
+                                  onClick={() => { setPickerCell({ date: ds, category }); setEditingMeal(null); }}
+                                  aria-label={`Add ${category} for ${DAY_HEADERS[i]}`}
+                                  className="no-print w-full rounded-md border border-dashed border-light-grey text-warm-grey hover:border-plum hover:text-plum transition-colors flex items-center justify-center"
+                                  style={{ height: cellMeals.length > 0 ? 26 : 38, marginTop: 'auto' }}
                                 >
-                                  <span className={`leading-none ${cellMeals.length > 0 ? 'text-sm' : 'text-lg'}`}>+</span>
+                                  <span className="leading-none" style={{ fontSize: cellMeals.length > 0 ? 14 : 18 }}>+</span>
                                 </button>
                               </div>
                             </td>
@@ -587,27 +600,12 @@ function MealPlanView({ setError, onSwitchToRecipes }) {
               screens (Print drops onto its own line). All hidden from
               the printed sheet via no-print. */}
           <div className="flex flex-wrap items-center justify-between gap-3 no-print">
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={onSwitchToRecipes}
-                className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
-              >
-                <span>📚</span> Recipe Box
-              </button>
-              <button
-                onClick={addWeekToShoppingList}
-                className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
-              >
-                <span>🛒</span> Add to Shopping List
-              </button>
+            <div className="flex flex-wrap gap-2.5">
+              <PillBtn onClick={onSwitchToRecipes} icon={<IconUtensils className="h-3.5 w-3.5" />}>Recipe box</PillBtn>
+              <PillBtn onClick={addWeekToShoppingList} icon={<IconCart className="h-3.5 w-3.5" />}>Add to shopping list</PillBtn>
+              <PillBtn primary onClick={suggestMeals} icon={<Sparkle />}>Plan with AI</PillBtn>
             </div>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linen border border-cream-border rounded-xl text-sm font-medium text-bark hover: transition-all"
-              title="Opens the browser's print dialog in landscape orientation"
-            >
-              <span>🖨️</span> Print meal plan
-            </button>
+            <PillBtn onClick={() => window.print()} title="Opens the browser's print dialog in landscape orientation">Print</PillBtn>
           </div>
         </div>
       )}
@@ -1284,35 +1282,30 @@ function RecipeBoxView({ setError }) {
         />
       </div>
 
-      {/* Category filters */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => { setCatFilter(''); setFavOnly(false); }}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            !catFilter && !favOnly ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => { setFavOnly(!favOnly); setCatFilter(''); }}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            favOnly ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
-          }`}
-        >
-          ⭐ Favourites
-        </button>
-        {MEAL_CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => { setCatFilter(catFilter === cat ? '' : cat); setFavOnly(false); }}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              catFilter === cat ? 'bg-primary text-white' : 'bg-oat text-cocoa hover:bg-secondary/30'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+      {/* Category filters - active = solid ink fill */}
+      <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter recipes by category">
+        {[{ k: 'all', l: 'All' }, ...MEAL_CATEGORIES.map((c) => ({ k: c, l: c })), { k: 'fav', l: 'Favourites' }].map(({ k, l }) => {
+          const active = k === 'all' ? (!catFilter && !favOnly) : k === 'fav' ? favOnly : catFilter === k;
+          const onClick = () => {
+            if (k === 'all') { setCatFilter(''); setFavOnly(false); }
+            else if (k === 'fav') { setFavOnly(true); setCatFilter(''); }
+            else { setCatFilter(catFilter === k ? '' : k); setFavOnly(false); }
+          };
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={onClick}
+              aria-pressed={active}
+              className="shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors"
+              style={active
+                ? { background: 'var(--color-charcoal)', color: '#fff' }
+                : { background: '#fff', color: 'var(--color-warm-grey)', border: '1px solid var(--color-light-grey)' }}
+            >
+              {l}
+            </button>
+          );
+        })}
       </div>
 
       {/* Dietary tag filters */}
@@ -1332,40 +1325,44 @@ function RecipeBoxView({ setError }) {
 
       {loading ? <Spinner /> : (
         <>
-          {/* Recipe grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Recipe grid - coloured banner + serif monogram + heart */}
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
             {recipes.map(recipe => {
-              const colors = getCatColours(recipe.category);
+              const c = planMealColour(recipe.category);
+              const fav = recipe.is_favourite || recipe.favourite;
+              const mins = (recipe.prep_time_mins || 0) + (recipe.cook_time_mins || 0);
               return (
                 <button
                   key={recipe.id}
                   onClick={() => setDetailRecipe(recipe)}
-                  className="bg-linen rounded-2xl  border border-cream-border p-4 text-left hover: transition-shadow"
+                  className="bg-white rounded-[14px] border border-light-grey overflow-hidden text-left transition-transform"
+                  onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(26,22,32,0.08)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-bark truncate">{recipe.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${colors.bg} ${colors.text} capitalize`}>{recipe.category}</span>
-                        {recipe.prep_time_mins && <span className="text-xs text-cocoa">Prep: {recipe.prep_time_mins}m</span>}
-                        {recipe.cook_time_mins && <span className="text-xs text-cocoa">Cook: {recipe.cook_time_mins}m</span>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={e => toggleFavourite(recipe, e)}
-                      className="text-lg shrink-0 transition-transform hover:scale-110"
-                      title={(recipe.is_favourite || recipe.favourite) ? 'Remove favourite' : 'Add favourite'}
+                  <div className="relative flex items-center justify-center" style={{ height: 110, background: c.bg }}>
+                    <span style={{ fontFamily: '"Instrument Serif", serif', fontSize: 40, color: 'rgba(0,0,0,0.15)' }}>
+                      {recipe.name?.charAt(0)?.toUpperCase()}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => toggleFavourite(recipe, e)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFavourite(recipe, e); } }}
+                      aria-label={fav ? `Remove ${recipe.name} from favourites` : `Add ${recipe.name} to favourites`}
+                      className="absolute top-2.5 right-2.5 cursor-pointer"
                     >
-                      {(recipe.is_favourite || recipe.favourite) ? '⭐' : '☆'}
-                    </button>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill={fav ? '#D8788A' : 'none'} stroke={fav ? '#D8788A' : 'rgba(0,0,0,0.35)'} strokeWidth="1.8" aria-hidden="true">
+                        <path d="M12 21s-8-4.5-8-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-8 11-8 11h-2z" />
+                      </svg>
+                    </span>
                   </div>
-                  {(recipe.dietary_tags || recipe.tags)?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {(recipe.dietary_tags || recipe.tags).map(tag => (
-                        <span key={tag} className="text-[10px] font-medium bg-oat text-cocoa px-2 py-0.5 rounded-full">{tag}</span>
-                      ))}
+                  <div className="p-3.5">
+                    <div className="text-sm font-semibold text-charcoal leading-snug mb-1.5 line-clamp-2">{recipe.name}</div>
+                    <div className="flex items-center gap-2 text-[11px] text-warm-grey">
+                      {mins > 0 && <><span>{mins} min</span><span>·</span></>}
+                      <span>serves {recipe.servings || 2}</span>
                     </div>
-                  )}
+                  </div>
                 </button>
               );
             })}
