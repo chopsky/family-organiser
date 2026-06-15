@@ -1341,8 +1341,8 @@ export default function Calendar() {
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <PageHeader
+        kicker={currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
         title="Calendar"
-        subtitle="Everyone's plans in one shared place."
         actions={
 
         <div className="flex items-center gap-2">
