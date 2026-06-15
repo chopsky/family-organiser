@@ -3,6 +3,7 @@ import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
+import PageHeader from '../components/ui/PageHeader';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
@@ -1339,25 +1340,10 @@ export default function Calendar() {
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-2.5 flex-wrap">
-        <h1 className="flex items-center gap-2.5 flex-1 min-w-0 text-[32px] md:text-[40px]" style={{ fontFamily: '"Instrument Serif"', fontWeight: 400, lineHeight: 1 }}>
-          <div
-            className="hidden"
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#f1eef8',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="1.5">
-              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-          </div>
-          Calendar
-        </h1>
+      <PageHeader
+        title="Calendar"
+        subtitle="Everyone's plans in one shared place."
+        actions={
 
         <div className="flex items-center gap-2">
           {/* Search button */}
@@ -1541,7 +1527,8 @@ export default function Calendar() {
             )}
           </div>
         </div>
-      </div>
+        }
+      />
 
       {/* ── Nav row ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
