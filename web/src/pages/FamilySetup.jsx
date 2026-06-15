@@ -2243,9 +2243,14 @@ export default function FamilySetup() {
         const renderRow = (kid, a, dim) => {
           const kidColor = hexFor(kid);
           const Glyph = ACTIVITY_ICONS[iconFor(a.activity)] || ACTIVITY_ICONS.star;
-          const s = a.time_start ? a.time_start.substring(0, 5) : '';
-          const e = a.time_end ? a.time_end.substring(0, 5) : '';
-          const time = s && e ? `${s}–${e}` : s ? `from ${s}` : e ? `until ${e}` : '';
+          // Two-line stack matching the dashboard Extracurricular card: start
+          // time over a faded end time, no dash. Falls back to whichever single
+          // time exists when only one is set.
+          const start = a.time_start ? a.time_start.substring(0, 5) : '';
+          const end = a.time_end ? a.time_end.substring(0, 5) : '';
+          const topTime = start || end;
+          const showEnd = start && end;
+          const timeLabel = showEnd ? `${start} to ${end}` : topTime;
           const pickup = a.pickup_member_id ? members.find(m => m.id === a.pickup_member_id) : null;
           const dayLabel = DAY_LABELS[a.day_of_week];
           return (
@@ -2254,7 +2259,7 @@ export default function FamilySetup() {
               type="button"
               onClick={isAdmin ? () => openEditActivity(kid, a) : undefined}
               disabled={!isAdmin}
-              aria-label={`${a.activity}, ${dayLabel}${time ? `, ${time}` : ''}${pickup ? `, pickup ${pickup.name}` : ''}`}
+              aria-label={`${a.activity}, ${dayLabel}${timeLabel ? `, ${timeLabel}` : ''}${pickup ? `, pickup ${pickup.name}` : ''}`}
               className={`w-full flex items-center gap-4 px-5 py-3 text-left transition-colors ${isAdmin ? 'hover:bg-[#F3EEE5]' : 'cursor-default'} ${dim ? 'opacity-60' : ''}`}
               style={{ borderTop: '1px solid var(--color-light-grey)' }}
             >
@@ -2268,7 +2273,12 @@ export default function FamilySetup() {
                 <span className="block text-sm font-semibold text-charcoal truncate">{a.activity}</span>
                 {dim && a.term_label && <span className="block text-xs text-warm-grey truncate">{a.term_label}</span>}
               </span>
-              {time && <span className="text-[12px] font-semibold text-warm-grey shrink-0 whitespace-nowrap" style={{ fontVariantNumeric: 'tabular-nums' }}>{time}</span>}
+              {topTime && (
+                <span className="shrink-0" style={{ fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+                  <span className="block" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>{topTime}</span>
+                  {showEnd && <span className="block" style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', opacity: 0.6 }}>{end}</span>}
+                </span>
+              )}
               {pickup && (
                 <span className="flex items-center gap-2 pl-3 shrink-0" style={{ borderLeft: '1px solid var(--color-light-grey)' }}>
                   <PickupCar className="h-3.5 w-3.5 text-warm-grey" />
