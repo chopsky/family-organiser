@@ -9,6 +9,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
+import Avatar from '../components/ui/Avatar';
 import { loadCached } from '../lib/offlineCache';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
@@ -19,28 +20,6 @@ import AfterSchoolCard from '../components/AfterSchoolCard';
 import { isIos } from '../lib/platform';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
-const avatarColors = {
-  red: 'bg-red text-white',
-  'burnt-orange': 'bg-burnt-orange text-white',
-  amber: 'bg-amber text-white',
-  gold: 'bg-gold text-white',
-  leaf: 'bg-leaf text-white',
-  emerald: 'bg-emerald text-white',
-  teal: 'bg-teal text-white',
-  sky: 'bg-sky text-white',
-  cobalt: 'bg-cobalt text-white',
-  indigo: 'bg-indigo text-white',
-  purple: 'bg-purple text-white',
-  magenta: 'bg-magenta text-white',
-  rose: 'bg-rose text-white',
-  terracotta: 'bg-terracotta text-white',
-  moss: 'bg-moss text-white',
-  slate: 'bg-slate text-white',
-  sage: 'bg-sage text-white',
-  plum: 'bg-plum text-white',
-  coral: 'bg-coral text-white',
-  lavender: 'bg-indigo text-white',
-};
 
 // ── Event dot colour map ────────────────────────────────────────
 const dotColors = {
@@ -587,15 +566,8 @@ export default function Dashboard() {
 
   function getMemberAvatar(member) {
     if (!member) return null;
-    const ac = avatarColors[member.color_theme] || avatarColors.sage;
-    if (member.avatar_url) {
-      return <img src={member.avatar_url} alt={member.name} className="w-7 h-7 rounded-full object-cover" />;
-    }
-    return (
-      <div className={`w-7 h-7 rounded-full ${ac} flex items-center justify-center text-xs font-bold`}>
-        {member.name?.[0]?.toUpperCase()}
-      </div>
-    );
+    // Shared Avatar handles the broken-photo → coloured-initial fallback.
+    return <Avatar member={member} size={28} />;
   }
 
   const EVENT_DOT_CYCLE = ['bg-plum', 'bg-coral', 'bg-[#E0A458]', 'bg-sage'];
@@ -688,12 +660,9 @@ export default function Dashboard() {
               </div>
               {whoList.length > 0 && (
                 <div className="flex shrink-0 -space-x-2">
-                  {whoList.map((m) => {
-                    const ac = avatarColors[m.color_theme] || avatarColors.sage;
-                    return m.avatar_url
-                      ? <img key={m.id} src={m.avatar_url} alt={m.name} className="w-[42px] h-[42px] rounded-full object-cover ring-2 ring-white" />
-                      : <div key={m.id} title={m.name} className={`w-[42px] h-[42px] rounded-full ${ac} flex items-center justify-center font-semibold ring-2 ring-white`} style={{ fontSize: 18 }}>{m.name?.[0]?.toUpperCase()}</div>;
-                  })}
+                  {whoList.map((m) => (
+                    <Avatar key={m.id} member={m} size={42} className="ring-2 ring-white" />
+                  ))}
                 </div>
               )}
             </div>
