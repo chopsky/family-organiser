@@ -149,7 +149,7 @@ function CollapsibleRow({ icon, label, sub, defaultOpen = false, className = '',
         aria-expanded={open}
         className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-oat transition-colors text-left"
       >
-        <span className="text-base" aria-hidden="true">{icon}</span>
+        {icon && <span className="text-base" aria-hidden="true">{icon}</span>}
         <span className="flex-1 text-sm text-bark">
           {label}
           {sub != null && <span className="text-cocoa"> · {sub}</span>}
@@ -1640,8 +1640,17 @@ export default function Settings() {
             • iOS list mode: each row sits in the section list above.
             • iOS sub-page mode: only the active section renders, bare. */}
 
+      {/* Connect WhatsApp + Connect Calendars + Send Emails to AI - the
+          three "how Housemait talks to the outside world" sections, grouped
+          into one shared card of accordions (mirrors the Notifications /
+          Location / Active sessions group below). */}
+      <div
+        className={isIosPlatform ? '' : 'bg-linen rounded-2xl px-5 md:px-6'}
+        style={isIosPlatform ? undefined : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+      >
+
       {/* Connect WhatsApp */}
-      <SectionWrapper slug="whatsapp" title="Connect WhatsApp" icon={IconMessageCircle}>
+      <SectionWrapper slug="whatsapp" title="Connect WhatsApp" icon={IconMessageCircle} accordion>
         {members.find((m) => m.id === user?.id)?.whatsapp_linked ? (
           <div className="space-y-3">
             <p className="text-sm text-success bg-success/10 rounded-2xl px-3 py-2">
@@ -1691,7 +1700,7 @@ export default function Settings() {
           actions otherwise read as the same thing. Most families set up both:
           1) bring their existing events IN (device sync / URL feeds), and
           2) see Housemait events OUT in their usual calendar app. */}
-      <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar}>
+      <SectionWrapper slug="calendars" title="Connect Calendars" icon={IconCalendar} accordion>
         {/* ONE hero: getting your events in. On iOS that's the device-sync
             card below (renders null on web, where the add-by-link row is
             expanded by default and plays hero instead). Everything else -
@@ -1707,7 +1716,7 @@ export default function Settings() {
         {/* The rows keep their code order but display roster → link →
             outbound via CSS order, so the big JSX blocks don't move. */}
         <div className="flex flex-col gap-2">
-        <CollapsibleRow icon="📤" label={<span className="font-semibold">Export from Housemait</span>} className="order-3">
+        <CollapsibleRow label={<span className="font-semibold">Export from Housemait</span>} className="order-3">
         <p className="text-xs text-cocoa mb-3">
           Housemait events appear alongside everything else in Apple Calendar (or Google/Outlook). One-way — nothing in your calendar is ever changed.
         </p>
@@ -1820,7 +1829,6 @@ export default function Settings() {
             phone that fed a calendar is lost or the app was deleted. */}
         {externalFeeds.some((f) => f.source === 'device' && f.sync_enabled !== false) && (
           <CollapsibleRow
-            icon="📱"
             label="Synced from phones"
             sub={(() => {
               const n = externalFeeds.filter((f) => f.source === 'device' && f.sync_enabled !== false).length;
@@ -1883,7 +1891,6 @@ export default function Settings() {
             (Driven by the same flag: if EventKit is ever switched back on,
             iOS re-collapses this to a quiet line under the device card.) */}
         <CollapsibleRow
-          icon="🔗"
           label={<span className="font-semibold">Import to Housemait</span>}
           sub={externalFeeds.some((f) => f.source !== 'device') ? String(externalFeeds.filter((f) => f.source !== 'device').length) : null}
           defaultOpen={!isDeviceCalendarSupported()}
@@ -2139,7 +2146,7 @@ export default function Settings() {
 
 
       {/* Send Emails to AI */}
-      <SectionWrapper slug="emails-to-ai" title="Send Emails to AI" icon={IconMail}>
+      <SectionWrapper slug="emails-to-ai" title="Send Emails to AI" icon={IconMail} accordion>
         <p className="text-sm text-cocoa mb-3">
           Forward any email to your household's unique address and our AI will automatically extract the details - receipts, flight bookings, school newsletters, appointment reminders, and more.
         </p>
@@ -2320,6 +2327,8 @@ export default function Settings() {
           </p>
         )}
       </SectionWrapper>
+
+      </div>
 
       {/* Grouped wrapper for Notifications + Active sessions - the
           two sections that stay collapsible on web. On web the wrapper
