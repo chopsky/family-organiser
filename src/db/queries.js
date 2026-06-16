@@ -2805,6 +2805,22 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
     && isBirthdayTitle(eventData.title)
       ? 'birthday'
       : (explicitCategory || 'general');
+
+  // Default a timed event to a 1-hour duration when the caller gave no end
+  // time, or an end that isn't actually after the start. The AI/chat path can
+  // return end == start for a single-time request ("dinner at 20:15"), which
+  // stores a zero-length event the user then can't save when they open it to
+  // edit ("end time must be after the start time"). All-day events are left as
+  // given. An explicitly shorter duration (e.g. a 30-min slot) is respected.
+  let endTime = eventData.end_time;
+  if (!eventData.all_day) {
+    const startMs = Date.parse(eventData.start_time);
+    const endMs = endTime ? Date.parse(endTime) : NaN;
+    if (!Number.isNaN(startMs) && (Number.isNaN(endMs) || endMs <= startMs)) {
+      endTime = new Date(startMs + 60 * 60 * 1000).toISOString();
+    }
+  }
+
   const { data, error } = await db
     .from('calendar_events')
     .insert({
@@ -2812,7 +2828,7 @@ async function createCalendarEvent(householdId, eventData, createdByUserId, db =
       title: eventData.title,
       description: eventData.description || null,
       start_time: eventData.start_time,
-      end_time: eventData.end_time,
+      end_time: endTime,
       all_day: eventData.all_day || false,
       location: eventData.location || null,
       color: eventData.color || 'sage',
