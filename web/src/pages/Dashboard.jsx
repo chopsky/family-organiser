@@ -579,23 +579,25 @@ export default function Dashboard() {
   return (
     <div {...ptr.bindings} className="max-w-5xl mx-auto space-y-4">
       <PullIndicator state={ptr.state} />
-      {/* Greeting + date kicker. Greeting (h1) on top, date/events line
-          below, on all viewports. gap-1.5 gives the 6px separation the
-          kicker's old margin provided. */}
-      <div className="flex flex-col gap-1.5">
+      {/* Header - mirrors the shared PageHeader used on Tasks/Meals/Shopping:
+          a plum uppercase kicker (here the date) on top, then the serif
+          title, then a warm-grey subtitle. Only the h1 size stays larger -
+          the home-screen greeting keeps its editorial 38/52px treatment. */}
+      <div className="mb-2">
+        <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
+          {todayStr}
+        </div>
         <h1
-          // Matches the PageHeader title used on Tasks/Meals/Shopping (serif,
-          // charcoal, -0.01em tracking). Only the size stays larger - the
-          // home-screen greeting keeps its editorial 38/52px treatment.
           className="m-0 text-[38px] md:text-[52px] leading-[1.05] font-normal text-charcoal"
           style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.01em' }}
         >
           {getGreeting()}, <i style={{ color: 'var(--color-plum)' }}>{user?.name}</i><span style={{ color: 'var(--color-plum)' }}>.</span>
         </h1>
-        <p className="text-sm text-warm-grey">
-          {todayStr}
-          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
-        </p>
+        {eventCount > 0 && (
+          <div className="text-sm text-warm-grey mt-1.5">
+            {eventCount} event{eventCount !== 1 ? 's' : ''} today
+          </div>
+        )}
       </div>
 
       {/* Weather widget - sits directly below the greeting and above the
