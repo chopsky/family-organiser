@@ -11,6 +11,7 @@ import { tap as hapticTap } from '../lib/haptics';
 import { onShortcutTapped } from '../lib/app-shortcuts';
 import { syncDeviceCalendarsQuietly } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
+import Avatar from './ui/Avatar';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 // Desktop sidebar nav, split into labelled groups (the "Grouped" design).
@@ -110,39 +111,12 @@ const moreAccountRows = [
   { to: '/help',     label: 'Help & support' },
 ];
 
-const avatarColors = {
-  red: 'bg-red text-white',
-  'burnt-orange': 'bg-burnt-orange text-white',
-  amber: 'bg-amber text-white',
-  gold: 'bg-gold text-white',
-  leaf: 'bg-leaf text-white',
-  emerald: 'bg-emerald text-white',
-  teal: 'bg-teal text-white',
-  sky: 'bg-sky text-white',
-  cobalt: 'bg-cobalt text-white',
-  indigo: 'bg-indigo text-white',
-  purple: 'bg-purple text-white',
-  magenta: 'bg-magenta text-white',
-  rose: 'bg-rose text-white',
-  terracotta: 'bg-terracotta text-white',
-  moss: 'bg-moss text-white',
-  slate: 'bg-slate text-white',
-  // Legacy fallbacks
-  sage: 'bg-sage text-white',
-  plum: 'bg-plum text-white',
-  coral: 'bg-coral text-white',
-  lavender: 'bg-indigo text-white',
-};
-
 export default function Layout({ children }) {
   const { household, user, token, login, logout, isPlatformAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const [members, setMembers] = useState([]);
-  // Sidebar avatar URL that failed to load - falls back to the initial instead
-  // of a broken-image icon. Keyed on the URL so a re-upload retries.
-  const [avatarErrUrl, setAvatarErrUrl] = useState(null);
 
   // Register for push notifications on iOS
   usePushNotifications(user);
@@ -223,17 +197,10 @@ export default function Layout({ children }) {
     navigate('/');
   }
 
-  const avatarClass = avatarColors[user?.color_theme] || avatarColors.sage;
-
-  function renderAvatar(size = 'w-8 h-8', textSize = 'text-sm') {
-    if (user?.avatar_url && avatarErrUrl !== user.avatar_url) {
-      return <img src={user.avatar_url} alt={user.name} onError={() => setAvatarErrUrl(user.avatar_url)} className={`${size} rounded-full object-cover`} />;
-    }
-    return (
-      <div className={`${size} rounded-full ${avatarClass} flex items-center justify-center font-bold ${textSize}`}>
-        {user?.name?.[0]?.toUpperCase()}
-      </div>
-    );
+  // The shared Avatar handles both states (solid colour + initial, or photo
+  // wrapped in the member's colour ring) and the broken-photo fallback.
+  function renderAvatar(size = 32) {
+    return <Avatar member={user} size={size} />;
   }
 
   const isMoreActive = moreNav.some(n => location.pathname === n.to);
@@ -291,7 +258,7 @@ export default function Layout({ children }) {
             page background. */}
         <div className="px-4 py-4 flex items-center gap-2.5" style={{ borderTop: '1px solid #f2f0ed' }}>
           <Link to="/settings" className="shrink-0 rounded-full transition-opacity hover:opacity-80" title="Settings" aria-label="Open settings">
-            {renderAvatar('w-8 h-8', 'text-xs')}
+            {renderAvatar()}
           </Link>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
@@ -324,7 +291,7 @@ export default function Layout({ children }) {
             <img src="/housemait-logo2.png" alt="Housemait" className="max-w-[140px] h-auto" />
           </Link>
           <Link to="/settings" className="shrink-0">
-            {renderAvatar('w-8 h-8', 'text-xs')}
+            {renderAvatar()}
           </Link>
         </div>
       </header>

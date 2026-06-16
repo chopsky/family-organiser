@@ -336,13 +336,7 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
 /* ─── MemberColumn Component ─── */
 
 function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle, toggling, openMenuId, onOpenMenu, onEdit, onDelete, deleting, onRestore, restoring, isMobile }) {
-  const colorTheme = member?.color_theme || 'slate';
-  const avatarColor = MEMBER_COLORS[colorTheme] || '#7A8694';
   const displayName = name || member?.name || 'Anyone';
-  const initial = displayName.charAt(0).toUpperCase();
-  // Fall back to the initial if the photo URL fails to load (keyed on the URL
-  // so a re-upload retries instead of staying stuck on the fallback).
-  const [avatarErrUrl, setAvatarErrUrl] = useState(null);
 
   return (
     <div
@@ -358,22 +352,11 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
     >
       {/* Column header */}
       <div className="flex items-center gap-2.5" style={{ padding: '4px 4px 6px' }}>
-        {member?.avatar_url && avatarErrUrl !== member.avatar_url ? (
-          <img
-            src={member.avatar_url}
-            alt=""
-            onError={() => setAvatarErrUrl(member.avatar_url)}
-            className="shrink-0 rounded-full object-cover"
-            style={{ width: 45, height: 45, border: '2px solid #fff' }}
-          />
-        ) : (
-          <div
-            className="shrink-0 flex items-center justify-center"
-            style={{ width: 45, height: 45, borderRadius: '50%', background: avatarColor, color: '#fff', fontSize: 16, fontWeight: 600, border: '2px solid #fff' }}
-          >
-            {initial}
-          </div>
-        )}
+        <Avatar
+          member={{ name: displayName, color_theme: member?.color_theme, avatar_url: member?.avatar_url }}
+          size={45}
+          style={{ boxShadow: '0 0 0 2px #fff' }}
+        />
         <div className="flex-1 min-w-0">
           <div className="truncate" style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-charcoal)' }}>{displayName}</div>
           <div style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)' }}>

@@ -29,14 +29,46 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
   };
 
   if (member.avatar_url && erroredUrl !== member.avatar_url) {
+    // Has-photo state: keep the member's identifying colour visible as a ring
+    // around the photo (the solid fill is gone once a photo replaces it).
+    // Outer = coloured ring, middle = thin white gap, inner = the photo.
+    // box-sizing: border-box throughout so the whole thing stays size x size.
+    const ring = Math.max(2, Math.round(size * 0.09)); // coloured ring thickness
+    const gap = Math.max(1, Math.round(size * 0.045));  // white gap thickness
     return (
-      <img
-        src={member.avatar_url}
-        alt={member.name || ''}
+      <div
         className={className}
-        style={{ ...base, objectFit: 'cover' }}
-        onError={() => setErroredUrl(member.avatar_url)}
-      />
+        style={{
+          ...base,
+          background: hexFor(member),
+          padding: ring,
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            background: '#fff',
+            padding: gap,
+            boxSizing: 'border-box',
+          }}
+        >
+          <img
+            src={member.avatar_url}
+            alt={member.name || ''}
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+            onError={() => setErroredUrl(member.avatar_url)}
+          />
+        </div>
+      </div>
     );
   }
 
