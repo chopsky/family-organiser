@@ -612,26 +612,15 @@ export default function Dashboard() {
           kicker's old margin provided. */}
       <div className="flex flex-col gap-1.5">
         <h1
-          // Responsive sizing via Tailwind arbitrary values - mobile gets
-          // the cosier 38px treatment, desktop the full 52px editorial
-          // headline. Inline styles cover properties Tailwind can't express
-          // with utilities here (custom font family + weight).
-          className="text-[38px] md:text-[52px] leading-[1.05] md:leading-[1.02] tracking-[-0.8px] md:tracking-[-1px]"
-          style={{
-            fontFamily: '"Instrument Serif"',
-            fontWeight: 400,
-            margin: 0,
-          }}
+          // Matches the PageHeader title used on Tasks/Meals/Shopping (serif,
+          // charcoal, -0.01em tracking). Only the size stays larger - the
+          // home-screen greeting keeps its editorial 38/52px treatment.
+          className="m-0 text-[38px] md:text-[52px] leading-[1.05] font-normal text-charcoal"
+          style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.01em' }}
         >
           {getGreeting()}, <i style={{ color: 'var(--color-plum)' }}>{user?.name}</i><span style={{ color: 'var(--color-plum)' }}>.</span>
         </h1>
-        <p
-          style={{
-            color: 'var(--ink-2)',
-            fontSize: '13px',
-            fontWeight: 500,
-          }}
-        >
+        <p className="text-sm text-warm-grey">
           {todayStr}
           {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
         </p>
