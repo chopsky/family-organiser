@@ -368,7 +368,6 @@ export default function Shopping() {
       <PageHeader
         kicker={`${itemCount} ${itemCount === 1 ? 'item' : 'items'}`}
         title="Shopping list"
-        subtitle="Your family's grocery lists, shared in real time."
         actions={
           <button
             type="button"

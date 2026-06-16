@@ -1774,7 +1774,6 @@ export default function FamilySetup() {
       <PageHeader
         kicker={`${members.length} ${members.length === 1 ? 'member' : 'members'}`}
         title={familyTitle(household?.name)}
-        subtitle="Manage who's in your household and how Housemait works for everyone."
       />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />

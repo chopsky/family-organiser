@@ -260,7 +260,6 @@ export default function Documents() {
       <PageHeader
         kicker={kicker}
         title="Documents"
-        subtitle="Everything the household needs, in one safe place."
         actions={<>
           <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => setShowNewFolder(true)}>
             New folder

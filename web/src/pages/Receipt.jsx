@@ -135,7 +135,7 @@ export default function Receipt() {
   if (!canWrite) {
     return (
       <div className="max-w-[1100px] mx-auto">
-        <PageHeader title="Receipts" subtitle="Scanned receipts, auto-matched to your grocery lists." />
+        <PageHeader title="Receipts" />
         <SubscribePrompt size="lg" message="Subscribe to scan receipts and auto-check shopping items" />
       </div>
     );
@@ -146,7 +146,6 @@ export default function Receipt() {
       <PageHeader
         kicker={receipts.length ? `${receipts.length} saved · ${symbol}${totalSpend.toFixed(2)}` : 'No receipts yet'}
         title="Receipts"
-        subtitle="Scanned receipts, auto-matched to your grocery lists."
         actions={
           <PillBtn primary icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => fileRef.current?.click()} disabled={scanning}>
             {scanning ? 'Scanning…' : 'Scan receipt'}
