@@ -1707,7 +1707,7 @@ export default function Settings() {
         {/* The rows keep their code order but display roster → link →
             outbound via CSS order, so the big JSX blocks don't move. */}
         <div className="flex flex-col gap-2">
-        <CollapsibleRow icon="📤" label="Show Housemait in Apple, Google or Outlook" className="order-3">
+        <CollapsibleRow icon="📤" label={<span className="font-semibold">Export from Housemait</span>} className="order-3">
         <p className="text-xs text-cocoa mb-3">
           Housemait events appear alongside everything else in Apple Calendar (or Google/Outlook). One-way — nothing in your calendar is ever changed.
         </p>
@@ -1884,7 +1884,7 @@ export default function Settings() {
             iOS re-collapses this to a quiet line under the device card.) */}
         <CollapsibleRow
           icon="🔗"
-          label={externalFeeds.some((f) => f.source !== 'device') ? 'Calendars by link' : 'Add a calendar by link'}
+          label={<span className="font-semibold">Import to Housemait</span>}
           sub={externalFeeds.some((f) => f.source !== 'device') ? String(externalFeeds.filter((f) => f.source !== 'device').length) : null}
           defaultOpen={!isDeviceCalendarSupported()}
           className="order-2"
