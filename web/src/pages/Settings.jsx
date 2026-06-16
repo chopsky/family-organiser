@@ -819,6 +819,9 @@ export default function Settings() {
   // The page-level `error`/`success` surface outside this modal, where a user
   // mid-subscribe can't see them - so a failed pull read as "nothing happened".
   const [feedError, setFeedError] = useState('');
+  // Own-avatar in the account header: fall back to the initial if the photo
+  // 404s (keyed on the URL so a re-upload retries).
+  const [headerAvatarErrUrl, setHeaderAvatarErrUrl] = useState(null);
   const [feedActionId, setFeedActionId] = useState(null); // id of feed currently being refreshed/removed
 
   // Receipt email forwarding state
@@ -1572,8 +1575,8 @@ export default function Settings() {
               <TrialIndicatorSubtle />
             </div>
             <div className="flex items-center gap-4">
-              {(me?.avatar_url || user?.avatar_url) ? (
-                <img src={me?.avatar_url || user?.avatar_url} alt={user?.name} className="w-12 h-12 rounded-full object-cover" />
+              {(me?.avatar_url || user?.avatar_url) && headerAvatarErrUrl !== (me?.avatar_url || user?.avatar_url) ? (
+                <img src={me?.avatar_url || user?.avatar_url} alt={user?.name} onError={() => setHeaderAvatarErrUrl(me?.avatar_url || user?.avatar_url)} className="w-12 h-12 rounded-full object-cover" />
               ) : (
                 <div className={`w-12 h-12 rounded-full ${ac} flex items-center justify-center font-bold text-lg`}>
                   {user?.name?.[0]?.toUpperCase()}
