@@ -358,6 +358,10 @@ export default function FamilySetup() {
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('teal');
   const [profileAvatar, setProfileAvatar] = useState(null);
+  // Edit-profile preview: a broken avatar URL falls back to the initial and is
+  // treated as "no photo" (initial + Upload only, no Remove). Keyed on the URL
+  // so a fresh upload retries.
+  const [profileAvatarErrUrl, setProfileAvatarErrUrl] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   // Separate flag for the household-card avatar quick-upload (different
   // from the per-member uploadingAvatar above). Lets us overlay a
@@ -3024,8 +3028,13 @@ export default function FamilySetup() {
             <div className="space-y-4">
               {/* Avatar upload */}
               <div className="flex flex-col items-center gap-2">
-                {profileAvatar ? (
-                  <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
+                {profileAvatar && profileAvatarErrUrl !== profileAvatar ? (
+                  <img
+                    src={profileAvatar}
+                    alt={profileName}
+                    onError={() => setProfileAvatarErrUrl(profileAvatar)}
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
                 ) : (
                   <div className={`w-20 h-20 rounded-full ${
                     AVATAR_COLOURS[profileColor] || AVATAR_COLOURS.teal
@@ -3044,7 +3053,7 @@ export default function FamilySetup() {
                       className="hidden"
                     />
                   </label>
-                  {profileAvatar && (
+                  {profileAvatar && profileAvatarErrUrl !== profileAvatar && (
                     <button
                       type="button"
                       onClick={handleAvatarRemove}
