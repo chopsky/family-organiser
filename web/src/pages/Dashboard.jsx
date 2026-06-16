@@ -583,7 +583,7 @@ export default function Dashboard() {
           a plum uppercase kicker (here the date) on top, then the serif
           title, then a warm-grey subtitle. Only the h1 size stays larger -
           the home-screen greeting keeps its editorial 38/52px treatment. */}
-      <div className="mb-2">
+      <div className="mb-4 md:mb-2">
         <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
           {todayStr}
           {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
