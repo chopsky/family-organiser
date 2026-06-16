@@ -781,25 +781,31 @@ router.post('/external-feeds', async (req, res) => {
   // page, or Google's public address on a non-public calendar) instead drops
   // the row and returns 400 with copy-this-instead guidance, so they fix the
   // paste rather than keeping a subscription that fails every cron forever.
-  let refresh = null;
-  let refreshError = null;
-  try {
-    refresh = await externalFeed.refreshFeed(feed);
-  } catch (err) {
-    refreshError = externalFeed.friendlyPullError(normalisedUrl, err.message || String(err));
-  }
+  // Return as soon as the row exists; run the initial pull in the BACKGROUND.
+  // A big calendar's first import (fetch + expand recurring events + upsert) can
+  // take many seconds, and making the user wait on a spinner was the rough edge.
+  // The common wrong-paste shapes were already rejected synchronously above
+  // (classifyFeedUrlMistake), so what's left is: pull the events and - for a URL
+  // that passes the shape check but proves permanently un-pullable - tidy the
+  // row away so it doesn't fail every cron forever. Transient failures keep the
+  // row (the refresh cron retries). Errors are logged, not surfaced - the
+  // response has already gone out.
+  externalFeed.refreshFeed(feed)
+    .then((refresh) => {
+      console.log(`[external-feeds] initial pull for ${feed.id} (${feed.display_name}): ${refresh?.fetched ?? 0} event(s)`);
+    })
+    .catch(async (err) => {
+      const refreshError = externalFeed.friendlyPullError(normalisedUrl, err.message || String(err));
+      if (refreshError?.permanent) {
+        await db.deleteExternalFeed(feed.id, req.householdId)
+          .catch((e) => console.error('POST /external-feeds: bg cleanup of bad-URL row failed:', e.message));
+        console.warn(`[external-feeds] initial pull for ${feed.id} permanently failed, row removed: ${refreshError.message}`);
+      } else {
+        console.warn(`[external-feeds] initial pull for ${feed.id} failed (transient, cron will retry): ${err.message}`);
+      }
+    });
 
-  if (refreshError) {
-    if (refreshError.permanent) {
-      // If this delete fails we still 400, but a zombie row remains and will
-      // fail every cron - log it so that state is at least diagnosable.
-      await db.deleteExternalFeed(feed.id, req.householdId)
-        .catch((e) => console.error('POST /external-feeds: cleanup of bad-URL row failed:', e.message));
-      return res.status(400).json({ error: refreshError.message });
-    }
-    return res.status(502).json({ feed, refresh: null, error: refreshError.message });
-  }
-  return res.json({ feed, refresh });
+  return res.status(201).json({ feed });
 });
 
 /**

@@ -1297,6 +1297,27 @@ describe('add external feed - wrong-paste detection', () => {
     expect(res.body.error).toMatch(/Public Calendar/);
     expect(db.createExternalFeed).not.toHaveBeenCalled();
   });
+
+  test('a valid feed is created and returns immediately - the pull runs in the background', async () => {
+    const externalFeed = require('../services/externalFeed');
+    // Never-resolving pull: proves the route returns without awaiting it, and
+    // keeps the background then/catch from logging after the test finishes.
+    const pull = jest.spyOn(externalFeed, 'refreshFeed').mockReturnValue(new Promise(() => {}));
+    db.createExternalFeed.mockResolvedValue({
+      id: 'feed-1', household_id: 'hh-1', display_name: 'Family',
+      feed_url: 'https://p161-caldav.icloud.com/published/2/abc.ics',
+    });
+
+    const res = await request(app).post('/api/calendar/external-feeds').set(AUTH)
+      .send({ feed_url: 'webcal://p161-caldav.icloud.com/published/2/abc.ics', display_name: 'Family' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.feed).toMatchObject({ id: 'feed-1' });
+    expect(res.body.refresh).toBeUndefined(); // no synchronous pull stats anymore
+    expect(db.createExternalFeed).toHaveBeenCalledTimes(1);
+    expect(pull).toHaveBeenCalledTimes(1);    // initial pull kicked off in the background
+    pull.mockRestore();
+  });
 });
 
 // ─── GET /api/calendar/feed/:token.ics - stable UIDs ────────────────────────────

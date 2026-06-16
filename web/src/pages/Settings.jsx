@@ -1300,11 +1300,7 @@ export default function Settings() {
         color: newFeedColor,
       });
       setExternalFeeds(prev => [...prev, data.feed]);
-      const stats = data.refresh;
-      const summary = stats
-        ? `Subscribed - pulled ${stats.fetched} event${stats.fetched === 1 ? '' : 's'}.`
-        : 'Subscribed.';
-      setSuccess(summary);
+      setSuccess('Subscribed - your calendar is syncing; events will appear on the calendar shortly.');
       setNewFeedUrl('');
       setNewFeedName('');
       setNewFeedColor('sky');
