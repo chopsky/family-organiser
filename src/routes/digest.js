@@ -6,6 +6,31 @@ const cache = require('../services/cache');
 const router = Router();
 
 /**
+ * Deduplicate a day's events for the digest:
+ *  - drop a read-only SYNCED copy (external_feed_id) shadowed by a NATIVE event
+ *    of the same title+date - a subscribed event deleted at the source that
+ *    lingers until the feed pull confirms it, re-created natively at a new time;
+ *    without this "Up next" / Today's schedule surface the ghost's old time;
+ *  - then collapse exact title+start_time dupes that sync can create.
+ * Pure + exported for testing. Mirrors the Calendar page's native-over-synced
+ * de-dup.
+ */
+function dedupeTodayEvents(events) {
+  const dateOf = (e) => (e.start_time || '').split('T')[0];
+  const nativeTitleDates = new Set(
+    events.filter((e) => !e.external_feed_id).map((e) => `${e.title}|${dateOf(e)}`),
+  );
+  const seen = new Set();
+  return events.filter((e) => {
+    if (e.external_feed_id && nativeTitleDates.has(`${e.title}|${dateOf(e)}`)) return false;
+    const key = `${e.title}|${e.start_time}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * GET /api/digest
  * Returns the data needed to render the weekly digest in the web app.
  *
@@ -66,14 +91,8 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
         const isToday = start === todayStr || (start <= todayStr && end >= todayStr);
         return isToday && e.category !== 'public_holiday' && e.category !== 'birthday';
       });
-      // Deduplicate events - calendar sync can create duplicate rows with same title + start_time
-      const seen = new Set();
-      todayEvents = filtered.filter(e => {
-        const key = `${e.title}|${e.start_time}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+      // Drop sync ghosts shadowed by a native event, then exact dupes.
+      todayEvents = dedupeTodayEvents(filtered);
       // Attach the multi-assignee list (event_assignees rows, the
       // separate per-event reminder fanout table) so the Dashboard can
       // render stacked avatars + "A, B +N" name labels. The
@@ -119,3 +138,4 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.dedupeTodayEvents = dedupeTodayEvents;
