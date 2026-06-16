@@ -31,6 +31,13 @@ function currencySymbol(totalText) {
   const m = String(totalText || '').match(/[^\d.,\s]/);
   return m ? m[0] : '£';
 }
+// Show the total with a currency symbol. AI extraction sometimes drops the
+// symbol (a bare "43.99"); prepend the household's currency in that case,
+// but leave a total that already carries one (e.g. "£43.99", "R 24,85") alone.
+function withCurrency(totalText, fallback = '£') {
+  if (!totalText) return '—';
+  return /[^\d.,\s]/.test(totalText) ? totalText : `${fallback}${totalText}`;
+}
 
 // The receipt's own purchase date (a YYYY-MM-DD, no time) is what belongs on the
 // card - not when it was uploaded. Show that; only when the scan couldn't read a
@@ -186,6 +193,7 @@ export default function Receipt() {
             <ReceiptCard
               key={r.id}
               r={r}
+              symbol={symbol}
               onView={() => setOpenId(r.id)}
               onKeep={() => handleKeep(r.id)}
               onDelete={() => handleDeleteReceipt(r.id)}
@@ -208,7 +216,7 @@ export default function Receipt() {
 
 /* ─── Receipt Card ─── */
 
-function ReceiptCard({ r, onView, onKeep, onDelete }) {
+function ReceiptCard({ r, onView, onKeep, onDelete, symbol = '£' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const color = colorFor(r.merchant || 'Receipt');
   const filed = r.status === 'filed';
@@ -267,7 +275,7 @@ function ReceiptCard({ r, onView, onKeep, onDelete }) {
       </div>
 
       <div className="text-[34px] leading-none text-charcoal" style={{ fontFamily: '"Instrument Serif", serif' }}>
-        {r.total_text || '—'}
+        {withCurrency(r.total_text, symbol)}
       </div>
 
       {filed ? (
@@ -353,7 +361,7 @@ function ReceiptDetailModal({ receiptId, onClose, onChanged }) {
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-charcoal truncate">{receipt?.merchant || 'Receipt'}</h3>
             <p className="text-[11px] text-warm-grey">
-              {receipt ? `${receipt.matched_count} of ${receipt.item_count} matched · ${receipt.total_text || ''}` : 'Loading…'}
+              {receipt ? `${receipt.matched_count} of ${receipt.item_count} matched · ${withCurrency(receipt.total_text)}` : 'Loading…'}
             </p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
