@@ -454,6 +454,13 @@ export default function Calendar() {
       // (single-day window) but vanished from the calendar's month grid. Key on
       // the unique occurrence_key when present, falling back to id.
       const byId = [...new Map(allEvents.map(e => [e.occurrence_key || e.id, e])).values()];
+      // Prefer a NATIVE event over a read-only SYNCED copy when they collide on
+      // title+date below (stable sort: native first). Without this, a
+      // subscribed-calendar event the user deleted at the source - but which
+      // lingers in our copy until the feed pull confirms the removal - hides the
+      // user's own re-created event. (The API already orders native-first; this
+      // keeps the dedup correct regardless of payload order.)
+      byId.sort((a, b) => (a.external_feed_id ? 1 : 0) - (b.external_feed_id ? 1 : 0));
       const seen = new Set();
       const uniqueEvents = byId.filter(e => {
         const key = `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}|${(e.end_time || '').split('T')[0]}`;

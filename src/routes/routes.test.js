@@ -1320,6 +1320,31 @@ describe('add external feed - wrong-paste detection', () => {
   });
 });
 
+// ─── GET /calendar/month orders native events before synced copies ──────────────
+// The calendar client dedupes by title+date and keeps the first event it sees,
+// so a native event must come before a read-only synced copy - otherwise an
+// event the user deleted at the source (but which still lingers in our copy)
+// hides their own re-created event.
+describe('GET /calendar/month native-before-synced ordering', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('a native event is returned before a synced copy at the same title+date', async () => {
+    db.getCalendarEvents.mockResolvedValue([
+      { id: 's1', title: 'Flicky', start_time: '2099-01-05T12:00:00Z', external_feed_id: 'feed-1', category: 'event' },
+      { id: 'n1', title: 'Flicky', start_time: '2099-01-05T12:00:00Z', external_feed_id: null, category: 'event' },
+    ]);
+    db.getTasksByDateRange.mockResolvedValue([]);
+    db.getEventAssigneesBatch.mockResolvedValue([]);
+    db.getEventRemindersBatch.mockResolvedValue([]);
+
+    // 2099-01 dodges any cal-month cache entry other tests may have seeded.
+    const res = await request(app).get('/api/calendar/month?month=2099-01').set(AUTH);
+    expect(res.status).toBe(200);
+    const ids = res.body.events.map((e) => e.id);
+    expect(ids.indexOf('n1')).toBeLessThan(ids.indexOf('s1'));
+  });
+});
+
 // ─── GET /api/calendar/feed/:token.ics - stable UIDs ────────────────────────────
 // Without explicit ids, ical-generator mints RANDOM UIDs per request, so
 // subscribers' calendar apps saw the whole feed deleted + recreated on every

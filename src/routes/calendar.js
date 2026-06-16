@@ -338,6 +338,14 @@ router.get('/month', async (req, res) => {
       event.reminders = remindersByEvent[event.id] || [];
     }
 
+    // Prefer NATIVE events over read-only SYNCED copies. The calendar client
+    // dedupes events by title+date and keeps the FIRST one it sees, so ordering
+    // native (no external_feed_id) ahead of synced means an event the user
+    // deleted at its source and re-created in Housemait isn't hidden behind the
+    // lingering subscribed copy (which clears on the next confirmed feed pull).
+    // Stable sort: only the native/synced partition moves, other order is kept.
+    events.sort((a, b) => (a.external_feed_id ? 1 : 0) - (b.external_feed_id ? 1 : 0));
+
     const result = { events, tasks };
     cache.set(cacheKey, result, 60);
     return res.json(result);
