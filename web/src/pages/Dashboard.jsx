@@ -586,6 +586,7 @@ export default function Dashboard() {
       <div className="mb-2">
         <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
           {todayStr}
+          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
         </div>
         <h1
           className="m-0 text-[38px] md:text-[52px] leading-[1.05] font-normal text-charcoal"
@@ -593,11 +594,6 @@ export default function Dashboard() {
         >
           {getGreeting()}, <i style={{ color: 'var(--color-plum)' }}>{user?.name}</i><span style={{ color: 'var(--color-plum)' }}>.</span>
         </h1>
-        {eventCount > 0 && (
-          <div className="text-sm text-warm-grey mt-1.5">
-            {eventCount} event{eventCount !== 1 ? 's' : ''} today
-          </div>
-        )}
       </div>
 
       {/* Weather widget - sits directly below the greeting and above the
