@@ -140,6 +140,9 @@ export default function Layout({ children }) {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const [members, setMembers] = useState([]);
+  // Sidebar avatar URL that failed to load - falls back to the initial instead
+  // of a broken-image icon. Keyed on the URL so a re-upload retries.
+  const [avatarErrUrl, setAvatarErrUrl] = useState(null);
 
   // Register for push notifications on iOS
   usePushNotifications(user);
@@ -223,8 +226,8 @@ export default function Layout({ children }) {
   const avatarClass = avatarColors[user?.color_theme] || avatarColors.sage;
 
   function renderAvatar(size = 'w-8 h-8', textSize = 'text-sm') {
-    if (user?.avatar_url) {
-      return <img src={user.avatar_url} alt={user.name} className={`${size} rounded-full object-cover`} />;
+    if (user?.avatar_url && avatarErrUrl !== user.avatar_url) {
+      return <img src={user.avatar_url} alt={user.name} onError={() => setAvatarErrUrl(user.avatar_url)} className={`${size} rounded-full object-cover`} />;
     }
     return (
       <div className={`${size} rounded-full ${avatarClass} flex items-center justify-center font-bold ${textSize}`}>
