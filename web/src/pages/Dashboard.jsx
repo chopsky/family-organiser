@@ -592,7 +592,7 @@ export default function Dashboard() {
           className="m-0 text-[38px] md:text-[52px] leading-[1.05] font-normal text-charcoal"
           style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.01em' }}
         >
-          {getGreeting()}, <i style={{ color: 'var(--color-plum)' }}>{user?.name}</i><span style={{ color: 'var(--color-plum)' }}>.</span>
+          {getGreeting()},<br /><i>{user?.name}</i>.
         </h1>
       </div>
 
@@ -613,9 +613,11 @@ export default function Dashboard() {
       {/* AI chat input - replaced with a subscribe prompt for expired
           households so typing into a broken input doesn't turn into a
           jarring 402 → redirect moment. */}
-      <WriteGate size="lg" message="Subscribe to create events, tasks, and more with AI">
-        <DashboardAiInput />
-      </WriteGate>
+      <div style={{ marginTop: '22px' }}>
+        <WriteGate size="lg" message="Subscribe to create events, tasks, and more with AI">
+          <DashboardAiInput />
+        </WriteGate>
+      </div>
 
       {/* "Up Next" card - the soonest upcoming timed event today, with a
           lead-up progress bar. Sits between the AI composer and the day's
