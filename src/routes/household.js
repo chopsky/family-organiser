@@ -272,13 +272,17 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
       }
     }
 
-    // Try to remove files from storage (best effort - may not exist or may have different ext)
+    // Remove only THIS member's avatar file(s). CRITICAL: the v1 storage list()
+    // takes `search`, NOT `prefix` - passing `prefix` is silently ignored, so
+    // listing the folder and removing the raw result would wipe EVERY avatar in
+    // the household (which is why members' photos kept vanishing when anyone
+    // removed one). Filter to files actually named `<userId>` / `<userId>.<ext>`
+    // before deleting. Best-effort: a missing object is fine.
     const userDb = supabaseAdmin;
-    const { data: files } = await userDb.storage.from('avatars').list(req.householdId, {
-      prefix: targetId,
-    });
-    if (files?.length) {
-      await userDb.storage.from('avatars').remove(files.map(f => `${req.householdId}/${f.name}`));
+    const { data: files } = await userDb.storage.from('avatars').list(req.householdId);
+    const mine = (files || []).filter(f => f.name === targetId || f.name.startsWith(`${targetId}.`));
+    if (mine.length) {
+      await userDb.storage.from('avatars').remove(mine.map(f => `${req.householdId}/${f.name}`));
     }
 
     // Clear in DB
@@ -766,11 +770,14 @@ router.post('/avatar', requireAuth, requireHousehold, requireAdmin, avatarUpload
  */
 router.delete('/avatar', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
-    const { data: files } = await supabaseAdmin.storage.from('avatars').list(req.householdId, {
-      prefix: 'household',
-    });
-    if (files?.length) {
-      await supabaseAdmin.storage.from('avatars').remove(files.map((f) => `${req.householdId}/${f.name}`));
+    // Remove only the household photo file(s) - `household` / `household.<ext>`.
+    // The v1 storage list() ignores `prefix` (it takes `search`), so listing the
+    // folder and removing the raw result would wipe every MEMBER avatar too.
+    // Filter to the household-photo names before deleting.
+    const { data: files } = await supabaseAdmin.storage.from('avatars').list(req.householdId);
+    const householdFiles = (files || []).filter((f) => f.name === 'household' || f.name.startsWith('household.'));
+    if (householdFiles.length) {
+      await supabaseAdmin.storage.from('avatars').remove(householdFiles.map((f) => `${req.householdId}/${f.name}`));
     }
     const updated = await db.updateHouseholdSettings(req.householdId, { avatar_url: null });
     cache.invalidate(`members:${req.householdId}`);

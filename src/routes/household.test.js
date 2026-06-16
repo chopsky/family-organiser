@@ -109,4 +109,40 @@ describe('DELETE /api/household/profile/avatar', () => {
     expect(res.status).toBe(404);
     expect(db.updateUser).not.toHaveBeenCalled();
   });
+
+  it('removes ONLY the target member\'s files, never other members\' avatars', async () => {
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason' }]);
+    db.updateUser.mockResolvedValue({ avatar_url: null });
+    // storage list() ignores `prefix`, so the route gets the WHOLE folder back
+    // and must filter to the target's files itself.
+    mockStorage.list.mockResolvedValue({ data: [
+      { name: 'me.jpg' }, { name: 'mason.jpg' }, { name: 'mason.png' }, { name: 'household.jpg' },
+    ] });
+
+    const res = await request(makeApp()).delete('/api/household/profile/avatar?userId=mason');
+
+    expect(res.status).toBe(200);
+    expect(mockStorage.remove).toHaveBeenCalledTimes(1);
+    expect(mockStorage.remove).toHaveBeenCalledWith(['h1/mason.jpg', 'h1/mason.png']);
+    const removed = mockStorage.remove.mock.calls[0][0];
+    expect(removed).not.toContain('h1/me.jpg');
+    expect(removed).not.toContain('h1/household.jpg');
+  });
+});
+
+describe('DELETE /api/household/avatar (household photo)', () => {
+  it('removes ONLY the household photo, never member avatars', async () => {
+    db.updateHouseholdSettings.mockResolvedValue({ avatar_url: null });
+    mockStorage.list.mockResolvedValue({ data: [
+      { name: 'household.jpg' }, { name: 'me.jpg' }, { name: 'mason.png' },
+    ] });
+
+    const res = await request(makeApp()).delete('/api/household/avatar');
+
+    expect(res.status).toBe(200);
+    expect(mockStorage.remove).toHaveBeenCalledWith(['h1/household.jpg']);
+    const removed = mockStorage.remove.mock.calls[0][0];
+    expect(removed).not.toContain('h1/me.jpg');
+    expect(removed).not.toContain('h1/mason.png');
+  });
 });
