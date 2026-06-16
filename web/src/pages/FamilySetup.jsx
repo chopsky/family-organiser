@@ -949,9 +949,17 @@ export default function FamilySetup() {
     setImportingWebsite(true);
     setImportError('');
     try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-website/preview`, { website_url: normalisedUrl });
+      // 90s ceiling: the AI extraction legitimately takes 30-60s, but
+      // without a cap a slow/blocking school server leaves the button stuck
+      // on "Finding…" forever with no way to tell it apart from progress.
+      const { data } = await api.post(
+        `/schools/${termDateSchoolId}/import-website/preview`,
+        { website_url: normalisedUrl },
+        { timeout: 90000 },
+      );
       if (!Array.isArray(data.dates) || data.dates.length === 0) {
         setImportError(data.message || 'No term dates found on that page. Try a different URL or another import method.');
+        setShowTermDateOptions(true);
         return;
       }
       setDraftImport({
@@ -963,7 +971,15 @@ export default function FamilySetup() {
       });
       setShowTermDateOptions(false);
     } catch (err) {
-      setImportError(err.response?.data?.error || 'Could not import from website. Try another option below.');
+      const timedOut = err.code === 'ECONNABORTED' || /timeout/i.test(err.message || '');
+      setImportError(
+        timedOut
+          ? "This is taking longer than we'd expect — the school's website may be slow or blocking us. Try 'Upload the school's PDF' below, or add the dates manually."
+          : (err.response?.data?.error || 'Could not import from website. Try another option below.'),
+      );
+      // If the admin closed this dialog while we were working, bring it back
+      // so the error is actually seen rather than silently swallowed.
+      setShowTermDateOptions(true);
     } finally {
       setImportingWebsite(false);
     }
@@ -2804,7 +2820,7 @@ export default function FamilySetup() {
 
       {/* Term Date Import Options Modal */}
       {showTermDateOptions && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => setShowTermDateOptions(false)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => { if (!(importingWebsite || importingPdf || importingLA || importingTermIcal)) setShowTermDateOptions(false); }}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -2825,6 +2841,22 @@ export default function FamilySetup() {
                 <div>
                   <p className="text-sm text-bark font-medium">{importError}</p>
                   <p className="text-xs text-cocoa mt-1">Please try another option below.</p>
+                </div>
+              </div>
+            )}
+
+            {/* In-progress banner so a 30-60s AI extraction never looks
+                frozen. Pinned at the top of the dialog and mirrored inline
+                under each option's button. */}
+            {(importingWebsite || importingPdf || importingLA || importingTermIcal) && (
+              <div className="bg-white border border-cream-border rounded-xl px-4 py-3 mb-4 flex items-start gap-2.5">
+                <svg className="h-4 w-4 text-primary animate-spin mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <div>
+                  <p className="text-sm text-bark font-medium">Finding term dates…</p>
+                  <p className="text-xs text-cocoa mt-1">This can take up to a minute. Keep this window open — we'll pop up the dates for you to review as soon as they're ready.</p>
                 </div>
               </div>
             )}
@@ -2907,6 +2939,9 @@ export default function FamilySetup() {
                     {importingWebsite ? 'Finding…' : 'Find dates'}
                   </button>
                 </div>
+                {importingWebsite && (
+                  <p className="text-[11px] text-cocoa mt-2">Reading the page and extracting dates — this can take up to a minute.</p>
+                )}
               </div>
 
               {/* Option: Upload a PDF directly. Fallback for schools
