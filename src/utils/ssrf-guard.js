@@ -62,16 +62,25 @@ function safeLookup(hostname, options, callback) {
     callback = options;
     options = {};
   }
+  // Node's autoSelectFamily / Happy-Eyeballs (default-on in Node >= 20, and
+  // engaged for dual-stack hosts like iCloud's caldav servers) calls lookup
+  // with all:true and expects the FULL [{address, family}] array back. We must
+  // honour that: returning a single address makes Node read addresses[0] as
+  // undefined and throw "Invalid IP address: undefined", failing the connect.
+  const wantsAll = !!(options && options.all);
   dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
     if (err) return callback(err);
     if (!addresses || addresses.length === 0) {
       return callback(new Error(`SSRF guard: no DNS records for ${hostname}`));
     }
+    // Validate EVERY resolved address - so whether we hand back the array or a
+    // single address, no blocked IP can be connected to (no rebinding window).
     for (const a of addresses) {
       if (isBlockedIp(a.address)) {
         return callback(new Error(`SSRF guard: ${hostname} resolves to blocked address ${a.address}`));
       }
     }
+    if (wantsAll) return callback(null, addresses);
     const chosen = addresses[0];
     callback(null, chosen.address, chosen.family);
   });
