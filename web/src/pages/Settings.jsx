@@ -815,6 +815,10 @@ export default function Settings() {
   const [newFeedProvider, setNewFeedProvider] = useState(null);
   const [colorPickerOpenId, setColorPickerOpenId] = useState(null); // id of feed whose inline colour picker is expanded
   const [addingFeed, setAddingFeed] = useState(false);
+  // Inline error for the add-feed form, shown next to the Subscribe button.
+  // The page-level `error`/`success` surface outside this modal, where a user
+  // mid-subscribe can't see them - so a failed pull read as "nothing happened".
+  const [feedError, setFeedError] = useState('');
   const [feedActionId, setFeedActionId] = useState(null); // id of feed currently being refreshed/removed
 
   // Receipt email forwarding state
@@ -1284,11 +1288,11 @@ export default function Settings() {
   async function handleAddExternalFeed(e) {
     e.preventDefault();
     if (!newFeedUrl.trim() || !newFeedName.trim()) {
-      setError('URL and name are required.');
+      setFeedError('URL and name are required.');
       return;
     }
     setAddingFeed(true);
-    setError('');
+    setFeedError('');
     try {
       const { data } = await api.post('/calendar/external-feeds', {
         feed_url: newFeedUrl.trim(),
@@ -1307,7 +1311,7 @@ export default function Settings() {
       setNewFeedProvider(null);
       setShowAddFeed(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not add calendar feed.');
+      setFeedError(err.response?.data?.error || "Couldn't reach that calendar. Check the link is the iCal/webcal address and try again.");
     } finally {
       setAddingFeed(false);
     }
@@ -2013,6 +2017,9 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
+              {feedError && (
+                <p className="text-[11px] rounded-xl px-3 py-2 bg-coral/10 text-bark">⚠️ {feedError}</p>
+              )}
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -2023,7 +2030,7 @@ export default function Settings() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowAddFeed(false); setNewFeedUrl(''); setNewFeedName(''); setNewFeedProvider(null); }}
+                  onClick={() => { setShowAddFeed(false); setNewFeedUrl(''); setNewFeedName(''); setNewFeedProvider(null); setFeedError(''); }}
                   className="text-sm text-cocoa hover:text-bark px-3"
                 >
                   Cancel
