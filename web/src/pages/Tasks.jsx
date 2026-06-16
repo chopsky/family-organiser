@@ -355,7 +355,6 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
         <Avatar
           member={{ name: displayName, color_theme: member?.color_theme, avatar_url: member?.avatar_url }}
           size={45}
-          style={{ boxShadow: '0 0 0 2px #fff' }}
         />
         <div className="flex-1 min-w-0">
           <div className="truncate" style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-charcoal)' }}>{displayName}</div>

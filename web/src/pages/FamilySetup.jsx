@@ -88,7 +88,7 @@ function MemberCard({ m, canEdit, canRemove, onEdit, onRemove, removing }) {
           )}
         </div>
       )}
-      <Avatar member={m} size={72} style={{ boxShadow: '0 0 0 2px #fff' }} />
+      <Avatar member={m} size={72} />
       <div>
         <div className="text-base font-semibold text-charcoal">{m.name}</div>
         {m.whatsapp_linked && (
