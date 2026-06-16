@@ -17,7 +17,6 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { setBadgeCount } from '../lib/badge';
 import WeatherStrip from '../components/WeatherStrip';
 import AfterSchoolCard from '../components/AfterSchoolCard';
-import { isIos } from '../lib/platform';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 
@@ -132,7 +131,6 @@ function formatTaskDueLabel(dueDateStr) {
 // users who already dismissed it aren't re-prompted.
 function CalendarSetupNudge() {
   const { user } = useAuth();
-  const onIphone = isIos();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -143,18 +141,15 @@ function CalendarSetupNudge() {
       if (localStorage.getItem(`housemait_calendar_nudge_dismissed:${user.id}`) === '1') return;
     } catch { return; }
     // Silently skips on transient API error (better to under-prompt than nag).
+    // Device sync is retired, so the conduit is ICS subscribe for everyone -
+    // prompt only while the household has no calendar connections at all.
     api.get('/calendar/external-feeds')
       .then((res) => {
         const feeds = (res.data?.feeds || []).filter((f) => f.sync_enabled !== false);
-        if (onIphone) {
-          const minePresent = feeds.some((f) => f.source === 'device' && f.device_owner_user_id === user.id);
-          if (!minePresent) setShow(true);
-        } else if (feeds.length === 0) {
-          setShow(true);
-        }
+        if (feeds.length === 0) setShow(true);
       })
       .catch(() => { /* no-op */ });
-  }, [user?.id, onIphone]);
+  }, [user?.id]);
 
   function dismiss() {
     try { localStorage.setItem(`housemait_calendar_nudge_dismissed:${user?.id}`, '1'); } catch { /* private mode */ }
@@ -171,18 +166,14 @@ function CalendarSetupNudge() {
       <div className="text-2xl leading-none mt-0.5" aria-hidden="true">📅</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-bark">
-          {onIphone
-            ? 'Put your calendar on the family calendar'
-            : 'See work, school and family calendars in one place'}
+          See work, school and family calendars in one place
         </p>
         <p className="text-xs text-cocoa mt-1 leading-relaxed">
-          {onIphone
-            ? 'Connect this iPhone’s calendars — iCloud, Google, Outlook — in two taps. Read-only: Housemait can never change or delete anything in them.'
-            : 'Open Housemait on an iPhone to sync its calendars in two taps, or subscribe to a calendar by link right here.'}
+          Subscribe to your Apple, Google or Outlook calendar by link and it shows up here — kept in sync automatically, read-only.
         </p>
         <div className="mt-3 flex items-center gap-4">
           <Link to="/settings?section=calendars" className="text-xs font-semibold text-primary hover:underline">
-            {onIphone ? 'Connect my calendars →' : 'Set up calendars →'}
+            Set up calendars →
           </Link>
           <button
             type="button"

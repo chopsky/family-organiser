@@ -81,7 +81,17 @@ export function getLastSyncAt() {
   }
 }
 
+// Kill-switch for the EventKit device-sync path. Turned OFF because the
+// phone is the only sync conduit and it only uploads when the iOS app is
+// foregrounded, so the web/desktop calendar drifts badly out of date. We're
+// leaning on ICS subscribe (both ways) instead, which the server pulls
+// independently of any device. Flip back to true to re-enable the whole
+// path (picker, auto-sync, onboarding block) in one place. Backend endpoint
+// and native bridge are left intact so this is fully reversible.
+const DEVICE_CALENDAR_ENABLED = false;
+
 export function isDeviceCalendarSupported() {
+  if (!DEVICE_CALENDAR_ENABLED) return false;
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
   } catch {

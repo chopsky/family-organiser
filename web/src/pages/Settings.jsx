@@ -7,6 +7,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
 import DeviceCalendarSync from '../components/DeviceCalendarSync';
+import { isDeviceCalendarSupported } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -1877,14 +1878,15 @@ export default function Settings() {
           </CollapsibleRow>
         )}
 
-        {/* External feed subscriptions (read-only inbound). On the web this
-            row is the inbound hero (device sync doesn't exist there), so it
-            opens expanded; on iOS it stays a quiet collapsed line. */}
+        {/* External feed subscriptions (read-only inbound). With device sync
+            retired this is the inbound hero everywhere, so it opens expanded.
+            (Driven by the same flag: if EventKit is ever switched back on,
+            iOS re-collapses this to a quiet line under the device card.) */}
         <CollapsibleRow
           icon="🔗"
           label={externalFeeds.some((f) => f.source !== 'device') ? 'Calendars by link' : 'Add a calendar by link'}
           sub={externalFeeds.some((f) => f.source !== 'device') ? String(externalFeeds.filter((f) => f.source !== 'device').length) : null}
-          defaultOpen={!Capacitor.isNativePlatform()}
+          defaultOpen={!isDeviceCalendarSupported()}
           className="order-2"
         >
           <div className="flex items-start justify-between gap-3 mb-3">
