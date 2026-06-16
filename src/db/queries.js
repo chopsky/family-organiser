@@ -2874,6 +2874,13 @@ async function findSimilarEvent(householdId, title, startTime, db = supabase) {
     .select('id, title, start_time, created_by, assigned_to_names, all_day')
     .eq('household_id', householdId)
     .is('deleted_at', null) // soft-deleted events shouldn't block recreation
+    // Only NATIVE events block a new one. A read-only SYNCED copy (URL feed or
+    // device sync) must NOT count as a duplicate - otherwise deleting an event
+    // at the source and re-adding it in Housemait is impossible while the
+    // synced row lingers (it can take a refresh cycle to clear, longer with
+    // iCloud's publish lag). Duplicate-detection is about two members both
+    // adding the same event by hand, not about mirrored external copies.
+    .is('external_feed_id', null)
     .ilike('title', title.trim()) // case-insensitive exact match (no wildcards)
     .gte('start_time', rangeStart)
     .lte('start_time', rangeEnd)
