@@ -102,9 +102,14 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/api/contact', contactLimiter);
 }
 
-// Health check
+// Health check. `commit` (Railway injects RAILWAY_GIT_COMMIT_SHA) lets us
+// confirm which build is actually live - handy when verifying a deploy landed.
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+  });
 });
 
 // Inbound webhooks (no auth - must be before authenticated routes)
