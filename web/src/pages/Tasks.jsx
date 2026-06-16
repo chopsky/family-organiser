@@ -185,7 +185,7 @@ function TaskCard({ task, completed, onToggle, toggling, onOpenMenu, openMenuId,
           <p
             className="leading-snug"
             style={{
-              fontSize: 13,
+              fontSize: 14,
               fontFamily: 'var(--font-sans, system-ui, sans-serif)',
               fontWeight: 500,
               color: completed ? 'var(--warm-grey, #6B6774)' : 'var(--charcoal, #2D2A33)',
@@ -375,7 +375,7 @@ function MemberColumn({ member, name, tasks, viewCompleted, onAddTask, onToggle,
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="truncate" style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-charcoal)' }}>{displayName}</div>
+          <div className="truncate" style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-charcoal)' }}>{displayName}</div>
           <div style={{ fontSize: 11, color: 'var(--warm-grey, #6B6774)' }}>
             {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
           </div>
