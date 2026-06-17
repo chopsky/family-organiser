@@ -63,7 +63,7 @@ const IcSearch = (p) => <Svg {...p}><circle cx="11" cy="11" r="7" /><path d="M21
 const IcClock = (p) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>;
 const IcRepeat = (p) => <Svg {...p}><path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></Svg>;
 const StarFill = ({ s = 12, c = STAR }) => <svg width={s} height={s} viewBox="0 0 24 24" fill={c}><path d="M12 2l3 6.3 6.9.9-5 4.8 1.2 6.8L12 17.8 5.9 20.8 7.1 14 2.1 9.2 9 8.3 12 2z" /></svg>;
-const Tick = ({ s = 12 }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 // ── meta chips (time + repeat) ──────────────────────────────────────────────
 function MetaChips({ task }) {
@@ -217,7 +217,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
           <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>{m.name}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: '#fff', fontSize: 11.5, fontWeight: 700, color: INK2 }}>
-              <Tick s={11} />{done}/{total}
+              <Tick s={11} c={INK2} />{done}/{total}
             </span>
             {kid && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 9px', borderRadius: 99, background: STAR_BG, fontSize: 11.5, fontWeight: 700, color: '#A9772A' }}><StarFill s={12} />{balance || 0}</span>}
           </div>
