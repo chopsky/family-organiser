@@ -1685,44 +1685,51 @@ export default function Calendar() {
                         key={idx}
                         className={`min-h-[90px] p-1.5 transition-colors border-b border-light-grey ${
                           idx % 7 !== 6 ? 'border-r' : ''
-                        } ${!isCurrent ? 'bg-[#F8F6F2]' : isToday_ ? 'bg-plum-light' : 'bg-white'}`}
+                        } ${isToday_ ? 'bg-plum-light' : 'bg-white'}`}
                       >
-                        <div className={`text-sm font-semibold mb-0.5 w-6 h-6 flex items-center justify-center ${
-                          !isCurrent ? 'text-light-grey' : isToday_ ? 'bg-plum text-white rounded-full' : 'text-charcoal'
-                        }`}>
-                          {date.getDate()}
-                        </div>
-                        {allItems.slice(0, maxShow).map(item => {
-                          const pillStyle = item._isTask ? { bg: '#E8724A18', text: '#E8724A' } : getEventStyle(item);
-                          return (
-                          <div
-                            key={item.id}
-                            className="text-[11px] font-semibold px-1.5 py-0.5 rounded-[3px] mb-0.5 truncate"
-                            style={{ background: pillStyle.bg, color: pillStyle.text }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (item._isTask) {
-                                openTaskEditForm(item);
-                              } else if (item.category !== 'public_holiday' && item.category !== 'birthday') {
-                                openEditForm(item);
-                              }
-                            }}
-                          >
-                            {item.title}
-                          </div>
-                          );
-                        })}
-                        {overflow > 0 && (
-                          <div
-                            className="text-[11px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer hover:underline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setMorePopup({ date, items: allItems, rect: { top: rect.bottom + 4, left: rect.left } });
-                            }}
-                          >
-                            +{overflow} more
-                          </div>
+                        {/* Padding cells for the previous/next month are left
+                            empty (no day number, no events) - only the current
+                            month's days are shown. */}
+                        {isCurrent && (
+                          <>
+                            <div className={`text-sm font-semibold mb-0.5 w-6 h-6 flex items-center justify-center ${
+                              isToday_ ? 'bg-plum text-white rounded-full' : 'text-charcoal'
+                            }`}>
+                              {date.getDate()}
+                            </div>
+                            {allItems.slice(0, maxShow).map(item => {
+                              const pillStyle = item._isTask ? { bg: '#E8724A18', text: '#E8724A' } : getEventStyle(item);
+                              return (
+                              <div
+                                key={item.id}
+                                className="text-[11px] font-semibold px-1.5 py-0.5 rounded-[3px] mb-0.5 truncate"
+                                style={{ background: pillStyle.bg, color: pillStyle.text }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (item._isTask) {
+                                    openTaskEditForm(item);
+                                  } else if (item.category !== 'public_holiday' && item.category !== 'birthday') {
+                                    openEditForm(item);
+                                  }
+                                }}
+                              >
+                                {item.title}
+                              </div>
+                              );
+                            })}
+                            {overflow > 0 && (
+                              <div
+                                className="text-[11px] font-semibold text-plum px-1.5 py-0.5 cursor-pointer hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setMorePopup({ date, items: allItems, rect: { top: rect.bottom + 4, left: rect.left } });
+                                }}
+                              >
+                                +{overflow} more
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     );
