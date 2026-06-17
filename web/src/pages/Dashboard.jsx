@@ -106,7 +106,7 @@ function formatTaskDueLabel(dueDateStr) {
   if (diffDays === 1) return { text: 'Tomorrow', overdue: false };
   if (diffDays === -1) return { text: 'Yesterday', overdue: true };
   if (diffDays < -1) return { text: `${Math.abs(diffDays)} days overdue`, overdue: true };
-  if (diffDays < 7) return { text: due.toLocaleDateString('en-GB', { weekday: 'long' }), overdue: false };
+  if (diffDays < 7) return { text: due.toLocaleDateString('en-GB', { weekday: 'short' }), overdue: false };
   return { text: due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), overdue: false };
 }
 
@@ -699,11 +699,11 @@ export default function Dashboard() {
                     <div key={ev.id || i} className="flex items-center gap-3 px-4 py-3 bg-cream rounded-2xl">
                       <span className={`w-1 self-stretch min-h-[2.25rem] rounded-full shrink-0 ${barColor}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-bark truncate leading-tight">{ev.title}</p>
+                        <p className="text-sm font-semibold text-bark truncate leading-[1.45]">{ev.title}</p>
                         {/* All-day events render "All day" instead of the
                             formatted start_time - otherwise a midnight-UTC
                             row shows up as "01:00" in BST. */}
-                        <p className="text-xs text-cocoa truncate mt-0.5">
+                        <p className="text-xs text-cocoa truncate mt-0.5 leading-[1.45]">
                           {ev.all_day ? 'All day' : formatTime(ev.start_time)}{ev.location ? ` · ${ev.location}` : ''}
                         </p>
                       </div>
@@ -748,38 +748,36 @@ export default function Dashboard() {
           {outstanding.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">All caught up!</p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="border-t border-[#1b14240f]">
               {outstanding.slice(0, 5).map((task) => {
                 const assignee = task.assigned_to_name
                   ? members.find(m => m.name === task.assigned_to_name)
                   : null;
                 const dueLabel = formatTaskDueLabel(task.due_date);
                 return (
-                  <li key={task.id} className="flex items-center gap-3 py-1">
+                  <li key={task.id} className="flex items-center gap-3 py-3.5 border-b border-[#1b14240f]">
                     <button
                       onClick={() => toggleTask(task)}
-                      className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                         task.completed
                           ? 'bg-sage border-sage text-white'
                           : 'border-cream-border hover:border-primary'
                       }`}
                     >
                       {task.completed && (
-                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                       )}
                     </button>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
-                        {task.title}
-                      </p>
-                      {dueLabel && (
-                        <p className={`text-xs mt-0.5 ${dueLabel.overdue ? 'text-coral' : 'text-cocoa'}`}>
-                          {dueLabel.text}
-                        </p>
-                      )}
-                    </div>
+                    <p className={`flex-1 min-w-0 text-sm truncate ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
+                      {task.title}
+                    </p>
+                    {dueLabel && (
+                      <span className={`shrink-0 text-[0.6875rem] font-bold uppercase tracking-wide ${dueLabel.overdue ? 'text-coral' : 'text-cocoa'}`}>
+                        {dueLabel.text}
+                      </span>
+                    )}
                     {assignee && (
-                      <div className="shrink-0">{getMemberAvatar(assignee)}</div>
+                      <div className="shrink-0">{getMemberAvatar(assignee, 36)}</div>
                     )}
                   </li>
                 );
