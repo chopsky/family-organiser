@@ -247,7 +247,6 @@ export default function Lists() {
                       </button>
                     );
                   })}
-                  {addWho.length > 0 && <span style={{ fontSize: 12, color: INK2, fontWeight: 600 }}>{members.filter((m) => addWho.includes(m.id)).map((m) => m.name).join(', ')}</span>}
                 </div>
               )}
 
