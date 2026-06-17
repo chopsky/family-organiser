@@ -55,13 +55,16 @@ function normaliseDef(body, memberIds) {
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const date = DATE_RE.test(req.query.date) ? req.query.date : await householdToday(req.householdId);
-    const [defs, completions, balances, skips] = await Promise.all([
+    const [defs, completions, balances] = await Promise.all([
       db.getChoreDefinitions(req.householdId),
       db.getChoreCompletionsForDate(req.householdId, date),
       db.getStarBalances(req.householdId),
-      db.getChoreSkipsForDate(req.householdId, date),
     ]);
-    const skipped = new Set(skips);
+    // Skips are best-effort: if the chore_skips migration hasn't run yet, a
+    // missing table must NOT blank the whole board - just show no skips.
+    let skipped = new Set();
+    try { skipped = new Set(await db.getChoreSkipsForDate(req.householdId, date)); }
+    catch (e) { console.warn('chore skips unavailable (run migration-chore-skips.sql):', e.message); }
     const tasks = buildDayView(defs, completions, date).filter((t) => !skipped.has(t.id));
     return res.json({ date, tasks, balances });
   } catch (err) {
