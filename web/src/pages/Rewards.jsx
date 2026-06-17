@@ -33,11 +33,19 @@ function relWhen(iso) {
 }
 
 // ── reward card ─────────────────────────────────────────────────────────────
-function RewardCard({ reward, balance, color, onRedeem, redeeming }) {
+function RewardCard({ reward, balance, color, onRedeem, redeeming, onRemove }) {
+  const [hover, setHover] = useState(false);
   const affordable = balance >= reward.cost;
   const pct = Math.min(100, Math.round((balance / Math.max(1, reward.cost)) * 100));
   return (
-    <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${LINE}`, padding: 16, boxShadow: '0 1px 4px rgba(26,22,32,0.05)' }}>
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative', background: '#fff', borderRadius: 16, border: `1px solid ${LINE}`, padding: 16, boxShadow: '0 1px 4px rgba(26,22,32,0.05)' }}>
+      {onRemove && (
+        <button onClick={() => onRemove(reward)} aria-label={`Remove ${reward.title}`}
+          style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}>
+          <IcTrash s={14} c="#C24A5E" />
+        </button>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 46, height: 46, borderRadius: 13, flexShrink: 0, fontSize: 24, background: STAR_BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{reward.emoji || '🎁'}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -172,7 +180,7 @@ export default function Rewards() {
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, margin: '0 -4px', padding: '0 4px 2px' }}>
                   {rewardsFor(k.id).map((r) => (
                     <div key={r.id} style={{ position: 'relative' }}>
-                      <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} />
+                      <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} onRemove={removeReward} />
                     </div>
                   ))}
                   {rewardsFor(k.id).length === 0 && <div style={{ fontSize: 13, color: INK3, fontStyle: 'italic', padding: '8px 4px' }}>No rewards yet — add one.</div>}
@@ -192,7 +200,7 @@ function Center({ children }) {
   return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24, textAlign: 'center' }}>{children}</div>;
 }
 
-function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, redeemingId }) {
+function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, redeemingId, removeReward }) {
   const kid = kids.find((k) => k.id === focusKid) || kids[0];
   const hex = hexFor(kid);
   return (
@@ -209,7 +217,7 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
         <div style={{ fontSize: 13, color: INK2, marginTop: 6, fontWeight: 600 }}>{kid.name}'s stars</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-        {rewardsFor(kid.id).map((r) => <RewardCard key={r.id} reward={r} balance={balances[kid.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${kid.id}`} onRedeem={() => redeem(r, kid.id)} />)}
+        {rewardsFor(kid.id).map((r) => <RewardCard key={r.id} reward={r} balance={balances[kid.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${kid.id}`} onRedeem={() => redeem(r, kid.id)} onRemove={removeReward} />)}
       </div>
     </div>
   );
