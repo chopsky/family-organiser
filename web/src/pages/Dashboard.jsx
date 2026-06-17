@@ -561,6 +561,19 @@ export default function Dashboard() {
     return <Avatar member={member} size={size} />;
   }
 
+  // Resolve a task's primary assignee. To-dos now store assignees as arrays
+  // (assigned_to_names / assigned_to_ids); fall back to the legacy singular
+  // assigned_to_name so older rows still match.
+  function getTaskAssignee(task) {
+    const names = Array.isArray(task.assigned_to_names) && task.assigned_to_names.length
+      ? task.assigned_to_names
+      : (task.assigned_to_name ? [task.assigned_to_name] : []);
+    for (const nm of names) { const m = members.find(x => x.name === nm); if (m) return m; }
+    const ids = Array.isArray(task.assigned_to_ids) ? task.assigned_to_ids : [];
+    for (const id of ids) { const m = members.find(x => x.id === id); if (m) return m; }
+    return null;
+  }
+
   const EVENT_DOT_CYCLE = ['bg-plum', 'bg-coral', 'bg-[#E0A458]', 'bg-sage'];
   function getEventDotColor(ev, index = 0) {
     return EVENT_DOT_CYCLE[index % EVENT_DOT_CYCLE.length];
@@ -750,12 +763,10 @@ export default function Dashboard() {
           ) : (
             <ul className="border-t border-[#1b14240f]">
               {outstanding.slice(0, 5).map((task) => {
-                const assignee = task.assigned_to_name
-                  ? members.find(m => m.name === task.assigned_to_name)
-                  : null;
+                const assignee = getTaskAssignee(task);
                 const dueLabel = formatTaskDueLabel(task.due_date);
                 return (
-                  <li key={task.id} className="flex items-center gap-3 py-3.5 border-b border-[#1b14240f]">
+                  <li key={task.id} className="flex items-center gap-3 py-2.5 border-b border-[#1b14240f]">
                     <button
                       onClick={() => toggleTask(task)}
                       className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
