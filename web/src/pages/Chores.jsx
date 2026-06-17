@@ -564,9 +564,9 @@ function TaskModal({ modal, members, onClose, onSave }) {
               </button>
               {reward && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button onClick={() => setStars((s) => Math.max(1, s - 5))} style={stepBtn}>−</button>
+                  <button onClick={() => setStars((s) => Math.max(1, s - 1))} style={stepBtn}>−</button>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 56, justifyContent: 'center', fontWeight: 700, color: '#A9772A' }}><StarFill s={14} /> {stars}</span>
-                  <button onClick={() => setStars((s) => Math.min(999, s + 5))} style={stepBtn}>+</button>
+                  <button onClick={() => setStars((s) => Math.min(999, s + 1))} style={stepBtn}>+</button>
                 </div>
               )}
             </div>
