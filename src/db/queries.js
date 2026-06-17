@@ -2413,11 +2413,22 @@ async function createShoppingList(householdId, name, opts = {}, db = supabase) {
   if (opts.emoji) row.emoji = opts.emoji;
   if (opts.color) row.color = opts.color;
   if (opts.protected) row.protected = true;
-  const { data, error } = await db
+  let { data, error } = await db
     .from('shopping_lists')
     .insert(row)
     .select()
     .single();
+  // The lists-adapter migration (emoji/color/protected columns) may not be
+  // applied yet - if those extra columns make the insert fail, retry with just
+  // the name so creating a list still works (the icon/colour simply won't
+  // persist until the migration runs).
+  if (error && (row.emoji || row.color || row.protected)) {
+    ({ data, error } = await db
+      .from('shopping_lists')
+      .insert({ household_id: householdId, name })
+      .select()
+      .single());
+  }
   if (error) throw error;
   return data;
 }
