@@ -10,6 +10,7 @@ import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
 
 // Design-handoff tokens (page-local; member colours come from each record).
@@ -157,7 +158,7 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
 }
 
 // ── one member column ───────────────────────────────────────────────────────
-function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onAdd }) {
+function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onAdd, mobile }) {
   const hex = hexFor(m);
   const kid = isKid(m);
   // group tasks into slots
@@ -178,7 +179,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onAdd }) 
   const visible = groups.filter((g) => active.includes(g.key));
 
   return (
-    <div style={{ flex: '0 0 300px', minWidth: 300, background: hex + '12', borderRadius: 24, padding: '18px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ flex: mobile ? 'none' : '0 0 300px', width: mobile ? '100%' : undefined, minWidth: mobile ? 0 : 300, background: hex + '12', borderRadius: 24, padding: '18px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* header (pinned) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
         <Avatar member={m} size={48} />
@@ -198,8 +199,8 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onAdd }) 
           {sectionsPresent.map((k) => { const s = slotStats(k); return <SlotToggle key={k} slot={k} active={active.includes(k)} color={hex} done={s.done} total={s.total} onClick={() => toggleSection(k)} />; })}
         </div>
       )}
-      {/* scroll region */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', margin: '0 -4px', padding: '0 4px 2px' }}>
+      {/* scroll region (the column scrolls on desktop; on mobile the page scrolls) */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: mobile ? 'visible' : 'auto', overflowX: 'hidden', margin: '0 -4px', padding: '0 4px 2px' }}>
         {visible.length === 0 && <div style={{ padding: '20px 4px', fontSize: 13, color: INK3, fontStyle: 'italic', textAlign: 'center' }}>Nothing here</div>}
         {visible.map((g) => (
           <div key={g.key} style={{ marginBottom: 16 }}>
@@ -233,6 +234,8 @@ export default function Chores() {
   const [celebrate, setCelebrate] = useState(null); // { member, balance }
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isMobile = useIsMobile();
+  const [activeWho, setActiveWho] = useState(null); // mobile: which member's column is shown
 
   // iOS home-screen "Add Task" shortcut lands here with ?quickAdd=1.
   useEffect(() => { if (searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams]);
@@ -301,6 +304,7 @@ export default function Chores() {
   }, [selDateStr, loadDay]);
 
   const shown = visibleIds ? members.filter((m) => visibleIds.includes(m.id)) : members;
+  const activeMember = members.find((m) => m.id === activeWho) || members[0];
   const tasksFor = (mid) => tasks.filter((t) => (t.assignee_ids || []).includes(mid));
   const toggleVisible = (id) => setVisibleIds((prev) => {
     const cur = prev || members.map((m) => m.id);
@@ -309,12 +313,13 @@ export default function Chores() {
   });
 
   return (
-    <div style={{ padding: '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ padding: isMobile ? '16px 14px 90px' : '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
         kicker={kicker}
         title="Tasks"
         actions={(
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {!isMobile && (
             <div style={{ position: 'relative' }} onMouseLeave={() => setFilterOpen(false)}>
               <button onClick={() => setFilterOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: visibleIds ? INK : BG_SOFT, color: visibleIds ? '#fff' : INK2, border: 0 }}>
                 <IcPeople s={16} c={visibleIds ? '#fff' : INK2} /> {visibleIds ? `${shown.length} of ${members.length}` : 'Everyone'}
@@ -335,6 +340,7 @@ export default function Chores() {
                 </div>
               )}
             </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
               <button onClick={() => setDayOffset(0)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 96 }}>{dayLabel}</button>
@@ -349,6 +355,29 @@ export default function Chores() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>Loading…</div>
       ) : members.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>Add family members to start assigning tasks.</div>
+      ) : isMobile ? (
+        // Mobile: a person selector + one member's column, full width, page-scrolled.
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0 12px', flexShrink: 0 }}>
+            {members.map((m) => {
+              const sel = m.id === (activeMember?.id);
+              const all = tasksFor(m.id); const done = all.filter((t) => t.done?.[m.id]).length;
+              return (
+                <button key={m.id} onClick={() => setActiveWho(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, flexShrink: 0, border: sel ? `1.5px solid ${hexFor(m)}` : `1px solid ${LINE}`, background: sel ? '#fff' : 'transparent' }}>
+                  <Avatar member={m} size={30} />
+                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: INK, lineHeight: 1.1 }}>{m.name}</span>
+                    <span style={{ fontSize: 10.5, color: INK3 }}>{done}/{all.length}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {activeMember && (
+            <MemberColumn key={activeMember.id} m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile
+              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+          )}
+        </div>
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {shown.map((m) => (

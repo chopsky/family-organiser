@@ -8,6 +8,7 @@ import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
@@ -71,6 +72,7 @@ export default function Rewards() {
   const [focusKid, setFocusKid] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
   const [modal, setModal] = useState(false);
+  const isMobile = useIsMobile();
 
   const kids = members.filter(isKid);
   const pending = redemptions.filter((r) => !r.fulfilled).length;
@@ -119,14 +121,16 @@ export default function Rewards() {
     catch (e) { alert(e.response?.data?.error || 'Could not save the reward.'); }
   }, [load]);
 
+  // Columns don't fit a phone - default to the single-kid Focused view there.
+  const effView = isMobile && view === 'columns' ? 'focused' : view;
   const viewOpts = [
-    { value: 'columns', label: 'Columns' },
-    { value: 'focused', label: 'Focused' },
+    ...(isMobile ? [] : [{ value: 'columns', label: 'Columns' }]),
+    { value: 'focused', label: isMobile ? 'Rewards' : 'Focused' },
     { value: 'redeemed', label: pending ? `Redeemed · ${pending}` : 'Redeemed' },
   ];
 
   return (
-    <div style={{ padding: '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ padding: isMobile ? '16px 14px 90px' : '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
         kicker="Spend your stars"
         title="Rewards"
@@ -134,7 +138,7 @@ export default function Rewards() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ display: 'inline-flex', background: BG_SOFT, borderRadius: 10, padding: 3, gap: 3 }}>
               {viewOpts.map((o) => (
-                <button key={o.value} onClick={() => setView(o.value)} style={{ padding: '7px 14px', borderRadius: 8, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: view === o.value ? '#fff' : 'transparent', color: view === o.value ? INK : INK3, boxShadow: view === o.value ? '0 1px 3px rgba(26,22,32,0.1)' : 'none' }}>{o.label}</button>
+                <button key={o.value} onClick={() => setView(o.value)} style={{ padding: '7px 14px', borderRadius: 8, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: effView === o.value ? '#fff' : 'transparent', color: effView === o.value ? INK : INK3, boxShadow: effView === o.value ? '0 1px 3px rgba(26,22,32,0.1)' : 'none' }}>{o.label}</button>
               ))}
             </div>
             <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal(true)}>Add reward</PillBtn>
@@ -146,9 +150,9 @@ export default function Rewards() {
         <Center>Loading…</Center>
       ) : kids.length === 0 ? (
         <Center>Add a child to your family to start the star economy.</Center>
-      ) : view === 'redeemed' ? (
+      ) : effView === 'redeemed' ? (
         <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} />
-      ) : view === 'focused' ? (
+      ) : effView === 'focused' ? (
         <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={removeReward} />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'flex-start', flex: 1, minHeight: 0 }}>

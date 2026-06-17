@@ -11,6 +11,7 @@ import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
@@ -45,6 +46,7 @@ export default function Lists() {
   const [newList, setNewList] = useState(false);
   const [searchParams] = useSearchParams();
   const quickAdd = !!searchParams.get('quickAdd'); // iOS "Add to list" shortcut
+  const isMobile = useIsMobile();
 
   const active = lists.find((l) => l.id === activeId) || lists[0];
   const isTodos = active?.id === TODOS_ID;
@@ -152,24 +154,24 @@ export default function Lists() {
   const memberOf = (id) => members.find((m) => m.id === id);
 
   return (
-    <div style={{ padding: '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ padding: isMobile ? '16px 14px 90px' : '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader kicker={active ? `${openItems.length} open` : ''} title="Lists"
         actions={<PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setNewList(true)}>New list</PillBtn>} />
 
       {loading ? (
         <Center>Loading…</Center>
       ) : (
-        <div style={{ display: 'flex', gap: 20, flex: 1, minHeight: 0 }}>
-          {/* rail */}
-          <div style={{ flex: '0 0 240px', display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, flex: 1, minHeight: 0 }}>
+          {/* rail (vertical on desktop, a horizontal chip strip on mobile) */}
+          <div style={{ flex: isMobile ? 'none' : '0 0 240px', display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 6, overflowX: isMobile ? 'auto' : 'visible', overflowY: isMobile ? 'hidden' : 'auto', paddingBottom: isMobile ? 4 : 0 }}>
             {lists.map((l) => {
               const on = l.id === activeId;
               return (
                 <button key={l.id} onClick={() => { setActiveId(l.id); setToFilter(null); setDoneOpen(false); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, textAlign: 'left', border: on ? `1.5px solid ${l.color}` : '1px solid transparent', background: on ? '#fff' : 'transparent', boxShadow: on ? '0 2px 10px rgba(26,22,32,0.05)' : 'none' }}>
-                  <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: l.color + '1F' }}>{l.emoji}</span>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: INK }}>{l.name}</span>
-                  {on && <span style={{ fontSize: 12, fontWeight: 700, color: INK3 }}>{openItems.length}</span>}
+                  style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 11, padding: isMobile ? '8px 14px 8px 8px' : '11px 12px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, textAlign: 'left', flexShrink: isMobile ? 0 : undefined, whiteSpace: 'nowrap', border: on ? `1.5px solid ${l.color}` : '1px solid transparent', background: on ? '#fff' : (isMobile ? '#fff' : 'transparent'), boxShadow: on ? '0 2px 10px rgba(26,22,32,0.05)' : 'none' }}>
+                  <span style={{ width: isMobile ? 28 : 34, height: isMobile ? 28 : 34, borderRadius: 10, flexShrink: 0, fontSize: isMobile ? 15 : 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: l.color + '1F' }}>{l.emoji}</span>
+                  <span style={{ flex: isMobile ? 'none' : 1, fontSize: 14, fontWeight: 600, color: INK }}>{l.name}</span>
+                  {on && !isMobile && <span style={{ fontSize: 12, fontWeight: 700, color: INK3 }}>{openItems.length}</span>}
                 </button>
               );
             })}
