@@ -788,7 +788,7 @@ export default function Dashboard() {
                       </span>
                     )}
                     {assignee && (
-                      <div className="shrink-0">{getMemberAvatar(assignee, 36)}</div>
+                      <div className="shrink-0">{getMemberAvatar(assignee, 22)}</div>
                     )}
                   </li>
                 );
