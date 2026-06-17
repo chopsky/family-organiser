@@ -7125,8 +7125,262 @@ async function updateSubscriptionRenewal(id, nextRenewalAt, remindedForDate, db 
   if (error) throw error;
 }
 
+// ─── Chores (recurring task definitions + per-person/per-day completion) ──────
+// The redesigned Tasks page. Definitions are recurring templates; completion is
+// tracked per member per day. See src/services/chores.js for the day-view
+// generation (appliesOn / buildDayView). Lives apart from the `tasks` table.
+
+const CHORE_DEF_COLS = 'id, household_id, title, emoji, type, assignee_ids, whens, repeat, days, due_date, start_date, due_time, reward, stars, position, created_by, created_at, archived_at';
+
+async function addChoreDefinition(householdId, def, createdBy, db = supabase) {
+  const row = {
+    household_id: householdId,
+    title: def.title,
+    emoji: def.emoji || null,
+    type: def.type || 'chore',
+    assignee_ids: def.assignee_ids || [],
+    whens: def.whens || [],
+    repeat: def.repeat || 'daily',
+    days: def.days || [],
+    due_date: def.due_date || null,
+    start_date: def.start_date || null,
+    due_time: def.due_time || null,
+    reward: !!def.reward,
+    stars: def.reward ? (def.stars || 0) : 0,
+    position: def.position ?? 0,
+    created_by: createdBy || null,
+  };
+  const { data, error } = await db.from('chore_definitions').insert(row).select(CHORE_DEF_COLS).single();
+  if (error) throw error;
+  return data;
+}
+
+async function getChoreDefinitions(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('chore_definitions')
+    .select(CHORE_DEF_COLS)
+    .eq('household_id', householdId)
+    .is('archived_at', null)
+    .order('position')
+    .order('created_at');
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateChoreDefinition(id, householdId, updates, db = supabase) {
+  const allowed = {};
+  for (const k of ['title', 'emoji', 'type', 'assignee_ids', 'whens', 'repeat', 'days', 'due_date', 'start_date', 'due_time', 'reward', 'stars', 'position']) {
+    if (k in updates) allowed[k] = updates[k];
+  }
+  if ('reward' in allowed && !allowed.reward) allowed.stars = 0; // clearing reward zeroes stars
+  const { data, error } = await db
+    .from('chore_definitions')
+    .update(allowed)
+    .eq('id', id)
+    .eq('household_id', householdId)
+    .select(CHORE_DEF_COLS)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Soft-delete ("Delete for everyone"). Completions cascade-delete with the row
+// only on a hard delete; archiving just hides it from future day-views.
+async function archiveChoreDefinition(id, householdId, db = supabase) {
+  const { error } = await db
+    .from('chore_definitions')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function reorderChoreDefinitions(householdId, orderedIds, db = supabase) {
+  // Persist the new manual order. Sequential to keep it simple; lists are small.
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.from('chore_definitions').update({ position: i }).eq('id', orderedIds[i]).eq('household_id', householdId);
+  }
+}
+
+async function getChoreCompletionsForDate(householdId, dateStr, db = supabase) {
+  const { data, error } = await db
+    .from('chore_completions')
+    .select('definition_id, member_id, completed_at')
+    .eq('household_id', householdId)
+    .eq('date', dateStr);
+  if (error) throw error;
+  return data || [];
+}
+
+// Idempotent insert of a completion. Returns { inserted: bool } - false when it
+// already existed (so the caller doesn't double-credit stars).
+async function addChoreCompletion(definitionId, memberId, householdId, dateStr, db = supabase) {
+  const { data, error } = await db
+    .from('chore_completions')
+    .upsert({ definition_id: definitionId, member_id: memberId, household_id: householdId, date: dateStr },
+      { onConflict: 'definition_id,member_id,date', ignoreDuplicates: true })
+    .select('id');
+  if (error) throw error;
+  return { inserted: Array.isArray(data) && data.length > 0 };
+}
+
+async function removeChoreCompletion(definitionId, memberId, dateStr, householdId, db = supabase) {
+  const { error } = await db
+    .from('chore_completions')
+    .delete()
+    .eq('definition_id', definitionId)
+    .eq('member_id', memberId)
+    .eq('date', dateStr)
+    .eq('household_id', householdId);
+  if (error) throw error;
+}
+
+// ─── Star economy: rewards, redemptions, ledger ──────────────────────────────
+
+async function getStarBalances(householdId, db = supabase) {
+  // Balance per member = SUM(delta). Sum in JS (households are small; avoids a
+  // GROUP BY RPC). Returns { [memberId]: number }.
+  const { data, error } = await db
+    .from('star_transactions')
+    .select('member_id, delta')
+    .eq('household_id', householdId);
+  if (error) throw error;
+  const balances = {};
+  for (const t of data || []) balances[t.member_id] = (balances[t.member_id] || 0) + t.delta;
+  return balances;
+}
+
+// Append a ledger entry. Idempotent when ref is provided (unique ref_type,ref_id):
+// a duplicate earn is swallowed. Returns { applied: bool }.
+async function addStarTransaction({ householdId, memberId, delta, reason, refType = null, refId = null }, db = supabase) {
+  const row = { household_id: householdId, member_id: memberId, delta, reason, ref_type: refType, ref_id: refId };
+  const q = refId
+    ? db.from('star_transactions').upsert(row, { onConflict: 'ref_type,ref_id', ignoreDuplicates: true }).select('id')
+    : db.from('star_transactions').insert(row).select('id');
+  const { data, error } = await q;
+  if (error) throw error;
+  return { applied: !refId || (Array.isArray(data) && data.length > 0) };
+}
+
+// Remove the ledger entry for a referenced event (used when un-completing a
+// rewarded chore - the cleanest way to revert without leaving a +N/-N pair).
+async function removeStarTransactionByRef(refType, refId, db = supabase) {
+  const { error } = await db.from('star_transactions').delete().eq('ref_type', refType).eq('ref_id', refId);
+  if (error) throw error;
+}
+
+async function getRewards(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('rewards')
+    .select('id, household_id, title, emoji, cost, who, position, active, created_at')
+    .eq('household_id', householdId)
+    .eq('active', true)
+    .order('position')
+    .order('created_at');
+  if (error) throw error;
+  return data || [];
+}
+
+async function addReward(householdId, reward, createdBy, db = supabase) {
+  const row = {
+    household_id: householdId,
+    title: reward.title,
+    emoji: reward.emoji || null,
+    cost: reward.cost,
+    who: reward.who || 'any',
+    position: reward.position ?? 0,
+    created_by: createdBy || null,
+  };
+  const { data, error } = await db.from('rewards').insert(row).select('id, title, emoji, cost, who, position, active').single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateReward(id, householdId, updates, db = supabase) {
+  const allowed = {};
+  for (const k of ['title', 'emoji', 'cost', 'who', 'position', 'active']) if (k in updates) allowed[k] = updates[k];
+  const { data, error } = await db
+    .from('rewards').update(allowed).eq('id', id).eq('household_id', householdId)
+    .select('id, title, emoji, cost, who, position, active').single();
+  if (error) throw error;
+  return data;
+}
+
+async function deactivateReward(id, householdId, db = supabase) {
+  const { error } = await db.from('rewards').update({ active: false }).eq('id', id).eq('household_id', householdId);
+  if (error) throw error;
+}
+
+async function getRewardById(id, householdId, db = supabase) {
+  const { data, error } = await db
+    .from('rewards').select('id, title, emoji, cost, who, active').eq('id', id).eq('household_id', householdId).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function getRedemptions(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('reward_redemptions')
+    .select('id, reward_id, member_id, title, emoji, cost, fulfilled, fulfilled_at, created_at')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function addRedemption(householdId, redemption, db = supabase) {
+  const row = {
+    household_id: householdId,
+    reward_id: redemption.reward_id || null,
+    member_id: redemption.member_id,
+    title: redemption.title,
+    emoji: redemption.emoji || null,
+    cost: redemption.cost,
+  };
+  const { data, error } = await db.from('reward_redemptions').insert(row)
+    .select('id, reward_id, member_id, title, emoji, cost, fulfilled, fulfilled_at, created_at').single();
+  if (error) throw error;
+  return data;
+}
+
+async function setRedemptionFulfilled(id, householdId, fulfilled, db = supabase) {
+  const { data, error } = await db
+    .from('reward_redemptions')
+    .update({ fulfilled: !!fulfilled, fulfilled_at: fulfilled ? new Date().toISOString() : null })
+    .eq('id', id).eq('household_id', householdId)
+    .select('id, fulfilled, fulfilled_at').single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+async function deleteRedemption(id, householdId, db = supabase) {
+  const { error } = await db.from('reward_redemptions').delete().eq('id', id).eq('household_id', householdId);
+  if (error) throw error;
+}
+
 module.exports = {
   sanitizeOrFilterValue,
+  // Chores + star economy
+  addChoreDefinition,
+  getChoreDefinitions,
+  updateChoreDefinition,
+  archiveChoreDefinition,
+  reorderChoreDefinitions,
+  getChoreCompletionsForDate,
+  addChoreCompletion,
+  removeChoreCompletion,
+  getStarBalances,
+  addStarTransaction,
+  removeStarTransactionByRef,
+  getRewards,
+  addReward,
+  updateReward,
+  deactivateReward,
+  getRewardById,
+  getRedemptions,
+  addRedemption,
+  setRedemptionFulfilled,
+  deleteRedemption,
   recordAdminAction,
   getAdminAuditLog,
   getAllHouseholds,
