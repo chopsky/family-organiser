@@ -1687,7 +1687,7 @@ export default function Calendar() {
                           idx % 7 !== 6 ? 'border-r' : ''
                         } ${!isCurrent ? 'bg-[#F8F6F2]' : isToday_ ? 'bg-plum-light' : 'bg-white'}`}
                       >
-                        <div className={`text-xs font-semibold mb-0.5 w-6 h-6 flex items-center justify-center ${
+                        <div className={`text-sm font-semibold mb-0.5 w-6 h-6 flex items-center justify-center ${
                           !isCurrent ? 'text-light-grey' : isToday_ ? 'bg-plum text-white rounded-full' : 'text-charcoal'
                         }`}>
                           {date.getDate()}
