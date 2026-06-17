@@ -130,7 +130,7 @@ export default function Rewards() {
   ];
 
   return (
-    <div style={{ height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
         kicker="Spend your stars"
         title="Rewards"
@@ -155,19 +155,21 @@ export default function Rewards() {
       ) : effView === 'focused' ? (
         <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={removeReward} />
       ) : (
-        <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'flex-start', flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {kids.map((k) => {
             const hex = hexFor(k);
             return (
-              <div key={k.id} style={{ flex: '0 0 320px', minWidth: 320, background: hex + '12', borderRadius: 24, padding: '18px 16px', display: 'flex', flexDirection: 'column', maxHeight: '100%', overflowY: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div key={k.id} style={{ flex: '0 0 320px', minWidth: 320, background: hex + '12', borderRadius: 24, padding: '18px 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                {/* pinned header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
                   <Avatar member={k} size={48} />
                   <div>
                     <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>{k.name}</div>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><StarFill s={16} /><span style={{ fontSize: 18, fontWeight: 800, color: '#A9772A' }}>{balances[k.id] || 0}</span></div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* only the reward list scrolls */}
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, margin: '0 -4px', padding: '0 4px 2px' }}>
                   {rewardsFor(k.id).map((r) => (
                     <div key={r.id} style={{ position: 'relative' }}>
                       <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} />

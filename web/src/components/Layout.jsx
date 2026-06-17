@@ -238,8 +238,17 @@ export default function Layout({ children }) {
     );
   }
 
+  // Pages whose columns scroll internally (pinned headers, only the lists
+  // scroll) need a bounded-height flex chain instead of the page growing the
+  // window. Constrain the shell + content wrapper for just these routes so
+  // every other page keeps its normal window scroll.
+  const appHeight = ['/tasks', '/lists', '/rewards'].includes(location.pathname);
+
   return (
-    <div className="min-h-screen bg-cream flex flex-col md:flex-row">
+    <div
+      className={`bg-cream flex flex-col md:flex-row ${appHeight ? 'overflow-hidden' : 'min-h-screen'}`}
+      style={appHeight ? { height: '100dvh' } : undefined}
+    >
       {/* ── Desktop Sidebar ── */}
       <aside
         className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30"
@@ -307,9 +316,9 @@ export default function Layout({ children }) {
       </header>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 md:ml-60 min-w-0 overflow-x-hidden">
+      <main className={`flex-1 md:ml-60 min-w-0 overflow-x-hidden${appHeight ? ' flex flex-col min-h-0' : ''}`}>
         <OfflineBanner />
-        <div className="px-4 md:px-8 py-4 md:py-9 pb-28 md:pb-9">
+        <div className={`px-4 md:px-8 py-4 md:py-9 pb-28 md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
           {children}
         </div>
       </main>
