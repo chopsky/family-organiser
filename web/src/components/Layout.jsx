@@ -24,8 +24,8 @@ const navGroups = [
   { label: 'Plan', items: [
     { to: '/calendar', label: 'Calendar',  Icon: IconCalendar },
     { to: '/tasks',    label: 'Tasks',     Icon: IconCheck    },
-    { to: '/lists',    label: 'Lists',     Icon: IconList     },
     { to: '/rewards',  label: 'Rewards',   Icon: IconGift     },
+    { to: '/lists',    label: 'Lists',     Icon: IconList     },
     { to: '/meals',    label: 'Meal Plan', Icon: IconUtensils },
   ] },
   { label: 'Household', items: [
