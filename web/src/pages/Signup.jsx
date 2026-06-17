@@ -188,6 +188,25 @@ export default function Signup() {
           <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>starts here.</em>
         </h1>
 
+        {/* Trial reassurance - every fresh signup gets a 30-day free trial with
+            no card up front. Hidden for invite signups: invited members join an
+            existing household and inherit its subscription, they don't start a
+            new trial. */}
+        {!inviteToken && (
+          <p
+            className="text-center"
+            style={{
+              marginTop: 10,
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#6B6774',
+            }}
+          >
+            Free for 30 days · No card needed
+          </p>
+        )}
+
         {inviteToken && (
           <p
             className="text-center"
