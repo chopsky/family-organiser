@@ -209,20 +209,28 @@ export default function Lists() {
 
               {/* To-dos assignee filter */}
               {isTodos && members.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap', flexShrink: 0 }}>
+                  {/* Everyone - clears the filter; left circle holds a group icon, right holds the total open count */}
                   <button onClick={() => setToFilter(null)} title="Everyone"
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px 4px 4px', borderRadius: 99, border: 0, cursor: 'pointer', background: '#fff', fontFamily: INTER, boxShadow: !toFilter ? `0 0 0 2px #fff, 0 0 0 4px ${BRAND}` : `inset 0 0 0 1px ${LINE_STRONG}` }}>
-                    <span style={{ width: 50, height: 50, borderRadius: '50%', background: BRAND, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <IcPeople s={24} c="#fff" />
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: !toFilter ? `${BRAND}1F` : '#fff', border: `1px solid ${!toFilter ? BRAND : LINE}` }}>
+                    <span style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', background: !toFilter ? BRAND : BG_SOFT }}>
+                      <IcPeople s={20} c={!toFilter ? '#fff' : INK3} />
                     </span>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: !toFilter ? BRAND : INK2 }}>{items.filter((i) => !i.done).length}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: !toFilter ? BRAND : INK3 }}>{items.filter((i) => !i.done).length}</span>
                   </button>
-                  {members.map((m) => (
-                    <button key={m.id} onClick={() => setToFilter(toFilter === m.id ? null : m.id)} title={m.name}
-                      style={{ border: toFilter === m.id ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}>
-                      <Avatar member={m} size={50} />
-                    </button>
-                  ))}
+                  {/* one pill per member - the colour-ring avatar plus their open-to-do count */}
+                  {members.map((m) => {
+                    const on = toFilter === m.id;
+                    const mc = hexFor(m);
+                    const count = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
+                    return (
+                      <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: on ? `${mc}1F` : '#fff', border: `1px solid ${on ? mc : LINE}` }}>
+                        <Avatar member={m} size={40} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: on ? mc : INK3 }}>{count}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
