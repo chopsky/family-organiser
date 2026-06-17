@@ -167,19 +167,29 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
     const isKid = member.member_type === 'dependent';
     const refId = `${def.id}:${memberId}:${date}`;
 
+    // The completion write is the source of truth for the toggle. The star
+    // ledger + balance steps below are best-effort: a ledger hiccup must not
+    // 500 the request, or the client would revert a toggle that actually saved.
     if (done) {
       const { inserted } = await db.addChoreCompletion(def.id, memberId, req.householdId, date);
       // Credit stars only on a NEW completion (insert) so repeat taps can't double-credit.
       if (inserted && isKid && def.reward && def.stars > 0) {
-        await db.addStarTransaction({ householdId: req.householdId, memberId, delta: def.stars, reason: 'earn', refType: 'chore_earn', refId });
+        try {
+          await db.addStarTransaction({ householdId: req.householdId, memberId, delta: def.stars, reason: 'earn', refType: 'chore_earn', refId });
+        } catch (e) { console.warn('chore complete: star credit failed (non-fatal):', e.message); }
       }
     } else {
       await db.removeChoreCompletion(def.id, memberId, date, req.householdId);
-      if (def.reward && def.stars > 0) await db.removeStarTransactionByRef('chore_earn', refId);
+      if (def.reward && def.stars > 0) {
+        try { await db.removeStarTransactionByRef('chore_earn', refId); }
+        catch (e) { console.warn('chore uncomplete: star refund failed (non-fatal):', e.message); }
+      }
     }
 
     cache.invalidate(`digest:${req.householdId}`);
-    const balances = await db.getStarBalances(req.householdId);
+    let balances = {};
+    try { balances = await db.getStarBalances(req.householdId); }
+    catch (e) { console.warn('chore complete: balance fetch failed (non-fatal):', e.message); }
     return res.json({ ok: true, balances });
   } catch (err) {
     console.error('POST /api/chores/:id/complete error:', err);

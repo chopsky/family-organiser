@@ -7310,16 +7310,29 @@ async function getStarBalances(householdId, db = supabase) {
   return balances;
 }
 
-// Append a ledger entry. Idempotent when ref is provided (unique ref_type,ref_id):
-// a duplicate earn is swallowed. Returns { applied: bool }.
+// Append a ledger entry. Idempotent when ref is provided: a duplicate earn is
+// swallowed. Returns { applied: bool }.
+//
+// The (ref_type, ref_id) unique index is PARTIAL (WHERE ref_id IS NOT NULL),
+// and PostgREST's on_conflict can't target a partial index - the upsert would
+// fail with 42P10 ("no unique or exclusion constraint matching"). So guard
+// idempotency with a pre-check + insert instead of relying on ON CONFLICT.
+// Unreferenced manual adjustments (no refId) always insert.
 async function addStarTransaction({ householdId, memberId, delta, reason, refType = null, refId = null }, db = supabase) {
+  if (refId) {
+    const { data: existing, error: selErr } = await db
+      .from('star_transactions')
+      .select('id')
+      .eq('ref_type', refType)
+      .eq('ref_id', refId)
+      .limit(1);
+    if (selErr) throw selErr;
+    if (Array.isArray(existing) && existing.length > 0) return { applied: false };
+  }
   const row = { household_id: householdId, member_id: memberId, delta, reason, ref_type: refType, ref_id: refId };
-  const q = refId
-    ? db.from('star_transactions').upsert(row, { onConflict: 'ref_type,ref_id', ignoreDuplicates: true }).select('id')
-    : db.from('star_transactions').insert(row).select('id');
-  const { data, error } = await q;
+  const { error } = await db.from('star_transactions').insert(row);
   if (error) throw error;
-  return { applied: !refId || (Array.isArray(data) && data.length > 0) };
+  return { applied: true };
 }
 
 // Remove the ledger entry for a referenced event (used when un-completing a
