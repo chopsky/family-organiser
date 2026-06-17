@@ -1658,7 +1658,7 @@ export default function Calendar() {
               {/* Day headers */}
               <div className="grid grid-cols-7">
                 {DAY_HEADERS.map(d => (
-                  <div key={d} className="py-2.5 px-1 text-center text-[11px] font-semibold text-warm-grey uppercase tracking-wider bg-cream border-b border-light-grey">
+                  <div key={d} className="py-2.5 px-1 text-center text-[11px] font-semibold text-warm-grey uppercase tracking-wider bg-white border-b border-light-grey">
                     {d}
                   </div>
                 ))}
