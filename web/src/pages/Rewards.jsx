@@ -9,6 +9,8 @@ import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import EmojiPicker from '../components/ui/EmojiPicker';
+import { REWARD_EMOJI_CATS, searchRewardEmojis } from '../lib/rewardIcons';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
@@ -16,7 +18,6 @@ const BRAND = '#6C3DD9', BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1
 const SERIF = '"Instrument Serif", serif';
 const INTER = '"Inter", system-ui, sans-serif';
 const isKid = (m) => m?.member_type === 'dependent';
-const REWARD_EMOJIS = ['📱', '🍦', '🍿', '💷', '🛌', '🦁', '🎮', '🍫', '🎬', '🧸', '🎁', '⚽', '🛴', '📚', '🍕', '🎨'];
 
 const Svg = (p) => <svg width={p.s || 16} height={p.s || 16} viewBox="0 0 24 24" fill="none" stroke={p.c || 'currentColor'} strokeWidth={p.w || 2} strokeLinecap="round" strokeLinejoin="round">{p.children}</svg>;
 const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
@@ -273,11 +274,7 @@ function RewardModal({ onClose, onSave, kids }) {
         </div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>Icon</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {REWARD_EMOJIS.map((em) => (
-              <button key={em} onClick={() => setEmoji(em)} style={{ width: 38, height: 38, borderRadius: 10, fontSize: 20, cursor: 'pointer', background: emoji === em ? '#EFE9FB' : '#fff', border: emoji === em ? `1.5px solid ${BRAND}` : `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{em}</button>
-            ))}
-          </div>
+          <EmojiPicker value={emoji} onChange={setEmoji} categories={REWARD_EMOJI_CATS} searchFn={searchRewardEmojis} />
         </div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>Cost</div>
