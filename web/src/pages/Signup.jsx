@@ -8,6 +8,16 @@ import TurnstileWidget from '../components/TurnstileWidget';
 import { localeHomePath } from '../hooks/useLocale';
 import { resolveSignupPromo, clearSignupPromo } from '../lib/signupPromo';
 
+// Human label for a confirmed promo, e.g. "25% off" or "£10 off".
+function promoDiscountLabel(info) {
+  if (info?.percentOff) return `${info.percentOff}% off`;
+  if (info?.amountOff) {
+    const symbol = { gbp: '£', usd: '$', eur: '€', zar: 'R' }[info.currency] || '';
+    return `${symbol}${(info.amountOff / 100).toFixed(2)} off`;
+  }
+  return 'A discount';
+}
+
 export default function Signup() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +41,20 @@ export default function Signup() {
   // signup (below) so a one-off campaign scan can't roll onto the next
   // account created in this browser. See lib/signupPromo.js.
   const [promoCode] = useState(() => resolveSignupPromo(searchParams));
+
+  // Confirm the code with the backend so the banner can show the real discount
+  // (e.g. "25% off"). Best-effort and reassurance-only: a failed/unknown lookup
+  // just hides the banner - the code is still saved + applied at checkout
+  // regardless. Public endpoint, no auth needed yet.
+  const [promoInfo, setPromoInfo] = useState(null);
+  useEffect(() => {
+    if (!promoCode) return undefined;
+    let cancelled = false;
+    api.get(`/subscription/promo/${encodeURIComponent(promoCode)}`)
+      .then(({ data }) => { if (!cancelled && data?.valid) setPromoInfo(data); })
+      .catch(() => { /* no banner on lookup failure */ });
+    return () => { cancelled = true; };
+  }, [promoCode]);
 
   useEffect(() => {
     document.title = 'Sign up | Housemait';
@@ -177,6 +201,26 @@ export default function Signup() {
           >
             You&apos;ve been invited to join a household!
           </p>
+        )}
+
+        {promoInfo?.valid && (
+          <div
+            className="text-center"
+            style={{
+              marginTop: 14,
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: 'rgba(125,174,130,0.14)',
+              border: '1px solid rgba(125,174,130,0.35)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              color: '#2D2A33',
+              lineHeight: 1.45,
+            }}
+          >
+            🎉 <strong>{promoDiscountLabel(promoInfo)}</strong> applied with code{' '}
+            <strong>{promoInfo.code}</strong> — finish signing up to claim it.
+          </div>
         )}
 
         <div style={{ marginTop: 24 }}>

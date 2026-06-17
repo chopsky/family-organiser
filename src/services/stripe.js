@@ -317,6 +317,45 @@ async function getPromotionCodeByString(code) {
   return res.data?.[0] || null;
 }
 
+/**
+ * Public, no-auth-safe summary of a promo code for the signup page banner.
+ * Resolves the code via Stripe and confirms it's genuinely redeemable right
+ * now (active, coupon valid, not expired, redemption cap not hit). Returns
+ * only what a prospective customer may see - never internal ids.
+ *
+ *   { valid: true, code: "HILLELFEST", percentOff: 25,
+ *     amountOff: null, currency: null }
+ *   { valid: false }   // unknown / disabled / expired / used up
+ */
+async function getPublicPromoSummary(code) {
+  if (!code) return { valid: false };
+  const stripe = getStripe();
+  const res = await stripe.promotionCodes.list({
+    code: String(code), active: true, limit: 1, expand: ['data.coupon'],
+  });
+  const promo = res.data?.[0];
+  if (!promo || !promo.active) return { valid: false };
+
+  // Promo-code level expiry / redemption caps aren't auto-flipped to
+  // active:false by Stripe, so check them explicitly.
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (promo.expires_at && promo.expires_at <= nowSec) return { valid: false };
+  if (promo.max_redemptions != null && promo.times_redeemed >= promo.max_redemptions) {
+    return { valid: false };
+  }
+
+  const coupon = promo.coupon;
+  if (!coupon || coupon.valid === false) return { valid: false };
+
+  return {
+    valid: true,
+    code: promo.code,
+    percentOff: coupon.percent_off ?? null,
+    amountOff: coupon.amount_off ?? null,
+    currency: coupon.currency ?? null,
+  };
+}
+
 /** Enable/disable a promotion code (Stripe can't delete an active one). */
 async function setDiscountCodeActive(promotionCodeId, active) {
   const stripe = getStripe();
@@ -340,6 +379,7 @@ module.exports = {
   createDiscountCode,
   listDiscountCodes,
   getPromotionCodeByString,
+  getPublicPromoSummary,
   setDiscountCodeActive,
   _resetForTests,
 };

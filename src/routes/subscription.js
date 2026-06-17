@@ -10,6 +10,28 @@ function resolveWebUrl() {
 }
 
 /**
+ * GET /api/subscription/promo/:code   (PUBLIC - no auth)
+ *
+ * Lightweight lookup so the signup page can confirm a campaign code from a
+ * tagged link (e.g. /signup?promo=HILLELFEST) and show "25% off applied".
+ * Returns only customer-safe fields, and only for a genuinely redeemable code:
+ *   { valid: true, code, percentOff, amountOff, currency }  |  { valid: false }
+ *
+ * Codes are printed on flyers (not secret) and the response carries no
+ * sensitive data, so the global /api 300/min limiter is sufficient. Never
+ * throws to the client - an unknown/invalid code is just { valid: false }.
+ */
+router.get('/promo/:code', async (req, res) => {
+  try {
+    const summary = await stripeService.getPublicPromoSummary(req.params.code);
+    return res.json(summary);
+  } catch (err) {
+    console.warn('[subscription] promo lookup failed:', err.message);
+    return res.json({ valid: false });
+  }
+});
+
+/**
  * GET /api/subscription/status
  *
  * Returns the current trial/subscription state for the authenticated
