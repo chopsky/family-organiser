@@ -2408,14 +2408,39 @@ async function getShoppingLists(householdId, db = supabase) {
   return data;
 }
 
-async function createShoppingList(householdId, name, db = supabase) {
+async function createShoppingList(householdId, name, opts = {}, db = supabase) {
+  const row = { household_id: householdId, name };
+  if (opts.emoji) row.emoji = opts.emoji;
+  if (opts.color) row.color = opts.color;
+  if (opts.protected) row.protected = true;
   const { data, error } = await db
     .from('shopping_lists')
-    .insert({ household_id: householdId, name })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+// Ensure the household has a protected "Groceries" staple list for the Lists
+// page (alongside the virtual To-dos list backed by the tasks table). Promotes
+// an existing grocery list to protected, or creates one. Leaves any locale
+// store lists (Default/Tesco/…) as ordinary custom lists.
+async function ensureGroceriesList(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('shopping_lists')
+    .select('id, name, protected')
+    .eq('household_id', householdId);
+  if (error) throw error;
+  const lists = data || [];
+  const grocery = lists.find((l) => /grocer/i.test(l.name));
+  if (grocery) {
+    if (!grocery.protected) {
+      await db.from('shopping_lists').update({ protected: true, emoji: '🛒', color: '#6BA368' }).eq('id', grocery.id);
+    }
+    return;
+  }
+  await db.from('shopping_lists').insert({ household_id: householdId, name: 'Groceries', emoji: '🛒', color: '#6BA368', protected: true });
 }
 
 async function deleteShoppingList(listId, householdId, db = supabase) {
@@ -7460,6 +7485,7 @@ module.exports = {
   getShoppingList,
   getShoppingLists,
   createShoppingList,
+  ensureGroceriesList,
   deleteShoppingList,
   getDefaultShoppingList,
   completeShoppingItemsByName,
