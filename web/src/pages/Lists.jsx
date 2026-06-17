@@ -175,7 +175,7 @@ export default function Lists() {
   const memberOf = (id) => members.find((m) => m.id === id);
 
   return (
-    <div style={{ padding: isMobile ? '16px 14px 90px' : '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader kicker={active ? `${openItems.length} open` : ''} title="Lists"
         actions={<PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setNewList(true)}>New list</PillBtn>} />
 

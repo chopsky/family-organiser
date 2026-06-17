@@ -356,7 +356,7 @@ export default function Chores() {
   });
 
   return (
-    <div style={{ padding: isMobile ? '16px 14px 90px' : '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
         kicker={kicker}
         title="Tasks"

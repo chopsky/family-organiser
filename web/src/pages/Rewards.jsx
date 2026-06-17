@@ -130,7 +130,7 @@ export default function Rewards() {
   ];
 
   return (
-    <div style={{ padding: isMobile ? '16px 14px 90px' : '32px 40px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
+    <div style={{ height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
         kicker="Spend your stars"
         title="Rewards"
