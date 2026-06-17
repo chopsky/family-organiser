@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCart, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp } from './Icons';
+import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp, IconList, IconGift } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -24,8 +24,9 @@ const navGroups = [
   { label: 'Plan', items: [
     { to: '/calendar', label: 'Calendar',  Icon: IconCalendar },
     { to: '/tasks',    label: 'Tasks',     Icon: IconCheck    },
+    { to: '/lists',    label: 'Lists',     Icon: IconList     },
+    { to: '/rewards',  label: 'Rewards',   Icon: IconGift     },
     { to: '/meals',    label: 'Meal Plan', Icon: IconUtensils },
-    { to: '/shopping', label: 'Shopping',  Icon: IconCart     },
   ] },
   { label: 'Household', items: [
     { to: '/receipt',   label: 'Receipts',  Icon: IconCamera   },
@@ -47,13 +48,14 @@ const mobileNav = [
   { to: '/dashboard',  label: 'Home',      Icon: IconHome     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck    },
-  { to: '/shopping',   label: 'Shopping',  Icon: IconCart     },
+  { to: '/lists',      label: 'Lists',     Icon: IconList     },
 ];
 
 // Routes considered "behind the More button" for active-tab styling.
 // (The bottom-sheet redesign exposes these as feature tiles + an account
 // list, but from a navigation-state perspective they all live under More.)
 const moreNav = [
+  { to: '/rewards' },
   { to: '/meals' },
   { to: '/family' },
   { to: '/documents' },
@@ -68,12 +70,20 @@ const moreNav = [
 // they're inlined rather than promoted to Tailwind utilities.
 const moreTiles = [
   {
+    to: '/rewards',
+    label: 'Rewards',
+    sub: 'Kids earn & spend stars',
+    Icon: IconGift,
+    bg: '#FBF1DE',
+    fg: '#D89B3A',
+  },
+  {
     to: '/meals',
     label: 'Meal Plan',
     sub: 'Weekly dinners & recipes',
     Icon: IconUtensils,
-    bg: '#FBF1DE',
-    fg: '#D89B3A',
+    bg: '#EFE9FB',
+    fg: '#6B3FA0',
   },
   {
     to: '/receipt',

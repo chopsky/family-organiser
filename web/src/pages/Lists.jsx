@@ -5,6 +5,7 @@
 // Grocery item emojis are derived client-side; To-do assignees come from the
 // task's assigned_to_ids. Mounted at /lists.
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
@@ -42,6 +43,8 @@ export default function Lists() {
   const [toFilter, setToFilter] = useState(null); // member id for To-dos filter
   const [doneOpen, setDoneOpen] = useState(false);
   const [newList, setNewList] = useState(false);
+  const [searchParams] = useSearchParams();
+  const quickAdd = !!searchParams.get('quickAdd'); // iOS "Add to list" shortcut
 
   const active = lists.find((l) => l.id === activeId) || lists[0];
   const isTodos = active?.id === TODOS_ID;
@@ -196,6 +199,7 @@ export default function Lists() {
               {/* quick add */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>
                 <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }}
+                  autoFocus={quickAdd}
                   placeholder={isTodos ? 'Add a to-do…' : 'Add an item…'} style={{ flex: 1, padding: '11px 14px', borderRadius: 12, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff' }} />
                 <button onClick={addItem} disabled={!draft.trim()} style={{ padding: '0 18px', borderRadius: 12, border: 0, cursor: 'pointer', background: active?.color || BRAND, color: '#fff', fontWeight: 700, fontFamily: INTER, opacity: draft.trim() ? 1 : 0.5 }}>Add</button>
               </div>

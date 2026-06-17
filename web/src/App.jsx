@@ -29,8 +29,9 @@ const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
 const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStandalone'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
-const Shopping        = lazy(() => import('./pages/Shopping'));
-const Tasks           = lazy(() => import('./pages/Tasks'));
+// Tasks → the chores/routines/stars rebuild (Chores); Shopping folded into
+// Lists. The old pages are retired from routing (their data lives on: old
+// to-dos in Lists → To-dos, old shopping in Lists → Groceries).
 const Chores          = lazy(() => import('./pages/Chores'));
 const Rewards         = lazy(() => import('./pages/Rewards'));
 const Lists           = lazy(() => import('./pages/Lists'));
@@ -208,14 +209,14 @@ function AppRoutes() {
             linked users to /dashboard. */}
         <Route path="/connect-whatsapp" element={<RequireAuthOnly><ConnectWhatsAppStandalone /></RequireAuthOnly>} />
         <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
-        <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
-        <Route path="/tasks" element={<RequireAuth><Layout><Tasks /></Layout></RequireAuth>} />
-        {/* New chores/routines/stars Tasks page (design rebuild). At /chores
-            during the build; nav cutover to /tasks lands in P6 once Lists
-            houses the old to-dos. */}
-        <Route path="/chores" element={<RequireAuth><Layout><Chores /></Layout></RequireAuth>} />
-        <Route path="/rewards" element={<RequireAuth><Layout><Rewards /></Layout></RequireAuth>} />
+        {/* Tasks is now the chores/routines/stars page; Shopping folded into
+            Lists. Old paths redirect so existing links/bookmarks/shortcuts keep
+            working. */}
+        <Route path="/tasks" element={<RequireAuth><Layout><Chores /></Layout></RequireAuth>} />
         <Route path="/lists" element={<RequireAuth><Layout><Lists /></Layout></RequireAuth>} />
+        <Route path="/rewards" element={<RequireAuth><Layout><Rewards /></Layout></RequireAuth>} />
+        <Route path="/chores" element={<Navigate to="/tasks" replace />} />
+        <Route path="/shopping" element={<Navigate to="/lists" replace />} />
         <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
         <Route path="/meals" element={<RequireAuth><Layout><Meals /></Layout></RequireAuth>} />
         <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />

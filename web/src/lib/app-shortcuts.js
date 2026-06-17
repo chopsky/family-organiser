@@ -42,7 +42,7 @@ const SHORTCUTS = [
     title: 'Add to Shopping',
     subtitle: 'Drop something on the list',
     iconType: 'Add',
-    data: { route: '/shopping?quickAdd=1' },
+    data: { route: '/lists?quickAdd=1' },
   },
   {
     id: 'view-calendar',
@@ -54,7 +54,7 @@ const SHORTCUTS = [
     id: 'shopping-list',
     title: 'Open Shopping List',
     iconType: 'Bookmark',
-    data: { route: '/shopping' },
+    data: { route: '/lists' },
   },
 ];
 

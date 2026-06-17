@@ -4,7 +4,7 @@
 // (members). Mounted at /chores for now; the nav cutover to /tasks lands in P6
 // once Lists houses the old to-dos.
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
@@ -232,6 +232,10 @@ export default function Chores() {
   const [modal, setModal] = useState(null); // { mode, task?, defaultWho? }
   const [celebrate, setCelebrate] = useState(null); // { member, balance }
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // iOS home-screen "Add Task" shortcut lands here with ?quickAdd=1.
+  useEffect(() => { if (searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams]);
 
   const selDate = new Date(); selDate.setDate(selDate.getDate() + dayOffset);
   const selDateStr = dateStrLocal(selDate);
