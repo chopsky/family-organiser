@@ -55,12 +55,13 @@ export default function Lists() {
 
   const buildDescriptors = useCallback((shoppingLists) => {
     const todos = { id: TODOS_ID, name: 'To-dos', emoji: '✅', color: '#6C3DD9', protected: true, kind: 'todos' };
+    const isStaple = (name) => /shopping|grocer/i.test(name) || name === 'Default';
     const shopping = (shoppingLists || []).map((l, i) => ({
-      id: l.id, name: l.name, emoji: l.emoji || (/grocer/i.test(l.name) ? '🛒' : '📋'),
-      color: l.color || DEFAULT_TINTS[(i + 1) % DEFAULT_TINTS.length], protected: !!l.protected || l.name === 'Default', kind: 'shopping',
+      id: l.id, name: l.name, emoji: l.emoji || (isStaple(l.name) ? '🛒' : '📋'),
+      color: l.color || DEFAULT_TINTS[(i + 1) % DEFAULT_TINTS.length], protected: !!l.protected || isStaple(l.name), kind: 'shopping',
     }));
-    // To-dos first, then Groceries, then the rest.
-    shopping.sort((a, b) => (/grocer/i.test(b.name) ? 1 : 0) - (/grocer/i.test(a.name) ? 1 : 0));
+    // To-dos first, then the Shopping staple, then the rest.
+    shopping.sort((a, b) => (isStaple(b.name) ? 1 : 0) - (isStaple(a.name) ? 1 : 0));
     return [todos, ...shopping];
   }, []);
 

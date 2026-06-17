@@ -2422,25 +2422,31 @@ async function createShoppingList(householdId, name, opts = {}, db = supabase) {
   return data;
 }
 
-// Ensure the household has a protected "Groceries" staple list for the Lists
+// Ensure the household has a protected "Shopping" staple list for the Lists
 // page (alongside the virtual To-dos list backed by the tasks table). Promotes
-// an existing grocery list to protected, or creates one. Leaves any locale
-// store lists (Default/Tesco/…) as ordinary custom lists.
-async function ensureGroceriesList(householdId, db = supabase) {
+// the existing staple (an old "Default"/"Groceries"/"Shopping" list) - renaming
+// it to "Shopping" with a cart icon - or creates one. Robust to the
+// lists-adapter migration not being applied yet: only `name` is guaranteed to
+// exist, so emoji/protected writes are best-effort and fall back to a
+// name-only rename.
+async function ensureShoppingList(householdId, db = supabase) {
   const { data, error } = await db
     .from('shopping_lists')
-    .select('id, name, protected')
+    .select('id, name')
     .eq('household_id', householdId);
   if (error) throw error;
   const lists = data || [];
-  const grocery = lists.find((l) => /grocer/i.test(l.name));
-  if (grocery) {
-    if (!grocery.protected) {
-      await db.from('shopping_lists').update({ protected: true, emoji: '🛒', color: '#6BA368' }).eq('id', grocery.id);
-    }
+  const staple = lists.find((l) => /^shopping$/i.test(l.name))
+    || lists.find((l) => /grocer/i.test(l.name))
+    || lists.find((l) => l.name === 'Default');
+
+  if (staple) {
+    const full = await db.from('shopping_lists').update({ name: 'Shopping', emoji: '🛒', protected: true }).eq('id', staple.id);
+    if (full.error) await db.from('shopping_lists').update({ name: 'Shopping' }).eq('id', staple.id);
     return;
   }
-  await db.from('shopping_lists').insert({ household_id: householdId, name: 'Groceries', emoji: '🛒', color: '#6BA368', protected: true });
+  const ins = await db.from('shopping_lists').insert({ household_id: householdId, name: 'Shopping', emoji: '🛒', protected: true });
+  if (ins.error) await db.from('shopping_lists').insert({ household_id: householdId, name: 'Shopping' });
 }
 
 async function deleteShoppingList(listId, householdId, db = supabase) {
@@ -7505,7 +7511,7 @@ module.exports = {
   getShoppingList,
   getShoppingLists,
   createShoppingList,
-  ensureGroceriesList,
+  ensureShoppingList,
   deleteShoppingList,
   getDefaultShoppingList,
   completeShoppingItemsByName,

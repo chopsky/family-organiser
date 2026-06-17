@@ -15,10 +15,10 @@ router.get('/shopping-lists', requireAuth, requireHousehold, async (req, res) =>
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    // Lists page needs a protected Groceries staple (alongside the virtual
+    // Lists page needs a protected "Shopping" staple (alongside the virtual
     // To-dos list backed by the tasks table). Cheap once it exists; the cache
     // below stops this re-running on every read.
-    try { await db.ensureGroceriesList(req.householdId); } catch (e) { console.warn('ensureGroceriesList:', e.message); }
+    try { await db.ensureShoppingList(req.householdId); } catch (e) { console.warn('ensureShoppingList:', e.message); }
     const lists = await db.getShoppingLists(req.householdId);
     const result = { lists };
     cache.set(cacheKey, result, 300); // 5 min TTL
@@ -65,7 +65,7 @@ router.delete('/shopping-lists/:id', requireAuth, requireHousehold, async (req, 
     if (!target) {
       return res.status(404).json({ error: 'List not found' });
     }
-    if (target.protected || target.name === 'Default') {
+    if (target.protected || ['Default', 'Shopping', 'Groceries'].includes(target.name)) {
       return res.status(400).json({ error: 'This list is protected and cannot be deleted' });
     }
 
