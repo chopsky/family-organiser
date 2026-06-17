@@ -25,6 +25,7 @@ const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
 const IcClose = (p) => <Svg {...p}><path d="M18 6L6 18M6 6l12 12" /></Svg>;
 const IcTrash = (p) => <Svg {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></Svg>;
 const IcChevDown = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;
+const IcPeople = (p) => <Svg {...p}><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5" /><path d="M16 5a3 3 0 0 1 0 6M22 20c0-2.5-2-4.3-4.5-4.8" /></Svg>;
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 // Derive a grocery emoji tile from the item text.
@@ -208,12 +209,18 @@ export default function Lists() {
 
               {/* To-dos assignee filter */}
               {isTodos && members.length > 0 && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', flexShrink: 0 }}>
-                  <FilterPill on={!toFilter} onClick={() => setToFilter(null)}>Everyone</FilterPill>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap', flexShrink: 0 }}>
+                  <button onClick={() => setToFilter(null)} title="Everyone"
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px 4px 4px', borderRadius: 99, border: 0, cursor: 'pointer', background: '#fff', fontFamily: INTER, boxShadow: !toFilter ? `0 0 0 2px #fff, 0 0 0 4px ${BRAND}` : `inset 0 0 0 1px ${LINE_STRONG}` }}>
+                    <span style={{ width: 50, height: 50, borderRadius: '50%', background: BRAND, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <IcPeople s={24} c="#fff" />
+                    </span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: !toFilter ? BRAND : INK2 }}>{items.filter((i) => !i.done).length}</span>
+                  </button>
                   {members.map((m) => (
                     <button key={m.id} onClick={() => setToFilter(toFilter === m.id ? null : m.id)} title={m.name}
                       style={{ border: toFilter === m.id ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}>
-                      <Avatar member={m} size={40} />
+                      <Avatar member={m} size={50} />
                     </button>
                   ))}
                 </div>
@@ -286,7 +293,6 @@ export default function Lists() {
 }
 
 function Center({ children }) { return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>{children}</div>; }
-function FilterPill({ on, onClick, children }) { return <button onClick={onClick} style={{ padding: '9px 16px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: on ? INK : '#fff', color: on ? '#fff' : INK2 }}>{children}</button>; }
 
 function Row({ it, isTodos, color, member, onToggle, onDelete }) {
   const [hover, setHover] = useState(false);
