@@ -1654,11 +1654,11 @@ export default function Calendar() {
         <>
           {/* Desktop month grid */}
           <div className="hidden md:block">
-            <div className="border border-light-grey rounded-2xl overflow-hidden bg-white">
+            <div className="border border-[rgba(26,22,32,0.07)] rounded-2xl overflow-hidden bg-white">
               {/* Day headers */}
               <div className="grid grid-cols-7">
                 {DAY_HEADERS.map(d => (
-                  <div key={d} className="py-2.5 px-1 text-center text-[11px] font-semibold text-warm-grey uppercase tracking-wider bg-white border-b border-light-grey">
+                  <div key={d} className="py-2.5 px-1 text-center text-[11px] font-semibold text-warm-grey uppercase tracking-wider bg-white border-b border-[rgba(26,22,32,0.07)]">
                     {d}
                   </div>
                 ))}
@@ -1667,7 +1667,7 @@ export default function Calendar() {
               <div className="grid grid-cols-7">
                 {loading && events.length === 0 ? (
                   Array.from({ length: 35 }).map((_, idx) => (
-                    <div key={idx} className="min-h-[90px] p-1.5 border-r border-b border-light-grey animate-pulse">
+                    <div key={idx} className="min-h-[90px] p-1.5 border-r border-b border-[rgba(26,22,32,0.07)] animate-pulse">
                       <div className="w-6 h-3 bg-light-grey rounded" />
                     </div>
                   ))
@@ -1683,7 +1683,7 @@ export default function Calendar() {
                     return (
                       <div
                         key={idx}
-                        className={`min-h-[90px] p-1.5 transition-colors border-b border-light-grey ${
+                        className={`min-h-[90px] p-1.5 transition-colors border-b border-[rgba(26,22,32,0.07)] ${
                           idx % 7 !== 6 ? 'border-r' : ''
                         } ${isToday_ ? 'bg-plum-light' : 'bg-white'}`}
                       >
