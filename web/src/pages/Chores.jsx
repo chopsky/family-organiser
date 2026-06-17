@@ -110,8 +110,8 @@ function DeleteMenu({ task, onDelete, onSkip, align = 'right' }) {
 }
 const menuItem = { display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 8px', borderRadius: 9, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, color: INK, textAlign: 'left' };
 
-// ── a single chore card (kid = large, adult = compact, no-icon = row) ────────
-function ChoreCard({ task, mid, tint, compact, onToggle, onEdit, onDelete, onSkip, onReorder }) {
+// ── a single chore card — one unified compact layout for every member ───────
+function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReorder }) {
   const [hover, setHover] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const done = !!task.done?.[mid];
@@ -122,46 +122,30 @@ function ChoreCard({ task, mid, tint, compact, onToggle, onEdit, onDelete, onSki
     onDragLeave: () => setDragOver(false),
     onDrop: (e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/chore'); if (id && id !== task.id) onReorder(id, task.id); },
   } : {};
-  const RingBox = (
-    <span style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
-      {done && <Tick s={12} />}
-    </span>
-  );
-  const actions = (
-    <div style={{ display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', flexShrink: 0 }}>
-      <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-      {/* kid cards put the actions top-left, so open the menu rightward; adult
-          (compact) cards put them at the right, so open it leftward. */}
-      <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align={compact ? 'right' : 'left'} />
-    </div>
-  );
   return (
     <div {...dragProps} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onToggle(task, mid)}
-      style={{ position: 'relative', cursor: 'pointer', background: '#fff', borderRadius: compact ? 13 : 16, padding: compact ? '9px 12px' : '12px 14px', opacity: done ? 0.62 : 1, transition: 'opacity .12s, box-shadow .12s', boxShadow: dragOver ? `inset 0 2px 0 ${tint}` : 'none' }}>
-      {compact ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {task.emoji && <span style={{ fontSize: 19, flexShrink: 0, filter: done ? 'grayscale(.4)' : 'none' }}>{task.emoji}</span>}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: done ? INK3 : INK, textDecoration: done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+      style={{ position: 'relative', cursor: 'pointer', background: '#fff', borderRadius: 16, padding: '12px 14px', opacity: done ? 0.62 : 1, transition: 'opacity .12s, box-shadow .12s', boxShadow: dragOver ? `inset 0 2px 0 ${tint}` : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* 44x44 emoji tile to the left of the title; no-icon tasks drop it entirely */}
+        {task.emoji && (
+          <span style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? BG_SOFT : `${tint}1F`, filter: done ? 'grayscale(.4)' : 'none' }}>{task.emoji}</span>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: done ? INK3 : INK, textDecoration: done ? 'line-through' : 'none', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <MetaChips task={task} />
+            {task.reward && task.stars ? <span style={{ marginTop: 4, display: 'inline-flex' }}><StarPill n={task.stars} small /></span> : null}
           </div>
-          {task.reward && task.stars ? <StarPill n={task.stars} small /> : null}
-          {RingBox}{actions}
         </div>
-      ) : (
-        <>
-          <div style={{ position: 'absolute', top: 8, left: 8 }}>{actions}</div>
-          {task.emoji && <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 8, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: done ? 'grayscale(.4)' : 'none' }}>{task.emoji}</div>}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: done ? INK3 : INK, textDecoration: done ? 'line-through' : 'none' }}>{task.title}</div>
-              <MetaChips task={task} />
-            </div>
-            {task.reward && task.stars ? <StarPill n={task.stars} small /> : null}
-            {RingBox}
-          </div>
-        </>
-      )}
+        <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
+          {done && <Tick s={13} />}
+        </span>
+      </div>
+      {/* hover actions — absolutely positioned top-right so they never squeeze the title */}
+      <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
+        <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
+        <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="right" />
+      </div>
     </div>
   );
 }
@@ -239,7 +223,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
               <span style={{ fontSize: 16, fontWeight: 600, color: INK2 }}>{g.meta.label}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} compact={!kid} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
+              {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
             </div>
           </div>
         ))}
