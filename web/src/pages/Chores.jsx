@@ -260,6 +260,7 @@ export default function Chores() {
   const [dayOffset, setDayOffset] = useState(0);
   const [visibleIds, setVisibleIds] = useState(null); // null = everyone
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef(null);
   const [modal, setModal] = useState(null); // { mode, task?, defaultWho? }
   const [celebrate, setCelebrate] = useState(null); // { member, balance }
   const navigate = useNavigate();
@@ -269,6 +270,15 @@ export default function Chores() {
 
   // iOS home-screen "Add Task" shortcut lands here with ?quickAdd=1.
   useEffect(() => { if (searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams]);
+
+  // Close the people filter on an outside click (not on mouse-leave, which
+  // would snap shut the moment the cursor crossed the gap to the menu).
+  useEffect(() => {
+    if (!filterOpen) return undefined;
+    const onDoc = (e) => { if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [filterOpen]);
 
   const selDate = new Date(); selDate.setDate(selDate.getDate() + dayOffset);
   const selDateStr = dateStrLocal(selDate);
@@ -365,12 +375,12 @@ export default function Chores() {
         actions={(
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {!isMobile && (
-            <div style={{ position: 'relative' }} onMouseLeave={() => setFilterOpen(false)}>
+            <div ref={filterRef} style={{ position: 'relative' }}>
               <button onClick={() => setFilterOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: visibleIds ? INK : BG_SOFT, color: visibleIds ? '#fff' : INK2, border: 0 }}>
                 <IcPeople s={16} c={visibleIds ? '#fff' : INK2} /> {visibleIds ? `${shown.length} of ${members.length}` : 'Everyone'}
               </button>
               {filterOpen && (
-                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '110%', right: 0, zIndex: 40, background: '#fff', borderRadius: 14, padding: 6, width: 210, border: `1px solid ${LINE}`, boxShadow: '0 14px 44px rgba(26,22,32,0.2)' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, background: '#fff', borderRadius: 14, padding: 6, width: 210, maxHeight: 340, overflowY: 'auto', border: `1px solid ${LINE}`, boxShadow: '0 14px 44px rgba(26,22,32,0.2)' }}>
                   <button onClick={() => setVisibleIds(null)} style={{ ...filterRow, color: visibleIds ? INK : BRAND, fontWeight: 700 }}><IcPeople s={18} c={visibleIds ? INK2 : BRAND} /> Everyone</button>
                   <div style={{ height: 1, background: LINE, margin: '4px 0' }} />
                   {members.map((m) => {

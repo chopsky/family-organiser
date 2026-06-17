@@ -46,7 +46,7 @@ export default function Lists() {
   const [doneOpen, setDoneOpen] = useState(false);
   const [newList, setNewList] = useState(false);
   const [counts, setCounts] = useState({}); // listId -> open count, for the rail
-  const [addWho, setAddWho] = useState(null); // To-dos: assignee for the next add
+  const [addWho, setAddWho] = useState([]); // To-dos: assignee ids for the next add (multi)
   const [searchParams] = useSearchParams();
   const quickAdd = !!searchParams.get('quickAdd'); // iOS "Add to list" shortcut
   const isMobile = useIsMobile();
@@ -86,7 +86,7 @@ export default function Lists() {
           api.get('/tasks', { params: { all: true } }),
           api.get('/tasks/recent'),
         ]);
-        const map = (t, isDone) => ({ id: t.id, text: t.title, done: isDone, section: null, who: (t.assigned_to_ids || [])[0] || null });
+        const map = (t, isDone) => ({ id: t.id, text: t.title, done: isDone, section: null, whoIds: t.assigned_to_ids || [] });
         setItems([...(open.tasks || []).map((t) => map(t, false)), ...(done.tasks || []).map((t) => map(t, true))]);
       } else {
         const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
@@ -124,8 +124,8 @@ export default function Lists() {
     setDraft('');
     try {
       if (isTodos) {
-        const m = members.find((x) => x.id === addWho);
-        await api.post('/tasks', { title: text, ...(m ? { assigned_to_names: [m.name] } : {}) });
+        const names = members.filter((x) => addWho.includes(x.id)).map((x) => x.name);
+        await api.post('/tasks', { title: text, ...(names.length ? { assigned_to_names: names } : {}) });
       } else {
         await api.post('/shopping', { item: text, list_id: active.id });
       }
@@ -168,7 +168,7 @@ export default function Lists() {
   }, [active, buildDescriptors]);
 
   // visible items (To-dos filter by assignee) + grouping
-  const filtered = isTodos && toFilter ? items.filter((i) => i.who === toFilter) : items;
+  const filtered = isTodos && toFilter ? items.filter((i) => (i.whoIds || []).includes(toFilter)) : items;
   const openItems = filtered.filter((i) => !i.done);
   const doneItems = filtered.filter((i) => i.done);
   const sections = isTodos ? [{ name: null, items: openItems }]
@@ -239,15 +239,15 @@ export default function Lists() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexShrink: 0, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, color: INK3, fontWeight: 600 }}>Assign to</span>
                   {members.map((m) => {
-                    const on = addWho === m.id;
+                    const on = addWho.includes(m.id);
                     return (
-                      <button key={m.id} onClick={() => setAddWho(on ? null : m.id)} title={m.name}
+                      <button key={m.id} onClick={() => setAddWho((cur) => (on ? cur.filter((x) => x !== m.id) : [...cur, m.id]))} title={m.name}
                         style={{ border: on ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer', opacity: on ? 1 : 0.65 }}>
                         <Avatar member={m} size={28} />
                       </button>
                     );
                   })}
-                  {addWho && <span style={{ fontSize: 12, color: INK2, fontWeight: 600 }}>{members.find((m) => m.id === addWho)?.name}</span>}
+                  {addWho.length > 0 && <span style={{ fontSize: 12, color: INK2, fontWeight: 600 }}>{members.filter((m) => addWho.includes(m.id)).map((m) => m.name).join(', ')}</span>}
                 </div>
               )}
 
@@ -261,7 +261,7 @@ export default function Lists() {
                           <div key={sec.name || 'all'} style={{ marginBottom: 14 }}>
                             {sec.name && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: INK3, padding: '0 4px 8px' }}>{sec.name}</div>}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {sec.items.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} member={memberOf(it.who)} onToggle={toggle} onDelete={removeItem} />)}
+                              {sec.items.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} />)}
                             </div>
                           </div>
                         ))}
@@ -271,7 +271,7 @@ export default function Lists() {
                               <span style={{ transform: doneOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', display: 'flex' }}><IcChevDown s={14} c={INK3} /></span>
                               Done · {doneItems.length}
                             </button>
-                            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>{doneItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} member={memberOf(it.who)} onToggle={toggle} onDelete={removeItem} />)}</div>}
+                            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>{doneItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} />)}</div>}
                           </div>
                         )}
                       </>
@@ -294,7 +294,7 @@ export default function Lists() {
 
 function Center({ children }) { return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>{children}</div>; }
 
-function Row({ it, isTodos, color, member, onToggle, onDelete }) {
+function Row({ it, isTodos, color, assignees = [], onToggle, onDelete }) {
   const [hover, setHover] = useState(false);
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -305,7 +305,15 @@ function Row({ it, isTodos, color, member, onToggle, onDelete }) {
       </button>
       {!isTodos && <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT }}>{it.emoji}</span>}
       <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
-      {isTodos && member && <Avatar member={member} size={26} />}
+      {isTodos && assignees.length > 0 && (
+        <div style={{ display: 'flex', flexShrink: 0 }}>
+          {assignees.slice(0, 3).map((m, i) => (
+            <div key={m.id} style={{ marginLeft: i ? -8 : 0, borderRadius: '50%', border: '2px solid #fff', display: 'flex' }}>
+              <Avatar member={m} size={26} />
+            </div>
+          ))}
+        </div>
+      )}
       <button onClick={() => onDelete(it)} aria-label="Delete" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}><IcTrash s={14} c="#C24A5E" /></button>
     </div>
   );

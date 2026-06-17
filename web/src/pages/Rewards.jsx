@@ -23,6 +23,7 @@ const Svg = (p) => <svg width={p.s || 16} height={p.s || 16} viewBox="0 0 24 24"
 const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
 const IcClose = (p) => <Svg {...p}><path d="M18 6L6 18M6 6l12 12" /></Svg>;
 const IcTrash = (p) => <Svg {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></Svg>;
+const IcPencil = (p) => <Svg {...p}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></Svg>;
 const StarFill = ({ s = 12, c = STAR }) => <svg width={s} height={s} viewBox="0 0 24 24" fill={c}><path d="M12 2l3 6.3 6.9.9-5 4.8 1.2 6.8L12 17.8 5.9 20.8 7.1 14 2.1 9.2 9 8.3 12 2z" /></svg>;
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
@@ -34,18 +35,28 @@ function relWhen(iso) {
 }
 
 // ── reward card ─────────────────────────────────────────────────────────────
-function RewardCard({ reward, balance, color, onRedeem, redeeming, onRemove }) {
+function RewardCard({ reward, balance, color, onRedeem, redeeming, onRemove, onEdit }) {
   const [hover, setHover] = useState(false);
   const affordable = balance >= reward.cost;
   const pct = Math.min(100, Math.round((balance / Math.max(1, reward.cost)) * 100));
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: 'relative', background: '#fff', borderRadius: 16, border: `1px solid ${LINE}`, padding: 16, boxShadow: '0 1px 4px rgba(26,22,32,0.05)' }}>
-      {onRemove && (
-        <button onClick={() => onRemove(reward)} aria-label={`Remove ${reward.title}`}
-          style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}>
-          <IcTrash s={14} c="#C24A5E" />
-        </button>
+      {(onEdit || onRemove) && (
+        <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6, opacity: hover ? 1 : 0, transition: 'opacity .12s' }}>
+          {onEdit && (
+            <button onClick={() => onEdit(reward)} aria-label={`Edit ${reward.title}`}
+              style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IcPencil s={14} c={INK2} />
+            </button>
+          )}
+          {onRemove && (
+            <button onClick={() => onRemove(reward)} aria-label={`Remove ${reward.title}`}
+              style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IcTrash s={14} c="#C24A5E" />
+            </button>
+          )}
+        </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 46, height: 46, borderRadius: 13, flexShrink: 0, fontSize: 24, background: STAR_BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{reward.emoji || '🎁'}</div>
@@ -126,9 +137,13 @@ export default function Rewards() {
   }, [load]);
 
   const saveReward = useCallback(async (form) => {
-    try { await api.post('/rewards', form); setModal(false); await load(); }
-    catch (e) { alert(e.response?.data?.error || 'Could not save the reward.'); }
-  }, [load]);
+    const editId = modal && modal !== 'add' ? modal.id : null;
+    try {
+      if (editId) await api.patch(`/rewards/${editId}`, form);
+      else await api.post('/rewards', form);
+      setModal(false); await load();
+    } catch (e) { alert(e.response?.data?.error || 'Could not save the reward.'); }
+  }, [load, modal]);
 
   // Columns don't fit a phone - default to the single-kid Focused view there.
   const effView = isMobile && view === 'columns' ? 'focused' : view;
@@ -150,7 +165,7 @@ export default function Rewards() {
                 <button key={o.value} onClick={() => setView(o.value)} style={{ padding: '7px 14px', borderRadius: 8, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: effView === o.value ? '#fff' : 'transparent', color: effView === o.value ? INK : INK3, boxShadow: effView === o.value ? '0 1px 3px rgba(26,22,32,0.1)' : 'none' }}>{o.label}</button>
               ))}
             </div>
-            <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal(true)}>Add reward</PillBtn>
+            <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal('add')}>Add reward</PillBtn>
           </div>
         )}
       />
@@ -162,7 +177,7 @@ export default function Rewards() {
       ) : effView === 'redeemed' ? (
         <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} />
       ) : effView === 'focused' ? (
-        <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={removeReward} />
+        <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={removeReward} editReward={setModal} />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {kids.map((k) => {
@@ -181,7 +196,7 @@ export default function Rewards() {
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, margin: '0 -4px', padding: '0 4px 2px' }}>
                   {rewardsFor(k.id).map((r) => (
                     <div key={r.id} style={{ position: 'relative' }}>
-                      <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} onRemove={removeReward} />
+                      <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} onRemove={removeReward} onEdit={setModal} />
                     </div>
                   ))}
                   {rewardsFor(k.id).length === 0 && <div style={{ fontSize: 13, color: INK3, fontStyle: 'italic', padding: '8px 4px' }}>No rewards yet — add one.</div>}
@@ -192,7 +207,7 @@ export default function Rewards() {
         </div>
       )}
 
-      {modal && <RewardModal onClose={() => setModal(false)} onSave={saveReward} kids={kids} />}
+      {modal && <RewardModal reward={modal === 'add' ? null : modal} onClose={() => setModal(false)} onSave={saveReward} kids={kids} />}
     </div>
   );
 }
@@ -201,7 +216,7 @@ function Center({ children }) {
   return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24, textAlign: 'center' }}>{children}</div>;
 }
 
-function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, redeemingId, removeReward }) {
+function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, redeemingId, removeReward, editReward }) {
   const kid = kids.find((k) => k.id === focusKid) || kids[0];
   const hex = hexFor(kid);
   return (
@@ -218,7 +233,7 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
         <div style={{ fontSize: 13, color: INK2, marginTop: 6, fontWeight: 600 }}>{kid.name}'s stars</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-        {rewardsFor(kid.id).map((r) => <RewardCard key={r.id} reward={r} balance={balances[kid.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${kid.id}`} onRedeem={() => redeem(r, kid.id)} onRemove={removeReward} />)}
+        {rewardsFor(kid.id).map((r) => <RewardCard key={r.id} reward={r} balance={balances[kid.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${kid.id}`} onRedeem={() => redeem(r, kid.id)} onRemove={removeReward} onEdit={editReward} />)}
       </div>
     </div>
   );
@@ -255,17 +270,18 @@ function RedeemedLog({ redemptions, members, onToggle }) {
 }
 
 // ── add-reward modal ────────────────────────────────────────────────────────
-function RewardModal({ onClose, onSave, kids }) {
-  const [title, setTitle] = useState('');
-  const [emoji, setEmoji] = useState('🎁');
-  const [cost, setCost] = useState(20);
-  const [who, setWho] = useState('any');
+function RewardModal({ onClose, onSave, kids, reward }) {
+  const editing = !!reward;
+  const [title, setTitle] = useState(reward?.title || '');
+  const [emoji, setEmoji] = useState(reward?.emoji || '🎁');
+  const [cost, setCost] = useState(reward?.cost ?? 20);
+  const [who, setWho] = useState(reward?.who || 'any');
   const submit = () => { if (title.trim()) onSave({ title: title.trim(), emoji, cost, who }); };
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 460, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>New reward</h2>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{editing ? 'Edit reward' : 'New reward'}</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
         </div>
         <div style={{ marginBottom: 16 }}>
@@ -295,7 +311,7 @@ function RewardModal({ onClose, onSave, kids }) {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
           <button onClick={onClose} style={{ ...input, width: 'auto', padding: '10px 18px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-          <button onClick={submit} disabled={!title.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: !title.trim() ? 0.5 : 1 }}>Add reward</button>
+          <button onClick={submit} disabled={!title.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: !title.trim() ? 0.5 : 1 }}>{editing ? 'Save' : 'Add reward'}</button>
         </div>
       </div>
     </div>
