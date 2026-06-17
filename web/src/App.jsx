@@ -31,6 +31,7 @@ const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStan
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
 const Shopping        = lazy(() => import('./pages/Shopping'));
 const Tasks           = lazy(() => import('./pages/Tasks'));
+const Chores          = lazy(() => import('./pages/Chores'));
 const Calendar        = lazy(() => import('./pages/Calendar'));
 const Meals           = lazy(() => import('./pages/Meals'));
 const Receipt         = lazy(() => import('./pages/Receipt'));
@@ -207,6 +208,10 @@ function AppRoutes() {
         <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
         <Route path="/shopping" element={<RequireAuth><Layout><Shopping /></Layout></RequireAuth>} />
         <Route path="/tasks" element={<RequireAuth><Layout><Tasks /></Layout></RequireAuth>} />
+        {/* New chores/routines/stars Tasks page (design rebuild). At /chores
+            during the build; nav cutover to /tasks lands in P6 once Lists
+            houses the old to-dos. */}
+        <Route path="/chores" element={<RequireAuth><Layout><Chores /></Layout></RequireAuth>} />
         <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
         <Route path="/meals" element={<RequireAuth><Layout><Meals /></Layout></RequireAuth>} />
         <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
