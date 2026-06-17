@@ -779,7 +779,7 @@ export default function Dashboard() {
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                       )}
                     </button>
-                    <p className={`flex-1 min-w-0 text-sm truncate ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
+                    <p className={`flex-1 min-w-0 text-sm font-medium truncate ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
                       {task.title}
                     </p>
                     {dueLabel && (
