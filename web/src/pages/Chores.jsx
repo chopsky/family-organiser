@@ -4,6 +4,7 @@
 // (members). Mounted at /chores for now; the nav cutover to /tasks lands in P6
 // once Lists houses the old to-dos.
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
@@ -229,6 +230,8 @@ export default function Chores() {
   const [visibleIds, setVisibleIds] = useState(null); // null = everyone
   const [filterOpen, setFilterOpen] = useState(false);
   const [modal, setModal] = useState(null); // { mode, task?, defaultWho? }
+  const [celebrate, setCelebrate] = useState(null); // { member, balance }
+  const navigate = useNavigate();
 
   const selDate = new Date(); selDate.setDate(selDate.getDate() + dayOffset);
   const selDateStr = dateStrLocal(selDate);
@@ -261,14 +264,20 @@ export default function Chores() {
 
   const toggle = useCallback(async (task, mid) => {
     const next = !task.done?.[mid];
-    setTasks((ts) => ts.map((t) => (t.id === task.id ? { ...t, done: { ...t.done, [mid]: next } } : t)));
+    const member = members.find((m) => m.id === mid);
+    const nextTasks = tasks.map((t) => (t.id === task.id ? { ...t, done: { ...t.done, [mid]: next } } : t));
+    setTasks(nextTasks);
+    // Celebrate when a kid completes the LAST of their rewarded tasks for the day.
+    const rewardTasks = nextTasks.filter((t) => (t.assignee_ids || []).includes(mid) && t.reward);
+    const justFinishedAll = next && task.reward && isKid(member) && rewardTasks.length > 0 && rewardTasks.every((t) => t.done?.[mid]);
     try {
       const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: mid, date: selDateStr, done: next });
       if (data.balances) setBalances(data.balances);
+      if (justFinishedAll) setCelebrate({ member, balance: data.balances?.[mid] ?? 0 });
     } catch {
       setTasks((ts) => ts.map((t) => (t.id === task.id ? { ...t, done: { ...t.done, [mid]: !next } } : t))); // revert
     }
-  }, [selDateStr]);
+  }, [selDateStr, tasks, members]);
 
   const handleDelete = useCallback(async (task) => {
     const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
@@ -346,6 +355,39 @@ export default function Chores() {
       )}
 
       {modal && <TaskModal modal={modal} members={members} onClose={() => setModal(null)} onSave={handleSave} />}
+      {celebrate && <Celebration data={celebrate} onClose={() => setCelebrate(null)} onGo={() => { setCelebrate(null); navigate('/rewards'); }} />}
+    </div>
+  );
+}
+
+// ── celebration overlay (confetti) ──────────────────────────────────────────
+function Celebration({ data, onClose, onGo }) {
+  useEffect(() => {
+    if (document.getElementById('chore-confetti-css')) return;
+    const s = document.createElement('style');
+    s.id = 'chore-confetti-css';
+    s.textContent = '@keyframes choreFall{0%{transform:translateY(-40px) rotate(0);opacity:1}100%{transform:translateY(900px) rotate(680deg);opacity:.9}}@keyframes chorePop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.06);opacity:1}100%{transform:scale(1);opacity:1}}';
+    document.head.appendChild(s);
+  }, []);
+  const colors = ['#6C3DD9', '#D89B3A', '#6BA368', '#D8788A', '#5B8DE0'];
+  const bits = Array.from({ length: 60 }, (_, i) => i);
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflow: 'hidden', fontFamily: INTER }}>
+      {bits.map((i) => (
+        <span key={i} aria-hidden="true" style={{ position: 'absolute', top: -20, left: `${(i * 37) % 100}%`, width: 9, height: 14, borderRadius: 2, background: colors[i % colors.length], animation: `choreFall ${1.8 + (i % 5) * 0.4}s linear ${(i % 7) * 0.15}s infinite` }} />
+      ))}
+      <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', background: '#fff', borderRadius: 24, padding: '32px 28px', width: '100%', maxWidth: 380, textAlign: 'center', boxShadow: '0 30px 80px -20px rgba(26,22,32,0.5)', animation: 'chorePop .35s ease both' }}>
+        <div style={{ fontSize: 52, marginBottom: 8 }}>🎉</div>
+        <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 32, fontWeight: 400, color: INK }}>Amazing, {data.member?.name}!</h2>
+        <p style={{ margin: '8px 0 18px', fontSize: 14, color: INK2 }}>All your star tasks are done for today.</p>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: STAR_BG, borderRadius: 99, padding: '8px 18px', marginBottom: 20 }}>
+          <StarFill s={22} /><span style={{ fontSize: 26, fontWeight: 800, color: '#A9772A' }}>{data.balance}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '11px', borderRadius: 12, border: `1px solid ${LINE_STRONG}`, background: '#fff', cursor: 'pointer', fontFamily: INTER, fontWeight: 600, fontSize: 14, color: INK2 }}>Nice!</button>
+          <button onClick={onGo} style={{ flex: 1, padding: '11px', borderRadius: 12, border: 0, background: BRAND, color: '#fff', cursor: 'pointer', fontFamily: INTER, fontWeight: 700, fontSize: 14 }}>Spend stars →</button>
+        </div>
+      </div>
     </div>
   );
 }

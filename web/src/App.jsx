@@ -32,6 +32,7 @@ const Dashboard       = lazy(() => import('./pages/Dashboard'));
 const Shopping        = lazy(() => import('./pages/Shopping'));
 const Tasks           = lazy(() => import('./pages/Tasks'));
 const Chores          = lazy(() => import('./pages/Chores'));
+const Rewards         = lazy(() => import('./pages/Rewards'));
 const Calendar        = lazy(() => import('./pages/Calendar'));
 const Meals           = lazy(() => import('./pages/Meals'));
 const Receipt         = lazy(() => import('./pages/Receipt'));
@@ -212,6 +213,7 @@ function AppRoutes() {
             during the build; nav cutover to /tasks lands in P6 once Lists
             houses the old to-dos. */}
         <Route path="/chores" element={<RequireAuth><Layout><Chores /></Layout></RequireAuth>} />
+        <Route path="/rewards" element={<RequireAuth><Layout><Rewards /></Layout></RequireAuth>} />
         <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
         <Route path="/meals" element={<RequireAuth><Layout><Meals /></Layout></RequireAuth>} />
         <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
