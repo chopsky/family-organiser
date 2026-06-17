@@ -44,6 +44,8 @@ export default function Lists() {
   const [toFilter, setToFilter] = useState(null); // member id for To-dos filter
   const [doneOpen, setDoneOpen] = useState(false);
   const [newList, setNewList] = useState(false);
+  const [counts, setCounts] = useState({}); // listId -> open count, for the rail
+  const [addWho, setAddWho] = useState(null); // To-dos: assignee for the next add
   const [searchParams] = useSearchParams();
   const quickAdd = !!searchParams.get('quickAdd'); // iOS "Add to list" shortcut
   const isMobile = useIsMobile();
@@ -60,6 +62,17 @@ export default function Lists() {
     // To-dos first, then Groceries, then the rest.
     shopping.sort((a, b) => (/grocer/i.test(b.name) ? 1 : 0) - (/grocer/i.test(a.name) ? 1 : 0));
     return [todos, ...shopping];
+  }, []);
+
+  // Open-item count per list for the rail (one light fetch each, on load).
+  const loadCounts = useCallback(async (descriptors) => {
+    const entries = await Promise.all((descriptors || []).map(async (l) => {
+      try {
+        if (l.kind === 'todos') { const { data } = await api.get('/tasks', { params: { all: true } }); return [l.id, (data.tasks || []).length]; }
+        const { data } = await api.get('/shopping', { params: { list_id: l.id } }); return [l.id, (data.items || []).length];
+      } catch { return [l.id, 0]; }
+    }));
+    setCounts(Object.fromEntries(entries));
   }, []);
 
   const loadItems = useCallback(async (list) => {
@@ -90,11 +103,13 @@ export default function Lists() {
         const [{ data: hh }, { data: sl }] = await Promise.all([api.get('/household'), api.get('/shopping-lists')]);
         if (cancelled) return;
         setMembers(hh.members || []);
-        setLists(buildDescriptors(sl.lists));
+        const descriptors = buildDescriptors(sl.lists);
+        setLists(descriptors);
+        loadCounts(descriptors);
       } catch { /* empty */ } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [buildDescriptors]);
+  }, [buildDescriptors, loadCounts]);
 
   useEffect(() => {
     if (active) loadItems(active);
@@ -106,11 +121,16 @@ export default function Lists() {
     if (!text || !active) return;
     setDraft('');
     try {
-      if (isTodos) await api.post('/tasks', { title: text });
-      else await api.post('/shopping', { item: text, list_id: active.id });
+      if (isTodos) {
+        const m = members.find((x) => x.id === addWho);
+        await api.post('/tasks', { title: text, ...(m ? { assigned_to_names: [m.name] } : {}) });
+      } else {
+        await api.post('/shopping', { item: text, list_id: active.id });
+      }
+      setCounts((c) => ({ ...c, [active.id]: (c[active.id] || 0) + 1 }));
       await loadItems(active);
     } catch { /* keep draft cleared; reload */ loadItems(active); }
-  }, [draft, active, isTodos, loadItems]);
+  }, [draft, active, isTodos, loadItems, members, addWho]);
 
   const toggle = useCallback(async (it) => {
     const next = !it.done;
@@ -171,7 +191,7 @@ export default function Lists() {
                   style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 11, padding: isMobile ? '8px 14px 8px 8px' : '11px 12px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, textAlign: 'left', flexShrink: isMobile ? 0 : undefined, whiteSpace: 'nowrap', border: on ? `1.5px solid ${l.color}` : '1px solid transparent', background: on ? '#fff' : (isMobile ? '#fff' : 'transparent'), boxShadow: on ? '0 2px 10px rgba(26,22,32,0.05)' : 'none' }}>
                   <span style={{ width: isMobile ? 28 : 34, height: isMobile ? 28 : 34, borderRadius: 10, flexShrink: 0, fontSize: isMobile ? 15 : 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: l.color + '1F' }}>{l.emoji}</span>
                   <span style={{ flex: isMobile ? 'none' : 1, fontSize: 14, fontWeight: 600, color: INK }}>{l.name}</span>
-                  {on && !isMobile && <span style={{ fontSize: 12, fontWeight: 700, color: INK3 }}>{openItems.length}</span>}
+                  {!isMobile && <span style={{ fontSize: 12, fontWeight: 700, color: on ? l.color : INK3 }}>{l.id === activeId ? openItems.length : (counts[l.id] ?? '')}</span>}
                 </button>
               );
             })}
@@ -205,6 +225,23 @@ export default function Lists() {
                   placeholder={isTodos ? 'Add a to-do…' : 'Add an item…'} style={{ flex: 1, padding: '11px 14px', borderRadius: 12, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff' }} />
                 <button onClick={addItem} disabled={!draft.trim()} style={{ padding: '0 18px', borderRadius: 12, border: 0, cursor: 'pointer', background: active?.color || BRAND, color: '#fff', fontWeight: 700, fontFamily: INTER, opacity: draft.trim() ? 1 : 0.5 }}>Add</button>
               </div>
+
+              {/* To-dos: optionally assign the new item to someone */}
+              {isTodos && members.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexShrink: 0, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: INK3, fontWeight: 600 }}>Assign to</span>
+                  {members.map((m) => {
+                    const on = addWho === m.id;
+                    return (
+                      <button key={m.id} onClick={() => setAddWho(on ? null : m.id)} title={m.name}
+                        style={{ border: on ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer', opacity: on ? 1 : 0.65 }}>
+                        <Avatar member={m} size={28} />
+                      </button>
+                    );
+                  })}
+                  {addWho && <span style={{ fontSize: 12, color: INK2, fontWeight: 600 }}>{members.find((m) => m.id === addWho)?.name}</span>}
+                </div>
+              )}
 
               {/* items */}
               <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>

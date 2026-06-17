@@ -7260,6 +7260,24 @@ async function removeChoreCompletion(definitionId, memberId, dateStr, householdI
   if (error) throw error;
 }
 
+// "Skip just today": hide one recurring definition on one date (household-wide).
+async function addChoreSkip(definitionId, householdId, dateStr, db = supabase) {
+  const { error } = await db
+    .from('chore_skips')
+    .upsert({ definition_id: definitionId, household_id: householdId, date: dateStr }, { onConflict: 'definition_id,date', ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+async function getChoreSkipsForDate(householdId, dateStr, db = supabase) {
+  const { data, error } = await db
+    .from('chore_skips')
+    .select('definition_id')
+    .eq('household_id', householdId)
+    .eq('date', dateStr);
+  if (error) throw error;
+  return (data || []).map((r) => r.definition_id);
+}
+
 // ─── Star economy: rewards, redemptions, ledger ──────────────────────────────
 
 async function getStarBalances(householdId, db = supabase) {
@@ -7394,6 +7412,8 @@ module.exports = {
   getChoreCompletionsForDate,
   addChoreCompletion,
   removeChoreCompletion,
+  addChoreSkip,
+  getChoreSkipsForDate,
   getStarBalances,
   addStarTransaction,
   removeStarTransactionByRef,

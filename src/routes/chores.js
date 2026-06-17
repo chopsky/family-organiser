@@ -55,12 +55,15 @@ function normaliseDef(body, memberIds) {
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const date = DATE_RE.test(req.query.date) ? req.query.date : await householdToday(req.householdId);
-    const [defs, completions, balances] = await Promise.all([
+    const [defs, completions, balances, skips] = await Promise.all([
       db.getChoreDefinitions(req.householdId),
       db.getChoreCompletionsForDate(req.householdId, date),
       db.getStarBalances(req.householdId),
+      db.getChoreSkipsForDate(req.householdId, date),
     ]);
-    return res.json({ date, tasks: buildDayView(defs, completions, date), balances });
+    const skipped = new Set(skips);
+    const tasks = buildDayView(defs, completions, date).filter((t) => !skipped.has(t.id));
+    return res.json({ date, tasks, balances });
   } catch (err) {
     console.error('GET /api/chores error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -106,6 +109,20 @@ router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     console.error('DELETE /api/chores/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** POST /api/chores/:id/skip — body { date } hides this recurring task for the day. */
+router.post('/:id/skip', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const date = DATE_RE.test(req.body?.date) ? req.body.date : null;
+    if (!date) return res.status(400).json({ error: 'date is required' });
+    await db.addChoreSkip(req.params.id, req.householdId, date);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/chores/:id/skip error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

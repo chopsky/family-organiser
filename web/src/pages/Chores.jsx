@@ -90,10 +90,38 @@ function StarPill({ n, small }) {
   );
 }
 
+// Delete control: a repeating task offers "Skip just today" vs "Delete for
+// everyone"; a one-time task just deletes.
+function DeleteMenu({ task, onDelete, onSkip }) {
+  const [open, setOpen] = useState(false);
+  const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
+  return (
+    <div style={{ position: 'relative' }} onMouseLeave={() => setOpen(false)}>
+      <button onClick={(e) => { e.stopPropagation(); if (repeats) setOpen((o) => !o); else onDelete(task); }} aria-label="Delete task" style={cardBtn}><IcTrash s={13} c="#C24A5E" /></button>
+      {open && (
+        <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '110%', right: 0, zIndex: 30, background: '#fff', borderRadius: 12, padding: 6, width: 188, border: `1px solid ${LINE}`, boxShadow: '0 14px 40px rgba(26,22,32,0.2)' }}>
+          <div style={{ fontSize: 11, color: INK3, padding: '4px 8px 6px' }}>This task repeats.</div>
+          <button onClick={() => { onSkip(task); setOpen(false); }} style={menuItem}><IcClock s={14} c={INK2} /> Skip just today</button>
+          <button onClick={() => { onDelete(task); setOpen(false); }} style={{ ...menuItem, color: '#C24A5E' }}><IcTrash s={14} c="#C24A5E" /> Delete for everyone</button>
+        </div>
+      )}
+    </div>
+  );
+}
+const menuItem = { display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 8px', borderRadius: 9, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, color: INK, textAlign: 'left' };
+
 // ── a single chore card (kid = large, adult = compact, no-icon = row) ────────
-function ChoreCard({ task, mid, tint, compact, onToggle, onEdit, onDelete }) {
+function ChoreCard({ task, mid, tint, compact, onToggle, onEdit, onDelete, onSkip, onReorder }) {
   const [hover, setHover] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const done = !!task.done?.[mid];
+  const dragProps = onReorder ? {
+    draggable: true,
+    onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/chore', task.id); },
+    onDragOver: (e) => { if (e.dataTransfer.types.includes('text/chore')) { e.preventDefault(); setDragOver(true); } },
+    onDragLeave: () => setDragOver(false),
+    onDrop: (e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/chore'); if (id && id !== task.id) onReorder(id, task.id); },
+  } : {};
   const RingBox = (
     <span style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
       {done && <Tick s={12} />}
@@ -102,12 +130,12 @@ function ChoreCard({ task, mid, tint, compact, onToggle, onEdit, onDelete }) {
   const actions = (
     <div style={{ display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', flexShrink: 0 }}>
       <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-      <button onClick={(e) => { e.stopPropagation(); onDelete(task); }} aria-label="Delete task" style={cardBtn}><IcTrash s={13} c="#C24A5E" /></button>
+      <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} />
     </div>
   );
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onToggle(task, mid)}
-      style={{ position: 'relative', cursor: 'pointer', background: '#fff', borderRadius: compact ? 13 : 16, padding: compact ? '9px 12px' : '12px 14px', opacity: done ? 0.62 : 1, transition: 'opacity .12s' }}>
+    <div {...dragProps} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onToggle(task, mid)}
+      style={{ position: 'relative', cursor: 'pointer', background: '#fff', borderRadius: compact ? 13 : 16, padding: compact ? '9px 12px' : '12px 14px', opacity: done ? 0.62 : 1, transition: 'opacity .12s, box-shadow .12s', boxShadow: dragOver ? `inset 0 2px 0 ${tint}` : 'none' }}>
       {compact ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {task.emoji && <span style={{ fontSize: 19, flexShrink: 0, filter: done ? 'grayscale(.4)' : 'none' }}>{task.emoji}</span>}
@@ -158,7 +186,7 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
 }
 
 // ── one member column ───────────────────────────────────────────────────────
-function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onAdd, mobile }) {
+function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile }) {
   const hex = hexFor(m);
   const kid = isKid(m);
   // group tasks into slots
@@ -209,7 +237,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onAdd, mo
               <span style={{ fontSize: 16, fontWeight: 600, color: INK2 }}>{g.meta.label}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} compact={!kid} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />)}
+              {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} compact={!kid} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
             </div>
           </div>
         ))}
@@ -286,13 +314,28 @@ export default function Chores() {
     }
   }, [selDateStr, tasks, members]);
 
-  const handleDelete = useCallback(async (task) => {
-    const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
-    const msg = repeats ? `Delete "${task.title}" for everyone? It will stop appearing on all days.` : `Delete "${task.title}"?`;
-    if (!window.confirm(msg)) return;
+  const handleDelete = useCallback((task) => {
+    // "Delete for everyone" - reached from the card menu (repeating) or a direct
+    // trash tap (one-time), so no extra confirm.
     setTasks((ts) => ts.filter((t) => t.id !== task.id));
-    try { await api.delete(`/chores/${task.id}`); } catch { loadDay(selDateStr); }
+    api.delete(`/chores/${task.id}`).catch(() => loadDay(selDateStr));
   }, [selDateStr, loadDay]);
+
+  const handleSkip = useCallback((task) => {
+    setTasks((ts) => ts.filter((t) => t.id !== task.id));
+    api.post(`/chores/${task.id}/skip`, { date: selDateStr }).catch(() => loadDay(selDateStr));
+  }, [selDateStr, loadDay]);
+
+  const handleReorder = useCallback((dragId, targetId) => {
+    const from = tasks.findIndex((t) => t.id === dragId);
+    const to = tasks.findIndex((t) => t.id === targetId);
+    if (from < 0 || to < 0 || from === to) return;
+    const arr = [...tasks];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    setTasks(arr);
+    api.post('/chores/reorder', { ids: arr.map((t) => t.id) }).catch(() => loadDay(selDateStr));
+  }, [tasks, selDateStr, loadDay]);
 
   const handleSave = useCallback(async (form) => {
     try {
@@ -375,14 +418,14 @@ export default function Chores() {
           </div>
           {activeMember && (
             <MemberColumn key={activeMember.id} m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile
-              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
           )}
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {shown.map((m) => (
             <MemberColumn key={m.id} m={m} balance={balances[m.id]} tasks={tasksFor(m.id)}
-              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
           ))}
         </div>
       )}
