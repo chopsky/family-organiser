@@ -92,14 +92,14 @@ function StarPill({ n, small }) {
 
 // Delete control: a repeating task offers "Skip just today" vs "Delete for
 // everyone"; a one-time task just deletes.
-function DeleteMenu({ task, onDelete, onSkip }) {
+function DeleteMenu({ task, onDelete, onSkip, align = 'right' }) {
   const [open, setOpen] = useState(false);
   const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
   return (
     <div style={{ position: 'relative' }} onMouseLeave={() => setOpen(false)}>
       <button onClick={(e) => { e.stopPropagation(); if (repeats) setOpen((o) => !o); else onDelete(task); }} aria-label="Delete task" style={cardBtn}><IcTrash s={13} c="#C24A5E" /></button>
       {open && (
-        <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '110%', right: 0, zIndex: 30, background: '#fff', borderRadius: 12, padding: 6, width: 188, border: `1px solid ${LINE}`, boxShadow: '0 14px 40px rgba(26,22,32,0.2)' }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '110%', [align]: 0, zIndex: 30, background: '#fff', borderRadius: 12, padding: 6, width: 188, border: `1px solid ${LINE}`, boxShadow: '0 14px 40px rgba(26,22,32,0.2)' }}>
           <div style={{ fontSize: 11, color: INK3, padding: '4px 8px 6px' }}>This task repeats.</div>
           <button onClick={() => { onSkip(task); setOpen(false); }} style={menuItem}><IcClock s={14} c={INK2} /> Skip just today</button>
           <button onClick={() => { onDelete(task); setOpen(false); }} style={{ ...menuItem, color: '#C24A5E' }}><IcTrash s={14} c="#C24A5E" /> Delete for everyone</button>
@@ -130,7 +130,9 @@ function ChoreCard({ task, mid, tint, compact, onToggle, onEdit, onDelete, onSki
   const actions = (
     <div style={{ display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', flexShrink: 0 }}>
       <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-      <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} />
+      {/* kid cards put the actions top-left, so open the menu rightward; adult
+          (compact) cards put them at the right, so open it leftward. */}
+      <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align={compact ? 'right' : 'left'} />
     </div>
   );
   return (
