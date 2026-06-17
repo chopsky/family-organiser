@@ -181,7 +181,9 @@ function AppRoutes() {
             user, and the new account row ends up half-created (no verification
             email sent, wrong household, etc). Bounce authed users to /dashboard. */}
         <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
-        {/* School-fair smart link: iPhone → App Store, others → web signup with promo. */}
+        {/* Legacy campaign link - admin now generates /signup?promo= directly.
+            Kept so older printed flyers still work; redirects to web signup with
+            the promo on every device. */}
         <Route path="/fair" element={<FairRedirect />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />

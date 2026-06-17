@@ -12,11 +12,12 @@ import { Fragment, useEffect, useState } from 'react';
 import api from '../../lib/api';
 import { appleOfferCodeRedeemUrl } from '../../lib/app-store';
 
-// The flyer QR / printed link. Opens the WEB signup on every device (iPhone
-// included), with the Stripe code pre-applied at annual checkout. The web
-// onboarding ends with its own "get the app" step. See FairRedirect.jsx.
-function fairLink(code) {
-  return `https://housemait.com/fair?promo=${encodeURIComponent(code)}`;
+// The promo's printed / QR link. Points straight at the WEB signup with the
+// code pre-applied, on every device (iPhone included - the web onboarding ends
+// with its own "get the app" step, and the iOS paywall surfaces the matching
+// Apple Offer Code). General-purpose: works for any campaign, not just fairs.
+function signupPromoLink(code) {
+  return `https://housemait.com/signup?promo=${encodeURIComponent(code)}`;
 }
 
 function fmtDate(iso) {
@@ -166,8 +167,9 @@ export default function AdminPromoCodes() {
         type it on the Stripe page). For the <strong>iOS app</strong>, create a matching <strong>Apple Offer Code</strong> with the
         same string in App Store Connect — Stripe and Apple don’t share codes. Percentage discounts only. Use <strong>100%</strong>
         for a free period (e.g. 100% off + Annual = a free first year). Each code below has a ready-to-print
-        <strong> Flyer / QR link</strong> that opens the web signup with the code pre-applied on every device
-        (iPhone included — the web onboarding ends with a "get the app" step), and an
+        <strong> Signup / QR link</strong> that opens the web signup with the code pre-applied on every device
+        (iPhone included — the web onboarding ends with a "get the app" step, and the iOS paywall surfaces the
+        matching Apple Offer Code), and an
         <strong> Apple redeem link</strong> that opens the in-app redemption sheet with the Offer Code pre-filled.
       </div>
 
@@ -272,7 +274,7 @@ export default function AdminPromoCodes() {
                       <tr className="border-b border-cream-border/60">
                         <td colSpan={7} className="pb-3 pt-0 pl-0">
                           <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 bg-cream/60 rounded-lg px-3 py-2">
-                            <CopyLink label="Flyer / QR link" url={fairLink(c.code)} copyKey={`${c.id}:fair`} copiedKey={copiedKey} onCopy={copyToClipboard} />
+                            <CopyLink label="Signup / QR link" url={signupPromoLink(c.code)} copyKey={`${c.id}:signup`} copiedKey={copiedKey} onCopy={copyToClipboard} />
                             <CopyLink label="Apple redeem link" url={appleOfferCodeRedeemUrl(c.code)} copyKey={`${c.id}:apple`} copiedKey={copiedKey} onCopy={copyToClipboard} />
                           </div>
                         </td>
