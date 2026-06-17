@@ -1,6 +1,7 @@
 // Reward emoji set for the Rewards add/edit picker — a richer, reward-themed
 // catalogue (treats, outings, screen time, money, toys…) shown in the same
 // searchable, categorized selector the Tasks page uses (see ui/EmojiPicker).
+import { CHORE_EMOJI_CATS, searchChoreEmojis } from './choreIcons';
 
 export const REWARD_EMOJI_CATS = [
   { key: 'treats', label: 'Treats', emojis: ['🍦', '🍫', '🍪', '🍭', '🧁', '🍩', '🎂', '🍰', '🍬', '🍿', '🥤', '🧃', '🍓', '🍉', '🍌', '🍎'] },
@@ -35,4 +36,32 @@ export function searchRewardEmojis(query) {
   const q = String(query || '').trim().toLowerCase();
   if (!q) return REWARD_EMOJI_ALL;
   return REWARD_EMOJI_ALL.filter((em) => ((KW[em] || '') + ' ' + (CAT_OF[em] || '')).includes(q));
+}
+
+// Reward picker shows the reward-themed categories first, then every Tasks
+// (chore) category too, so it has "more icons (same as Tasks)". Categories
+// with the same label are merged (emojis deduped) and keys are kept unique.
+function mergeCats(...lists) {
+  const out = [];
+  const byLabel = new Map();
+  const keys = new Set();
+  for (const cat of lists.flat()) {
+    let existing = byLabel.get(cat.label);
+    if (!existing) {
+      let key = cat.key; let n = 1;
+      while (keys.has(key)) key = `${cat.key}${++n}`;
+      keys.add(key);
+      existing = { key, label: cat.label, emojis: [] };
+      byLabel.set(cat.label, existing);
+      out.push(existing);
+    }
+    for (const em of cat.emojis) if (!existing.emojis.includes(em)) existing.emojis.push(em);
+  }
+  return out;
+}
+
+export const REWARD_PLUS_TASK_CATS = mergeCats(REWARD_EMOJI_CATS, CHORE_EMOJI_CATS);
+
+export function searchRewardPlusTaskEmojis(query) {
+  return Array.from(new Set([...searchRewardEmojis(query), ...searchChoreEmojis(query)]));
 }

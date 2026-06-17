@@ -10,7 +10,7 @@ import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import EmojiPicker from '../components/ui/EmojiPicker';
-import { REWARD_EMOJI_CATS, searchRewardEmojis } from '../lib/rewardIcons';
+import { REWARD_PLUS_TASK_CATS, searchRewardPlusTaskEmojis } from '../lib/rewardIcons';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
@@ -274,7 +274,7 @@ function RewardModal({ onClose, onSave, kids }) {
         </div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>Icon</div>
-          <EmojiPicker value={emoji} onChange={setEmoji} categories={REWARD_EMOJI_CATS} searchFn={searchRewardEmojis} />
+          <EmojiPicker value={emoji} onChange={setEmoji} categories={REWARD_PLUS_TASK_CATS} searchFn={searchRewardPlusTaskEmojis} />
         </div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>Cost</div>
