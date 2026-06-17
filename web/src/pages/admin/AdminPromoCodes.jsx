@@ -12,9 +12,9 @@ import { Fragment, useEffect, useState } from 'react';
 import api from '../../lib/api';
 import { appleOfferCodeRedeemUrl } from '../../lib/app-store';
 
-// The flyer QR / printed link. Routes by device: iPhone → App Store (redeem the
-// Apple Offer Code in-app), Android/desktop → web signup with the Stripe code
-// pre-applied at annual checkout. See web/src/pages/FairRedirect.jsx.
+// The flyer QR / printed link. Opens the WEB signup on every device (iPhone
+// included), with the Stripe code pre-applied at annual checkout. The web
+// onboarding ends with its own "get the app" step. See FairRedirect.jsx.
 function fairLink(code) {
   return `https://housemait.com/fair?promo=${encodeURIComponent(code)}`;
 }
@@ -166,7 +166,8 @@ export default function AdminPromoCodes() {
         type it on the Stripe page). For the <strong>iOS app</strong>, create a matching <strong>Apple Offer Code</strong> with the
         same string in App Store Connect — Stripe and Apple don’t share codes. Percentage discounts only. Use <strong>100%</strong>
         for a free period (e.g. 100% off + Annual = a free first year). Each code below has a ready-to-print
-        <strong> Flyer / QR link</strong> (routes iPhone → App Store, everyone else → web signup) and an
+        <strong> Flyer / QR link</strong> that opens the web signup with the code pre-applied on every device
+        (iPhone included — the web onboarding ends with a "get the app" step), and an
         <strong> Apple redeem link</strong> that opens the in-app redemption sheet with the Offer Code pre-filled.
       </div>
 
