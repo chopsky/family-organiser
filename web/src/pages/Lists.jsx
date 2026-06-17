@@ -11,6 +11,7 @@ import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
+import { getItemEmoji } from '../lib/shopping-constants';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -27,10 +28,6 @@ const IcTrash = (p) => <Svg {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" 
 const IcChevDown = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;
 const IcPeople = (p) => <Svg {...p}><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5" /><path d="M16 5a3 3 0 0 1 0 6M22 20c0-2.5-2-4.3-4.5-4.8" /></Svg>;
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-
-// Derive a grocery emoji tile from the item text.
-const GROCERY_EMOJI = [[/milk|yogh|yogurt|cream|butter|cheese|dairy/, '🥛'], [/egg/, '🥚'], [/bread|sourdough|loaf|bagel|bun/, '🍞'], [/apple/, '🍎'], [/banana/, '🍌'], [/orange|mandarin|clementine/, '🍊'], [/mango/, '🥭'], [/pear/, '🍐'], [/grape/, '🍇'], [/strawber|blueber|berr/, '🍓'], [/spinach|lettuce|salad|greens|kale|rocket/, '🥬'], [/carrot/, '🥕'], [/potato/, '🥔'], [/tomato/, '🍅'], [/onion/, '🧅'], [/garlic/, '🧄'], [/pepper|capsicum/, '🫑'], [/broccoli/, '🥦'], [/corn/, '🌽'], [/chicken|turkey/, '🍗'], [/beef|steak|mince|sausage|bacon|ham|pork|lamb/, '🥩'], [/fish|salmon|tuna|cod|prawn/, '🐟'], [/rice/, '🍚'], [/pasta|spaghetti|noodle/, '🍝'], [/coffee/, '☕'], [/\btea\b/, '🫖'], [/water|juice|squash|drink|cola|lemonade/, '🧃'], [/oil|olive/, '🫒'], [/salt|sugar|flour|spice|season/, '🧂'], [/choc|biscuit|cookie|digestive|sweet|candy/, '🍪'], [/crisp|\bchips?\b/, '🥫'], [/frozen|\bpeas\b|ice/, '🧊'], [/flower|bouquet/, '💐'], [/wine/, '🍷'], [/beer|lager|ale/, '🍺'], [/cake/, '🍰'], [/pizza/, '🍕'], [/cereal|oats|granola/, '🥣'], [/nappy|nappies|diaper|wipes/, '🍼'], [/soap|shampoo|toothpaste|detergent|cleaner|roll/, '🧴']];
-function emojiFor(name) { const n = (name || '').toLowerCase(); for (const [re, em] of GROCERY_EMOJI) if (re.test(n)) return em; return '🛒'; }
 
 const DEFAULT_TINTS = ['#6C3DD9', '#6BA368', '#5B8DE0', '#D8788A', '#D89B3A', '#3AADA0'];
 
@@ -92,7 +89,7 @@ export default function Lists() {
         const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
         setItems((data.items || []).map((i) => ({
           id: i.id, text: i.quantity ? `${i.item} · ${i.quantity}` : i.item, done: !!i.completed,
-          section: i.aisle_category || 'Other', who: null, emoji: emojiFor(i.item),
+          section: i.aisle_category || 'Other', who: null, emoji: getItemEmoji(i.item, i.aisle_category),
         })));
       }
     } catch { setItems([]); } finally { setLoadingItems(false); }
