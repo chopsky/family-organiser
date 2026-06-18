@@ -251,6 +251,15 @@ export default function Chores() {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const [activeWho, setActiveWho] = useState(null); // mobile: which member's column is shown
+  const [slideDir, setSlideDir] = useState(0); // mobile: column slide-in direction (-1 prev, +1 next)
+  const swipeRef = useRef(null); // mobile: horizontal-swipe touch start
+  useEffect(() => {
+    if (document.getElementById('chore-swipe-css')) return;
+    const s = document.createElement('style');
+    s.id = 'chore-swipe-css';
+    s.textContent = '@keyframes choreSlideL{from{transform:translateX(-22px);opacity:.4}to{transform:none;opacity:1}}@keyframes choreSlideR{from{transform:translateX(22px);opacity:.4}to{transform:none;opacity:1}}';
+    document.head.appendChild(s);
+  }, []);
 
   // iOS home-screen "Add Task" shortcut lands here with ?quickAdd=1.
   useEffect(() => { if (searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams]);
@@ -344,6 +353,27 @@ export default function Chores() {
 
   const shown = visibleIds ? members.filter((m) => visibleIds.includes(m.id)) : members;
   const activeMember = members.find((m) => m.id === activeWho) || members[0];
+  // Mobile: change the shown member, remembering travel direction so the new
+  // column slides in from the correct side.
+  const goToMember = (id) => {
+    if (!id) return;
+    const cur = members.findIndex((m) => m.id === activeMember?.id);
+    const nxt = members.findIndex((m) => m.id === id);
+    if (nxt === -1) return;
+    setSlideDir(nxt > cur ? 1 : nxt < cur ? -1 : 0);
+    setActiveWho(id);
+  };
+  const onColTouchStart = (e) => { const t = e.touches[0]; swipeRef.current = { x: t.clientX, y: t.clientY }; };
+  const onColTouchEnd = (e) => {
+    const s = swipeRef.current; swipeRef.current = null;
+    if (!s) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignore vertical scrolls / taps
+    const idx = members.findIndex((m) => m.id === activeMember?.id);
+    const next = idx + (dx < 0 ? 1 : -1);
+    if (next >= 0 && next < members.length) goToMember(members[next].id);
+  };
   const tasksFor = (mid) => tasks.filter((t) => (t.assignee_ids || []).includes(mid));
   const toggleVisible = (id) => setVisibleIds((prev) => {
     const cur = prev || members.map((m) => m.id);
@@ -402,7 +432,7 @@ export default function Chores() {
               const sel = m.id === (activeMember?.id);
               const all = tasksFor(m.id); const done = all.filter((t) => t.done?.[m.id]).length;
               return (
-                <button key={m.id} onClick={() => setActiveWho(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, flexShrink: 0, border: sel ? `1.5px solid ${hexFor(m)}` : `1px solid ${LINE}`, background: sel ? '#fff' : 'transparent' }}>
+                <button key={m.id} onClick={() => goToMember(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, flexShrink: 0, border: sel ? `1.5px solid ${hexFor(m)}` : `1px solid ${LINE}`, background: sel ? '#fff' : 'transparent' }}>
                   <Avatar member={m} size={30} />
                   <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: INK, lineHeight: 1.1 }}>{m.name}</span>
@@ -413,8 +443,11 @@ export default function Chores() {
             })}
           </div>
           {activeMember && (
-            <MemberColumn key={activeMember.id} m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile
-              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+            <div key={activeMember.id} onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
+              style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
+              <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile
+                onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+            </div>
           )}
         </div>
       ) : (
