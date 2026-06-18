@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChildMode } from '../context/ChildModeContext';
+import { CHILD_VISIBLE_ROUTES } from '../lib/childMode';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp, IconList, IconGift } from './Icons';
@@ -121,8 +123,18 @@ const moreAccountRows = [
   { to: '/help',     label: 'Help & support' },
 ];
 
+// Small non-interactive badge shown by the logo while Child Mode is active.
+function ChildModeChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-plum-light text-plum text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-0.5">
+      <IconShield className="h-3 w-3" /> Child
+    </span>
+  );
+}
+
 export default function Layout({ children }) {
   const { household, user, token, login, logout, isPlatformAdmin } = useAuth();
+  const { enabled: childMode } = useChildMode();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -244,6 +256,15 @@ export default function Layout({ children }) {
   // every other page keeps its normal window scroll.
   const appHeight = ['/tasks', '/lists', '/rewards'].includes(location.pathname);
 
+  // Child Mode trims the nav to the kid-safe routes. Desktop groups drop empty;
+  // the mobile bar swaps Lists out for Rewards and loses the More button.
+  const visibleGroups = childMode
+    ? navGroups.map((g) => ({ ...g, items: g.items.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)) })).filter((g) => g.items.length)
+    : navGroups;
+  const visibleMobileNav = childMode
+    ? [...mobileNav.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)), { to: '/rewards', label: 'Rewards', Icon: IconGift }]
+    : mobileNav;
+
   return (
     <div
       className={`bg-cream flex flex-col md:flex-row ${appHeight ? 'overflow-hidden' : 'min-h-screen'}`}
@@ -256,11 +277,12 @@ export default function Layout({ children }) {
         {/* Logo */}
         <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
           <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
+          {childMode && <ChildModeChip />}
         </div>
 
         {/* Grouped nav - labelled sections; active item is a solid-brand pill. */}
         <nav className="flex-1 px-3 flex flex-col gap-[18px] overflow-y-auto">
-          {navGroups.map((g) => (
+          {visibleGroups.map((g) => (
             <div key={g.label}>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-2)]">
                 {g.label}
@@ -283,7 +305,7 @@ export default function Layout({ children }) {
             <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
             <p className="text-[11px] text-warm-grey capitalize">{user?.role || 'Member'}</p>
           </div>
-          {isPlatformAdmin && (
+          {!childMode && isPlatformAdmin && (
             <Link to="/admin" className="text-warm-grey hover:text-plum transition-colors" title="Admin Dashboard">
               <IconShield className="h-5 w-5" />
             </Link>
@@ -309,6 +331,7 @@ export default function Layout({ children }) {
           <Link to="/dashboard" className="shrink-0 flex items-center">
             <img src="/housemait-logo2.png" alt="Housemait" className="max-w-[140px] h-auto" />
           </Link>
+          {childMode && <ChildModeChip />}
           <Link to="/settings" className="shrink-0">
             {renderAvatar()}
           </Link>
@@ -343,7 +366,7 @@ export default function Layout({ children }) {
           WebkitBackdropFilter: 'blur(14px) saturate(180%)',
         }}
       >
-        {mobileNav.map(({ to, label, Icon }) => (
+        {visibleMobileNav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -370,6 +393,7 @@ export default function Layout({ children }) {
             instead of being clipped by the tab bar. The button matches
             the layout/sizing of the NavLinks above so the row stays
             visually balanced. */}
+        {!childMode && (
         <button
           onClick={() => setMoreOpen(v => !v)}
           aria-expanded={moreOpen}
@@ -379,6 +403,7 @@ export default function Layout({ children }) {
           <IconMore className="h-[26px] w-[26px]" />
           <span className="text-[11px] font-semibold tracking-[0.01em]">More</span>
         </button>
+        )}
       </nav>
 
       {/* ── More bottom sheet ──────────────────────────────────────
@@ -386,7 +411,7 @@ export default function Layout({ children }) {
           panel slides up with `cubic-bezier(0.32, 0.72, 0, 1)` over 320ms.
           Designed mobile-first - it auto-hides on ≥768px where the
           desktop sidebar already exposes everything in this menu. */}
-      {moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
+      {!childMode && moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
 
       <Suspense fallback={null}><ChatWidget /></Suspense>
 

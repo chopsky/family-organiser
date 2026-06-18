@@ -11,6 +11,7 @@ import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useChildMode } from '../context/ChildModeContext';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
 
 // Design-handoff tokens (page-local; member colours come from each record).
@@ -262,6 +263,7 @@ export default function Chores() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const { enabled: childMode } = useChildMode();
   const [activeWho, setActiveWho] = useState(null); // mobile: which member's column is shown
   const [slideDir, setSlideDir] = useState(0); // mobile: column slide-in direction (-1 prev, +1 next)
   const swipeRef = useRef(null); // mobile: horizontal-swipe touch start
@@ -363,14 +365,17 @@ export default function Chores() {
     } catch (e) { alert(e.response?.data?.error || 'Could not save the task.'); }
   }, [selDateStr, loadDay]);
 
-  const shown = visibleIds ? members.filter((m) => visibleIds.includes(m.id)) : members;
-  const activeMember = members.find((m) => m.id === activeWho) || members[0];
+  // Child Mode shows only dependents across the board (columns, mobile pills,
+  // swipe). loadDay/tasksFor still operate on real ids.
+  const baseMembers = childMode ? members.filter(isKid) : members;
+  const shown = visibleIds ? baseMembers.filter((m) => visibleIds.includes(m.id)) : baseMembers;
+  const activeMember = baseMembers.find((m) => m.id === activeWho) || baseMembers[0];
   // Mobile: change the shown member, remembering travel direction so the new
   // column slides in from the correct side.
   const goToMember = (id) => {
     if (!id) return;
-    const cur = members.findIndex((m) => m.id === activeMember?.id);
-    const nxt = members.findIndex((m) => m.id === id);
+    const cur = baseMembers.findIndex((m) => m.id === activeMember?.id);
+    const nxt = baseMembers.findIndex((m) => m.id === id);
     if (nxt === -1) return;
     setSlideDir(nxt > cur ? 1 : nxt < cur ? -1 : 0);
     setActiveWho(id);
@@ -382,9 +387,9 @@ export default function Chores() {
     const t = e.changedTouches[0];
     const dx = t.clientX - s.x, dy = t.clientY - s.y;
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignore vertical scrolls / taps
-    const idx = members.findIndex((m) => m.id === activeMember?.id);
+    const idx = baseMembers.findIndex((m) => m.id === activeMember?.id);
     const next = idx + (dx < 0 ? 1 : -1);
-    if (next >= 0 && next < members.length) goToMember(members[next].id);
+    if (next >= 0 && next < baseMembers.length) goToMember(baseMembers[next].id);
   };
   const tasksFor = (mid) => tasks.filter((t) => (t.assignee_ids || []).includes(mid));
   const toggleVisible = (id) => setVisibleIds((prev) => {
@@ -400,7 +405,7 @@ export default function Chores() {
         title="Tasks"
         actions={(
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {!isMobile && (
+            {!isMobile && !childMode && (
             <div ref={filterRef} style={{ position: 'relative' }}>
               <button onClick={() => setFilterOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: visibleIds ? INK : BG_SOFT, color: visibleIds ? '#fff' : INK2, border: 0 }}>
                 <IcPeople s={16} c={visibleIds ? '#fff' : INK2} /> {visibleIds ? `${shown.length} of ${members.length}` : 'Everyone'}
@@ -440,7 +445,7 @@ export default function Chores() {
         // Mobile: a person selector + one member's column, full width, page-scrolled.
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0 12px', flexShrink: 0 }}>
-            {members.map((m) => {
+            {baseMembers.map((m) => {
               const sel = m.id === (activeMember?.id);
               const all = tasksFor(m.id); const done = all.filter((t) => t.done?.[m.id]).length;
               return (

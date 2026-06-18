@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChildMode } from '../context/ChildModeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
@@ -394,6 +395,7 @@ function DashboardAiInput() {
 // ── Dashboard ───────────────────────────────────────────────────
 export default function Dashboard() {
   const { user, household } = useAuth();
+  const { enabled: childMode } = useChildMode();
   const navigate = useNavigate();
   const [digest, setDigest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -682,8 +684,8 @@ export default function Dashboard() {
           the user dismisses. Sits above the 2-column grid so it's the
           first thing a brand-new user sees but doesn't push existing
           content off the fold. */}
-      <PromoClaimNudge />
-      <CalendarSetupNudge />
+      {!childMode && <PromoClaimNudge />}
+      {!childMode && <CalendarSetupNudge />}
 
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -797,8 +799,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 3 - Grocery list */}
-        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        {/* Card 3 - Grocery list (hidden in Child Mode - Lists is off-limits) */}
+        <div className={`${childMode ? 'hidden ' : ''}bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5`} style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">
               Grocery list
@@ -845,8 +847,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 4 - Today's meals */}
-        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        {/* Card 4 - Today's meals (hidden in Child Mode - Meal Plan is off-limits) */}
+        <div className={`${childMode ? 'hidden ' : ''}bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5`} style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">Today's meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>

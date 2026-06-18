@@ -9,6 +9,7 @@ import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useChildMode } from '../context/ChildModeContext';
 import EmojiPicker from '../components/ui/EmojiPicker';
 import { REWARD_PLUS_TASK_CATS, searchRewardPlusTaskEmojis } from '../lib/rewardIcons';
 
@@ -89,6 +90,7 @@ export default function Rewards() {
   const [redemptions, setRedemptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('columns'); // columns | focused | redeemed
+  const { enabled: childMode } = useChildMode();
   const [focusKid, setFocusKid] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
   const [modal, setModal] = useState(false);
@@ -150,7 +152,8 @@ export default function Rewards() {
   const viewOpts = [
     ...(isMobile ? [] : [{ value: 'columns', label: 'Columns' }]),
     { value: 'focused', label: isMobile ? 'Rewards' : 'Focused' },
-    { value: 'redeemed', label: pending ? `Redeemed · ${pending}` : 'Redeemed' },
+    // The Redeemed log is a parent queue - hidden in Child Mode.
+    ...(childMode ? [] : [{ value: 'redeemed', label: pending ? `Redeemed · ${pending}` : 'Redeemed' }]),
   ];
 
   return (
@@ -165,7 +168,7 @@ export default function Rewards() {
                 <button key={o.value} onClick={() => setView(o.value)} style={{ padding: '7px 14px', borderRadius: 8, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: effView === o.value ? '#fff' : 'transparent', color: effView === o.value ? INK : INK3, boxShadow: effView === o.value ? '0 1px 3px rgba(26,22,32,0.1)' : 'none' }}>{o.label}</button>
               ))}
             </div>
-            <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal('add')}>Add reward</PillBtn>
+            {!childMode && <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal('add')}>Add reward</PillBtn>}
           </div>
         )}
       />
@@ -174,10 +177,10 @@ export default function Rewards() {
         <Center>Loading…</Center>
       ) : kids.length === 0 ? (
         <Center>Add a child to your family to start the star economy.</Center>
-      ) : effView === 'redeemed' ? (
+      ) : (effView === 'redeemed' && !childMode) ? (
         <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} />
       ) : effView === 'focused' ? (
-        <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={removeReward} editReward={setModal} />
+        <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {kids.map((k) => {
@@ -196,7 +199,7 @@ export default function Rewards() {
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, margin: '0 -4px', padding: '0 4px 2px' }}>
                   {rewardsFor(k.id).map((r) => (
                     <div key={r.id} style={{ position: 'relative' }}>
-                      <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} onRemove={removeReward} onEdit={setModal} />
+                      <RewardCard reward={r} balance={balances[k.id] || 0} color={hex} redeeming={redeemingId === `${r.id}:${k.id}`} onRedeem={() => redeem(r, k.id)} onRemove={childMode ? undefined : removeReward} onEdit={childMode ? undefined : setModal} />
                     </div>
                   ))}
                   {rewardsFor(k.id).length === 0 && <div style={{ fontSize: 13, color: INK3, fontStyle: 'italic', padding: '8px 4px' }}>No rewards yet — add one.</div>}

@@ -42,6 +42,17 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  // In-place patch of the cached household (localStorage + state), e.g. after
+  // setting/removing the Child Mode PIN so `child_mode_pin_set` flips without a
+  // refetch.
+  const updateHousehold = useCallback((patch) => {
+    setHousehold((prev) => {
+      const next = { ...(prev || {}), ...patch };
+      safeSetItem('household', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const logout = useCallback(() => {
     // Revoke the refresh token server-side (fire-and-forget)
     const rt = safeGetItem('refreshToken');
@@ -104,7 +115,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      token, user, household, login, logout, updateUser,
+      token, user, household, login, logout, updateUser, updateHousehold,
       isAdmin: user?.role === 'admin',
       // Housemait is collaborative: every adult member can manage the
       // household (add family, school dates, activities, settings). Children

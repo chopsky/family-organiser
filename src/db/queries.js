@@ -86,6 +86,34 @@ async function updateHouseholdSettings(id, settings, db = supabase) {
   return data;
 }
 
+// ── Child Mode PIN (household-level, bcrypt). Server-only - the hash is never
+//    returned to the client; GET /api/household exposes child_mode_pin_set. ──
+async function setChildModePinHash(id, hash, db = supabase) {
+  const { error } = await db
+    .from('households')
+    .update({ child_mode_pin_hash: hash })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+async function clearChildModePinHash(id, db = supabase) {
+  const { error } = await db
+    .from('households')
+    .update({ child_mode_pin_hash: null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+async function getChildModePinHash(id, db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .select('child_mode_pin_hash')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return data?.child_mode_pin_hash || null;
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 /**
@@ -7464,6 +7492,9 @@ module.exports = {
   getHouseholdByCode,
   getHouseholdById,
   updateHouseholdSettings,
+  setChildModePinHash,
+  clearChildModePinHash,
+  getChildModePinHash,
   // Subscription / Stripe
   updateHouseholdSubscription,
   findHouseholdByStripeCustomerId,

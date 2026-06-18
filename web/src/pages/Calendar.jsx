@@ -6,6 +6,7 @@ import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, 
 import PageHeader from '../components/ui/PageHeader';
 import Segmented from '../components/ui/Segmented';
 import { useCanWrite } from '../context/SubscriptionContext';
+import { useChildMode } from '../context/ChildModeContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
 import { confirmDestructive } from '../lib/action-sheet';
@@ -296,6 +297,7 @@ export default function Calendar() {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
+  const { enabled: childMode } = useChildMode();
   const [schoolData, setSchoolData] = useState(null);
   // Subscribed (read-only) external calendars. Used to colour their
   // events with the per-feed colour configured in Settings, so a
@@ -710,6 +712,7 @@ export default function Calendar() {
     const ds = toDateStr(date);
     const memberIdSet = new Set(members.map((m) => m.id));
     const nameToId = new Map(members.map((m) => [m.name, m.id]));
+    const kidIds = childMode ? new Set(members.filter((m) => m.member_type === 'dependent').map((m) => m.id)) : null;
     return events.filter(e => {
       const start = e.start_time?.split('T')[0];
       const end = e.end_time?.split('T')[0];
@@ -720,6 +723,13 @@ export default function Calendar() {
       if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
       if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
       if (cat === 'school' && !activeFilters.has('school')) return false;
+      // Child Mode: holidays + school (term dates / extracurriculars) stay; any
+      // other event must be assigned to a dependent. Unassigned adult/household
+      // events are hidden (a deliberate departure from the fail-open default).
+      if (childMode && cat !== 'public_holiday' && cat !== 'school') {
+        const ids = assigneeMemberIds(e, nameToId, memberIdSet);
+        if (![...ids].some((id) => kidIds.has(id))) return false;
+      }
       // Member filter by IDENTITY (member id), and FAIL OPEN: hide only when the
       // item is assigned to current member(s) who are ALL toggled off. An item
       // resolving to no current member is treated as household-wide and shown -
@@ -737,8 +747,14 @@ export default function Calendar() {
     const ds = toDateStr(date);
     const memberIdSet = new Set(members.map((m) => m.id));
     const nameToId = new Map(members.map((m) => [m.name, m.id]));
+    const kidIds = childMode ? new Set(members.filter((m) => m.member_type === 'dependent').map((m) => m.id)) : null;
     return tasks.filter(t => {
       if (t.due_date !== ds) return false;
+      // Child Mode: only a dependent's tasks appear on the calendar.
+      if (childMode) {
+        const ids = assigneeMemberIds(t, nameToId, memberIdSet);
+        if (![...ids].some((id) => kidIds.has(id))) return false;
+      }
       if (activeMemberFilters) {
         const ids = assigneeMemberIds(t, nameToId, memberIdSet);
         if (ids.size > 0 && ![...ids].some((id) => activeMemberFilters.has(id))) return false;
@@ -1496,7 +1512,8 @@ export default function Calendar() {
             </button>
           )}
 
-          {/* Settings cog */}
+          {/* Settings cog - hidden in Child Mode so kids can't change filters */}
+          {!childMode && (
           <div ref={settingsRef} className="relative">
             <button
               onClick={() => setShowSettings(!showSettings)}
@@ -1584,6 +1601,7 @@ export default function Calendar() {
               </div>
             )}
           </div>
+          )}
         </div>
         </>
         }

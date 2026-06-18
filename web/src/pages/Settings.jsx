@@ -20,6 +20,7 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
+import { useChildMode } from '../context/ChildModeContext';
 import resizeImage from '../lib/resizeImage';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
@@ -608,6 +609,7 @@ function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = fal
 // (or 'delete' for the danger one) belongs to this sub-page. Order
 // here drives the order of the row list on the iOS landing.
 const IOS_SECTIONS = [
+  { slug: 'child-mode',   title: 'Child Mode',        icon: 'IconShield' },
   { slug: 'whatsapp',     title: 'Connect WhatsApp',  icon: 'IconMessageCircle' },
   { slug: 'calendars',    title: 'Connect Calendars', icon: 'IconCalendar' },
   { slug: 'emails-to-ai', title: 'Send Emails to AI', icon: 'IconMail' },
@@ -627,8 +629,38 @@ export default function Settings() {
   // Management controls (e.g. the Send-Emails-to-AI allowlist) gate on
   // canManage - any adult member - per the collaborative model. Billing is
   // owner-only (isOwner), enforced on the server too.
-  const { household, user, canManage: isAdmin, isOwner, login, logout, token } = useAuth();
+  const { household, user, canManage: isAdmin, isOwner, login, logout, token, updateHousehold } = useAuth();
+  const { enabled: childMode, enable: enableChildMode, disable: disableChildMode, pinIsSet } = useChildMode();
   const navigate = useNavigate();
+
+  // ── Child Mode PIN management ──────────────────────────────────
+  const [pinFormOpen, setPinFormOpen] = useState(false);
+  const [pinDraft, setPinDraft] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinMsg, setPinMsg] = useState('');
+  async function saveChildPin() {
+    if (!/^\d{4,6}$/.test(pinDraft)) { setPinMsg('PIN must be 4 to 6 digits.'); return; }
+    if (pinDraft !== pinConfirm) { setPinMsg("The two PINs don't match."); return; }
+    setPinBusy(true); setPinMsg('');
+    try {
+      await api.post('/household/child-mode/pin', { pin: pinDraft });
+      updateHousehold({ child_mode_pin_set: true });
+      setPinFormOpen(false); setPinDraft(''); setPinConfirm('');
+    } catch (err) {
+      setPinMsg(err.response?.data?.error || 'Could not save PIN.');
+    } finally { setPinBusy(false); }
+  }
+  async function removeChildPin() {
+    if (childMode) return; // never strand a locked device with no PIN
+    setPinBusy(true); setPinMsg('');
+    try {
+      await api.delete('/household/child-mode/pin');
+      updateHousehold({ child_mode_pin_set: false });
+    } catch (err) {
+      setPinMsg(err.response?.data?.error || 'Could not remove PIN.');
+    } finally { setPinBusy(false); }
+  }
 
   // iOS native shell: the Settings landing is a list of section rows
   // (same surface as a sectioned iOS Settings.app screen). Tapping a
@@ -1617,6 +1649,62 @@ export default function Settings() {
               + Active sessions (long lists worth hiding when not in use).
             • iOS list mode: each row sits in the section list above.
             • iOS sub-page mode: only the active section renders, bare. */}
+
+      {/* Child Mode - lock this device to a kid-safe view; PIN to exit. */}
+      <SectionWrapper slug="child-mode" title="Child Mode" icon={IconShield}>
+        <div className="space-y-4">
+          <p className="text-sm text-cocoa">
+            Lock this device to a kid-safe view - Home, Tasks, Rewards and a calendar
+            of just their events. Adults unlock Settings with a PIN. It's a guardrail to
+            keep kids on track, not a hard security lock.
+          </p>
+
+          {isAdmin && (
+            <div className="rounded-xl border border-cream-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-bark">Access PIN</p>
+                  <p className="text-xs text-cocoa mt-0.5">{pinIsSet ? 'A PIN is set for this household.' : 'No PIN yet - set one to use Child Mode.'}</p>
+                </div>
+                {!pinFormOpen && (
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => { setPinFormOpen(true); setPinMsg(''); }} className="px-3 py-2 rounded-lg border border-cream-border text-sm font-medium text-bark hover:bg-oat transition-colors">{pinIsSet ? 'Change' : 'Set PIN'}</button>
+                    {pinIsSet && !childMode && <button onClick={removeChildPin} disabled={pinBusy} className="px-3 py-2 rounded-lg text-sm font-medium text-coral hover:bg-oat disabled:opacity-50 transition-colors">Remove</button>}
+                  </div>
+                )}
+              </div>
+              {pinFormOpen && (
+                <div className="mt-3 space-y-2">
+                  <input type="password" inputMode="numeric" maxLength={6} value={pinDraft} onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))} placeholder="New PIN (4-6 digits)" className="w-full h-11 rounded-lg border border-cream-border px-3 text-sm bg-white focus:border-plum outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))} placeholder="Confirm PIN" className="w-full h-11 rounded-lg border border-cream-border px-3 text-sm bg-white focus:border-plum outline-none" />
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={saveChildPin} disabled={pinBusy} className="flex-1 h-11 rounded-lg bg-plum text-white text-sm font-semibold disabled:opacity-50">{pinBusy ? 'Saving…' : 'Save PIN'}</button>
+                    <button onClick={() => { setPinFormOpen(false); setPinDraft(''); setPinConfirm(''); setPinMsg(''); }} className="px-4 h-11 rounded-lg border border-cream-border text-sm font-medium text-cocoa">Cancel</button>
+                  </div>
+                </div>
+              )}
+              {pinMsg && <p className="text-xs text-coral mt-2">{pinMsg}</p>}
+            </div>
+          )}
+
+          {!childMode ? (
+            <>
+              <button
+                onClick={() => { if (enableChildMode()) navigate('/dashboard'); }}
+                disabled={!pinIsSet}
+                className="w-full h-12 rounded-xl bg-plum text-white font-semibold disabled:opacity-50 transition-opacity"
+              >
+                Turn on Child Mode (this device)
+              </button>
+              {!pinIsSet && <p className="text-xs text-cocoa text-center">Set a PIN first to enable Child Mode.</p>}
+            </>
+          ) : (
+            <button onClick={() => { disableChildMode(); navigate('/dashboard'); }} className="w-full h-12 rounded-xl border-[1.5px] border-plum text-plum font-semibold">
+              Turn off Child Mode
+            </button>
+          )}
+        </div>
+      </SectionWrapper>
 
       {/* Connect WhatsApp + Connect Calendars + Send Emails to AI - the
           three "how Housemait talks to the outside world" sections, grouped

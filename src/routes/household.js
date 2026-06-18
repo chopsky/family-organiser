@@ -2,6 +2,8 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
+const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
 const { supabaseAdmin } = require('../db/client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
@@ -10,6 +12,18 @@ const cache = require('../services/cache');
 const { validateEmailAlias } = require('../utils/email-alias');
 
 const router = Router();
+
+// Child Mode PIN: 4-6 digits, bcrypt-hashed. The verify endpoint is rate-limited
+// (an adult unlocking Settings is fine; brute-forcing a 4-digit space is not).
+const BCRYPT_ROUNDS = 12;
+const PIN_RE = /^\d{4,6}$/;
+const childPinVerifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a minute and try again.' },
+});
 
 // Multer config for avatar uploads (5 MB, images only)
 const avatarUpload = multer({
@@ -33,15 +47,74 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const [household, members] = await Promise.all([
+    const [householdRow, members] = await Promise.all([
       db.getHouseholdById(req.householdId),
       db.getHouseholdMembers(req.householdId),
     ]);
+    // Never expose the Child Mode PIN hash; surface only a derived boolean.
+    const { child_mode_pin_hash, ...household } = householdRow || {};
+    household.child_mode_pin_set = !!child_mode_pin_hash;
     const result = { household, members };
     cache.set(cacheKey, result, 300); // 5 min TTL
     return res.json(result);
   } catch (err) {
     console.error('GET /api/household error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/household/child-mode/pin
+ * Set or change the household's Child Mode PIN. Adult (any authenticated
+ * household member) only - children never log in.
+ * Body: { pin: '4-6 digits' }
+ */
+router.post('/child-mode/pin', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const pin = String(req.body?.pin || '');
+  if (!PIN_RE.test(pin)) {
+    return res.status(400).json({ error: 'PIN must be 4 to 6 digits.' });
+  }
+  try {
+    const hash = await bcrypt.hash(pin, BCRYPT_ROUNDS);
+    await db.setChildModePinHash(req.householdId, hash);
+    cache.invalidate(`members:${req.householdId}`);
+    return res.json({ ok: true, child_mode_pin_set: true });
+  } catch (err) {
+    console.error('POST /api/household/child-mode/pin error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/household/child-mode/pin
+ * Remove the Child Mode PIN. Adult only.
+ */
+router.delete('/child-mode/pin', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    await db.clearChildModePinHash(req.householdId);
+    cache.invalidate(`members:${req.householdId}`);
+    return res.json({ ok: true, child_mode_pin_set: false });
+  } catch (err) {
+    console.error('DELETE /api/household/child-mode/pin error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/household/child-mode/verify-pin
+ * Verify a PIN to unlock Settings / exit Child Mode. Any authenticated member
+ * on the session; rate-limited against brute force.
+ * Body: { pin }
+ */
+router.post('/child-mode/verify-pin', childPinVerifyLimiter, requireAuth, requireHousehold, async (req, res) => {
+  const pin = String(req.body?.pin || '');
+  try {
+    const hash = await db.getChildModePinHash(req.householdId);
+    if (!hash) return res.status(400).json({ error: 'No PIN is set.' });
+    const ok = PIN_RE.test(pin) && (await bcrypt.compare(pin, hash));
+    return res.status(ok ? 200 : 401).json({ ok });
+  } catch (err) {
+    console.error('POST /api/household/child-mode/verify-pin error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

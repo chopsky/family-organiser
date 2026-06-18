@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
+import { ChildModeProvider, useChildMode } from './context/ChildModeContext';
+import ChildModePinScreen from './components/ChildModePinScreen';
+import { CHILD_OPEN_ROUTES } from './lib/childMode';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { localeHomePath } from './hooks/useLocale';
@@ -125,6 +128,18 @@ function RequirePlatformAdmin({ children }) {
   return children;
 }
 
+// Child Mode route gate (per-device). Allowed kid routes render through;
+// /settings is replaced by the PIN screen until unlocked; every other in-app
+// route redirects Home. A no-op when Child Mode is off.
+function ChildGate({ children }) {
+  const { enabled, settingsUnlocked } = useChildMode();
+  const path = useLocation().pathname;
+  if (!enabled) return children;
+  if (CHILD_OPEN_ROUTES.includes(path)) return children;
+  if (path === '/settings') return settingsUnlocked ? children : <ChildModePinScreen />;
+  return <Navigate to="/dashboard" replace />;
+}
+
 /**
  * Wraps Routes in a div keyed by pathname so a CSS animation fires on
  * every route change. Pairs with the `.page-transition` keyframe in
@@ -208,22 +223,22 @@ function AppRoutes() {
             WhatsApp can both reach it - the page itself bounces already-
             linked users to /dashboard. */}
         <Route path="/connect-whatsapp" element={<RequireAuthOnly><ConnectWhatsAppStandalone /></RequireAuthOnly>} />
-        <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
+        <Route path="/dashboard" element={<RequireAuth><ChildGate><Layout><Dashboard /></Layout></ChildGate></RequireAuth>} />
         {/* Tasks is now the chores/routines/stars page; Shopping folded into
             Lists. Old paths redirect so existing links/bookmarks/shortcuts keep
             working. */}
-        <Route path="/tasks" element={<RequireAuth><Layout><Chores /></Layout></RequireAuth>} />
-        <Route path="/lists" element={<RequireAuth><Layout><Lists /></Layout></RequireAuth>} />
-        <Route path="/rewards" element={<RequireAuth><Layout><Rewards /></Layout></RequireAuth>} />
+        <Route path="/tasks" element={<RequireAuth><ChildGate><Layout><Chores /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/lists" element={<RequireAuth><ChildGate><Layout><Lists /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/rewards" element={<RequireAuth><ChildGate><Layout><Rewards /></Layout></ChildGate></RequireAuth>} />
         <Route path="/chores" element={<Navigate to="/tasks" replace />} />
         <Route path="/shopping" element={<Navigate to="/lists" replace />} />
-        <Route path="/calendar" element={<RequireAuth><Layout><Calendar /></Layout></RequireAuth>} />
-        <Route path="/meals" element={<RequireAuth><Layout><Meals /></Layout></RequireAuth>} />
-        <Route path="/receipt" element={<RequireAuth><Layout><Receipt /></Layout></RequireAuth>} />
-        <Route path="/documents" element={<RequireAuth><Layout><Documents /></Layout></RequireAuth>} />
-        <Route path="/family" element={<RequireAuth><Layout><FamilySetup /></Layout></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
-        <Route path="/help" element={<RequireAuth><Layout><Help /></Layout></RequireAuth>} />
+        <Route path="/calendar" element={<RequireAuth><ChildGate><Layout><Calendar /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/meals" element={<RequireAuth><ChildGate><Layout><Meals /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/receipt" element={<RequireAuth><ChildGate><Layout><Receipt /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/documents" element={<RequireAuth><ChildGate><Layout><Documents /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/family" element={<RequireAuth><ChildGate><Layout><FamilySetup /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/settings" element={<RequireAuth><ChildGate><Layout><Settings /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/help" element={<RequireAuth><ChildGate><Layout><Help /></Layout></ChildGate></RequireAuth>} />
         {/* Subscribe flow - Subscribe page is reachable by anyone logged in
             (including expired users, so they can reactivate). Success and
             Cancel pages are hit by Stripe redirects so they need to work
@@ -261,10 +276,14 @@ export default function App() {
             separate from AuthContext matches the server-side split
             (routes/auth vs routes/subscription) and keeps AuthContext
             lean for the parts of the app that don't care about billing. */}
-        <SubscriptionProvider>
-          <AppRoutes />
-          <ConsentBanner />
-        </SubscriptionProvider>
+        {/* ChildModeProvider needs useAuth() (household) and useLocation()
+            (re-lock-on-leave), so it sits inside AuthProvider and BrowserRouter. */}
+        <ChildModeProvider>
+          <SubscriptionProvider>
+            <AppRoutes />
+            <ConsentBanner />
+          </SubscriptionProvider>
+        </ChildModeProvider>
       </AuthProvider>
     </BrowserRouter>
   );
