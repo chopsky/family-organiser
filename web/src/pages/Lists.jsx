@@ -31,6 +31,9 @@ const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 
 
 const DEFAULT_TINTS = ['#6C3DD9', '#6BA368', '#5B8DE0', '#D8788A', '#D89B3A', '#3AADA0'];
 
+// Shopping items display capitalised (first letter), e.g. "milk" -> "Milk".
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 export default function Lists() {
   const [members, setMembers] = useState([]);
   const [lists, setLists] = useState([]); // descriptors
@@ -90,7 +93,7 @@ export default function Lists() {
         const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
         setItems((data.items || []).map((i) => ({
           id: i.id, done: !!i.completed, section: i.aisle_category || 'Other', emoji: getItemEmoji(i.item, i.aisle_category),
-          text: i.quantity ? `${i.item} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : i.item,
+          text: i.quantity ? `${cap(i.item)} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : cap(i.item),
           // raw fields kept so the Edit-item form can prefill
           item: i.item, quantity: i.quantity || '', unit: i.unit || '', description: i.description || '', aisle_category: i.aisle_category || 'Other',
         })));
