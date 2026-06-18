@@ -12,7 +12,7 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import {
-  IconMessageCircle, IconCalendar, IconMail, IconBell,
+  IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
@@ -537,37 +537,21 @@ function EditProfileForm({
  * Plan cards already on this page, and the section cards on the
  * Family page.
  */
-// ── Settings restyle tokens ─────────────────────────────────────────────────
-// Mirror the reference palette (already the values the Tasks/Rewards/Lists
-// pages use). The web Settings shell adopts the centred single-column "section
-// label + card" design; the iOS popup/sub-page markup is intentionally left
-// alone.
-const SET_INK = '#1A1620', SET_INK2 = '#4A4453', SET_INK3 = '#8A8493';
-const SET_LINE = 'rgba(26,22,32,0.07)', SET_LINE_STRONG = 'rgba(26,22,32,0.12)';
-const SET_BRAND = '#6C3DD9', SET_DANGER = '#A04257';
-const SET_SERIF = '"Instrument Serif", serif';
-const settingsCardStyle = (danger) => ({
-  background: '#fff',
-  border: `1px solid ${danger ? 'rgba(160,66,87,0.25)' : SET_LINE}`,
-  borderRadius: 18,
-  boxShadow: '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)',
-});
-const settingsLabelStyle = (danger) => ({
-  fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
-  color: danger ? SET_DANGER : SET_INK3, margin: '0 0 12px 4px',
-});
-
-// A small uppercase section label sitting above a white card (the new web
-// Settings pattern). `icon` is accepted but ignored - the label has no icon -
-// so existing `icon={...}` call sites keep working.
-function SettingsCard({ title, danger = false, children }) {
+function SettingsCard({ title, icon: IconCmp, danger = false, children }) {
+  const baseStyle = danger
+    ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
+    : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
+  const wrapClass = danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-4.5 md:p-6';
+  const iconColor = danger ? 'text-error' : 'text-plum';
+  const titleColor = danger ? 'text-error' : 'text-bark';
   return (
-    <section>
-      <div style={settingsLabelStyle(danger)}>{title}</div>
-      <div style={{ ...settingsCardStyle(danger), padding: '18px 20px' }}>
-        {children}
+    <div className={wrapClass} style={baseStyle}>
+      <div className="flex items-center gap-3 mb-3">
+        {IconCmp && <IconCmp className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}
+        <h2 className={`flex-1 text-base md:text-medium font-semibold ${titleColor}`}>{title}</h2>
       </div>
-    </section>
+      {children}
+    </div>
   );
 }
 
@@ -1555,15 +1539,26 @@ export default function Settings() {
 
 
   return (
-    <div className="space-y-[30px]" style={{ maxWidth: 760, margin: '0 auto', paddingBottom: 100, color: SET_INK }}>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: SET_INK3, marginBottom: 6 }}>
-          Account &amp; preferences
+    <div className="max-w-3xl mx-auto space-y-6">
+      <h1
+        className="flex text-[32px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
+        style={{ fontFamily: '"Instrument Serif"' }}
+      >
+        <div
+          className="hidden"
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f1eef8',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconSettings className="h-5 w-5 text-plum" />
         </div>
-        <h1 style={{ margin: 0, fontFamily: SET_SERIF, fontSize: 44, fontWeight: 400, lineHeight: 1, color: SET_INK }}>
-          Settings
-        </h1>
-      </div>
+        Settings
+      </h1>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
@@ -1573,35 +1568,38 @@ export default function Settings() {
       {(() => {
         const me = members.find((m) => m.id === user?.id);
         const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
-        const photo = me?.avatar_url || user?.avatar_url;
-        const sub = me?.family_role || user?.email;
         return (
-          <section>
-            <div style={settingsLabelStyle(false)}>Your profile</div>
-            <div style={{ ...settingsCardStyle(false), padding: 22 }}>
-              <div className="flex items-center gap-4">
-                {photo && headerAvatarErrUrl !== photo ? (
-                  <img src={photo} alt={user?.name} onError={() => setHeaderAvatarErrUrl(photo)} style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                ) : (
-                  <div className={`${ac} flex items-center justify-center`} style={{ width: 60, height: 60, borderRadius: '50%', fontWeight: 700, fontSize: 22, flexShrink: 0 }}>
-                    {user?.name?.[0]?.toUpperCase()}
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: SET_INK }}>{user?.name}</div>
-                  {sub && <div style={{ fontSize: 13, color: SET_INK3, marginTop: 2 }}>{sub}</div>}
-                </div>
-                {/* Subtle trial indicator - renders nothing unless the household is trialing. */}
-                <TrialIndicatorSubtle />
-                <button
-                  onClick={openEditProfile}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid ${SET_LINE_STRONG}`, background: '#fff', color: SET_INK2, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
-                >
-                  Edit profile
-                </button>
-              </div>
+          <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+            <div className="flex items-start justify-between mb-3">
+              <h2 className="text-base md:text-medium font-semibold text-bark">My profile</h2>
+              {/* Subtle trial indicator - renders nothing unless the household
+                  is trialing. Safe to leave always-mounted; the component
+                  guards its own visibility. */}
+              <TrialIndicatorSubtle />
             </div>
-          </section>
+            <div className="flex items-center gap-4">
+              {(me?.avatar_url || user?.avatar_url) && headerAvatarErrUrl !== (me?.avatar_url || user?.avatar_url) ? (
+                <img src={me?.avatar_url || user?.avatar_url} alt={user?.name} onError={() => setHeaderAvatarErrUrl(me?.avatar_url || user?.avatar_url)} className="w-12 h-12 rounded-full object-cover" />
+              ) : (
+                <div className={`w-12 h-12 rounded-full ${ac} flex items-center justify-center font-bold text-lg`}>
+                  {user?.name?.[0]?.toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="font-medium text-bark">{user?.name}</p>
+                {me?.family_role && <p className="text-xs text-cocoa">{me.family_role}</p>}
+              </div>
+              <button
+                onClick={openEditProfile}
+                className="flex items-center gap-1.5 border border-cream-border text-cocoa font-medium px-4 py-2 rounded-xl text-sm hover:bg-oat transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                Edit
+              </button>
+            </div>
+          </div>
         );
       })()}
 
