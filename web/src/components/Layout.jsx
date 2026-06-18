@@ -318,7 +318,7 @@ export default function Layout({ children }) {
       {/* ── Main Content ── */}
       <main className={`flex-1 md:ml-60 min-w-0 overflow-x-hidden${appHeight ? ' flex flex-col min-h-0' : ''}`}>
         <OfflineBanner />
-        <div className={`px-4 md:px-8 py-4 md:py-9 pb-28 md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
+        <div className={`px-4 md:px-8 py-4 md:py-9 ${location.pathname === '/tasks' ? 'pb-20' : 'pb-28'} md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
           {children}
         </div>
       </main>
