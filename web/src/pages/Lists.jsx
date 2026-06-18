@@ -11,7 +11,7 @@ import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
-import { getItemEmoji } from '../lib/shopping-constants';
+import { getItemEmoji, AISLE_CATEGORIES } from '../lib/shopping-constants';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -42,6 +42,7 @@ export default function Lists() {
   const [toFilter, setToFilter] = useState(null); // member id for To-dos filter
   const [doneOpen, setDoneOpen] = useState(false);
   const [newList, setNewList] = useState(false);
+  const [editItem, setEditItem] = useState(null); // grocery item being edited
   const [counts, setCounts] = useState({}); // listId -> open count, for the rail
   const [addWho, setAddWho] = useState([]); // To-dos: assignee ids for the next add (multi)
   const [searchParams] = useSearchParams();
@@ -88,8 +89,10 @@ export default function Lists() {
       } else {
         const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
         setItems((data.items || []).map((i) => ({
-          id: i.id, text: i.quantity ? `${i.item} · ${i.quantity}` : i.item, done: !!i.completed,
-          section: i.aisle_category || 'Other', who: null, emoji: getItemEmoji(i.item, i.aisle_category),
+          id: i.id, done: !!i.completed, section: i.aisle_category || 'Other', emoji: getItemEmoji(i.item, i.aisle_category),
+          text: i.quantity ? `${i.item} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : i.item,
+          // raw fields kept so the Edit-item form can prefill
+          item: i.item, quantity: i.quantity || '', unit: i.unit || '', description: i.description || '', aisle_category: i.aisle_category || 'Other',
         })));
       }
     } catch { setItems([]); } finally { setLoadingItems(false); }
@@ -130,6 +133,22 @@ export default function Lists() {
       await loadItems(active);
     } catch { /* keep draft cleared; reload */ loadItems(active); }
   }, [draft, active, isTodos, loadItems, members, addWho]);
+
+  // Edit a grocery item (name, quantity, unit, aisle, notes) via PATCH /shopping/:id.
+  const saveEdit = useCallback(async (fields) => {
+    if (!editItem || !fields.item?.trim()) return;
+    try {
+      await api.patch(`/shopping/${editItem.id}`, {
+        item: fields.item.trim(),
+        quantity: fields.quantity || null,
+        unit: fields.unit || null,
+        aisle_category: fields.aisle_category,
+        description: fields.description || null,
+      });
+    } catch { /* fall through to reload */ }
+    setEditItem(null);
+    if (active) loadItems(active);
+  }, [editItem, active, loadItems]);
 
   const toggle = useCallback(async (it) => {
     const next = !it.done;
@@ -266,7 +285,7 @@ export default function Lists() {
                           <div key={sec.name || 'all'} style={{ marginBottom: 14 }}>
                             {sec.name && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: INK3, padding: '0 4px 8px' }}>{sec.name}</div>}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {sec.items.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} />)}
+                              {sec.items.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={setEditItem} />)}
                             </div>
                           </div>
                         ))}
@@ -276,7 +295,7 @@ export default function Lists() {
                               <span style={{ transform: doneOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', display: 'flex' }}><IcChevDown s={14} c={INK3} /></span>
                               Done · {doneItems.length}
                             </button>
-                            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>{doneItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} />)}</div>}
+                            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>{doneItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={setEditItem} />)}</div>}
                           </div>
                         )}
                       </>
@@ -293,14 +312,16 @@ export default function Lists() {
       )}
 
       {newList && <NewListModal onClose={() => setNewList(false)} onSave={createList} />}
+      {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSave={saveEdit} />}
     </div>
   );
 }
 
 function Center({ children }) { return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>{children}</div>; }
 
-function Row({ it, isTodos, color, assignees = [], onToggle, onDelete }) {
+function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit }) {
   const [hover, setHover] = useState(false);
+  const editable = !isTodos && !!onEdit; // grocery items open an Edit-item form
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 13, padding: '11px 14px', opacity: it.done ? 0.6 : 1 }}>
@@ -308,8 +329,11 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete }) {
         style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: it.done ? `2px solid ${color}` : `1.5px solid ${LINE_STRONG}`, background: it.done ? color : 'transparent' }}>
         {it.done && <Tick s={12} />}
       </button>
-      {!isTodos && <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT }}>{it.emoji}</span>}
-      <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      <div onClick={editable ? () => onEdit(it) : undefined} title={editable ? 'Edit item' : undefined}
+        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, cursor: editable ? 'pointer' : 'default' }}>
+        {!isTodos && <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT }}>{it.emoji}</span>}
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      </div>
       {isTodos && assignees.length > 0 && (
         <div style={{ display: 'flex', flexShrink: 0 }}>
           {assignees.slice(0, 3).map((m, i) => (
@@ -320,6 +344,60 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete }) {
         </div>
       )}
       <button onClick={() => onDelete(it)} aria-label="Delete" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}><IcTrash s={14} c="#C24A5E" /></button>
+    </div>
+  );
+}
+
+// Edit a grocery item — name, quantity + unit, aisle, notes. Restores the
+// "Edit item" form the old Shopping page had (PATCH /shopping/:id).
+const UNIT_OPTIONS = ['g', 'kg', 'ml', 'l', 'pcs', 'pack', 'tin', 'bunch', 'loaf'];
+function EditItemModal({ item, onClose, onSave }) {
+  const [f, setF] = useState({
+    item: item.item || '', quantity: item.quantity || '', unit: item.unit || '',
+    aisle_category: item.aisle_category || 'Other', description: item.description || '',
+  });
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const field = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff', color: INK };
+  const label = { fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 };
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 440, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>Edit item</h2>
+          <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <div style={label}>Item name</div>
+          <input autoFocus value={f.item} onChange={(e) => set('item', e.target.value)} style={field} />
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Quantity</div>
+            <input value={f.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="e.g. 2" style={field} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Unit</div>
+            <select value={f.unit} onChange={(e) => set('unit', e.target.value)} style={field}>
+              <option value="">—</option>
+              {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <div style={label}>Aisle</div>
+          <select value={f.aisle_category} onChange={(e) => set('aisle_category', e.target.value)} style={field}>
+            {AISLE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <div style={label}>Notes</div>
+          <textarea value={f.description} onChange={(e) => set('description', e.target.value)} rows={2} style={{ ...field, resize: 'none' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, background: '#fff', cursor: 'pointer', fontWeight: 600, fontFamily: INTER, fontSize: 14, color: INK2 }}>Cancel</button>
+          <button onClick={() => f.item.trim() && onSave(f)} disabled={!f.item.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: f.item.trim() ? 1 : 0.5 }}>Save</button>
+        </div>
+      </div>
     </div>
   );
 }
