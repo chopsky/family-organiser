@@ -19,6 +19,7 @@ import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
 import PageHeader from '../components/ui/PageHeader';
+import Avatar from '../components/ui/Avatar';
 import resizeImage from '../lib/resizeImage';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
@@ -824,7 +825,6 @@ export default function Settings() {
   const [feedError, setFeedError] = useState('');
   // Own-avatar in the account header: fall back to the initial if the photo
   // 404s (keyed on the URL so a re-upload retries).
-  const [headerAvatarErrUrl, setHeaderAvatarErrUrl] = useState(null);
   const [feedActionId, setFeedActionId] = useState(null); // id of feed currently being refreshed/removed
 
   // Receipt email forwarding state
@@ -1550,7 +1550,6 @@ export default function Settings() {
       {/* My profile */}
       {(() => {
         const me = members.find((m) => m.id === user?.id);
-        const ac = avatarColors[me?.color_theme || user?.color_theme] || avatarColors.teal;
         return (
           <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
             <div className="flex items-start justify-between mb-3">
@@ -1561,13 +1560,7 @@ export default function Settings() {
               <TrialIndicatorSubtle />
             </div>
             <div className="flex items-center gap-4">
-              {(me?.avatar_url || user?.avatar_url) && headerAvatarErrUrl !== (me?.avatar_url || user?.avatar_url) ? (
-                <img src={me?.avatar_url || user?.avatar_url} alt={user?.name} onError={() => setHeaderAvatarErrUrl(me?.avatar_url || user?.avatar_url)} className="w-12 h-12 rounded-full object-cover" />
-              ) : (
-                <div className={`w-12 h-12 rounded-full ${ac} flex items-center justify-center font-bold text-lg`}>
-                  {user?.name?.[0]?.toUpperCase()}
-                </div>
-              )}
+              <Avatar member={me || user} size={72} />
               <div className="flex-1">
                 <p className="font-medium text-bark">{user?.name}</p>
                 {me?.family_role && <p className="text-xs text-cocoa">{me.family_role}</p>}
