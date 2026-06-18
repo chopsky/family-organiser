@@ -180,7 +180,7 @@ export default function Lists() {
       {loading ? (
         <Center>Loading…</Center>
       ) : (
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, flex: 1, minHeight: 0, overflowY: isMobile ? 'auto' : undefined, WebkitOverflowScrolling: 'touch' }}>
           {/* rail (vertical on desktop, a horizontal chip strip on mobile) */}
           <div style={{ flex: isMobile ? 'none' : '0 0 240px', display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 6, overflowX: isMobile ? 'auto' : 'visible', overflowY: isMobile ? 'hidden' : 'auto', paddingBottom: isMobile ? 4 : 0 }}>
             {lists.map((l) => {
@@ -197,8 +197,8 @@ export default function Lists() {
           </div>
 
           {/* active list */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div style={{ background: (active?.color || BRAND) + '12', borderRadius: 22, padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+          <div style={{ flex: isMobile ? 'none' : 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: isMobile ? undefined : 0 }}>
+            <div style={{ background: (active?.color || BRAND) + '12', borderRadius: 22, padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: isMobile ? undefined : 0, flex: isMobile ? 'none' : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0 }}>
                 <span style={{ fontSize: 26 }}>{active?.emoji}</span>
                 <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{active?.name}</h2>
@@ -255,8 +255,9 @@ export default function Lists() {
                 </div>
               )}
 
-              {/* items */}
-              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>
+              {/* items — scroll internally on desktop; on mobile let the whole
+                  page scroll (only the page header stays fixed) */}
+              <div style={{ flex: isMobile ? 'none' : 1, minHeight: isMobile ? undefined : 0, overflowY: isMobile ? 'visible' : 'auto', margin: '0 -4px', padding: '0 4px' }}>
                 {loadingItems ? <div style={{ padding: 20, color: INK3, fontSize: 13 }}>Loading…</div>
                   : openItems.length === 0 && doneItems.length === 0 ? <div style={{ padding: '30px 4px', textAlign: 'center', color: INK3, fontStyle: 'italic' }}>Nothing here yet — add the first item.</div>
                     : (
