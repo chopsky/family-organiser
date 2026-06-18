@@ -12,6 +12,7 @@ import { isUkHousehold, isSouthAfricaHousehold, hasSchoolsFeature } from '../lib
 import SubscribePrompt from '../components/SubscribePrompt';
 import { loadCached } from '../lib/offlineCache';
 import { pickPhoto } from '../lib/photo-picker';
+import resizeImage from '../lib/resizeImage';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
@@ -1413,8 +1414,9 @@ export default function FamilySetup() {
     if (!targetId) return;
     setUploadingAvatar(true);
     try {
+      const resized = await resizeImage(file);
       const formData = new FormData();
-      formData.append('avatar', file);
+      formData.append('avatar', resized, resized.name);
       formData.append('userId', targetId);
       const { data } = await api.post('/household/profile/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -1604,9 +1606,10 @@ export default function FamilySetup() {
     setUploadingHouseholdAvatar(true);
     setError('');
     try {
+      const resized = await resizeImage(file);
       const form = new FormData();
       // Synthesize a filename for blobs that don't carry one.
-      form.append('avatar', file, file.name || 'household.jpg');
+      form.append('avatar', resized, resized.name || file.name || 'household.jpg');
       const { data } = await api.post('/household/avatar', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -1642,8 +1645,9 @@ export default function FamilySetup() {
 
       // 2. If the user picked a new image, upload it.
       if (hhEditAvatarFile) {
+        const resized = await resizeImage(hhEditAvatarFile);
         const form = new FormData();
-        form.append('avatar', hhEditAvatarFile);
+        form.append('avatar', resized, resized.name);
         const upRes = await api.post('/household/avatar', form, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });

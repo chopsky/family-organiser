@@ -18,6 +18,7 @@ import {
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
+import resizeImage from '../lib/resizeImage';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
 } from '../lib/location';
@@ -941,10 +942,11 @@ export default function Settings() {
     if (!blob) return;
     setUploadingAvatar(true);
     try {
+      const resized = await resizeImage(blob);
       const formData = new FormData();
       // Camera-plugin Blobs don't carry a filename - the backend needs
       // one for multipart, so synthesize a stable jpg name.
-      formData.append('avatar', blob, blob.name || 'avatar.jpg');
+      formData.append('avatar', resized, resized.name || blob.name || 'avatar.jpg');
       const { data } = await api.post('/household/profile/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
