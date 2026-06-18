@@ -12,12 +12,13 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import {
-  IconSettings, IconMessageCircle, IconCalendar, IconMail, IconBell,
+  IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
+import PageHeader from '../components/ui/PageHeader';
 import resizeImage from '../lib/resizeImage';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
@@ -1540,25 +1541,7 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1
-        className="flex text-[32px] md:text-[40px] font-normal leading-none text-bark items-center gap-2"
-        style={{ fontFamily: '"Instrument Serif"' }}
-      >
-        <div
-          className="hidden"
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: '#f1eef8',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconSettings className="h-5 w-5 text-plum" />
-        </div>
-        Settings
-      </h1>
+      <PageHeader kicker="Account & preferences" title="Settings" />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
