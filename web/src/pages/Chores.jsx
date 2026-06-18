@@ -141,10 +141,10 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
           {done && <Tick s={13} />}
         </span>
       </div>
-      {/* hover actions — absolutely positioned top-right so they never squeeze the title */}
-      <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
+      {/* hover actions — absolutely positioned top-left so they never squeeze the title */}
+      <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
         <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-        <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="right" />
+        <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="left" />
       </div>
     </div>
   );
