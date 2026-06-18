@@ -183,10 +183,22 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
   const sectionsPresent = groups.map((g) => g.key);
   const slotsPresent = sectionsPresent.filter((k) => k !== 'chores');
   const focusSlot = slotsPresent.includes(currentSlot()) ? currentSlot() : slotsPresent[0];
-  const [active, setActive] = useState(() => {
+  const defaultActive = () => {
     const init = sectionsPresent.filter((k) => k === focusSlot || k === 'chores');
     return init.length ? init : sectionsPresent;
-  });
+  };
+  const [active, setActive] = useState(defaultActive);
+  // The useState initializer runs once - if this column first mounted before
+  // its tasks had loaded, re-seed the default (focused slot + Chores ON) the
+  // first time sections actually appear, so Chores is on from the beginning.
+  const seeded = useRef(active.length > 0);
+  const sectionsKey = sectionsPresent.join(',');
+  useEffect(() => {
+    if (seeded.current || !sectionsKey) return;
+    seeded.current = true;
+    setActive(defaultActive());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionsKey]);
   const toggleSection = (k) => setActive((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]));
   const total = tasks.length, done = tasks.filter((t) => t.done?.[m.id]).length;
   const slotStats = (k) => { const g = groups.find((x) => x.key === k); return g ? { done: g.tasks.filter((t) => t.done?.[m.id]).length, total: g.tasks.length } : { done: 0, total: 0 }; };
