@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ChildModeProvider, useChildMode } from './context/ChildModeContext';
 import ChildModePinScreen from './components/ChildModePinScreen';
-import { CHILD_OPEN_ROUTES } from './lib/childMode';
+import { CHILD_OPEN_ROUTES, CHILD_HOME_ROUTE } from './lib/childMode';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { localeHomePath } from './hooks/useLocale';
@@ -137,7 +137,7 @@ function ChildGate({ children }) {
   if (!enabled) return children;
   if (CHILD_OPEN_ROUTES.includes(path)) return children;
   if (path === '/settings') return settingsUnlocked ? children : <ChildModePinScreen />;
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to={CHILD_HOME_ROUTE} replace />;
 }
 
 /**

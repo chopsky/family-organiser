@@ -62,10 +62,10 @@ export default function ChildModePinScreen() {
         </button>
         <button
           type="button"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/tasks')}
           className="mt-4 text-sm font-medium text-warm-grey hover:text-charcoal"
         >
-          ← Back to Home
+          ← Back to Tasks
         </button>
       </form>
     </div>

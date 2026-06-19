@@ -275,7 +275,7 @@ export default function Layout({ children }) {
         className="hidden md:flex w-60 bg-white flex-col fixed inset-y-0 left-0 z-30"
       >
         {/* Logo */}
-        <div className="px-6 flex items-center gap-2.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
+        <div className="px-6 flex flex-wrap items-center gap-x-2.5 gap-y-1.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
           <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
           {childMode && <ChildModeChip />}
         </div>
@@ -413,7 +413,7 @@ export default function Layout({ children }) {
           desktop sidebar already exposes everything in this menu. */}
       {!childMode && moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
 
-      <Suspense fallback={null}><ChatWidget /></Suspense>
+      {!childMode && <Suspense fallback={null}><ChatWidget /></Suspense>}
 
       {/* Trial-ended overlay - only renders for expired households who
           haven't dismissed it this session. Scoped to Layout so it

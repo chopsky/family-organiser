@@ -1690,7 +1690,7 @@ export default function Settings() {
           {!childMode ? (
             <>
               <button
-                onClick={() => { if (enableChildMode()) navigate('/dashboard'); }}
+                onClick={() => { if (enableChildMode()) navigate('/tasks'); }}
                 disabled={!pinIsSet}
                 className="w-full h-12 rounded-xl bg-plum text-white font-semibold disabled:opacity-50 transition-opacity"
               >
