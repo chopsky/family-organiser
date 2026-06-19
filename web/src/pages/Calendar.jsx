@@ -845,6 +845,7 @@ export default function Calendar() {
   }
 
   function openAddForm(date, hour) {
+    if (childMode) return; // calendar is read-only for kids
     resetForm();
     if (date) {
       setFormDate(toDateStr(date));
@@ -858,6 +859,13 @@ export default function Calendar() {
   }
 
   function openEditForm(ev) {
+    // In Child Mode the calendar is read-only: tapping an event opens the
+    // detail sheet (title/date/time/location) so kids can see what's on,
+    // but never the editor.
+    if (childMode) {
+      setSyncedEvent(ev);
+      return;
+    }
     // Synced copies (device sync / URL feeds) are READ-ONLY: an edit here
     // would silently revert on the next sync and a delete would resurrect -
     // the most confusing possible outcome. Show a detail sheet with
@@ -1097,6 +1105,7 @@ export default function Calendar() {
   }
 
   function openTaskEditForm(task) {
+    if (childMode) return; // read-only for kids; they complete via the checkbox
     setEditingTask(task);
     setTaskTitle(task.title);
     setTaskDueDate(task.due_date);
@@ -1431,7 +1440,7 @@ export default function Calendar() {
         >
           <IconSearch className="w-5 h-5" />
         </button>
-        {canWrite && (
+        {canWrite && !childMode && (
           <button
             onClick={() => openAddForm(selectedDate)}
             aria-label="New event"
@@ -2783,12 +2792,17 @@ export default function Calendar() {
                 {syncedEvent.all_day ? ' · All day' : ` · ${formatTime(syncedEvent.start_time)} – ${formatTime(syncedEvent.end_time)}`}
               </p>
               {syncedEvent.location && <p className="text-sm text-warm-grey mt-1">📍 {syncedEvent.location}</p>}
-              <div className="mt-4 bg-plum-light rounded-xl px-3 py-2.5">
-                <p className="text-xs font-medium text-plum">🔄 {sourceLine}</p>
-                <p className="text-[11px] text-plum/70 mt-0.5">
-                  Read-only here - edit or delete it in that calendar and Housemait updates automatically.
-                </p>
-              </div>
+              {/* Provenance footer only applies to genuinely synced events. In
+                  Child Mode this same sheet shows native events read-only, where
+                  the "edit it in that calendar" copy would be misleading. */}
+              {syncedEvent.external_feed_id && (
+                <div className="mt-4 bg-plum-light rounded-xl px-3 py-2.5">
+                  <p className="text-xs font-medium text-plum">🔄 {sourceLine}</p>
+                  <p className="text-[11px] text-plum/70 mt-0.5">
+                    Read-only here - edit or delete it in that calendar and Housemait updates automatically.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );
