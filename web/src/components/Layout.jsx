@@ -111,7 +111,7 @@ const moreTiles = [
 // we don't yet deep-link cleanly. Help & support links to /help, which
 // hosts the FAQ + contact form (logged-out users have /support).
 const moreAccountRows = [
-  { to: '/family',   label: 'Family Setup',   Icon: IconUsers },
+  { to: '/family',   label: 'Family Setup', bold: true, Icon: IconUsers },
   { to: '/settings', label: 'Settings', bold: true, Icon: IconSettings },
   { to: '/help',     label: 'Help & support', Icon: IconHelp },
 ];
