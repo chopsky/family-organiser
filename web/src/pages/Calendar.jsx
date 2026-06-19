@@ -1419,7 +1419,7 @@ export default function Calendar() {
   // ── Render ─────────────────────────────────────────────
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="mx-auto space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
 
