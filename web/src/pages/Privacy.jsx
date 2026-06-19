@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { localeHomePath } from '../hooks/useLocale'
+import { setCanonical } from '../lib/seo'
 
 /**
  * Privacy Policy page.
@@ -10,6 +11,7 @@ import { localeHomePath } from '../hooks/useLocale'
 export default function Privacy() {
   useEffect(() => {
     document.title = 'Privacy Policy | Housemait'
+    setCanonical('/privacy')
     window.scrollTo(0, 0)
   }, [])
 

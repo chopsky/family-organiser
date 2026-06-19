@@ -12,10 +12,12 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ContactForm from '../components/ContactForm';
 import { localeHomePath } from '../hooks/useLocale';
+import { setCanonical } from '../lib/seo';
 
 export default function Support() {
   useEffect(() => {
     document.title = 'Contact | Housemait';
+    setCanonical('/support');
   }, []);
 
   return (

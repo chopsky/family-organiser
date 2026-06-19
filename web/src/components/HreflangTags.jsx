@@ -28,7 +28,12 @@ export default function HreflangTags({ locale }) {
     // Wipe previously-injected tags so we don't accumulate them on
     // route changes (e.g. visitor goes /gb → /us, the old <link>s would
     // otherwise stick around and Google would see conflicting signals).
-    document.querySelectorAll(`[${MARKER_ATTR}]`).forEach((node) => node.remove());
+    // Also remove ANY existing rel=canonical — including the static
+    // homepage canonical shipped in index.html — so a landing page never
+    // ends up with two competing canonicals (the static one + ours).
+    document
+      .querySelectorAll(`[${MARKER_ATTR}], link[rel="canonical"]`)
+      .forEach((node) => node.remove());
 
     // Self-canonical for this page.
     const canonical = document.createElement('link');

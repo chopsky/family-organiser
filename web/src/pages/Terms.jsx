@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { localeHomePath } from '../hooks/useLocale'
+import { setCanonical } from '../lib/seo'
 
 /**
  * Terms of Service page.
@@ -18,6 +19,7 @@ import { localeHomePath } from '../hooks/useLocale'
 export default function Terms() {
   useEffect(() => {
     document.title = 'Terms of Service | Housemait'
+    setCanonical('/terms')
     window.scrollTo(0, 0)
   }, [])
 

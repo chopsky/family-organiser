@@ -7,10 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#6B3FA0" />
     <meta name="description" content="Housemait - family organiser for modern households." />
+    <!-- Static homepage canonical. The apex (non-www) host is canonical
+         everywhere — it matches SITE_URL, the sitemap, and the hreflang
+         set. On the locale landing pages HreflangTags replaces this with
+         the correct per-route canonical; Support/Privacy/Terms set their
+         own via setCanonical(). Keep this host in sync with the Vercel
+         primary domain (apex, 308-redirecting www → apex). -->
+    <link rel="canonical" href="https://housemait.com/" />
     <meta property="og:title" content="Housemait - Family Organiser" />
     <meta property="og:description" content="Coordinate calendars, grocery lists, meal plans, tasks and more - all in one place for modern families." />
-    <meta property="og:image" content="https://www.housmait.com/housemait-logo2.png" />
-    <meta property="og:url" content="https://www.housmait.com" />
+    <meta property="og:image" content="https://housemait.com/housemait-logo2.png" />
+    <meta property="og:url" content="https://housemait.com/" />
     <meta property="og:type" content="website" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
