@@ -614,7 +614,7 @@ export default function LandingPage() {
       <nav className="top">
         <div className="wrap inner">
           <a className="logo" href="#">
-            <img src="/assets/logo.png" alt="housemait" />
+            <img src="/housemait-logo-web.svg" alt="housemait" />
           </a>
           <ul>
             {NAV_LINKS.map(l => (
@@ -1096,7 +1096,7 @@ export default function LandingPage() {
         <div className="wrap">
           <div className="fgrid">
             <div>
-              <img src="/assets/logo.png" alt="housemait" style={{ height: 26 }} />
+              <img src="/housemait-logo-web.svg" alt="housemait" style={{ height: 26 }} />
               <p className="tag">Family life, organised. AI-powered household management for {locale.audienceTagline}.</p>
               <div className="social">
                 <a href="https://linkedin.com/company/housemait/" target="_blank" rel="noopener noreferrer" aria-label="Housemait on LinkedIn">

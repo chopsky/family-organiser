@@ -34,7 +34,7 @@ export default function SubscribeCancel() {
           {/* Housemait logomark - matches /login + /signup. The house
               metaphor here ("nothing's changed, you're still home") still
               lands because the brand mark itself is a house. */}
-          <img src="/housemait-logomark.png" alt="Housemait" className="h-12 mx-auto mb-5" />
+          <img src="/housemait-logomark.svg" alt="Housemait" className="h-12 mx-auto mb-5" />
           <h1
             className="text-[28px] text-charcoal mb-2"
             style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, letterSpacing: '-0.02em' }}

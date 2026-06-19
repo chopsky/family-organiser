@@ -171,7 +171,7 @@ export default function SetupHousehold() {
           }}
           aria-hidden="true"
         >
-          <img src="/housemait-logomark.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          <img src="/housemait-logomark.svg" alt="" style={{ width: 36, height: 36, objectFit: 'contain' }} />
         </div>
 
         <h1

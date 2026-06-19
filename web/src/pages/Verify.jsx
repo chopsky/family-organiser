@@ -108,7 +108,7 @@ export default function Verify() {
               border: '1px solid rgba(107,63,160,0.18)',
             }}
           >
-            <img src="/housemait-logomark.png" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+            <img src="/housemait-logomark.svg" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
           </div>
         </Link>
 

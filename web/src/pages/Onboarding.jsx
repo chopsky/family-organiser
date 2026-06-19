@@ -213,7 +213,7 @@ export default function Onboarding() {
             }}
             aria-hidden="true"
           >
-            <img src="/housemait-logomark.png" alt="" style={{ width: 34, height: 34, objectFit: 'contain' }} />
+            <img src="/housemait-logomark.svg" alt="" style={{ width: 34, height: 34, objectFit: 'contain' }} />
           </div>
 
           <ErrorBanner message={error} onDismiss={() => setError('')} />
