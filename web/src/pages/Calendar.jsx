@@ -299,6 +299,7 @@ export default function Calendar() {
   const [members, setMembers] = useState([]);
   const { enabled: childMode } = useChildMode();
   const [schoolData, setSchoolData] = useState(null);
+  const [activitiesData, setActivitiesData] = useState(null);
   // Subscribed (read-only) external calendars. Used to colour their
   // events with the per-feed colour configured in Settings, so a
   // subscribed event reads visually distinct from a native Housemait
@@ -441,7 +442,8 @@ export default function Calendar() {
 
       const monthResults = await Promise.all(monthsToFetch.map(fetchMonth));
       const schoolFetch = schoolData ? Promise.resolve(null) : api.get('/schools').catch(() => null);
-      const freshSchoolData = await schoolFetch;
+      const activitiesFetch = activitiesData ? Promise.resolve(null) : api.get('/schools/activities').catch(() => null);
+      const [freshSchoolData, freshActivities] = await Promise.all([schoolFetch, activitiesFetch]);
 
       const allEvents = monthResults.flatMap(r => r.events);
       const allTasks = monthResults.flatMap(r => r.tasks);
@@ -476,6 +478,10 @@ export default function Calendar() {
       const schools = Array.isArray(rawSchools) ? rawSchools : [];
       if (freshSchoolData) setSchoolData(schools);
 
+      const rawActivities = freshActivities ? freshActivities.data?.activities : activitiesData;
+      const activities = Array.isArray(rawActivities) ? rawActivities : [];
+      if (freshActivities) setActivitiesData(activities);
+
       // Scope all school-derived events (term dates AND weekly activities) to
       // the exact months we fetched events for, so leak-through cells (days
       // from prev/next month shown in the grid when the 1st falls mid-week)
@@ -509,33 +515,42 @@ export default function Calendar() {
             _school: true,
           });
         }
-        for (const child of (school.children || [])) {
-          for (const act of (child.activities || [])) {
-            const start = new Date(firstY, firstM - 1, 1);
-            const end = new Date(lastY, lastM, 0); // day=0 → last day of (lastM)
-            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-              const jsDay = d.getDay();
-              const ourDay = (jsDay + 6) % 7;
-              if (ourDay === act.day_of_week) {
-                // Use local-date components, NOT toISOString - during BST,
-                // a `Date` for "Mon 4 May 00:00 local" is "Sun 3 May 23:00 UTC",
-                // so toISOString().split('T')[0] would return Sunday's date and
-                // the activity would render on the wrong day.
-                const dateStr = toDateStr(d);
-                schoolEvents.push({
-                  id: `act-${act.id}-${dateStr}`,
-                  title: `${child.name} - ${act.activity}`,
-                  start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
-                  end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
-                  all_day: !act.time_start,
-                  category: 'school',
-                  assigned_to_names: [child.name],
-                  color: child.color_theme || 'sky',
-                  _school: true,
-                  _activity: true,
-                });
-              }
-            }
+      }
+
+      // Weekly extracurriculars come from the flat, school-independent
+      // /schools/activities endpoint (every child's child_weekly_schedule,
+      // whether or not the child is linked to a school). The school-nested
+      // payload above only carries activities for children whose school_id
+      // matches a school, so a child with no linked school - the common case,
+      // since a child carries no school by default - would otherwise never
+      // surface here. Resolve each child_id to a member for the name + colour.
+      const memberById = new Map(members.map((m) => [m.id, m]));
+      for (const act of activities) {
+        const child = memberById.get(act.child_id);
+        if (!child) continue;
+        const start = new Date(firstY, firstM - 1, 1);
+        const end = new Date(lastY, lastM, 0); // day=0 → last day of (lastM)
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const jsDay = d.getDay();
+          const ourDay = (jsDay + 6) % 7;
+          if (ourDay === act.day_of_week) {
+            // Use local-date components, NOT toISOString - during BST,
+            // a `Date` for "Mon 4 May 00:00 local" is "Sun 3 May 23:00 UTC",
+            // so toISOString().split('T')[0] would return Sunday's date and
+            // the activity would render on the wrong day.
+            const dateStr = toDateStr(d);
+            schoolEvents.push({
+              id: `act-${act.id}-${dateStr}`,
+              title: `${child.name} - ${act.activity}`,
+              start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
+              end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
+              all_day: !act.time_start,
+              category: 'school',
+              assigned_to_names: [child.name],
+              color: child.color_theme || 'sky',
+              _school: true,
+              _activity: true,
+            });
           }
         }
       }
@@ -548,7 +563,7 @@ export default function Calendar() {
     } finally {
       setLoading(false);
     }
-  }, [currentMonth, selectedDate, viewMode]);
+  }, [currentMonth, selectedDate, viewMode, members]);
 
   useEffect(() => {
     setLoading(true);
