@@ -400,6 +400,7 @@ function buildSchoolTermsItem(locale) {
 function Showcase({ items }) {
   const [active, setActive] = useState(0)
   const trigRefs = useRef([])
+  const pinRef = useRef(null)
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -413,6 +414,33 @@ function Showcase({ items }) {
     trigRefs.current.forEach(el => el && obs.observe(el))
     return () => obs.disconnect()
   }, [items])
+
+  // Plain feature name for a dot's label — pulled from the eyebrow node
+  // (e.g. "Shared Calendar"), with a numeric fallback.
+  const dotLabel = (it, i) => {
+    const text = it?.eyebrow?.props?.children
+    return typeof text === 'string' ? text : `Feature ${i + 1}`
+  }
+
+  // Clicking a dot scrolls to the band of the pinned section where that
+  // feature is active. We compute the target manually and clamp it into
+  // the stage's pinned range rather than scrollIntoView-ing the trigger:
+  // each trigger is 80vh tall and trigger 0 sits at the pin's top, so
+  // centring it resolves to ~10vh ABOVE the pin, which un-sticks the
+  // stage and reads as an unwanted jump upward. Clamping the target to
+  // >= the pin's top keeps the stage pinned for every dot.
+  const goToFeature = (i) => {
+    const pin = pinRef.current
+    if (!pin || typeof window === 'undefined') return
+    const vh = window.innerHeight
+    const pinTop = pin.getBoundingClientRect().top + window.scrollY
+    const maxStick = pinTop + pin.offsetHeight - vh
+    // Trigger i (80vh tall) centres in the viewport at this scroll offset.
+    const target = pinTop + (i * 0.8 - 0.1) * vh
+    const clamped = Math.max(pinTop, Math.min(target, maxStick))
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: clamped, behavior: reduce ? 'auto' : 'smooth' })
+  }
 
   const Panel = ({ it }) => (
     <>
@@ -430,7 +458,7 @@ function Showcase({ items }) {
 
   return (
     <section className="section-white sec-block showcase" id="how">
-      <div className="showcase-pin">
+      <div className="showcase-pin" ref={pinRef}>
         <div className="showcase-stage">
           <div className="wrap showcase-grid">
             <div className="showcase-left">
@@ -448,6 +476,18 @@ function Showcase({ items }) {
               ))}
             </div>
           </div>
+          <nav className="showcase-dots" aria-label="Feature navigation">
+            {items.map((it, i) => (
+              <button
+                key={it.id}
+                type="button"
+                className={`showcase-dot${active === i ? ' on' : ''}`}
+                aria-label={`Go to ${dotLabel(it, i)}`}
+                aria-current={active === i ? 'true' : undefined}
+                onClick={() => goToFeature(i)}
+              />
+            ))}
+          </nav>
         </div>
         <div className="showcase-trigs" aria-hidden="true">
           {items.map((_, i) => (

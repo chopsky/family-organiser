@@ -726,6 +726,41 @@ section.showcase { padding: 0; }
 .showcase-mock .shot-wrap { width: 100%; }
 .showcase-trigs { position: absolute; inset: 0; pointer-events: none; }
 .showcase-trig { position: absolute; left: 0; right: 0; height: 80vh; pointer-events: none; }
+
+/* Bottom-centre pager that tracks the active feature in the pinned
+   scroll section. Sits inside .showcase-stage (sticky), so it stays put
+   while the features scrub past; hidden on mobile with .showcase-pin.
+   Inactive = neutral dot, active = widened plum pill. */
+.showcase-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  z-index: 4;
+}
+.showcase-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(27, 20, 36, .15);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: width .35s ease, background .35s ease, border-radius .35s ease;
+}
+.showcase-dot:hover { background: rgba(27, 20, 36, .35); }
+.showcase-dot.on { width: 30px; border-radius: 5px; background: var(--purple); }
+.showcase-dot.on:hover { background: var(--purple); }
+.showcase-dot:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .showcase-dot { transition: none; }
+}
+
 .showcase-mobile { display: none; }
 
 @media (max-width: 959px) {
