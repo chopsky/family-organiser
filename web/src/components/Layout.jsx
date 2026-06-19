@@ -262,7 +262,13 @@ export default function Layout({ children }) {
     ? navGroups.map((g) => ({ ...g, items: g.items.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)) })).filter((g) => g.items.length)
     : navGroups;
   const visibleMobileNav = childMode
-    ? [...mobileNav.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)), { to: '/rewards', label: 'Rewards', Icon: IconGift }]
+    ? [
+      ...mobileNav.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)),
+      { to: '/rewards', label: 'Rewards', Icon: IconGift },
+      // No More button in Child Mode, so Settings (PIN-gated, the exit path)
+      // gets its own tab.
+      { to: '/settings', label: 'Settings', Icon: IconSettings },
+    ]
     : mobileNav;
 
   return (
