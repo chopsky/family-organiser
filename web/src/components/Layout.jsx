@@ -275,7 +275,7 @@ export default function Layout({ children }) {
       >
         {/* Logo */}
         <div className="px-6 flex flex-wrap items-center gap-x-2.5 gap-y-1.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
-          <img src="/housemait-logo.svg" alt="HouseMait" className="h-6" />
+          <img src="/housemait-logo-web.svg" alt="Housemait" className="h-6 w-auto" />
           {childMode && <ChildModeChip />}
         </div>
 
@@ -328,7 +328,7 @@ export default function Layout({ children }) {
       >
         <div className="px-4 py-3 flex items-center justify-between">
           <Link to="/dashboard" className="shrink-0 flex items-center">
-            <img src="/housemait-logo2.png" alt="Housemait" className="max-w-[140px] h-auto" />
+            <img src="/housemait-logo-web.svg" alt="Housemait" className="h-6 w-auto" />
           </Link>
           {childMode && <ChildModeChip />}
           <Link to="/settings" className="shrink-0">
