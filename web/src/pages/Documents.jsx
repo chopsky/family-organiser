@@ -68,10 +68,10 @@ export default function Documents() {
   const [files, setFiles] = useState([]); // current folder's files, or recent-across-household at root
   const [breadcrumbs, setBreadcrumbs] = useState([]); // [{id, name}, ...]
   const [currentFolder, setCurrentFolder] = useState(null);
+  const [usage, setUsage] = useState(null); // file/folder counts for the header kicker
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [usage, setUsage] = useState(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState(null);
   const [renamingDoc, setRenamingDoc] = useState(null);
@@ -286,8 +286,6 @@ export default function Documents() {
         onChange={handleUpload}
       />
 
-      {usage && <div className="mb-5"><StorageBar usage={usage} /></div>}
-
       <Breadcrumbs breadcrumbs={breadcrumbs} onNavigate={navigateUp} />
 
       {error && (
@@ -385,26 +383,6 @@ export default function Documents() {
           onDownload={() => window.open(previewUrl, '_blank')}
         />
       )}
-    </div>
-  );
-}
-
-/* ─── Storage Bar ──────────────────────────────────────────────────────────── */
-
-function StorageBar({ usage }) {
-  const pct = Math.min((usage.totalBytes / usage.limitBytes) * 100, 100);
-  return (
-    <div>
-      <div className="flex items-center justify-between text-[11px] text-warm-grey mb-1">
-        <span>{formatFileSize(usage.totalBytes)} / {formatFileSize(usage.limitBytes)} used</span>
-        <span>{usage.fileCount} / {usage.limitFiles} files</span>
-      </div>
-      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: SOFT }}>
-        <div
-          className="h-full rounded-full transition-all duration-300"
-          style={{ width: `${pct}%`, backgroundColor: pct > 90 ? '#E8724A' : pct > 70 ? '#E0A458' : '#6B3FA0' }}
-        />
-      </div>
     </div>
   );
 }
