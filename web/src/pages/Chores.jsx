@@ -113,10 +113,12 @@ const menuItem = { display: 'flex', alignItems: 'center', gap: 9, width: '100%',
 
 // ── a single chore card — one unified compact layout for every member ───────
 function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReorder }) {
+  const { enabled: childMode } = useChildMode();
   const [hover, setHover] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const done = !!task.done?.[mid];
-  const dragProps = onReorder ? {
+  // Child Mode is complete-only: no reorder, edit or delete.
+  const dragProps = (onReorder && !childMode) ? {
     draggable: true,
     onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/chore', task.id); },
     onDragOver: (e) => { if (e.dataTransfer.types.includes('text/chore')) { e.preventDefault(); setDragOver(true); } },
@@ -142,11 +144,14 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
           {done && <Tick s={13} />}
         </span>
       </div>
-      {/* hover actions — absolutely positioned top-left so they never squeeze the title */}
-      <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
-        <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-        <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="left" />
-      </div>
+      {/* hover actions — absolutely positioned top-left so they never squeeze
+          the title. Hidden in Child Mode, which is complete-only. */}
+      {!childMode && (
+        <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
+          <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="left" />
+        </div>
+      )}
     </div>
   );
 }
@@ -174,6 +179,7 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
 
 // ── one member column ───────────────────────────────────────────────────────
 function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile }) {
+  const { enabled: childMode } = useChildMode();
   const hex = hexFor(m);
   const kid = isKid(m);
   // group tasks into slots
@@ -240,9 +246,11 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
             </div>
           </div>
         ))}
-        <button onClick={() => onAdd(m.id)} style={{ width: '100%', padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1px dashed ${hex}66`, color: hex, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <IcPlus s={14} w={2.2} c={hex} /> Add task
-        </button>
+        {!childMode && (
+          <button onClick={() => onAdd(m.id)} style={{ width: '100%', padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1px dashed ${hex}66`, color: hex, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <IcPlus s={14} w={2.2} c={hex} /> Add task
+          </button>
+        )}
       </div>
     </div>
   );
@@ -276,7 +284,7 @@ export default function Chores() {
   }, []);
 
   // iOS home-screen "Add Task" shortcut lands here with ?quickAdd=1.
-  useEffect(() => { if (searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams]);
+  useEffect(() => { if (!childMode && searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams, childMode]);
 
   // Close the people filter on an outside click (not on mouse-leave, which
   // would snap shut the moment the cursor crossed the gap to the menu).
@@ -432,7 +440,7 @@ export default function Chores() {
               <button onClick={() => setDayOffset(0)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 96 }}>{dayLabel}</button>
               <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
             </div>
-            <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })}>Add task</PillBtn>
+            {!childMode && <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })}>Add task</PillBtn>}
           </div>
         )}
       />
