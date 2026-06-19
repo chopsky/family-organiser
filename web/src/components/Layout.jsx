@@ -103,14 +103,6 @@ const moreTiles = [
     bg: '#E2ECFA',
     fg: '#5B8DE0',
   },
-  {
-    to: '/family',
-    label: 'Family',
-    sub: 'Members & settings',
-    Icon: IconUsers,
-    bg: '#FBE6EA',
-    fg: '#D8788A',
-  },
 ];
 
 // Account section rows. Notifications, Connected apps and Privacy &
@@ -119,8 +111,9 @@ const moreTiles = [
 // we don't yet deep-link cleanly. Help & support links to /help, which
 // hosts the FAQ + contact form (logged-out users have /support).
 const moreAccountRows = [
-  { to: '/settings', label: 'Settings', bold: true },
-  { to: '/help',     label: 'Help & support' },
+  { to: '/family',   label: 'Family Setup',   Icon: IconUsers },
+  { to: '/settings', label: 'Settings', bold: true, Icon: IconSettings },
+  { to: '/help',     label: 'Help & support', Icon: IconHelp },
 ];
 
 // Small non-interactive badge shown by the logo while Child Mode is active.
@@ -717,6 +710,9 @@ function MoreSheet({ onClose }) {
                 // borders unconditionally on the link/anchor rows.
                 const rowClasses = 'flex items-center px-4 py-3.5 border-b border-light-grey';
                 const labelClasses = `flex-1 text-[14px] text-charcoal ${row.bold ? 'font-semibold' : 'font-normal'}`;
+                const Leading = row.Icon ? (
+                  <row.Icon className="h-5 w-5 text-warm-grey mr-3 shrink-0" />
+                ) : null;
                 const Chevron = (
                   <IconChevronRight className="h-3.5 w-3.5 text-warm-grey/60 ml-2" />
                 );
@@ -724,6 +720,7 @@ function MoreSheet({ onClose }) {
                 if (row.href) {
                   return (
                     <a key={row.label} href={row.href} className={rowClasses}>
+                      {Leading}
                       <span className={labelClasses}>{row.label}</span>
                       {Chevron}
                     </a>
@@ -731,6 +728,7 @@ function MoreSheet({ onClose }) {
                 }
                 return (
                   <NavLink key={row.label} to={row.to} className={rowClasses}>
+                    {Leading}
                     <span className={labelClasses}>{row.label}</span>
                     {Chevron}
                   </NavLink>
