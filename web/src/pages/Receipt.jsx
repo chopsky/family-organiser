@@ -134,7 +134,7 @@ export default function Receipt() {
 
   if (!canWrite) {
     return (
-      <div className="max-w-[1100px] mx-auto">
+      <div className="mx-auto">
         <PageHeader title="Receipts" />
         <SubscribePrompt size="lg" message="Subscribe to scan receipts and auto-check shopping items" />
       </div>
@@ -142,7 +142,7 @@ export default function Receipt() {
   }
 
   return (
-    <div className="max-w-[1100px] mx-auto pb-24">
+    <div className="mx-auto pb-24">
       <PageHeader
         kicker={receipts.length ? `${receipts.length} saved · ${symbol}${totalSpend.toFixed(2)}` : 'No receipts yet'}
         title="Receipts"
