@@ -521,7 +521,7 @@ function MealPlanView({ setError }) {
           {/* Weekly grid - desktop only on screen, always visible in print */}
           <div className="hidden md:block print:block bg-linen rounded-2xl  border border-cream-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] border-collapse">
+              <table className="w-full min-w-[700px] border-collapse table-fixed">
                 <thead>
                   <tr>
                     <th className="w-[120px] py-3 px-3 border-b border-light-grey" />
