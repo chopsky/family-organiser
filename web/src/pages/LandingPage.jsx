@@ -777,7 +777,7 @@ export default function LandingPage() {
             </div>
             <div className="sticker s1">
               <div className="ic">✓</div>
-              <div>Beef sausages<br /><span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>Added to shopping list</span></div>
+              <div>Bananas<br /><span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>Added to shopping list</span></div>
             </div>
             <div className="sticker s2">
               <div className="ic">🍝</div>
@@ -929,7 +929,7 @@ export default function LandingPage() {
                   WhatsApp AI Assistant
                 </span>
                 <h3 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 'clamp(36px,4.4vw,56px)', lineHeight: 1.05, letterSpacing: '-.015em', margin: '18px 0' }}>
-                  Your family's AI assistant, <em style={{ fontStyle: 'italic', color: 'var(--purple)' }}>right in WhatsApp.</em>
+                  Your family's assistant, <em style={{ fontStyle: 'italic', color: 'var(--purple)' }}>right in WhatsApp.</em>
                 </h3>
                 <p style={{ color: 'var(--ink-soft)', fontSize: 17, maxWidth: 480, margin: 0 }}>
                   Your family already lives in WhatsApp, so Housemait does too. No new app for the household to ignore: message the bot the way you'd message each other, and everything lands in the right place, filed and remembered.
