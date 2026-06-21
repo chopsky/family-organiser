@@ -527,19 +527,27 @@ function Showcase({ items }) {
  * QR is the affordance. type="button" keeps it Tab-focusable, so
  * keyboard users can also reveal the popover via :focus-within.
  */
-function DownloadQR() {
+function DownloadQR({ preferUp = false }) {
   const wrapperRef = useRef(null)
-  const [placement, setPlacement] = useState('bottom')
+  const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
 
   const recompute = () => {
     const el = wrapperRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    // ~200 = popover height (182) + gap (12) + small buffer. If less
-    // than that fits below the button before the viewport edge, flip
-    // the popover above the button instead.
-    const spaceBelow = window.innerHeight - rect.bottom
-    setPlacement(spaceBelow < 200 ? 'top' : 'bottom')
+    // ~200 = popover height (182) + gap (12) + small buffer.
+    const NEED = 200
+    if (preferUp) {
+      // Used inside the bottom CTA card, which has overflow:hidden — a
+      // downward popover would be clipped by the card edge. Open upward
+      // (into the card, over the heading) and only fall back to below if
+      // there genuinely isn't room above.
+      setPlacement(rect.top < NEED ? 'bottom' : 'top')
+    } else {
+      // If less than NEED fits below the button before the viewport edge,
+      // flip the popover above the button instead.
+      setPlacement(window.innerHeight - rect.bottom < NEED ? 'top' : 'bottom')
+    }
   }
 
   return (
@@ -1119,7 +1127,7 @@ export default function LandingPage() {
               <h2>Try Housemait <em>free</em><br />for 30&nbsp;days.</h2>
               <p>Set Housemait up in under 5 minutes. Your calmer family life starts here.</p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                {APP_STORE_CONFIGURED && <DownloadQR />}
+                {APP_STORE_CONFIGURED && <DownloadQR preferUp />}
                 {!iosVisitor && (
                   <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
                     Try it on the web
