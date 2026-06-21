@@ -712,15 +712,15 @@ export default function LandingPage() {
           <div>
             <span className="eyebrow">
               <span className="dot" style={{ background: '#25D366', boxShadow: '0 0 0 4px rgba(37,211,102,.22)' }} />
-              New · WhatsApp AI assistant for your household
+              New · WhatsApp assistant for your household
             </span>
             <h1 className="display">
               The quiet hum<br />
-              of <em>family life</em><br />
-              made easy&nbsp;with&nbsp;AI.
+              of <em>family life</em>,<br />
+              made&nbsp;easy.
             </h1>
             <p className="lede">
-              Housemait is the AI assistant that restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
+              Housemait restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
             </p>
             <div className="hero-cta">
               {/* Hero CTA — the styled "Download on the App Store" pill
