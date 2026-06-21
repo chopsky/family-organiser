@@ -14,14 +14,6 @@ const NAV_LINKS = [
   { label: 'FAQ', href: '#faq' },
 ]
 
-const QUICK_CHIPS = [
-  { label: 'Calendar', color: 'var(--purple)' },
-  { label: 'Shopping', color: 'var(--sage)' },
-  { label: 'Tasks', color: 'var(--coral)' },
-  { label: 'Meal plan', color: 'var(--butter)' },
-  { label: 'Documents', color: 'var(--pink)' },
-]
-
 /** Build the FAQ list with pricing strings interpolated from the active
  *  locale. Most answers don't reference price/region, so they're shared
  *  verbatim across locales; only the pricing answer varies. */
@@ -740,14 +732,6 @@ export default function LandingPage() {
             </div>
             <div className="hero-price">
               Free 30-day trial. No card to start. Cancel anytime.
-            </div>
-            <div className="quicks">
-              {QUICK_CHIPS.map(c => (
-                <span className="chip" key={c.label}>
-                  <span className="cdot" style={{ background: c.color }} />
-                  {c.label}
-                </span>
-              ))}
             </div>
           </div>
 
