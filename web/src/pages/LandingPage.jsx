@@ -693,6 +693,7 @@ export default function LandingPage() {
           {NAV_LINKS.map(l => (
             <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)}>{l.label}</a>
           ))}
+          <a href={SIGNIN_URL} onClick={() => setMenuOpen(false)}>Sign in</a>
           {/* On iPhone visitors we still drop the trial CTA from the mobile
               menu — they're pushed toward the App Store instead (hero badge +
               'Get Housemait' FAB) and an in-Safari signup would just create an
@@ -702,7 +703,6 @@ export default function LandingPage() {
           {!iosVisitor && (
             <a href={SIGNUP_URL} className="btn btn-primary" style={{ marginTop: 12, justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Start 30-day free trial</a>
           )}
-          <a href={SIGNIN_URL} onClick={() => setMenuOpen(false)}>Sign in</a>
         </div>
       </nav>
 
