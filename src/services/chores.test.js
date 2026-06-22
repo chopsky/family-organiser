@@ -69,4 +69,13 @@ describe('buildDayView', () => {
     const view = buildDayView(defs, completions, date);
     expect(view.find((d) => d.id === 'd2').done).toEqual({ m: false });
   });
+
+  test('anyone defs carry a shared completed flag + completed_by, not per-member done', () => {
+    const anyoneDefs = [{ id: 'a1', repeat: 'daily', anyone: true, assignee_ids: [], position: 0, created_at: '2026-01-01' }];
+    // unclaimed
+    expect(buildDayView(anyoneDefs, [], date)[0]).toMatchObject({ id: 'a1', completed: false, completed_by: null, done: {} });
+    // claimed by 'm' (the attributed completer)
+    const claimed = buildDayView(anyoneDefs, [{ definition_id: 'a1', member_id: 'm' }], date)[0];
+    expect(claimed).toMatchObject({ completed: true, completed_by: 'm', done: {} });
+  });
 });

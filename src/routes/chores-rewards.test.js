@@ -35,6 +35,7 @@ beforeEach(() => {
   db.getChoreDefinitions.mockResolvedValue([REWARD_DEF]);
   db.getStarBalances.mockResolvedValue({ m: 5 });
   db.addChoreCompletion.mockResolvedValue({ inserted: true });
+  db.getChoreCompletionsForDate.mockResolvedValue([]);
   db.removeChoreCompletion.mockResolvedValue();
   db.addStarTransaction.mockResolvedValue({ applied: true });
   db.removeStarTransactionByRef.mockResolvedValue();
@@ -58,9 +59,12 @@ describe('POST /api/chores/:id/complete', () => {
     expect(db.addStarTransaction).not.toHaveBeenCalled();
   });
 
-  test('an adult (account holder) completing a reward chore earns nothing', async () => {
-    await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'g', date: DATE, done: true });
-    expect(db.addStarTransaction).not.toHaveBeenCalled();
+  test('an adult (account holder) completing a reward chore now earns its stars too', async () => {
+    const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'g', date: DATE, done: true });
+    expect(res.status).toBe(200);
+    expect(db.addStarTransaction).toHaveBeenCalledWith(expect.objectContaining({
+      memberId: 'g', delta: 5, reason: 'earn', refType: 'chore_earn', refId: 'd1:g:2026-04-18',
+    }));
   });
 
   test('un-completing refunds by removing the earn ledger entry', async () => {
@@ -79,6 +83,34 @@ describe('POST /api/chores/:id/complete', () => {
   test('missing date is rejected', async () => {
     const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', done: true });
     expect(res.status).toBe(400);
+  });
+
+  describe('"Anyone" chores', () => {
+    const ANYONE = { id: 'a1', anyone: true, assignee_ids: [], reward: true, stars: 3 };
+    beforeEach(() => { db.getChoreDefinitions.mockResolvedValue([ANYONE]); });
+
+    test('any member (even one not assigned) can claim it and is credited', async () => {
+      const res = await request(chores()).post('/api/chores/a1/complete').send({ member_id: 'g', date: DATE, done: true });
+      expect(res.status).toBe(200);
+      expect(db.addChoreCompletion).toHaveBeenCalledWith('a1', 'g', 'h1', DATE);
+      expect(db.addStarTransaction).toHaveBeenCalledWith(expect.objectContaining({
+        memberId: 'g', delta: 3, reason: 'earn', refType: 'chore_earn', refId: 'a1:g:2026-04-18',
+      }));
+    });
+
+    test('a second claim once already completed is a no-op (no double credit)', async () => {
+      db.getChoreCompletionsForDate.mockResolvedValue([{ definition_id: 'a1', member_id: 'm' }]);
+      const res = await request(chores()).post('/api/chores/a1/complete').send({ member_id: 'g', date: DATE, done: true });
+      expect(res.status).toBe(200);
+      expect(db.addChoreCompletion).not.toHaveBeenCalled();
+      expect(db.addStarTransaction).not.toHaveBeenCalled();
+    });
+
+    test('un-claiming refunds the attributed completer', async () => {
+      await request(chores()).post('/api/chores/a1/complete').send({ member_id: 'g', date: DATE, done: false });
+      expect(db.removeChoreCompletion).toHaveBeenCalledWith('a1', 'g', DATE, 'h1');
+      expect(db.removeStarTransactionByRef).toHaveBeenCalledWith('chore_earn', 'a1:g:2026-04-18');
+    });
   });
 });
 

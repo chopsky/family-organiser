@@ -7200,7 +7200,7 @@ async function updateSubscriptionRenewal(id, nextRenewalAt, remindedForDate, db 
 // tracked per member per day. See src/services/chores.js for the day-view
 // generation (appliesOn / buildDayView). Lives apart from the `tasks` table.
 
-const CHORE_DEF_COLS = 'id, household_id, title, emoji, type, assignee_ids, whens, repeat, days, due_date, start_date, due_time, reward, stars, position, created_by, created_at, archived_at';
+const CHORE_DEF_COLS = 'id, household_id, title, emoji, type, anyone, assignee_ids, whens, repeat, days, due_date, start_date, due_time, reward, stars, position, created_by, created_at, archived_at';
 
 async function addChoreDefinition(householdId, def, createdBy, db = supabase) {
   const row = {
@@ -7208,6 +7208,7 @@ async function addChoreDefinition(householdId, def, createdBy, db = supabase) {
     title: def.title,
     emoji: def.emoji || null,
     type: def.type || 'chore',
+    anyone: !!def.anyone,
     assignee_ids: def.assignee_ids || [],
     whens: def.whens || [],
     repeat: def.repeat || 'daily',
@@ -7239,7 +7240,7 @@ async function getChoreDefinitions(householdId, db = supabase) {
 
 async function updateChoreDefinition(id, householdId, updates, db = supabase) {
   const allowed = {};
-  for (const k of ['title', 'emoji', 'type', 'assignee_ids', 'whens', 'repeat', 'days', 'due_date', 'start_date', 'due_time', 'reward', 'stars', 'position']) {
+  for (const k of ['title', 'emoji', 'type', 'anyone', 'assignee_ids', 'whens', 'repeat', 'days', 'due_date', 'start_date', 'due_time', 'reward', 'stars', 'position']) {
     if (k in updates) allowed[k] = updates[k];
   }
   if ('reward' in allowed && !allowed.reward) allowed.stars = 0; // clearing reward zeroes stars

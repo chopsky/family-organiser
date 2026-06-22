@@ -54,6 +54,13 @@ function buildDayView(defs, completions, dateStr) {
   return (defs || [])
     .filter((d) => appliesOn(d, dateStr))
     .map((d) => {
+      // "Anyone" chores have no per-assignee state: a single shared completion
+      // (the attributed completer) marks the whole chore done for the day.
+      if (d.anyone) {
+        const who = doneByDef.get(d.id);
+        const completedBy = who && who.size ? [...who][0] : null;
+        return { ...d, done: {}, completed: !!completedBy, completed_by: completedBy };
+      }
       const doneSet = doneByDef.get(d.id) || new Set();
       const done = {};
       for (const mid of d.assignee_ids || []) done[mid] = doneSet.has(mid);

@@ -96,7 +96,10 @@ export default function Rewards() {
   const [modal, setModal] = useState(false);
   const isMobile = useIsMobile();
 
-  const kids = members.filter(isKid);
+  // Everyone earns + redeems stars now. In Child Mode the device is locked to
+  // kids, so we still show only dependents there (a kid shouldn't spend a
+  // parent's stars); in full mode every member appears.
+  const earners = childMode ? members.filter(isKid) : members;
   const pending = redemptions.filter((r) => !r.fulfilled).length;
 
   const load = useCallback(async () => {
@@ -110,7 +113,7 @@ export default function Rewards() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => { try { const m = await load(); if (!cancelled) setFocusKid((m.find(isKid) || {}).id || null); } catch { /* empty */ } finally { if (!cancelled) setLoading(false); } })();
+    (async () => { try { const m = await load(); if (!cancelled) setFocusKid((m[0] || {}).id || null); } catch { /* empty */ } finally { if (!cancelled) setLoading(false); } })();
     return () => { cancelled = true; };
   }, [load]);
 
@@ -175,15 +178,15 @@ export default function Rewards() {
 
       {loading ? (
         <Center>Loading…</Center>
-      ) : kids.length === 0 ? (
-        <Center>Add a child to your family to start the star economy.</Center>
+      ) : earners.length === 0 ? (
+        <Center>Add family members to start the star economy.</Center>
       ) : (effView === 'redeemed' && !childMode) ? (
         <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} />
       ) : effView === 'focused' ? (
-        <Focused kids={kids} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} />
+        <Focused kids={earners} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
-          {kids.map((k) => {
+          {earners.map((k) => {
             const hex = hexFor(k);
             return (
               <div key={k.id} style={{ flex: '0 0 320px', minWidth: 320, background: hex + '12', borderRadius: 24, padding: '18px 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -210,7 +213,7 @@ export default function Rewards() {
         </div>
       )}
 
-      {modal && <RewardModal reward={modal === 'add' ? null : modal} onClose={() => setModal(false)} onSave={saveReward} kids={kids} />}
+      {modal && <RewardModal reward={modal === 'add' ? null : modal} onClose={() => setModal(false)} onSave={saveReward} kids={earners} />}
     </div>
   );
 }
@@ -307,7 +310,7 @@ function RewardModal({ onClose, onSave, kids, reward }) {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>For</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Chip on={who === 'any'} onClick={() => setWho('any')}>Any child</Chip>
+              <Chip on={who === 'any'} onClick={() => setWho('any')}>Anyone</Chip>
               {kids.map((k) => <Chip key={k.id} on={who === k.id} onClick={() => setWho(k.id)}>{k.name}</Chip>)}
             </div>
           </div>

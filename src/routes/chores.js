@@ -23,11 +23,14 @@ async function householdToday(householdId) {
 // Validate + normalise an incoming definition body. Returns { def } or { error }.
 function normaliseDef(body, memberIds) {
   if (!body || typeof body.title !== 'string' || !body.title.trim()) return { error: 'title is required' };
-  const type = VALID_TYPES.includes(body.type) ? body.type : 'chore';
+  // "Anyone" chores are up-for-grabs: no assignee, always a chore (not a
+  // routine). The completer is chosen at check-off time, not here.
+  const anyone = !!body.anyone;
+  const type = anyone ? 'chore' : (VALID_TYPES.includes(body.type) ? body.type : 'chore');
   const repeat = VALID_REPEATS.includes(body.repeat) ? body.repeat : 'daily';
-  const assignee_ids = Array.isArray(body.assignee_ids)
+  const assignee_ids = (!anyone && Array.isArray(body.assignee_ids))
     ? body.assignee_ids.filter((id) => memberIds.includes(id)) : [];
-  const whens = type === 'routine' && Array.isArray(body.whens)
+  const whens = (!anyone && type === 'routine' && Array.isArray(body.whens))
     ? body.whens.filter((w) => VALID_WHENS.includes(w)) : [];
   const days = repeat === 'weekly' && Array.isArray(body.days)
     ? body.days.filter((d) => VALID_DAYS.includes(d)) : [];
@@ -38,7 +41,7 @@ function normaliseDef(body, memberIds) {
   const stars = reward ? Math.max(0, Math.min(999, parseInt(body.stars, 10) || 0)) : 0;
   return {
     def: {
-      title: body.title.trim(), emoji: body.emoji || null, type, assignee_ids, whens, repeat, days,
+      title: body.title.trim(), emoji: body.emoji || null, type, anyone, assignee_ids, whens, repeat, days,
       due_date: repeat === 'once' ? (body.due_date || null) : null,
       start_date: body.start_date || null,
       due_time: body.due_time || null,
@@ -162,21 +165,34 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
     const defs = await db.getChoreDefinitions(req.householdId);
     const def = defs.find((d) => d.id === req.params.id);
     if (!def) return res.status(404).json({ error: 'Task not found' });
-    if (!(def.assignee_ids || []).includes(memberId)) return res.status(400).json({ error: 'Task not assigned to this member' });
+    // Assigned chores must be completed by one of their assignees; "Anyone"
+    // chores accept any household member as the attributed completer (chosen in
+    // the "Who completed this task?" popup).
+    if (!def.anyone && !(def.assignee_ids || []).includes(memberId)) {
+      return res.status(400).json({ error: 'Task not assigned to this member' });
+    }
 
-    const isKid = member.member_type === 'dependent';
     const refId = `${def.id}:${memberId}:${date}`;
 
     // The completion write is the source of truth for the toggle. The star
     // ledger + balance steps below are best-effort: a ledger hiccup must not
     // 500 the request, or the client would revert a toggle that actually saved.
     if (done) {
-      const { inserted } = await db.addChoreCompletion(def.id, memberId, req.householdId, date);
-      // Credit stars only on a NEW completion (insert) so repeat taps can't double-credit.
-      if (inserted && isKid && def.reward && def.stars > 0) {
-        try {
-          await db.addStarTransaction({ householdId: req.householdId, memberId, delta: def.stars, reason: 'earn', refType: 'chore_earn', refId });
-        } catch (e) { console.warn('chore complete: star credit failed (non-fatal):', e.message); }
+      // An "Anyone" chore is claimed once per day: if someone already completed
+      // it, ignore further claims so a second member can't double-credit stars.
+      let alreadyClaimed = false;
+      if (def.anyone) {
+        const dayCompletions = await db.getChoreCompletionsForDate(req.householdId, date);
+        alreadyClaimed = (dayCompletions || []).some((c) => c.definition_id === def.id);
+      }
+      if (!alreadyClaimed) {
+        const { inserted } = await db.addChoreCompletion(def.id, memberId, req.householdId, date);
+        // Credit stars only on a NEW completion (insert) so repeat taps can't double-credit.
+        if (inserted && def.reward && def.stars > 0) {
+          try {
+            await db.addStarTransaction({ householdId: req.householdId, memberId, delta: def.stars, reason: 'earn', refType: 'chore_earn', refId });
+          } catch (e) { console.warn('chore complete: star credit failed (non-fatal):', e.message); }
+        }
       }
     } else {
       await db.removeChoreCompletion(def.id, memberId, date, req.householdId);

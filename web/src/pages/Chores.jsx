@@ -12,6 +12,7 @@ import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useChildMode } from '../context/ChildModeContext';
+import { useAuth } from '../context/AuthContext';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
 
 // Design-handoff tokens (page-local; member colours come from each record).
@@ -112,11 +113,14 @@ function DeleteMenu({ task, onDelete, onSkip, align = 'right' }) {
 const menuItem = { display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 8px', borderRadius: 9, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, color: INK, textAlign: 'left' };
 
 // ── a single chore card — one unified compact layout for every member ───────
-function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReorder }) {
+function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReorder, anyone, members }) {
   const { enabled: childMode } = useChildMode();
   const [hover, setHover] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const done = !!task.done?.[mid];
+  // "Anyone" chores have a single shared done state plus an attributed
+  // completer; assigned chores are done per-member.
+  const done = anyone ? !!task.completed : !!task.done?.[mid];
+  const completer = (anyone && done && members) ? members.find((m) => m.id === task.completed_by) : null;
   // Child Mode is complete-only: no reorder, edit or delete.
   const dragProps = (onReorder && !childMode) ? {
     draggable: true,
@@ -140,6 +144,7 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
             {task.reward && task.stars ? <span style={{ marginTop: 4, display: 'inline-flex' }}><StarPill n={task.stars} small /></span> : null}
           </div>
         </div>
+        {completer && <Avatar member={completer} size={26} />}
         <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
           {done && <Tick s={13} />}
         </span>
@@ -181,7 +186,6 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
 function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile }) {
   const { enabled: childMode } = useChildMode();
   const hex = hexFor(m);
-  const kid = isKid(m);
   // group tasks into slots
   const groups = SLOT_ORDER.map((key) => ({
     key, meta: SLOT_META[key],
@@ -222,7 +226,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: '#fff', fontSize: 11.5, fontWeight: 700, color: INK2 }}>
               <Tick s={11} c={INK2} />{done}/{total}
             </span>
-            {kid && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 9px', borderRadius: 99, background: STAR_BG, fontSize: 11.5, fontWeight: 700, color: '#A9772A' }}><StarFill s={12} />{balance || 0}</span>}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 9px', borderRadius: 99, background: STAR_BG, fontSize: 11.5, fontWeight: 700, color: '#A9772A' }}><StarFill s={12} />{balance || 0}</span>
           </div>
         </div>
       </div>
@@ -256,6 +260,71 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
   );
 }
 
+// ── the "Anyone" column — up-for-grabs chores any member can claim ──────────
+function AnyoneColumn({ tasks, members, onClaim, onEdit, onDelete, onSkip, onAdd, mobile }) {
+  const { enabled: childMode } = useChildMode();
+  const tint = BRAND;
+  const total = tasks.length;
+  const done = tasks.filter((t) => t.completed).length;
+  return (
+    <div style={{ flex: mobile ? 'none' : '0 0 300px', width: mobile ? '100%' : undefined, minWidth: mobile ? 0 : 300, background: BRAND_SOFT, borderRadius: 24, padding: '18px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* header (pinned) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
+        <span style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: tint, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={24} c="#fff" /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>Anyone</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: '#fff', fontSize: 11.5, fontWeight: 700, color: INK2 }}>
+              <Tick s={11} c={INK2} />{done}/{total}
+            </span>
+          </div>
+        </div>
+      </div>
+      {/* chores list (scrolls on desktop; the page scrolls on mobile) */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: mobile ? 'visible' : 'auto', overflowX: 'hidden', margin: '0 -4px', padding: '0 4px 2px' }}>
+        {total === 0 && <div style={{ padding: '20px 4px', fontSize: 13, color: INK3, fontStyle: 'italic', textAlign: 'center' }}>No up-for-grabs chores yet</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {tasks.map((t) => <ChoreCard key={t.id} task={t} tint={tint} anyone members={members} onToggle={onClaim} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} />)}
+        </div>
+        {!childMode && (
+          <button onClick={() => onAdd()} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1px dashed ${tint}66`, color: tint, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <IcPlus s={14} w={2.2} c={tint} /> Add chore
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── "Who completed this task?" — attribution popup for an Anyone chore ──────
+function WhoCompletedModal({ task, members, currentUserId, onClose, onPick }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 420, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: INK }}>Who completed this task?</h2>
+          <button onClick={onClose} aria-label="Close" style={{ ...cardBtn, width: 34, height: 34, flexShrink: 0 }}><IcClose s={18} c={INK2} /></button>
+        </div>
+        <div style={{ fontSize: 13, color: INK3, marginBottom: 18 }}>
+          {task.title}{task.reward && task.stars ? <> · <span style={{ color: '#A9772A', fontWeight: 700 }}>{task.stars} ★</span></> : null}
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {members.map((m) => {
+            const me = m.id === currentUserId;
+            return (
+              <button key={m.id} onClick={() => onPick(m.id)} title={m.name}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, width: 78, padding: '10px 4px', borderRadius: 16, border: me ? `1.5px solid ${hexFor(m)}` : `1px solid ${LINE}`, background: '#fff', cursor: 'pointer' }}>
+                <Avatar member={m} size={48} />
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: INK, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>{m.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── page ────────────────────────────────────────────────────────────────────
 export default function Chores() {
   const [members, setMembers] = useState([]);
@@ -266,8 +335,10 @@ export default function Chores() {
   const [visibleIds, setVisibleIds] = useState(null); // null = everyone
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef(null);
-  const [modal, setModal] = useState(null); // { mode, task?, defaultWho? }
+  const [modal, setModal] = useState(null); // { mode, task?, defaultWho?, anyone? }
   const [celebrate, setCelebrate] = useState(null); // { member, balance }
+  const [claim, setClaim] = useState(null); // anyone chore awaiting "who completed?"
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
@@ -329,9 +400,9 @@ export default function Chores() {
     const member = members.find((m) => m.id === mid);
     const nextTasks = tasks.map((t) => (t.id === task.id ? { ...t, done: { ...t.done, [mid]: next } } : t));
     setTasks(nextTasks);
-    // Celebrate when a kid completes the LAST of their rewarded tasks for the day.
+    // Celebrate when a member completes the LAST of their rewarded tasks for the day.
     const rewardTasks = nextTasks.filter((t) => (t.assignee_ids || []).includes(mid) && t.reward);
-    const justFinishedAll = next && task.reward && isKid(member) && rewardTasks.length > 0 && rewardTasks.every((t) => t.done?.[mid]);
+    const justFinishedAll = next && task.reward && rewardTasks.length > 0 && rewardTasks.every((t) => t.done?.[mid]);
     try {
       const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: mid, date: selDateStr, done: next });
       if (data.balances) setBalances(data.balances);
@@ -373,17 +444,43 @@ export default function Chores() {
     } catch (e) { alert(e.response?.data?.error || 'Could not save the task.'); }
   }, [selDateStr, loadDay]);
 
+  // Anyone chores: a single shared completion attributed to the chosen member,
+  // who is credited any stars. Optimistic, then persisted.
+  const setAnyoneDone = useCallback(async (task, memberId, done) => {
+    setTasks((ts) => ts.map((t) => (t.id === task.id ? { ...t, completed: done, completed_by: done ? memberId : null } : t)));
+    try {
+      const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: memberId, date: selDateStr, done });
+      if (data.balances) setBalances(data.balances);
+    } catch { loadDay(selDateStr); }
+  }, [selDateStr, loadDay]);
+
+  // Tap an Anyone chore: if already done, uncheck it (refunds the completer);
+  // otherwise open the "Who completed this task?" popup to attribute it.
+  const claimAnyone = useCallback((task) => {
+    if (task.completed) setAnyoneDone(task, task.completed_by, false);
+    else setClaim(task);
+  }, [setAnyoneDone]);
+
   // Child Mode shows only dependents across the board (columns, mobile pills,
   // swipe). loadDay/tasksFor still operate on real ids.
   const baseMembers = childMode ? members.filter(isKid) : members;
   const shown = visibleIds ? baseMembers.filter((m) => visibleIds.includes(m.id)) : baseMembers;
+  // The up-for-grabs "Anyone" chores get their own column. Parents always see
+  // it (so they can add to it); in Child Mode it only appears once it has
+  // chores to claim.
+  const anyoneTasks = tasks.filter((t) => t.anyone);
+  const showAnyone = !childMode || anyoneTasks.length > 0;
+  // Mobile selectables = member pills + an "Anyone" pill (id 'anyone').
+  const selectables = showAnyone ? [...baseMembers, { id: 'anyone' }] : baseMembers;
+  const anyoneActive = activeWho === 'anyone' && showAnyone;
   const activeMember = baseMembers.find((m) => m.id === activeWho) || baseMembers[0];
-  // Mobile: change the shown member, remembering travel direction so the new
+  const selectedId = anyoneActive ? 'anyone' : activeMember?.id;
+  // Mobile: change the shown column, remembering travel direction so the new
   // column slides in from the correct side.
   const goToMember = (id) => {
     if (!id) return;
-    const cur = baseMembers.findIndex((m) => m.id === activeMember?.id);
-    const nxt = baseMembers.findIndex((m) => m.id === id);
+    const cur = selectables.findIndex((m) => m.id === selectedId);
+    const nxt = selectables.findIndex((m) => m.id === id);
     if (nxt === -1) return;
     setSlideDir(nxt > cur ? 1 : nxt < cur ? -1 : 0);
     setActiveWho(id);
@@ -395,11 +492,11 @@ export default function Chores() {
     const t = e.changedTouches[0];
     const dx = t.clientX - s.x, dy = t.clientY - s.y;
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignore vertical scrolls / taps
-    const idx = baseMembers.findIndex((m) => m.id === activeMember?.id);
+    const idx = selectables.findIndex((m) => m.id === selectedId);
     const next = idx + (dx < 0 ? 1 : -1);
-    if (next >= 0 && next < baseMembers.length) goToMember(baseMembers[next].id);
+    if (next >= 0 && next < selectables.length) goToMember(selectables[next].id);
   };
-  const tasksFor = (mid) => tasks.filter((t) => (t.assignee_ids || []).includes(mid));
+  const tasksFor = (mid) => tasks.filter((t) => !t.anyone && (t.assignee_ids || []).includes(mid));
   const toggleVisible = (id) => setVisibleIds((prev) => {
     const cur = prev || members.map((m) => m.id);
     const nextArr = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
@@ -467,8 +564,24 @@ export default function Chores() {
                 </button>
               );
             })}
+            {showAnyone && (
+              <button onClick={() => goToMember('anyone')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, flexShrink: 0, border: anyoneActive ? `1.5px solid ${BRAND}` : `1px solid ${LINE}`, background: anyoneActive ? '#fff' : 'transparent' }}>
+                <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: BRAND, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={16} c="#fff" /></span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: INK, lineHeight: 1.1 }}>Anyone</span>
+                  <span style={{ fontSize: 10.5, color: INK3 }}>{anyoneTasks.filter((t) => t.completed).length}/{anyoneTasks.length}</span>
+                </span>
+              </button>
+            )}
           </div>
-          {activeMember && (
+          {anyoneActive ? (
+            <div key="anyone" onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
+              style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
+              <AnyoneColumn tasks={anyoneTasks} members={members} mobile onClaim={claimAnyone}
+                onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip}
+                onAdd={() => setModal({ mode: 'add', anyone: true })} />
+            </div>
+          ) : activeMember && (
             <div key={activeMember.id} onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile
@@ -482,11 +595,17 @@ export default function Chores() {
             <MemberColumn key={m.id} m={m} balance={balances[m.id]} tasks={tasksFor(m.id)}
               onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
           ))}
+          {showAnyone && (
+            <AnyoneColumn tasks={anyoneTasks} members={members} onClaim={claimAnyone}
+              onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip}
+              onAdd={() => setModal({ mode: 'add', anyone: true })} />
+          )}
         </div>
       )}
 
       {modal && <TaskModal modal={modal} members={members} onClose={() => setModal(null)} onSave={handleSave} />}
       {celebrate && <Celebration data={celebrate} onClose={() => setCelebrate(null)} onGo={() => { setCelebrate(null); navigate('/rewards'); }} />}
+      {claim && <WhoCompletedModal task={claim} members={members} currentUserId={user?.id} onClose={() => setClaim(null)} onPick={(mid) => { setAnyoneDone(claim, mid, true); setClaim(null); }} />}
     </div>
   );
 }
@@ -540,17 +659,23 @@ function TaskModal({ modal, members, onClose, onSave }) {
   const [reward, setReward] = useState(!!t.reward);
   const [stars, setStars] = useState(t.stars || 5);
 
-  const anyKid = members.some((m) => assignees.includes(m.id) && isKid(m));
+  // "Anyone" chores carry no assignee and are always a chore (not a routine);
+  // the completer is chosen at check-off. Adults earn stars too now, so any
+  // assignee (or an anyone chore) can carry a reward.
+  const isAnyone = !!(modal.anyone || t.anyone);
+  const rewardable = isAnyone || assignees.length > 0;
   const toggleIn = (arr, set, v) => set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
   const submit = () => {
     if (!title.trim()) return;
     onSave({
-      id: t.id, title: title.trim(), emoji: emoji || null, type,
-      assignee_ids: assignees, whens: type === 'routine' ? whens : [],
+      id: t.id, title: title.trim(), emoji: emoji || null,
+      type: isAnyone ? 'chore' : type, anyone: isAnyone,
+      assignee_ids: isAnyone ? [] : assignees,
+      whens: (!isAnyone && type === 'routine') ? whens : [],
       repeat, days: repeat === 'weekly' ? days : [],
       start_date: startDate || null, due_time: dueTime || null,
-      reward: anyKid ? reward : false, stars: anyKid && reward ? stars : 0,
+      reward: rewardable ? reward : false, stars: rewardable && reward ? stars : 0,
     });
   };
 
@@ -558,7 +683,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{t.id ? 'Edit task' : 'New task'}</h2>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{t.id ? 'Edit task' : (isAnyone ? 'New shared chore' : 'New task')}</h2>
           <button onClick={onClose} aria-label="Close" style={{ ...cardBtn, width: 34, height: 34 }}><IcClose s={18} c={INK2} /></button>
         </div>
 
@@ -568,26 +693,34 @@ function TaskModal({ modal, members, onClose, onSave }) {
 
         <Field label="Icon"><IconPicker value={emoji} onChange={setEmoji} /></Field>
 
-        <Field label="Who">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {members.map((m) => {
-              const on = assignees.includes(m.id);
-              return (
-                <button key={m.id} onClick={() => toggleIn(assignees, setAssignees, m.id)} title={m.name}
-                  style={{ position: 'relative', border: on ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}>
-                  <Avatar member={m} size={50} />
-                  {on && <span style={{ position: 'absolute', right: -2, bottom: -2, width: 18, height: 18, borderRadius: '50%', background: hexFor(m), border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Tick s={10} /></span>}
-                </button>
-              );
-            })}
+        {isAnyone ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: BRAND_SOFT, marginBottom: 16, fontSize: 12.5, fontWeight: 600, color: BRAND }}>
+            <IcPeople s={16} c={BRAND} /> Anyone can complete this — you'll pick who did it when it's checked off.
           </div>
-        </Field>
+        ) : (
+          <>
+            <Field label="Who">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {members.map((m) => {
+                  const on = assignees.includes(m.id);
+                  return (
+                    <button key={m.id} onClick={() => toggleIn(assignees, setAssignees, m.id)} title={m.name}
+                      style={{ position: 'relative', border: on ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}>
+                      <Avatar member={m} size={50} />
+                      {on && <span style={{ position: 'absolute', right: -2, bottom: -2, width: 18, height: 18, borderRadius: '50%', background: hexFor(m), border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Tick s={10} /></span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
 
-        <Field label="Type">
-          <Seg options={[{ v: 'chore', l: 'Chore' }, { v: 'routine', l: 'Routine' }]} value={type} onChange={setType} />
-        </Field>
+            <Field label="Type">
+              <Seg options={[{ v: 'chore', l: 'Chore' }, { v: 'routine', l: 'Routine' }]} value={type} onChange={setType} />
+            </Field>
+          </>
+        )}
 
-        {type === 'routine' && (
+        {!isAnyone && type === 'routine' && (
           <Field label="Time of day">
             <div style={{ display: 'flex', gap: 8 }}>
               {['morning', 'afternoon', 'evening'].map((w) => (
@@ -611,7 +744,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
           <Field label="Due time (optional)" style={{ flex: 1 }}><input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} style={input} /></Field>
         </div>
 
-        {anyKid && (
+        {rewardable && (
           <Field label="Reward">
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <button onClick={() => setReward((r) => !r)} style={{ width: 46, height: 28, borderRadius: 99, border: 0, cursor: 'pointer', background: reward ? STAR : LINE_STRONG, position: 'relative', transition: 'background .15s' }}>
@@ -630,7 +763,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
           <button onClick={onClose} style={{ ...input, width: 'auto', padding: '10px 18px', cursor: 'pointer', fontWeight: 600, background: '#fff' }}>Cancel</button>
-          <button onClick={submit} disabled={!title.trim() || assignees.length === 0} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: (!title.trim() || assignees.length === 0) ? 0.5 : 1 }}>{t.id ? 'Save' : 'Add task'}</button>
+          <button onClick={submit} disabled={!title.trim() || (!isAnyone && assignees.length === 0)} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: (!title.trim() || (!isAnyone && assignees.length === 0)) ? 0.5 : 1 }}>{t.id ? 'Save' : (isAnyone ? 'Add chore' : 'Add task')}</button>
         </div>
       </div>
     </div>
