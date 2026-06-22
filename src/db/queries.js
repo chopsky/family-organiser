@@ -3968,17 +3968,27 @@ async function getRecentPurchases(householdId, days = 14, db = supabase) {
  */
 async function fetchLastActiveByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
-  const { data, error } = await db
-    .from('refresh_tokens')
-    .select('user_id, last_used_at')
-    .in('user_id', userIds);
-  if (error) throw error;
+  // "Last active" = the most recent of EVERY activity signal we record:
+  //   - refresh_tokens.last_used_at (web sign-in / token refreshes)
+  //   - device_tokens.updated_at    (the native app re-registering its push
+  //     token on launch/foreground)
+  // Without the device_tokens signal, app users who hold a long-lived token
+  // and rarely hit the refresh endpoint showed "Never" even though their
+  // iOS-App platform (also derived from device_tokens) proves recent use.
+  const [tokensRes, devicesRes] = await Promise.all([
+    db.from('refresh_tokens').select('user_id, last_used_at').in('user_id', userIds),
+    db.from('device_tokens').select('user_id, updated_at').in('user_id', userIds),
+  ]);
+  if (tokensRes.error) throw tokensRes.error;
   const map = new Map();
-  for (const r of data || []) {
-    if (!r.last_used_at) continue;
-    const existing = map.get(r.user_id);
-    if (!existing || r.last_used_at > existing) map.set(r.user_id, r.last_used_at);
-  }
+  const note = (userId, ts) => {
+    if (!ts) return;
+    const existing = map.get(userId);
+    if (!existing || ts > existing) map.set(userId, ts);
+  };
+  for (const r of tokensRes.data || []) note(r.user_id, r.last_used_at);
+  // device_tokens is best-effort - a missing table must never blank the list.
+  if (!devicesRes.error) for (const d of devicesRes.data || []) note(d.user_id, d.updated_at);
   return map;
 }
 
