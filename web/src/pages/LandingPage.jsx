@@ -709,7 +709,7 @@ export default function LandingPage() {
             <h1 className="display">
               The quiet hum<br />
               of <em>family life</em>,<br />
-              made&nbsp;easy.
+              made easy with&nbsp;AI.
             </h1>
             <p className="lede">
               Housemait restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
