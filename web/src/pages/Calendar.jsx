@@ -1455,7 +1455,7 @@ export default function Calendar() {
           <div ref={searchRef} className="relative">
             <button
               onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.querySelector('input')?.focus(), 50); }}
-              className={`w-9 h-9 rounded-[10px] border-[1.5px] flex items-center justify-center transition-all ${
+              className={`w-9 h-9 rounded-[10px] border-[1.5px] flex items-center justify-center transition-all active:scale-[0.98] ${
                 showSearch
                   ? 'border-plum bg-plum-light text-plum'
                   : 'border-light-grey bg-white text-charcoal hover:border-plum hover:text-plum hover:bg-plum-light'
@@ -1528,7 +1528,7 @@ export default function Calendar() {
             <button
               onClick={() => openAddForm(selectedDate)}
               aria-label="New event"
-              className="h-9 w-9 rounded-xl bg-plum hover:bg-plum-dark text-white flex items-center justify-center transition-colors"
+              className="h-9 w-9 rounded-[10px] bg-plum text-white shadow-sm hover:bg-plum/90 active:scale-[0.98] flex items-center justify-center transition-transform"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
