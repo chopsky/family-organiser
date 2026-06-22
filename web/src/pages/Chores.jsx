@@ -263,20 +263,23 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
 // ── the "Anyone" column — up-for-grabs chores any member can claim ──────────
 function AnyoneColumn({ tasks, members, onClaim, onEdit, onDelete, onSkip, onAdd, mobile }) {
   const { enabled: childMode } = useChildMode();
-  const tint = BRAND;
+  // Neutral "up for grabs" drop-zone: a dashed outline + muted greys, distinct
+  // from the colour-tinted per-member columns. Cards get a grey tile tint.
+  const tile = INK3;
   const total = tasks.length;
   const done = tasks.filter((t) => t.completed).length;
   return (
-    <div style={{ flex: mobile ? 'none' : '0 0 300px', width: mobile ? '100%' : undefined, minWidth: mobile ? 0 : 300, background: BRAND_SOFT, borderRadius: 24, padding: '18px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ flex: mobile ? 'none' : '0 0 300px', width: mobile ? '100%' : undefined, minWidth: mobile ? 0 : 300, boxSizing: 'border-box', background: 'rgba(26,22,32,0.02)', border: `1.5px dashed ${LINE_STRONG}`, borderRadius: 24, padding: '18px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* header (pinned) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
-        <span style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: tint, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={24} c="#fff" /></span>
+        <span style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: '#fff', border: `1px solid ${LINE_STRONG}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={22} c={INK3} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>Anyone</div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: '#fff', fontSize: 11.5, fontWeight: 700, color: INK2 }}>
               <Tick s={11} c={INK2} />{done}/{total}
             </span>
+            <span style={{ fontSize: 12.5, fontWeight: 500, color: INK3 }}>up for grabs</span>
           </div>
         </div>
       </div>
@@ -284,11 +287,11 @@ function AnyoneColumn({ tasks, members, onClaim, onEdit, onDelete, onSkip, onAdd
       <div style={{ flex: 1, minHeight: 0, overflowY: mobile ? 'visible' : 'auto', overflowX: 'hidden', margin: '0 -4px', padding: '0 4px 2px' }}>
         {total === 0 && <div style={{ padding: '20px 4px', fontSize: 13, color: INK3, fontStyle: 'italic', textAlign: 'center' }}>No up-for-grabs chores yet</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {tasks.map((t) => <ChoreCard key={t.id} task={t} tint={tint} anyone members={members} onToggle={onClaim} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} />)}
+          {tasks.map((t) => <ChoreCard key={t.id} task={t} tint={tile} anyone members={members} onToggle={onClaim} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} />)}
         </div>
         {!childMode && (
-          <button onClick={() => onAdd()} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1px dashed ${tint}66`, color: tint, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <IcPlus s={14} w={2.2} c={tint} /> Add chore
+          <button onClick={() => onAdd()} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1.5px dashed ${LINE_STRONG}`, color: INK3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <IcPlus s={14} w={2.2} c={INK3} /> Add chore
           </button>
         )}
       </div>
@@ -565,8 +568,8 @@ export default function Chores() {
               );
             })}
             {showAnyone && (
-              <button onClick={() => goToMember('anyone')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, flexShrink: 0, border: anyoneActive ? `1.5px solid ${BRAND}` : `1px solid ${LINE}`, background: anyoneActive ? '#fff' : 'transparent' }}>
-                <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: BRAND, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={16} c="#fff" /></span>
+              <button onClick={() => goToMember('anyone')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, flexShrink: 0, border: anyoneActive ? `1.5px solid ${INK}` : `1px solid ${LINE}`, background: anyoneActive ? '#fff' : 'transparent' }}>
+                <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: '#fff', border: `1px solid ${LINE_STRONG}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={16} c={INK3} /></span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: INK, lineHeight: 1.1 }}>Anyone</span>
                   <span style={{ fontSize: 10.5, color: INK3 }}>{anyoneTasks.filter((t) => t.completed).length}/{anyoneTasks.length}</span>
