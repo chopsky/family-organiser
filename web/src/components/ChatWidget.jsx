@@ -585,7 +585,7 @@ I'm always here if you need me!`;
             }
             setIsOpen(true);
           }}
-          className="hidden md:flex fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg items-center justify-center transition-all hover:scale-105"
+          className="flex fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg items-center justify-center transition-all hover:scale-105"
           title="Chat with AI Assistant"
         >
           <SparklesIcon className="h-6 w-6" />
