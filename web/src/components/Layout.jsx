@@ -340,7 +340,10 @@ export default function Layout({ children }) {
       {/* ── Main Content ── */}
       <main className={`flex-1 md:ml-60 min-w-0 overflow-x-hidden${appHeight ? ' flex flex-col min-h-0' : ''}`}>
         <OfflineBanner />
-        <div className={`px-4 md:px-8 py-4 md:py-9 ${location.pathname === '/tasks' || location.pathname === '/lists' ? 'pb-20' : 'pb-28'} md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
+        {/* pb-40 on mobile keeps the last of the page's content clear of the
+            floating AI chat button (bottom-24 + h-14 = ~152px tall) that now
+            shows on phones; desktop has no bottom bar so it stays at pb-9. */}
+        <div className={`px-4 md:px-8 py-4 md:py-9 pb-40 md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
           {children}
         </div>
       </main>
