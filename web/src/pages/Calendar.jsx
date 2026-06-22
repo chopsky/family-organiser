@@ -1527,12 +1527,12 @@ export default function Calendar() {
           {canWrite && (
             <button
               onClick={() => openAddForm(selectedDate)}
-              className="h-9 px-3 md:px-4 rounded-xl bg-plum hover:bg-plum-dark text-white text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
+              aria-label="New event"
+              className="h-9 w-9 rounded-xl bg-plum hover:bg-plum-dark text-white flex items-center justify-center transition-colors"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span className="hidden md:inline">New event</span>
             </button>
           )}
 

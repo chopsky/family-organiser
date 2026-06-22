@@ -540,7 +540,7 @@ export default function Chores() {
               <button onClick={() => setDayOffset(0)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 96 }}>{dayLabel}</button>
               <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
             </div>
-            {!childMode && <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })}>Add task</PillBtn>}
+            {!childMode && <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />}
           </div>
         )}
       />

@@ -173,7 +173,7 @@ export default function Rewards() {
                 <button key={o.value} onClick={() => setView(o.value)} style={{ padding: '7px 14px', borderRadius: 8, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: effView === o.value ? '#fff' : 'transparent', color: effView === o.value ? INK : INK3, boxShadow: effView === o.value ? '0 1px 3px rgba(26,22,32,0.1)' : 'none' }}>{o.label}</button>
               ))}
             </div>
-            {!childMode && <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setModal('add')}>Add reward</PillBtn>}
+            {!childMode && <PillBtn primary aria-label="Add reward" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal('add')} />}
           </div>
         )}
       />
