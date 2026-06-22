@@ -346,7 +346,7 @@ export default function Layout({ children }) {
             full-height viewport (pb-0) and pad the bottom of their OWN scroll
             area, so the gap only shows once you reach the end - not
             permanently. Desktop has no bottom bar, so pb-9 throughout. */}
-        <div className={`px-4 md:px-8 pt-4 md:pt-9 ${(location.pathname === '/tasks' || location.pathname === '/lists') ? 'pb-0' : 'pb-40'} md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
+        <div className={`px-4 md:px-8 pt-4 md:pt-9 ${(location.pathname === '/tasks' || location.pathname === '/lists') ? 'pb-0' : 'pb-40'} md:pb-9 ${appHeight ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
           {children}
         </div>
       </main>
