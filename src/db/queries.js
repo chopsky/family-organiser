@@ -7227,13 +7227,20 @@ async function addChoreDefinition(householdId, def, createdBy, db = supabase) {
 }
 
 async function getChoreDefinitions(householdId, db = supabase) {
-  const { data, error } = await db
+  const run = (cols) => db
     .from('chore_definitions')
-    .select(CHORE_DEF_COLS)
+    .select(cols)
     .eq('household_id', householdId)
     .is('archived_at', null)
     .order('position')
     .order('created_at');
+  let { data, error } = await run(CHORE_DEF_COLS);
+  // Pre-migration tolerance: if migration-chores-anyone.sql hasn't been applied
+  // yet, the `anyone` column is missing and the explicit select 400s. Fall back
+  // to '*' so the Tasks page still loads during the deploy window.
+  if (error && /anyone/i.test(error.message || '')) {
+    ({ data, error } = await run('*'));
+  }
   if (error) throw error;
   return data || [];
 }
