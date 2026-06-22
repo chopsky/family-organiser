@@ -26,11 +26,14 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
 /** POST /api/rewards — create a reward (parent-set). */
 router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const { title, emoji, cost, who, position } = req.body || {};
+    const { title, emoji, cost, who_ids, position } = req.body || {};
     if (typeof title !== 'string' || !title.trim()) return res.status(400).json({ error: 'title is required' });
     const c = parseInt(cost, 10);
     if (!Number.isInteger(c) || c < 0) return res.status(400).json({ error: 'cost must be a non-negative integer' });
-    const created = await db.addReward(req.householdId, { title: title.trim(), emoji: emoji || null, cost: c, who: who || 'any', position }, req.user.id);
+    // who_ids = which members this reward is for ([] = everyone). Keep only real members.
+    const members = await db.getHouseholdMembers(req.householdId);
+    const ids = Array.isArray(who_ids) ? who_ids.filter((id) => members.some((m) => m.id === id)) : [];
+    const created = await db.addReward(req.householdId, { title: title.trim(), emoji: emoji || null, cost: c, who_ids: ids, position }, req.user.id);
     return res.status(201).json({ reward: created });
   } catch (err) {
     console.error('POST /api/rewards error:', err);
@@ -42,7 +45,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     const updates = {};
-    for (const k of ['title', 'emoji', 'who', 'position', 'active']) if (k in (req.body || {})) updates[k] = req.body[k];
+    for (const k of ['title', 'emoji', 'position', 'active']) if (k in (req.body || {})) updates[k] = req.body[k];
+    if ('who_ids' in (req.body || {})) {
+      const members = await db.getHouseholdMembers(req.householdId);
+      updates.who_ids = Array.isArray(req.body.who_ids) ? req.body.who_ids.filter((id) => members.some((m) => m.id === id)) : [];
+    }
     if ('cost' in (req.body || {})) {
       const c = parseInt(req.body.cost, 10);
       if (!Number.isInteger(c) || c < 0) return res.status(400).json({ error: 'cost must be a non-negative integer' });

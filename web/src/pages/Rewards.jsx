@@ -117,7 +117,9 @@ export default function Rewards() {
     return () => { cancelled = true; };
   }, [load]);
 
-  const rewardsFor = (kidId) => rewards.filter((r) => r.who === 'any' || r.who === kidId);
+  // A reward shows for a member if it lists them, or if it lists nobody
+  // (who_ids empty = everyone — kept for legacy "Anyone" rewards).
+  const rewardsFor = (kidId) => rewards.filter((r) => { const ids = r.who_ids || []; return ids.length === 0 || ids.includes(kidId); });
 
   const redeem = useCallback(async (reward, kidId) => {
     setRedeemingId(`${reward.id}:${kidId}`);
@@ -281,8 +283,9 @@ function RewardModal({ onClose, onSave, kids, reward }) {
   const [title, setTitle] = useState(reward?.title || '');
   const [emoji, setEmoji] = useState(reward?.emoji || '🎁');
   const [cost, setCost] = useState(reward?.cost ?? 20);
-  const [who, setWho] = useState(reward?.who || 'any');
-  const submit = () => { if (title.trim()) onSave({ title: title.trim(), emoji, cost, who }); };
+  const [whoIds, setWhoIds] = useState(reward?.who_ids || []);
+  const toggleWho = (id) => setWhoIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const submit = () => { if (title.trim()) onSave({ title: title.trim(), emoji, cost, who_ids: whoIds }); };
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 460, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
@@ -310,8 +313,7 @@ function RewardModal({ onClose, onSave, kids, reward }) {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>For</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Chip on={who === 'any'} onClick={() => setWho('any')}>Anyone</Chip>
-              {kids.map((k) => <Chip key={k.id} on={who === k.id} onClick={() => setWho(k.id)}>{k.name}</Chip>)}
+              {kids.map((k) => <Chip key={k.id} on={whoIds.includes(k.id)} onClick={() => toggleWho(k.id)}>{k.name}</Chip>)}
             </div>
           </div>
         )}

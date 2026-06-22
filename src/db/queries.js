@@ -7379,13 +7379,18 @@ async function removeStarTransactionByRef(refType, refId, db = supabase) {
 }
 
 async function getRewards(householdId, db = supabase) {
-  const { data, error } = await db
+  const run = (cols) => db
     .from('rewards')
-    .select('id, household_id, title, emoji, cost, who, position, active, created_at')
+    .select(cols)
     .eq('household_id', householdId)
     .eq('active', true)
     .order('position')
     .order('created_at');
+  let { data, error } = await run('id, household_id, title, emoji, cost, who, who_ids, position, active, created_at');
+  // Pre-migration tolerance: who_ids may not exist yet (migration-rewards-who-ids.sql).
+  if (error && /who_ids/i.test(error.message || '')) {
+    ({ data, error } = await run('id, household_id, title, emoji, cost, who, position, active, created_at'));
+  }
   if (error) throw error;
   return data || [];
 }
@@ -7397,20 +7402,21 @@ async function addReward(householdId, reward, createdBy, db = supabase) {
     emoji: reward.emoji || null,
     cost: reward.cost,
     who: reward.who || 'any',
+    who_ids: reward.who_ids || [],
     position: reward.position ?? 0,
     created_by: createdBy || null,
   };
-  const { data, error } = await db.from('rewards').insert(row).select('id, title, emoji, cost, who, position, active').single();
+  const { data, error } = await db.from('rewards').insert(row).select('id, title, emoji, cost, who, who_ids, position, active').single();
   if (error) throw error;
   return data;
 }
 
 async function updateReward(id, householdId, updates, db = supabase) {
   const allowed = {};
-  for (const k of ['title', 'emoji', 'cost', 'who', 'position', 'active']) if (k in updates) allowed[k] = updates[k];
+  for (const k of ['title', 'emoji', 'cost', 'who', 'who_ids', 'position', 'active']) if (k in updates) allowed[k] = updates[k];
   const { data, error } = await db
     .from('rewards').update(allowed).eq('id', id).eq('household_id', householdId)
-    .select('id, title, emoji, cost, who, position, active').single();
+    .select('id, title, emoji, cost, who, who_ids, position, active').single();
   if (error) throw error;
   return data;
 }
