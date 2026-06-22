@@ -20,6 +20,7 @@ const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
 const BRAND = '#6C3DD9', BRAND_SOFT = '#EFE9FB';
 const BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
+const BG_APP = '#FBF8F3'; // page background — the gap colour in the selected-avatar halo
 const SERIF = '"Instrument Serif", serif';
 const INTER = '"Inter", system-ui, sans-serif';
 
@@ -301,18 +302,18 @@ function MemberDayCard({ member, done, total, balance, showRewards, onRewards })
   const hex = hexFor(member);
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: `${hex}14`, borderRadius: 20, padding: 16, marginBottom: 16, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: `${hex}14`, borderRadius: 18, padding: '14px 16px', marginBottom: 16, flexShrink: 0 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: INK }}>{member.name}'s day</div>
-        <div style={{ height: 7, borderRadius: 99, background: '#fff', overflow: 'hidden', margin: '12px 0 8px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: INK }}>{member.name}'s day</div>
+        <div style={{ height: 8, borderRadius: 99, background: '#fff', overflow: 'hidden', marginTop: 8 }}>
           <div style={{ height: '100%', width: `${pct}%`, background: hex, borderRadius: 99, transition: 'width .3s ease' }} />
         </div>
-        <div style={{ fontSize: 13, color: INK3 }}>{done} of {total} done today</div>
+        <div style={{ fontSize: 11, color: INK3, marginTop: 6 }}>{done} of {total} done today</div>
       </div>
       {showRewards && (
-        <button onClick={onRewards} aria-label="Open rewards" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: '#fff', borderRadius: 14, padding: '12px 18px', border: 0, cursor: 'pointer' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><StarFill s={18} /><span style={{ fontSize: 22, fontWeight: 800, color: INK, lineHeight: 1 }}>{balance || 0}</span></span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: BRAND, letterSpacing: '0.04em' }}>REWARDS ›</span>
+        <button onClick={onRewards} aria-label="Open rewards" style={{ flexShrink: 0, background: '#fff', borderRadius: 14, padding: '10px 12px', border: 0, cursor: 'pointer', textAlign: 'center', boxShadow: '0 1px 4px rgba(26,22,32,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}><StarFill s={16} /><span style={{ fontSize: 18, fontWeight: 800, color: INK }}>{balance || 0}</span></div>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: BRAND, marginTop: 2 }}>Rewards ›</div>
         </button>
       )}
     </div>
@@ -622,8 +623,8 @@ export default function Chores() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexShrink: 0 }}>
             {/* Filter pill: hides completed tasks (filled dark when on) */}
             <button onClick={() => setHideCompleted((v) => !v)} aria-pressed={hideCompleted}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 14, fontWeight: 600, background: hideCompleted ? INK : BG_SOFT, color: hideCompleted ? '#fff' : INK2, border: 0 }}>
-              <IcEyeOff s={16} c={hideCompleted ? '#fff' : INK2} /> Filter
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: hideCompleted ? INK : BG_SOFT, color: hideCompleted ? '#fff' : INK2, border: 0 }}>
+              <IcEyeOff s={15} c={hideCompleted ? '#fff' : INK2} /> Filter
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
@@ -632,33 +633,35 @@ export default function Chores() {
             </div>
           </div>
           {/* member avatars */}
-          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '4px 0 16px', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '7px 0 16px', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
             {baseMembers.map((m) => {
               const sel = !anyoneActive && m.id === (activeMember?.id);
               const all = tasksFor(m.id); const dn = all.filter((t) => t.done?.[m.id]).length;
-              const bal = balances[m.id] || 0;
+              const showStar = isKid(m) || (balances[m.id] || 0) > 0;
               return (
-                <button key={m.id} onClick={() => goToMember(m.id)} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, minWidth: 72, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
-                  <div style={{ position: 'relative', padding: 3, borderRadius: '50%', border: `2.5px solid ${sel ? hexFor(m) : 'transparent'}` }}>
-                    <Avatar member={m} size={52} />
-                    {bal > 0 && (
-                      <span style={{ position: 'absolute', bottom: 0, right: -6, background: '#fff', borderRadius: 99, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 3, boxShadow: '0 2px 7px rgba(26,22,32,0.18)' }}>
-                        <StarFill s={11} /><span style={{ fontSize: 11.5, fontWeight: 800, color: INK }}>{bal}</span>
-                      </span>
+                <button key={m.id} onClick={() => goToMember(m.id)} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 64, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ borderRadius: '50%', boxShadow: sel ? `0 0 0 3px ${BG_APP}, 0 0 0 5px ${hexFor(m)}` : 'none', opacity: sel ? 1 : 0.85, transition: 'all .15s ease' }}>
+                      <Avatar member={m} size={52} />
+                    </div>
+                    {showStar && (
+                      <div style={{ position: 'absolute', bottom: -4, right: -8, display: 'flex', alignItems: 'center', gap: 2, background: '#fff', borderRadius: 99, padding: '2px 6px', boxShadow: '0 2px 6px rgba(26,22,32,0.15)' }}>
+                        <StarFill s={10} /><span style={{ fontSize: 10, fontWeight: 800, color: '#A9772A' }}>{balances[m.id] || 0}</span>
+                      </div>
                     )}
                   </div>
-                  <span style={{ fontSize: 14, fontWeight: sel ? 700 : 600, color: sel ? INK : INK2, lineHeight: 1 }}>{m.name}</span>
-                  <span style={{ fontSize: 12.5, color: INK3, lineHeight: 1 }}>{dn}/{all.length}</span>
+                  <div style={{ fontSize: 12, fontWeight: sel ? 700 : 600, color: sel ? INK : INK3 }}>{m.name}</div>
+                  <div style={{ fontSize: 10, color: INK3, fontVariantNumeric: 'tabular-nums' }}>{dn}/{all.length}</div>
                 </button>
               );
             })}
             {showAnyone && (
-              <button onClick={() => goToMember('anyone')} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, minWidth: 72, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
-                <div style={{ position: 'relative', padding: 3, borderRadius: '50%', border: `2.5px solid ${anyoneActive ? INK : 'transparent'}` }}>
-                  <span style={{ width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT, border: `1px solid ${LINE_STRONG}` }}><IcPeople s={22} c={INK3} /></span>
+              <button onClick={() => goToMember('anyone')} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 64, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
+                <div style={{ borderRadius: '50%', boxShadow: anyoneActive ? `0 0 0 3px ${BG_APP}, 0 0 0 5px ${INK}` : 'none', opacity: anyoneActive ? 1 : 0.85, transition: 'all .15s ease' }}>
+                  <span style={{ width: 52, height: 52, borderRadius: '50%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT, border: `1px solid ${LINE_STRONG}` }}><IcPeople s={22} c={INK3} /></span>
                 </div>
-                <span style={{ fontSize: 14, fontWeight: anyoneActive ? 700 : 600, color: anyoneActive ? INK : INK2, lineHeight: 1 }}>Anyone</span>
-                <span style={{ fontSize: 12.5, color: INK3, lineHeight: 1 }}>{anyoneTasks.filter((t) => t.completed).length}/{anyoneTasks.length}</span>
+                <div style={{ fontSize: 12, fontWeight: anyoneActive ? 700 : 600, color: anyoneActive ? INK : INK3 }}>Anyone</div>
+                <div style={{ fontSize: 10, color: INK3, fontVariantNumeric: 'tabular-nums' }}>{anyoneTasks.filter((t) => t.completed).length}/{anyoneTasks.length}</div>
               </button>
             )}
           </div>
