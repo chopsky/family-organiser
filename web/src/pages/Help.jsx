@@ -368,7 +368,12 @@ export default function Help() {
         id="contact"
         className="bg-white rounded-2xl border border-cream-border p-6 md:p-8 mt-10"
       >
-        <h2 className="text-warm-grey m-0 text-[11px] font-bold uppercase tracking-[0.1em]">
+        <h2
+          className="text-charcoal m-0 text-base md:text-xl font-semibold md:font-medium"
+          style={{
+            lineHeight: 1.3,
+          }}
+        >
           Still need help?
         </h2>
         <p className="text-warm-grey mt-1 text-[15px]">
