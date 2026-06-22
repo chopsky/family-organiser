@@ -228,10 +228,10 @@ export default function Lists() {
 
               {/* To-dos assignee filter */}
               {isTodos && members.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: isMobile ? 'nowrap' : 'wrap', overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
                   {/* Everyone - clears the filter; left circle holds a group icon, right holds the total open count */}
                   <button onClick={() => setToFilter(null)} title="Everyone"
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: !toFilter ? `${BRAND}1F` : '#fff', border: `1px solid ${!toFilter ? BRAND : LINE}` }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, flexShrink: 0, background: !toFilter ? `${BRAND}1F` : '#fff', border: `1px solid ${!toFilter ? BRAND : LINE}` }}>
                     <span style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', background: !toFilter ? BRAND : BG_SOFT }}>
                       <IcPeople s={20} c={!toFilter ? '#fff' : INK3} />
                     </span>
@@ -244,7 +244,7 @@ export default function Lists() {
                     const count = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
                     return (
                       <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: on ? `${mc}1F` : '#fff', border: `1px solid ${on ? mc : LINE}` }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, flexShrink: 0, background: on ? `${mc}1F` : '#fff', border: `1px solid ${on ? mc : LINE}` }}>
                         <Avatar member={m} size={40} />
                         <span style={{ fontSize: 13, fontWeight: 700, color: on ? mc : INK3 }}>{count}</span>
                       </button>
