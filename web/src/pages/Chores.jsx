@@ -162,6 +162,101 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
   );
 }
 const cardBtn = { width: 26, height: 26, borderRadius: 7, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const swipeAction = { width: 72, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 };
+
+// ── mobile chore tile — tap to complete, swipe left to reveal Edit/Delete ────
+// Touch rules (from the design spec): ~12px slop before committing to an axis;
+// only a decisively horizontal drag reveals actions (vertical stays a scroll);
+// the tap fires on pointerup (the synthetic click is flaky under pointer
+// capture on touch); and any change to completion forces the row closed.
+function MobileChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip }) {
+  const { enabled: childMode } = useChildMode();
+  const done = !!task.done?.[mid];
+  const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
+  const REVEAL = childMode ? 0 : 144; // two 72px actions
+  const [tx, setTx] = useState(0);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [dragging, setDragging] = useState(false); // suppress the snap transition mid-drag
+  const txRef = useRef(0);
+  const start = useRef(null); // { x, y, tx } while a pointer is down
+  const axis = useRef(null);  // 'h' | 'v' | null (undecided)
+  const setTranslate = (v) => { txRef.current = v; setTx(v); };
+  const close = () => { setTranslate(0); setConfirmDel(false); };
+
+  // Checking / unchecking a task must never leave the row open (resets the
+  // local swipe state to follow the completion prop).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { txRef.current = 0; setTx(0); setConfirmDel(false); }, [done]);
+
+  const onDown = (e) => { start.current = { x: e.clientX, y: e.clientY, tx: txRef.current }; axis.current = null; };
+  const onMove = (e) => {
+    const s = start.current; if (!s) return;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (!axis.current) {
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;            // within slop — undecided
+      axis.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';        // decisive axis
+      if (axis.current === 'h' && REVEAL) { setDragging(true); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ } }
+    }
+    if (axis.current === 'h' && REVEAL) setTranslate(Math.max(-REVEAL, Math.min(0, s.tx + dx)));
+  };
+  const onUp = () => {
+    const s = start.current; start.current = null; setDragging(false);
+    if (!s) return;
+    if (!axis.current) {                          // a tap (never broke the slop)
+      if (txRef.current < 0) close();             // open row → tap closes it
+      else onToggle(task, mid);                   // complete/uncomplete (per-person)
+      return;
+    }
+    if (axis.current === 'h') {                    // a horizontal drag → snap open/closed
+      const open = txRef.current < -REVEAL / 2;
+      setTranslate(open ? -REVEAL : 0);
+      if (!open) setConfirmDel(false);
+    }
+    axis.current = null;
+  };
+  const onCancel = () => { start.current = null; axis.current = null; setDragging(false); setTranslate(txRef.current < -REVEAL / 2 ? -REVEAL : 0); };
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: done ? BG_SOFT : '#fff' }}>
+      {/* revealed actions, behind the tile */}
+      {!childMode && (
+        <div aria-hidden={tx === 0} style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'flex-end' }}>
+          {confirmDel ? (
+            <>
+              <button onClick={() => { onSkip(task); close(); }} style={{ ...swipeAction, background: '#8A8493' }}><IcClock s={18} c="#fff" /> Skip</button>
+              <button onClick={() => onDelete(task)} style={{ ...swipeAction, background: '#C24A5E' }}><IcTrash s={18} c="#fff" /> Delete</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { onEdit(task); close(); }} style={{ ...swipeAction, background: '#5A6B7B' }}><IcPencil s={18} c="#fff" /> Edit</button>
+              <button onClick={() => { if (repeats) setConfirmDel(true); else onDelete(task); }} style={{ ...swipeAction, background: '#C24A5E' }}><IcTrash s={18} c="#fff" /> Delete</button>
+            </>
+          )}
+        </div>
+      )}
+      {/* foreground tile */}
+      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}
+        style={{ position: 'relative', background: done ? BG_SOFT : '#fff', borderRadius: 16, padding: '12px 14px', transform: `translateX(${tx}px)`, transition: dragging ? 'none' : 'transform .2s ease', opacity: done ? 0.62 : 1, touchAction: 'pan-y', userSelect: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* 44px tile; a faint dot stands in when the task has no emoji */}
+          <span style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? '#fff' : `${tint}1F`, filter: done ? 'grayscale(.4)' : 'none' }}>
+            {task.emoji || <span style={{ width: 7, height: 7, borderRadius: '50%', background: tint, opacity: 0.5 }} />}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: done ? INK3 : INK, textDecoration: done ? 'line-through' : 'none', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <MetaChips task={task} />
+              {task.reward && task.stars ? <span style={{ marginTop: 4, display: 'inline-flex' }}><StarPill n={task.stars} small /></span> : null}
+            </div>
+          </div>
+          <span style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
+            {done && <Tick s={14} />}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── circular slot toggle with completion ring ───────────────────────────────
 function SlotToggle({ slot, active, color, done, total, onClick }) {
@@ -184,7 +279,7 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
 }
 
 // ── one member column ───────────────────────────────────────────────────────
-function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile, bare }) {
+function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile, bare, hideCompleted }) {
   const { enabled: childMode } = useChildMode();
   const hex = hexFor(m);
   // group tasks into slots
@@ -233,32 +328,65 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
         </div>
       </div>
       )}
-      {/* slot toggles (pinned) */}
-      {sectionsPresent.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-around', gap: 4, padding: '4px 2px 14px', borderBottom: `1px solid ${hex}22`, marginBottom: 12, flexShrink: 0 }}>
-          {sectionsPresent.map((k) => { const s = slotStats(k); return <SlotToggle key={k} slot={k} active={active.includes(k)} color={hex} done={s.done} total={s.total} onClick={() => toggleSection(k)} />; })}
+      {bare ? (
+        // Mobile: fixed-order sections (no toggles), each with its own
+        // done/total + "Done" marker; swipe tiles. Empty sections drop out.
+        <div>
+          {groups.length === 0 && <div style={{ padding: '12px 4px 4px', fontSize: 13.5, color: INK3, fontStyle: 'italic' }}>Nothing for today.</div>}
+          {groups.map((g) => {
+            const sd = g.tasks.filter((t) => t.done?.[m.id]).length, st = g.tasks.length;
+            const allDone = st > 0 && sd === st;
+            const tiles = hideCompleted ? g.tasks.filter((t) => !t.done?.[m.id]) : g.tasks;
+            return (
+              <div key={g.key} style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 2px 12px' }}>
+                  <span style={{ fontSize: 18 }} aria-hidden="true">{g.meta.emoji}</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>{g.meta.label}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: INK3 }}>{sd}/{st}</span>
+                  {allDone && <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, color: '#6BA368', fontSize: 12, fontWeight: 700 }}><Tick s={12} c="#6BA368" /> Done</span>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {tiles.map((t) => <MobileChoreCard key={t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} />)}
+                </div>
+              </div>
+            );
+          })}
+          {!childMode && (
+            <button onClick={() => onAdd(m.id)} style={{ width: '100%', padding: 13, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, background: 'transparent', border: `1px dashed ${hex}66`, color: hex, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <IcPlus s={14} w={2.2} c={hex} /> Add task
+            </button>
+          )}
         </div>
-      )}
-      {/* scroll region (the column scrolls on desktop; on mobile the page scrolls) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: mobile ? 'visible' : 'auto', overflowX: 'hidden', margin: '0 -4px', padding: '0 4px 2px' }}>
-        {visible.length === 0 && <div style={{ padding: '20px 4px', fontSize: 13, color: INK3, fontStyle: 'italic', textAlign: 'center' }}>Nothing here</div>}
-        {visible.map((g) => (
-          <div key={g.key} style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px 8px' }}>
-              <span style={{ fontSize: 17 }}>{g.meta.emoji}</span>
-              <span style={{ fontSize: 16, fontWeight: 600, color: INK2 }}>{g.meta.label}</span>
+      ) : (
+        <>
+          {/* slot toggles (pinned) */}
+          {sectionsPresent.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-around', gap: 4, padding: '4px 2px 14px', borderBottom: `1px solid ${hex}22`, marginBottom: 12, flexShrink: 0 }}>
+              {sectionsPresent.map((k) => { const s = slotStats(k); return <SlotToggle key={k} slot={k} active={active.includes(k)} color={hex} done={s.done} total={s.total} onClick={() => toggleSection(k)} />; })}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
-            </div>
+          )}
+          {/* scroll region (the column scrolls on desktop) */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', margin: '0 -4px', padding: '0 4px 2px' }}>
+            {visible.length === 0 && <div style={{ padding: '20px 4px', fontSize: 13, color: INK3, fontStyle: 'italic', textAlign: 'center' }}>Nothing here</div>}
+            {visible.map((g) => (
+              <div key={g.key} style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px 8px' }}>
+                  <span style={{ fontSize: 17 }}>{g.meta.emoji}</span>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: INK2 }}>{g.meta.label}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
+                </div>
+              </div>
+            ))}
+            {!childMode && (
+              <button onClick={() => onAdd(m.id)} style={{ width: '100%', padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1px dashed ${hex}66`, color: hex, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <IcPlus s={14} w={2.2} c={hex} /> Add task
+              </button>
+            )}
           </div>
-        ))}
-        {!childMode && (
-          <button onClick={() => onAdd(m.id)} style={{ width: '100%', padding: 11, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: 'transparent', border: `1px dashed ${hex}66`, color: hex, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <IcPlus s={14} w={2.2} c={hex} /> Add task
-          </button>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -268,7 +396,7 @@ function MemberDayCard({ member, done, total, balance, showRewards, onRewards })
   const hex = hexFor(member);
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: BG_SOFT, borderRadius: 20, padding: 16, marginBottom: 16, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: `${hex}14`, borderRadius: 20, padding: 16, marginBottom: 16, flexShrink: 0 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: INK }}>{member.name}'s day</div>
         <div style={{ height: 7, borderRadius: 99, background: '#fff', overflow: 'hidden', margin: '12px 0 8px' }}>
@@ -361,8 +489,9 @@ export default function Chores() {
   const [balances, setBalances] = useState({});
   const [loading, setLoading] = useState(true);
   const [dayOffset, setDayOffset] = useState(0);
-  const [visibleIds, setVisibleIds] = useState(null); // null = everyone
+  const [visibleIds, setVisibleIds] = useState(null); // null = everyone (desktop people filter)
   const [filterOpen, setFilterOpen] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false); // mobile Filter pill
   const filterRef = useRef(null);
   const [modal, setModal] = useState(null); // { mode, task?, defaultWho?, anyone? }
   const [celebrate, setCelebrate] = useState(null); // { member, balance }
@@ -374,7 +503,6 @@ export default function Chores() {
   const { enabled: childMode } = useChildMode();
   const [activeWho, setActiveWho] = useState(null); // mobile: which member's column is shown
   const [slideDir, setSlideDir] = useState(0); // mobile: column slide-in direction (-1 prev, +1 next)
-  const swipeRef = useRef(null); // mobile: horizontal-swipe touch start
   useEffect(() => {
     if (document.getElementById('chore-swipe-css')) return;
     const s = document.createElement('style');
@@ -514,17 +642,6 @@ export default function Chores() {
     setSlideDir(nxt > cur ? 1 : nxt < cur ? -1 : 0);
     setActiveWho(id);
   };
-  const onColTouchStart = (e) => { const t = e.touches[0]; swipeRef.current = { x: t.clientX, y: t.clientY }; };
-  const onColTouchEnd = (e) => {
-    const s = swipeRef.current; swipeRef.current = null;
-    if (!s) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - s.x, dy = t.clientY - s.y;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignore vertical scrolls / taps
-    const idx = selectables.findIndex((m) => m.id === selectedId);
-    const next = idx + (dx < 0 ? 1 : -1);
-    if (next >= 0 && next < selectables.length) goToMember(selectables[next].id);
-  };
   const tasksFor = (mid) => tasks.filter((t) => !t.anyone && (t.assignee_ids || []).includes(mid));
   const toggleVisible = (id) => setVisibleIds((prev) => {
     const cur = prev || members.map((m) => m.id);
@@ -568,7 +685,10 @@ export default function Chores() {
               <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
             </div>
             )}
-            {!childMode && <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />}
+            {!childMode && (isMobile
+              ? <PillBtn primary aria-label="Add task" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
+              : <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
+            )}
           </div>
         )}
       />
@@ -583,28 +703,11 @@ export default function Chores() {
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 160 }}>
           {/* Filter + day navigation */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexShrink: 0 }}>
-            {!childMode ? (
-              <div ref={filterRef} style={{ position: 'relative' }}>
-                <button onClick={() => setFilterOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 14, fontWeight: 600, background: visibleIds ? INK : BG_SOFT, color: visibleIds ? '#fff' : INK2, border: 0 }}>
-                  <IcEyeOff s={16} c={visibleIds ? '#fff' : INK2} /> Filter
-                </button>
-                {filterOpen && (
-                  <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 40, background: '#fff', borderRadius: 14, padding: 6, width: 210, maxHeight: 340, overflowY: 'auto', border: `1px solid ${LINE}`, boxShadow: '0 14px 44px rgba(26,22,32,0.2)' }}>
-                    <button onClick={() => setVisibleIds(null)} style={{ ...filterRow, color: visibleIds ? INK : BRAND, fontWeight: 700 }}><IcPeople s={18} c={visibleIds ? INK2 : BRAND} /> Everyone</button>
-                    <div style={{ height: 1, background: LINE, margin: '4px 0' }} />
-                    {members.map((m) => {
-                      const on = !visibleIds || visibleIds.includes(m.id);
-                      return (
-                        <button key={m.id} onClick={() => toggleVisible(m.id)} style={filterRow}>
-                          <Avatar member={m} size={26} /><span style={{ fontSize: 13.5, fontWeight: 600 }}>{m.name}</span>
-                          <span style={{ marginLeft: 'auto', width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: on ? hexFor(m) : 'transparent', border: on ? `1px solid ${hexFor(m)}` : `1.5px solid ${LINE_STRONG}` }}>{on && <Tick s={12} />}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : <span />}
+            {/* Filter pill: hides completed tasks (filled dark when on) */}
+            <button onClick={() => setHideCompleted((v) => !v)} aria-pressed={hideCompleted}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 14, fontWeight: 600, background: hideCompleted ? INK : BG_SOFT, color: hideCompleted ? '#fff' : INK2, border: 0 }}>
+              <IcEyeOff s={16} c={hideCompleted ? '#fff' : INK2} /> Filter
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
               <button onClick={() => setDayOffset(0)} style={{ padding: '9px 18px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK }}>{dayLabel}</button>
@@ -620,7 +723,7 @@ export default function Chores() {
               return (
                 <button key={m.id} onClick={() => goToMember(m.id)} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, minWidth: 72, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
                   <div style={{ position: 'relative', padding: 3, borderRadius: '50%', border: `2.5px solid ${sel ? hexFor(m) : 'transparent'}` }}>
-                    <Avatar member={m} size={62} />
+                    <Avatar member={m} size={52} />
                     {bal > 0 && (
                       <span style={{ position: 'absolute', bottom: 0, right: -6, background: '#fff', borderRadius: 99, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 3, boxShadow: '0 2px 7px rgba(26,22,32,0.18)' }}>
                         <StarFill s={11} /><span style={{ fontSize: 11.5, fontWeight: 800, color: INK }}>{bal}</span>
@@ -635,7 +738,7 @@ export default function Chores() {
             {showAnyone && (
               <button onClick={() => goToMember('anyone')} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, minWidth: 72, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
                 <div style={{ position: 'relative', padding: 3, borderRadius: '50%', border: `2.5px solid ${anyoneActive ? INK : 'transparent'}` }}>
-                  <span style={{ width: 62, height: 62, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT, border: `1px solid ${LINE_STRONG}` }}><IcPeople s={26} c={INK3} /></span>
+                  <span style={{ width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT, border: `1px solid ${LINE_STRONG}` }}><IcPeople s={22} c={INK3} /></span>
                 </div>
                 <span style={{ fontSize: 14, fontWeight: anyoneActive ? 700 : 600, color: anyoneActive ? INK : INK2, lineHeight: 1 }}>Anyone</span>
                 <span style={{ fontSize: 12.5, color: INK3, lineHeight: 1 }}>{anyoneTasks.filter((t) => t.completed).length}/{anyoneTasks.length}</span>
@@ -643,17 +746,17 @@ export default function Chores() {
             )}
           </div>
           {anyoneActive ? (
-            <div key="anyone" onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
+            <div key="anyone"
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <AnyoneColumn tasks={anyoneTasks} members={members} mobile onClaim={claimAnyone}
                 onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip}
                 onAdd={() => setModal({ mode: 'add', anyone: true })} />
             </div>
           ) : activeMember && (
-            <div key={activeMember.id} onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
+            <div key={activeMember.id}
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <MemberDayCard member={activeMember} done={tasksFor(activeMember.id).filter((t) => t.done?.[activeMember.id]).length} total={tasksFor(activeMember.id).length} balance={balances[activeMember.id]} showRewards={isKid(activeMember) || (balances[activeMember.id] || 0) > 0} onRewards={() => navigate('/rewards')} />
-              <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare
+              <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare hideCompleted={hideCompleted}
                 onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
             </div>
           )}
