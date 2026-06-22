@@ -37,6 +37,7 @@ const OPTIONAL = [
   { key: 'ANTHROPIC_API_KEY', hint: 'AI failover provider (Claude)' },
   { key: 'OPENAI_API_KEY', hint: 'AI failover provider (GPT-4o) + transcription' },
   { key: 'GOOGLE_CLIENT_ID', hint: 'Google social login' },
+  { key: 'GOOGLE_CLIENT_SECRET', hint: 'Google social login - web OAuth code exchange (/auth/google with a code)' },
   { key: 'APPLE_CLIENT_ID', hint: 'Apple social login' },
   { key: 'GOOGLE_CALENDAR_CLIENT_ID', hint: 'Google Calendar sync' },
   { key: 'GOOGLE_CALENDAR_CLIENT_SECRET', hint: 'Google Calendar sync' },

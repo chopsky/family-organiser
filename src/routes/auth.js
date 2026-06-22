@@ -1061,11 +1061,11 @@ router.delete('/sessions', requireAuth, async (req, res) => {
 // ─── POST /api/auth/google ──────────────────────────────────────────────────
 
 router.post('/google', async (req, res) => {
-  const { idToken, inviteToken, promoCode } = req.body;
+  const { idToken, code, inviteToken, promoCode } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
 
-  if (!idToken) {
-    return res.status(400).json({ error: 'idToken is required' });
+  if (!idToken && !code) {
+    return res.status(400).json({ error: 'idToken or code is required' });
   }
 
   try {
@@ -1081,8 +1081,33 @@ router.post('/google', async (req, res) => {
     if (process.env.GOOGLE_IOS_CLIENT_ID) {
       validAudiences.push(process.env.GOOGLE_IOS_CLIENT_ID);
     }
+
+    // The web app uses a custom "Continue with Google" button wired to
+    // Google's OAuth popup (authorization-code) flow, so it sends a one-time
+    // `code` rather than an idToken. Exchange it for tokens server-side, then
+    // verify the returned id_token exactly like the iOS idToken path below.
+    // redirect_uri 'postmessage' is the value Google's JS code client
+    // (ux_mode: 'popup') binds the code to.
+    let verificationToken = idToken;
+    if (code) {
+      if (!process.env.GOOGLE_CLIENT_SECRET) {
+        console.error('POST /api/auth/google: GOOGLE_CLIENT_SECRET is not set; cannot exchange auth code.');
+        return res.status(500).json({ error: 'Google sign-in is not configured.' });
+      }
+      const exchangeClient = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        'postmessage',
+      );
+      const { tokens } = await exchangeClient.getToken(code);
+      verificationToken = tokens.id_token;
+      if (!verificationToken) {
+        return res.status(401).json({ error: 'Google sign-in failed.' });
+      }
+    }
+
     const ticket = await client.verifyIdToken({
-      idToken,
+      idToken: verificationToken,
       audience: validAudiences,
     });
     const payload = ticket.getPayload();

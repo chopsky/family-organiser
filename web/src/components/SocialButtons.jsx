@@ -40,14 +40,27 @@ function isCancelError(err) {
 export default function SocialButtons({ inviteToken, promoCode, onSuccess, onError }) {
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [nativeSocialLoginInitialised, setNativeSocialLoginInitialised] = useState(false);
-  // Container the Google Identity Services SDK renders its official button into
-  // on web (see the renderButton effect below).
-  const googleBtnRef = useRef(null);
+  // Holds Google's OAuth code client (web), initialised once the GIS SDK loads.
+  const codeClientRef = useRef(null);
 
-  const handleGoogleResponse = useCallback(async (response) => {
+  // Web custom-button flow: Google's popup returns a one-time auth `code`,
+  // which the backend exchanges for tokens and verifies. Using the OAuth code
+  // flow (rather than the ID-token / One Tap flow) is what lets us keep our
+  // own fully-styled button instead of Google's locked-down iframe button.
+  const handleGoogleCode = useCallback(async (response) => {
+    // User closed the popup or denied consent - silent no-op, no error toast.
+    if (response?.error) {
+      if (response.error === 'access_denied' || response.error === 'popup_closed') return;
+      onError('Google sign-in failed. Please try again.');
+      return;
+    }
+    if (!response?.code) {
+      onError('Google sign-in failed. Please try again.');
+      return;
+    }
     try {
       const { data } = await api.post('/auth/google', {
-        idToken: response.credential,
+        code: response.code,
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
       });
@@ -99,46 +112,24 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
     document.head.appendChild(script);
   }, []);
 
-  // Web: render Google's official GIS button once the SDK has loaded.
+  // Web: initialise Google's OAuth code client once the GIS SDK has loaded.
   //
-  // We deliberately DON'T use google.accounts.id.prompt() (One Tap) here:
-  // since browsers dropped third-party cookies, One Tap silently fails to
-  // display unless FedCM is available, so an explicit "Continue with Google"
-  // click did nothing. The rendered button always opens Google's sign-in
-  // popup and returns an ID token (`credential`) to handleGoogleResponse -
-  // the exact same payload the /auth/google backend already verifies.
+  // We deliberately avoid google.accounts.id (One Tap / the rendered iframe
+  // button): One Tap silently fails to display since browsers dropped
+  // third-party cookies, and the rendered button can't be custom-styled. The
+  // OAuth code client lets our own styled button open Google's sign-in popup
+  // on click via requestCode(), returning a one-time auth code to
+  // handleGoogleCode for the backend to exchange.
   useEffect(() => {
     if (isNativeIos()) return;
-    if (!googleLoaded || !GOOGLE_CLIENT_ID || !window.google?.accounts?.id) return;
-    const el = googleBtnRef.current;
-    if (!el) return;
-
-    window.google.accounts.id.initialize({
+    if (!googleLoaded || !GOOGLE_CLIENT_ID || !window.google?.accounts?.oauth2) return;
+    codeClientRef.current = window.google.accounts.oauth2.initCodeClient({
       client_id: GOOGLE_CLIENT_ID,
-      callback: handleGoogleResponse,
-      itp_support: true, // popup fallback for Safari/ITP
+      scope: 'openid email profile',
+      ux_mode: 'popup',
+      callback: handleGoogleCode,
     });
-
-    // renderButton needs an explicit pixel width (max 400). Match the
-    // container and re-render on resize so it stays full-width.
-    const draw = () => {
-      const width = Math.min(Math.max(Math.round(el.offsetWidth) || 320, 200), 400);
-      el.replaceChildren(); // clear any previously-rendered button
-      window.google.accounts.id.renderButton(el, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        text: 'continue_with',
-        shape: 'rectangular',
-        logo_alignment: 'left',
-        width,
-      });
-    };
-    draw();
-    const ro = new ResizeObserver(draw);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [googleLoaded, handleGoogleResponse]);
+  }, [googleLoaded, handleGoogleCode]);
 
   // Click handler - branches on platform:
   //   • iOS native: invoke the Capgo plugin which uses Google's iOS SDK
@@ -187,8 +178,12 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
       }
       return;
     }
-    // Web is handled by Google's rendered button (see the renderButton
-    // effect above), not this click handler.
+    // Web: open Google's sign-in popup via the OAuth code client.
+    if (!codeClientRef.current) {
+      onError('Google Sign-In is loading. Please try again in a moment.');
+      return;
+    }
+    codeClientRef.current.requestCode();
   }
 
   async function handleApple() {
@@ -293,27 +288,20 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
   return (
     <div className="space-y-3">
       {showGoogle && (
-        isNativeIos() ? (
-          // iOS native: custom button drives the Capgo Social Login plugin.
-          <button
-            type="button"
-            onClick={handleGoogleClick}
-            disabled={!nativeSocialLoginInitialised}
-            className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors disabled:opacity-60 disabled:cursor-wait"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Continue with Google
-          </button>
-        ) : (
-          // Web: Google Identity Services renders its official, reliably
-          // clickable button into this container (see the renderButton effect).
-          <div ref={googleBtnRef} className="w-full flex justify-center min-h-[40px]" />
-        )
+        <button
+          type="button"
+          onClick={handleGoogleClick}
+          disabled={isNativeIos() ? !nativeSocialLoginInitialised : !googleLoaded}
+          className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors disabled:opacity-60 disabled:cursor-wait"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
       )}
       {showApple && (
         <button
