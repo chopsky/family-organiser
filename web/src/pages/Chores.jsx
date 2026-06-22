@@ -63,7 +63,6 @@ const IcPencil = (p) => <Svg {...p}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 
 const IcTrash = (p) => <Svg {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></Svg>;
 const IcClose = (p) => <Svg {...p}><path d="M18 6L6 18M6 6l12 12" /></Svg>;
 const IcSearch = (p) => <Svg {...p}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></Svg>;
-const IcEyeOff = (p) => <Svg {...p}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></Svg>;
 const IcClock = (p) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>;
 const IcRepeat = (p) => <Svg {...p}><path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></Svg>;
 const StarFill = ({ s = 12, c = STAR }) => <svg width={s} height={s} viewBox="0 0 24 24" fill={c}><path d="M12 2l3 6.3 6.9.9-5 4.8 1.2 6.8L12 17.8 5.9 20.8 7.1 14 2.1 9.2 9 8.3 12 2z" /></svg>;
@@ -185,7 +184,7 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
 }
 
 // ── one member column ───────────────────────────────────────────────────────
-function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile, bare, hideCompleted }) {
+function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, onReorder, onAdd, mobile, bare }) {
   const { enabled: childMode } = useChildMode();
   const hex = hexFor(m);
   // group tasks into slots
@@ -242,7 +241,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
           {groups.map((g) => {
             const sd = g.tasks.filter((t) => t.done?.[m.id]).length, st = g.tasks.length;
             const allDone = st > 0 && sd === st;
-            const tiles = hideCompleted ? g.tasks.filter((t) => !t.done?.[m.id]) : g.tasks;
+            const tiles = g.tasks;
             return (
               <div key={g.key} style={{ marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 2px 12px' }}>
@@ -397,7 +396,6 @@ export default function Chores() {
   const [dayOffset, setDayOffset] = useState(0);
   const [visibleIds, setVisibleIds] = useState(null); // null = everyone (desktop people filter)
   const [filterOpen, setFilterOpen] = useState(false);
-  const [hideCompleted, setHideCompleted] = useState(false); // mobile Filter pill
   const filterRef = useRef(null);
   const [modal, setModal] = useState(null); // { mode, task?, defaultWho?, anyone? }
   const [celebrate, setCelebrate] = useState(null); // { member, balance }
@@ -596,13 +594,11 @@ export default function Chores() {
               )}
             </div>
             )}
-            {!isMobile && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
               <button onClick={() => setDayOffset(0)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 96 }}>{dayLabel}</button>
               <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
             </div>
-            )}
             {!childMode && (isMobile
               ? <PillBtn primary aria-label="Add task" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
               : <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
@@ -619,19 +615,6 @@ export default function Chores() {
         // Mobile: a person selector + one member's column, full width, page-scrolled.
         // paddingBottom clears the floating AI chat button once scrolled to the end.
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 160 }}>
-          {/* Filter + day navigation */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14, flexShrink: 0 }}>
-            {/* Filter pill: hides completed tasks (filled dark when on) */}
-            <button onClick={() => setHideCompleted((v) => !v)} aria-pressed={hideCompleted}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: hideCompleted ? INK : BG_SOFT, color: hideCompleted ? '#fff' : INK2, border: 0 }}>
-              <IcEyeOff s={15} c={hideCompleted ? '#fff' : INK2} /> Filter
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
-              <button onClick={() => setDayOffset(0)} style={{ padding: '9px 18px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK }}>{dayLabel}</button>
-              <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
-            </div>
-          </div>
           {/* member avatars */}
           <div style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '7px 0 16px', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
             {baseMembers.map((m) => {
@@ -676,7 +659,7 @@ export default function Chores() {
             <div key={activeMember.id} onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <MemberDayCard member={activeMember} done={tasksFor(activeMember.id).filter((t) => t.done?.[activeMember.id]).length} total={tasksFor(activeMember.id).length} balance={balances[activeMember.id]} showRewards={isKid(activeMember) || (balances[activeMember.id] || 0) > 0} onRewards={() => navigate('/rewards')} />
-              <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare hideCompleted={hideCompleted}
+              <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare
                 onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
             </div>
           )}
