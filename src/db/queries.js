@@ -2461,6 +2461,21 @@ async function createShoppingList(householdId, name, opts = {}, db = supabase) {
   return data;
 }
 
+// Fold any stray auto-created "Default" shopping lists into the resolved staple
+// list, moving their items across. Heals the bug where the WhatsApp bot's hard
+// `name === 'Default'` match spawned a separate "Default" list (with the user's
+// items) instead of using the app's "Shopping" staple. Best-effort + a no-op
+// once there are no strays. `lists` is the already-fetched list set.
+async function _foldStrayDefaultLists(householdId, stapleId, lists, db = supabase) {
+  const strays = (lists || []).filter((l) => l.id !== stapleId && l.name === 'Default');
+  for (const stray of strays) {
+    try {
+      await db.from('shopping_items').update({ list_id: stapleId }).eq('list_id', stray.id);
+      await db.from('shopping_lists').delete().eq('id', stray.id).eq('household_id', householdId);
+    } catch { /* best-effort heal - never block the caller */ }
+  }
+}
+
 // Ensure the household has a protected "Shopping" staple list for the Lists
 // page (alongside the virtual To-dos list backed by the tasks table). Promotes
 // the existing staple (an old "Default"/"Groceries"/"Shopping" list) - renaming
@@ -2482,6 +2497,7 @@ async function ensureShoppingList(householdId, db = supabase) {
   if (staple) {
     const full = await db.from('shopping_lists').update({ name: 'Shopping', emoji: '🛒', protected: true }).eq('id', staple.id);
     if (full.error) await db.from('shopping_lists').update({ name: 'Shopping' }).eq('id', staple.id);
+    await _foldStrayDefaultLists(householdId, staple.id, lists, db);
     return;
   }
   const ins = await db.from('shopping_lists').insert({ household_id: householdId, name: 'Shopping', emoji: '🛒', protected: true });
@@ -2498,35 +2514,36 @@ async function deleteShoppingList(listId, householdId, db = supabase) {
   return data;
 }
 
+// Resolve the household's single staple shopping list - the SAME list the Lists
+// page maintains via ensureShoppingList (named "Shopping", protected). The
+// WhatsApp bot, meal-plan "add ingredients", and chat all funnel through here,
+// so they MUST land on the app's list rather than spawning a separate "Default"
+// list (the previous hard `name === 'Default'` match did exactly that once the
+// app had renamed the staple to "Shopping"). Folds any stray "Default" list
+// back in along the way.
 async function getDefaultShoppingList(householdId, db = supabase) {
-  let { data } = await db
-    .from('shopping_lists')
-    .select('*')
-    .eq('household_id', householdId)
-    .eq('name', 'Default')
-    .single();
-  if (!data) {
-    // Create all default lists for this household. The preset set is
-    // locale-aware (UK gets Tesco/M&S/etc., SA gets Pick n Pay/Woolies,
-    // everywhere else gets just "Default") - see DEFAULT_LISTS_BY_COUNTRY
-    // above getShoppingLists for the rationale.
-    const { data: hh } = await db
-      .from('households')
-      .select('country')
-      .eq('id', householdId)
-      .single();
-    const presets = defaultShoppingListsFor(hh?.country);
-    const rows = presets.map(name => ({ household_id: householdId, name }));
-    await db.from('shopping_lists').insert(rows);
-    const result = await db
-      .from('shopping_lists')
-      .select('*')
-      .eq('household_id', householdId)
-      .eq('name', 'Default')
-      .single();
-    data = result.data;
+  const { data } = await db.from('shopping_lists').select('*').eq('household_id', householdId);
+  const lists = data || [];
+  const staple = lists.find((l) => /^shopping$/i.test(l.name))
+    || lists.find((l) => /grocer/i.test(l.name))
+    || lists.find((l) => l.name === 'Default')
+    || lists.find((l) => l.protected)
+    || lists[0];
+  if (staple) {
+    await _foldStrayDefaultLists(householdId, staple.id, lists, db);
+    return staple;
   }
-  return data;
+  // No lists yet - create the canonical "Shopping" staple (matches
+  // ensureShoppingList). Fall back to a name-only insert if the lists-adapter
+  // columns (emoji/protected) don't exist yet.
+  const ins = await db.from('shopping_lists')
+    .insert({ household_id: householdId, name: 'Shopping', emoji: '🛒', protected: true })
+    .select('*').single();
+  if (!ins.error && ins.data) return ins.data;
+  const fb = await db.from('shopping_lists')
+    .insert({ household_id: householdId, name: 'Shopping' })
+    .select('*').single();
+  return fb.data || null;
 }
 
 async function getOverdueTasksForUser(householdId, userId, db = supabase) {
