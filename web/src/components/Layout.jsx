@@ -340,10 +340,13 @@ export default function Layout({ children }) {
       {/* ── Main Content ── */}
       <main className={`flex-1 md:ml-60 min-w-0 overflow-x-hidden${appHeight ? ' flex flex-col min-h-0' : ''}`}>
         <OfflineBanner />
-        {/* pb-40 on mobile keeps the last of the page's content clear of the
-            floating AI chat button (bottom-24 + h-14 = ~152px tall) that now
-            shows on phones; desktop has no bottom bar so it stays at pb-9. */}
-        <div className={`px-4 md:px-8 py-4 md:py-9 pb-40 md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
+        {/* Mobile reserves room for the floating AI chat button (≈152px tall,
+            bottom-right) so it never covers content. Window-scrolling pages get
+            pb-40 directly. The inner-scroll Tasks/Lists pages instead keep a
+            full-height viewport (pb-0) and pad the bottom of their OWN scroll
+            area, so the gap only shows once you reach the end - not
+            permanently. Desktop has no bottom bar, so pb-9 throughout. */}
+        <div className={`px-4 md:px-8 pt-4 md:pt-9 ${(location.pathname === '/tasks' || location.pathname === '/lists') ? 'pb-0' : 'pb-40'} md:pb-9${appHeight ? ' flex-1 min-h-0 overflow-hidden' : ''}`}>
           {children}
         </div>
       </main>

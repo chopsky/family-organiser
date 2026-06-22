@@ -451,7 +451,8 @@ export default function Chores() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>Add family members to start assigning tasks.</div>
       ) : isMobile ? (
         // Mobile: a person selector + one member's column, full width, page-scrolled.
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        // paddingBottom clears the floating AI chat button once scrolled to the end.
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 160 }}>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0 12px', flexShrink: 0 }}>
             {baseMembers.map((m) => {
               const sel = m.id === (activeMember?.id);

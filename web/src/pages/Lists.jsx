@@ -202,7 +202,7 @@ export default function Lists() {
       {loading ? (
         <Center>Loading…</Center>
       ) : (
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, flex: 1, minHeight: 0, overflowY: isMobile ? 'auto' : undefined, WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, flex: 1, minHeight: 0, overflowY: isMobile ? 'auto' : undefined, WebkitOverflowScrolling: 'touch', paddingBottom: isMobile ? 160 : undefined }}>
           {/* rail (vertical on desktop, a horizontal chip strip on mobile) */}
           <div style={{ flex: isMobile ? 'none' : '0 0 240px', display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 6, overflowX: isMobile ? 'auto' : 'visible', overflowY: isMobile ? 'hidden' : 'auto', paddingBottom: isMobile ? 4 : 0 }}>
             {lists.map((l) => {
