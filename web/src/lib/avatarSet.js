@@ -5,7 +5,7 @@
 // Avatar precedence (see components/ui/Avatar): photo -> illustration -> initial.
 
 const SET = 'set2';
-const COUNT = 59;
+const COUNT = 60;
 
 // ['set2/n01', 'set2/n02', … 'set2/n52']
 export const FAMILY_AVATARS = Array.from(
