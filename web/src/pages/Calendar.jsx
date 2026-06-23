@@ -465,9 +465,22 @@ export default function Calendar() {
       // user's own re-created event. (The API already orders native-first; this
       // keeps the dedup correct regardless of payload order.)
       byId.sort((a, b) => (a.external_feed_id ? 1 : 0) - (b.external_feed_id ? 1 : 0));
+      // Collapse a read-only SYNCED copy only when a NATIVE event shares its
+      // title+date (the deleted-at-source ghost case above). Then drop exact
+      // dupes by title + START TIME — keying on the time, not just the date, so
+      // two genuinely-different same-title events on one day (e.g. "Flicky" at
+      // 12:00 AND 14:00) both survive instead of the later one silently
+      // vanishing. Mirrors the dashboard digest's dedupeTodayEvents so the two
+      // surfaces agree.
+      const nativeTitleDates = new Set(
+        byId.filter(e => !e.external_feed_id)
+          .map(e => `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}`),
+      );
       const seen = new Set();
       const uniqueEvents = byId.filter(e => {
-        const key = `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}|${(e.end_time || '').split('T')[0]}`;
+        const title = (e.title || '').toLowerCase().trim();
+        if (e.external_feed_id && nativeTitleDates.has(`${title}|${(e.start_time || '').split('T')[0]}`)) return false;
+        const key = `${title}|${e.start_time || ''}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
