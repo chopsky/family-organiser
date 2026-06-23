@@ -424,6 +424,32 @@ describe('PATCH /api/household/profile', () => {
     expect(res.status).not.toBe(403);
     expect(db.updateUser).toHaveBeenCalledWith('k-1', expect.objectContaining({ name: 'Logan B' }));
   });
+
+  test('picking an illustrated avatar stores avatar_id and clears any photo', async () => {
+    db.updateUser.mockResolvedValue({ id: 'u-2', avatar_id: 'set2/n07' });
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    const res = await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` }).send({ name: 'Lynn', avatar_id: 'set2/n07' });
+    expect(res.status).not.toBe(403);
+    expect(db.updateUser).toHaveBeenCalledWith('u-2', expect.objectContaining({ avatar_id: 'set2/n07', avatar_url: null }));
+  });
+
+  test('clearing the avatar (null) leaves any photo untouched', async () => {
+    db.updateUser.mockResolvedValue({ id: 'u-2' });
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` }).send({ name: 'Lynn', avatar_id: null });
+    const updates = db.updateUser.mock.calls[0][1];
+    expect(updates.avatar_id).toBeNull();
+    expect(updates).not.toHaveProperty('avatar_url');
+  });
+
+  test('rejects a malformed avatar id', async () => {
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    const res = await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` }).send({ name: 'Lynn', avatar_id: '../../etc/passwd' });
+    expect(res.status).toBe(400);
+  });
 });
 
 // ─── DELETE /api/household/members/:userId ──────────────────────────────────

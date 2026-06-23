@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { hexFor } from '../../lib/memberColors';
+import { avatarSrc } from '../../lib/avatarSet';
 
 /**
  * Avatar - solid colour circle with the member's initial, or their uploaded
@@ -68,6 +69,23 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
             onError={() => setErroredUrl(member.avatar_url)}
           />
         </div>
+      </div>
+    );
+  }
+
+  // Chosen illustrated avatar (no photo) - the illustration sits on a soft tint
+  // of the member's identifying colour, anchored to the bottom of the circle.
+  if (member.avatar_id) {
+    return (
+      <div
+        className={className}
+        style={{ ...base, background: hexFor(member) + '22', overflow: 'hidden', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      >
+        <img
+          src={avatarSrc(member.avatar_id)}
+          alt={member.name || ''}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
       </div>
     );
   }

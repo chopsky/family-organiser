@@ -19,6 +19,7 @@ import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { ACTIVITY_ICONS, iconFor } from '../lib/activityIcons';
 import { FAMILY_ROLES } from '../lib/familyRoles';
+import { FAMILY_AVATARS } from '../lib/avatarSet';
 
 // Soft warm sand for inset chips / day pills (shared literal across the
 // redesigned pages - no exact theme token for this neutral).
@@ -364,11 +365,9 @@ export default function FamilySetup() {
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
   const [profileColor, setProfileColor] = useState('teal');
-  const [profileAvatar, setProfileAvatar] = useState(null);
-  // Edit-profile preview: a broken avatar URL falls back to the initial and is
-  // treated as "no photo" (initial + Upload only, no Remove). Keyed on the URL
-  // so a fresh upload retries.
-  const [profileAvatarErrUrl, setProfileAvatarErrUrl] = useState(null);
+  const [profileAvatar, setProfileAvatar] = useState(null); // uploaded photo URL
+  const [profileAvatarId, setProfileAvatarId] = useState(''); // chosen illustrated-avatar id (e.g. 'set2/n07')
+  const [profilePicker, setProfilePicker] = useState('avatar'); // 'avatar' | 'photo'
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   // Separate flag for the household-card avatar quick-upload (different
   // from the per-member uploadingAvatar above). Lets us overlay a
@@ -687,6 +686,8 @@ export default function FamilySetup() {
     setProfileBirthday(member.birthday || '');
     setProfileColor(member.color_theme || 'sage');
     setProfileAvatar(member.avatar_url || null);
+    setProfileAvatarId(member.avatar_id || '');
+    setProfilePicker(member.avatar_url ? 'photo' : 'avatar');
     setProfileSchoolId(member.school_id || null);
     setProfileAttendsSchool(Boolean(member.school_id));
     const school = householdSchools.find(s => s.id === member.school_id);
@@ -1430,7 +1431,8 @@ export default function FamilySetup() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setProfileAvatar(data.avatar_url);
-      setEditingMember(m => (m ? { ...m, avatar_url: data.avatar_url } : m));
+      setProfileAvatarId(''); // uploading a photo clears any chosen illustration
+      setEditingMember(m => (m ? { ...m, avatar_url: data.avatar_url, avatar_id: null } : m));
       await loadMembers();
       // Only the current user's avatar lives in the auth context.
       if (targetId === user.id) login({ token, user: { ...user, avatar_url: data.avatar_url }, household });
@@ -1473,6 +1475,9 @@ export default function FamilySetup() {
         family_role: profileRole.trim(),
         birthday: profileBirthday || null,
         color_theme: profileColor,
+        // Chosen illustrated avatar; the backend clears any photo when this is
+        // set, and leaves the photo untouched when it's null.
+        avatar_id: profileAvatarId || null,
       };
 
       // School link is only a term-calendar disambiguator now, surfaced as
@@ -1507,7 +1512,7 @@ export default function FamilySetup() {
 
       // Only update auth context if editing own profile
       if (isEditingSelf) {
-        const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
+        const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor, avatar_id: profileAvatarId || null, ...(profileAvatarId ? { avatar_url: null } : {}) };
         login({ token, user: updatedUser, household });
       }
       setEditingMember(null);
@@ -3076,44 +3081,43 @@ export default function FamilySetup() {
             )}
 
             <div className="space-y-4">
-              {/* Avatar upload */}
-              <div className="flex flex-col items-center gap-2">
-                {profileAvatar && profileAvatarErrUrl !== profileAvatar ? (
-                  <img
-                    src={profileAvatar}
-                    alt={profileName}
-                    onError={() => setProfileAvatarErrUrl(profileAvatar)}
-                    className="w-20 h-20 rounded-full object-cover"
-                  />
+              {/* Avatar: an illustrated avatar from the set, or an uploaded photo */}
+              <div className="flex flex-col items-center gap-3.5">
+                <Avatar member={{ name: profileName, color_theme: profileColor, avatar_url: profileAvatar, avatar_id: profileAvatarId }} size={84} />
+                {/* Avatar / Photo toggle */}
+                <div className="inline-flex gap-1 p-1 rounded-[11px]" style={{ background: '#F3EEE5' }}>
+                  {[['avatar', 'Avatar'], ['photo', 'Photo']].map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => setProfilePicker(k)}
+                      className="px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-colors"
+                      style={profilePicker === k ? { background: '#fff', color: '#2D2A33', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' } : { background: 'transparent', color: '#6B6774' }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                {profilePicker === 'photo' ? (
+                  <div className="flex items-center gap-3">
+                    <label className={`text-sm font-medium cursor-pointer ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}>
+                      {uploadingAvatar ? 'Uploading…' : (profileAvatar ? 'Change photo' : 'Upload photo')}
+                      <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={uploadingAvatar} className="hidden" />
+                    </label>
+                    {profileAvatar && (
+                      <button type="button" onClick={handleAvatarRemove} disabled={uploadingAvatar} className="text-sm text-error hover:text-error/80 transition-colors">Remove</button>
+                    )}
+                  </div>
                 ) : (
-                  <div className={`w-20 h-20 rounded-full ${
-                    AVATAR_COLOURS[profileColor] || AVATAR_COLOURS.teal
-                  } flex items-center justify-center font-semibold text-2xl`}>
-                    {profileName?.[0]?.toUpperCase() || '?'}
+                  <div className="w-full" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 52px)', justifyContent: 'space-between', gap: '12px 8px', maxHeight: 120, overflowY: 'auto', padding: 4 }}>
+                    {FAMILY_AVATARS.map((id) => {
+                      const on = profileAvatarId === id && !profileAvatar;
+                      const hex = hexFor({ color_theme: profileColor });
+                      return (
+                        <button key={id} type="button" onClick={() => { setProfileAvatarId(id); setProfileAvatar(null); }} aria-label="Choose avatar"
+                          style={{ width: 52, height: 52, borderRadius: '50%', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxSizing: 'border-box', border: 'none', background: (on ? hex : '#8A8493') + (on ? '33' : '12'), boxShadow: on ? `0 0 0 2px ${hex}` : 'none' }}>
+                          <img src={`/avatars/${id}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
-                <div className="flex items-center gap-3">
-                  <label className={`text-sm font-medium cursor-pointer ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}>
-                    {uploadingAvatar ? 'Uploading…' : 'Upload photo'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      disabled={uploadingAvatar}
-                      className="hidden"
-                    />
-                  </label>
-                  {profileAvatar && profileAvatarErrUrl !== profileAvatar && (
-                    <button
-                      type="button"
-                      onClick={handleAvatarRemove}
-                      disabled={uploadingAvatar}
-                      className="text-sm text-error hover:text-error/80 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
               </div>
 
               <div>

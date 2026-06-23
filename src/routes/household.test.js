@@ -58,7 +58,7 @@ describe('POST /api/household/profile/avatar', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.userId).toBe('mason');
-    expect(db.updateUser).toHaveBeenCalledWith('mason', { avatar_url: expect.any(String) });
+    expect(db.updateUser).toHaveBeenCalledWith('mason', { avatar_url: expect.any(String), avatar_id: null });
     // stored under the target member's id, not the caller's
     expect(mockStorage.upload).toHaveBeenCalledWith('h1/mason.jpg', expect.anything(), expect.anything());
   });
@@ -85,7 +85,7 @@ describe('POST /api/household/profile/avatar', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.userId).toBe('me');
-    expect(db.updateUser).toHaveBeenCalledWith('me', { avatar_url: expect.any(String) });
+    expect(db.updateUser).toHaveBeenCalledWith('me', { avatar_url: expect.any(String), avatar_id: null });
     // self path skips the household membership lookup
     expect(db.getHouseholdMembers).not.toHaveBeenCalled();
   });

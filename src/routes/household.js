@@ -171,7 +171,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  */
 router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
-  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id } = req.body;
+  const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, avatar_id } = req.body;
 
   // Determine target user. Housemait is collaborative — any household member
   // (every authenticated member is a managing adult) may edit another member's
@@ -218,6 +218,16 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     updates.longitude = req.body.longitude;
   }
   if (school_id !== undefined) updates.school_id = school_id || null;
+
+  // Illustrated avatar (e.g. 'set2/n07'). Picking one clears any uploaded photo
+  // so the precedence photo -> illustration -> initial keeps at most one set.
+  if (avatar_id !== undefined) {
+    if (avatar_id && !/^[a-z0-9_-]+\/[a-z0-9_-]+$/i.test(avatar_id)) {
+      return res.status(400).json({ error: 'Invalid avatar.' });
+    }
+    updates.avatar_id = avatar_id || null;
+    if (avatar_id) updates.avatar_url = null;
+  }
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No valid fields to update.' });
@@ -321,8 +331,9 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
     // Append cache-buster so browsers pick up new image
     const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-    // Save to DB
-    const updated = await db.updateUser(targetId, { avatar_url: avatarUrl });
+    // Save to DB. Uploading a photo clears any chosen illustration so the
+    // precedence photo -> illustration -> initial keeps at most one set.
+    const updated = await db.updateUser(targetId, { avatar_url: avatarUrl, avatar_id: null });
     cache.invalidate(`members:${req.householdId}`);
     return res.json({ avatar_url: updated.avatar_url, userId: targetId });
   } catch (err) {
