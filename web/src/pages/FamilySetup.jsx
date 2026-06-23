@@ -18,6 +18,7 @@ import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { ACTIVITY_ICONS, iconFor } from '../lib/activityIcons';
+import { FAMILY_ROLES } from '../lib/familyRoles';
 
 // Soft warm sand for inset chips / day pills (shared literal across the
 // redesigned pages - no exact theme token for this neutral).
@@ -2758,7 +2759,11 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-                <input type="text" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Mother, Son, Grandmother" />
+                <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white">
+                  <option value="">Select role…</option>
+                  {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {newRole && !FAMILY_ROLES.includes(newRole) && <option value={newRole}>{newRole}</option>}
+                </select>
               </div>
 
               <div>
@@ -3117,13 +3122,15 @@ export default function FamilySetup() {
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-                <input
-                  type="text"
+                <select
                   value={profileRole}
                   onChange={(e) => setProfileRole(e.target.value)}
                   className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
-                  placeholder="e.g. Father, Mother, Daughter"
-                />
+                >
+                  <option value="">Select role…</option>
+                  {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {profileRole && !FAMILY_ROLES.includes(profileRole) && <option value={profileRole}>{profileRole}</option>}
+                </select>
               </div>
 
               {/* Native iOS date/time inputs have an intrinsic min-width that

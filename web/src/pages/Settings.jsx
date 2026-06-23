@@ -11,6 +11,7 @@ import { isDeviceCalendarSupported } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
+import { FAMILY_ROLES } from '../lib/familyRoles';
 import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
@@ -453,7 +454,11 @@ function EditProfileForm({
 
         <div>
           <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-          <input type="text" value={profileRole} onChange={(e) => setProfileRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Father, Mother, Daughter" />
+          <select value={profileRole} onChange={(e) => setProfileRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white">
+            <option value="">Select role…</option>
+            {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {profileRole && !FAMILY_ROLES.includes(profileRole) && <option value={profileRole}>{profileRole}</option>}
+          </select>
         </div>
 
         <div>
