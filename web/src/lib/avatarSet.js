@@ -9,7 +9,7 @@ const COUNT = 60;
 
 // Retired avatar ids: filtered out of the picker but never renumbered, so every
 // other member's saved avatar_id keeps pointing at the same face.
-const RETIRED = new Set(['set2/n53']);
+const RETIRED = new Set(['set2/n53', 'set2/n54']);
 
 // ['set2/n01', 'set2/n02', … 'set2/n60'] minus the retired ones
 export const FAMILY_AVATARS = Array.from(
