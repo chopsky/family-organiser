@@ -93,18 +93,18 @@ export default function Meals() {
       <PageHeader
         kicker={activeTab === 'plan' ? 'This week' : null}
         title={activeTab === 'plan' ? 'Meal plan' : 'Recipe box'}
+        actions={(
+          <Segmented
+            value={activeTab}
+            onChange={setActiveTab}
+            ariaLabel="Meals view"
+            options={[{ value: 'plan', label: 'Meal plan' }, { value: 'recipes', label: 'Recipe box' }]}
+          />
+        )}
       />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {!canWrite && <SubscribePrompt message="Subscribe to plan meals, save recipes, and generate shopping lists" />}
-
-      {/* Meal plan / Recipe box toggle */}
-      <Segmented
-        value={activeTab}
-        onChange={setActiveTab}
-        ariaLabel="Meals view"
-        options={[{ value: 'plan', label: 'Meal plan' }, { value: 'recipes', label: 'Recipe box' }]}
-      />
 
       {activeTab === 'plan' ? (
         <MealPlanView error={error} setError={setError} />

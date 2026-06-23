@@ -531,7 +531,7 @@ export default function Chores() {
   // it (so they can add to it); in Child Mode it only appears once it has
   // chores to claim.
   const anyoneTasks = tasks.filter((t) => t.anyone);
-  const showAnyone = !childMode || anyoneTasks.length > 0;
+  const showAnyone = true; // always offered, incl. Child Mode (kids claim up-for-grabs chores)
   // Mobile selectables = member pills + an "Anyone" pill (id 'anyone').
   const selectables = showAnyone ? [...baseMembers, { id: 'anyone' }] : baseMembers;
   const anyoneActive = activeWho === 'anyone' && showAnyone;
