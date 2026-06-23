@@ -668,8 +668,10 @@ export default function FamilySetup() {
 
   // Personal profiles are private: an adult can edit only their OWN profile.
   // Children (dependents) have no login, so any adult may edit theirs.
+  // Any managing adult may edit any member's profile (self, a child, or another
+  // account-holder); non-managers can still edit themselves + children.
   function canEditProfile(m) {
-    return !!m && (m.id === user?.id || m.member_type === 'dependent');
+    return !!m && (isAdmin || m.id === user?.id || m.member_type === 'dependent');
   }
 
   function openEditProfile(member) {

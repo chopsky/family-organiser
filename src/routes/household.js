@@ -173,10 +173,12 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
   const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id } = req.body;
 
-  // Determine target user. Personal profiles are private: each adult edits
-  // ONLY their own. Any adult may edit a child's (dependent's) profile, since
-  // children don't have their own login. So editing someone else is allowed
-  // only when that someone is a dependent.
+  // Determine target user. Housemait is collaborative — any household member
+  // (every authenticated member is a managing adult) may edit another member's
+  // PROFILE: name, family role, birthday, colour and school link, whether that
+  // member is a child or another account-holder. The target must belong to this
+  // household (guards IDOR). Personal notification/locale/location settings stay
+  // self-only and are skipped below when editing someone else.
   let targetUserId = req.user.id;
   if (user_id && user_id !== req.user.id) {
     const members = await db.getHouseholdMembers(req.householdId);
@@ -184,11 +186,9 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     if (!target) {
       return res.status(404).json({ error: 'Member not found in this household.' });
     }
-    if (target.member_type !== 'dependent') {
-      return res.status(403).json({ error: 'You can only edit your own profile. Each adult manages their own.' });
-    }
     targetUserId = user_id;
   }
+  const editingOther = targetUserId !== req.user.id;
 
   const updates = {};
 
@@ -204,14 +204,16 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     }
     updates.color_theme = color_theme;
   }
-  if (reminder_time !== undefined) {
+  // Personal notification/locale/location settings are self-only — never
+  // changed for you when another member edits your profile.
+  if (reminder_time !== undefined && !editingOther) {
     // Accept HH:MM or null (null = use household default)
     updates.reminder_time = reminder_time || null;
   }
-  if (timezone !== undefined) {
+  if (timezone !== undefined && !editingOther) {
     updates.timezone = timezone || null;
   }
-  if (req.body.latitude !== undefined && req.body.longitude !== undefined) {
+  if (req.body.latitude !== undefined && req.body.longitude !== undefined && !editingOther) {
     updates.latitude = req.body.latitude;
     updates.longitude = req.body.longitude;
   }

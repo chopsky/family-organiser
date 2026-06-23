@@ -393,13 +393,26 @@ describe('PATCH /api/household/profile', () => {
     expect(db.updateUser).toHaveBeenCalledWith('u-2', expect.objectContaining({ name: 'Lynne' }));
   });
 
-  test('a member CANNOT edit another adult\'s profile', async () => {
+  test('a member CAN edit another account-holder\'s profile identity', async () => {
     db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
+    db.updateUser.mockResolvedValue({ id: 'u-1', name: 'Grant B' });
     const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
     const res = await request(app).patch('/api/household/profile')
-      .set({ Authorization: `Bearer ${lynn}` }).send({ user_id: 'u-1', name: 'Hacked' });
-    expect(res.status).toBe(403);
-    expect(db.updateUser).not.toHaveBeenCalled();
+      .set({ Authorization: `Bearer ${lynn}` }).send({ user_id: 'u-1', name: 'Grant B', family_role: 'Father' });
+    expect(res.status).not.toBe(403);
+    expect(db.updateUser).toHaveBeenCalledWith('u-1', expect.objectContaining({ name: 'Grant B', family_role: 'Father' }));
+  });
+
+  test('editing another member never changes their personal settings', async () => {
+    db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
+    db.updateUser.mockResolvedValue({ id: 'u-1', name: 'Grant' });
+    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${lynn}` })
+      .send({ user_id: 'u-1', name: 'Grant', reminder_time: '23:00', timezone: 'Pacific/Auckland' });
+    const updates = db.updateUser.mock.calls[0][1];
+    expect(updates).not.toHaveProperty('reminder_time');
+    expect(updates).not.toHaveProperty('timezone');
   });
 
   test('a member CAN edit a child (dependent) profile', async () => {
