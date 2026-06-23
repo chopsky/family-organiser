@@ -3111,7 +3111,7 @@ export default function FamilySetup() {
                       const hex = hexFor({ color_theme: profileColor });
                       return (
                         <button key={id} type="button" onClick={() => { setProfileAvatarId(id); setProfileAvatar(null); }} aria-label="Choose avatar"
-                          style={{ width: 52, height: 52, borderRadius: '50%', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxSizing: 'border-box', border: 'none', background: (on ? hex : '#8A8493') + (on ? '33' : '12'), boxShadow: on ? `0 0 0 2px ${hex}` : 'none' }}>
+                          style={{ width: 52, height: 52, borderRadius: '50%', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxSizing: 'border-box', border: 'none', background: on ? hex + '33' : 'transparent', boxShadow: on ? `0 0 0 2px ${hex}` : 'none' }}>
                           <img src={`/avatars/${id}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                         </button>
                       );
