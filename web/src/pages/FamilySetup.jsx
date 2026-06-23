@@ -24,6 +24,7 @@ import { FAMILY_ROLES } from '../lib/familyRoles';
 // redesigned pages - no exact theme token for this neutral).
 const SOFT = '#F3EEE5';
 const CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
+const CARD_SHADOW_HOVER = '0 4px 18px rgba(26, 22, 32, 0.10)';
 
 // Small pickup-car glyph for the Activities rows.
 function PickupCar({ className = 'h-3.5 w-3.5' }) {
@@ -71,20 +72,24 @@ function roleMeta(m) {
 // on hover. The role pill carries a text label (not colour alone) for a11y.
 function MemberCard({ m, canEdit, canRemove, onEdit, onRemove, removing }) {
   const rm = roleMeta(m);
+  const [hover, setHover] = useState(false);
   return (
     <div
       className="group relative bg-white rounded-[18px] border border-light-grey px-5 py-[22px] flex flex-col items-center text-center gap-3"
-      style={{ boxShadow: CARD_SHADOW }}
+      style={{ boxShadow: hover ? CARD_SHADOW_HOVER : CARD_SHADOW, cursor: canEdit ? 'pointer' : 'default', transition: 'box-shadow .2s ease' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={canEdit ? onEdit : undefined}
     >
       {(canEdit || canRemove) && (
         <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           {canEdit && (
-            <button onClick={onEdit} aria-label={`Edit ${m.name}`} className="p-1.5 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} aria-label={`Edit ${m.name}`} className="p-1.5 rounded-lg text-warm-grey hover:text-plum hover:bg-plum-light transition-colors">
               <IconEdit className="h-3.5 w-3.5" />
             </button>
           )}
           {canRemove && (
-            <button onClick={onRemove} disabled={removing} aria-label={`Remove ${m.name}`} className="p-1.5 rounded-lg text-warm-grey hover:text-coral hover:bg-coral-light transition-colors disabled:opacity-50 disabled:cursor-wait">
+            <button onClick={(e) => { e.stopPropagation(); onRemove(); }} disabled={removing} aria-label={`Remove ${m.name}`} className="p-1.5 rounded-lg text-warm-grey hover:text-coral hover:bg-coral-light transition-colors disabled:opacity-50 disabled:cursor-wait">
               <IconTrash className="h-3.5 w-3.5" />
             </button>
           )}
