@@ -4,7 +4,7 @@
 //   • Groceries / custom → the shopping system, via /api/shopping(+lists)
 // Grocery item emojis are derived client-side; To-do assignees come from the
 // task's assigned_to_ids. Mounted at /lists.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
@@ -13,6 +13,7 @@ import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { getItemEmoji, AISLE_CATEGORIES } from '../lib/shopping-constants';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { isIos } from '../lib/platform';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
@@ -47,13 +48,24 @@ export default function Lists() {
   const [newList, setNewList] = useState(false);
   const [editItem, setEditItem] = useState(null); // grocery item being edited
   const [counts, setCounts] = useState({}); // listId -> open count, for the rail
-  const [addWho, setAddWho] = useState([]); // To-dos: assignee ids for the next add (multi)
+  const [addWho, setAddWho] = useState([]); // To-dos (desktop): assignee ids for the next add (multi)
+  const [draftWho, setDraftWho] = useState(null); // To-dos (mobile): single assignee for the next add
+  const [whoPickerOpen, setWhoPickerOpen] = useState(false); // mobile quick-add assignee picker
+  const [confirmDel, setConfirmDel] = useState(false); // mobile inline delete-list confirm
   const [searchParams] = useSearchParams();
   const quickAdd = !!searchParams.get('quickAdd'); // iOS "Add to list" shortcut
   const isMobile = useIsMobile();
+  const iosNative = isIos(); // native iOS → swipe-to-delete; else a delete button
 
   const active = lists.find((l) => l.id === activeId) || lists[0];
   const isTodos = active?.id === TODOS_ID;
+
+  // Switching lists clears the filter + transient mobile UI.
+  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); }, [activeId]);
+  // Mobile coupling: the next item's assignee mirrors the active filter —
+  // picking a member defaults new items to them, "All" clears it (items added
+  // under All are unassigned). The picker can still override independently.
+  useEffect(() => { setDraftWho(toFilter); }, [toFilter]);
 
   const buildDescriptors = useCallback((shoppingLists) => {
     const todos = { id: TODOS_ID, name: 'To-dos', emoji: '✅', color: '#6C3DD9', protected: true, kind: 'todos' };
@@ -127,7 +139,9 @@ export default function Lists() {
     setDraft('');
     try {
       if (isTodos) {
-        const names = members.filter((x) => addWho.includes(x.id)).map((x) => x.name);
+        const names = isMobile
+          ? (draftWho ? [members.find((x) => x.id === draftWho)?.name].filter(Boolean) : [])
+          : members.filter((x) => addWho.includes(x.id)).map((x) => x.name);
         await api.post('/tasks', { title: text, ...(names.length ? { assigned_to_names: names } : {}) });
       } else {
         await api.post('/shopping', { item: text, list_id: active.id });
@@ -135,7 +149,7 @@ export default function Lists() {
       setCounts((c) => ({ ...c, [active.id]: (c[active.id] || 0) + 1 }));
       await loadItems(active);
     } catch { /* keep draft cleared; reload */ loadItems(active); }
-  }, [draft, active, isTodos, loadItems, members, addWho]);
+  }, [draft, active, isTodos, loadItems, members, addWho, isMobile, draftWho]);
 
   // Edit a grocery item (name, quantity, unit, aisle, notes) via PATCH /shopping/:id.
   const saveEdit = useCallback(async (fields) => {
@@ -175,9 +189,8 @@ export default function Lists() {
     } catch (e) { alert(e.response?.data?.error || 'Could not create the list.'); }
   }, [buildDescriptors]);
 
-  const deleteList = useCallback(async () => {
+  const deleteListRaw = useCallback(async () => {
     if (!active || active.protected) return;
-    if (!window.confirm(`Delete the "${active.name}" list and everything on it?`)) return;
     try {
       await api.delete(`/shopping-lists/${active.id}`);
       const sl = (await api.get('/shopping-lists')).data.lists;
@@ -185,6 +198,13 @@ export default function Lists() {
       setActiveId(TODOS_ID);
     } catch { /* ignore */ }
   }, [active, buildDescriptors]);
+
+  // Desktop confirms with the browser dialog; mobile uses the inline confirm.
+  const deleteList = useCallback(() => {
+    if (!active || active.protected) return;
+    if (!window.confirm(`Delete the "${active.name}" list and everything on it?`)) return;
+    deleteListRaw();
+  }, [active, deleteListRaw]);
 
   // visible items (To-dos filter by assignee) + grouping
   const filtered = isTodos && toFilter ? items.filter((i) => (i.whoIds || []).includes(toFilter)) : items;
@@ -196,13 +216,142 @@ export default function Lists() {
 
   return (
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
-      <PageHeader kicker={active ? `${openItems.length} open` : ''} title="Lists"
-        actions={<PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setNewList(true)}>New list</PillBtn>} />
+      <PageHeader kicker={isMobile ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : (active ? `${openItems.length} open` : '')} title="Lists"
+        actions={isMobile
+          ? <PillBtn primary aria-label="New list" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setNewList(true)} />
+          : <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setNewList(true)}>New list</PillBtn>} />
 
       {loading ? (
         <Center>Loading…</Center>
+      ) : isMobile ? (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 160 }}>
+          {/* list pills */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 16, WebkitOverflowScrolling: 'touch' }}>
+            {lists.map((l) => {
+              const on = l.id === activeId;
+              const n = on ? openItems.length : (counts[l.id] ?? 0);
+              return (
+                <button key={l.id} onClick={() => setActiveId(l.id)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, fontFamily: INTER, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, background: on ? l.color : '#fff', color: on ? '#fff' : INK2, border: `1px solid ${on ? l.color : LINE}` }}>
+                  <span style={{ fontSize: 14 }}>{l.emoji}</span>{l.name}
+                  {n > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, fontSize: 10, fontWeight: 700, background: on ? 'rgba(255,255,255,0.28)' : l.color + '1F', color: on ? '#fff' : l.color }}>{n}</span>}
+                </button>
+              );
+            })}
+            <button onClick={() => setNewList(true)} aria-label="New list" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: '50%', background: '#fff', border: `1px dashed ${LINE_STRONG}`, color: INK3, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><IcPlus s={16} w={2.2} c={INK3} /></button>
+          </div>
+
+          {/* active list card (tinted in the list colour) */}
+          <div style={{ background: (active?.color || BRAND) + '14', borderRadius: 22, padding: '16px 14px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px 12px' }}>
+              <span style={{ fontSize: 22 }}>{active?.emoji}</span>
+              <span style={{ fontFamily: SERIF, fontSize: 24, color: INK, flex: 1, minWidth: 0 }}>{active?.name}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: active?.color || BRAND }}>{openItems.length} left</span>
+            </div>
+
+            {/* quick-add (To-dos: assignee picker on the left) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 13, padding: isTodos ? '4px 4px 4px 8px' : '4px 4px 4px 14px', marginBottom: 12, position: 'relative' }}>
+              {isTodos && members.length > 0 && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button onClick={() => setWhoPickerOpen((o) => !o)} aria-label={draftWho ? `Assign to ${memberOf(draftWho)?.name}` : 'Assign to someone'}
+                    style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', borderRadius: '50%' }}>
+                    {draftWho ? <Avatar member={memberOf(draftWho)} size={30} /> : <span style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px dashed ${LINE_STRONG}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPlus s={14} w={2.2} c={INK3} /></span>}
+                  </button>
+                  {whoPickerOpen && (
+                    <>
+                      <div onClick={() => setWhoPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                      <div style={{ position: 'absolute', top: 38, left: 0, zIndex: 30, background: '#fff', borderRadius: 14, padding: 6, minWidth: 172, border: `1px solid ${LINE}`, boxShadow: '0 12px 34px rgba(26,22,32,0.18)' }}>
+                        {members.map((m) => (
+                          <button key={m.id} onClick={() => { setDraftWho(m.id); setWhoPickerOpen(false); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: draftWho === m.id ? BG_SOFT : 'transparent', fontFamily: INTER, textAlign: 'left' }}>
+                            <Avatar member={m} size={26} /><span style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{m.name}</span>
+                            {draftWho === m.id && <span style={{ marginLeft: 'auto' }}><Tick s={13} c={active?.color || BRAND} /></span>}
+                          </button>
+                        ))}
+                        {draftWho && (
+                          <button onClick={() => { setDraftWho(null); setWhoPickerOpen(false); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: 'transparent', fontFamily: INTER, textAlign: 'left', color: INK3, fontSize: 13, marginTop: 2, borderTop: `1px solid ${LINE}` }}>Anyone</button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }} autoFocus={quickAdd}
+                placeholder={isTodos && draftWho ? `Add for ${memberOf(draftWho)?.name}…` : (isTodos ? 'Add a to-do…' : 'Add an item…')}
+                style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', fontFamily: INTER, fontSize: 14, background: 'transparent', padding: '10px 0', color: INK }} />
+              <button onClick={addItem} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 10, background: active?.color || BRAND, color: '#fff', border: 0, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: INTER, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IcPlus s={14} w={2.4} c="#fff" /> Add</button>
+            </div>
+
+            {/* assignee filter (To-dos only) */}
+            {isTodos && members.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, WebkitOverflowScrolling: 'touch' }}>
+                <button onClick={() => setToFilter(null)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: 0, background: !toFilter ? (active?.color || BRAND) : '#fff', color: !toFilter ? '#fff' : INK2 }}>All</button>
+                {members.map((m) => {
+                  const on = toFilter === m.id; const mc = hexFor(m);
+                  const n = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
+                  return (
+                    <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, border: 0, background: on ? mc + '22' : '#fff', boxShadow: on ? `inset 0 0 0 1.5px ${mc}` : `inset 0 0 0 1px ${LINE}` }}>
+                      <Avatar member={m} size={26} /><span style={{ fontSize: 12, fontWeight: 700, color: on ? mc : INK3 }}>{n}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* items grouped by section */}
+            {loadingItems ? (
+              <div style={{ padding: 20, color: INK3, fontSize: 13 }}>Loading…</div>
+            ) : openItems.length === 0 && doneItems.length === 0 ? (
+              <div style={{ padding: '28px 0', textAlign: 'center', color: INK3, fontFamily: SERIF, fontSize: 20 }}>Nothing here yet</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {sections.filter((s) => s.items.length).map((sec) => (
+                  <div key={sec.name || '_all'}>
+                    {sec.name && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: active?.color || BRAND, padding: '0 4px 6px' }}>{sec.name}</div>}
+                    <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+                      {sec.items.map((it, i, arr) => (
+                        <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {doneItems.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK3, padding: '4px 4px 6px' }}>Done · {doneItems.length}</div>
+                    <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', opacity: 0.65 }}>
+                      {doneItems.map((it, i, arr) => (
+                        <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} doneRow />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* delete list — inline confirm, hidden for protected lists */}
+          {active && !active.protected && (
+            <div style={{ paddingTop: 16 }}>
+              {!confirmDel ? (
+                <button onClick={() => setConfirmDel(true)} style={{ width: '100%', padding: 12, borderRadius: 14, cursor: 'pointer', fontFamily: INTER, background: 'transparent', border: '1px solid rgba(215,85,106,0.35)', color: '#C24A5E', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                  <IcTrash s={16} c="#C24A5E" /> Delete list
+                </button>
+              ) : (
+                <div style={{ background: '#fff', borderRadius: 16, padding: 14, border: '1px solid rgba(215,85,106,0.3)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: INK, textAlign: 'center', marginBottom: 3 }}>Delete “{active.name}”?</div>
+                  <div style={{ fontSize: 12.5, color: INK3, textAlign: 'center', marginBottom: 14 }}>This removes the list and its {items.length} item{items.length === 1 ? '' : 's'}.</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setConfirmDel(false)} style={{ flex: 1, padding: 11, borderRadius: 12, cursor: 'pointer', fontFamily: INTER, background: BG_SOFT, border: 0, color: INK2, fontSize: 14, fontWeight: 600 }}>Cancel</button>
+                    <button onClick={() => { deleteListRaw(); setConfirmDel(false); }} style={{ flex: 1, padding: 11, borderRadius: 12, cursor: 'pointer', fontFamily: INTER, background: '#D7556A', border: 0, color: '#fff', fontSize: 14, fontWeight: 600 }}>Delete</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, flex: 1, minHeight: 0, overflowY: isMobile ? 'auto' : undefined, WebkitOverflowScrolling: 'touch', paddingBottom: isMobile ? 160 : undefined }}>
+        <div style={{ display: 'flex', flexDirection: 'row', gap: 20, flex: 1, minHeight: 0 }}>
           {/* rail (vertical on desktop, a horizontal chip strip on mobile) */}
           <div style={{ flex: isMobile ? 'none' : '0 0 240px', display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 6, overflowX: isMobile ? 'auto' : 'visible', overflowY: isMobile ? 'hidden' : 'auto', paddingBottom: isMobile ? 4 : 0 }}>
             {lists.map((l) => {
@@ -347,6 +496,81 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit })
         </div>
       )}
       <button onClick={() => onDelete(it)} aria-label="Delete" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}><IcTrash s={14} c="#C24A5E" /></button>
+    </div>
+  );
+}
+
+// One mobile list row. On native iOS it's a swipe-left-to-reveal Delete (the
+// platform convention); on desktop + mobile web a tap-to-delete trash button
+// (same affordance as desktop). Completed rows render bare (checkbox + text).
+function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, onToggle, onDelete, doneRow }) {
+  const REVEAL = 88; // px of Delete action revealed
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dxRef = useRef(0);
+  const start = useRef(null); // { x, y, tx } while a pointer is down
+  const axis = useRef(null);  // 'h' | 'v' | null (undecided)
+  const setTx = (v) => { dxRef.current = v; setDx(v); };
+  // Toggling completion closes any open swipe.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { dxRef.current = 0; setDx(0); }, [it.done]);
+  const border = last ? 'none' : `1px solid ${LINE}`;
+
+  if (doneRow) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: border }}>
+        <button onClick={() => onToggle(it)} aria-label="Mark not done" style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${color}`, background: color }}><Tick s={12} /></button>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: INK3, textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      </div>
+    );
+  }
+
+  const onDown = (e) => { if (!iosNative) return; start.current = { x: e.clientX, y: e.clientY, tx: dxRef.current }; axis.current = null; };
+  const onMove = (e) => {
+    const s = start.current; if (!s) return;
+    const ddx = e.clientX - s.x, ddy = e.clientY - s.y;
+    if (!axis.current) {
+      if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return;          // slop
+      axis.current = Math.abs(ddx) > Math.abs(ddy) ? 'h' : 'v';      // decisive axis
+      if (axis.current === 'h') { setDragging(true); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ } }
+    }
+    if (axis.current === 'h') setTx(Math.max(-REVEAL, Math.min(0, s.tx + ddx)));
+  };
+  const onUp = () => {
+    const s = start.current; start.current = null; setDragging(false);
+    if (!s || axis.current !== 'h') { axis.current = null; return; } // vertical = scroll, do nothing
+    setTx(dxRef.current < -REVEAL / 2 ? -REVEAL : 0);                // snap
+    axis.current = null;
+  };
+  const onCancel = () => { start.current = null; axis.current = null; setDragging(false); setTx(dxRef.current < -REVEAL / 2 ? -REVEAL : 0); };
+
+  const inner = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
+      <button onClick={() => onToggle(it)} aria-label={it.done ? 'Mark not done' : 'Mark done'}
+        style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: it.done ? `2px solid ${color}` : `1.5px solid ${LINE_STRONG}`, background: it.done ? color : 'transparent' }}>
+        {it.done && <Tick s={12} />}
+      </button>
+      {!isTodos && it.emoji && <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, fontSize: 18, background: color + '1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.emoji}</span>}
+      <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      {isTodos && assignees.length > 0 && (
+        <div style={{ display: 'flex', flexShrink: 0 }}>
+          {assignees.slice(0, 3).map((m, i) => <div key={m.id} style={{ marginLeft: i ? -8 : 0, borderRadius: '50%', border: '2px solid #fff', display: 'flex' }}><Avatar member={m} size={26} /></div>)}
+        </div>
+      )}
+      {!iosNative && <button onClick={() => onDelete(it)} aria-label="Delete" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcTrash s={14} c="#C24A5E" /></button>}
+    </div>
+  );
+
+  if (!iosNative) return <div style={{ borderBottom: border }}>{inner}</div>;
+  return (
+    <div style={{ position: 'relative', borderBottom: border }}>
+      <button onClick={() => onDelete(it)} aria-label="Delete" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: REVEAL, border: 0, cursor: 'pointer', background: '#D7556A', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: INTER, fontSize: 12, fontWeight: 700 }}>
+        <IcTrash s={18} c="#fff" /> Delete
+      </button>
+      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}
+        style={{ position: 'relative', background: '#fff', transform: `translateX(${dx}px)`, transition: dragging ? 'none' : 'transform .22s ease', touchAction: 'pan-y' }}>
+        {inner}
+      </div>
     </div>
   );
 }
