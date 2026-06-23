@@ -27,7 +27,6 @@ const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
 const IcClose = (p) => <Svg {...p}><path d="M18 6L6 18M6 6l12 12" /></Svg>;
 const IcTrash = (p) => <Svg {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></Svg>;
 const IcChevDown = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;
-const IcPeople = (p) => <Svg {...p}><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5" /><path d="M16 5a3 3 0 0 1 0 6M22 20c0-2.5-2-4.3-4.5-4.8" /></Svg>;
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 const DEFAULT_TINTS = ['#6C3DD9', '#6BA368', '#5B8DE0', '#D8788A', '#D89B3A', '#3AADA0'];
@@ -48,8 +47,7 @@ export default function Lists() {
   const [newList, setNewList] = useState(false);
   const [editItem, setEditItem] = useState(null); // grocery item being edited
   const [counts, setCounts] = useState({}); // listId -> open count, for the rail
-  const [addWho, setAddWho] = useState([]); // To-dos (desktop): assignee ids for the next add (multi)
-  const [draftWho, setDraftWho] = useState(null); // To-dos (mobile): single assignee for the next add
+  const [draftWho, setDraftWho] = useState(null); // To-dos: single assignee for the next add (mobile + desktop)
   const [whoPickerOpen, setWhoPickerOpen] = useState(false); // mobile quick-add assignee picker
   const [confirmDel, setConfirmDel] = useState(false); // mobile inline delete-list confirm
   const [searchParams] = useSearchParams();
@@ -139,9 +137,7 @@ export default function Lists() {
     setDraft('');
     try {
       if (isTodos) {
-        const names = isMobile
-          ? (draftWho ? [members.find((x) => x.id === draftWho)?.name].filter(Boolean) : [])
-          : members.filter((x) => addWho.includes(x.id)).map((x) => x.name);
+        const names = draftWho ? [members.find((x) => x.id === draftWho)?.name].filter(Boolean) : [];
         await api.post('/tasks', { title: text, ...(names.length ? { assigned_to_names: names } : {}) });
       } else {
         await api.post('/shopping', { item: text, list_id: active.id });
@@ -149,7 +145,7 @@ export default function Lists() {
       setCounts((c) => ({ ...c, [active.id]: (c[active.id] || 0) + 1 }));
       await loadItems(active);
     } catch { /* keep draft cleared; reload */ loadItems(active); }
-  }, [draft, active, isTodos, loadItems, members, addWho, isMobile, draftWho]);
+  }, [draft, active, isTodos, loadItems, members, draftWho]);
 
   // Edit a grocery item (name, quantity, unit, aisle, notes) via PATCH /shopping/:id.
   const saveEdit = useCallback(async (fields) => {
@@ -214,6 +210,59 @@ export default function Lists() {
     : Object.entries(openItems.reduce((acc, i) => { (acc[i.section] ||= []).push(i); return acc; }, {})).map(([name, its]) => ({ name, items: its }));
   const memberOf = (id) => members.find((m) => m.id === id);
 
+  // Shared To-do controls (mobile + desktop): the quick-add bar with the
+  // single-assignee picker, and the All-plus-members filter row.
+  const quickAddBar = () => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 13, padding: isTodos && members.length > 0 ? '4px 4px 4px 8px' : '4px 4px 4px 14px', marginBottom: 12, position: 'relative', flexShrink: 0 }}>
+      {isTodos && members.length > 0 && (
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button onClick={() => setWhoPickerOpen((o) => !o)} aria-label={draftWho ? `Assign to ${memberOf(draftWho)?.name}` : 'Assign to someone'}
+            style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', borderRadius: '50%' }}>
+            {draftWho ? <Avatar member={memberOf(draftWho)} size={30} /> : <span style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px dashed ${LINE_STRONG}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPlus s={14} w={2.2} c={INK3} /></span>}
+          </button>
+          {whoPickerOpen && (
+            <>
+              <div onClick={() => setWhoPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+              <div style={{ position: 'absolute', top: 38, left: 0, zIndex: 30, background: '#fff', borderRadius: 14, padding: 6, minWidth: 172, border: `1px solid ${LINE}`, boxShadow: '0 12px 34px rgba(26,22,32,0.18)' }}>
+                {members.map((m) => (
+                  <button key={m.id} onClick={() => { setDraftWho(m.id); setWhoPickerOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: draftWho === m.id ? BG_SOFT : 'transparent', fontFamily: INTER, textAlign: 'left' }}>
+                    <Avatar member={m} size={26} /><span style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{m.name}</span>
+                    {draftWho === m.id && <span style={{ marginLeft: 'auto' }}><Tick s={13} c={active?.color || BRAND} /></span>}
+                  </button>
+                ))}
+                {draftWho && (
+                  <button onClick={() => { setDraftWho(null); setWhoPickerOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: 'transparent', fontFamily: INTER, textAlign: 'left', color: INK3, fontSize: 13, marginTop: 2, borderTop: `1px solid ${LINE}` }}>Anyone</button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }} autoFocus={quickAdd}
+        placeholder={isTodos && draftWho ? `Add for ${memberOf(draftWho)?.name}…` : (isTodos ? 'Add a to-do…' : 'Add an item…')}
+        style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', fontFamily: INTER, fontSize: 14, background: 'transparent', padding: '10px 0', color: INK }} />
+      <button onClick={addItem} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 10, background: active?.color || BRAND, color: '#fff', border: 0, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: INTER, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IcPlus s={14} w={2.4} c="#fff" /> Add</button>
+    </div>
+  );
+
+  const assigneeFilter = () => (isTodos && members.length > 0 ? (
+    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
+      <button onClick={() => setToFilter(null)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: 0, background: !toFilter ? (active?.color || BRAND) : '#fff', color: !toFilter ? '#fff' : INK2 }}>All</button>
+      {members.map((m) => {
+        const on = toFilter === m.id; const mc = hexFor(m);
+        const n = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
+        return (
+          <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, border: 0, background: on ? mc + '22' : '#fff', boxShadow: on ? `inset 0 0 0 1.5px ${mc}` : `inset 0 0 0 1px ${LINE}` }}>
+            <Avatar member={m} size={26} /><span style={{ fontSize: 12, fontWeight: 700, color: on ? mc : INK3 }}>{n}</span>
+          </button>
+        );
+      })}
+    </div>
+  ) : null);
+
   return (
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader kicker={isMobile ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : (active ? `${openItems.length} open` : '')} title="Lists"
@@ -248,56 +297,8 @@ export default function Lists() {
               <span style={{ fontSize: 12, fontWeight: 600, color: active?.color || BRAND }}>{openItems.length} left</span>
             </div>
 
-            {/* quick-add (To-dos: assignee picker on the left) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 13, padding: isTodos ? '4px 4px 4px 8px' : '4px 4px 4px 14px', marginBottom: 12, position: 'relative' }}>
-              {isTodos && members.length > 0 && (
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <button onClick={() => setWhoPickerOpen((o) => !o)} aria-label={draftWho ? `Assign to ${memberOf(draftWho)?.name}` : 'Assign to someone'}
-                    style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', borderRadius: '50%' }}>
-                    {draftWho ? <Avatar member={memberOf(draftWho)} size={30} /> : <span style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px dashed ${LINE_STRONG}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPlus s={14} w={2.2} c={INK3} /></span>}
-                  </button>
-                  {whoPickerOpen && (
-                    <>
-                      <div onClick={() => setWhoPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
-                      <div style={{ position: 'absolute', top: 38, left: 0, zIndex: 30, background: '#fff', borderRadius: 14, padding: 6, minWidth: 172, border: `1px solid ${LINE}`, boxShadow: '0 12px 34px rgba(26,22,32,0.18)' }}>
-                        {members.map((m) => (
-                          <button key={m.id} onClick={() => { setDraftWho(m.id); setWhoPickerOpen(false); }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: draftWho === m.id ? BG_SOFT : 'transparent', fontFamily: INTER, textAlign: 'left' }}>
-                            <Avatar member={m} size={26} /><span style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{m.name}</span>
-                            {draftWho === m.id && <span style={{ marginLeft: 'auto' }}><Tick s={13} c={active?.color || BRAND} /></span>}
-                          </button>
-                        ))}
-                        {draftWho && (
-                          <button onClick={() => { setDraftWho(null); setWhoPickerOpen(false); }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: 'transparent', fontFamily: INTER, textAlign: 'left', color: INK3, fontSize: 13, marginTop: 2, borderTop: `1px solid ${LINE}` }}>Anyone</button>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }} autoFocus={quickAdd}
-                placeholder={isTodos && draftWho ? `Add for ${memberOf(draftWho)?.name}…` : (isTodos ? 'Add a to-do…' : 'Add an item…')}
-                style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', fontFamily: INTER, fontSize: 14, background: 'transparent', padding: '10px 0', color: INK }} />
-              <button onClick={addItem} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 10, background: active?.color || BRAND, color: '#fff', border: 0, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: INTER, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IcPlus s={14} w={2.4} c="#fff" /> Add</button>
-            </div>
-
-            {/* assignee filter (To-dos only) */}
-            {isTodos && members.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, WebkitOverflowScrolling: 'touch' }}>
-                <button onClick={() => setToFilter(null)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: 0, background: !toFilter ? (active?.color || BRAND) : '#fff', color: !toFilter ? '#fff' : INK2 }}>All</button>
-                {members.map((m) => {
-                  const on = toFilter === m.id; const mc = hexFor(m);
-                  const n = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
-                  return (
-                    <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
-                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, border: 0, background: on ? mc + '22' : '#fff', boxShadow: on ? `inset 0 0 0 1.5px ${mc}` : `inset 0 0 0 1px ${LINE}` }}>
-                      <Avatar member={m} size={26} /><span style={{ fontSize: 12, fontWeight: 700, color: on ? mc : INK3 }}>{n}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {quickAddBar()}
+            {assigneeFilter()}
 
             {/* items grouped by section */}
             {loadingItems ? (
@@ -375,56 +376,8 @@ export default function Lists() {
                 <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{active?.name}</h2>
               </div>
 
-              {/* To-dos assignee filter */}
-              {isTodos && members.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: isMobile ? 'nowrap' : 'wrap', overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
-                  {/* Everyone - clears the filter; left circle holds a group icon, right holds the total open count */}
-                  <button onClick={() => setToFilter(null)} title="Everyone"
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, flexShrink: 0, background: !toFilter ? `${BRAND}1F` : '#fff', border: `1px solid ${!toFilter ? BRAND : LINE}` }}>
-                    <span style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', background: !toFilter ? BRAND : BG_SOFT }}>
-                      <IcPeople s={20} c={!toFilter ? '#fff' : INK3} />
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: !toFilter ? BRAND : INK3 }}>{items.filter((i) => !i.done).length}</span>
-                  </button>
-                  {/* one pill per member - the colour-ring avatar plus their open-to-do count */}
-                  {members.map((m) => {
-                    const on = toFilter === m.id;
-                    const mc = hexFor(m);
-                    const count = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
-                    return (
-                      <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, flexShrink: 0, background: on ? `${mc}1F` : '#fff', border: `1px solid ${on ? mc : LINE}` }}>
-                        <Avatar member={m} size={40} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: on ? mc : INK3 }}>{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* quick add */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>
-                <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }}
-                  autoFocus={quickAdd}
-                  placeholder={isTodos ? 'Add a to-do…' : 'Add an item…'} style={{ flex: 1, padding: '11px 14px', borderRadius: 12, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff' }} />
-                <button onClick={addItem} disabled={!draft.trim()} style={{ padding: '0 18px', borderRadius: 12, border: 0, cursor: 'pointer', background: active?.color || BRAND, color: '#fff', fontWeight: 700, fontFamily: INTER, opacity: draft.trim() ? 1 : 0.5 }}>Add</button>
-              </div>
-
-              {/* To-dos: optionally assign the new item to someone */}
-              {isTodos && members.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexShrink: 0, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, color: INK3, fontWeight: 600 }}>Assign to</span>
-                  {members.map((m) => {
-                    const on = addWho.includes(m.id);
-                    return (
-                      <button key={m.id} onClick={() => setAddWho((cur) => (on ? cur.filter((x) => x !== m.id) : [...cur, m.id]))} title={m.name}
-                        style={{ border: on ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer', opacity: on ? 1 : 0.65 }}>
-                        <Avatar member={m} size={28} />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {quickAddBar()}
+              {assigneeFilter()}
 
               {/* items — scroll internally on desktop; on mobile let the whole
                   page scroll (only the page header stays fixed) */}
