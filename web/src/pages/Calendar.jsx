@@ -537,8 +537,10 @@ export default function Calendar() {
       // matches a school, so a child with no linked school - the common case,
       // since a child carries no school by default - would otherwise never
       // surface here. Resolve each child_id to a member for the name + colour.
+      // Extracurriculars only appear on the calendar in Child Mode; in the
+      // normal parent view they live on the Family page's Activities card.
       const memberById = new Map(members.map((m) => [m.id, m]));
-      for (const act of activities) {
+      for (const act of (childMode ? activities : [])) {
         const child = memberById.get(act.child_id);
         if (!child) continue;
         const start = new Date(firstY, firstM - 1, 1);
@@ -576,7 +578,7 @@ export default function Calendar() {
     } finally {
       setLoading(false);
     }
-  }, [currentMonth, selectedDate, viewMode, members]);
+  }, [currentMonth, selectedDate, viewMode, members, childMode]);
 
   useEffect(() => {
     setLoading(true);
