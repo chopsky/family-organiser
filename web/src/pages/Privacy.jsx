@@ -28,7 +28,7 @@ export default function Privacy() {
       >
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
           <Link to={localeHomePath()} className="flex items-center gap-2.5">
-            <img src="/housemait-logo2.png" alt="Housemait" className="h-7" />
+            <img src="/housemait-logo-web.svg" alt="Housemait" className="h-7" />
           </Link>
           <Link
             to={localeHomePath()}
