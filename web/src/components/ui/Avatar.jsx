@@ -79,14 +79,14 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
     return (
       <div
         className={className}
-        style={{ ...base, background: hexFor(member) + '22', overflow: 'hidden', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+        style={{ ...base, background: hexFor(member) + '22', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <img
           src={avatarSrc(member.avatar_id)}
           alt={member.name || ''}
-          // 85% width leaves a little breathing room inside the circle instead
-          // of the figure filling it edge-to-edge; still anchored to the bottom.
-          style={{ width: '85%', height: 'auto', objectFit: 'contain', display: 'block' }}
+          // 85% width leaves a little breathing room inside the circle; full
+          // height + objectFit:contain keeps the figure centred (not bottom-stuck).
+          style={{ width: '85%', height: '100%', objectFit: 'contain', display: 'block' }}
         />
       </div>
     );
