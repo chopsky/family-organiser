@@ -36,6 +36,29 @@ const GCAL_ENABLED = process.env.GOOGLE_CALENDAR_ENABLED === 'true';
 const GCAL_REDIRECT = `${process.env.API_URL || 'http://localhost:3000'}/api/calendar/connect/google/callback`;
 const GCAL_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 
+// Staged-rollout allowlist. When GOOGLE_CALENDAR_ALLOWLIST is set (comma-
+// separated emails), the connect UI + routes are enabled ONLY for those users -
+// everyone else sees nothing (status returns enabled:false). Unset → enabled for
+// all (plain global-flag behaviour). The master GOOGLE_CALENDAR_ENABLED switch
+// gates both: with it off, nobody gets it regardless of the allowlist. This lets
+// the feature ship to prod while only the founder (a Google test user) can see
+// it, until verification lifts the test-user cap.
+const GCAL_ALLOWLIST = (process.env.GOOGLE_CALENDAR_ALLOWLIST || '')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+async function gcalEnabledFor(req) {
+  if (!GCAL_ENABLED) return false;
+  if (GCAL_ALLOWLIST.length === 0) return true; // no allowlist → everyone
+  if (!req.user?.id) return false;
+  try {
+    const u = await db.getUserById(req.user.id);
+    const email = (u?.email || '').toLowerCase();
+    return !!email && GCAL_ALLOWLIST.includes(email);
+  } catch {
+    return false;
+  }
+}
+
 function gcalOAuthClient() {
   const { google } = require('googleapis');
   return new google.auth.OAuth2(
@@ -49,8 +72,8 @@ function gcalOAuthClient() {
 // client to open. `state` is a short-lived signed JWT carrying user+household so
 // the (unauthenticated) callback can attribute the tokens. calendar.readonly
 // ONLY - no write scope in Phase 1.
-router.get('/connect/google', requireAuth, requireHousehold, (req, res) => {
-  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Calendar connect is not available.' });
+router.get('/connect/google', requireAuth, requireHousehold, async (req, res) => {
+  if (!(await gcalEnabledFor(req))) return res.status(404).json({ error: 'Calendar connect is not available.' });
   if (!process.env.GOOGLE_CALENDAR_CLIENT_ID || !process.env.GOOGLE_CALENDAR_CLIENT_SECRET) {
     return res.status(500).json({ error: 'Google Calendar is not configured.' });
   }
@@ -121,7 +144,7 @@ function isReconnectError(err) {
 
 // Connection status for the UI: connected?, which account, which calendars chosen.
 router.get('/google/status', requireAuth, requireHousehold, async (req, res) => {
-  if (!GCAL_ENABLED) return res.json({ enabled: false, connected: false });
+  if (!(await gcalEnabledFor(req))) return res.json({ enabled: false, connected: false });
   try {
     const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
     if (!conn) return res.json({ enabled: true, connected: false });
@@ -141,7 +164,7 @@ router.get('/google/status', requireAuth, requireHousehold, async (req, res) => 
 
 // List the connected account's calendars for the picker (each flagged selected).
 router.get('/google/calendars', requireAuth, requireHousehold, async (req, res) => {
-  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Not available' });
+  if (!(await gcalEnabledFor(req))) return res.status(404).json({ error: 'Not available' });
   const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
   if (!conn || conn.status === 'needs_reconnect' || !conn.refresh_token) {
     return res.status(409).json({ error: 'not_connected', needsConnect: true });
@@ -169,7 +192,7 @@ router.get('/google/calendars', requireAuth, requireHousehold, async (req, res) 
 // Save which calendars to import. Adds feed rows for newly-selected calendars
 // and removes deselected ones (their events cascade away via external_feed_id).
 router.post('/google/select', requireAuth, requireHousehold, async (req, res) => {
-  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Not available' });
+  if (!(await gcalEnabledFor(req))) return res.status(404).json({ error: 'Not available' });
   const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
   if (!conn) return res.status(409).json({ error: 'not_connected' });
   const wanted = Array.isArray(req.body?.calendars) ? req.body.calendars : [];
@@ -201,7 +224,7 @@ router.post('/google/select', requireAuth, requireHousehold, async (req, res) =>
 // Disconnect: best-effort revoke at Google, then delete the connection (which
 // cascades to its feed rows and their pulled events).
 router.delete('/google/disconnect', requireAuth, requireHousehold, async (req, res) => {
-  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Not available' });
+  if (!(await gcalEnabledFor(req))) return res.status(404).json({ error: 'Not available' });
   try {
     const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
     if (!conn) return res.json({ ok: true });
