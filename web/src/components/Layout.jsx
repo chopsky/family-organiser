@@ -277,6 +277,11 @@ export default function Layout({ children }) {
         <div className="px-6 flex flex-wrap items-center gap-x-2.5 gap-y-1.5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 35px)', paddingBottom: '30px' }}>
           <img src="/housemait-logo-web.svg" alt="Housemait" className="h-6 w-auto" />
           {childMode && <ChildModeChip />}
+          {!childMode && isPlatformAdmin && (
+            <Link to="/admin" className="ml-auto text-warm-grey hover:text-plum transition-colors" title="Admin Dashboard" aria-label="Admin Dashboard">
+              <IconShield className="h-5 w-5" />
+            </Link>
+          )}
         </div>
 
         {/* Grouped nav - labelled sections; active item is a solid-brand pill. */}
@@ -293,23 +298,6 @@ export default function Layout({ children }) {
           ))}
         </nav>
 
-        {/* User footer - top border uses a warmer grey than the global
-            --color-light-grey so it sits more softly against the cream
-            page background. */}
-        <div className="px-4 py-4 flex items-center gap-2.5" style={{ borderTop: '1px solid #f2f0ed' }}>
-          <Link to="/settings" className="shrink-0 rounded-full transition-opacity hover:opacity-80" title="Settings" aria-label="Open settings">
-            {renderAvatar()}
-          </Link>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-charcoal truncate">{user?.name}</p>
-            <p className="text-[11px] text-warm-grey capitalize">{user?.role || 'Member'}</p>
-          </div>
-          {!childMode && isPlatformAdmin && (
-            <Link to="/admin" className="text-warm-grey hover:text-plum transition-colors" title="Admin Dashboard">
-              <IconShield className="h-5 w-5" />
-            </Link>
-          )}
-        </div>
       </aside>
 
       {/* ── Mobile Top Bar ──────────────────────────────────────────
