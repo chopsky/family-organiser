@@ -365,6 +365,8 @@ export default function Calendar() {
   // Settings popup
   const [showSettings, setShowSettings] = useState(false);
   const settingsRef = useRef(null);
+  // Mobile filter sheet (the desktop cog is hidden on phones)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Filters
   const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays', 'school']));
@@ -1433,6 +1435,83 @@ export default function Calendar() {
     });
   }
 
+  // The calendar filter panel (family members + calendar type), shared by the
+  // desktop settings popup and the mobile filter bottom sheet.
+  function renderCalendarFilters() {
+    return (
+      <>
+        <h3 className="text-[15px] font-semibold mb-3" style={{ fontFamily: 'var(--font-display)' }}>Calendar filters</h3>
+
+        {/* Family members */}
+        <div className="mb-4">
+          <div className="text-[11px] font-semibold text-warm-grey uppercase tracking-wider mb-2">Family members</div>
+          <div className="flex flex-wrap gap-1.5">
+            {members.map(m => {
+              const hex = COLOR_HEX[m.color_theme] || COLOR_HEX.sage;
+              const isOn = activeMemberFilters === null || activeMemberFilters.has(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setActiveMemberFilters(prev => {
+                      const next = new Set(prev || members.map(x => x.id));
+                      next.has(m.id) ? next.delete(m.id) : next.add(m.id);
+                      return next;
+                    });
+                  }}
+                  className="flex items-center gap-1.5 rounded-2xl text-[11px] font-semibold transition-all cursor-pointer"
+                  style={{
+                    padding: '5px 12px 5px 5px',
+                    border: isOn ? 'none' : '1.5px solid #E8E5EC',
+                    background: isOn ? hex : 'white',
+                    color: isOn ? 'white' : '#2D2A33',
+                  }}
+                >
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: hex }}>
+                    {m.name?.[0]?.toUpperCase()}
+                  </div>
+                  {m.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Calendar type */}
+        <div className="mb-4">
+          <div className="text-[11px] font-semibold text-warm-grey uppercase tracking-wider mb-2">Calendar type</div>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { key: 'events', label: 'Events', dot: '#6B3FA0' },
+              { key: 'tasks', label: 'Tasks', dot: '#E8724A' },
+              { key: 'birthdays', label: 'Birthdays', dot: '#D4537E' },
+              { key: 'holidays', label: 'Holidays', dot: '#7DAE82' },
+              { key: 'school', label: 'School', dot: '#E8A040' },
+            ].map(({ key, label, dot }) => {
+              const isOn = activeFilters.has(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleFilter(key)}
+                  className="flex items-center gap-1.5 rounded-2xl text-[11px] font-semibold transition-all cursor-pointer"
+                  style={{
+                    padding: '5px 12px 5px 5px',
+                    border: isOn ? '1.5px solid #6B3FA0' : '1.5px solid #E8E5EC',
+                    background: isOn ? '#6B3FA0' : 'white',
+                    color: isOn ? 'white' : '#2D2A33',
+                  }}
+                >
+                  <div className="w-3 h-3 rounded" style={{ background: dot }} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   // ── Render ─────────────────────────────────────────────
 
   return (
@@ -1456,6 +1535,15 @@ export default function Calendar() {
           className={`md:hidden h-11 w-11 justify-center px-0! rounded-full! ${mobileSearchOpen ? 'border-plum! bg-plum-light! text-plum!' : ''}`}
           icon={<IconSearch className="h-[18px] w-[18px]" />}
         />
+        {!childMode && (
+          <PillBtn
+            aria-label="Filters"
+            aria-expanded={mobileFiltersOpen}
+            onClick={() => setMobileFiltersOpen(o => !o)}
+            className={`md:hidden h-11 w-11 justify-center px-0! rounded-full! ${mobileFiltersOpen ? 'border-plum! bg-plum-light! text-plum!' : ''}`}
+            icon={<SettingsIcon className="h-[18px] w-[18px]" />}
+          />
+        )}
         {canWrite && !childMode && (
           <PillBtn
             primary
@@ -1568,74 +1656,7 @@ export default function Calendar() {
             {/* Settings popup */}
             {showSettings && (
               <div className="absolute right-0 top-[42px] w-80 bg-white rounded-2xl border border-light-grey z-30 p-5" style={{ boxShadow: 'var(--shadow-lg)' }}>
-                <h3 className="text-[15px] font-semibold mb-3" style={{ fontFamily: 'var(--font-display)' }}>Calendar filters</h3>
-
-                {/* Family members */}
-                <div className="mb-4">
-                  <div className="text-[11px] font-semibold text-warm-grey uppercase tracking-wider mb-2">Family members</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {members.map(m => {
-                      const hex = COLOR_HEX[m.color_theme] || COLOR_HEX.sage;
-                      const isOn = activeMemberFilters === null || activeMemberFilters.has(m.id);
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setActiveMemberFilters(prev => {
-                              const next = new Set(prev || members.map(x => x.id));
-                              next.has(m.id) ? next.delete(m.id) : next.add(m.id);
-                              return next;
-                            });
-                          }}
-                          className="flex items-center gap-1.5 rounded-2xl text-[11px] font-semibold transition-all cursor-pointer"
-                          style={{
-                            padding: '5px 12px 5px 5px',
-                            border: isOn ? 'none' : '1.5px solid #E8E5EC',
-                            background: isOn ? hex : 'white',
-                            color: isOn ? 'white' : '#2D2A33',
-                          }}
-                        >
-                          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: hex }}>
-                            {m.name?.[0]?.toUpperCase()}
-                          </div>
-                          {m.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Calendar type */}
-                <div className="mb-4">
-                  <div className="text-[11px] font-semibold text-warm-grey uppercase tracking-wider mb-2">Calendar type</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { key: 'events', label: 'Events', dot: '#6B3FA0' },
-                      { key: 'tasks', label: 'Tasks', dot: '#E8724A' },
-                      { key: 'birthdays', label: 'Birthdays', dot: '#D4537E' },
-                      { key: 'holidays', label: 'Holidays', dot: '#7DAE82' },
-                      { key: 'school', label: 'School', dot: '#E8A040' },
-                    ].map(({ key, label, dot }) => {
-                      const isOn = activeFilters.has(key);
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => toggleFilter(key)}
-                          className="flex items-center gap-1.5 rounded-2xl text-[11px] font-semibold transition-all cursor-pointer"
-                          style={{
-                            padding: '5px 12px 5px 5px',
-                            border: isOn ? '1.5px solid #6B3FA0' : '1.5px solid #E8E5EC',
-                            background: isOn ? '#6B3FA0' : 'white',
-                            color: isOn ? 'white' : '#2D2A33',
-                          }}
-                        >
-                          <div className="w-3 h-3 rounded" style={{ background: dot }} />
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                {renderCalendarFilters()}
 
               </div>
             )}
@@ -2251,6 +2272,16 @@ export default function Calendar() {
       )}
 
       {/* Day Detail Panel removed - "+N more" popup handles overflow */}
+
+      {/* ── Mobile filter sheet (the desktop settings cog is hidden on phones).
+            md:hidden wrapper keeps it off desktop, which uses the cog popup. ── */}
+      <div className="md:hidden">
+        <BottomSheet open={mobileFiltersOpen} onDismiss={() => setMobileFiltersOpen(false)}>
+          <div className="px-5 pb-safe">
+            {renderCalendarFilters()}
+          </div>
+        </BottomSheet>
+      </div>
 
       {/* ── Event Form Modal ───────────────────────────────────── */}
       {showForm && (
