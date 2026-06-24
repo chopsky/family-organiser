@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
+const { buildDayView } = require('../services/chores');
 
 const router = Router();
 
@@ -118,6 +119,33 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     } catch (e) { console.warn('digest: calendar events fetch failed:', e.message); }
     try { weekMeals = await db.getMealPlanForWeek(req.householdId, weekStart, weekEnd) || []; } catch (e) { console.warn('digest: meals fetch failed:', e.message); }
 
+    // Per-member progress on today's chores/routines, for the dashboard
+    // "Today's tasks" scorecard. Only members with at least one task today are
+    // listed. "Anyone" chores are excluded (no single assignee). Best-effort:
+    // a chore_* migration gap must not break the rest of the digest.
+    let taskScores = [];
+    try {
+      const [defs, completions] = await Promise.all([
+        db.getChoreDefinitions(req.householdId),
+        db.getChoreCompletionsForDate(req.householdId, todayStr),
+      ]);
+      let skipped = new Set();
+      try { skipped = new Set(await db.getChoreSkipsForDate(req.householdId, todayStr)); } catch { /* no skips table yet */ }
+      const dayTasks = buildDayView(defs, completions, todayStr).filter((t) => !skipped.has(t.id) && !t.anyone);
+      taskScores = members.map((m) => {
+        const mine = dayTasks.filter((t) => (t.assignee_ids || []).includes(m.id));
+        return {
+          member_id: m.id,
+          name: m.name,
+          color_theme: m.color_theme,
+          avatar_url: m.avatar_url,
+          avatar_id: m.avatar_id,
+          done: mine.filter((t) => t.done?.[m.id]).length,
+          total: mine.length,
+        };
+      }).filter((s) => s.total > 0);
+    } catch (e) { console.warn('digest: task scores failed:', e.message); }
+
     const result = {
       completed: { tasks: completedTasks, shopping: completedShopping },
       outstanding,
@@ -128,6 +156,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       todayEvents,
       shoppingItems: shoppingItems.filter((i) => !i.completed),
       weekMeals,
+      taskScores,
     };
     cache.set(cacheKey, result, 60); // 60 sec TTL
     return res.json(result);

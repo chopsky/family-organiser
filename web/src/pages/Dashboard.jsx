@@ -518,6 +518,8 @@ export default function Dashboard() {
   const outstanding = digest?.outstanding ?? [];
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
   const weekMeals = digest?.weekMeals ?? [];
+  // Per-member progress on today's chores/routines for the "Today's tasks" card.
+  const taskScores = digest?.taskScores ?? [];
 
   // Today's meals by category
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -749,16 +751,47 @@ export default function Dashboard() {
             occupy a grid cell in those cases. */}
         <AfterSchoolCard members={members} />
 
-        {/* Card 2 - Tasks */}
+        {/* Card 2a - Today's tasks scorecard: per-member chores/routines
+            progress (done/total + a progress bar in the member's colour). */}
+        {taskScores.length > 0 && (
+          <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-sans font-semibold text-bark">Today&apos;s tasks</h2>
+              <Link to="/tasks" className="text-xs font-medium text-primary hover:underline">View all →</Link>
+            </div>
+            <ul className="flex flex-col gap-4">
+              {taskScores.map((s) => {
+                const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+                const barClass = dotColors[s.color_theme] || 'bg-plum';
+                return (
+                  <li key={s.member_id} className="flex items-center gap-3">
+                    <div className="shrink-0">{getMemberAvatar(s, 40)}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-sm font-semibold text-bark truncate">{s.name}</span>
+                        <span className="shrink-0 text-xs font-semibold text-cocoa">{s.done}/{s.total}</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: '#EDE7DB' }}>
+                        <div className={`h-full rounded-full ${barClass} transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {/* Card 2 - To-do list (outstanding to-dos; chores live in the scorecard above) */}
         <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">
-              Tasks
+              To-do list
               {actionableCount > 0 && (
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-2)' }}> · {actionableCount} due</span>
               )}
             </h2>
-            <Link to="/tasks" className="text-xs font-medium text-primary hover:underline">View all →</Link>
+            <Link to="/lists" className="text-xs font-medium text-primary hover:underline">View all →</Link>
           </div>
           {outstanding.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">All caught up!</p>
