@@ -7,6 +7,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import Spinner from '../components/Spinner';
 import WhatsAppPairing from '../components/WhatsAppPairing';
 import DeviceCalendarSync from '../components/DeviceCalendarSync';
+import GoogleCalendarConnect from '../components/GoogleCalendarConnect';
 import { isDeviceCalendarSupported } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
@@ -1936,6 +1937,12 @@ export default function Settings() {
           defaultOpen={!isDeviceCalendarSupported()}
           className="order-2"
         >
+          {/* Google Calendar OAuth (read-only inbound). Self-hides unless the
+              backend reports the feature enabled, so it's invisible until the
+              GOOGLE_CALENDAR_ENABLED flag is on. The one-tap, sign-in path -
+              sits above the paste-a-URL fallback below. */}
+          <GoogleCalendarConnect onChange={loadExternalFeeds} />
+
           <div className="flex items-start justify-between gap-3 mb-3">
             <p className="text-sm text-cocoa">
               Show your third-party calendar events in your Housemait calendar. Read-only - edits happen in the source calendar.
