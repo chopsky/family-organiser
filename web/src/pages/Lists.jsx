@@ -66,7 +66,9 @@ export default function Lists() {
   useEffect(() => { setDraftWho(toFilter); }, [toFilter]);
 
   const buildDescriptors = useCallback((shoppingLists) => {
-    const todos = { id: TODOS_ID, name: 'To-dos', emoji: '✅', color: '#6C3DD9', protected: true, kind: 'todos' };
+    // Brand plum (= var(--color-plum)); kept as hex because the list colour is
+    // concatenated with alpha suffixes (e.g. color + '1F') for tinted fills.
+    const todos = { id: TODOS_ID, name: 'To-dos', emoji: '✅', color: '#6d38ad', protected: true, kind: 'todos' };
     const isStaple = (name) => /shopping|grocer/i.test(name) || name === 'Default';
     const shopping = (shoppingLists || []).map((l, i) => ({
       id: l.id, name: l.name, emoji: l.emoji || (isStaple(l.name) ? '🛒' : '📋'),
