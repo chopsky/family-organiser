@@ -1954,7 +1954,7 @@ export default function FamilySetup() {
         <h2 className="text-lg font-semibold text-charcoal mb-0.5">Members</h2>
         <p className="text-sm text-[var(--ink-2)] mb-4">Family members with their own accounts.</p>
         {loadingMembers ? <Spinner /> : (
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:[grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
             {members.filter(m => m.member_type !== 'dependent').map((m) => (
               <MemberCard
                 key={m.id}
@@ -2029,7 +2029,7 @@ export default function FamilySetup() {
         <h2 className="text-lg font-semibold text-charcoal mb-0.5">Children &amp; dependents</h2>
         <p className="text-sm text-[var(--ink-2)] mb-4">Family members who don&apos;t need their own account (e.g. infants, young children, pets). They can be assigned tasks and events.</p>
         {loadingMembers ? <Spinner /> : (
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:[grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
             {members.filter(m => m.member_type === 'dependent').map((m) => (
               <MemberCard
                 key={m.id}
