@@ -29,7 +29,7 @@ export default function PageHeader({ kicker, title, subtitle, actions }) {
           {title}
         </h1>
         {subtitle && (
-          <div className="text-sm text-warm-grey mt-1.5">{subtitle}</div>
+          <div className="text-sm text-[var(--ink-2)] mt-1.5">{subtitle}</div>
         )}
       </div>
       {actions && <div className="flex gap-2.5 shrink-0">{actions}</div>}
