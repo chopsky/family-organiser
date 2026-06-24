@@ -101,11 +101,21 @@ function feedUrlHint(rawUrl) {
 function ProviderLogo({ id, size = 28 }) {
   const s = { width: size, height: size, flexShrink: 0 };
   if (id === 'google') {
+    // Google Calendar (2020): a white page with the four Google brand colours
+    // on its edges (blue TL, red TR, green BL, yellow BR) and a blue "31".
     return (
       <svg viewBox="0 0 24 24" style={s} aria-hidden="true">
-        <rect x="1" y="1" width="22" height="22" rx="5" fill="#4285F4" />
-        <rect x="4.5" y="6" width="15" height="14" rx="2.5" fill="#fff" />
-        <text x="12" y="16.6" textAnchor="middle" fontSize="9" fontWeight="700" fill="#4285F4" fontFamily="Arial, sans-serif">31</text>
+        <defs>
+          <clipPath id="gcal-card"><rect x="1.5" y="1.5" width="21" height="21" rx="3.5" /></clipPath>
+        </defs>
+        <g clipPath="url(#gcal-card)">
+          <rect x="1.5" y="1.5" width="10.5" height="10.5" fill="#4285F4" />
+          <rect x="12" y="1.5" width="10.5" height="10.5" fill="#EA4335" />
+          <rect x="1.5" y="12" width="10.5" height="10.5" fill="#34A853" />
+          <rect x="12" y="12" width="10.5" height="10.5" fill="#FBBC04" />
+        </g>
+        <rect x="3.3" y="3.3" width="17.4" height="17.4" rx="1.6" fill="#fff" />
+        <text x="12" y="16.2" textAnchor="middle" fontSize="8.4" fontWeight="700" fill="#4285F4" fontFamily="Arial, sans-serif">31</text>
       </svg>
     );
   }
@@ -119,12 +129,27 @@ function ProviderLogo({ id, size = 28 }) {
     );
   }
   if (id === 'outlook') {
+    // Microsoft Outlook: the blue "O" panel + calendar grid (the real icon).
     return (
-      <svg viewBox="0 0 24 24" style={s} aria-hidden="true">
-        <rect x="1" y="1" width="22" height="22" rx="5" fill="#0F6CBD" />
-        <rect x="9.5" y="6" width="10" height="12" rx="1.5" fill="#fff" opacity="0.9" />
-        <circle cx="9" cy="12" r="5.2" fill="#0F6CBD" stroke="#fff" strokeWidth="1.6" />
-        <circle cx="9" cy="12" r="2.1" fill="none" stroke="#fff" strokeWidth="1.6" />
+      <svg viewBox="0 0 48 48" style={s} aria-hidden="true">
+        <path fill="#1976d2" d="M28,13h14.533C43.343,13,44,13.657,44,14.467v19.066C44,34.343,43.343,35,42.533,35H28V13z" />
+        <rect width="14" height="15.542" x="28" y="17.958" fill="#fff" />
+        <polygon fill="#1976d2" points="27,44 4,39.5 4,8.5 27,4" />
+        <path fill="#fff" d="M15.25,16.5c-3.176,0-5.75,3.358-5.75,7.5s2.574,7.5,5.75,7.5S21,28.142,21,24S18.426,16.5,15.25,16.5z M15,28.5c-1.657,0-3-2.015-3-4.5s1.343-4.5,3-4.5s3,2.015,3,4.5S16.657,28.5,15,28.5z" />
+        <rect width="2.7" height="2.9" x="28.047" y="29.737" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="31.448" y="29.737" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="34.849" y="29.737" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="28.047" y="26.159" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="31.448" y="26.159" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="34.849" y="26.159" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="38.25" y="26.159" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="28.047" y="22.706" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="31.448" y="22.706" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="34.849" y="22.706" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="38.25" y="22.706" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="31.448" y="19.112" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="34.849" y="19.112" fill="#1976d2" />
+        <rect width="2.7" height="2.9" x="38.25" y="19.112" fill="#1976d2" />
       </svg>
     );
   }
