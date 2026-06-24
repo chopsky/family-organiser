@@ -84,7 +84,9 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
         <img
           src={avatarSrc(member.avatar_id)}
           alt={member.name || ''}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          // 85% width leaves a little breathing room inside the circle instead
+          // of the figure filling it edge-to-edge; still anchored to the bottom.
+          style={{ width: '85%', height: 'auto', objectFit: 'contain', display: 'block' }}
         />
       </div>
     );
