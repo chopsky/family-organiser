@@ -109,6 +109,12 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+    // Booleans only (no secrets) so we can confirm feature flags actually
+    // reached the running process without guessing at the Railway dashboard.
+    flags: {
+      calendarInbound: process.env.GOOGLE_CALENDAR_ENABLED === 'true',
+      calendarWrites: process.env.GOOGLE_CALENDAR_WRITES_ENABLED === 'true',
+    },
   });
 });
 
