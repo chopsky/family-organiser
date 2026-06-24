@@ -368,6 +368,7 @@ export default function FamilySetup() {
   const [profileAvatar, setProfileAvatar] = useState(null); // uploaded photo URL
   const [profileAvatarId, setProfileAvatarId] = useState(''); // chosen illustrated-avatar id (e.g. 'set2/n07')
   const [profilePicker, setProfilePicker] = useState('avatar'); // 'avatar' | 'photo'
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false); // illustrated-avatar dropdown open?
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   // Separate flag for the household-card avatar quick-upload (different
   // from the per-member uploadingAvatar above). Lets us overlay a
@@ -688,6 +689,7 @@ export default function FamilySetup() {
     setProfileAvatar(member.avatar_url || null);
     setProfileAvatarId(member.avatar_id || '');
     setProfilePicker(member.avatar_url ? 'photo' : 'avatar');
+    setAvatarMenuOpen(false);
     setProfileSchoolId(member.school_id || null);
     setProfileAttendsSchool(Boolean(member.school_id));
     const school = householdSchools.find(s => s.id === member.school_id);
@@ -3105,17 +3107,39 @@ export default function FamilySetup() {
                     )}
                   </div>
                 ) : (
-                  <div className="w-full" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 52px)', justifyContent: 'space-between', gap: '12px 8px', maxHeight: 120, overflowY: 'auto', padding: 4 }}>
-                    {FAMILY_AVATARS.map((id) => {
-                      const on = profileAvatarId === id && !profileAvatar;
-                      const hex = hexFor({ color_theme: profileColor });
-                      return (
-                        <button key={id} type="button" onClick={() => { setProfileAvatarId(id); setProfileAvatar(null); }} aria-label="Choose avatar"
-                          style={{ width: 52, height: 52, borderRadius: '50%', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxSizing: 'border-box', border: 'none', background: on ? hex + '33' : 'transparent', boxShadow: on ? `0 0 0 2px ${hex}` : 'none' }}>
-                          <img src={`/avatars/${id}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                        </button>
-                      );
-                    })}
+                  <div className="w-full relative">
+                    {/* Dropdown trigger - opens the avatar grid below it */}
+                    <button
+                      type="button"
+                      onClick={() => setAvatarMenuOpen((o) => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={avatarMenuOpen}
+                      className="w-full flex items-center justify-between border border-cream-border rounded-lg pl-3 pr-3.5 py-2 bg-white text-sm"
+                    >
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        {profileAvatarId ? (
+                          <img src={`/avatars/${profileAvatarId}.png`} alt="" className="w-7 h-7 rounded-full object-contain shrink-0" />
+                        ) : (
+                          <span className="w-7 h-7 rounded-full shrink-0" style={{ background: hexFor({ color_theme: profileColor }) + '33' }} />
+                        )}
+                        <span className="text-bark truncate">{profileAvatarId ? 'Avatar selected' : 'Choose an avatar'}</span>
+                      </span>
+                      <svg className={`shrink-0 text-cocoa transition-transform ${avatarMenuOpen ? 'rotate-180' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                    </button>
+                    {avatarMenuOpen && (
+                      <div className="mt-2 rounded-lg border border-cream-border bg-white p-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 52px)', justifyContent: 'space-between', gap: '12px 8px', maxHeight: 200, overflowY: 'auto' }}>
+                        {FAMILY_AVATARS.map((id) => {
+                          const on = profileAvatarId === id && !profileAvatar;
+                          const hex = hexFor({ color_theme: profileColor });
+                          return (
+                            <button key={id} type="button" onClick={() => { setProfileAvatarId(id); setProfileAvatar(null); setAvatarMenuOpen(false); }} aria-label="Choose avatar"
+                              style={{ width: 52, height: 52, borderRadius: '50%', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxSizing: 'border-box', border: 'none', background: on ? hex + '33' : 'transparent', boxShadow: on ? `0 0 0 2px ${hex}` : 'none' }}>
+                              <img src={`/avatars/${id}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -3126,22 +3150,25 @@ export default function FamilySetup() {
                   type="text"
                   value={profileName}
                   onChange={(e) => setProfileName(e.target.value)}
-                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
                   placeholder="Your name"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-                <select
-                  value={profileRole}
-                  onChange={(e) => setProfileRole(e.target.value)}
-                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
-                >
-                  <option value="">Select role…</option>
-                  {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                  {profileRole && !FAMILY_ROLES.includes(profileRole) && <option value={profileRole}>{profileRole}</option>}
-                </select>
+                <div className="relative">
+                  <select
+                    value={profileRole}
+                    onChange={(e) => setProfileRole(e.target.value)}
+                    className="w-full appearance-none border border-cream-border rounded-lg pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  >
+                    <option value="">Select role…</option>
+                    {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {profileRole && !FAMILY_ROLES.includes(profileRole) && <option value={profileRole}>{profileRole}</option>}
+                  </select>
+                  <svg className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-cocoa" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                </div>
               </div>
 
               {/* Native iOS date/time inputs have an intrinsic min-width that
@@ -3156,7 +3183,7 @@ export default function FamilySetup() {
                   value={profileBirthday}
                   onChange={(e) => setProfileBirthday(e.target.value)}
                   style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', display: 'block' }}
-                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                  className="w-full border border-cream-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
                 />
               </div>
 
@@ -3191,14 +3218,17 @@ export default function FamilySetup() {
               {showSchools && householdSchools.length >= 2 && (
                 <div>
                   <label className="block text-sm font-medium text-bark mb-1">School <span className="text-xs text-cocoa font-normal">(optional)</span></label>
-                  <select
-                    value={profileSchoolId || ''}
-                    onChange={(e) => setProfileSchoolId(e.target.value || null)}
-                    className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
-                  >
-                    <option value="">Not sure / not applicable</option>
-                    {householdSchools.map(s => <option key={s.id} value={s.id}>{s.school_name}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={profileSchoolId || ''}
+                      onChange={(e) => setProfileSchoolId(e.target.value || null)}
+                      className="w-full appearance-none border border-cream-border rounded-lg pl-4 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white text-sm"
+                    >
+                      <option value="">Not sure / not applicable</option>
+                      {householdSchools.map(s => <option key={s.id} value={s.id}>{s.school_name}</option>)}
+                    </select>
+                    <svg className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-cocoa" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                  </div>
                   <p className="text-xs text-cocoa mt-1">Sets which school&apos;s term calendar applies for term-only activities and reminders.</p>
                 </div>
               )}
