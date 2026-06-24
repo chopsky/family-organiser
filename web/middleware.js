@@ -51,6 +51,16 @@ const SKIP_PATHS = new Set([
   '/fair',
 ]);
 
+// Of the SKIP_PATHS, these country-agnostic legal / support pages must pass
+// straight through with NO cookie-stamp self-redirect. They render identically
+// everywhere, so the locale cookie buys nothing - and the 307-to-self below
+// loops forever for any client that doesn't echo the cookie back on the second
+// hit (Googlebot, the Google OAuth verification privacy-policy fetcher, curl).
+// That loop made /privacy unreachable to Google, which would fail OAuth
+// verification. Humans in a browser never noticed (the cookie resolves it in
+// one hop), so the bug only bit headless fetchers.
+const NO_STAMP_PATHS = new Set(['/privacy', '/terms', '/support']);
+
 // Prefix-match paths - anything starting with one of these is bypassed.
 // Mostly authenticated app routes that already require a JWT to render
 // anything useful, and a few well-known infra endpoints.
@@ -122,6 +132,10 @@ export default function middleware(request) {
     return;
   }
   if (SKIP_PATHS.has(path)) {
+    // Country-agnostic legal/support pages: return immediately, never stamp a
+    // cookie via a self-redirect (it loops for cookieless clients - see
+    // NO_STAMP_PATHS). This keeps /privacy reachable for Google's verifier.
+    if (NO_STAMP_PATHS.has(path)) return;
     const cookieHeader = request.headers.get('cookie') || '';
     if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return; // already set
     const country = request.headers.get('x-vercel-ip-country') || '';
