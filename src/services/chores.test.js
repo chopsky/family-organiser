@@ -70,6 +70,39 @@ describe('buildDayView', () => {
     expect(view.find((d) => d.id === 'd2').done).toEqual({ m: false });
   });
 
+  test('a multi-slot routine expands into one independent instance per slot', () => {
+    const routineDefs = [
+      { id: 'r1', type: 'routine', repeat: 'daily', whens: ['morning', 'evening'], assignee_ids: ['m'], position: 0, created_at: '2026-01-01' },
+    ];
+    // morning ticked, evening not - completion is keyed by slot
+    const view = buildDayView(routineDefs, [{ definition_id: 'r1', member_id: 'm', slot: 'morning' }], date);
+    expect(view).toHaveLength(2);
+    const morning = view.find((t) => t.slot === 'morning');
+    const evening = view.find((t) => t.slot === 'evening');
+    expect(morning.done).toEqual({ m: true });
+    expect(evening.done).toEqual({ m: false }); // ticking morning must NOT tick evening
+    expect(morning.occurrence_key).toBe('r1|morning');
+    expect(evening.occurrence_key).toBe('r1|evening');
+  });
+
+  test('a slotless completion does not mark a routine slot done (and vice versa)', () => {
+    const routineDefs = [
+      { id: 'r1', type: 'routine', repeat: 'daily', whens: ['morning'], assignee_ids: ['m'], position: 0, created_at: '2026-01-01' },
+    ];
+    // a legacy/slotless row ('') must not satisfy the 'morning' instance
+    const view = buildDayView(routineDefs, [{ definition_id: 'r1', member_id: 'm', slot: '' }], date);
+    expect(view.find((t) => t.slot === 'morning').done).toEqual({ m: false });
+  });
+
+  test('a single-slot routine gives one instance keyed by its slot', () => {
+    const routineDefs = [
+      { id: 'r2', type: 'routine', repeat: 'daily', whens: ['afternoon'], assignee_ids: ['l'], position: 0, created_at: '2026-01-01' },
+    ];
+    const view = buildDayView(routineDefs, [{ definition_id: 'r2', member_id: 'l', slot: 'afternoon' }], date);
+    expect(view).toHaveLength(1);
+    expect(view[0]).toMatchObject({ slot: 'afternoon', occurrence_key: 'r2|afternoon', done: { l: true } });
+  });
+
   test('anyone defs carry a shared completed flag + completed_by, not per-member done', () => {
     const anyoneDefs = [{ id: 'a1', repeat: 'daily', anyone: true, assignee_ids: [], position: 0, created_at: '2026-01-01' }];
     // unclaimed

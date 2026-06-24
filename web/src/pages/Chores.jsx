@@ -190,7 +190,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
   // group tasks into slots
   const groups = SLOT_ORDER.map((key) => ({
     key, meta: SLOT_META[key],
-    tasks: key === 'chores' ? tasks.filter((t) => t.type === 'chore') : tasks.filter((t) => t.type === 'routine' && (t.whens || []).includes(key)),
+    tasks: key === 'chores' ? tasks.filter((t) => t.type === 'chore') : tasks.filter((t) => t.type === 'routine' && t.slot === key),
   })).filter((g) => g.tasks.length > 0);
   const sectionsPresent = groups.map((g) => g.key);
   const slotsPresent = sectionsPresent.filter((k) => k !== 'chores');
@@ -251,7 +251,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
                   {allDone && <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, color: '#6BA368', fontSize: 12, fontWeight: 700 }}><Tick s={12} c="#6BA368" /> Done</span>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {tiles.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
+                  {tiles.map((t) => <ChoreCard key={t.occurrence_key || t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
                 </div>
               </div>
             );
@@ -280,7 +280,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
                   <span style={{ fontSize: 16, fontWeight: 600, color: INK2 }}>{g.meta.label}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {g.tasks.map((t) => <ChoreCard key={t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
+                  {g.tasks.map((t) => <ChoreCard key={t.occurrence_key || t.id} task={t} mid={m.id} tint={hex} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} onReorder={onReorder} />)}
                 </div>
               </div>
             ))}
@@ -460,17 +460,20 @@ export default function Chores() {
   const toggle = useCallback(async (task, mid) => {
     const next = !task.done?.[mid];
     const member = members.find((m) => m.id === mid);
-    const nextTasks = tasks.map((t) => (t.id === task.id ? { ...t, done: { ...t.done, [mid]: next } } : t));
+    // Match by occurrence_key, not id: a routine in several slots shares one id
+    // but each slot is its own independent instance/tick.
+    const ek = task.occurrence_key || task.id;
+    const nextTasks = tasks.map((t) => ((t.occurrence_key || t.id) === ek ? { ...t, done: { ...t.done, [mid]: next } } : t));
     setTasks(nextTasks);
     // Celebrate when a member completes the LAST of their rewarded tasks for the day.
     const rewardTasks = nextTasks.filter((t) => (t.assignee_ids || []).includes(mid) && t.reward);
     const justFinishedAll = next && task.reward && rewardTasks.length > 0 && rewardTasks.every((t) => t.done?.[mid]);
     try {
-      const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: mid, date: selDateStr, done: next });
+      const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: mid, date: selDateStr, done: next, slot: task.slot || '' });
       if (data.balances) setBalances(data.balances);
       if (justFinishedAll) setCelebrate({ member, balance: data.balances?.[mid] ?? 0 });
     } catch {
-      setTasks((ts) => ts.map((t) => (t.id === task.id ? { ...t, done: { ...t.done, [mid]: !next } } : t))); // revert
+      setTasks((ts) => ts.map((t) => ((t.occurrence_key || t.id) === ek ? { ...t, done: { ...t.done, [mid]: !next } } : t))); // revert
     }
   }, [selDateStr, tasks, members]);
 
@@ -494,7 +497,7 @@ export default function Chores() {
     const [moved] = arr.splice(from, 1);
     arr.splice(to, 0, moved);
     setTasks(arr);
-    api.post('/chores/reorder', { ids: arr.map((t) => t.id) }).catch(() => loadDay(selDateStr));
+    api.post('/chores/reorder', { ids: [...new Set(arr.map((t) => t.id))] }).catch(() => loadDay(selDateStr));
   }, [tasks, selDateStr, loadDay]);
 
   const handleSave = useCallback(async (form) => {

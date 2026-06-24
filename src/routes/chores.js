@@ -172,7 +172,13 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
       return res.status(400).json({ error: 'Task not assigned to this member' });
     }
 
-    const refId = `${def.id}:${memberId}:${date}`;
+    // A routine shown in several time-of-day slots is completed per-slot, so
+    // each (member, date, slot) is an independent tick. Chores/anyone are
+    // slotless (''). Only honour a slot the routine actually carries.
+    const slot = (def.type === 'routine' && VALID_WHENS.includes(req.body?.slot) && (def.whens || []).includes(req.body.slot))
+      ? req.body.slot : '';
+
+    const refId = slot ? `${def.id}:${memberId}:${date}:${slot}` : `${def.id}:${memberId}:${date}`;
 
     // The completion write is the source of truth for the toggle. The star
     // ledger + balance steps below are best-effort: a ledger hiccup must not
@@ -186,7 +192,7 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
         alreadyClaimed = (dayCompletions || []).some((c) => c.definition_id === def.id);
       }
       if (!alreadyClaimed) {
-        const { inserted } = await db.addChoreCompletion(def.id, memberId, req.householdId, date);
+        const { inserted } = await db.addChoreCompletion(def.id, memberId, req.householdId, date, slot);
         // Credit stars only on a NEW completion (insert) so repeat taps can't double-credit.
         if (inserted && def.reward && def.stars > 0) {
           try {
@@ -195,7 +201,7 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
         }
       }
     } else {
-      await db.removeChoreCompletion(def.id, memberId, date, req.householdId);
+      await db.removeChoreCompletion(def.id, memberId, date, req.householdId, slot);
       if (def.reward && def.stars > 0) {
         try { await db.removeStarTransactionByRef('chore_earn', refId); }
         catch (e) { console.warn('chore uncomplete: star refund failed (non-fatal):', e.message); }

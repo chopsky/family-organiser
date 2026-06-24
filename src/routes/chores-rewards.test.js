@@ -47,7 +47,7 @@ describe('POST /api/chores/:id/complete', () => {
   test('a kid completing a reward chore earns its stars exactly once', async () => {
     const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: true });
     expect(res.status).toBe(200);
-    expect(db.addChoreCompletion).toHaveBeenCalledWith('d1', 'm', 'h1', DATE);
+    expect(db.addChoreCompletion).toHaveBeenCalledWith('d1', 'm', 'h1', DATE, '');
     expect(db.addStarTransaction).toHaveBeenCalledWith(expect.objectContaining({
       memberId: 'm', delta: 5, reason: 'earn', refType: 'chore_earn', refId: 'd1:m:2026-04-18',
     }));
@@ -69,8 +69,27 @@ describe('POST /api/chores/:id/complete', () => {
 
   test('un-completing refunds by removing the earn ledger entry', async () => {
     await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: false });
-    expect(db.removeChoreCompletion).toHaveBeenCalledWith('d1', 'm', DATE, 'h1');
+    expect(db.removeChoreCompletion).toHaveBeenCalledWith('d1', 'm', DATE, 'h1', '');
     expect(db.removeStarTransactionByRef).toHaveBeenCalledWith('chore_earn', 'd1:m:2026-04-18');
+  });
+
+  test('a routine slot is completed independently (slot threaded into the write + ref)', async () => {
+    db.getChoreDefinitions.mockResolvedValue([
+      { id: 'r1', type: 'routine', whens: ['morning', 'evening'], assignee_ids: ['m'], reward: true, stars: 2 },
+    ]);
+    await request(chores()).post('/api/chores/r1/complete').send({ member_id: 'm', date: DATE, done: true, slot: 'evening' });
+    expect(db.addChoreCompletion).toHaveBeenCalledWith('r1', 'm', 'h1', DATE, 'evening');
+    expect(db.addStarTransaction).toHaveBeenCalledWith(expect.objectContaining({
+      refType: 'chore_earn', refId: 'r1:m:2026-04-18:evening',
+    }));
+  });
+
+  test('an unknown/foreign slot falls back to slotless (ignored)', async () => {
+    db.getChoreDefinitions.mockResolvedValue([
+      { id: 'r1', type: 'routine', whens: ['morning'], assignee_ids: ['m'], reward: false, stars: 0 },
+    ]);
+    await request(chores()).post('/api/chores/r1/complete').send({ member_id: 'm', date: DATE, done: true, slot: 'evening' });
+    expect(db.addChoreCompletion).toHaveBeenCalledWith('r1', 'm', 'h1', DATE, ''); // evening not in whens
   });
 
   test('completing for a member the task is not assigned to is rejected', async () => {
@@ -92,7 +111,7 @@ describe('POST /api/chores/:id/complete', () => {
     test('any member (even one not assigned) can claim it and is credited', async () => {
       const res = await request(chores()).post('/api/chores/a1/complete').send({ member_id: 'g', date: DATE, done: true });
       expect(res.status).toBe(200);
-      expect(db.addChoreCompletion).toHaveBeenCalledWith('a1', 'g', 'h1', DATE);
+      expect(db.addChoreCompletion).toHaveBeenCalledWith('a1', 'g', 'h1', DATE, '');
       expect(db.addStarTransaction).toHaveBeenCalledWith(expect.objectContaining({
         memberId: 'g', delta: 3, reason: 'earn', refType: 'chore_earn', refId: 'a1:g:2026-04-18',
       }));
@@ -108,7 +127,7 @@ describe('POST /api/chores/:id/complete', () => {
 
     test('un-claiming refunds the attributed completer', async () => {
       await request(chores()).post('/api/chores/a1/complete').send({ member_id: 'g', date: DATE, done: false });
-      expect(db.removeChoreCompletion).toHaveBeenCalledWith('a1', 'g', DATE, 'h1');
+      expect(db.removeChoreCompletion).toHaveBeenCalledWith('a1', 'g', DATE, 'h1', '');
       expect(db.removeStarTransactionByRef).toHaveBeenCalledWith('chore_earn', 'a1:g:2026-04-18');
     });
   });

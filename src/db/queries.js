@@ -7308,34 +7308,46 @@ async function reorderChoreDefinitions(householdId, orderedIds, db = supabase) {
 }
 
 async function getChoreCompletionsForDate(householdId, dateStr, db = supabase) {
-  const { data, error } = await db
+  let { data, error } = await db
     .from('chore_completions')
-    .select('definition_id, member_id, completed_at')
+    .select('definition_id, member_id, slot, completed_at')
     .eq('household_id', householdId)
     .eq('date', dateStr);
+  // `slot` may not exist yet (pre-migration) - fall back so the day view still
+  // loads, treating every completion as slotless.
+  if (error) {
+    ({ data, error } = await db
+      .from('chore_completions')
+      .select('definition_id, member_id, completed_at')
+      .eq('household_id', householdId)
+      .eq('date', dateStr));
+  }
   if (error) throw error;
   return data || [];
 }
 
 // Idempotent insert of a completion. Returns { inserted: bool } - false when it
-// already existed (so the caller doesn't double-credit stars).
-async function addChoreCompletion(definitionId, memberId, householdId, dateStr, db = supabase) {
+// already existed (so the caller doesn't double-credit stars). `slot` is ''
+// for chores/anyone and the time-of-day for a routine, so a multi-slot routine
+// gets one completion per slot.
+async function addChoreCompletion(definitionId, memberId, householdId, dateStr, slot = '', db = supabase) {
   const { data, error } = await db
     .from('chore_completions')
-    .upsert({ definition_id: definitionId, member_id: memberId, household_id: householdId, date: dateStr },
-      { onConflict: 'definition_id,member_id,date', ignoreDuplicates: true })
+    .upsert({ definition_id: definitionId, member_id: memberId, household_id: householdId, date: dateStr, slot: slot || '' },
+      { onConflict: 'definition_id,member_id,date,slot', ignoreDuplicates: true })
     .select('id');
   if (error) throw error;
   return { inserted: Array.isArray(data) && data.length > 0 };
 }
 
-async function removeChoreCompletion(definitionId, memberId, dateStr, householdId, db = supabase) {
+async function removeChoreCompletion(definitionId, memberId, dateStr, householdId, slot = '', db = supabase) {
   const { error } = await db
     .from('chore_completions')
     .delete()
     .eq('definition_id', definitionId)
     .eq('member_id', memberId)
     .eq('date', dateStr)
+    .eq('slot', slot || '')
     .eq('household_id', householdId);
   if (error) throw error;
 }

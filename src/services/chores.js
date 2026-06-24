@@ -39,34 +39,48 @@ function appliesOn(def, dateStr) {
  * with a per-member `done` map keyed by member id (from that date's completion
  * rows). Mirrors the demo's `done: { memberId: bool }`, but real + per-day.
  *
+ * A routine assigned to several time-of-day slots (e.g. Morning + Evening)
+ * expands into one INDEPENDENT instance per slot, each carrying its own `slot`
+ * + `occurrence_key` and its own per-member `done`. Chores and "Anyone" chores
+ * are slotless (one instance, `slot: ''`). Completions are keyed by
+ * (definition, slot) so ticking Morning never marks Evening done.
+ *
  * @param {Array} defs        chore_definitions rows
  * @param {Array} completions chore_completions rows for THIS date only
- *                            (each: { definition_id, member_id })
+ *                            (each: { definition_id, member_id, slot })
  * @param {string} dateStr    'YYYY-MM-DD'
- * @returns definitions (sorted by position, then created_at) with `done` added.
+ * @returns instances (sorted by position, then created_at) with `done`, `slot`
+ *          and `occurrence_key` added.
  */
 function buildDayView(defs, completions, dateStr) {
-  const doneByDef = new Map(); // definition_id -> Set(member_id)
+  const doneByDefSlot = new Map(); // `${definition_id}|${slot}` -> Set(member_id)
   for (const c of completions || []) {
-    if (!doneByDef.has(c.definition_id)) doneByDef.set(c.definition_id, new Set());
-    doneByDef.get(c.definition_id).add(c.member_id);
+    const k = `${c.definition_id}|${c.slot || ''}`;
+    if (!doneByDefSlot.has(k)) doneByDefSlot.set(k, new Set());
+    doneByDefSlot.get(k).add(c.member_id);
   }
-  return (defs || [])
-    .filter((d) => appliesOn(d, dateStr))
-    .map((d) => {
-      // "Anyone" chores have no per-assignee state: a single shared completion
-      // (the attributed completer) marks the whole chore done for the day.
-      if (d.anyone) {
-        const who = doneByDef.get(d.id);
-        const completedBy = who && who.size ? [...who][0] : null;
-        return { ...d, done: {}, completed: !!completedBy, completed_by: completedBy };
-      }
-      const doneSet = doneByDef.get(d.id) || new Set();
+  const out = [];
+  for (const d of (defs || [])) {
+    if (!appliesOn(d, dateStr)) continue;
+    // "Anyone" chores have no per-assignee state: a single shared completion
+    // (the attributed completer) marks the whole chore done for the day.
+    if (d.anyone) {
+      const who = doneByDefSlot.get(`${d.id}|`);
+      const completedBy = who && who.size ? [...who][0] : null;
+      out.push({ ...d, slot: '', occurrence_key: d.id, done: {}, completed: !!completedBy, completed_by: completedBy });
+      continue;
+    }
+    // Multi-slot routines render once per slot; everything else is one slotless
+    // instance. A routine with no whens still gets a single '' instance.
+    const slots = (d.type === 'routine' && (d.whens || []).length) ? d.whens : [''];
+    for (const slot of slots) {
+      const doneSet = doneByDefSlot.get(`${d.id}|${slot}`) || new Set();
       const done = {};
       for (const mid of d.assignee_ids || []) done[mid] = doneSet.has(mid);
-      return { ...d, done };
-    })
-    .sort((a, b) => (a.position - b.position) || String(a.created_at).localeCompare(String(b.created_at)));
+      out.push({ ...d, slot, occurrence_key: slot ? `${d.id}|${slot}` : d.id, done });
+    }
+  }
+  return out.sort((a, b) => (a.position - b.position) || String(a.created_at).localeCompare(String(b.created_at)));
 }
 
 module.exports = { weekdayAbbrev, appliesOn, buildDayView };
