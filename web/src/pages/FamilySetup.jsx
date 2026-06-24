@@ -15,6 +15,7 @@ import { pickPhoto } from '../lib/photo-picker';
 import resizeImage from '../lib/resizeImage';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
+import { BottomSheet } from '../components/BottomSheet';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { ACTIVITY_ICONS, iconFor } from '../lib/activityIcons';
@@ -2843,9 +2844,8 @@ export default function FamilySetup() {
 
       {/* Term Date Import Options Modal */}
       {showTermDateOptions && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => { if (!(importingWebsite || importingPdf || importingLA || importingTermIcal)) setShowTermDateOptions(false); }}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <BottomSheet open onDismiss={() => { if (!(importingWebsite || importingPdf || importingLA || importingTermIcal)) setShowTermDateOptions(false); }} desktopWidthClass="sm:w-[512px]">
+          <div className="overflow-y-auto min-h-0 p-6 pt-1">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base md:text-lg font-medium text-bark">Import term dates</h2>
               <button onClick={() => setShowTermDateOptions(false)} className="text-cocoa hover:text-bark p-1">
@@ -3053,22 +3053,16 @@ export default function FamilySetup() {
               </div>
             </div>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Edit Profile Modal */}
       {editingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingMember(null)}>
-          <div className="absolute inset-0 bg-black/40" />
-          {/* overflow-x-hidden clips any horizontal overflow from native iOS
-              date/time inputs that would otherwise push past the modal edge.
-              Vertical scrolling still works via overflow-y-auto. p-4 on mobile
-              (instead of flat p-6) gives narrow phones more room for the
-              native picker controls. */}
-          <div
-            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <BottomSheet open onDismiss={() => setEditingMember(null)} desktopWidthClass="sm:w-[480px]">
+          {/* overflow-x-hidden clips horizontal overflow from native iOS date
+              inputs; min-h-0 lets the form scroll inside the sheet (the sheet
+              caps height + adds the drag handle). */}
+          <div className="overflow-y-auto overflow-x-hidden min-h-0 px-4 sm:px-6 pt-1 pb-4">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base md:text-lg font-medium text-bark">{editingMember?.id === user?.id ? 'Edit profile' : `Edit ${editingMember?.name}`}</h2>
               <button onClick={() => { setEditingMember(null); setProfileError(''); }} className="text-cocoa hover:text-bark p-1">
@@ -3251,7 +3245,7 @@ export default function FamilySetup() {
               </button>
             </div>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Review Imported Dates Panel - opens after /import-website/preview
@@ -3260,9 +3254,8 @@ export default function FamilySetup() {
           server-side validator and an info button revealing the AI's
           source quote. */}
       {draftImport && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4" onClick={() => { if (!savingDraftImport) setDraftImport(null); }}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <BottomSheet open onDismiss={() => { if (!savingDraftImport) setDraftImport(null); }} desktopWidthClass="sm:w-[672px]">
+          <div className="overflow-y-auto min-h-0 p-6 pt-1">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-base md:text-lg font-medium text-bark">Review imported dates</h2>
               <button onClick={() => setDraftImport(null)} disabled={savingDraftImport} className="text-cocoa hover:text-bark p-1 disabled:opacity-50">
@@ -3384,14 +3377,13 @@ export default function FamilySetup() {
               </button>
             </div>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* View & Edit All Dates Panel */}
       {showAllDates && termDateSchoolId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowAllDates(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <BottomSheet open onDismiss={() => setShowAllDates(false)} desktopWidthClass="sm:w-[512px]">
+          <div className="overflow-y-auto min-h-0 p-6 pt-1">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-base md:text-lg font-medium text-bark">All term dates</h2>
               <button onClick={() => setShowAllDates(false)} className="text-cocoa hover:text-bark p-1">
@@ -3575,7 +3567,7 @@ export default function FamilySetup() {
               );
             })()}
           </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );
