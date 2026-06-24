@@ -10,6 +10,7 @@ const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/a
 const email = require('../services/email');
 const cache = require('../services/cache');
 const { validateEmailAlias } = require('../utils/email-alias');
+const { publicHousehold } = require('../utils/publicHousehold');
 
 const router = Router();
 
@@ -52,8 +53,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       db.getHouseholdMembers(req.householdId),
     ]);
     // Never expose the Child Mode PIN hash; surface only a derived boolean.
-    const { child_mode_pin_hash, ...household } = householdRow || {};
-    household.child_mode_pin_set = !!child_mode_pin_hash;
+    const household = publicHousehold(householdRow || {});
     const result = { household, members };
     cache.set(cacheKey, result, 300); // 5 min TTL
     return res.json(result);
@@ -157,7 +157,7 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
 
   try {
     const updated = await db.updateHouseholdSettings(req.householdId, updates);
-    return res.json({ household: updated });
+    return res.json({ household: publicHousehold(updated) });
   } catch (err) {
     console.error('PATCH /api/settings error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -717,14 +717,14 @@ router.patch('/email-alias', requireAuth, requireHousehold, requireAdmin, async 
     const { alias } = req.body || {};
     if (alias === null || alias === '') {
       const updated = await db.setHouseholdEmailAlias(req.householdId, null);
-      return res.json({ household: updated });
+      return res.json({ household: publicHousehold(updated) });
     }
     const v = validateEmailAlias(alias);
     if (!v.ok) return res.status(400).json({ error: v.reason });
     const available = await db.isEmailAliasAvailable(v.normalised, req.householdId);
     if (!available) return res.status(409).json({ error: 'That alias is already taken.' });
     const updated = await db.setHouseholdEmailAlias(req.householdId, v.normalised);
-    return res.json({ household: updated });
+    return res.json({ household: publicHousehold(updated) });
   } catch (err) {
     // 23505 is Postgres unique_violation - race between availability
     // check and update. Surface as 409 same as a direct collision.
@@ -840,7 +840,7 @@ router.post('/avatar', requireAuth, requireHousehold, requireAdmin, avatarUpload
 
     const updated = await db.updateHouseholdSettings(req.householdId, { avatar_url: avatarUrl });
     cache.invalidate(`members:${req.householdId}`);
-    return res.json({ avatar_url: updated.avatar_url, household: updated });
+    return res.json({ avatar_url: updated.avatar_url, household: publicHousehold(updated) });
   } catch (err) {
     console.error('POST /api/household/avatar error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -867,7 +867,7 @@ router.delete('/avatar', requireAuth, requireHousehold, requireAdmin, async (req
     }
     const updated = await db.updateHouseholdSettings(req.householdId, { avatar_url: null });
     cache.invalidate(`members:${req.householdId}`);
-    return res.json({ avatar_url: null, household: updated });
+    return res.json({ avatar_url: null, household: publicHousehold(updated) });
   } catch (err) {
     console.error('DELETE /api/household/avatar error:', err);
     return res.status(500).json({ error: 'Internal server error' });

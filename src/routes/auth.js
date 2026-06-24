@@ -9,6 +9,7 @@ const publicHolidays = require('../services/publicHolidays');
 const cache = require('../services/cache');
 const stripeService = require('../services/stripe');
 const { validatePassword } = require('../utils/password-strength');
+const { publicHousehold } = require('../utils/publicHousehold');
 
 const router = Router();
 
@@ -95,16 +96,13 @@ async function authResponse(user, req = null) {
       // banner + auto-apply at annual checkout. Null for most users.
       signup_promo_code: user.signup_promo_code || null,
     },
-    // Return the full household row. The previous version returned only
-    // 5 enumerated fields, which silently stripped avatar_url / address /
-    // email_alias / inbound_email_token from the auth-context household
-    // on every refresh-token rotation - making freshly-uploaded
-    // household photos and saved addresses "disappear" on next sync.
-    // The household table has no fields that need redacting (all
-    // contents are household-internal); shipping the full row also
-    // means new columns added in future migrations are surfaced
-    // automatically without touching this serialiser.
-    household: household || null,
+    // Return the (almost) full household row so new columns surface
+    // automatically and avatar_url / address / email_alias etc. stay put on
+    // every refresh-token rotation. publicHousehold() strips the one field we
+    // must NOT leak - child_mode_pin_hash - and adds the derived
+    // child_mode_pin_set boolean the UI keys off; without it a fresh login
+    // showed "no PIN set" and re-prompted the user to set one.
+    household: publicHousehold(household),
   };
 }
 
