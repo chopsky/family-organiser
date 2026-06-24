@@ -196,7 +196,7 @@ export default function Rewards() {
               <div key={k.id} style={{ flex: '0 0 320px', minWidth: 320, background: hex + '12', borderRadius: 24, padding: '18px 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 {/* pinned header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
-                  <Avatar member={k} size={48} />
+                  <Avatar member={k} size={48} bg="#fff" />
                   <div>
                     <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>{k.name}</div>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><StarFill s={16} /><span style={{ fontSize: 18, fontWeight: 800, color: '#A9772A' }}>{balances[k.id] || 0}</span></div>
@@ -236,7 +236,7 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
       <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'nowrap', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
         {kids.map((k) => (
           <button key={k.id} onClick={() => setFocusKid(k.id)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 8px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, background: k.id === kid.id ? '#fff' : 'transparent', border: k.id === kid.id ? `1.5px solid ${hexFor(k)}` : `1px solid ${LINE}` }}>
-            <Avatar member={k} size={34} /><span style={{ fontSize: 14, fontWeight: 700, color: INK }}>{k.name}</span>
+            <Avatar member={k} size={34} bg="#fff" /><span style={{ fontSize: 14, fontWeight: 700, color: INK }}>{k.name}</span>
           </button>
         ))}
       </div>
@@ -265,7 +265,7 @@ function RedeemedLog({ redemptions, members, onToggle, readOnly }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14.5, fontWeight: 600, color: INK }}>{r.title}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 12, color: INK3 }}>
-                  {m && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Avatar member={m} size={18} />{m.name}</span>}
+                  {m && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Avatar member={m} size={18} bg="#fff" />{m.name}</span>}
                   <span>·</span><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><StarFill s={11} />{r.cost}</span>
                   <span>·</span><span>{relWhen(r.created_at)}</span>
                 </div>

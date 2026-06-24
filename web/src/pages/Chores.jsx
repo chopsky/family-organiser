@@ -146,7 +146,7 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
             {task.reward && task.stars ? <span style={{ marginTop: 4, display: 'inline-flex' }}><StarPill n={task.stars} small /></span> : null}
           </div>
         </div>
-        {completer && <Avatar member={completer} size={26} />}
+        {completer && <Avatar member={completer} size={26} bg="#fff" />}
         <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
           {done && <Tick s={13} />}
         </span>
@@ -222,7 +222,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
       {/* header (pinned) */}
       {!bare && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
-        <Avatar member={m} size={48} />
+        <Avatar member={m} size={48} bg="#fff" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>{m.name}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
@@ -377,7 +377,7 @@ function WhoCompletedModal({ task, members, currentUserId, onClose, onPick }) {
             return (
               <button key={m.id} onClick={() => onPick(m.id)} title={m.name}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, width: 78, padding: '10px 4px', borderRadius: 16, border: me ? `1.5px solid ${hexFor(m)}` : `1px solid ${LINE}`, background: '#fff', cursor: 'pointer' }}>
-                <Avatar member={m} size={48} />
+                <Avatar member={m} size={48} bg="#fff" />
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: INK, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>{m.name}</span>
               </button>
             );
@@ -589,7 +589,7 @@ export default function Chores() {
                     const on = !visibleIds || visibleIds.includes(m.id);
                     return (
                       <button key={m.id} onClick={() => toggleVisible(m.id)} style={filterRow}>
-                        <Avatar member={m} size={26} /><span style={{ fontSize: 13.5, fontWeight: 600 }}>{m.name}</span>
+                        <Avatar member={m} size={26} bg="#fff" /><span style={{ fontSize: 13.5, fontWeight: 600 }}>{m.name}</span>
                         <span style={{ marginLeft: 'auto', width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: on ? hexFor(m) : 'transparent', border: on ? `1px solid ${hexFor(m)}` : `1.5px solid ${LINE_STRONG}` }}>{on && <Tick s={12} />}</span>
                       </button>
                     );
@@ -629,7 +629,7 @@ export default function Chores() {
                 <button key={m.id} onClick={() => goToMember(m.id)} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 64, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
                   <div style={{ position: 'relative' }}>
                     <div style={{ borderRadius: '50%', boxShadow: sel ? `0 0 0 3px ${BG_APP}, 0 0 0 5px ${hexFor(m)}` : 'none', opacity: sel ? 1 : 0.85, transition: 'all .15s ease' }}>
-                      <Avatar member={m} size={52} />
+                      <Avatar member={m} size={52} bg="#fff" />
                     </div>
                     {showStar && (
                       <div style={{ position: 'absolute', bottom: -4, right: -8, display: 'flex', alignItems: 'center', gap: 2, background: '#fff', borderRadius: 99, padding: '2px 6px', boxShadow: '0 2px 6px rgba(26,22,32,0.15)' }}>
@@ -785,7 +785,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
                   return (
                     <button key={m.id} onClick={() => toggleIn(assignees, setAssignees, m.id)} title={m.name}
                       style={{ position: 'relative', border: on ? `2px solid ${hexFor(m)}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}>
-                      <Avatar member={m} size={50} />
+                      <Avatar member={m} size={50} bg="#fff" />
                       {on && <span style={{ position: 'absolute', right: -2, bottom: -2, width: 18, height: 18, borderRadius: '50%', background: hexFor(m), border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Tick s={10} /></span>}
                     </button>
                   );

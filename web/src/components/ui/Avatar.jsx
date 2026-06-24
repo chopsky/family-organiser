@@ -13,7 +13,7 @@ import { avatarSrc } from '../../lib/avatarSet';
  *   size    - px diameter (default 40)
  *   className / style - merged onto the root
  */
-export default function Avatar({ member, size = 40, className = '', style = {} }) {
+export default function Avatar({ member, size = 40, className = '', style = {}, bg }) {
   // Track the URL that failed to load so a broken photo falls back to the
   // coloured initial instead of the browser's broken-image icon. Keyed on the
   // URL (not a boolean) so a later re-upload - a new URL - is retried rather
@@ -79,11 +79,11 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
     return (
       <div
         className={className}
-        // Opaque pale tint: the member colour at ~13% composited over white via
-        // a solid-colour gradient layer. Opaque (not the old translucent tint)
-        // so overlapping avatars occlude each other cleanly instead of the
-        // see-through discs muddying the stack.
-        style={{ ...base, background: `linear-gradient(${hexFor(member)}22, ${hexFor(member)}22), #fff`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        // Opaque pale tint by default (the member colour at ~13% composited
+        // over white via a solid-colour gradient layer) so overlapping avatars
+        // occlude each other cleanly. `bg` overrides it - e.g. white on the
+        // Tasks/Rewards columns where a tint would clash with the surface.
+        style={{ ...base, background: bg || `linear-gradient(${hexFor(member)}22, ${hexFor(member)}22), #fff`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <img
           src={avatarSrc(member.avatar_id)}
