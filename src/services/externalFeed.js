@@ -139,6 +139,22 @@ async function fetchFeed(feedUrl) {
 }
 
 /**
+ * Read the calendar's own display name from the feed (the X-WR-CALNAME header
+ * that Google / Apple / Outlook publish in the VCALENDAR). Lets us auto-name a
+ * subscribed calendar instead of making the user type one. Returns null if the
+ * feed doesn't advertise a name.
+ */
+function extractCalendarName(icalText) {
+  if (!icalText || typeof icalText !== 'string') return null;
+  // Unfold ICS line continuations (CRLF followed by a space/tab) first.
+  const unfolded = icalText.replace(/\r?\n[ \t]/g, '');
+  const m = unfolded.match(/^X-WR-CALNAME(?:;[^:\r\n]*)?:(.*)$/mi);
+  if (!m) return null;
+  const name = m[1].trim().slice(0, 200);
+  return name || null;
+}
+
+/**
  * Pull every VEVENT block out of the iCal text. Returns an array of
  * raw VEVENT strings (each still in BEGIN:VEVENT...END:VEVENT form so
  * parseVEvent can take them as-is).
@@ -213,6 +229,10 @@ async function refreshFeed(feed) {
     await db.recordExternalFeedFailure(feed.id, err.message || String(err));
     throw err;
   }
+
+  // The calendar's own name (X-WR-CALNAME), surfaced so the add-feed route can
+  // auto-name a freshly-subscribed calendar from the feed itself.
+  stats.calendarName = extractCalendarName(icalText);
 
   const vevents = extractVEvents(icalText);
   const rawRecords = [];
@@ -396,6 +416,7 @@ module.exports = {
   classifyFeedUrlMistake,
   friendlyPullError,
   fetchFeed,
+  extractCalendarName,
   extractVEvents,
   vEventToRecords,
   refreshFeed,

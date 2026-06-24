@@ -1357,8 +1357,8 @@ export default function Settings() {
 
   async function handleAddExternalFeed(e) {
     e.preventDefault();
-    if (!newFeedUrl.trim() || !newFeedName.trim()) {
-      setFeedError('URL and name are required.');
+    if (!newFeedUrl.trim()) {
+      setFeedError('Please paste the calendar URL.');
       return;
     }
     setAddingFeed(true);
@@ -2048,7 +2048,7 @@ export default function Settings() {
               )}
               <input
                 type="text"
-                placeholder="Calendar name (e.g. Work, School, Sasha's iCloud)"
+                placeholder="Calendar name (optional — we'll use the calendar's own name)"
                 value={newFeedName}
                 onChange={(e) => setNewFeedName(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"

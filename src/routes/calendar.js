@@ -1017,11 +1017,27 @@ router.get('/external-feeds', async (req, res) => {
  *   - 502 if the initial pull fails transiently (the feed row is kept;
  *     the cron retries once the source comes back).
  */
+// A friendly placeholder name shown until the feed's real X-WR-CALNAME is read
+// on the initial pull (a few seconds). Derived from the provider host.
+function provisionalFeedName(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes('google')) return 'Google calendar';
+    if (host.includes('icloud') || host.includes('apple')) return 'Apple calendar';
+    if (host.includes('outlook') || host.includes('office')) return 'Outlook calendar';
+  } catch { /* fall through */ }
+  return 'Subscribed calendar';
+}
+
 router.post('/external-feeds', async (req, res) => {
   const { feed_url, display_name, color } = req.body || {};
-  if (!feed_url || !display_name) {
-    return res.status(400).json({ error: 'feed_url and display_name are required.' });
+  if (!feed_url) {
+    return res.status(400).json({ error: 'feed_url is required.' });
   }
+  // The name is optional - if the user leaves it blank we read the calendar's
+  // own name (X-WR-CALNAME) from the feed on the initial pull below.
+  const providedName = (display_name || '').trim();
+  const autoName = !providedName;
   const normalisedUrl = externalFeed.normaliseFeedUrl(feed_url);
   if (!/^https?:\/\//i.test(normalisedUrl)) {
     return res.status(400).json({ error: 'Feed URL must start with https://, http://, or webcal://.' });
@@ -1044,7 +1060,7 @@ router.post('/external-feeds', async (req, res) => {
       user_id: req.user.id,
       household_id: req.householdId,
       feed_url: normalisedUrl,
-      display_name: display_name.trim().slice(0, 200),
+      display_name: (providedName || provisionalFeedName(normalisedUrl)).slice(0, 200),
       owner_member_id: req.user.id,
       color: owner?.color_theme || color || 'sky',
     });
@@ -1075,6 +1091,12 @@ router.post('/external-feeds', async (req, res) => {
   externalFeed.refreshFeed(feed)
     .then((refresh) => {
       console.log(`[external-feeds] initial pull for ${feed.id} (${feed.display_name}): ${refresh?.fetched ?? 0} event(s)`);
+      // If the user left the name blank, adopt the calendar's own name from the
+      // feed (X-WR-CALNAME). Falls back silently to the provisional name.
+      if (autoName && refresh?.calendarName) {
+        db.updateExternalFeed(feed.id, req.householdId, { display_name: refresh.calendarName })
+          .catch((e) => console.error('[external-feeds] auto-name update failed:', e.message));
+      }
     })
     .catch(async (err) => {
       const refreshError = externalFeed.friendlyPullError(normalisedUrl, err.message || String(err));

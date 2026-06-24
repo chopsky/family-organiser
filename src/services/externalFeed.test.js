@@ -32,7 +32,7 @@ jest.mock('./providers/apple', () => ({
 
 const axios = require('axios');
 const db = require('../db/queries');
-const { refreshFeed, classifyFeedUrlMistake, friendlyPullError } = require('./externalFeed');
+const { refreshFeed, classifyFeedUrlMistake, friendlyPullError, extractCalendarName } = require('./externalFeed');
 
 const FEED = (over = {}) => ({
   id: 'F1', household_id: 'hh-1', feed_url: 'https://example.com/cal.ics',
@@ -199,4 +199,27 @@ describe('friendlyPullError - actionable guidance for permanent wrong-paste fail
     const r = friendlyPullError('https://www.stmarys.school/calendar.ics', 'Feed response is not an iCalendar document');
     expect(r.permanent).toBe(false);
   });
+});
+
+describe('extractCalendarName (auto-name a subscribed calendar)', () => {
+  test('reads the calendar name from X-WR-CALNAME', () => {
+    expect(extractCalendarName('BEGIN:VCALENDAR\nX-WR-CALNAME:Sasha Work\nEND:VCALENDAR')).toBe('Sasha Work');
+  });
+  test('handles a parameter on the property', () => {
+    expect(extractCalendarName('X-WR-CALNAME;VALUE=TEXT:Family Holidays')).toBe('Family Holidays');
+  });
+  test('unfolds a folded (continued) line', () => {
+    expect(extractCalendarName('X-WR-CALNAME:A very long\n  calendar name')).toBe('A very long calendar name');
+  });
+  test('returns null when the feed advertises no name', () => {
+    expect(extractCalendarName('BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR')).toBeNull();
+    expect(extractCalendarName('')).toBeNull();
+  });
+});
+
+test('refreshFeed surfaces the calendar name (X-WR-CALNAME) in its stats', async () => {
+  serve(ics(['a'], '\nX-WR-CALNAME:Work — London'));
+  db.getExternalFeedEvents.mockResolvedValue([]);
+  const stats = await refreshFeed(FEED());
+  expect(stats.calendarName).toBe('Work — London');
 });
