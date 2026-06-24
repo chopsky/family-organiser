@@ -234,6 +234,43 @@ export default function Privacy() {
             </TableWrap>
           </Section>
 
+          <Section title="5a. Google Calendar data &amp; Limited Use">
+            <p>
+              If you choose to connect a Google Calendar (<strong>Settings → Connect
+              Calendars</strong>), Housemait accesses your Google calendar data with your
+              explicit consent and uses it only to provide the calendar-sync feature:
+            </p>
+            <ul className="list-disc pl-6 space-y-1.5">
+              <li>
+                We request <strong>read-only</strong> access (the{' '}
+                <code>calendar.readonly</code> scope) to the specific calendars you
+                select, so their events can appear inside your family's shared calendar
+                view in Housemait.
+              </li>
+              <li>
+                We <strong>never create, modify, or delete</strong> anything in your Google
+                calendars. We do not access any calendar you have not chosen to import.
+              </li>
+              <li>
+                Calendar data is fetched server-side on a schedule and stored only to
+                render your family calendar. Access tokens are encrypted at rest and never
+                shared.
+              </li>
+              <li>
+                You can disconnect at any time in <strong>Settings → Connect Calendars</strong>,
+                which revokes our access and removes the imported events from Housemait.
+              </li>
+            </ul>
+            <p>
+              Housemait's use and transfer of information received from Google APIs adheres
+              to the{' '}
+              <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-plum hover:underline">
+                Google API Services User Data Policy
+              </a>, including the Limited Use requirements. Google user data is never used
+              for advertising, never sold, and never used to train AI models.
+            </p>
+          </Section>
+
           <Section title="6. International data transfers">
             <p>
               Several of our processors (notably AI providers, Twilio, Vercel and Railway) are based in
