@@ -159,7 +159,7 @@ export default function Rewards() {
     { value: 'focused', label: isMobile ? 'Rewards' : 'Focused' },
     // Kids can VIEW the Redeemed log (to see what a parent has fulfilled); the
     // "Mark fulfilled" action itself stays parent-only (see RedeemedLog).
-    { value: 'redeemed', label: pending ? `Redeemed · ${pending}` : 'Redeemed' },
+    { value: 'redeemed', label: (pending && !isMobile) ? `Redeemed · ${pending}` : 'Redeemed' },
   ];
 
   return (
