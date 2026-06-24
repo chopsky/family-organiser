@@ -16,9 +16,9 @@ Companion to `google-calendar-twoway-plan.md`. Everything here is done in the **
 >   user's existing data). It needs **NO verification, NO justification, NO demo**.
 >   **Leave it on the consent screen** — it just works; do NOT remove it.
 > - The form only asks you to justify `calendar.readonly`. That's expected.
-> - **Privacy policy URL → `https://housemait.com/privacy.html`** (pre‑rendered
->   static page carrying the Limited Use disclosure in its initial HTML — robust
->   for human reviewers and headless checks). `/privacy` works too.
+> - **Privacy policy URL → `https://housemait.com/privacy`** (the single
+>   canonical policy; the old `/privacy.html` duplicate was removed and now
+>   308‑redirects here). It carries the Google Calendar Limited Use disclosure.
 > - **Demo video:** show ONLY the read‑only flow (connect → events appear in
 >   Housemait). You do NOT need to film the Housemait‑calendar‑in‑Google part —
 >   `app.created` is non‑sensitive. The consent screen will still list both
@@ -36,8 +36,8 @@ Only `calendar.readonly` is sensitive → standard verification, **no CASA / pai
 ## A0. Submission — the exact current‑state checklist
 
 1. **OAuth consent screen → scopes:** ensure both `calendar.readonly` and `calendar.app.created` are added. **Keep `app.created` — it's non‑sensitive, needs no verification, and is harmless to request.** Only `calendar.readonly` is gated.
-2. **Branding:** app name, user support email, logo, app homepage `https://housemait.com`, **privacy URL `https://housemait.com/privacy.html`**, authorized domain `housemait.com`.
-3. **Confirm live before submitting:** open `https://housemait.com/privacy.html` and check the "5a. Google Calendar data & Limited Use" section is visible. (Verified live 2026‑06‑24.)
+2. **Branding:** app name, user support email, logo, app homepage `https://housemait.com`, **privacy URL `https://housemait.com/privacy`**, authorized domain `housemait.com`.
+3. **Confirm live before submitting:** open `https://housemait.com/privacy` and check the "5a. Google Calendar data & Limited Use" section is visible.
 4. **Scope justification:** the form only asks for `calendar.readonly` — paste §B's readonly paragraph. (No justification field for `app.created`; it's non‑sensitive.)
 5. **Demo video (~90s):** record the §C‑readonly script. It only needs to show the **read‑only** scope in use; you do NOT need to film the `app.created` (Housemait‑calendar‑in‑Google) part. Voiceover OR on‑screen captions — either is accepted.
 6. **Publish:** Publishing status → Publish app → "Prepare for verification" → submit. Until approved: 100‑user cap + unverified‑app screen on the *calendar* consent (sign‑in unaffected, thanks to incremental consent + test users).

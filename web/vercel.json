@@ -4,6 +4,11 @@
       "source": "/uk",
       "destination": "/gb",
       "permanent": true
+    },
+    {
+      "source": "/privacy.html",
+      "destination": "/privacy",
+      "permanent": true
     }
   ],
   "rewrites": [

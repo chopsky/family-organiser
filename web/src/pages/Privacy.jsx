@@ -4,9 +4,9 @@ import { localeHomePath } from '../hooks/useLocale'
 import { setCanonical } from '../lib/seo'
 
 /**
- * Privacy Policy page.
- * Content mirrors /web/public/privacy.html, re-styled to match the landing-page
- * design system (Inter body, Instrument Serif headings, plum accents, cream background, tailwind tokens).
+ * Privacy Policy page — the single source of truth, served at /privacy.
+ * (The old static /public/privacy.html duplicate was removed; /privacy.html now
+ * 308-redirects here via vercel.json.)
  */
 export default function Privacy() {
   useEffect(() => {
