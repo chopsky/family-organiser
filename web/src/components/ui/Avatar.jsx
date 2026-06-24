@@ -13,7 +13,7 @@ import { avatarSrc } from '../../lib/avatarSet';
  *   size    - px diameter (default 40)
  *   className / style - merged onto the root
  */
-export default function Avatar({ member, size = 40, className = '', style = {} }) {
+export default function Avatar({ member, size = 40, className = '', style = {}, fill = false }) {
   // Track the URL that failed to load so a broken photo falls back to the
   // coloured initial instead of the browser's broken-image icon. Keyed on the
   // URL (not a boolean) so a later re-upload - a new URL - is retried rather
@@ -79,14 +79,17 @@ export default function Avatar({ member, size = 40, className = '', style = {} }
     return (
       <div
         className={className}
-        style={{ ...base, background: hexFor(member) + '22', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{ ...base, background: hexFor(member) + '22', overflow: 'hidden', display: 'flex', alignItems: fill ? 'flex-end' : 'center', justifyContent: 'center' }}
       >
         <img
           src={avatarSrc(member.avatar_id)}
           alt={member.name || ''}
-          // 85% width leaves a little breathing room inside the circle; full
-          // height + objectFit:contain keeps the figure centred (not bottom-stuck).
-          style={{ width: '85%', height: '100%', objectFit: 'contain', display: 'block' }}
+          // Default: 85% width + vertically centred, a little breathing room
+          // inside the circle. `fill`: edge-to-edge, bottom-anchored - for tight
+          // overlapping stacks where the figures need to read as full heads.
+          style={fill
+            ? { width: '100%', height: '100%', objectFit: 'contain', display: 'block' }
+            : { width: '85%', height: '100%', objectFit: 'contain', display: 'block' }}
         />
       </div>
     );

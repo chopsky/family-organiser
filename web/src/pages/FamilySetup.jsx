@@ -1875,6 +1875,7 @@ export default function FamilySetup() {
                     key={m.id}
                     member={m}
                     size={32}
+                    fill
                     className="object-cover"
                     style={{ border: '2.5px solid #fff', marginLeft: i ? -10 : 0 }}
                   />
