@@ -15,11 +15,19 @@ const RETIRED = new Set([
   'set2/n53', 'set2/n54',
 ]);
 
-// ['set2/n01', 'set2/n02', … 'set2/n60'] minus the retired ones
-export const FAMILY_AVATARS = Array.from(
-  { length: COUNT },
-  (_, i) => `${SET}/n${String(i + 1).padStart(2, '0')}`,
-).filter((id) => !RETIRED.has(id));
+// The four grandparent faces, pinned to the END of the picker (after the kids
+// + parents) so families scroll past the everyday faces first.
+const GRANDPARENTS = ['set2/n35', 'set2/n36', 'set2/n44', 'set2/n45'];
+
+// ['set2/n01', 'set2/n02', … 'set2/n61'] minus the retired ones, with the
+// grandparents lifted out of sequence and appended at the end.
+export const FAMILY_AVATARS = (() => {
+  const rest = Array.from(
+    { length: COUNT },
+    (_, i) => `${SET}/n${String(i + 1).padStart(2, '0')}`,
+  ).filter((id) => !RETIRED.has(id) && !GRANDPARENTS.includes(id));
+  return [...rest, ...GRANDPARENTS];
+})();
 
 // 'set2/n07' -> '/avatars/set2/n07.png'. Returns null for falsy ids.
 export function avatarSrc(id) {
