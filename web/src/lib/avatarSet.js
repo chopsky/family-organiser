@@ -12,7 +12,7 @@ const COUNT = 61;
 const RETIRED = new Set([
   'set2/n02', 'set2/n11', 'set2/n13', 'set2/n20', 'set2/n24', 'set2/n33',
   'set2/n34', 'set2/n43', 'set2/n47', 'set2/n48', 'set2/n50',
-  'set2/n53', 'set2/n54',
+  'set2/n53', 'set2/n54', 'set2/n58',
 ]);
 
 // The four grandparent faces, pinned to the END of the picker (after the kids
