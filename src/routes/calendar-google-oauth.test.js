@@ -231,6 +231,40 @@ describe('POST /api/calendar/google/select', () => {
   });
 });
 
+describe('GET /api/calendar/external-feeds', () => {
+  test('hides google feeds (managed by the Google card, not this list)', async () => {
+    db.getExternalFeedsByHousehold.mockResolvedValue([
+      { id: 'a', source: 'ical', feed_url: 'https://x/cal.ics' },
+      { id: 'b', source: 'google', feed_url: 'google://c1/cal-1' },
+      { id: 'c', source: 'device', feed_url: 'device://phone/cal' },
+    ]);
+    const res = await request(app()).get('/api/calendar/external-feeds');
+    expect(res.status).toBe(200);
+    expect(res.body.feeds.map((f) => f.id)).toEqual(['a', 'c']); // no google
+  });
+});
+
+describe('POST /api/calendar/external-feeds/:id/refresh (google)', () => {
+  test('routes a google feed to the Google pull, never the iCal fetcher', async () => {
+    db.getExternalFeedById.mockResolvedValue({
+      id: 'F1', household_id: 'h1', source: 'google', connection_id: 'c1', google_calendar_id: 'cal-1',
+    });
+    db.getCalendarConnectionById.mockResolvedValue({ id: 'c1', refresh_token: 'enc' });
+    googleCal.refreshGoogleFeed.mockResolvedValue({ created: 2 });
+    const res = await request(app()).post('/api/calendar/external-feeds/F1/refresh');
+    expect(res.status).toBe(200);
+    expect(googleCal.refreshGoogleFeed).toHaveBeenCalled();
+  });
+
+  test('a google feed whose connection lost its token asks for reconnect', async () => {
+    db.getExternalFeedById.mockResolvedValue({ id: 'F1', household_id: 'h1', source: 'google', connection_id: 'c1' });
+    db.getCalendarConnectionById.mockResolvedValue({ id: 'c1', refresh_token: null });
+    const res = await request(app()).post('/api/calendar/external-feeds/F1/refresh');
+    expect(res.status).toBe(409);
+    expect(googleCal.refreshGoogleFeed).not.toHaveBeenCalled();
+  });
+});
+
 describe('DELETE /api/calendar/google/disconnect', () => {
   test('revokes + deletes the connection', async () => {
     const revoke = jest.fn().mockResolvedValue();

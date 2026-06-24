@@ -987,7 +987,10 @@ router.delete('/feed-token', async (req, res) => {
 router.get('/external-feeds', async (req, res) => {
   try {
     const feeds = await db.getExternalFeedsByHousehold(req.householdId);
-    return res.json({ feeds });
+    // Google feeds are managed by the dedicated "Connect Google Calendar" card
+    // (via /google/status), not this generic list - showing them here would
+    // duplicate them and expose an iCal-style refresh that doesn't apply.
+    return res.json({ feeds: feeds.filter((f) => f.source !== 'google') });
   } catch (err) {
     console.error('GET /api/calendar/external-feeds error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -1092,6 +1095,22 @@ router.post('/external-feeds/:id/refresh', async (req, res) => {
   // server-side to fetch. Freshness comes from the owner's phone syncing.
   if (feed.source === 'device') {
     return res.status(400).json({ error: "This calendar syncs from a phone, not a URL. Open Housemait on the connected iPhone to refresh it." });
+  }
+  // Google feeds have synthetic google:// URLs - they're pulled via the Google
+  // Calendar API + the connection's token, NOT the iCal HTTP fetcher (which
+  // would trip the SSRF guard with "Only http(s) URLs are allowed").
+  if (feed.source === 'google') {
+    try {
+      const conn = feed.connection_id ? await db.getCalendarConnectionById(feed.connection_id) : null;
+      if (!conn || !conn.refresh_token) {
+        return res.status(409).json({ error: 'Reconnect Google Calendar to refresh this calendar.' });
+      }
+      const refresh = await googleCal.refreshGoogleFeed(feed, conn);
+      return res.json({ refresh });
+    } catch (err) {
+      console.error(`[gcal manual refresh] feed ${feed.id}:`, err.message);
+      return res.status(502).json({ error: err.message || 'Refresh failed.' });
+    }
   }
   try {
     const refresh = await externalFeed.refreshFeed(feed);
