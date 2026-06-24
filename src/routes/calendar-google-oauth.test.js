@@ -1,0 +1,127 @@
+/**
+ * Phase 1 Google Calendar OAuth routes: /connect/google (start) and
+ * /connect/google/callback (exchange + store). googleapis, the DB, and auth are
+ * mocked. The key assertions: scopes are read-only + offline, identity rides in
+ * a signed `state`, and the stored tokens are ENCRYPTED (never plaintext).
+ */
+const crypto = require('crypto');
+
+// Must be set before the router module loads (GCAL_ENABLED is read at import).
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+process.env.GOOGLE_CALENDAR_ENABLED = 'true';
+process.env.GOOGLE_CALENDAR_CLIENT_ID = 'test-cid';
+process.env.GOOGLE_CALENDAR_CLIENT_SECRET = 'test-secret';
+process.env.CALENDAR_TOKEN_KEY = crypto.randomBytes(32).toString('base64');
+process.env.WEB_URL = 'https://app.test';
+process.env.API_URL = 'https://api.test';
+
+jest.mock('../db/queries');
+jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
+jest.mock('../middleware/auth', () => ({
+  requireAuth: (req, _res, next) => { req.user = { id: 'u1' }; req.householdId = 'h1'; next(); },
+  requireHousehold: (_req, _res, next) => next(),
+}));
+// Heavy services calendar.js imports but these routes never call.
+jest.mock('../services/r2', () => ({}));
+jest.mock('../services/push', () => ({}));
+jest.mock('../services/broadcast', () => ({}));
+jest.mock('../services/externalFeed', () => ({}));
+jest.mock('../services/publicHolidays', () => ({}));
+jest.mock('../services/deviceCalendarSync', () => ({}));
+jest.mock('../services/cache', () => ({ get: jest.fn(), set: jest.fn(), invalidate: jest.fn() }));
+
+const mockGetToken = jest.fn();
+jest.mock('googleapis', () => ({
+  google: {
+    auth: {
+      OAuth2: jest.fn().mockImplementation(() => ({
+        generateAuthUrl: (opts) =>
+          `https://accounts.google.com/o/oauth2/auth?scope=${encodeURIComponent((opts.scope || []).join(' '))}` +
+          `&access_type=${opts.access_type}&prompt=${opts.prompt}&state=${opts.state}`,
+        getToken: (...a) => mockGetToken(...a),
+      })),
+    },
+  },
+}));
+
+const express = require('express');
+const request = require('supertest');
+const jwt = require('jsonwebtoken');
+const db = require('../db/queries');
+
+function app() {
+  const a = express();
+  a.use('/api/calendar', require('./calendar'));
+  return a;
+}
+
+beforeEach(() => { jest.clearAllMocks(); });
+
+describe('GET /api/calendar/connect/google', () => {
+  test('returns a Google consent URL with read-only + offline + signed state', async () => {
+    const res = await request(app()).get('/api/calendar/connect/google');
+    expect(res.status).toBe(200);
+    expect(res.body.url).toContain('accounts.google.com');
+    expect(res.body.url).toContain('calendar.readonly');
+    expect(res.body.url).toContain('access_type=offline');
+    expect(res.body.url).toContain('prompt=consent');
+    // The state is a valid JWT carrying the caller's identity.
+    const state = new URL(res.body.url).searchParams.get('state');
+    const claims = jwt.verify(state, process.env.JWT_SECRET);
+    expect(claims).toMatchObject({ uid: 'u1', hid: 'h1', p: 'gcal' });
+  });
+});
+
+describe('GET /api/calendar/connect/google/callback', () => {
+  const validState = () => jwt.sign({ uid: 'u1', hid: 'h1', p: 'gcal' }, process.env.JWT_SECRET);
+
+  test('exchanges the code and stores ENCRYPTED tokens, then redirects connected', async () => {
+    mockGetToken.mockResolvedValue({
+      tokens: {
+        access_token: 'ya29.at',
+        refresh_token: '1//rt-secret',
+        expiry_date: Date.now() + 3600_000,
+        scope: 'https://www.googleapis.com/auth/calendar.readonly',
+        id_token: jwt.sign({ email: 'parent@home.com' }, 'irrelevant'),
+      },
+    });
+    db.upsertCalendarConnection.mockResolvedValue({ id: 'c1' });
+
+    const res = await request(app()).get(`/api/calendar/connect/google/callback?code=abc&state=${validState()}`);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('https://app.test/settings?section=calendars&google=connected');
+
+    const arg = db.upsertCalendarConnection.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: 'u1', householdId: 'h1', googleEmail: 'parent@home.com', status: 'ok' });
+    // Stored token must be ciphertext (iv.tag.ct), never the plaintext.
+    expect(arg.refreshTokenEnc).not.toBe('1//rt-secret');
+    expect(String(arg.refreshTokenEnc).split('.')).toHaveLength(3);
+  });
+
+  test('no refresh token → status needs_reconnect', async () => {
+    mockGetToken.mockResolvedValue({
+      tokens: { access_token: 'ya29.at', expiry_date: Date.now() + 3600_000, scope: 'x' },
+    });
+    db.upsertCalendarConnection.mockResolvedValue({ id: 'c1' });
+    const res = await request(app()).get(`/api/calendar/connect/google/callback?code=abc&state=${validState()}`);
+    expect(res.headers.location).toContain('google=connected');
+    const arg = db.upsertCalendarConnection.mock.calls[0][0];
+    expect(arg.status).toBe('needs_reconnect');
+    expect(arg.refreshTokenEnc).toBeNull();
+  });
+
+  test('a forged / bad state is rejected and stores nothing', async () => {
+    const res = await request(app()).get('/api/calendar/connect/google/callback?code=abc&state=not-a-jwt');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('google=error');
+    expect(res.headers.location).toContain('reason=bad_state');
+    expect(db.upsertCalendarConnection).not.toHaveBeenCalled();
+  });
+
+  test('Google returning an error param redirects with that reason', async () => {
+    const res = await request(app()).get('/api/calendar/connect/google/callback?error=access_denied');
+    expect(res.headers.location).toContain('google=error');
+    expect(res.headers.location).toContain('access_denied');
+    expect(db.upsertCalendarConnection).not.toHaveBeenCalled();
+  });
+});

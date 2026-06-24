@@ -11,8 +11,10 @@ async function getIcal() {
   }
   return _ical;
 }
+const jwt = require('jsonwebtoken');
 const db = require('../db/queries');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireHousehold } = require('../middleware/auth');
+const { encryptToken } = require('../utils/calendar-token-crypto');
 const deviceCalendarSync = require('../services/deviceCalendarSync');
 const cache = require('../services/cache');
 const push = require('../services/push');
@@ -27,6 +29,88 @@ const r2 = require('../services/r2');
 const { validateUpload, normaliseFilename } = require('../utils/fileValidation');
 
 const router = Router();
+
+// ── Google Calendar OAuth (Phase 1: inbound read-only, flag-gated) ──────────
+const GCAL_ENABLED = process.env.GOOGLE_CALENDAR_ENABLED === 'true';
+const GCAL_REDIRECT = `${process.env.API_URL || 'http://localhost:3000'}/api/calendar/connect/google/callback`;
+const GCAL_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+
+function gcalOAuthClient() {
+  const { google } = require('googleapis');
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CALENDAR_CLIENT_ID,
+    process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
+    GCAL_REDIRECT,
+  );
+}
+
+// Start the connect flow. Authenticated; returns the Google consent URL for the
+// client to open. `state` is a short-lived signed JWT carrying user+household so
+// the (unauthenticated) callback can attribute the tokens. calendar.readonly
+// ONLY - no write scope in Phase 1.
+router.get('/connect/google', requireAuth, requireHousehold, (req, res) => {
+  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Calendar connect is not available.' });
+  if (!process.env.GOOGLE_CALENDAR_CLIENT_ID || !process.env.GOOGLE_CALENDAR_CLIENT_SECRET) {
+    return res.status(500).json({ error: 'Google Calendar is not configured.' });
+  }
+  const state = jwt.sign(
+    { uid: req.user.id, hid: req.householdId, p: 'gcal' },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' },
+  );
+  const url = gcalOAuthClient().generateAuthUrl({
+    access_type: 'offline',     // need a refresh token for background pulls
+    prompt: 'consent',          // force a refresh token even on re-consent
+    include_granted_scopes: true,
+    scope: GCAL_SCOPES,
+    state,
+  });
+  return res.json({ url });
+});
+
+// OAuth callback - a top-level browser redirect from Google, so NO Bearer auth.
+// Identity comes from the signed `state`. Exchanges the code, encrypts + stores
+// the tokens, and bounces back to the web app's Connect Calendars screen.
+router.get('/connect/google/callback', async (req, res) => {
+  const webUrl = process.env.WEB_URL || 'http://localhost:5173';
+  const back = (status, extra = '') =>
+    res.redirect(`${webUrl}/settings?section=calendars&google=${status}${extra}`);
+  if (!GCAL_ENABLED) return back('error', '&reason=disabled');
+
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError) return back('error', `&reason=${encodeURIComponent(String(oauthError))}`);
+  if (!code || !state) return back('error', '&reason=missing_code');
+
+  let claims;
+  try {
+    claims = jwt.verify(String(state), process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  } catch {
+    return back('error', '&reason=bad_state');
+  }
+  if (claims.p !== 'gcal' || !claims.uid || !claims.hid) return back('error', '&reason=bad_state');
+
+  try {
+    const { tokens } = await gcalOAuthClient().getToken(String(code));
+    let email = null;
+    if (tokens.id_token) { try { email = jwt.decode(tokens.id_token)?.email || null; } catch { /* ignore */ } }
+    await db.upsertCalendarConnection({
+      userId: claims.uid,
+      householdId: claims.hid,
+      provider: 'google',
+      googleEmail: email,
+      refreshTokenEnc: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+      accessTokenEnc: tokens.access_token ? encryptToken(tokens.access_token) : null,
+      tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+      scopes: tokens.scope || GCAL_SCOPES.join(' '),
+      // No refresh token → can't pull in the background; flag for re-connect.
+      status: tokens.refresh_token ? 'ok' : 'needs_reconnect',
+    });
+    return back('connected');
+  } catch (err) {
+    console.error('[gcal callback] token exchange failed:', err.message);
+    return back('error', '&reason=exchange_failed');
+  }
+});
 
 // Event attachments: in-memory multer, 25 MB cap (same as documents). Type
 // allowlist + magic-byte sniffing happens in validateUpload after parsing.

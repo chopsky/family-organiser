@@ -5,7 +5,7 @@
  * timeRangeError helper off the router.
  */
 jest.mock('../db/queries', () => ({}));
-jest.mock('../middleware/auth', () => ({ requireAuth: (req, res, next) => next() }));
+jest.mock('../middleware/auth', () => ({ requireAuth: (req, res, next) => next(), requireHousehold: (req, res, next) => next() }));
 jest.mock('../services/cache', () => ({ invalidate: jest.fn(), invalidatePattern: jest.fn() }));
 jest.mock('../services/push', () => ({}));
 jest.mock('../services/broadcast', () => ({}));

@@ -3116,6 +3116,45 @@ async function getFeedTokenData(token, db = supabase) {
 // and a non-null external_uid. The pull/dedup logic lives in
 // services/externalFeed.js - these helpers are thin DB wrappers.
 
+// ── Google Calendar OAuth connections (Phase 1: inbound read-only) ──────────
+// Tokens stored here are ENCRYPTED by the caller (utils/calendar-token-crypto).
+// One row per (user, provider). Server-only table (RLS, no policies).
+
+async function upsertCalendarConnection(conn, db = supabase) {
+  const row = {
+    user_id: conn.userId,
+    household_id: conn.householdId,
+    provider: conn.provider || 'google',
+    google_email: conn.googleEmail ?? null,
+    scopes: conn.scopes ?? null,
+    status: conn.status || 'ok',
+  };
+  // Only overwrite a stored token when the caller actually has a new one - a
+  // re-consent that returns no refresh_token must NOT wipe the existing one.
+  if (conn.refreshTokenEnc !== undefined && conn.refreshTokenEnc !== null) row.refresh_token = conn.refreshTokenEnc;
+  if (conn.accessTokenEnc !== undefined) row.access_token = conn.accessTokenEnc ?? null;
+  if (conn.tokenExpiresAt !== undefined) row.token_expires_at = conn.tokenExpiresAt ?? null;
+
+  const { data, error } = await db
+    .from('calendar_connections')
+    .upsert(row, { onConflict: 'user_id,provider' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getCalendarConnectionByUser(userId, provider = 'google', db = supabase) {
+  const { data, error } = await db
+    .from('calendar_connections')
+    .select()
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 async function getExternalFeedsByHousehold(householdId, db = supabase) {
   const { data, error } = await db
     .from('external_calendar_feeds')
@@ -7673,6 +7712,8 @@ module.exports = {
   getFeedTokenData,
   getFeedTokenIfExists,
   deleteFeedToken,
+  upsertCalendarConnection,
+  getCalendarConnectionByUser,
   getExternalFeedsByHousehold,
   getAllActiveExternalFeeds,
   findDeviceCalendarLink,
