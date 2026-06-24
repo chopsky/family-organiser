@@ -242,23 +242,30 @@ export default function Privacy() {
             </p>
             <ul className="list-disc pl-6 space-y-1.5">
               <li>
-                We request <strong>read-only</strong> access (the{' '}
-                <code>calendar.readonly</code> scope) to the specific calendars you
-                select, so their events can appear inside your family's shared calendar
-                view in Housemait.
+                <strong>Read-only access</strong> (the <code>calendar.readonly</code> scope)
+                to the specific calendars you select, so their events appear inside your
+                family's shared calendar view in Housemait.
               </li>
               <li>
-                We <strong>never create, modify, or delete</strong> anything in your Google
-                calendars. We do not access any calendar you have not chosen to import.
+                <strong>A dedicated "Housemait" calendar</strong> (the{' '}
+                <code>calendar.app.created</code> scope): with your consent we create one
+                secondary calendar named "Housemait" in your Google account and add the
+                family events you create in Housemait to <strong>only that calendar</strong>,
+                so you can also see them in your own Google Calendar.
               </li>
               <li>
-                Calendar data is fetched server-side on a schedule and stored only to
-                render your family calendar. Access tokens are encrypted at rest and never
-                shared.
+                We <strong>never read, modify, or delete</strong> your primary calendar or
+                any other calendar you did not choose — by Google's design, the "Housemait"
+                calendar scope can only touch the calendar we created.
+              </li>
+              <li>
+                Calendar data is fetched and written server-side; access tokens are
+                encrypted at rest and never shared.
               </li>
               <li>
                 You can disconnect at any time in <strong>Settings → Connect Calendars</strong>,
-                which revokes our access and removes the imported events from Housemait.
+                which revokes our access, removes the imported events from Housemait, and
+                deletes the "Housemait" calendar we created.
               </li>
             </ul>
             <p>
