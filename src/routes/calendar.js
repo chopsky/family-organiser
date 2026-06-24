@@ -200,19 +200,31 @@ router.post('/google/select', requireAuth, requireHousehold, async (req, res) =>
   try {
     const existing = await db.getGoogleFeedsByConnection(conn.id);
     const existingIds = new Set(existing.map((f) => f.google_calendar_id));
+    const added = [];
     for (const [id, c] of wantById) {
       if (!existingIds.has(id)) {
-        await db.addGoogleCalendarFeed({
+        const feed = await db.addGoogleCalendarFeed({
           userId: req.user.id,
           householdId: req.householdId,
           connectionId: conn.id,
           googleCalendarId: id,
           displayName: c.summary || c.name || 'Google calendar',
         });
+        if (feed) added.push(feed);
       }
     }
     for (const f of existing) {
       if (!wantById.has(f.google_calendar_id)) await db.deleteExternalFeed(f.id, req.householdId);
+    }
+    // Kick off an immediate first pull for the newly-added calendars so events
+    // appear within seconds instead of waiting for the next 30-min cron tick.
+    // Fire-and-forget: we've already saved the feed rows, so a transient sync
+    // failure is non-fatal (the cron retries). Promise.resolve() guards against
+    // a non-thenable return. Runs on the long-lived server, so it completes
+    // after the response is sent.
+    for (const feed of added) {
+      Promise.resolve(googleCal.refreshGoogleFeed(feed, conn)).catch((err) =>
+        console.warn(`[gcal select] immediate sync failed for feed ${feed.id}:`, err.message));
     }
     return res.json({ ok: true, count: wantById.size });
   } catch (err) {

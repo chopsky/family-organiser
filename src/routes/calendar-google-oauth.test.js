@@ -167,8 +167,9 @@ describe('POST /api/calendar/google/select', () => {
       { id: 'feed-old', google_calendar_id: 'cal-OLD' },
       { id: 'feed-keep', google_calendar_id: 'cal-KEEP' },
     ]);
-    db.addGoogleCalendarFeed.mockResolvedValue({ id: 'feed-new' });
+    db.addGoogleCalendarFeed.mockResolvedValue({ id: 'feed-new', google_calendar_id: 'cal-NEW' });
     db.deleteExternalFeed.mockResolvedValue();
+    googleCal.refreshGoogleFeed.mockResolvedValue({ created: 3 });
 
     const res = await request(app())
       .post('/api/calendar/google/select')
@@ -179,6 +180,9 @@ describe('POST /api/calendar/google/select', () => {
     expect(db.addGoogleCalendarFeed.mock.calls[0][0]).toMatchObject({ googleCalendarId: 'cal-NEW', connectionId: 'c1' });
     expect(db.deleteExternalFeed).toHaveBeenCalledWith('feed-old', 'h1'); // cal-OLD deselected
     expect(db.deleteExternalFeed).not.toHaveBeenCalledWith('feed-keep', 'h1');
+    // Newly-added calendar is synced immediately (not left for the cron).
+    expect(googleCal.refreshGoogleFeed).toHaveBeenCalledTimes(1);
+    expect(googleCal.refreshGoogleFeed).toHaveBeenCalledWith({ id: 'feed-new', google_calendar_id: 'cal-NEW' }, { id: 'c1' });
   });
 });
 
