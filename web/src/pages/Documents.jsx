@@ -260,6 +260,7 @@ export default function Documents() {
       <PageHeader
         kicker={kicker}
         title="Documents"
+        subtitle="Family documents, organised and easy to find."
         actions={<>
           <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => setShowNewFolder(true)}>
             New folder
@@ -306,8 +307,15 @@ export default function Documents() {
       ) : empty ? (
         <div className="text-center py-16">
           <IconFolder className="h-16 w-16 mx-auto text-light-grey mb-4" />
-          <p className="text-warm-grey text-lg font-medium">No documents yet</p>
-          <p className="text-warm-grey/70 text-sm mt-1">Create a folder or upload a file to get started</p>
+          <p className="text-bark text-lg font-medium">Keep the documents that matter in one safe place</p>
+          <p className="text-warm-grey text-sm mt-1.5">Upload a file or create a folder to get started.</p>
+          <div className="flex flex-wrap justify-center gap-2 mt-5 max-w-md mx-auto">
+            {['Medical records', 'Insurance policies', 'Passports', 'Warranties', 'School forms'].map((ex) => (
+              <span key={ex} className="inline-flex items-center px-3 py-1.5 rounded-full bg-plum-light text-plum text-xs font-semibold">
+                {ex}
+              </span>
+            ))}
+          </div>
         </div>
       ) : (
         <>
