@@ -2,11 +2,49 @@
 
 Companion to `google-calendar-twoway-plan.md`. Everything here is done in the **existing** Housemait Google Cloud project (the one already used for Google sign‑in). No new account/project.
 
-Scopes being added:
-- `https://www.googleapis.com/auth/calendar.readonly` — read the user's selected calendars (inbound, read‑only)
-- `https://www.googleapis.com/auth/calendar.app.created` — create/manage events on **only** a secondary "Housemait" calendar the app creates (outbound). Cannot access the user's other calendars.
+> ## ⚠️ SUBMIT NOW: `calendar.readonly` ONLY (2026‑06‑24)
+>
+> Phase 1 (inbound, read‑only) is **built, deployed, and live behind the
+> allowlist**. Phase 2 (`calendar.app.created`, outbound writes) is **NOT built
+> yet**. Google requires you to *demonstrate each requested scope in use* in the
+> demo video — you cannot film a feature that doesn't exist. So:
+>
+> - **Request `calendar.readonly` ONLY.** On the OAuth consent screen, if
+>   `calendar.app.created` is listed, **remove it** for this submission. Add it
+>   back for a second (incremental) verification when Phase 2 ships.
+> - **Privacy policy URL → `https://housemait.com/privacy.html`** (the
+>   pre‑rendered static page; it carries the Limited Use disclosure in its
+>   initial HTML, so it's robust for both human reviewers and headless checks).
+>   `/privacy` (React route) also works now and carries the disclosure, but the
+>   `.html` is the safer choice for the reviewer.
+> - Use the **readonly‑only** scope justification (§B) and demo script (§C‑readonly).
+>
+> The full two‑scope content below is retained for the **Phase 2** verification
+> round and should be ignored for the current submission.
+
+Scopes (full plan — Phase 2 adds the second one):
+- `https://www.googleapis.com/auth/calendar.readonly` — read the user's selected calendars (inbound, read‑only). **← the only scope to submit now.**
+- `https://www.googleapis.com/auth/calendar.app.created` — create/manage events on **only** a secondary "Housemait" calendar the app creates (outbound). Cannot access the user's other calendars. **← Phase 2, not yet built; do not request this round.**
 
 Both are **sensitive** (not restricted) → standard verification, **no CASA / paid security assessment**.
+
+---
+
+## A0. Readonly‑only submission — the exact current‑state checklist
+
+1. **OAuth consent screen → scopes:** ensure `calendar.readonly` is added; **remove `calendar.app.created` if present.**
+2. **Branding:** app name, user support email, logo, app homepage `https://housemait.com`, **privacy URL `https://housemait.com/privacy.html`**, authorized domain `housemait.com`.
+3. **Confirm live before submitting:** open `https://housemait.com/privacy.html` and check the "5a. Google Calendar data & Limited Use" section is visible. (Verified live 2026‑06‑24.)
+4. **Scope justification:** paste §B's `calendar.readonly` paragraph only.
+5. **Demo video (~90s):** record the §C‑readonly script (no `app.created` shot).
+6. **Publish:** Publishing status → Publish app → "Prepare for verification" → submit. Until approved: 100‑user cap + unverified‑app screen on the *calendar* consent (sign‑in unaffected, thanks to incremental consent + test users).
+
+### §C‑readonly — demo video script (current submission)
+1. Show `https://housemait.com` in the address bar — "Housemait, a shared family organiser."
+2. Sign in → **Settings → Connect Calendars → Connect Google Calendar**.
+3. **Google's real consent screen** showing the read‑only calendar permission — read it aloud, click **Allow**.
+4. Show the picker → select a calendar → your existing Google events now appear inside Housemait's calendar (read‑only).
+5. Show **Disconnect** — it revokes access and removes the imported events.
 
 ---
 
