@@ -242,4 +242,16 @@ describe('DELETE /api/calendar/google/disconnect', () => {
     expect(revoke).toHaveBeenCalled();
     expect(db.deleteCalendarConnection).toHaveBeenCalledWith('c1');
   });
+
+  test('deletes the Housemait app calendar before revoking when one exists', async () => {
+    const revoke = jest.fn().mockResolvedValue();
+    db.getCalendarConnectionByUser.mockResolvedValue({ id: 'c1', refresh_token: 'enc', app_calendar_id: 'housemait-cal' });
+    googleCal.oauthClientForConnection.mockReturnValue({ revokeCredentials: revoke });
+    googleCal.deleteAppCalendar.mockResolvedValue({ ok: true });
+    db.deleteCalendarConnection.mockResolvedValue();
+    const res = await request(app()).delete('/api/calendar/google/disconnect');
+    expect(res.status).toBe(200);
+    expect(googleCal.deleteAppCalendar).toHaveBeenCalledWith(expect.objectContaining({ app_calendar_id: 'housemait-cal' }));
+    expect(db.deleteCalendarConnection).toHaveBeenCalledWith('c1');
+  });
 });

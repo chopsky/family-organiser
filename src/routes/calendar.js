@@ -253,13 +253,19 @@ router.post('/google/select', requireAuth, requireHousehold, async (req, res) =>
   }
 });
 
-// Disconnect: best-effort revoke at Google, then delete the connection (which
-// cascades to its feed rows and their pulled events).
+// Disconnect: delete the "Housemait" app calendar (removes ONLY events we put
+// there), then best-effort revoke at Google, then delete the connection (which
+// cascades to its feed rows + pulled events + sync mappings).
 router.delete('/google/disconnect', requireAuth, requireHousehold, async (req, res) => {
   if (!(await gcalEnabledFor(req))) return res.status(404).json({ error: 'Not available' });
   try {
     const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
     if (!conn) return res.json({ ok: true });
+    // Delete the Housemait calendar FIRST - the revoke below kills the token we
+    // need to do it. Best-effort: a failure here must not block disconnect.
+    if (conn.app_calendar_id && conn.refresh_token) {
+      try { await googleCal.deleteAppCalendar(conn); } catch (e) { console.error('[gcal disconnect] app calendar delete failed:', e.message); }
+    }
     if (conn.refresh_token) {
       try { await googleCal.oauthClientForConnection(conn).revokeCredentials(); } catch { /* best-effort */ }
     }
