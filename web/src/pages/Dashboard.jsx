@@ -799,7 +799,6 @@ export default function Dashboard() {
             <ul className="border-t border-[#1b14240f]">
               {outstanding.slice(0, 5).map((task) => {
                 const assignee = getTaskAssignee(task);
-                const dueLabel = formatTaskDueLabel(task.due_date);
                 return (
                   <li key={task.id} className="flex items-center gap-3 py-2.5 border-b border-[#1b14240f]">
                     <button
@@ -817,13 +816,8 @@ export default function Dashboard() {
                     <p className={`flex-1 min-w-0 text-sm font-medium truncate ${task.completed ? 'line-through text-cocoa/60' : 'text-bark'}`}>
                       {task.title}
                     </p>
-                    {dueLabel && (
-                      <span className={`shrink-0 text-[0.6875rem] font-bold uppercase tracking-wide ${dueLabel.overdue ? 'text-coral' : 'text-cocoa'}`}>
-                        {dueLabel.text}
-                      </span>
-                    )}
                     {assignee && (
-                      <div className="shrink-0">{getMemberAvatar(assignee, 22)}</div>
+                      <div className="shrink-0">{getMemberAvatar(assignee, 25)}</div>
                     )}
                   </li>
                 );
