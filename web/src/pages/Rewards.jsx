@@ -165,7 +165,7 @@ export default function Rewards() {
   return (
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
-        kicker="Spend your stars"
+        kicker="Spend stars"
         title="Rewards"
         actions={(
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
