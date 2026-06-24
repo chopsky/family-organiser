@@ -15,6 +15,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { encryptToken } = require('../utils/calendar-token-crypto');
+const googleCal = require('../services/googleCalendar');
 const deviceCalendarSync = require('../services/deviceCalendarSync');
 const cache = require('../services/cache');
 const push = require('../services/push');
@@ -109,6 +110,109 @@ router.get('/connect/google/callback', async (req, res) => {
   } catch (err) {
     console.error('[gcal callback] token exchange failed:', err.message);
     return back('error', '&reason=exchange_failed');
+  }
+});
+
+// Is a token error from Google a "the user revoked us / re-consent needed" one?
+function isReconnectError(err) {
+  const m = `${err?.message || ''} ${err?.response?.data?.error || ''}`.toLowerCase();
+  return err?.code === 'NO_REFRESH_TOKEN' || /invalid_grant|unauthorized|invalid credentials|401/.test(m);
+}
+
+// Connection status for the UI: connected?, which account, which calendars chosen.
+router.get('/google/status', requireAuth, requireHousehold, async (req, res) => {
+  if (!GCAL_ENABLED) return res.json({ enabled: false, connected: false });
+  try {
+    const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
+    if (!conn) return res.json({ enabled: true, connected: false });
+    const feeds = await db.getGoogleFeedsByConnection(conn.id);
+    return res.json({
+      enabled: true,
+      connected: true,
+      email: conn.google_email,
+      status: conn.status,
+      calendars: feeds.map((f) => ({ id: f.google_calendar_id, name: f.display_name, lastSyncedAt: f.last_synced_at })),
+    });
+  } catch (err) {
+    console.error('[gcal status]', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// List the connected account's calendars for the picker (each flagged selected).
+router.get('/google/calendars', requireAuth, requireHousehold, async (req, res) => {
+  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Not available' });
+  const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
+  if (!conn || conn.status === 'needs_reconnect' || !conn.refresh_token) {
+    return res.status(409).json({ error: 'not_connected', needsConnect: true });
+  }
+  try {
+    const [calendars, feeds] = await Promise.all([
+      googleCal.listCalendars(conn),
+      db.getGoogleFeedsByConnection(conn.id),
+    ]);
+    const selected = new Set(feeds.map((f) => f.google_calendar_id));
+    return res.json({
+      email: conn.google_email,
+      calendars: calendars.map((c) => ({ ...c, selected: selected.has(c.id) })),
+    });
+  } catch (err) {
+    if (isReconnectError(err)) {
+      await db.markCalendarConnectionStatus(conn.id, 'needs_reconnect').catch(() => {});
+      return res.status(409).json({ error: 'reconnect_required', needsConnect: true });
+    }
+    console.error('[gcal calendars]', err.message);
+    return res.status(502).json({ error: 'Could not load calendars from Google.' });
+  }
+});
+
+// Save which calendars to import. Adds feed rows for newly-selected calendars
+// and removes deselected ones (their events cascade away via external_feed_id).
+router.post('/google/select', requireAuth, requireHousehold, async (req, res) => {
+  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Not available' });
+  const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
+  if (!conn) return res.status(409).json({ error: 'not_connected' });
+  const wanted = Array.isArray(req.body?.calendars) ? req.body.calendars : [];
+  const wantById = new Map(wanted.filter((c) => c && c.id).map((c) => [String(c.id), c]));
+  try {
+    const existing = await db.getGoogleFeedsByConnection(conn.id);
+    const existingIds = new Set(existing.map((f) => f.google_calendar_id));
+    for (const [id, c] of wantById) {
+      if (!existingIds.has(id)) {
+        await db.addGoogleCalendarFeed({
+          userId: req.user.id,
+          householdId: req.householdId,
+          connectionId: conn.id,
+          googleCalendarId: id,
+          displayName: c.summary || c.name || 'Google calendar',
+        });
+      }
+    }
+    for (const f of existing) {
+      if (!wantById.has(f.google_calendar_id)) await db.deleteExternalFeed(f.id, req.householdId);
+    }
+    return res.json({ ok: true, count: wantById.size });
+  } catch (err) {
+    console.error('[gcal select]', err.message);
+    return res.status(500).json({ error: 'Could not save calendar selection.' });
+  }
+});
+
+// Disconnect: best-effort revoke at Google, then delete the connection (which
+// cascades to its feed rows and their pulled events).
+router.delete('/google/disconnect', requireAuth, requireHousehold, async (req, res) => {
+  if (!GCAL_ENABLED) return res.status(404).json({ error: 'Not available' });
+  try {
+    const conn = await db.getCalendarConnectionByUser(req.user.id, 'google');
+    if (!conn) return res.json({ ok: true });
+    if (conn.refresh_token) {
+      try { await googleCal.oauthClientForConnection(conn).revokeCredentials(); } catch { /* best-effort */ }
+    }
+    await db.deleteCalendarConnection(conn.id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[gcal disconnect]', err.message);
+    return res.status(500).json({ error: 'Could not disconnect.' });
   }
 });
 

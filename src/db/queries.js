@@ -3155,6 +3155,54 @@ async function getCalendarConnectionByUser(userId, provider = 'google', db = sup
   return data || null;
 }
 
+async function markCalendarConnectionStatus(connectionId, status, db = supabase) {
+  const { error } = await db
+    .from('calendar_connections')
+    .update({ status })
+    .eq('id', connectionId);
+  if (error) throw error;
+}
+
+// Removing the connection cascades to its google feed rows, and those cascade
+// to their calendar_events (external_feed_id ON DELETE CASCADE) - so a
+// disconnect cleanly removes every event Housemait pulled from this account.
+async function deleteCalendarConnection(connectionId, db = supabase) {
+  const { error } = await db.from('calendar_connections').delete().eq('id', connectionId);
+  if (error) throw error;
+}
+
+// One external_calendar_feeds row per SELECTED Google calendar (source='google').
+async function getGoogleFeedsByConnection(connectionId, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('connection_id', connectionId)
+    .eq('source', 'google');
+  if (error) throw error;
+  return data || [];
+}
+
+async function addGoogleCalendarFeed(f, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .insert({
+      user_id: f.userId,
+      household_id: f.householdId,
+      connection_id: f.connectionId,
+      source: 'google',
+      google_calendar_id: f.googleCalendarId,
+      // Synthetic, satisfies NOT NULL + the (household_id, feed_url) unique index.
+      feed_url: `google://${f.connectionId}/${f.googleCalendarId}`,
+      display_name: f.displayName || 'Google calendar',
+      color: f.color || 'sky',
+      sync_enabled: true,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function getExternalFeedsByHousehold(householdId, db = supabase) {
   const { data, error } = await db
     .from('external_calendar_feeds')
@@ -7714,6 +7762,10 @@ module.exports = {
   deleteFeedToken,
   upsertCalendarConnection,
   getCalendarConnectionByUser,
+  markCalendarConnectionStatus,
+  deleteCalendarConnection,
+  getGoogleFeedsByConnection,
+  addGoogleCalendarFeed,
   getExternalFeedsByHousehold,
   getAllActiveExternalFeeds,
   findDeviceCalendarLink,

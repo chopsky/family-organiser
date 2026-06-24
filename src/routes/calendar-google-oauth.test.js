@@ -29,6 +29,7 @@ jest.mock('../services/externalFeed', () => ({}));
 jest.mock('../services/publicHolidays', () => ({}));
 jest.mock('../services/deviceCalendarSync', () => ({}));
 jest.mock('../services/cache', () => ({ get: jest.fn(), set: jest.fn(), invalidate: jest.fn() }));
+jest.mock('../services/googleCalendar');
 
 const mockGetToken = jest.fn();
 jest.mock('googleapis', () => ({
@@ -48,9 +49,11 @@ const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const db = require('../db/queries');
+const googleCal = require('../services/googleCalendar');
 
 function app() {
   const a = express();
+  a.use(express.json());
   a.use('/api/calendar', require('./calendar'));
   return a;
 }
@@ -123,5 +126,71 @@ describe('GET /api/calendar/connect/google/callback', () => {
     expect(res.headers.location).toContain('google=error');
     expect(res.headers.location).toContain('access_denied');
     expect(db.upsertCalendarConnection).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/calendar/google/calendars', () => {
+  test('409 needsConnect when there is no connection', async () => {
+    db.getCalendarConnectionByUser.mockResolvedValue(null);
+    const res = await request(app()).get('/api/calendar/google/calendars');
+    expect(res.status).toBe(409);
+    expect(res.body.needsConnect).toBe(true);
+  });
+
+  test('returns calendars flagged with their current selection', async () => {
+    db.getCalendarConnectionByUser.mockResolvedValue({ id: 'c1', refresh_token: 'enc', status: 'ok', google_email: 'p@h.com' });
+    googleCal.listCalendars.mockResolvedValue([
+      { id: 'cal-A', summary: 'Work', primary: false },
+      { id: 'cal-B', summary: 'Family', primary: true },
+    ]);
+    db.getGoogleFeedsByConnection.mockResolvedValue([{ google_calendar_id: 'cal-B' }]);
+    const res = await request(app()).get('/api/calendar/google/calendars');
+    expect(res.status).toBe(200);
+    expect(res.body.calendars.find((c) => c.id === 'cal-B').selected).toBe(true);
+    expect(res.body.calendars.find((c) => c.id === 'cal-A').selected).toBe(false);
+  });
+
+  test('a revoked token marks the connection needs_reconnect and 409s', async () => {
+    db.getCalendarConnectionByUser.mockResolvedValue({ id: 'c1', refresh_token: 'enc', status: 'ok' });
+    db.markCalendarConnectionStatus.mockResolvedValue();
+    googleCal.listCalendars.mockRejectedValue(new Error('invalid_grant'));
+    const res = await request(app()).get('/api/calendar/google/calendars');
+    expect(res.status).toBe(409);
+    expect(db.markCalendarConnectionStatus).toHaveBeenCalledWith('c1', 'needs_reconnect');
+  });
+});
+
+describe('POST /api/calendar/google/select', () => {
+  test('adds newly-selected calendars and removes deselected ones', async () => {
+    db.getCalendarConnectionByUser.mockResolvedValue({ id: 'c1' });
+    db.getGoogleFeedsByConnection.mockResolvedValue([
+      { id: 'feed-old', google_calendar_id: 'cal-OLD' },
+      { id: 'feed-keep', google_calendar_id: 'cal-KEEP' },
+    ]);
+    db.addGoogleCalendarFeed.mockResolvedValue({ id: 'feed-new' });
+    db.deleteExternalFeed.mockResolvedValue();
+
+    const res = await request(app())
+      .post('/api/calendar/google/select')
+      .send({ calendars: [{ id: 'cal-KEEP', summary: 'Family' }, { id: 'cal-NEW', summary: 'School' }] });
+
+    expect(res.status).toBe(200);
+    expect(db.addGoogleCalendarFeed).toHaveBeenCalledTimes(1);
+    expect(db.addGoogleCalendarFeed.mock.calls[0][0]).toMatchObject({ googleCalendarId: 'cal-NEW', connectionId: 'c1' });
+    expect(db.deleteExternalFeed).toHaveBeenCalledWith('feed-old', 'h1'); // cal-OLD deselected
+    expect(db.deleteExternalFeed).not.toHaveBeenCalledWith('feed-keep', 'h1');
+  });
+});
+
+describe('DELETE /api/calendar/google/disconnect', () => {
+  test('revokes + deletes the connection', async () => {
+    const revoke = jest.fn().mockResolvedValue();
+    db.getCalendarConnectionByUser.mockResolvedValue({ id: 'c1', refresh_token: 'enc' });
+    googleCal.oauthClientForConnection.mockReturnValue({ revokeCredentials: revoke });
+    db.deleteCalendarConnection.mockResolvedValue();
+    const res = await request(app()).delete('/api/calendar/google/disconnect');
+    expect(res.status).toBe(200);
+    expect(revoke).toHaveBeenCalled();
+    expect(db.deleteCalendarConnection).toHaveBeenCalledWith('c1');
   });
 });
