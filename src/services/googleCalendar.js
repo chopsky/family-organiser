@@ -189,6 +189,10 @@ async function refreshGoogleFeed(feed, connection) {
   const existing = await db.getExternalFeedEvents(feed.id); // [{ id, external_uid, ... }]
   const existingByUid = new Map(existing.map((e) => [e.external_uid, e]));
 
+  // A synced calendar inherits its owner member's colour + attribution (or a
+  // neutral "Shared" colour with no assignee). Resolved once per refresh.
+  const attr = await db.getFeedAttribution(feed);
+
   const rows = events.map((ev) => {
     if (existingByUid.has(ev.id)) stats.updated += 1; else stats.created += 1;
     return {
@@ -196,7 +200,9 @@ async function refreshGoogleFeed(feed, connection) {
       title: ev.summary || 'Untitled event',
       description: ev.description || null,
       location: ev.location || null,
-      color: feed.color || 'sky',
+      color: attr.color,
+      assigned_to_ids: attr.assignedIds,
+      assigned_to_names: attr.assignedNames,
       source_user_id: feed.user_id,
       external_feed_id: feed.id,
       external_uid: ev.id,

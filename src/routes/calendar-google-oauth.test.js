@@ -28,7 +28,7 @@ jest.mock('../services/broadcast', () => ({}));
 jest.mock('../services/externalFeed', () => ({}));
 jest.mock('../services/publicHolidays', () => ({}));
 jest.mock('../services/deviceCalendarSync', () => ({}));
-jest.mock('../services/cache', () => ({ get: jest.fn(), set: jest.fn(), invalidate: jest.fn() }));
+jest.mock('../services/cache', () => ({ get: jest.fn(), set: jest.fn(), invalidate: jest.fn(), invalidatePattern: jest.fn() }));
 jest.mock('../services/googleCalendar');
 
 const mockGetToken = jest.fn();
@@ -262,6 +262,37 @@ describe('POST /api/calendar/external-feeds/:id/refresh (google)', () => {
     const res = await request(app()).post('/api/calendar/external-feeds/F1/refresh');
     expect(res.status).toBe(409);
     expect(googleCal.refreshGoogleFeed).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/calendar/external-feeds/:id/owner', () => {
+  test('attributes a feed to a household member (colour + re-stamp events)', async () => {
+    db.getExternalFeedById.mockResolvedValue({ id: 'F1', household_id: 'h1' });
+    db.getUserById.mockResolvedValue({ id: 'm1', household_id: 'h1', color_theme: 'cobalt', name: 'Dad' });
+    db.setExternalFeedOwner.mockResolvedValue({ id: 'F1', owner_member_id: 'm1', color: 'cobalt' });
+    db.restampFeedEventsAttribution.mockResolvedValue();
+    const res = await request(app()).patch('/api/calendar/external-feeds/F1/owner').send({ owner_member_id: 'm1' });
+    expect(res.status).toBe(200);
+    expect(db.setExternalFeedOwner).toHaveBeenCalledWith('F1', 'h1', 'm1', 'cobalt');
+    expect(db.restampFeedEventsAttribution).toHaveBeenCalledWith('F1', 'h1', { color: 'cobalt', assignedIds: ['m1'], assignedNames: ['Dad'] });
+  });
+
+  test('"Shared" (null owner) → neutral colour, no assignee, no member lookup', async () => {
+    db.getExternalFeedById.mockResolvedValue({ id: 'F1', household_id: 'h1' });
+    db.setExternalFeedOwner.mockResolvedValue({ id: 'F1', owner_member_id: null, color: 'slate' });
+    db.restampFeedEventsAttribution.mockResolvedValue();
+    const res = await request(app()).patch('/api/calendar/external-feeds/F1/owner').send({ owner_member_id: null });
+    expect(res.status).toBe(200);
+    expect(db.setExternalFeedOwner).toHaveBeenCalledWith('F1', 'h1', null, 'slate');
+    expect(db.restampFeedEventsAttribution).toHaveBeenCalledWith('F1', 'h1', { color: 'slate', assignedIds: [], assignedNames: [] });
+  });
+
+  test('rejects a member from another household', async () => {
+    db.getExternalFeedById.mockResolvedValue({ id: 'F1', household_id: 'h1' });
+    db.getUserById.mockResolvedValue({ id: 'm9', household_id: 'OTHER', color_theme: 'red', name: 'X' });
+    const res = await request(app()).patch('/api/calendar/external-feeds/F1/owner').send({ owner_member_id: 'm9' });
+    expect(res.status).toBe(400);
+    expect(db.setExternalFeedOwner).not.toHaveBeenCalled();
   });
 });
 

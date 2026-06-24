@@ -12,6 +12,7 @@ jest.mock('../db/queries', () => ({
   recordExternalFeedSuccess: jest.fn().mockResolvedValue(),
   recordExternalFeedPartial: jest.fn().mockResolvedValue(),
   recordExternalFeedFailure: jest.fn().mockResolvedValue(),
+  getFeedAttribution: jest.fn().mockResolvedValue({ color: 'slate', assignedIds: [], assignedNames: [] }),
 }));
 jest.mock('./cache', () => ({ invalidatePattern: jest.fn(), invalidate: jest.fn() }));
 jest.mock('../utils/ssrf-guard', () => ({

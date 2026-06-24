@@ -220,6 +220,9 @@ router.post('/google/select', requireAuth, requireHousehold, async (req, res) =>
   try {
     const existing = await db.getGoogleFeedsByConnection(conn.id);
     const existingIds = new Set(existing.map((f) => f.google_calendar_id));
+    // New Google calendars default to belonging to the member who connected
+    // them - they inherit that member's colour + attribution.
+    const owner = await Promise.resolve(db.getUserById(req.user.id)).catch(() => null);
     const added = [];
     for (const [id, c] of wantById) {
       if (!existingIds.has(id)) {
@@ -229,6 +232,8 @@ router.post('/google/select', requireAuth, requireHousehold, async (req, res) =>
           connectionId: conn.id,
           googleCalendarId: id,
           displayName: c.summary || c.name || 'Google calendar',
+          ownerMemberId: req.user.id,
+          color: owner?.color_theme || 'sky',
         });
         if (feed) added.push(feed);
       }
@@ -1031,12 +1036,17 @@ router.post('/external-feeds', async (req, res) => {
 
   let feed;
   try {
+    // A synced calendar defaults to belonging to the person who connected it
+    // (their own calendar) - events inherit that member's colour + attribution.
+    // They can re-point it to another member or "Shared" later.
+    const owner = await Promise.resolve(db.getUserById(req.user.id)).catch(() => null);
     feed = await db.createExternalFeed({
       user_id: req.user.id,
       household_id: req.householdId,
       feed_url: normalisedUrl,
       display_name: display_name.trim().slice(0, 200),
-      color: color || 'sky',
+      owner_member_id: req.user.id,
+      color: owner?.color_theme || color || 'sky',
     });
   } catch (err) {
     // Unique violation on (household_id, feed_url) - friendlier message.
@@ -1150,6 +1160,44 @@ router.patch('/external-feeds/:id', async (req, res) => {
   } catch (err) {
     console.error(`PATCH /api/calendar/external-feeds/${feed.id} error:`, err);
     return res.status(500).json({ error: err.message || 'Could not update feed.' });
+  }
+});
+
+/**
+ * PATCH /api/calendar/external-feeds/:id/owner
+ * Set which household member a synced calendar belongs to ("Whose calendar is
+ * this?"). Body: { owner_member_id: <member id> | null }. null = "Shared"
+ * (neutral colour, no assignee). Re-stamps already-imported events so the
+ * colour + attribution update immediately, not just on the next sync.
+ */
+router.patch('/external-feeds/:id/owner', async (req, res) => {
+  const feed = await db.getExternalFeedById(req.params.id);
+  if (!feed || feed.household_id !== req.householdId) {
+    return res.status(404).json({ error: 'Feed not found.' });
+  }
+  const ownerMemberId = req.body?.owner_member_id || null;
+  try {
+    // A non-null owner must be a member of THIS household (no cross-tenant).
+    let attr = { color: 'slate', assignedIds: [], assignedNames: [] };
+    if (ownerMemberId) {
+      const member = await db.getUserById(ownerMemberId);
+      if (!member || member.household_id !== req.householdId) {
+        return res.status(400).json({ error: 'That member is not in your household.' });
+      }
+      attr = {
+        color: member.color_theme || 'slate',
+        assignedIds: [member.id],
+        assignedNames: [member.name].filter(Boolean),
+      };
+    }
+    const updated = await db.setExternalFeedOwner(feed.id, req.householdId, ownerMemberId, attr.color);
+    await db.restampFeedEventsAttribution(feed.id, req.householdId, attr);
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
+    cache.invalidatePattern(`cal-events:${req.householdId}:`);
+    return res.json({ feed: updated });
+  } catch (err) {
+    console.error(`PATCH /api/calendar/external-feeds/${feed.id}/owner error:`, err);
+    return res.status(500).json({ error: err.message || 'Could not update calendar owner.' });
   }
 });
 

@@ -248,6 +248,11 @@ async function refreshFeed(feed) {
   const existing = await db.getExternalFeedEvents(feed.id);
   const existingByUid = new Map(existing.map((e) => [e.external_uid, e]));
 
+  // Attribution: a synced calendar inherits its owner member's colour and is
+  // assigned to them (or a neutral "Shared" colour with no assignee when the
+  // feed has no owner). Resolved once per refresh.
+  const attr = await db.getFeedAttribution(feed);
+
   // Build the row payload up-front so the batched upsert is a single
   // round-trip. Doing this per-row used to be the bottleneck - Apple
   // iCloud Family calendars expand into 5k–20k rows once recurrence is
@@ -268,7 +273,9 @@ async function refreshFeed(feed) {
       end_time: rec.end_time || rec.start_time,
       all_day: !!rec.all_day,
       location: rec.location || null,
-      color: feed.color || 'sky',
+      color: attr.color,
+      assigned_to_ids: attr.assignedIds,
+      assigned_to_names: attr.assignedNames,
       source_user_id: feed.user_id,
       external_feed_id: feed.id,
       external_uid: rec.external_uid,

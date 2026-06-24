@@ -3204,6 +3204,8 @@ async function addGoogleCalendarFeed(f, db = supabase) {
       // Synthetic, satisfies NOT NULL + the (household_id, feed_url) unique index.
       feed_url: `google://${f.connectionId}/${f.googleCalendarId}`,
       display_name: f.displayName || 'Google calendar',
+      // Defaults to belonging to the connecting member (their own calendar).
+      owner_member_id: f.ownerMemberId || f.userId,
       color: f.color || 'sky',
       sync_enabled: true,
     })
@@ -3568,6 +3570,52 @@ async function updateExternalFeed(feedId, householdId, fields, db = supabase) {
     .single();
   if (error) throw error;
   return data;
+}
+
+// Resolve how a synced feed's events should be coloured + attributed:
+//   - owner set    → that member's colour + assigned to them
+//   - owner NULL    → "Shared" calendar: neutral colour, attributed to no one
+// Members are rows in `users`, so the owner's colour/name come from there.
+async function getFeedAttribution(feed, db = supabase) {
+  if (!feed || !feed.owner_member_id) {
+    return { color: 'slate', assignedIds: [], assignedNames: [] };
+  }
+  const owner = await getUserById(feed.owner_member_id, db);
+  if (!owner) return { color: feed.color || 'slate', assignedIds: [], assignedNames: [] };
+  return {
+    color: owner.color_theme || 'slate',
+    assignedIds: [owner.id],
+    assignedNames: [owner.name].filter(Boolean),
+  };
+}
+
+// Set which member a synced calendar belongs to (NULL = Shared) + its derived
+// colour. Household-scoped so a bare id can't be retargeted cross-tenant.
+async function setExternalFeedOwner(feedId, householdId, ownerMemberId, color, db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .update({ owner_member_id: ownerMemberId || null, color })
+    .eq('id', feedId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Re-stamp every already-imported event of a feed when its owner changes, so
+// the colour + attribution catch up without waiting for the next sync.
+async function restampFeedEventsAttribution(feedId, householdId, attr, db = supabase) {
+  const { error } = await db
+    .from('calendar_events')
+    .update({
+      assigned_to_ids: attr.assignedIds || [],
+      assigned_to_names: attr.assignedNames || [],
+      color: attr.color,
+    })
+    .eq('external_feed_id', feedId)
+    .eq('household_id', householdId);
+  if (error) throw error;
 }
 
 async function recordExternalFeedSuccess(feedId, db = supabase) {
@@ -7926,6 +7974,9 @@ module.exports = {
   createExternalFeed,
   deleteExternalFeed,
   updateExternalFeed,
+  getFeedAttribution,
+  setExternalFeedOwner,
+  restampFeedEventsAttribution,
   recordExternalFeedSuccess,
   recordExternalFeedPartial,
   recordExternalFeedFailure,

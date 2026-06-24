@@ -39,6 +39,7 @@ jest.mock('../db/queries', () => ({
   deleteSyncMapping: jest.fn().mockResolvedValue(),
   recordCalendarWriteAudit: jest.fn().mockResolvedValue(),
   getWritableConnectionsByHousehold: jest.fn().mockResolvedValue([]),
+  getFeedAttribution: jest.fn().mockResolvedValue({ color: 'slate', assignedIds: [], assignedNames: [] }),
 }));
 jest.mock('./cache', () => ({ invalidatePattern: jest.fn() }));
 
@@ -108,6 +109,18 @@ describe('refreshGoogleFeed', () => {
     expect(db.updateGoogleFeedSyncToken).toHaveBeenCalledWith('F1', 'TK-new');
     expect(db.recordExternalFeedSuccess).toHaveBeenCalledWith('F1');
     expect(stats.created).toBe(1);
+  });
+
+  test('imported events inherit the feed owner colour + attribution', async () => {
+    db.getFeedAttribution.mockResolvedValue({ color: 'cobalt', assignedIds: ['m1'], assignedNames: ['Dad'] });
+    mockList.mockResolvedValueOnce(page([
+      { id: 'ev-a', summary: 'Standup', start: { dateTime: '2026-06-24T09:00:00Z' }, end: { dateTime: '2026-06-24T09:30:00Z' } },
+    ], { nextSyncToken: 'TK' }));
+
+    await refreshGoogleFeed(FEED(), CONN);
+
+    const row = db.batchUpsertExternalFeedEvents.mock.calls[0][0][0];
+    expect(row).toMatchObject({ color: 'cobalt', assigned_to_ids: ['m1'], assigned_to_names: ['Dad'] });
   });
 
   test('an incremental cancelled event soft-deletes only that row (explicit delete)', async () => {
