@@ -5,7 +5,7 @@
 // Avatar precedence (see components/ui/Avatar): photo -> illustration -> initial.
 
 const SET = 'set2';
-const COUNT = 60;
+const COUNT = 61;
 
 // Retired avatar ids: filtered out of the picker but never renumbered, so every
 // other member's saved avatar_id keeps pointing at the same face.
