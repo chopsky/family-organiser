@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
+import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
@@ -542,8 +543,8 @@ function EditItemModal({ item, onClose, onSave }) {
   const field = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff', color: INK };
   const label = { fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 };
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 440, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
+    <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[440px]">
+      <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>Edit item</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
@@ -580,7 +581,7 @@ function EditItemModal({ item, onClose, onSave }) {
           <button onClick={() => f.item.trim() && onSave(f)} disabled={!f.item.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: f.item.trim() ? 1 : 0.5 }}>Save</button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -590,8 +591,8 @@ function NewListModal({ onClose, onSave }) {
   const [emoji, setEmoji] = useState('📋');
   const [color, setColor] = useState(DEFAULT_TINTS[0]);
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 440, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
+    <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[440px]">
+      <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>New list</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
@@ -617,6 +618,6 @@ function NewListModal({ onClose, onSave }) {
           <button onClick={() => name.trim() && onSave({ name: name.trim(), emoji, color })} disabled={!name.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: name.trim() ? 1 : 0.5 }}>Create</button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }

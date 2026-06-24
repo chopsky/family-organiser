@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
+import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
@@ -758,8 +759,8 @@ function TaskModal({ modal, members, onClose, onSave }) {
   };
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
+    <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[520px]">
+      <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{t.id ? 'Edit task' : (isAnyone ? 'New shared chore' : 'New task')}</h2>
           <button onClick={onClose} aria-label="Close" style={{ ...cardBtn, width: 34, height: 34 }}><IcClose s={18} c={INK2} /></button>
@@ -844,7 +845,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
           <button onClick={submit} disabled={!title.trim() || (!isAnyone && assignees.length === 0)} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: (!title.trim() || (!isAnyone && assignees.length === 0)) ? 0.5 : 1 }}>{t.id ? 'Save' : (isAnyone ? 'Add chore' : 'Add task')}</button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 

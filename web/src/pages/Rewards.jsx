@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
+import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
@@ -297,8 +298,8 @@ function RewardModal({ onClose, onSave, kids, reward }) {
   const toggleWho = (id) => setWhoIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   const submit = () => { if (title.trim()) onSave({ title: title.trim(), emoji, cost, who_ids: whoIds }); };
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 460, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
+    <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[460px]">
+      <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{editing ? 'Edit reward' : 'New reward'}</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
@@ -332,7 +333,7 @@ function RewardModal({ onClose, onSave, kids, reward }) {
           <button onClick={submit} disabled={!title.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: !title.trim() ? 0.5 : 1 }}>{editing ? 'Save' : 'Add reward'}</button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 const input = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, color: INK, outline: 'none', background: '#fff' };

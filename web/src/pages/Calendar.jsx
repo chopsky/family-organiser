@@ -5,6 +5,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
+import { BottomSheet } from '../components/BottomSheet';
 import Segmented from '../components/ui/Segmented';
 import { useCanWrite } from '../context/SubscriptionContext';
 import { useChildMode } from '../context/ChildModeContext';
@@ -2253,11 +2254,10 @@ export default function Calendar() {
 
       {/* ── Event Form Modal ───────────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setShowForm(false); resetForm(); }}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div ref={formRef} onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-2xl border border-light-grey w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
+        <BottomSheet open={showForm} onDismiss={() => { setShowForm(false); resetForm(); }} desktopWidthClass="sm:w-[480px]">
+          <div ref={formRef} className="overflow-y-auto min-h-0">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-2">
+            <div className="flex items-center justify-between px-6 pt-2 pb-2">
               <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>
                 {editingEvent ? 'Edit Event' : 'New Event'}
               </h2>
@@ -2627,7 +2627,7 @@ export default function Calendar() {
               </div>
             </form>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* ── Task Edit Form Modal ────────────────────────────────── */}
