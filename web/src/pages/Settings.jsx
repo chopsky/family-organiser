@@ -22,6 +22,7 @@ import { useSubscription } from '../context/SubscriptionContext';
 import { pickPhoto } from '../lib/photo-picker';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
+import { MEMBER_HEX } from '../lib/memberColors';
 import { useChildMode } from '../context/ChildModeContext';
 import resizeImage from '../lib/resizeImage';
 import {
@@ -880,7 +881,7 @@ export default function Settings() {
   // Which provider the user picked in the add-calendar wizard. Drives the
   // step-by-step panel + deep link; null until they choose.
   const [newFeedProvider, setNewFeedProvider] = useState(null);
-  const [colorPickerOpenId, setColorPickerOpenId] = useState(null); // id of feed whose inline colour picker is expanded
+  const [feedOwnerOpenId, setFeedOwnerOpenId] = useState(null); // id of feed whose "Whose calendar?" picker is expanded
   const [addingFeed, setAddingFeed] = useState(false);
   // Inline error for the add-feed form, shown next to the Subscribe button.
   // The page-level `error`/`success` surface outside this modal, where a user
@@ -1406,17 +1407,21 @@ export default function Settings() {
     }
   }
 
-  async function handleUpdateFeedColor(id, color) {
-    setColorPickerOpenId(null);
-    // Optimistic update so the swatch flips immediately - revert if the
-    // PATCH fails.
+  // "Whose calendar is this?" - attribute a synced calendar to a member (events
+  // take that member's colour + show in their filter) or to nobody ("Shared":
+  // a neutral colour, e.g. for school / holidays). The backend re-stamps the
+  // already-imported events; we optimistically reflect the colour change here.
+  async function handleSetFeedOwner(id, ownerMemberId) {
+    setFeedOwnerOpenId(null);
     const prev = externalFeeds;
-    setExternalFeeds(p => p.map(f => f.id === id ? { ...f, color } : f));
+    const member = members.find((m) => m.id === ownerMemberId);
+    const color = ownerMemberId ? (member?.color_theme || 'slate') : 'slate';
+    setExternalFeeds(p => p.map(f => f.id === id ? { ...f, owner_member_id: ownerMemberId, color } : f));
     try {
-      await api.patch(`/calendar/external-feeds/${id}`, { color });
+      await api.patch(`/calendar/external-feeds/${id}/owner`, { owner_member_id: ownerMemberId });
     } catch (err) {
       setExternalFeeds(prev);
-      setError(err.response?.data?.error || 'Could not update calendar colour.');
+      setError(err.response?.data?.error || 'Could not update calendar owner.');
     }
   }
 
@@ -2053,25 +2058,10 @@ export default function Settings() {
                 onChange={(e) => setNewFeedName(e.target.value)}
                 className="w-full border border-cream-border rounded-2xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              {/* Colour picker - 16-swatch palette matching the member-theme
-                  picker in FamilySetup. Sets the colour that subscribed-feed
-                  events will use on the calendar grid; defaults to 'sky'. */}
-              <div>
-                <p className="text-xs text-cocoa mb-1.5">Colour <span className="text-cocoa">(how this calendar's events appear on the grid)</span></p>
-                <div className="flex flex-wrap gap-2">
-                  {FEED_COLOR_PALETTE.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setNewFeedColor(c)}
-                      title={c}
-                      aria-label={`Set colour ${c}`}
-                      className={`w-6 h-6 rounded-full transition-transform ${newFeedColor === c ? 'ring-2 ring-bark ring-offset-2 ring-offset-white scale-110' : 'hover:scale-105'}`}
-                      style={{ backgroundColor: FEED_COLOR_HEX[c] }}
-                    />
-                  ))}
-                </div>
-              </div>
+              {/* No colour picker here: a new calendar is added under you (it
+                  takes your colour and shows in your filter). Change "whose
+                  calendar" it is — or mark it Shared — from the list below. */}
+              <p className="text-[11px] text-cocoa">This calendar will be added under you. You can change whose it is afterwards.</p>
               {feedError && (
                 <p className="text-[11px] rounded-xl px-3 py-2 bg-coral/10 text-bark">⚠️ {feedError}</p>
               )}
@@ -2117,15 +2107,16 @@ export default function Settings() {
               {externalFeeds.filter((f) => f.source !== 'device').map((feed) => (
                 <li key={feed.id} className="bg-white border border-cream-border rounded-2xl px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    {/* Clickable colour swatch - tap to expand the inline
-                        16-colour picker below the row. Optimistically
-                        updates on pick. */}
+                    {/* Owner swatch - shows the colour of the member this
+                        calendar belongs to (or neutral grey when Shared). Tap
+                        to expand the "Whose calendar?" picker below the row. */}
                     <button
                       type="button"
-                      onClick={() => setColorPickerOpenId(colorPickerOpenId === feed.id ? null : feed.id)}
-                      aria-label={`Change colour for ${feed.display_name}`}
+                      onClick={() => setFeedOwnerOpenId(feedOwnerOpenId === feed.id ? null : feed.id)}
+                      aria-label={`Set whose calendar ${feed.display_name} is`}
+                      title="Whose calendar?"
                       className="w-5 h-5 rounded-full shrink-0 ring-1 ring-cream-border hover:ring-bark transition-shadow"
-                      style={{ backgroundColor: FEED_COLOR_HEX[feed.color] || FEED_COLOR_HEX.sky }}
+                      style={{ backgroundColor: MEMBER_HEX[feed.color] || MEMBER_HEX.slate }}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-bark truncate">{feed.display_name}</p>
@@ -2164,22 +2155,39 @@ export default function Settings() {
                       </button>
                     </div>
                   </div>
-                  {/* Inline colour picker - expands beneath the row when the
-                      swatch is tapped. Same 16-colour palette as the add
-                      form. Picking a colour fires the PATCH + collapses. */}
-                  {colorPickerOpenId === feed.id && (
-                    <div className="mt-2 pt-2 border-t border-cream-border flex flex-wrap gap-2">
-                      {FEED_COLOR_PALETTE.map((c) => (
+                  {/* "Whose calendar?" picker - expands beneath the row when the
+                      owner swatch is tapped. Picking a member attributes the
+                      calendar's events to them (their colour + their filter);
+                      "Shared" makes it neutral with no assignee. */}
+                  {feedOwnerOpenId === feed.id && (
+                    <div className="mt-2 pt-2 border-t border-cream-border">
+                      <p className="text-xs text-cocoa mb-2">Whose calendar is this?</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {members.map((m) => {
+                          const isOwner = feed.owner_member_id === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => handleSetFeedOwner(feed.id, m.id)}
+                              aria-label={`Assign ${feed.display_name} to ${m.name}`}
+                              className={`flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full border text-xs transition-colors ${isOwner ? 'border-bark bg-oat' : 'border-cream-border hover:border-bark'}`}
+                            >
+                              <Avatar member={m} size={20} />
+                              <span className="text-bark truncate max-w-[88px]">{m.name}</span>
+                            </button>
+                          );
+                        })}
                         <button
-                          key={c}
                           type="button"
-                          onClick={() => handleUpdateFeedColor(feed.id, c)}
-                          title={c}
-                          aria-label={`Set ${feed.display_name} colour to ${c}`}
-                          className={`w-6 h-6 rounded-full transition-transform ${feed.color === c ? 'ring-2 ring-bark ring-offset-2 ring-offset-white scale-110' : 'hover:scale-105'}`}
-                          style={{ backgroundColor: FEED_COLOR_HEX[c] }}
-                        />
-                      ))}
+                          onClick={() => handleSetFeedOwner(feed.id, null)}
+                          aria-label={`Mark ${feed.display_name} as shared`}
+                          className={`flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full border text-xs transition-colors ${!feed.owner_member_id ? 'border-bark bg-oat' : 'border-cream-border hover:border-bark'}`}
+                        >
+                          <span className="w-5 h-5 rounded-full shrink-0" style={{ background: MEMBER_HEX.slate }} />
+                          <span className="text-bark">Shared</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </li>
