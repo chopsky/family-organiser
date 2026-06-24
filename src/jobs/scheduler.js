@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const ical = require('node-ical');
 const db = require('../db/queries');
 const externalFeed = require('../services/externalFeed');
+const googleCal = require('../services/googleCalendar');
 const staleDeviceNudge = require('../services/stale-device-nudge');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
@@ -440,6 +441,78 @@ async function refreshAllExternalFeeds() {
 }
 
 /**
+ * Refresh every connected Google Calendar feed (source='google') via the
+ * Google Calendar API + incremental syncToken. Distinct from
+ * refreshAllExternalFeeds (HTTP iCal poller, source='ical').
+ *
+ * Feeds are grouped by connection so each account's OAuth client is built once.
+ * A revoked/expired connection marks the connection needs_reconnect and skips
+ * its remaining feeds rather than walking every feed's failure counter. Gated
+ * by GOOGLE_CALENDAR_ENABLED so it's inert until the flag is flipped.
+ */
+async function refreshAllGoogleFeeds() {
+  if (process.env.GOOGLE_CALENDAR_ENABLED !== 'true') return;
+  console.log('[scheduler] Starting Google calendar feed refresh');
+  let succeeded = 0;
+  let failed = 0;
+
+  try {
+    const feeds = await db.getAllActiveGoogleFeeds();
+    if (feeds.length === 0) {
+      console.log('[scheduler] No Google feeds to refresh');
+      return;
+    }
+
+    // Group by connection so we load + decrypt each account's token once.
+    const byConnection = new Map();
+    for (const feed of feeds) {
+      if (!feed.connection_id) continue;
+      if (!byConnection.has(feed.connection_id)) byConnection.set(feed.connection_id, []);
+      byConnection.get(feed.connection_id).push(feed);
+    }
+
+    for (const [connectionId, group] of byConnection) {
+      const conn = await db.getCalendarConnectionById(connectionId);
+      if (!conn || conn.status !== 'ok' || !conn.refresh_token || !conn.sync_enabled) {
+        console.log(`[scheduler] Skipping connection ${connectionId} (status=${conn?.status || 'missing'})`);
+        continue;
+      }
+      for (const feed of group) {
+        try {
+          const stats = await googleCal.refreshGoogleFeed(feed, conn);
+          succeeded += 1;
+          console.log(
+            `[scheduler] Google feed ${feed.id} (${feed.display_name}): ` +
+              `${stats.created} new, ${stats.updated} updated, ${stats.deleted} deleted`,
+          );
+        } catch (err) {
+          failed += 1;
+          // A token-level failure affects every feed on this account - mark the
+          // connection and stop hammering the rest of its calendars this run.
+          if (isReconnectError(err)) {
+            await db.markCalendarConnectionStatus(conn.id, 'needs_reconnect').catch(() => {});
+            console.warn(`[scheduler] Connection ${conn.id} needs reconnect - skipping its remaining feeds`);
+            break;
+          }
+          console.error(`[scheduler] Google feed ${feed.id} failed:`, err.message);
+        }
+      }
+    }
+
+    console.log(`[scheduler] Google feed refresh complete: ${succeeded} succeeded, ${failed} failed`);
+  } catch (err) {
+    console.error('[scheduler] Google feed refresh batch error:', err);
+  }
+}
+
+// A token error from Google that means "the user revoked us / re-consent
+// needed" - mirrors the same check in routes/calendar.js.
+function isReconnectError(err) {
+  const m = `${err?.message || ''} ${err?.response?.data?.error || ''}`.toLowerCase();
+  return err?.code === 'NO_REFRESH_TOKEN' || /invalid_grant|unauthorized|invalid credentials|401|403/.test(m);
+}
+
+/**
  * Daily iCal sync - re-fetch and replace all ical_import dates for every
  * school that has an ical_url configured.
  */
@@ -624,6 +697,13 @@ function startScheduler() {
   cron.schedule('15 */6 * * *', () => refreshAllExternalFeeds());
   console.log('✓ External feed refresh scheduled (every 6h at :15)');
 
+  // ── Google Calendar inbound pull: every 30 min ─────────────────────────────
+  // OAuth-connected Google calendars sync via incremental syncTokens, so each
+  // run is cheap (only changes since last time) - we can afford a much tighter
+  // cadence than the iCal poller. No-op unless GOOGLE_CALENDAR_ENABLED=true.
+  cron.schedule('5,35 * * * *', () => refreshAllGoogleFeeds());
+  console.log('✓ Google calendar feed refresh scheduled (every 30m)');
+
   // ── Yearly public holiday refresh: Dec 1 at midnight ───────────────────────
   cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
@@ -713,4 +793,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };
+module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, refreshAllGoogleFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };

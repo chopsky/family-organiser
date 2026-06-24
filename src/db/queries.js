@@ -3155,6 +3155,16 @@ async function getCalendarConnectionByUser(userId, provider = 'google', db = sup
   return data || null;
 }
 
+async function getCalendarConnectionById(connectionId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_connections')
+    .select()
+    .eq('id', connectionId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 async function markCalendarConnectionStatus(connectionId, status, db = supabase) {
   const { error } = await db
     .from('calendar_connections')
@@ -3255,6 +3265,31 @@ async function getAllActiveExternalFeeds(db = supabase) {
   }
   if (res.error) throw res.error;
   return res.data || [];
+}
+
+// Active Google-sourced feeds for the inbound pull cron. Distinct from the iCal
+// poller (getAllActiveExternalFeeds, source='ical') - these are refreshed via
+// the Google Calendar API + their stored syncToken, not an HTTP fetch.
+async function getAllActiveGoogleFeeds(db = supabase) {
+  const { data, error } = await db
+    .from('external_calendar_feeds')
+    .select()
+    .eq('sync_enabled', true)
+    .eq('source', 'google')
+    .lt('consecutive_failures', EXTERNAL_FEED_MAX_FAILURES)
+    .order('last_synced_at', { ascending: true, nullsFirst: true });
+  if (error) throw error;
+  return data || [];
+}
+
+// Persist a Google calendar's incremental syncToken so the next pull only
+// fetches what changed. Null clears it (forces a full resync next time).
+async function updateGoogleFeedSyncToken(feedId, syncToken, db = supabase) {
+  const { error } = await db
+    .from('external_calendar_feeds')
+    .update({ sync_token: syncToken || null })
+    .eq('id', feedId);
+  if (error) throw error;
 }
 
 // ─── Device calendar links (EventKit sync) ──────────────────────────────────────
@@ -7762,10 +7797,13 @@ module.exports = {
   deleteFeedToken,
   upsertCalendarConnection,
   getCalendarConnectionByUser,
+  getCalendarConnectionById,
   markCalendarConnectionStatus,
   deleteCalendarConnection,
   getGoogleFeedsByConnection,
   addGoogleCalendarFeed,
+  getAllActiveGoogleFeeds,
+  updateGoogleFeedSyncToken,
   getExternalFeedsByHousehold,
   getAllActiveExternalFeeds,
   findDeviceCalendarLink,
