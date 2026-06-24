@@ -4,6 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
 import PageHeader from '../components/ui/PageHeader';
+import PillBtn from '../components/ui/PillBtn';
 import Segmented from '../components/ui/Segmented';
 import { useCanWrite } from '../context/SubscriptionContext';
 import { useChildMode } from '../context/ChildModeContext';
@@ -1444,26 +1445,24 @@ export default function Calendar() {
         title="Calendar"
         actions={
         <>
-        {/* Mobile: compact search + round add button. The full toolbar below
-            is desktop-only; mobile gets a stacked view + nav block under the
-            header, and search is revealed on demand by this button. */}
-        <button
-          onClick={() => setMobileSearchOpen(o => !o)}
+        {/* Mobile: round search + add buttons matched to the Tasks/Lists
+            PillBtn (h-11 w-11, rounded-full) so all three pages share one
+            toolbar style. The full toolbar below is desktop-only. */}
+        <PillBtn
           aria-label="Search"
           aria-expanded={mobileSearchOpen}
-          className={`md:hidden w-12 h-12 rounded-full border flex items-center justify-center shrink-0 transition-colors ${mobileSearchOpen ? 'border-plum bg-plum-light text-plum' : 'border-light-grey bg-white text-charcoal'}`}
-        >
-          <IconSearch className="w-5 h-5" />
-        </button>
+          onClick={() => setMobileSearchOpen(o => !o)}
+          className={`md:hidden h-11 w-11 justify-center px-0! rounded-full! ${mobileSearchOpen ? 'border-plum! bg-plum-light! text-plum!' : ''}`}
+          icon={<IconSearch className="h-[18px] w-[18px]" />}
+        />
         {canWrite && !childMode && (
-          <button
-            onClick={() => openAddForm(selectedDate)}
+          <PillBtn
+            primary
             aria-label="New event"
-            className="md:hidden w-12 h-12 rounded-full bg-plum hover:bg-plum-dark text-white flex items-center justify-center shrink-0 transition-colors"
-            style={{ boxShadow: '0 8px 20px rgba(107,63,160,0.32)' }}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          </button>
+            onClick={() => openAddForm(selectedDate)}
+            className="md:hidden h-11 w-11 justify-center px-0! rounded-full!"
+            icon={<IconPlus className="h-[18px] w-[18px]" strokeWidth={2.4} />}
+          />
         )}
         <div className="hidden md:flex items-center gap-2">
           {/* Search button */}
