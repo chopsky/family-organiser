@@ -578,6 +578,22 @@ export default function Dashboard() {
     return null;
   }
 
+  // Does this to-do pertain to the logged-in user (by member id or name)?
+  function taskIsMine(task) {
+    if (!user) return false;
+    const ids = Array.isArray(task.assigned_to_ids) ? task.assigned_to_ids : [];
+    if (ids.includes(user.id)) return true;
+    const names = Array.isArray(task.assigned_to_names) && task.assigned_to_names.length
+      ? task.assigned_to_names
+      : (task.assigned_to_name ? [task.assigned_to_name] : []);
+    return names.includes(user.name);
+  }
+  // To-do list card: float the user's own items to the top, then cap at 4.
+  const visibleTodos = [
+    ...outstanding.filter(taskIsMine),
+    ...outstanding.filter((t) => !taskIsMine(t)),
+  ].slice(0, 4);
+
   const EVENT_DOT_CYCLE = ['bg-plum', 'bg-coral', 'bg-[#E0A458]', 'bg-sage'];
   function getEventDotColor(ev, index = 0) {
     return EVENT_DOT_CYCLE[index % EVENT_DOT_CYCLE.length];
@@ -797,7 +813,7 @@ export default function Dashboard() {
             <p className="text-sm text-cocoa py-4 text-center">All caught up!</p>
           ) : (
             <ul className="border-t border-[#1b14240f]">
-              {outstanding.slice(0, 5).map((task) => {
+              {visibleTodos.map((task) => {
                 const assignee = getTaskAssignee(task);
                 return (
                   <li key={task.id} className="flex items-center gap-3 py-2.5 border-b border-[#1b14240f]">
