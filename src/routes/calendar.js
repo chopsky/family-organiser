@@ -690,6 +690,11 @@ router.post('/events', async (req, res) => {
       console.error('Failed to save reminders/assignees:', err.message);
     }
 
+    // Phase 2: mirror this household-native event out to any writable Google
+    // calendar in the household (fire-and-forget; no-ops unless two-way writes
+    // are on, and self-skips feed-sourced events via the echo guard).
+    googleCal.syncEventOutbound(req.householdId, event, 'create').catch(() => {});
+
     // Notify household via BOTH channels so we reach members regardless of
     // whether they've registered for iOS push, have WhatsApp linked, or both.
     // Fire-and-forget - a failure in either channel must not block the response.
@@ -803,6 +808,10 @@ router.patch('/events/:id', async (req, res) => {
       console.error('Failed to update reminders/assignees:', err.message);
     }
 
+    // Phase 2: push the edit out to any writable Google calendar (fire-and-
+    // forget; updates the mapped copy, or no-ops when writes are off).
+    googleCal.syncEventOutbound(req.householdId, event, 'update').catch(() => {});
+
     // cal-month is the only one the frontend actually reads (see
     // Calendar.jsx fetchMonth). cal-events / cal-tasks are kept for
     // legacy endpoints that may still be hit by other clients. Without
@@ -838,6 +847,9 @@ router.delete('/events/:id', async (req, res) => {
     // Clean up assignees before soft-deleting
     await db.saveEventAssignees(req.params.id, req.householdId, [], []).catch(() => {});
     await db.deleteCalendarEvent(req.params.id, req.householdId);
+    // Phase 2: remove the mirrored copy from any writable Google calendar
+    // (fire-and-forget, mapping-only — only ever deletes a copy we created).
+    googleCal.syncEventOutbound(req.householdId, { id: req.params.id }, 'delete').catch(() => {});
     // cal-month is the only one the frontend actually reads (see
     // Calendar.jsx fetchMonth). cal-events / cal-tasks are kept for
     // legacy endpoints that may still be hit by other clients. Without

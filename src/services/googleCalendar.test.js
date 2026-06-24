@@ -38,6 +38,7 @@ jest.mock('../db/queries', () => ({
   upsertSyncMapping: jest.fn().mockResolvedValue({}),
   deleteSyncMapping: jest.fn().mockResolvedValue(),
   recordCalendarWriteAudit: jest.fn().mockResolvedValue(),
+  getWritableConnectionsByHousehold: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('./cache', () => ({ invalidatePattern: jest.fn() }));
 
@@ -45,6 +46,7 @@ const db = require('../db/queries');
 const {
   googleEventToTimes, refreshGoogleFeed,
   buildGoogleEventPayload, pushEventToGoogle, deleteEventFromGoogle, isNativeEvent,
+  syncEventOutbound,
 } = require('./googleCalendar');
 
 const CONN = { id: 'c1', refresh_token: 'enc', status: 'ok' };
@@ -302,5 +304,39 @@ describe('deleteEventFromGoogle', () => {
     db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'SOME-OTHER-CAL', google_event_id: 'x' });
     await expect(deleteEventFromGoogle(CONN_W, 'ev-1')).rejects.toThrow(/target mismatch/);
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncEventOutbound', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  beforeEach(() => {
+    db.getWritableConnectionsByHousehold.mockResolvedValue([]);
+    db.getSyncMapping.mockResolvedValue(null);
+    mockInsert.mockResolvedValue({ data: { id: 'g-1' } });
+    mockDelete.mockResolvedValue({});
+  });
+
+  test('no-ops entirely (no connection lookup) when writes are globally off', async () => {
+    delete process.env.GOOGLE_CALENDAR_WRITES_ENABLED;
+    await syncEventOutbound('hh-1', EVENT(), 'create');
+    expect(db.getWritableConnectionsByHousehold).not.toHaveBeenCalled();
+  });
+
+  test('create fans a push out to each writable connection in the household', async () => {
+    process.env.GOOGLE_CALENDAR_WRITES_ENABLED = 'true';
+    db.getWritableConnectionsByHousehold.mockResolvedValue([CONN_W]);
+    await syncEventOutbound('hh-1', EVENT(), 'create');
+    await flush();
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert.mock.calls[0][0].calendarId).toBe('housemait-cal');
+  });
+
+  test('delete fans a mapping-only delete out to each writable connection', async () => {
+    process.env.GOOGLE_CALENDAR_WRITES_ENABLED = 'true';
+    db.getWritableConnectionsByHousehold.mockResolvedValue([CONN_W]);
+    db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'housemait-cal', google_event_id: 'g-1' });
+    await syncEventOutbound('hh-1', { id: 'ev-1' }, 'delete');
+    await flush();
+    expect(mockDelete).toHaveBeenCalledWith({ calendarId: 'housemait-cal', eventId: 'g-1' });
   });
 });

@@ -422,6 +422,31 @@ async function deleteAppCalendar(connection) {
   return { ok: true };
 }
 
+// Fan one event mutation out to every writable Google connection in the
+// household. Safe to call for ANY event/op from the event routes: it fast-no-ops
+// when writes are globally off; each connection is isolated so one failure can't
+// affect the others or the caller; create/update self-skip non-native events
+// (echo guard) and delete is mapping-only. Callers fire-and-forget this so the
+// user's mutation response is never blocked on Google.
+async function syncEventOutbound(householdId, event, op) {
+  if (!writesGloballyEnabled()) return;
+  if (!event || !event.id) return;
+  let connections;
+  try {
+    connections = await db.getWritableConnectionsByHousehold(householdId);
+  } catch (err) {
+    console.error('[gcal outbound] failed to load writable connections:', err.message);
+    return;
+  }
+  for (const conn of connections) {
+    const run = op === 'delete'
+      ? deleteEventFromGoogle(conn, event.id)
+      : pushEventToGoogle(conn, event);
+    Promise.resolve(run).catch((err) =>
+      console.warn(`[gcal outbound] ${op} failed for connection ${conn.id}:`, err.message));
+  }
+}
+
 module.exports = {
   oauthClientForConnection,
   calendarApi,
@@ -437,4 +462,5 @@ module.exports = {
   pushEventToGoogle,
   deleteEventFromGoogle,
   deleteAppCalendar,
+  syncEventOutbound,
 };
