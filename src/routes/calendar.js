@@ -70,8 +70,10 @@ function gcalOAuthClient() {
 
 // Start the connect flow. Authenticated; returns the Google consent URL for the
 // client to open. `state` is a short-lived signed JWT carrying user+household so
-// the (unauthenticated) callback can attribute the tokens. calendar.readonly
-// ONLY - no write scope in Phase 1.
+// the (unauthenticated) callback can attribute the tokens. Requests
+// calendar.readonly always, and calendar.app.created additionally when outbound
+// writes are globally enabled (Phase 2) - the write scope can only touch a
+// secondary calendar this app creates, never the user's real calendars.
 router.get('/connect/google', requireAuth, requireHousehold, async (req, res) => {
   if (!(await gcalEnabledFor(req))) return res.status(404).json({ error: 'Calendar connect is not available.' });
   if (!process.env.GOOGLE_CALENDAR_CLIENT_ID || !process.env.GOOGLE_CALENDAR_CLIENT_SECRET) {
@@ -82,11 +84,12 @@ router.get('/connect/google', requireAuth, requireHousehold, async (req, res) =>
     process.env.JWT_SECRET,
     { expiresIn: '15m' },
   );
+  const scope = googleCal.writesGloballyEnabled() ? [...GCAL_SCOPES, googleCal.WRITE_SCOPE] : GCAL_SCOPES;
   const url = gcalOAuthClient().generateAuthUrl({
     access_type: 'offline',     // need a refresh token for background pulls
     prompt: 'consent',          // force a refresh token even on re-consent
     include_granted_scopes: true,
-    scope: GCAL_SCOPES,
+    scope,
     state,
   });
   return res.json({ url });
@@ -117,18 +120,35 @@ router.get('/connect/google/callback', async (req, res) => {
     const { tokens } = await gcalOAuthClient().getToken(String(code));
     let email = null;
     if (tokens.id_token) { try { email = jwt.decode(tokens.id_token)?.email || null; } catch { /* ignore */ } }
-    await db.upsertCalendarConnection({
+    const refreshTokenEnc = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
+    const conn = await db.upsertCalendarConnection({
       userId: claims.uid,
       householdId: claims.hid,
       provider: 'google',
       googleEmail: email,
-      refreshTokenEnc: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+      refreshTokenEnc,
       accessTokenEnc: tokens.access_token ? encryptToken(tokens.access_token) : null,
       tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
       scopes: tokens.scope || GCAL_SCOPES.join(' '),
       // No refresh token → can't pull in the background; flag for re-connect.
       status: tokens.refresh_token ? 'ok' : 'needs_reconnect',
     });
+
+    // Phase 2: if outbound writes are enabled AND the user granted the
+    // app.created scope, create the dedicated "Housemait" calendar now so it
+    // appears in their Google account immediately, and flip on this connection's
+    // write flag. Non-fatal: the read-only connection already works, so a
+    // failure here just leaves writes off (retried on next connect / first push).
+    const grantedWrite = String(tokens.scope || '').includes(googleCal.WRITE_SCOPE);
+    if (refreshTokenEnc && conn?.id && googleCal.writesGloballyEnabled() && grantedWrite) {
+      try {
+        const appCalId = await googleCal.ensureAppCalendar({ refresh_token: refreshTokenEnc, app_calendar_id: null });
+        await db.setConnectionAppCalendar(conn.id, appCalId);
+        await db.setConnectionWritesEnabled(conn.id, true);
+      } catch (e) {
+        console.error('[gcal callback] Housemait calendar setup failed:', e.message);
+      }
+    }
     return back('connected');
   } catch (err) {
     console.error('[gcal callback] token exchange failed:', err.message);

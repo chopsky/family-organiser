@@ -58,7 +58,13 @@ function app() {
   return a;
 }
 
-beforeEach(() => { jest.clearAllMocks(); });
+beforeEach(() => {
+  jest.clearAllMocks();
+  // Phase 2 write path defaults to OFF; the write-scope tests opt in. WRITE_SCOPE
+  // is a string export the automock drops, so set it explicitly.
+  googleCal.WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
+  googleCal.writesGloballyEnabled.mockReturnValue(false);
+});
 
 describe('GET /api/calendar/connect/google', () => {
   test('returns a Google consent URL with read-only + offline + signed state', async () => {
@@ -72,6 +78,13 @@ describe('GET /api/calendar/connect/google', () => {
     const state = new URL(res.body.url).searchParams.get('state');
     const claims = jwt.verify(state, process.env.JWT_SECRET);
     expect(claims).toMatchObject({ uid: 'u1', hid: 'h1', p: 'gcal' });
+  });
+
+  test('requests the app.created write scope when outbound writes are enabled', async () => {
+    googleCal.writesGloballyEnabled.mockReturnValue(true);
+    const res = await request(app()).get('/api/calendar/connect/google');
+    expect(res.body.url).toContain('calendar.readonly');
+    expect(res.body.url).toContain('calendar.app.created');
   });
 });
 
@@ -126,6 +139,38 @@ describe('GET /api/calendar/connect/google/callback', () => {
     expect(res.headers.location).toContain('google=error');
     expect(res.headers.location).toContain('access_denied');
     expect(db.upsertCalendarConnection).not.toHaveBeenCalled();
+  });
+
+  test('with writes enabled + write scope granted, creates the Housemait calendar', async () => {
+    googleCal.writesGloballyEnabled.mockReturnValue(true);
+    googleCal.ensureAppCalendar.mockResolvedValue('housemait-cal-id');
+    mockGetToken.mockResolvedValue({
+      tokens: {
+        access_token: 'ya29.at',
+        refresh_token: '1//rt',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.app.created',
+        id_token: jwt.sign({ email: 'p@home.com' }, 'x'),
+      },
+    });
+    db.upsertCalendarConnection.mockResolvedValue({ id: 'c1' });
+
+    const res = await request(app()).get(`/api/calendar/connect/google/callback?code=abc&state=${validState()}`);
+    expect(res.headers.location).toContain('google=connected');
+    expect(googleCal.ensureAppCalendar).toHaveBeenCalled();
+    expect(db.setConnectionAppCalendar).toHaveBeenCalledWith('c1', 'housemait-cal-id');
+    expect(db.setConnectionWritesEnabled).toHaveBeenCalledWith('c1', true);
+  });
+
+  test('without the write scope granted, no Housemait calendar is created', async () => {
+    googleCal.writesGloballyEnabled.mockReturnValue(true);
+    mockGetToken.mockResolvedValue({
+      tokens: { access_token: 'ya29.at', refresh_token: '1//rt', scope: 'https://www.googleapis.com/auth/calendar.readonly' },
+    });
+    db.upsertCalendarConnection.mockResolvedValue({ id: 'c1' });
+
+    await request(app()).get(`/api/calendar/connect/google/callback?code=abc&state=${validState()}`);
+    expect(googleCal.ensureAppCalendar).not.toHaveBeenCalled();
+    expect(db.setConnectionAppCalendar).not.toHaveBeenCalled();
   });
 });
 
