@@ -230,9 +230,11 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
   const hex = hexFor(kid);
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
+      {/* Single horizontally-scrollable row of who-to-view buttons (no wrap),
+          so a large family scrolls sideways instead of stacking onto a 2nd row. */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'nowrap', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
         {kids.map((k) => (
-          <button key={k.id} onClick={() => setFocusKid(k.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 8px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, background: k.id === kid.id ? '#fff' : 'transparent', border: k.id === kid.id ? `1.5px solid ${hexFor(k)}` : `1px solid ${LINE}` }}>
+          <button key={k.id} onClick={() => setFocusKid(k.id)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 8px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, background: k.id === kid.id ? '#fff' : 'transparent', border: k.id === kid.id ? `1.5px solid ${hexFor(k)}` : `1px solid ${LINE}` }}>
             <Avatar member={k} size={34} /><span style={{ fontSize: 14, fontWeight: 700, color: INK }}>{k.name}</span>
           </button>
         ))}
