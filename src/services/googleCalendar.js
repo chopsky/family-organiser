@@ -246,6 +246,182 @@ async function refreshGoogleFeed(feed, connection) {
   return stats;
 }
 
+// ─── Phase 2: outbound writes (calendar.app.created, SAFE-by-scoping) ────────
+//
+// This scope can touch ONLY a secondary calendar this app creates - never the
+// user's primary or any other calendar. Every function below layers the guards
+// the founder required on top of that permission guarantee: a global kill
+// switch + per-connection flag, an echo guard (never push an event we pulled
+// IN), a single-target assertion (the calendarId is ALWAYS app_calendar_id),
+// mapping-ONLY deletes (never delete-by-absence), tz-correct payloads, and an
+// audit row for every attempt.
+
+const WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
+const APP_CALENDAR_SUMMARY = 'Housemait';
+
+// Master kill switch. With this off, NO outbound write happens for anyone,
+// regardless of per-connection flags. Inbound pull is unaffected.
+function writesGloballyEnabled() {
+  return process.env.GOOGLE_CALENDAR_WRITES_ENABLED === 'true';
+}
+
+// Find-or-create the dedicated "Housemait" secondary calendar in the user's
+// account. Reuses a stored app_calendar_id when present (idempotent across
+// reconnects). Returns the calendar id; the caller persists it.
+async function ensureAppCalendar(connection) {
+  if (connection.app_calendar_id) return connection.app_calendar_id;
+  const cal = calendarApi(connection);
+  const res = await cal.calendars.insert({
+    requestBody: {
+      summary: APP_CALENDAR_SUMMARY,
+      description: 'Family events from Housemait. Managed by Housemait — you can hide this calendar, but edits here are not synced back.',
+    },
+  });
+  const id = res.data && res.data.id;
+  if (!id) throw new Error('Google did not return an app calendar id');
+  return id;
+}
+
+// Build the Google event resource from a Housemait event. INVERSE of the inbound
+// googleEventToTimes: timed events send the absolute UTC instant PLUS an explicit
+// IANA timeZone (DST-safe, can't shift); all-day events send date-only with
+// Google's EXCLUSIVE end (our stored inclusive end + 1 day). A private extended
+// property tags the event as Housemait-sourced so we can recognise our own
+// writes and never re-import them.
+function buildGoogleEventPayload(event, timeZone = 'Europe/London') {
+  const body = {
+    summary: event.title || 'Untitled event',
+    description: event.description || undefined,
+    location: event.location || undefined,
+    extendedProperties: { private: { housemaitEventId: String(event.id), source: 'housemait' } },
+  };
+  if (event.all_day) {
+    const startDay = String(event.start_time).slice(0, 10);
+    const endInclusive = String(event.end_time || event.start_time).slice(0, 10);
+    const d = new Date(`${endInclusive}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1); // inclusive → exclusive for Google
+    body.start = { date: startDay };
+    body.end = { date: d.toISOString().slice(0, 10) };
+  } else {
+    body.start = { dateTime: new Date(event.start_time).toISOString(), timeZone };
+    body.end = { dateTime: new Date(event.end_time || event.start_time).toISOString(), timeZone };
+  }
+  return body;
+}
+
+// Is this Housemait event eligible to sync OUT? Only events authored in
+// Housemait - anything with an external_feed_id was pulled IN (Google/iCal/
+// device) and pushing it back would loop. Exported so callers can pre-filter.
+function isNativeEvent(event) {
+  return !!event && !event.external_feed_id && !event.deleted_at;
+}
+
+// Create or update a household-native event in the connection's app calendar.
+async function pushEventToGoogle(connection, event) {
+  const base = {
+    connectionId: connection.id,
+    householdId: connection.household_id,
+    googleCalendarId: connection.app_calendar_id,
+    housemaitEventId: event.id,
+  };
+  if (!writesGloballyEnabled() || !connection.writes_enabled) {
+    await db.recordCalendarWriteAudit({ ...base, op: 'create', result: 'blocked', error: 'writes_disabled' });
+    return { skipped: 'writes_disabled' };
+  }
+  if (!isNativeEvent(event)) {
+    await db.recordCalendarWriteAudit({ ...base, op: 'create', result: 'skipped', error: 'inbound_event' });
+    return { skipped: 'inbound_event' };
+  }
+  const target = connection.app_calendar_id;
+  if (!target) {
+    await db.recordCalendarWriteAudit({ ...base, op: 'create', result: 'error', error: 'no_app_calendar' });
+    return { skipped: 'no_app_calendar' };
+  }
+
+  const existing = await db.getSyncMapping(connection.id, event.id);
+  const op = existing ? 'update' : 'create';
+  // SINGLE-TARGET ASSERTION: refuse if a stored mapping ever points anywhere but
+  // the app calendar. Better to fail loudly than risk a real calendar.
+  if (existing && existing.google_calendar_id !== target) {
+    await db.recordCalendarWriteAudit({ ...base, op, googleEventId: existing.google_event_id, result: 'blocked', error: 'target_mismatch' });
+    throw new Error(`[gcal write] target mismatch: mapping ${existing.google_calendar_id} != app calendar ${target}`);
+  }
+
+  const cal = calendarApi(connection);
+  const requestBody = buildGoogleEventPayload(event);
+  try {
+    const res = existing
+      ? await cal.events.update({ calendarId: target, eventId: existing.google_event_id, requestBody })
+      : await cal.events.insert({ calendarId: target, requestBody });
+    const googleEventId = res.data && res.data.id;
+    await db.upsertSyncMapping({
+      connectionId: connection.id,
+      householdId: connection.household_id,
+      housemaitEventId: event.id,
+      googleCalendarId: target,
+      googleEventId,
+    });
+    await db.recordCalendarWriteAudit({ ...base, op, googleEventId, result: 'ok' });
+    return { ok: true, op, googleEventId };
+  } catch (err) {
+    await db.recordCalendarWriteAudit({ ...base, op, result: 'error', error: err.message });
+    throw err;
+  }
+}
+
+// Mapping-ONLY delete: we only ever delete a Google event we have a mapping for
+// (i.e. one WE created). No mapping → do nothing. This is the core guarantee
+// that a Housemait bug can't wipe a user's events.
+async function deleteEventFromGoogle(connection, housemaitEventId) {
+  const base = {
+    connectionId: connection.id,
+    householdId: connection.household_id,
+    googleCalendarId: connection.app_calendar_id,
+    housemaitEventId,
+    op: 'delete',
+  };
+  if (!writesGloballyEnabled() || !connection.writes_enabled) {
+    await db.recordCalendarWriteAudit({ ...base, result: 'blocked', error: 'writes_disabled' });
+    return { skipped: 'writes_disabled' };
+  }
+  const mapping = await db.getSyncMapping(connection.id, housemaitEventId);
+  if (!mapping) return { skipped: 'no_mapping' }; // never delete-by-absence
+
+  const target = connection.app_calendar_id;
+  if (mapping.google_calendar_id !== target) {
+    await db.recordCalendarWriteAudit({ ...base, googleEventId: mapping.google_event_id, result: 'blocked', error: 'target_mismatch' });
+    throw new Error('[gcal delete] target mismatch: refusing to delete outside the app calendar');
+  }
+  const cal = calendarApi(connection);
+  try {
+    await cal.events.delete({ calendarId: target, eventId: mapping.google_event_id });
+  } catch (err) {
+    // Already gone on Google's side is success (idempotent).
+    const gone = err?.code === 404 || err?.code === 410 || /\b(404|410)\b/.test(err?.message || '');
+    if (!gone) {
+      await db.recordCalendarWriteAudit({ ...base, googleEventId: mapping.google_event_id, result: 'error', error: err.message });
+      throw err;
+    }
+  }
+  await db.deleteSyncMapping(connection.id, housemaitEventId);
+  await db.recordCalendarWriteAudit({ ...base, googleEventId: mapping.google_event_id, result: 'ok' });
+  return { ok: true };
+}
+
+// Delete the whole "Housemait" secondary calendar (removes ONLY events we put
+// there — app.created cannot touch any other calendar). Used on disconnect.
+async function deleteAppCalendar(connection) {
+  if (!connection.app_calendar_id) return { skipped: 'no_app_calendar' };
+  const cal = calendarApi(connection);
+  try {
+    await cal.calendars.delete({ calendarId: connection.app_calendar_id });
+  } catch (err) {
+    const gone = err?.code === 404 || err?.code === 410 || /\b(404|410)\b/.test(err?.message || '');
+    if (!gone) throw err;
+  }
+  return { ok: true };
+}
+
 module.exports = {
   oauthClientForConnection,
   calendarApi,
@@ -253,4 +429,12 @@ module.exports = {
   googleEventToTimes,
   pullCalendarChanges,
   refreshGoogleFeed,
+  WRITE_SCOPE,
+  writesGloballyEnabled,
+  ensureAppCalendar,
+  buildGoogleEventPayload,
+  isNativeEvent,
+  pushEventToGoogle,
+  deleteEventFromGoogle,
+  deleteAppCalendar,
 };

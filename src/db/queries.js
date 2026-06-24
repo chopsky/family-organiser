@@ -3213,6 +3213,107 @@ async function addGoogleCalendarFeed(f, db = supabase) {
   return data;
 }
 
+// ─── Phase 2: outbound write (calendar.app.created) ─────────────────────────
+
+// Store the id of the "Housemait" secondary calendar we created in the user's
+// Google account. Every outbound write asserts its target == this value.
+async function setConnectionAppCalendar(connectionId, appCalendarId, db = supabase) {
+  const { error } = await db
+    .from('calendar_connections')
+    .update({ app_calendar_id: appCalendarId })
+    .eq('id', connectionId);
+  if (error) throw error;
+}
+
+async function setConnectionWritesEnabled(connectionId, enabled, db = supabase) {
+  const { error } = await db
+    .from('calendar_connections')
+    .update({ writes_enabled: !!enabled })
+    .eq('id', connectionId);
+  if (error) throw error;
+}
+
+// Connections in a household that may receive outbound writes: healthy, with a
+// created app calendar, and writes turned on. One household event is mirrored
+// into each such connection's own "Housemait" calendar.
+async function getWritableConnectionsByHousehold(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_connections')
+    .select()
+    .eq('household_id', householdId)
+    .eq('provider', 'google')
+    .eq('status', 'ok')
+    .eq('writes_enabled', true)
+    .not('app_calendar_id', 'is', null);
+  if (error) throw error;
+  return data || [];
+}
+
+async function getSyncMapping(connectionId, housemaitEventId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_sync_mappings')
+    .select()
+    .eq('connection_id', connectionId)
+    .eq('housemait_event_id', housemaitEventId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+async function getSyncMappingsByConnection(connectionId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_sync_mappings')
+    .select()
+    .eq('connection_id', connectionId);
+  if (error) throw error;
+  return data || [];
+}
+
+async function upsertSyncMapping(m, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_sync_mappings')
+    .upsert({
+      connection_id: m.connectionId,
+      household_id: m.householdId,
+      housemait_event_id: m.housemaitEventId,
+      google_calendar_id: m.googleCalendarId,
+      google_event_id: m.googleEventId,
+      last_pushed_at: new Date().toISOString(),
+    }, { onConflict: 'connection_id,housemait_event_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteSyncMapping(connectionId, housemaitEventId, db = supabase) {
+  const { error } = await db
+    .from('calendar_sync_mappings')
+    .delete()
+    .eq('connection_id', connectionId)
+    .eq('housemait_event_id', housemaitEventId);
+  if (error) throw error;
+}
+
+// Append-only. Never throws to the caller's critical path - a failed audit
+// write must not also fail (or worse, mask) the actual sync result.
+async function recordCalendarWriteAudit(a, db = supabase) {
+  try {
+    await db.from('calendar_write_audit').insert({
+      connection_id: a.connectionId || null,
+      household_id: a.householdId || null,
+      google_calendar_id: a.googleCalendarId || null,
+      google_event_id: a.googleEventId || null,
+      housemait_event_id: a.housemaitEventId || null,
+      op: a.op,
+      result: a.result,
+      error: a.error ? String(a.error).slice(0, 1000) : null,
+    });
+  } catch (err) {
+    console.error('[calendar-write-audit] failed to record:', err.message);
+  }
+}
+
 async function getExternalFeedsByHousehold(householdId, db = supabase) {
   const { data, error } = await db
     .from('external_calendar_feeds')
@@ -7804,6 +7905,14 @@ module.exports = {
   addGoogleCalendarFeed,
   getAllActiveGoogleFeeds,
   updateGoogleFeedSyncToken,
+  setConnectionAppCalendar,
+  setConnectionWritesEnabled,
+  getWritableConnectionsByHousehold,
+  getSyncMapping,
+  getSyncMappingsByConnection,
+  upsertSyncMapping,
+  deleteSyncMapping,
+  recordCalendarWriteAudit,
   getExternalFeedsByHousehold,
   getAllActiveExternalFeeds,
   findDeviceCalendarLink,

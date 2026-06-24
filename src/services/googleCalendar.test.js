@@ -9,10 +9,18 @@
  */
 
 const mockList = jest.fn();
+const mockInsert = jest.fn();
+const mockUpdate = jest.fn();
+const mockDelete = jest.fn();
+const mockCalInsert = jest.fn();
+const mockCalDelete = jest.fn();
 jest.mock('googleapis', () => ({
   google: {
     auth: { OAuth2: jest.fn().mockImplementation(() => ({ setCredentials: jest.fn() })) },
-    calendar: jest.fn(() => ({ events: { list: mockList } })),
+    calendar: jest.fn(() => ({
+      events: { list: mockList, insert: mockInsert, update: mockUpdate, delete: mockDelete },
+      calendars: { insert: mockCalInsert, delete: mockCalDelete },
+    })),
   },
 }));
 jest.mock('../utils/calendar-token-crypto', () => ({
@@ -26,11 +34,18 @@ jest.mock('../db/queries', () => ({
   updateGoogleFeedSyncToken: jest.fn().mockResolvedValue(),
   recordExternalFeedSuccess: jest.fn().mockResolvedValue(),
   recordExternalFeedFailure: jest.fn().mockResolvedValue(),
+  getSyncMapping: jest.fn().mockResolvedValue(null),
+  upsertSyncMapping: jest.fn().mockResolvedValue({}),
+  deleteSyncMapping: jest.fn().mockResolvedValue(),
+  recordCalendarWriteAudit: jest.fn().mockResolvedValue(),
 }));
 jest.mock('./cache', () => ({ invalidatePattern: jest.fn() }));
 
 const db = require('../db/queries');
-const { googleEventToTimes, refreshGoogleFeed } = require('./googleCalendar');
+const {
+  googleEventToTimes, refreshGoogleFeed,
+  buildGoogleEventPayload, pushEventToGoogle, deleteEventFromGoogle, isNativeEvent,
+} = require('./googleCalendar');
 
 const CONN = { id: 'c1', refresh_token: 'enc', status: 'ok' };
 const FEED = (over = {}) => ({
@@ -164,5 +179,128 @@ describe('refreshGoogleFeed', () => {
     await expect(refreshGoogleFeed(FEED(), CONN)).rejects.toThrow('ECONNRESET');
     expect(db.recordExternalFeedFailure).toHaveBeenCalledWith('F1', 'ECONNRESET');
     expect(db.recordExternalFeedSuccess).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Phase 2: outbound write safety invariants ──────────────────────────────
+
+const CONN_W = {
+  id: 'c1', household_id: 'hh-1', refresh_token: 'enc',
+  app_calendar_id: 'housemait-cal', writes_enabled: true,
+};
+const EVENT = (over = {}) => ({
+  id: 'ev-1', title: 'Swimming', description: null, location: null,
+  start_time: '2026-06-24T09:00:00.000Z', end_time: '2026-06-24T10:00:00.000Z',
+  all_day: false, external_feed_id: null, deleted_at: null, ...over,
+});
+
+describe('buildGoogleEventPayload', () => {
+  test('timed event sends the UTC instant + an explicit IANA timeZone', () => {
+    const body = buildGoogleEventPayload(EVENT());
+    expect(body.start).toEqual({ dateTime: '2026-06-24T09:00:00.000Z', timeZone: 'Europe/London' });
+    expect(body.end).toEqual({ dateTime: '2026-06-24T10:00:00.000Z', timeZone: 'Europe/London' });
+    expect(body.extendedProperties.private).toMatchObject({ housemaitEventId: 'ev-1', source: 'housemait' });
+  });
+  test('all-day event sends date-only with Google EXCLUSIVE end (+1 day)', () => {
+    const body = buildGoogleEventPayload(EVENT({ all_day: true, start_time: '2026-06-24', end_time: '2026-06-25' }));
+    expect(body.start).toEqual({ date: '2026-06-24' });
+    expect(body.end).toEqual({ date: '2026-06-26' }); // stored inclusive 25th → exclusive 26th
+  });
+});
+
+describe('isNativeEvent', () => {
+  test('an event pulled from a feed is NOT native (echo guard)', () => {
+    expect(isNativeEvent(EVENT({ external_feed_id: 'feed-1' }))).toBe(false);
+    expect(isNativeEvent(EVENT())).toBe(true);
+  });
+});
+
+describe('pushEventToGoogle', () => {
+  beforeEach(() => {
+    process.env.GOOGLE_CALENDAR_WRITES_ENABLED = 'true';
+    db.getSyncMapping.mockResolvedValue(null);
+    mockInsert.mockResolvedValue({ data: { id: 'g-evt-1' } });
+    mockUpdate.mockResolvedValue({ data: { id: 'g-evt-1' } });
+  });
+
+  test('global kill switch off → no API call, audited blocked', async () => {
+    delete process.env.GOOGLE_CALENDAR_WRITES_ENABLED;
+    const r = await pushEventToGoogle(CONN_W, EVENT());
+    expect(r).toEqual({ skipped: 'writes_disabled' });
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(db.recordCalendarWriteAudit).toHaveBeenCalledWith(expect.objectContaining({ result: 'blocked', error: 'writes_disabled' }));
+  });
+
+  test('per-connection writes_enabled off → no API call', async () => {
+    const r = await pushEventToGoogle({ ...CONN_W, writes_enabled: false }, EVENT());
+    expect(r).toEqual({ skipped: 'writes_disabled' });
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  test('echo guard: an inbound (feed-sourced) event is never pushed back out', async () => {
+    const r = await pushEventToGoogle(CONN_W, EVENT({ external_feed_id: 'feed-1' }));
+    expect(r).toEqual({ skipped: 'inbound_event' });
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  test('native create → inserts into the APP calendar only, writes mapping', async () => {
+    const r = await pushEventToGoogle(CONN_W, EVENT());
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert.mock.calls[0][0].calendarId).toBe('housemait-cal'); // single-target
+    expect(r).toMatchObject({ ok: true, op: 'create', googleEventId: 'g-evt-1' });
+    expect(db.upsertSyncMapping).toHaveBeenCalledWith(expect.objectContaining({
+      housemaitEventId: 'ev-1', googleCalendarId: 'housemait-cal', googleEventId: 'g-evt-1',
+    }));
+  });
+
+  test('existing mapping → updates the same Google event (idempotent)', async () => {
+    db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'housemait-cal', google_event_id: 'g-evt-1' });
+    const r = await pushEventToGoogle(CONN_W, EVENT());
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ calendarId: 'housemait-cal', eventId: 'g-evt-1' }));
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(r.op).toBe('update');
+  });
+
+  test('SINGLE-TARGET ASSERTION: a mapping pointing elsewhere throws, never writes', async () => {
+    db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'SOME-OTHER-CAL', google_event_id: 'x' });
+    await expect(pushEventToGoogle(CONN_W, EVENT())).rejects.toThrow(/target mismatch/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteEventFromGoogle', () => {
+  beforeEach(() => {
+    process.env.GOOGLE_CALENDAR_WRITES_ENABLED = 'true';
+    mockDelete.mockResolvedValue({});
+  });
+
+  test('MAPPING-ONLY: no mapping → does nothing (never delete-by-absence)', async () => {
+    db.getSyncMapping.mockResolvedValue(null);
+    const r = await deleteEventFromGoogle(CONN_W, 'ev-unknown');
+    expect(r).toEqual({ skipped: 'no_mapping' });
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  test('with a mapping → deletes that event in the app calendar + drops the mapping', async () => {
+    db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'housemait-cal', google_event_id: 'g-evt-1' });
+    const r = await deleteEventFromGoogle(CONN_W, 'ev-1');
+    expect(mockDelete).toHaveBeenCalledWith({ calendarId: 'housemait-cal', eventId: 'g-evt-1' });
+    expect(db.deleteSyncMapping).toHaveBeenCalledWith('c1', 'ev-1');
+    expect(r).toEqual({ ok: true });
+  });
+
+  test('kill switch off → no delete call', async () => {
+    delete process.env.GOOGLE_CALENDAR_WRITES_ENABLED;
+    db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'housemait-cal', google_event_id: 'g-evt-1' });
+    const r = await deleteEventFromGoogle(CONN_W, 'ev-1');
+    expect(r).toEqual({ skipped: 'writes_disabled' });
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  test('a mapping pointing outside the app calendar throws, never deletes', async () => {
+    db.getSyncMapping.mockResolvedValue({ google_calendar_id: 'SOME-OTHER-CAL', google_event_id: 'x' });
+    await expect(deleteEventFromGoogle(CONN_W, 'ev-1')).rejects.toThrow(/target mismatch/);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });
