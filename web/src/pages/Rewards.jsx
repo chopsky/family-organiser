@@ -157,8 +157,9 @@ export default function Rewards() {
   const viewOpts = [
     ...(isMobile ? [] : [{ value: 'columns', label: 'Columns' }]),
     { value: 'focused', label: isMobile ? 'Rewards' : 'Focused' },
-    // The Redeemed log is a parent queue - hidden in Child Mode.
-    ...(childMode ? [] : [{ value: 'redeemed', label: pending ? `Redeemed · ${pending}` : 'Redeemed' }]),
+    // Kids can VIEW the Redeemed log (to see what a parent has fulfilled); the
+    // "Mark fulfilled" action itself stays parent-only (see RedeemedLog).
+    { value: 'redeemed', label: pending ? `Redeemed · ${pending}` : 'Redeemed' },
   ];
 
   return (
@@ -182,8 +183,8 @@ export default function Rewards() {
         <Center>Loading…</Center>
       ) : earners.length === 0 ? (
         <Center>Add family members to start the star economy.</Center>
-      ) : (effView === 'redeemed' && !childMode) ? (
-        <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} />
+      ) : effView === 'redeemed' ? (
+        <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} readOnly={childMode} />
       ) : effView === 'focused' ? (
         <Focused kids={earners} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} />
       ) : (
@@ -247,7 +248,7 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
   );
 }
 
-function RedeemedLog({ redemptions, members, onToggle }) {
+function RedeemedLog({ redemptions, members, onToggle, readOnly }) {
   const memberOf = (id) => members.find((m) => m.id === id);
   if (redemptions.length === 0) return <Center>Nothing redeemed yet.</Center>;
   return (
@@ -266,9 +267,16 @@ function RedeemedLog({ redemptions, members, onToggle }) {
                   <span>·</span><span>{relWhen(r.created_at)}</span>
                 </div>
               </div>
-              <button onClick={() => onToggle(r)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: r.fulfilled ? 0 : `1.5px solid ${LINE_STRONG}`, background: r.fulfilled ? '#E5F0E2' : '#fff', color: r.fulfilled ? '#3F6E3D' : INK2 }}>
-                {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Mark fulfilled'}
-              </button>
+              {readOnly ? (
+                // Kids see the status only - no power to mark it fulfilled.
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, fontFamily: INTER, fontSize: 13, fontWeight: 700, background: r.fulfilled ? '#E5F0E2' : STAR_BG, color: r.fulfilled ? '#3F6E3D' : '#A9772A' }}>
+                  {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Waiting'}
+                </span>
+              ) : (
+                <button onClick={() => onToggle(r)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: r.fulfilled ? 0 : `1.5px solid ${LINE_STRONG}`, background: r.fulfilled ? '#E5F0E2' : '#fff', color: r.fulfilled ? '#3F6E3D' : INK2 }}>
+                  {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Mark fulfilled'}
+                </button>
+              )}
             </div>
           );
         })}
