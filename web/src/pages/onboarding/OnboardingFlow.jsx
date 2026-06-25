@@ -17,7 +17,7 @@
  * card) in our plum tokens. British English, no em dashes,
  * prefers-reduced-motion honoured.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
@@ -50,6 +50,21 @@ function entryIndex({ token, household, user }) {
 
 const firstNameOf = (user) => (user?.name || '').trim().split(/\s+/)[0] || 'there';
 
+// Persist the furthest post-auth step so closing/reopening the browser mid-flow
+// resumes where the user actually was (not back at the invite step). Keyed by
+// household id so a stale value from a different household is ignored.
+const PROGRESS_KEY = 'housemait_onboarding_step';
+function loadStoredStep(householdId) {
+  if (!householdId) return null;
+  try {
+    const { hh, idx } = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+    return hh === householdId && typeof idx === 'number' ? idx : null;
+  } catch { return null; }
+}
+function clearStoredStep() {
+  try { localStorage.removeItem(PROGRESS_KEY); } catch { /* private mode */ }
+}
+
 export default function OnboardingFlow() {
   const auth = useAuth();
   const navigate = useNavigate();
@@ -66,6 +81,12 @@ export default function OnboardingFlow() {
     // Invited users arrive via /signup?invite= and join a specific household, so
     // skip the marketing pitch (welcome/heaviest/plan) and start at account.
     if (e === 0 && inviteToken) return STEPS.indexOf('account');
+    // Resume the furthest post-auth step for THIS household, so reopening the
+    // browser mid-flow doesn't dump the user back at the invite step.
+    if (e >= 4 && auth.household?.id) {
+      const stored = loadStoredStep(auth.household.id);
+      if (stored != null && stored > e) return Math.min(stored, STEPS.length - 1);
+    }
     return e;
   });
   const [form, setForm] = useState(() => ({
@@ -80,6 +101,13 @@ export default function OnboardingFlow() {
   const [leavingWelcome, setLeavingWelcome] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
+
+  // Remember the current step (once a household exists) so a reopen resumes here.
+  useEffect(() => {
+    if (!auth.household?.id || idx < STEPS.indexOf('household')) return;
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ hh: auth.household.id, idx })); }
+    catch { /* private mode */ }
+  }, [idx, auth.household?.id]);
 
   // A fully-onboarded session should never see the flow (e.g. typed /signup).
   if (auth.token && auth.household && auth.user?.onboarded_at) {
@@ -121,13 +149,14 @@ export default function OnboardingFlow() {
     } catch (err) {
       console.error('[onboarding] mark-onboarded failed:', err?.response?.data?.error || err.message);
     } finally {
+      clearStoredStep();
       navigate('/dashboard');
     }
   };
 
   // Escape hatch - a half-finished signup would otherwise be trapped here by
   // RequireAuth's redirect. Logging out clears the token so the landing renders.
-  const signOut = () => { auth.logout(); window.location.href = '/'; };
+  const signOut = () => { clearStoredStep(); auth.logout(); window.location.href = '/'; };
 
   const ctx = {
     auth, navigate, reduced,

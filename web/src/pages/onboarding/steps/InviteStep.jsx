@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../../../lib/api';
 import { Title, Em, Kicker, Lead, PrimaryButton, Ghost } from './_ui';
 import { inputStyle } from './_styles';
@@ -6,6 +6,12 @@ import { inputStyle } from './_styles';
 // Vibrant per-member avatar colours (brand palette).
 const AVATAR_COLOURS = ['#D8788A', '#5B8DE0', '#D89B3A', '#6BA368', '#6C3DD9', '#B05B9E'];
 const initialOf = (s) => (s || '?').trim().charAt(0).toUpperCase() || '?';
+// Dedupe key: an adult by email (their natural id), a kid by name.
+const dupKey = (e) => `${e.kind}:${(e.kind === 'adult' ? (e.email || e.label) : e.label || '').trim().toLowerCase()}`;
+const dedupe = (list) => {
+  const seen = new Set();
+  return (list || []).filter((e) => { const k = dupKey(e); if (seen.has(k)) return false; seen.add(k); return true; });
+};
 
 // Step 6. Populate the household: invite grown-ups by email (/household/invite)
 // and add kids by first name (/household/dependents). Invited members are
@@ -24,16 +30,48 @@ export default function InviteStep({ auth, form, update, next, setError }) {
   const [addingKid, setAddingKid] = useState(false);
 
   const invited = form.invited || [];
-  const addInvited = (entry) => update({ invited: [...invited, entry] });
+  const addInvited = (entry) => update({ invited: dedupe([...invited, entry]) });
+
+  // Seed the chips from the household's REAL members + pending invites once on
+  // mount. Without this, reopening the browser mid-flow showed an empty list,
+  // so re-adding "Bobby" created a fresh dependent every time. Source of truth
+  // is the server; merged with anything added this session and de-duplicated.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || seededRef.current) return;
+    seededRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [hhRes, invRes] = await Promise.all([
+          api.get('/household'),
+          api.get('/household/invites').catch(() => ({ data: { invites: [] } })),
+        ]);
+        if (cancelled) return;
+        const fromMembers = (hhRes.data?.members || [])
+          .filter((m) => m.id !== user?.id)
+          .map((m) => ({ kind: m.member_type === 'dependent' ? 'kid' : 'adult', label: m.name, email: m.email || undefined }));
+        const fromInvites = (invRes.data?.invites || [])
+          .map((iv) => ({ kind: 'adult', label: iv.name || iv.email, email: iv.email }));
+        update({ invited: dedupe([...(form.invited || []), ...fromMembers, ...fromInvites]) });
+      } catch { /* leave the in-session list as-is on failure */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleInvite(e) {
     e.preventDefault();
-    if (!email.trim()) return;
+    const em = email.trim().toLowerCase();
+    if (!em) return;
     setError('');
+    if (invited.some((p) => p.kind === 'adult' && (p.email || '').toLowerCase() === em)) {
+      setError(`${em} has already been invited.`); return;
+    }
     setSending(true);
     try {
-      await api.post('/household/invite', { email: email.trim().toLowerCase(), name: name.trim() || null });
-      addInvited({ kind: 'adult', label: name.trim() || email.trim().split('@')[0] });
+      await api.post('/household/invite', { email: em, name: name.trim() || null });
+      addInvited({ kind: 'adult', label: name.trim() || em.split('@')[0], email: em });
       setEmail(''); setName('');
     } catch (err) {
       setError(err.response?.data?.error || 'Could not send the invite.');
@@ -47,6 +85,9 @@ export default function InviteStep({ auth, form, update, next, setError }) {
     const n = childName.trim();
     if (!n) return;
     setError('');
+    if (invited.some((p) => p.kind === 'kid' && p.label.trim().toLowerCase() === n.toLowerCase())) {
+      setError(`You've already added ${n}.`); return;
+    }
     setAddingKid(true);
     try {
       await api.post('/household/dependents', { name: n, family_role: 'Child' });
