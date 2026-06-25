@@ -163,7 +163,7 @@ export default function OnboardingFlow() {
             backdropFilter: 'blur(18px) saturate(140%)', WebkitBackdropFilter: 'blur(18px) saturate(140%)',
             border: '1px solid rgba(255,255,255,0.9)', borderRadius: 28,
             boxShadow: '0 30px 80px -20px rgba(26,22,32,0.25), inset 0 2px 0 rgba(255,255,255,0.6)',
-            padding: '28px 32px 30px', textAlign: 'center',
+            padding: '30px 40px 30px', textAlign: 'center',
           }}
         >
           {/* Progress header: back chevron (hidden on the first step) + fill bar. */}
