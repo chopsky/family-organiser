@@ -17,14 +17,16 @@
  * background. British English, no em dashes, prefers-reduced-motion honoured.
  */
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ErrorBanner from '../../components/ErrorBanner';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
+import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
 import WelcomeStep from './steps/WelcomeStep';
 import WelcomeNotifications from './steps/WelcomeNotifications';
 import HeaviestStep from './steps/HeaviestStep';
 import PlanStep from './steps/PlanStep';
+import AccountStep from './steps/AccountStep';
 
 // Instrument Serif is loaded app-wide (web/index.html); apply it inline so the
 // flow doesn't depend on the page-scoped .serif class from landing.css.
@@ -49,14 +51,22 @@ export default function OnboardingFlow() {
   const auth = useAuth();
   const navigate = useNavigate();
   const reduced = usePrefersReducedMotion();
+  const [searchParams] = useSearchParams();
+
+  // Carry a tagged campaign promo + invite token through the account step, the
+  // same way Signup.jsx does, so /start can become the primary funnel without
+  // dropping the /fair promo feature or invite auto-join.
+  const inviteToken = searchParams.get('invite') || undefined;
 
   const [idx, setIdx] = useState(() => entryIndex(auth));
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     pains: ['head', 'nag'],   // sensible defaults so the plan screen is never empty
+    accName: '',
+    promoCode: resolveSignupPromo(searchParams),
     hhMode: 'new', hhName: '', joinCode: '',
     invited: [],
     calProvider: null, calUrl: '',
-  });
+  }));
   const [error, setError] = useState('');
   const [leavingWelcome, setLeavingWelcome] = useState(false);
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -80,6 +90,16 @@ export default function OnboardingFlow() {
     setTimeout(() => { setLeavingWelcome(false); next(); }, 480);
   };
 
+  // Account created/authenticated (Google popup or an invite auto-join). Store
+  // the session, then resume at the right step: an existing household jumps to
+  // invite (the top-level guard sends fully-onboarded users to the dashboard);
+  // a fresh account goes to the household step.
+  const goAfterAuth = (data) => {
+    clearSignupPromo();
+    auth.login(data);
+    setIdx(STEPS.indexOf(data?.household ? 'invite' : 'household'));
+  };
+
   // Escape hatch - a half-finished signup would otherwise be trapped here by
   // RequireAuth's redirect. Logging out clears the token so the landing renders.
   const signOut = () => { auth.logout(); window.location.href = '/'; };
@@ -88,7 +108,8 @@ export default function OnboardingFlow() {
     auth, navigate, reduced,
     form, update,
     next, back, setError,
-    leaveWelcome,
+    leaveWelcome, goAfterAuth,
+    inviteToken, promoCode: form.promoCode,
     firstName: firstNameOf(auth.user),
   };
 
@@ -161,6 +182,8 @@ function renderStep(key, ctx) {
       return <HeaviestStep form={ctx.form} update={ctx.update} next={ctx.next} />;
     case 'plan':
       return <PlanStep form={ctx.form} next={ctx.next} />;
+    case 'account':
+      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} />;
     default:
       return <StepPlaceholder stepKey={key} ctx={ctx} />;
   }
