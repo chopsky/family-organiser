@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import api from '../../../lib/api';
 import SocialButtons from '../../../components/SocialButtons';
 import TurnstileWidget from '../../../components/TurnstileWidget';
+import ErrorBanner from '../../../components/ErrorBanner';
 import { clearSignupPromo } from '../../../lib/signupPromo';
 import { Title, Em, Kicker, PrimaryButton, Ghost } from './_ui';
 import { inputStyle, labelStyle } from './_styles';
@@ -34,6 +35,11 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState(null);
   const [promoInfo, setPromoInfo] = useState(null);
+  // Email-form errors render inline next to the Create account button (the card
+  // is tall once the form is open, so the shared top-of-card banner scrolls out
+  // of view). SSO errors still use the shared banner - the Google button is up
+  // top where that banner is visible.
+  const [formError, setFormError] = useState('');
   const turnstileRef = useRef(null);
 
   // Confirm the promo with the backend so the banner can show the real discount.
@@ -50,9 +56,9 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
 
   async function submit(e) {
     e.preventDefault();
-    setError('');
-    if (!name.trim() || !email.trim() || !password) { setError('Please fill in your name, email and a password.'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    setError(''); setFormError('');
+    if (!name.trim() || !email.trim() || !password) { setFormError('Please fill in your name, email and a password.'); return; }
+    if (password.length < 8) { setFormError('Password must be at least 8 characters.'); return; }
     setLoading(true);
     try {
       const { data } = await api.post('/auth/register', {
@@ -69,7 +75,7 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
         setSentTo(email.trim());       // normal flow: verify by email
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+      setFormError(err.response?.data?.error || 'Something went wrong. Please try again.');
       // Turnstile tokens are single-use and the backend just consumed this one.
       setTurnstile(null);
       turnstileRef.current?.reset();
@@ -165,6 +171,11 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
               <input id="ob-password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" style={inputStyle} />
             </div>
             <TurnstileWidget ref={turnstileRef} onChange={setTurnstile} />
+            {formError && (
+              <div style={{ textAlign: 'left' }}>
+                <ErrorBanner message={formError} onDismiss={() => setFormError('')} />
+              </div>
+            )}
             <PrimaryButton type="submit" disabled={loading} style={{ marginTop: 2 }}>
               {loading ? 'Creating account…' : 'Create account'}
             </PrimaryButton>
