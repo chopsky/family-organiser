@@ -1,17 +1,31 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChildMode } from '../context/ChildModeContext';
+import { useAuth } from '../context/AuthContext';
 
 // Full-screen gate shown in place of Settings while Child Mode is on. A correct
 // PIN flips `settingsUnlocked` in the context, which re-renders the route to the
 // real Settings page (see ChildGate in App.jsx).
 export default function ChildModePinScreen() {
-  const { verifyPin } = useChildMode();
+  const { verifyPin, disable } = useChildMode();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
   const inputRef = useRef(null);
+
+  // Forgot-PIN escape hatch: a forgotten PIN must never permanently lock the
+  // device. Turn Child Mode off on THIS device and sign out, so the only way
+  // back in is the household account's own email + password - which a child
+  // won't have. (Child Mode is a soft per-device guardrail, so this is a
+  // reasonable adult-proves-ownership reset; a new PIN can be set in Settings.)
+  function resetViaSignOut() {
+    disable();
+    logout();
+    navigate('/login', { replace: true });
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -67,6 +81,38 @@ export default function ChildModePinScreen() {
         >
           ← Back to Tasks
         </button>
+
+        {!forgot ? (
+          <button
+            type="button"
+            onClick={() => setForgot(true)}
+            className="block mx-auto mt-3 text-xs text-warm-grey hover:text-charcoal underline"
+          >
+            Forgot PIN?
+          </button>
+        ) : (
+          <div className="mt-4 rounded-xl bg-white border border-light-grey p-4 text-left">
+            <p className="text-[13px] text-charcoal leading-snug">
+              No problem. Sign out, then sign back in with your Housemait email and password to turn Child Mode off. You can set a new PIN in Settings afterwards.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={resetViaSignOut}
+                className="flex-1 h-10 rounded-lg bg-plum text-white text-sm font-semibold"
+              >
+                Sign out
+              </button>
+              <button
+                type="button"
+                onClick={() => setForgot(false)}
+                className="h-10 px-4 rounded-lg text-sm font-medium text-warm-grey hover:text-charcoal"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );
