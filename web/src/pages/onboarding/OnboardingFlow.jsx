@@ -185,14 +185,14 @@ export default function OnboardingFlow() {
       <main className={`relative z-10 flex-1 flex justify-center px-4 ${key === 'welcome' ? 'items-center py-8' : 'items-start pt-10 pb-8 md:pt-14 md:pb-10'}`}>
         <div
           key={reduced ? 'static' : key /* re-mount per step so the enter animation fires */}
-          className={reduced ? '' : 'ob-card-in'}
+          className={`ob-card ${reduced ? '' : 'ob-card-in'}`}
           style={{
             position: 'relative', width: '100%', maxWidth: 480,
             background: 'rgba(255,253,250,0.9)',
             backdropFilter: 'blur(18px) saturate(140%)', WebkitBackdropFilter: 'blur(18px) saturate(140%)',
             border: '1px solid rgba(255,255,255,0.9)', borderRadius: 28,
             boxShadow: '0 30px 80px -20px rgba(26,22,32,0.25), inset 0 2px 0 rgba(255,255,255,0.6)',
-            padding: '30px 40px 30px', textAlign: 'center',
+            textAlign: 'center',
           }}
         >
           {/* Progress header: back chevron (hidden on the first step) + fill bar. */}
