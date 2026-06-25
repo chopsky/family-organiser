@@ -182,7 +182,10 @@ export default function OnboardingFlow() {
 
       {/* Welcome is short, so centre it vertically; the later (often taller)
           steps stay top-aligned so they never clip on short viewports. */}
-      <main className={`relative z-10 flex-1 flex justify-center px-4 ${key === 'welcome' ? 'items-center py-8' : 'items-start pt-10 pb-8 md:pt-14 md:pb-10'}`}>
+      {/* The stage's env(safe-area-inset-top) padding already clears the iOS
+          status bar, so the card only needs a small gap below it on mobile
+          (pt-3); desktop keeps a roomier top. */}
+      <main className={`relative z-10 flex-1 flex justify-center px-4 ${key === 'welcome' ? 'items-center py-8' : 'items-start pt-3 pb-8 md:pt-14 md:pb-10'}`}>
         <div
           key={reduced ? 'static' : key /* re-mount per step so the enter animation fires */}
           className={`ob-card ${reduced ? '' : 'ob-card-in'}`}
