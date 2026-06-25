@@ -26,11 +26,48 @@ const VALID_EVENT_TYPES = new Set([
 // so we present as a normal browser. (e.g. leicestershire.gov.uk: 403 to a
 // "SchoolDatesBot" UA, 200 to this one.) Shared by the LA import and the
 // website/PDF import so both behave the same.
+// A full "real Chrome navigation" header set, not just a UA. Councils behind
+// the lighter WAF rules (block on missing Sec-Fetch-*/sec-ch-ua, not just UA)
+// let these through where a bare UA gets a 403. We deliberately do NOT set
+// Accept-Encoding: undici then stops auto-decompressing and response.text()
+// would return raw gzip/br bytes.
 const TERM_FETCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8',
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'en-GB,en;q=0.9',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'sec-ch-ua': '"Google Chrome";v="126", "Chromium";v="126", "Not?A_Brand";v="24"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"macOS"',
+  'Cache-Control': 'max-age=0',
 };
+
+// Bot-protection (WAF) challenge pages return HTTP 200 with a tiny body that is
+// the challenge, not the content - so they slip past the !response.ok check and
+// get mis-reported downstream as "JS-rendered / scanned". Detect the common
+// ones (Incapsula/Imperva, Cloudflare, Akamai) so the caller gets an accurate
+// "blocked by bot protection" reason instead.
+const WAF_MARKERS = [
+  'Incapsula incident',
+  'Request unsuccessful',
+  '_Incapsula_Resource',
+  'Attention Required! | Cloudflare',
+  'cf-browser-verification',
+  'Just a moment...',
+  'Checking your browser before',
+  'Please enable JavaScript and cookies',
+  'Access Denied',
+  'Reference #', // Akama-style "Access Denied / Reference #..."
+];
+function looksLikeWafChallenge(rawHtml) {
+  if (!rawHtml) return false;
+  const head = rawHtml.slice(0, 4000);
+  return WAF_MARKERS.some((m) => head.includes(m)) && rawHtml.length < 6000;
+}
 
 /**
  * Shared AI extractor used by /import-website/preview, /import-pdf/preview, and
@@ -215,6 +252,9 @@ async function fetchTermDatesPageText(url) {
   }
 
   const rawHtml = await response.text();
+  if (looksLikeWafChallenge(rawHtml)) {
+    throw new Error('That page is protected by bot-detection (a WAF challenge page was returned instead of the content).');
+  }
   // Strip HTML but preserve table/list structure so dates stay on their own
   // lines for the extractor (identical treatment to the website-import route).
   const text = rawHtml

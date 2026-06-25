@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { callWithFailover, callClaude, REASONING_TIMEOUT_MS } = require('./ai-client');
+const { callWithFailover, callClaude, CLAUDE_HAIKU_MODEL, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { getCityFromTimezone } = require('./weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { formatPreferenceLines } = require('./preferences-format');
@@ -550,7 +550,11 @@ async function findOfficialTermDatesUrl({ localAuthority, academicYear } = {}) {
     const { text } = await callClaude({
       system,
       messages: [{ role: 'user', content: `Find the official ${localAuthority} council web page that lists school term dates for the ${academicYear} academic year.` }],
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      // Haiku + a hard search cap: this is a cheap "return one URL" task, and
+      // every web search injects the result-page content back as input tokens
+      // (the real cost), so capping uses keeps a single lookup from ballooning.
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+      model: CLAUDE_HAIKU_MODEL,
       maxTokens: 1024,
       timeoutMs: REASONING_TIMEOUT_MS,
     });
@@ -564,4 +568,69 @@ async function findOfficialTermDatesUrl({ localAuthority, academicYear } = {}) {
   }
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch, findOfficialTermDatesUrl };
+/**
+ * Search-grounded term-date extraction. Used as a FALLBACK when a direct fetch
+ * of the council page is blocked (many councils sit behind WAFs that 403 direct
+ * bots or serve a challenge page, but allowlist search-engine crawlers - so the
+ * dates are still reachable through web_search).
+ *
+ * Grounding discipline (this is NOT the old "recall from memory" approach the
+ * team removed): Claude must use web_search and extract ONLY dates that appear
+ * in the retrieved results, each with a verbatim source_quote. The caller runs
+ * the same validateTermDates pass over the result. If the search surfaces no
+ * concrete dates, it returns [].
+ *
+ * Returns an array of { event_type, date, end_date|null, label, academic_year,
+ * source_quote } (possibly empty), or [] on any failure.
+ */
+async function extractTermDatesViaSearch({ localAuthority, academicYears = [] } = {}) {
+  if (!localAuthority) return [];
+  const ays = academicYears.filter(Boolean).join(' and ') || 'the current academic year';
+  const system = `You find and extract OFFICIAL UK school term dates for a named local authority using the web_search tool.
+
+STRICT RULES:
+- Use web_search to find the council's OWN published term dates (prefer its *.gov.uk page). Search more than once if needed (e.g. include the academic year).
+- Extract ONLY dates that actually appear in the search results / retrieved page content. DO NOT use prior knowledge, memory, or "typical" dates for the region. If the results do not contain specific dates, return [].
+- Cover ${ays}.
+- Be exhaustive within what the results show: term start/end, half terms, INSET/training days, and bank-holiday/closure days.
+
+Return ONLY a JSON array, no prose, no code fences:
+[{"event_type":"term_start","date":"YYYY-MM-DD","end_date":null,"label":"...","academic_year":"YYYY-YYYY","source_quote":"the exact snippet from the retrieved content containing this date"}]
+
+Valid event_type: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday.
+For multi-day breaks use half_term_start (or bank_holiday) with an end_date.
+source_quote MUST be copied verbatim from the retrieved content (include a weekday name if shown). If you cannot find a verbatim snippet for an entry, omit that entry. Return [] if you find nothing concrete.`;
+
+  let text;
+  try {
+    ({ text } = await callClaude({
+      system,
+      messages: [{ role: 'user', content: `Find and extract the official ${localAuthority} council school term dates for ${ays}. Return the JSON array only.` }],
+      // Haiku + capped searches: this fallback is the priciest step (a web
+      // search whose result content dominates the token bill). Haiku quarters
+      // the per-token rate; max_uses bounds how much it pulls. validateTermDates
+      // downstream still guards quality against the verbatim source quotes.
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+      model: CLAUDE_HAIKU_MODEL,
+      maxTokens: 8192,
+      timeoutMs: REASONING_TIMEOUT_MS,
+    }));
+  } catch (err) {
+    console.warn(`[la-term-dates] search extraction failed for ${localAuthority}:`, err.message);
+    return [];
+  }
+
+  try {
+    const cleaned = (text || '').replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
+    const first = cleaned.indexOf('[');
+    const last = cleaned.lastIndexOf(']');
+    if (first === -1 || last <= first) return [];
+    const dates = JSON.parse(cleaned.substring(first, last + 1));
+    return Array.isArray(dates) ? dates.filter((d) => d && typeof d === 'object' && d.date) : [];
+  } catch (err) {
+    console.warn(`[la-term-dates] search extraction parse failed for ${localAuthority}:`, err.message);
+    return [];
+  }
+}
+
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch, findOfficialTermDatesUrl, extractTermDatesViaSearch };

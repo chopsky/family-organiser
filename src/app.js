@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -118,6 +119,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+// LA term-dates directory - a self-contained, public web app (searchable list
+// of every UK local education authority + its school term dates). The static
+// page is served here; its read API is mounted below, BEFORE the subscription
+// gate, because it's public and unauthenticated.
+app.use('/la-term-dates', express.static(path.join(__dirname, '..', 'public', 'la-term-dates')));
+
 // Inbound webhooks (no auth - must be before authenticated routes)
 app.use('/api/inbound-email', require('./routes/inbound-email'));
 
@@ -141,6 +148,10 @@ app.use('/api/unsubscribe', require('./routes/unsubscribe'));
 
 // Contact form endpoint - public, no auth required.
 app.use('/api/contact', require('./routes/contact'));
+
+// LA term-dates directory API - public read endpoints (key-gated import).
+// Mounted before the subscription gate: no household/auth context required.
+app.use('/api/la-term-dates', require('./routes/laTermDates'));
 
 // Trial / subscription gate. Returns 402 for households whose trial has
 // expired or whose subscription has lapsed. Excludes /auth, /subscription,

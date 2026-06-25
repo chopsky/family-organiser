@@ -13,6 +13,10 @@ const { supabaseAdmin: supabase } = require('../db/client');
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
+// Cheap Claude tier (~1/4 the input price of Sonnet). For simple, high-volume
+// calls where Sonnet is overkill - e.g. "return one URL" or "copy dates out of
+// these search results". callClaude accepts a `model` override to opt in.
+const CLAUDE_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const GPT_MODEL = 'gpt-4o';
 const DEFAULT_TIMEOUT_MS = 12000; // abort after 12s for chat
 const LONG_TIMEOUT_MS = 30000;   // 30s for complex tasks (imports, scraping)
@@ -138,14 +142,14 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
  * enabled the model can invoke them server-side; the response still
  * contains a final text block which is what we extract here.
  */
-async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false, tools }) {
+async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false, tools, model }) {
   const client = getAnthropicClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
 
   try {
     const params = {
-      model: CLAUDE_MODEL,
+      model: model || CLAUDE_MODEL,
       max_tokens: maxTokens,
       system,
       messages,
@@ -346,6 +350,7 @@ module.exports = {
   isTransient,
   GEMINI_MODEL,
   CLAUDE_MODEL,
+  CLAUDE_HAIKU_MODEL,
   GPT_MODEL,
   LONG_TIMEOUT_MS,
 };

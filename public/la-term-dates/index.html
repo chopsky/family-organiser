@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UK School Term Dates — by local authority</title>
+  <meta name="description" content="Searchable directory of school term dates published by every UK local education authority. Updated monthly." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --plum: #6B3FA0; --coral: #E8724A; --sage: #7DAE82; --charcoal: #2D2A33;
+      --plum-light: #F3EDFC; --coral-light: #FDF0EB; --sage-light: #EDF5EE;
+      --cream: #FBF8F3; --warm-grey: #6B6774; --light-grey: #E8E5EC; --white: #FFFFFF;
+      --amber: #E0A458;
+      --shadow-sm: 0 2px 8px rgba(107, 63, 160, 0.06);
+      --shadow-md: 0 4px 16px rgba(107, 63, 160, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--cream); color: var(--charcoal);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6; -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+
+    header h1 {
+      font-family: 'Instrument Serif', Georgia, serif; font-weight: 400;
+      font-size: clamp(34px, 6vw, 52px); line-height: 1.05; letter-spacing: -0.02em;
+      color: var(--plum); margin: 0 0 8px;
+    }
+    header p.lede { color: var(--warm-grey); font-size: 16px; margin: 0 0 24px; max-width: 60ch; }
+
+    .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+    .stat {
+      background: var(--white); border: 1.5px solid var(--light-grey); border-radius: 16px;
+      padding: 12px 16px; min-width: 104px; cursor: pointer; transition: all .2s ease-out;
+      box-shadow: var(--shadow-sm); text-align: left; font-family: inherit;
+    }
+    .stat:hover { border-color: var(--plum); box-shadow: var(--shadow-md); }
+    .stat[aria-pressed="true"] { border-color: var(--plum); background: var(--plum-light); }
+    .stat.static { cursor: default; }
+    .stat.static:hover { border-color: var(--light-grey); box-shadow: var(--shadow-sm); }
+    .stat .num { font-family: 'Instrument Serif', serif; font-size: 30px; line-height: 1; color: var(--charcoal); }
+    .stat .lbl { font-size: 12px; font-weight: 600; color: var(--warm-grey); margin-top: 4px; }
+    .stat.ok .num { color: var(--sage); }
+    .stat.attn .num { color: var(--coral); }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; }
+    .search { position: relative; flex: 1 1 280px; }
+    .search input {
+      width: 100%; height: 48px; border: 1.5px solid var(--light-grey); border-radius: 10px;
+      background: var(--white); padding: 0 16px 0 42px; font-size: 15px; font-family: inherit; color: var(--charcoal);
+      transition: border-color .2s ease-out, box-shadow .2s ease-out;
+    }
+    .search input:focus { outline: none; border-color: var(--plum); box-shadow: 0 0 0 3px var(--plum-light); }
+    .search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--warm-grey); }
+    select {
+      height: 48px; border: 1.5px solid var(--light-grey); border-radius: 10px; background: var(--white);
+      padding: 0 14px; font-size: 14px; font-weight: 500; font-family: inherit; color: var(--charcoal); cursor: pointer;
+    }
+    select:focus { outline: none; border-color: var(--plum); box-shadow: 0 0 0 3px var(--plum-light); }
+
+    .meta-line { font-size: 13px; color: var(--warm-grey); margin: 0 0 14px; min-height: 20px; }
+
+    ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .card {
+      background: var(--white); border-radius: 16px; box-shadow: var(--shadow-sm);
+      border: 1px solid var(--light-grey); overflow: hidden; transition: box-shadow .2s ease-out;
+    }
+    .card:hover { box-shadow: var(--shadow-md); }
+    .card-head {
+      display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; width: 100%;
+      background: none; border: none; text-align: left; font-family: inherit;
+    }
+    .card-head:focus-visible { outline: 2px solid var(--plum); outline-offset: -2px; }
+    .card-title { flex: 1; min-width: 0; }
+    .card-title .name { display: block; font-size: 16px; font-weight: 600; color: var(--charcoal); }
+    .card-title .sub { display: block; font-size: 12.5px; color: var(--warm-grey); margin-top: 2px; }
+    .badge { font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 8px; white-space: nowrap; }
+    .badge.ok { background: var(--sage-light); color: #43734a; }
+    .badge.partial { background: #FBF1DE; color: #936314; }
+    .badge.failed { background: var(--coral-light); color: #b8431f; }
+    .badge.pending { background: var(--light-grey); color: var(--warm-grey); }
+    .chev { color: var(--warm-grey); font-size: 22px; line-height: 1; transition: transform .2s ease-out; flex-shrink: 0; }
+    .card[aria-expanded="true"] .chev { transform: rotate(90deg); }
+
+    .card-body { padding: 0 18px 18px; border-top: 1px solid var(--light-grey); }
+    .err-box {
+      background: var(--coral-light); border-radius: 12px; padding: 12px 14px; margin: 14px 0 4px;
+      font-size: 13.5px; color: #8f3a1b;
+    }
+    .err-box strong { color: #b8431f; }
+    .retry {
+      margin-top: 10px; height: 40px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--plum);
+      background: var(--white); color: var(--plum); font-weight: 600; font-size: 13px; font-family: inherit; cursor: pointer;
+    }
+    .retry:hover { background: var(--plum-light); }
+    .retry:disabled { opacity: .5; cursor: default; }
+
+    .year-block { margin-top: 16px; }
+    .year-block h3 {
+      font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 22px; color: var(--plum);
+      margin: 0 0 8px; letter-spacing: -0.01em;
+    }
+    table.dates { width: 100%; border-collapse: collapse; }
+    table.dates td { padding: 7px 0; border-bottom: 1px solid var(--light-grey); vertical-align: top; font-size: 14px; }
+    table.dates tr:last-child td { border-bottom: none; }
+    td.date-col { white-space: nowrap; font-weight: 600; width: 168px; color: var(--charcoal); }
+    td.label-col { color: var(--charcoal); }
+    .type-tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 8px; margin-left: 8px; vertical-align: middle; }
+    .t-term { background: var(--plum-light); color: var(--plum); }
+    .t-half { background: #FBF1DE; color: #936314; }
+    .t-inset { background: var(--light-grey); color: var(--warm-grey); }
+    .t-bank { background: var(--coral-light); color: #b8431f; }
+    .src { font-size: 12px; color: var(--warm-grey); margin-top: 12px; word-break: break-all; }
+    .src a { color: var(--plum); }
+
+    .pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 26px; }
+    .pager button {
+      height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid var(--light-grey);
+      background: var(--white); color: var(--plum); font-weight: 600; font-size: 14px; font-family: inherit; cursor: pointer;
+    }
+    .pager button:hover:not(:disabled) { border-color: var(--plum); }
+    .pager button:disabled { opacity: .4; cursor: default; }
+    .pager .where { font-size: 13px; color: var(--warm-grey); }
+
+    .skeleton { height: 72px; border-radius: 16px; background: linear-gradient(90deg, #f1edf6, #f8f5fb, #f1edf6);
+      background-size: 200% 100%; animation: shimmer 1.3s infinite; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .empty { text-align: center; padding: 48px 20px; color: var(--warm-grey); }
+    .empty .big { font-family: 'Instrument Serif', serif; font-size: 26px; color: var(--charcoal); margin-bottom: 6px; }
+    .admin-flag { display: inline-block; background: var(--plum-light); color: var(--plum); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 8px; margin-left: 8px; }
+
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+    @media (max-width: 520px) { td.date-col { width: auto; display: block; } table.dates td { padding: 5px 0; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>UK school term dates</h1>
+      <p class="lede">Term dates published by every UK local education authority, in one searchable place.
+        Sourced from each council's own pages and refreshed monthly.<span id="adminFlag"></span></p>
+    </header>
+
+    <div class="stats" id="stats" role="group" aria-label="Filter by import status"></div>
+
+    <div class="controls">
+      <div class="search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <input id="search" type="search" placeholder="Search for a local authority…" autocomplete="off" aria-label="Search authorities" />
+      </div>
+      <select id="region" aria-label="Filter by region">
+        <option value="">All regions</option>
+        <option value="England">England</option>
+        <option value="Wales">Wales</option>
+      </select>
+    </div>
+
+    <p class="meta-line" id="metaLine"></p>
+    <ul class="list" id="list" aria-live="polite"></ul>
+    <div class="pager" id="pager" hidden>
+      <button id="prev" type="button">← Previous</button>
+      <span class="where" id="where"></span>
+      <button id="next" type="button">Next →</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

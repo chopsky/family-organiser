@@ -11,6 +11,7 @@ const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
+const { runMonthlyLAImport } = require('./la-term-dates-import');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
@@ -707,6 +708,14 @@ function startScheduler() {
   // ── Yearly public holiday refresh: Dec 1 at midnight ───────────────────────
   cron.schedule('0 0 1 12 *', () => publicHolidays.refreshHolidaysForAllHouseholds());
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
+
+  // ── Monthly LA term-dates import: 1st of the month, 03:00 UTC ──────────────
+  // Re-imports every UK local authority's published term dates (picks up newly
+  // published academic years, retries previously-failed councils). Internally
+  // guarded by a per-month scheduler lock so only one instance runs it. 03:00
+  // UTC is a quiet window that dodges the top-of-hour reminder ticks.
+  cron.schedule('0 3 1 * *', () => runMonthlyLAImport());
+  console.log('✓ Monthly LA term-dates import scheduled (03:00 UTC, 1st of month)');
 
   // ── Stale device-calendar nudge: daily at 17:30 Europe/London ──────────────
   // Pushes the OWNER of a device-synced calendar whose phone hasn't synced
