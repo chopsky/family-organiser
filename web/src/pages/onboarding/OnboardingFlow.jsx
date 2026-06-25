@@ -18,8 +18,10 @@
  * prefers-reduced-motion honoured.
  */
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { isIos, APP_STORE_CONFIGURED } from '../../lib/app-store';
 import api from '../../lib/api';
 import ErrorBanner from '../../components/ErrorBanner';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
@@ -33,11 +35,19 @@ import HouseholdStep from './steps/HouseholdStep';
 import InviteStep from './steps/InviteStep';
 import WhatsAppStep from './steps/WhatsAppStep';
 import CalendarStep from './steps/CalendarStep';
+import GetAppStep from './steps/GetAppStep';
 import FinishStep from './steps/FinishStep';
 
+// The "Get the app" nudge belongs ONLY to someone finishing onboarding in a
+// mobile BROWSER on an iPhone: not inside the native app (already there), not on
+// Android/desktop (no app), and not before a live App Store listing exists.
+// When false, next()/back() skip straight over the get-app step.
+const SHOW_GET_APP = !Capacitor.isNativePlatform() && isIos() && APP_STORE_CONFIGURED;
+
 // Step keys in order + the progress-bar fill per step (mirrors the prototype).
-const STEPS = ['welcome', 'heaviest', 'plan', 'account', 'household', 'invite', 'whatsapp', 'calendar', 'finish'];
-const PROGRESS = { welcome: 14, heaviest: 28, plan: 43, account: 57, household: 63, invite: 75, whatsapp: 88, calendar: 100, finish: 100 };
+// 'get-app' sits just before 'finish' and is skipped for non-iPhone-web users.
+const STEPS = ['welcome', 'heaviest', 'plan', 'account', 'household', 'invite', 'whatsapp', 'calendar', 'get-app', 'finish'];
+const PROGRESS = { welcome: 14, heaviest: 28, plan: 43, account: 57, household: 63, invite: 75, whatsapp: 88, calendar: 100, 'get-app': 100, finish: 100 };
 
 // Where to drop the user in based on auth state, so a refresh / email-verify
 // return resumes correctly instead of restarting. -1 => already onboarded.
@@ -122,8 +132,18 @@ export default function OnboardingFlow() {
   const key = STEPS[Math.max(0, idx)];
   const isFirst = idx <= 0;
 
-  const next = () => setIdx((i) => Math.min(i + 1, STEPS.length - 1));
-  const back = () => setIdx((i) => Math.max(i - 1, 0));
+  // Advance/retreat one step, hopping over 'get-app' when it isn't shown for
+  // this visitor (so non-iPhone-web users go calendar <-> finish directly).
+  const next = () => setIdx((i) => {
+    let n = Math.min(i + 1, STEPS.length - 1);
+    if (STEPS[n] === 'get-app' && !SHOW_GET_APP) n = Math.min(n + 1, STEPS.length - 1);
+    return n;
+  });
+  const back = () => setIdx((i) => {
+    let n = Math.max(i - 1, 0);
+    if (STEPS[n] === 'get-app' && !SHOW_GET_APP) n = Math.max(n - 1, 0);
+    return n;
+  });
 
   // Welcome continue: let the corner notifications drift out to their corners,
   // then advance. Under reduced motion there is nothing to wait for.
@@ -248,6 +268,8 @@ function renderStep(key, ctx) {
       return <WhatsAppStep next={ctx.next} setError={ctx.setError} />;
     case 'calendar':
       return <CalendarStep form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
+    case 'get-app':
+      return <GetAppStep next={ctx.next} />;
     case 'finish':
       return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} userId={ctx.auth.user?.id} invited={ctx.form.invited} finishing={ctx.finishing} onFinish={ctx.finish} />;
     default:
