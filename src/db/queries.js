@@ -735,7 +735,7 @@ async function touchConversation(conversationId, db = supabase) {
 
 // ─── School helpers ──────────────────────────────────────────────────────────
 
-const { tokenize, buildOrFilter, filterAndRank } = require('../utils/school-search');
+const { tokenize, buildTokenFilters, filterAndRank } = require('../utils/school-search');
 
 /**
  * Search the GIAS schools directory.
@@ -758,15 +758,18 @@ async function searchSchools(query, postcode, db = supabase) {
   const { distinctive } = tokenize(query);
   if (distinctive.length === 0) return [];
 
-  const orFilter = buildOrFilter(distinctive);
-  if (!orFilter) return [];
+  const tokenFilters = buildTokenFilters(distinctive);
+  if (tokenFilters.length === 0) return [];
 
   let q = db
     .from('schools_directory')
     .select('urn, name, type, phase, local_authority, address, postcode')
-    .eq('status', 'open')
-    .or(orFilter)
-    .limit(200); // generous - JS filter below tightens this to 10
+    .eq('status', 'open');
+  // AND each token's cross-column OR together: a candidate must match EVERY
+  // token somewhere (name/LA/address/postcode). Precise + small, so the row cap
+  // can't hide the target the way a single broad OR did (see buildTokenFilters).
+  for (const f of tokenFilters) q = q.or(f);
+  q = q.limit(200); // generous headroom - filterAndRank tightens this to 10
 
   if (postcode) {
     q = q.ilike('postcode', `${postcode}%`);

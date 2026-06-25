@@ -13,6 +13,7 @@
 const {
   tokenize,
   buildOrFilter,
+  buildTokenFilters,
   filterAndRank,
   SEARCH_STOPWORDS,
 } = require('./school-search');
@@ -119,6 +120,32 @@ describe('buildOrFilter()', () => {
 
   test('returns an empty string for an empty token list', () => {
     expect(buildOrFilter([])).toBe('');
+  });
+});
+
+// ─── buildTokenFilters() ─────────────────────────────────────────────────────
+
+describe('buildTokenFilters()', () => {
+  test('returns one cross-column OR string per token (incl. postcode)', () => {
+    const filters = buildTokenFilters(['queen', 'barnet']);
+    // One filter string per token - applied as separate .or() calls (AND-ed),
+    // so a candidate must match EVERY token. This is what stops the broad-OR
+    // row cap from hiding "Queen Elizabeth's School, Barnet".
+    expect(filters).toHaveLength(2);
+    expect(filters[0]).toBe(
+      'name.ilike.*queen*,local_authority.ilike.*queen*,address.ilike.*queen*,postcode.ilike.*queen*'
+    );
+    expect(filters[1]).toContain('postcode.ilike.*barnet*');
+  });
+
+  test('keeps apostrophes and strips or()-breaking chars', () => {
+    expect(buildTokenFilters(["elizabeth's"])[0]).toContain("name.ilike.*elizabeth's*");
+    expect(buildTokenFilters(['a,b(c)*d'])[0]).toContain('name.ilike.*abcd*');
+  });
+
+  test('skips empty-after-strip tokens and an empty list', () => {
+    expect(buildTokenFilters([',*()'])).toEqual([]);
+    expect(buildTokenFilters([])).toEqual([]);
   });
 });
 

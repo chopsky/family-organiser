@@ -91,6 +91,33 @@ function buildOrFilter(tokens) {
 }
 
 /**
+ * Build an ARRAY of PostgREST `or()` filter strings, ONE PER TOKEN. Each
+ * string matches a row whose name / local_authority / address / postcode
+ * substring-matches that token. The caller applies them as separate `.or()`
+ * calls, which PostgREST ANDs together - so a candidate row must match EVERY
+ * token (in some column). This mirrors filterAndRank's "every token present"
+ * rule at the DB layer, keeping the candidate set small and precise.
+ *
+ * Why this matters: the old single big OR (buildOrFilter) matched a row if ANY
+ * token hit, so common words ("queen", "elizabeth") flooded the results with
+ * thousands of national matches and the row cap truncated them BEFORE the real
+ * target was reached - "Queen Elizabeth's School, Barnet" fell off the list,
+ * and adding "barnet" returned nothing at all. Including postcode here also
+ * lets a pasted postcode token ("en5", "4dq") find the school.
+ */
+function buildTokenFilters(tokens) {
+  const filters = [];
+  for (const raw of tokens) {
+    const safe = String(raw).replace(/[,()*]/g, '');
+    if (!safe) continue;
+    filters.push(
+      `name.ilike.*${safe}*,local_authority.ilike.*${safe}*,address.ilike.*${safe}*,postcode.ilike.*${safe}*`
+    );
+  }
+  return filters;
+}
+
+/**
  * Filter rows to those where every required token appears (case-insensitive)
  * in the combined name+LA+address+postcode text, then rank:
  *
@@ -130,6 +157,7 @@ function filterAndRank(rows, requiredTokens) {
 module.exports = {
   tokenize,
   buildOrFilter,
+  buildTokenFilters,
   filterAndRank,
   SEARCH_STOPWORDS,
 };
