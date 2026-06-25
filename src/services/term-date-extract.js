@@ -21,6 +21,17 @@ const VALID_EVENT_TYPES = new Set([
   'inset_day', 'bank_holiday',
 ]);
 
+// Headers for fetching term-date pages. Councils and schools routinely sit
+// behind WAFs (Cloudflare etc.) that 403 anything advertising itself as a bot,
+// so we present as a normal browser. (e.g. leicestershire.gov.uk: 403 to a
+// "SchoolDatesBot" UA, 200 to this one.) Shared by the LA import and the
+// website/PDF import so both behave the same.
+const TERM_FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8',
+  'Accept-Language': 'en-GB,en;q=0.9',
+};
+
 /**
  * Shared AI extractor used by /import-website/preview, /import-pdf/preview, and
  * the WhatsApp bot. Takes already-extracted plain text (HTML strip / pdfParse /
@@ -184,12 +195,7 @@ async function fetchTermDatesPageText(url) {
   const looksLikePdfUrl = /\.pdf(\?|#|$)/i.test(trimmed);
   let response;
   try {
-    response = await fetch(trimmed, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/pdf',
-      },
-    });
+    response = await fetch(trimmed, { headers: TERM_FETCH_HEADERS });
   } catch (err) {
     throw new Error(`Could not reach that page: ${err.message}`);
   }
@@ -255,4 +261,4 @@ function academicYearsForCountry(country) {
   return { currentAY, nextAY };
 }
 
-module.exports = { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES };
+module.exports = { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES, TERM_FETCH_HEADERS };

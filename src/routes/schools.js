@@ -9,7 +9,7 @@ const externalFeed = require('../services/externalFeed');
 const { validateTermDates } = require('../services/termDateValidator');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
-const { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES } = require('../services/term-date-extract');
+const { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES, TERM_FETCH_HEADERS } = require('../services/term-date-extract');
 const { findOfficialTermDatesUrl } = require('../services/ai');
 
 // Memory-storage multer for direct PDF uploads to the term-dates
@@ -811,9 +811,7 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
 
     if (looksLikePdfUrl) {
       try {
-        const pdfResponse = await fetch(trimmedUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)' },
-        });
+        const pdfResponse = await fetch(trimmedUrl, { headers: TERM_FETCH_HEADERS });
         if (!pdfResponse.ok) {
           return res.status(400).json({ error: `PDF returned HTTP ${pdfResponse.status}. Check the URL and try again.` });
         }
@@ -830,12 +828,7 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
     } else {
       // HTML path - the original flow.
       try {
-        const response = await fetch(trimmedUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)',
-            'Accept': 'text/html,application/xhtml+xml,application/pdf',
-          },
-        });
+        const response = await fetch(trimmedUrl, { headers: TERM_FETCH_HEADERS });
         if (!response.ok) {
           return res.status(400).json({ error: `Website returned HTTP ${response.status}. Check the URL and try again.` });
         }
@@ -916,9 +909,7 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
       for (const pdfUrl of pdfsToTry.slice(0, 4)) {
         try {
           console.log('[import-website] Fetching PDF:', pdfUrl);
-          const pdfResponse = await fetch(pdfUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)' },
-          });
+          const pdfResponse = await fetch(pdfUrl, { headers: TERM_FETCH_HEADERS });
           if (!pdfResponse.ok) continue;
           const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
           const pdfData = await pdfParse(pdfBuffer);

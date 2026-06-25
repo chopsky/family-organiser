@@ -53,7 +53,16 @@ Both the website/PDF imports, the WhatsApp bot, and the LA import funnel through
 - **`fetchTermDatesPageText(url)`** — fetch a page or PDF and return plain text.
   SSRF-guarded (`assertFetchableUrl`: http(s) only, no credentials, no private
   IPs), handles both HTML (structure-preserving strip) and PDF (`pdf-parse`).
-  Throws an `Error` with a user-facing message on any failure.
+  Throws an `Error` with a user-facing message on any failure. Sends
+  browser-like headers (`TERM_FETCH_HEADERS`, shared with the website/PDF
+  import) because councils sit behind WAFs that 403 obvious bot User-Agents
+  (e.g. leicestershire.gov.uk: 403 to a bot UA, 200 to a browser UA).
+
+  **Limitation:** this is a plain fetch, not a headless browser, so a
+  JS-rendered council page only yields whatever is in the initial HTML. Some
+  councils (Leicestershire) render their term-date tables client-side, so the
+  LA import may return partial or no dates even on a 200. The friendly errors
+  steer to the website/PDF import for those.
 - **`extractTermDatesPreview({ pageText, country, currentAY, nextAY, ... })`** —
   runs the country-aware AI prompt (GB vs ZA vocab differ a lot), parses the
   lenient JSON, then runs `validateTermDates` (`src/services/termDateValidator.js`)
