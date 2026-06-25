@@ -130,11 +130,16 @@ router.delete('/users/:id', async (req, res) => {
 
     await db.deleteUserAdmin(id);
 
-    // If user was in a household, check if it's now empty
+    // If that was the household's last account-holder, delete the household
+    // too (which cascades its dependents away via the users FK). Dependents
+    // are users rows with member_type='dependent', so getHouseholdMembers
+    // returns them; counting them here would keep an ownerless household (and
+    // its kids) alive forever. Only real accounts keep a household.
     let householdDeleted = false;
     if (householdId) {
       const remaining = await db.getHouseholdMembers(householdId);
-      if (remaining.length === 0) {
+      const remainingAccounts = remaining.filter((m) => m.member_type !== 'dependent');
+      if (remainingAccounts.length === 0) {
         await db.deleteHouseholdCascade(householdId);
         householdDeleted = true;
       }

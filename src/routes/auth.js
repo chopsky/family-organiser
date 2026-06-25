@@ -814,7 +814,12 @@ router.delete('/account', requireAuth, async (req, res) => {
       members = await db.getHouseholdMembers(user.household_id);
       otherMembers = members.filter((m) => m.id !== user.id);
     }
-    const willDeleteHousehold = !!household && otherMembers.length === 0;
+    // Dependents are users rows (member_type='dependent') but not real
+    // account-holders. The household only "empties" when the last account
+    // leaves; its dependents should then be cascaded away with it, not left to
+    // keep an ownerless household alive.
+    const otherAccounts = otherMembers.filter((m) => m.member_type !== 'dependent');
+    const willDeleteHousehold = !!household && otherAccounts.length === 0;
     const deletionMode = willDeleteHousehold ? 'household_deleted' : 'user_only';
 
     // ── Stripe: cancel the subscription BEFORE we nuke the row ──
@@ -890,12 +895,15 @@ router.delete('/account', requireAuth, async (req, res) => {
       return res.json({ mode: 'household_deleted', stripe_cancelled: stripeCancelled });
     }
 
-    // Only admin with other members → promote the oldest non-admin to
-    // admin so the household stays operable after we remove this user.
+    // Only admin with other accounts → promote the oldest non-admin account
+    // to admin so the household stays operable after we remove this user.
+    // Pick from real accounts only: a dependent (kid) must never become admin,
+    // and reaching here guarantees at least one other account exists (else
+    // willDeleteHousehold would have been true).
     if (user.household_id && user.role === 'admin') {
-      const otherAdmins = otherMembers.filter((m) => m.role === 'admin');
-      if (otherAdmins.length === 0) {
-        const nextAdmin = [...otherMembers].sort(
+      const otherAdmins = otherAccounts.filter((m) => m.role === 'admin');
+      if (otherAdmins.length === 0 && otherAccounts.length > 0) {
+        const nextAdmin = [...otherAccounts].sort(
           (a, b) => new Date(a.created_at) - new Date(b.created_at)
         )[0];
         await db.updateUser(nextAdmin.id, { role: 'admin' });

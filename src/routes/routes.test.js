@@ -935,6 +935,27 @@ describe('DELETE /api/auth/account', () => {
     expect(db.deleteUserAdmin).not.toHaveBeenCalled();
   });
 
+  test('deletes the whole household when only dependents (kids) remain', async () => {
+    // Dependents are users rows (member_type='dependent'). They must not keep
+    // an ownerless household alive, nor be promoted to admin. Deleting the
+    // last real account deletes the household, which cascades the kids away.
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$x' });
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.getHouseholdMembers.mockResolvedValue([
+      { ...USER, member_type: 'account' },
+      { id: 'k-1', name: 'Bobby', member_type: 'dependent', role: 'member', household_id: HOUSEHOLD.id, created_at: '2024-01-01' },
+      { id: 'k-2', name: 'Bobby', member_type: 'dependent', role: 'member', household_id: HOUSEHOLD.id, created_at: '2024-02-01' },
+    ]);
+    db.deleteHouseholdCascade.mockResolvedValue();
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ password: 'pw', confirmation: 'DELETE' });
+    expect(res.status).toBe(200);
+    expect(res.body.mode).toBe('household_deleted');
+    expect(db.deleteHouseholdCascade).toHaveBeenCalledWith(HOUSEHOLD.id);
+    expect(db.updateUser).not.toHaveBeenCalled(); // never promote a dependent
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+  });
+
   test('deletes just the user when other members remain and this user is non-admin', async () => {
     const NON_ADMIN = { ...USER, role: 'member' };
     db.getUserById.mockResolvedValue({ ...NON_ADMIN, password_hash: '$2b$12$x' });
