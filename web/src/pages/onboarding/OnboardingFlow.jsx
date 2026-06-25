@@ -42,7 +42,14 @@ import FinishStep from './steps/FinishStep';
 // mobile BROWSER on an iPhone: not inside the native app (already there), not on
 // Android/desktop (no app), and not before a live App Store listing exists.
 // When false, next()/back() skip straight over the get-app step.
-const SHOW_GET_APP = !Capacitor.isNativePlatform() && isIos() && APP_STORE_CONFIGURED;
+//
+// TEMPORARILY OFF: the live App Store build is stale (the developer account is
+// migrating individual -> organisation, which blocks updates), so we must NOT
+// push fresh web signups to download the outdated app. Flip APP_STORE_BUILD_CURRENT
+// back to true once the new version is approved and live, and the step returns
+// for iPhone-web users as before.
+const APP_STORE_BUILD_CURRENT = false;
+const SHOW_GET_APP = APP_STORE_BUILD_CURRENT && !Capacitor.isNativePlatform() && isIos() && APP_STORE_CONFIGURED;
 
 // Step keys in order + the progress-bar fill per step (mirrors the prototype).
 // 'get-app' sits just before 'finish' and is skipped for non-iPhone-web users.
