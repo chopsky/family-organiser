@@ -71,6 +71,36 @@ async function getEntriesForLA(laId) {
   return data || [];
 }
 
+/**
+ * Look up an authority by the name stored on household_schools.local_authority
+ * (the GIAS "LA (name)" string, which the directory is keyed by too) and return
+ * its term-date entries for a given academic year - ready to drop into a
+ * school. Case-insensitive exact match; only authorities with usable data
+ * (ok/partial) count. Returns [] when the LA isn't in the directory or has no
+ * dates for that year yet, so the caller can fall back to the live scrape.
+ * This is how Housemait's "Import from local authority" reads the directory.
+ */
+async function getDirectoryTermDatesByName(localAuthority, academicYear) {
+  if (!localAuthority || !academicYear) return [];
+  const { data: la, error: laErr } = await supabase
+    .from('la_directory')
+    .select('id, name, import_status')
+    .ilike('name', localAuthority.trim()) // no wildcards = case-insensitive equality
+    .in('import_status', ['ok', 'partial'])
+    .maybeSingle();
+  if (laErr) throw laErr;
+  if (!la) return [];
+
+  const { data, error } = await supabase
+    .from('la_term_date_entries')
+    .select('academic_year, event_type, date, end_date, label')
+    .eq('la_id', la.id)
+    .eq('academic_year', academicYear)
+    .order('date', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
 /** Headline counts for the dashboard + the latest run. */
 async function getStats() {
   const countWhere = async (build) => {
@@ -223,6 +253,7 @@ module.exports = {
   listAuthorities,
   getAuthorityBySlug,
   getEntriesForLA,
+  getDirectoryTermDatesByName,
   getStats,
   replaceEntriesForLA,
   updateAuthorityStatus,

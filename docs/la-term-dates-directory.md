@@ -168,9 +168,15 @@ To retry one council past the cap: `node scripts/run-la-import.js <slug>`.
 
 ## Relationship to Housemait
 
-Eventually Housemait's "Import from local authority" (`src/routes/schools.js`)
-can read from `la_directory` / `la_term_date_entries` instead of doing the
-live web-search-and-scrape per family — the names already match
-`household_schools.local_authority`. That swap is intentionally **not** wired up
-yet; the live flow remains the fallback until this dataset is populated and
-trusted. See the `project-la-term-dates-dataset` memory.
+Housemait's "Import from local authority" (`POST /:schoolId/import-la-dates` in
+`src/routes/schools.js`) now reads this directory **first**, via
+`laDb.getDirectoryTermDatesByName(local_authority, academicYear)` — a plain DB
+lookup keyed by name (the directory's `name` matches
+`household_schools.local_authority`, both GIAS LA strings). A directory hit is
+free and instant and never touches the paid `web_search` path.
+
+The live web-search-and-scrape remains the **fallback**, used only when the LA
+isn't in the directory yet (or on `?refresh=1`), so the feature still works for
+the long tail while the dataset fills in. As more authorities import `ok`, more
+families get served straight from the directory. See the
+`project-la-term-dates-dataset` memory.

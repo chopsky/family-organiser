@@ -82,7 +82,15 @@ it for every other family in the LA**. Result: confident, wrong dates (e.g.
 Queen Elizabeth's Girls' came back with dates that didn't match Barnet's). Fixed
 2026-06-25.
 
-### How it works now (cache miss)
+### Source priority (since the directory went live)
+1. **The LA term-dates directory** (`la_directory` / `la_term_date_entries`) via
+   `laDb.getDirectoryTermDatesByName(local_authority, academicYear)` — a free,
+   instant DB read of the curated, validated, centrally-refreshed dataset. This
+   is the common case. See docs/la-term-dates-directory.md.
+2. **The live per-family scrape** (below) — fallback for LAs not in the
+   directory yet, or when an admin forces `?refresh=1`.
+
+### Live-scrape fallback (directory miss)
 1. **`findOfficialTermDatesUrl({ localAuthority, academicYear })`**
    (`src/services/ai.js`) — Claude's `web_search` tool finds the council's OWN
    term-dates page (prefers `*.gov.uk`, accepts a direct PDF), returns a URL

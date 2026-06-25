@@ -10,6 +10,7 @@ const { validateTermDates } = require('../services/termDateValidator');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 const { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES, TERM_FETCH_HEADERS } = require('../services/term-date-extract');
+const laDb = require('../db/laTermDates');
 const { findOfficialTermDatesUrl } = require('../services/ai');
 
 // Memory-storage multer for direct PDF uploads to the term-dates
@@ -625,12 +626,15 @@ router.post('/:schoolId/import-sa-term-dates', requireAuth, requireHousehold, re
 /**
  * POST /api/schools/:schoolId/import-la-dates
  *
- * Import term dates for a school from its LOCAL AUTHORITY. We share results
- * across families in the same LA via a cache. On a cache miss we web-search for
- * the council's OWN term-dates page, fetch it, and run the validated extractor
- * over its real text - so the dates come from the council, not from the model's
- * memory. (The previous version asked the model to recall/approximate the dates,
- * which produced confident but wrong dates that were then cached as canonical.)
+ * Import term dates for a school from its LOCAL AUTHORITY. Source priority:
+ *   1. The shared LA term-dates directory (la_directory / la_term_date_entries)
+ *      - curated, validated, refreshed centrally. A plain DB read: free,
+ *      instant, and it never touches the paid web_search path. This is the
+ *      common case once the directory is populated.
+ *   2. Fallback for LAs not in the directory yet (or ?refresh=1): the live
+ *      per-family scrape - web-search the council's OWN term-dates page, fetch
+ *      it, and run the validated extractor over its real text. Shared across
+ *      families via its own cache.
  * Schools that set their own dates can instead use "Import from school website",
  * the PDF upload, or manual entry.
  */
@@ -654,71 +658,85 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
 
     const now = new Date();
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
-
-    // Check shared cache first - another family may have already imported this
-    // LA's dates. An admin can force a fresh fetch (bypassing a possibly-wrong
-    // cached entry) with ?refresh=1 or { refresh: true }.
+    // ?refresh=1 / { refresh: true } skips every cache (directory + scrape
+    // cache) and forces a fresh live fetch of the council's page.
     const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.body?.refresh === true;
-    const cached = forceRefresh ? null : await db.getCachedLATermDates(school.local_authority, academicYear);
+
     let dates;
-    let fromCache = false;
+    let source = null; // 'directory' | 'cache' | 'scrape' - drives the response copy
 
-    if (cached) {
-      dates = cached;
-      fromCache = true;
-      console.log(`[import-la] Cache hit for ${school.local_authority} ${academicYear}`);
-    } else {
-      console.log(`[import-la] Cache miss for ${school.local_authority} ${academicYear} - finding the official council page`);
+    // 1) Preferred source: the shared LA term-dates directory. A plain DB read,
+    //    so it's free and instant and never hits the paid web_search path. This
+    //    is the whole point of the directory - families stop re-scraping the
+    //    same councils one by one.
+    if (!forceRefresh) {
+      const dirDates = await laDb.getDirectoryTermDatesByName(school.local_authority, academicYear);
+      if (dirDates.length) {
+        dates = dirDates;
+        source = 'directory';
+        console.log(`[import-la] Directory hit for ${school.local_authority} ${academicYear} (${dirDates.length} dates)`);
+      }
+    }
 
-      // Step 1: find the council's OWN term-dates page via web search. We then
-      // extract the dates from that real page, rather than asking the model to
-      // recall them - which used to produce plausible but wrong dates that we
-      // then saved as authoritative and shared with every other family in the LA.
-      const sourceUrl = await findOfficialTermDatesUrl({
-        localAuthority: school.local_authority,
-        academicYear,
-      });
-      if (!sourceUrl) {
-        return res.status(404).json({
-          error: `Could not find an official term-dates page for ${school.local_authority}. Use "Import from school website" with the council or school URL, or add the dates manually.`,
+    // 2) Fallback: the live per-family scrape, for LAs not in the directory yet
+    //    (or on ?refresh=1). Shared across families via its own cache.
+    if (!dates) {
+      const cached = forceRefresh ? null : await db.getCachedLATermDates(school.local_authority, academicYear);
+      if (cached) {
+        dates = cached;
+        source = 'cache';
+        console.log(`[import-la] Cache hit for ${school.local_authority} ${academicYear}`);
+      } else {
+        console.log(`[import-la] No directory/cache entry for ${school.local_authority} ${academicYear} - finding the official council page`);
+
+        // Find the council's OWN term-dates page via web search, then extract
+        // the dates from that real page (not the model's memory).
+        const sourceUrl = await findOfficialTermDatesUrl({
+          localAuthority: school.local_authority,
+          academicYear,
         });
-      }
+        if (!sourceUrl) {
+          return res.status(404).json({
+            error: `Could not find an official term-dates page for ${school.local_authority}. Use "Import from school website" with the council or school URL, or add the dates manually.`,
+          });
+        }
 
-      // Step 2: fetch that page (SSRF-guarded; handles HTML and PDF).
-      let pageText;
-      try {
-        pageText = await fetchTermDatesPageText(sourceUrl);
-      } catch (fetchErr) {
-        return res.status(502).json({
-          error: `Found ${school.local_authority}'s term-dates page but couldn't read it (${fetchErr.message}). Use "Import from school website" with the link, or add the dates manually.`,
+        // Fetch that page (SSRF-guarded; handles HTML and PDF).
+        let pageText;
+        try {
+          pageText = await fetchTermDatesPageText(sourceUrl);
+        } catch (fetchErr) {
+          return res.status(502).json({
+            error: `Found ${school.local_authority}'s term-dates page but couldn't read it (${fetchErr.message}). Use "Import from school website" with the link, or add the dates manually.`,
+          });
+        }
+
+        // Run the same validated extractor the website/PDF import uses, then
+        // keep only this academic year's dates.
+        const nextAY = `${parseInt(academicYear.split('-')[1])}-${parseInt(academicYear.split('-')[1]) + 1}`;
+        const result = await extractTermDatesPreview({
+          pageText,
+          country: 'GB',
+          currentAY: academicYear,
+          nextAY,
+          householdId: req.householdId,
+          userId: req.user.id,
+          sourceLabel: sourceUrl,
         });
-      }
+        if (!result.ok) {
+          return res.status(result.status || 502).json(result.body);
+        }
+        dates = (result.body.dates || []).filter((d) => d.academic_year === academicYear);
+        if (dates.length === 0) {
+          return res.status(404).json({
+            error: `Read ${school.local_authority}'s page but couldn't find ${academicYear} term dates on it. Use "Import from school website", or add the dates manually.`,
+          });
+        }
+        source = 'scrape';
 
-      // Step 3: run the same validated extractor the website/PDF import uses,
-      // then keep only this academic year's dates (the extractor may also
-      // surface next year's, but downstream we relabel and clear per AY).
-      const nextAY = `${parseInt(academicYear.split('-')[1])}-${parseInt(academicYear.split('-')[1]) + 1}`;
-      const result = await extractTermDatesPreview({
-        pageText,
-        country: 'GB',
-        currentAY: academicYear,
-        nextAY,
-        householdId: req.householdId,
-        userId: req.user.id,
-        sourceLabel: sourceUrl,
-      });
-      if (!result.ok) {
-        return res.status(result.status || 502).json(result.body);
+        // Cache the real, extracted dates for other families in the same LA.
+        await db.cacheLATermDates(school.local_authority, academicYear, dates);
       }
-      dates = (result.body.dates || []).filter((d) => d.academic_year === academicYear);
-      if (dates.length === 0) {
-        return res.status(404).json({
-          error: `Read ${school.local_authority}'s page but couldn't find ${academicYear} term dates on it. Use "Import from school website", or add the dates manually.`,
-        });
-      }
-
-      // Cache the real, extracted dates for other families in the same LA.
-      await db.cacheLATermDates(school.local_authority, academicYear, dates);
     }
 
     // Add academic year and source to each date
@@ -745,10 +763,14 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
 
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
+    const sourceNote = source === 'directory'
+      ? ' Imported from the local-authority directory.'
+      : source === 'scrape' ? ' These dates are now saved for other families.' : '';
     return res.json({
       imported: termDates.length,
       local_authority: school.local_authority,
-      message: `Updated ${termDates.length} dates for ${academicYear}.${fromCache ? '' : ' These dates are now cached for other families.'}`,
+      source,
+      message: `Updated ${termDates.length} dates for ${academicYear}.${sourceNote}`,
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-la-dates error:', err);
