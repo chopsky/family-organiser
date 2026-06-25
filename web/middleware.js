@@ -37,6 +37,11 @@ const EU_OR_EEA = new Set([
 const SKIP_PATHS = new Set([
   '/login',
   '/signup',
+  // Unified onboarding flow + primary "Get started" target. Country-agnostic
+  // (renders the same everywhere), so it must NOT geo-redirect to /gb, /us, etc.
+  // Treated like /signup: the locale-cookie stamp below still runs, which feeds
+  // the household step's country detection (storefront > locale cookie > tz).
+  '/start',
   '/forgot-password',
   '/reset-password',
   '/check-email',
