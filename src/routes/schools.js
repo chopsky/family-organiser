@@ -655,8 +655,11 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     const now = new Date();
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
 
-    // Check shared cache first - another family may have already imported this LA's dates
-    const cached = await db.getCachedLATermDates(school.local_authority, academicYear);
+    // Check shared cache first - another family may have already imported this
+    // LA's dates. An admin can force a fresh fetch (bypassing a possibly-wrong
+    // cached entry) with ?refresh=1 or { refresh: true }.
+    const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.body?.refresh === true;
+    const cached = forceRefresh ? null : await db.getCachedLATermDates(school.local_authority, academicYear);
     let dates;
     let fromCache = false;
 

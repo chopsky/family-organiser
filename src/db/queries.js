@@ -848,12 +848,24 @@ async function updateHouseholdSchool(schoolId, updates, db = supabase) {
   return data;
 }
 
+// How long a cached LA term-dates row is trusted before we re-fetch the
+// council's page. Term dates rarely change once published, but councils do
+// occasionally correct them, so we refresh roughly once a term. This is also
+// the backstop that flushes any stale rows (e.g. data written by an older
+// import flow) without anyone having to purge them by hand. See
+// docs/school-term-dates.md.
+const LA_CACHE_MAX_AGE_DAYS = 90;
+
 async function getCachedLATermDates(localAuthority, academicYear, db = supabase) {
+  // Only serve rows fresh enough to trust. An older row is treated as a miss,
+  // so the route re-fetches the real page and the upsert below overwrites it.
+  const cutoffIso = new Date(Date.now() - LA_CACHE_MAX_AGE_DAYS * 86400000).toISOString();
   const { data, error } = await db
     .from('la_term_dates_cache')
     .select('dates')
     .eq('local_authority', localAuthority.toLowerCase().trim())
     .eq('academic_year', academicYear)
+    .gte('created_at', cutoffIso)
     .maybeSingle();
   if (error) throw error;
   return data?.dates || null;
@@ -866,6 +878,11 @@ async function cacheLATermDates(localAuthority, academicYear, dates, db = supaba
       local_authority: localAuthority.toLowerCase().trim(),
       academic_year: academicYear,
       dates,
+      // Stamp every write so the freshness window resets on a refresh. The
+      // column default only fires on INSERT; an upsert that turns into an
+      // UPDATE would otherwise keep the original (possibly stale) timestamp,
+      // making the row instantly stale again and re-fetch on every import.
+      created_at: new Date().toISOString(),
     }, { onConflict: 'local_authority,academic_year' });
   if (error) console.error('Failed to cache LA term dates:', error.message);
 }
