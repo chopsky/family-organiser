@@ -22,11 +22,12 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ErrorBanner from '../../components/ErrorBanner';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
-import { resolveSignupPromo } from '../../lib/signupPromo';
+import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
 import WelcomeStep from './steps/WelcomeStep';
 import WelcomeNotifications from './steps/WelcomeNotifications';
 import HeaviestStep from './steps/HeaviestStep';
 import PlanStep from './steps/PlanStep';
+import AccountStep from './steps/AccountStep';
 
 // Step keys in order + the progress-bar fill per step (mirrors the prototype).
 const STEPS = ['welcome', 'heaviest', 'plan', 'account', 'household', 'invite', 'whatsapp', 'calendar', 'finish'];
@@ -92,6 +93,16 @@ export default function OnboardingFlow() {
     setTimeout(() => { setLeavingWelcome(false); next(); }, 480);
   };
 
+  // Account created/authenticated (Google popup or an invite auto-join). Store
+  // the session, consume the promo, then resume at the right step: an existing
+  // household jumps to invite (the top-level guard sends fully-onboarded users
+  // to the dashboard); a fresh account goes to the household step.
+  const goAfterAuth = (data) => {
+    clearSignupPromo();
+    auth.login(data);
+    setIdx(STEPS.indexOf(data?.household ? 'invite' : 'household'));
+  };
+
   // Escape hatch - a half-finished signup would otherwise be trapped here by
   // RequireAuth's redirect. Logging out clears the token so the landing renders.
   const signOut = () => { auth.logout(); window.location.href = '/'; };
@@ -100,7 +111,7 @@ export default function OnboardingFlow() {
     auth, navigate, reduced,
     form, update,
     next, back, setError,
-    leaveWelcome,
+    leaveWelcome, goAfterAuth,
     inviteToken, promoCode: form.promoCode,
     firstName: firstNameOf(auth.user),
   };
@@ -174,6 +185,8 @@ function renderStep(key, ctx) {
       return <HeaviestStep form={ctx.form} update={ctx.update} next={ctx.next} />;
     case 'plan':
       return <PlanStep form={ctx.form} next={ctx.next} />;
+    case 'account':
+      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} />;
     default:
       return <StepPlaceholder stepKey={key} ctx={ctx} />;
   }
