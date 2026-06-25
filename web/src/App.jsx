@@ -21,7 +21,9 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 
 // Lazy load everything else - only downloaded when the route is visited
-const Signup          = lazy(() => import('./pages/Signup'));
+// Signup.jsx is retired - /signup now renders the unified OnboardingFlow. The
+// file is kept on disk only as the design reference the account step was lifted
+// from.
 const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
@@ -110,10 +112,11 @@ function LocaleRedirect({ children }) {
 function RequireAuth({ children }) {
   const { token, needsHousehold, needsOnboarding } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (needsHousehold) return <Navigate to="/setup" replace />;
-  // Any authenticated in-app route bounces to /onboarding until the wizard
-  // is done. Skipping the wizard by typing the URL directly is blocked too.
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
+  // A half-finished signup (no household, or not-yet-onboarded) funnels into the
+  // unified flow at /signup, which resumes from auth state via entryIndex. The
+  // legacy /setup + /onboarding routes stay mounted as a fallback (reachable by
+  // direct URL) but the gates no longer point at them.
+  if (needsHousehold || needsOnboarding) return <Navigate to="/signup" replace />;
   return children;
 }
 
@@ -200,13 +203,12 @@ function AppRoutes() {
             the flow, every API call inside onboarding acts as the original
             user, and the new account row ends up half-created (no verification
             email sent, wrong household, etc). Bounce authed users to /dashboard. */}
-        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
-        {/* TEMPORARY build route for the rebuilt onboarding flow. No guard: it
-            renders pre-auth (steps 1-4) AND post-auth-not-onboarded (steps 5-9),
-            and self-redirects to /dashboard once fully onboarded. The final phase
-            mounts this flow at /signup and removes this route (and its
-            middleware SKIP_PATHS entry). */}
-        <Route path="/signup-next" element={<OnboardingFlow />} />
+        {/* /signup IS the unified onboarding flow. No guard: it renders pre-auth
+            (steps 1-4) AND post-auth-not-onboarded (steps 5-9), self-redirecting
+            to /dashboard once fully onboarded. Carries ?invite= and ?promo=
+            through (the flow captures them). The old single-screen Signup.jsx is
+            retired (kept on disk as the styling reference). */}
+        <Route path="/signup" element={<OnboardingFlow />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
             the promo on every device. */}

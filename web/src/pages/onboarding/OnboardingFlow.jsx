@@ -12,14 +12,15 @@
  * "check your inbox"; after verifying, the auth gate funnels the user back here
  * and entryIndex() resumes them at the right step.
  *
- * Built behind /signup-next during construction; the final phase mounts it at
- * /signup itself. Visual language reuses the existing concierge stage (gradient
- * + ambient blobs + glass card) in our plum tokens. British English, no em
- * dashes, prefers-reduced-motion honoured.
+ * Mounted at /signup (it replaced the old single-screen Signup form). Visual
+ * language reuses the existing concierge stage (gradient + ambient blobs + glass
+ * card) in our plum tokens. British English, no em dashes,
+ * prefers-reduced-motion honoured.
  */
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../lib/api';
 import ErrorBanner from '../../components/ErrorBanner';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
@@ -32,6 +33,7 @@ import HouseholdStep from './steps/HouseholdStep';
 import InviteStep from './steps/InviteStep';
 import WhatsAppStep from './steps/WhatsAppStep';
 import CalendarStep from './steps/CalendarStep';
+import FinishStep from './steps/FinishStep';
 
 // Step keys in order + the progress-bar fill per step (mirrors the prototype).
 const STEPS = ['welcome', 'heaviest', 'plan', 'account', 'household', 'invite', 'whatsapp', 'calendar', 'finish'];
@@ -76,6 +78,7 @@ export default function OnboardingFlow() {
   }));
   const [error, setError] = useState('');
   const [leavingWelcome, setLeavingWelcome] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   // A fully-onboarded session should never see the flow (e.g. typed /signup).
@@ -107,6 +110,21 @@ export default function OnboardingFlow() {
     setIdx(STEPS.indexOf(data?.household ? 'invite' : 'household'));
   };
 
+  // Finish: flip users.onboarded_at server-side, patch the cached user so the
+  // auth gate stops funnelling back here, then land on the dashboard. A failed
+  // mark-onboarded must not trap the user, so we navigate regardless.
+  const finish = async () => {
+    setFinishing(true);
+    try {
+      const { data } = await api.post('/auth/mark-onboarded');
+      if (data?.user) auth.updateUser(data.user);
+    } catch (err) {
+      console.error('[onboarding] mark-onboarded failed:', err?.response?.data?.error || err.message);
+    } finally {
+      navigate('/dashboard');
+    }
+  };
+
   // Escape hatch - a half-finished signup would otherwise be trapped here by
   // RequireAuth's redirect. Logging out clears the token so the landing renders.
   const signOut = () => { auth.logout(); window.location.href = '/'; };
@@ -115,7 +133,7 @@ export default function OnboardingFlow() {
     auth, navigate, reduced,
     form, update,
     next, back, setError,
-    leaveWelcome, goAfterAuth,
+    leaveWelcome, goAfterAuth, finish, finishing,
     inviteToken, promoCode: form.promoCode,
     firstName: firstNameOf(auth.user),
   };
@@ -199,27 +217,9 @@ function renderStep(key, ctx) {
       return <WhatsAppStep next={ctx.next} setError={ctx.setError} />;
     case 'calendar':
       return <CalendarStep form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
+    case 'finish':
+      return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} invited={ctx.form.invited} finishing={ctx.finishing} onFinish={ctx.finish} />;
     default:
-      return <StepPlaceholder stepKey={key} ctx={ctx} />;
+      return null;
   }
-}
-
-function StepPlaceholder({ stepKey, ctx }) {
-  const isLast = stepKey === 'finish';
-  return (
-    <div className="text-left">
-      <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 40, fontWeight: 400, lineHeight: 1.05, color: 'var(--color-charcoal)', margin: '8px 0 8px' }}>
-        {stepKey}
-      </h1>
-      <p className="text-cocoa" style={{ fontSize: 15 }}>Step placeholder. Real content lands in the next phase.</p>
-      <button
-        type="button"
-        onClick={() => (isLast ? ctx.navigate('/dashboard') : ctx.next())}
-        className="w-full text-white font-bold transition-colors"
-        style={{ marginTop: 24, padding: 16, border: 0, borderRadius: 14, background: 'var(--color-plum)', fontSize: 16, cursor: 'pointer' }}
-      >
-        {isLast ? 'Go to dashboard' : 'Continue'}
-      </button>
-    </div>
-  );
 }

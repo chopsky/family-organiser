@@ -37,10 +37,6 @@ const EU_OR_EEA = new Set([
 const SKIP_PATHS = new Set([
   '/login',
   '/signup',
-  // TEMPORARY: preview route for the rebuilt onboarding flow. Removed when the
-  // flow takes over /signup (which is already bypassed). Bypassing it here keeps
-  // a direct visit from geo-redirecting to /gb during the build.
-  '/signup-next',
   '/forgot-password',
   '/reset-password',
   '/check-email',
