@@ -151,7 +151,9 @@ export default function OnboardingFlow() {
           card). Hidden under 880px via CSS. */}
       {key === 'welcome' && <WelcomeNotifications leaving={leavingWelcome} reduced={reduced} />}
 
-      <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-10 pb-8 md:pt-14 md:pb-10">
+      {/* Welcome is short, so centre it vertically; the later (often taller)
+          steps stay top-aligned so they never clip on short viewports. */}
+      <main className={`relative z-10 flex-1 flex justify-center px-4 ${key === 'welcome' ? 'items-center py-8' : 'items-start pt-10 pb-8 md:pt-14 md:pb-10'}`}>
         <div
           key={reduced ? 'static' : key /* re-mount per step so the enter animation fires */}
           className={reduced ? '' : 'ob-card-in'}
@@ -186,13 +188,15 @@ export default function OnboardingFlow() {
         </div>
       </main>
 
-      <footer className="relative z-10 safe-bottom">
-        <div className="max-w-[480px] mx-auto px-5 py-4 flex items-center justify-end text-xs">
-          {auth.token && (
+      {/* Sign-out escape hatch, only once a session exists. Omitting the footer
+          pre-auth lets <main> fill the full height so the welcome card centres. */}
+      {auth.token && (
+        <footer className="relative z-10 safe-bottom">
+          <div className="max-w-[480px] mx-auto px-5 py-4 flex items-center justify-end text-xs">
             <button type="button" onClick={signOut} className="text-cocoa hover:text-bark transition-colors">Sign out</button>
-          )}
-        </div>
-      </footer>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
