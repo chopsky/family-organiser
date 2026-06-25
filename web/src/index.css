@@ -184,7 +184,7 @@
   .ob-notif-tile { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.14); overflow: hidden; }
   .ob-notif-bd { flex: 1; min-width: 0; text-align: left; }
   .ob-notif-r1 { display: flex; align-items: baseline; gap: 6px; }
-  .ob-notif-t { font-size: 13px; font-weight: 700; color: #1A1620; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ob-notif-t { font-size: 13px; font-weight: 600; color: #1A1620; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ob-notif-tm { font-size: 11.5px; color: #8A8493; flex-shrink: 0; }
   .ob-notif-sub { font-size: 12.5px; font-weight: 600; color: #1A1620; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ob-notif-bo { font-size: 12.5px; color: #4A4453; line-height: 1.35; margin-top: 1px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
