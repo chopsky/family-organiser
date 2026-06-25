@@ -30,6 +30,7 @@ const Verified        = lazy(() => import('./pages/Verified'));
 const Verify          = lazy(() => import('./pages/Verify'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
+const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStandalone'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
 // Tasks → the chores/routines/stars rebuild (Chores); Shopping folded into
@@ -217,6 +218,12 @@ function AppRoutes() {
             NOT a completed onboarding (that's what it sets). Renders without
             the regular Layout so the wizard owns the full viewport. */}
         <Route path="/onboarding" element={<RequireAuthOnly><Onboarding /></RequireAuthOnly>} />
+        {/* New unified onboarding flow (rebuilt prototype). No guard: it renders
+            pre-auth (steps 1-4) AND post-auth-not-onboarded (steps 5-9), and
+            self-redirects to /dashboard once fully onboarded. The live CTA/gate
+            cutover happens in the final phase; until then it's reachable by URL
+            for build-up + review without affecting the existing funnel. */}
+        <Route path="/start" element={<OnboardingFlow />} />
         {/* Standalone WhatsApp pairing surface for the T+24h re-engagement
             email's CTA. RequireAuthOnly (not RequireAuth) so users who
             never completed the wizard AND users who did but skipped

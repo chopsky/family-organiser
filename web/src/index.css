@@ -158,6 +158,15 @@
     .page-transition { animation: none; }
   }
 
+  /* Onboarding flow: card enter (per-step) - a gentle rise + fade. The global
+     prefers-reduced-motion rule below neutralises this automatically, and the
+     flow also swaps the per-step remount key to avoid any flash. */
+  .ob-card-in { animation: ob-card-in .5s cubic-bezier(0.22,1,0.36,1) both; }
+  @keyframes ob-card-in {
+    from { opacity: 0; transform: translateY(14px) scale(.985); }
+    to   { opacity: 1; transform: none; }
+  }
+
   /* ── iOS safe-area insets (Capacitor / PWA) ── */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
