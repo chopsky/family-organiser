@@ -4,19 +4,15 @@ import { FEED_PROVIDERS } from '../../../lib/feedProviders';
 import { Title, Em, Kicker, Lead, PrimaryButton, Ghost } from './_ui';
 import { inputStyle } from './_styles';
 
-// Friendly display order + a brand-ish tile colour per provider.
+// Friendly display order + the real brand icon per provider (in /public).
 const TILE = {
-  apple:   { colour: '#1A1620', name: 'Apple Calendar' },
-  google:  { colour: '#4285F4', name: 'Google Calendar' },
-  outlook: { colour: '#0F6CBD', name: 'Outlook Calendar' },
+  apple:   { name: 'Apple Calendar',   icon: '/onboarding-icons/cal-apple.webp' },
+  google:  { name: 'Google Calendar',  icon: '/onboarding-icons/cal-google.png' },
+  outlook: { name: 'Outlook Calendar', icon: '/onboarding-icons/cal-outlook.svg' },
 };
 const PROVIDERS = ['apple', 'google', 'outlook']
   .map((id) => FEED_PROVIDERS.find((p) => p.id === id))
   .filter(Boolean);
-
-const CalGlyph = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="3" /><path d="M3 9h18M8 3v3M16 3v3" /></svg>
-);
 
 // Step 8. Subscribe to one external calendar by URL (Apple/Google/Outlook),
 // reusing the shared FEED_PROVIDERS instructions and POST
@@ -97,7 +93,9 @@ export default function CalendarStep({ form, update, next, setError }) {
         {PROVIDERS.map((p) => (
           <button key={p.id} type="button" onClick={() => choose(p)}
             style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '18px 8px 14px', borderRadius: 18, cursor: 'pointer', fontFamily: 'inherit', background: '#fff', border: '1.5px solid var(--color-cream-border)' }}>
-            <span style={{ width: 48, height: 48, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: TILE[p.id]?.colour || 'var(--color-plum)' }}><CalGlyph /></span>
+            <span style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src={TILE[p.id]?.icon} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+            </span>
             <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-charcoal)', textAlign: 'center', lineHeight: 1.2 }}>{TILE[p.id]?.name || p.label}</span>
           </button>
         ))}
