@@ -81,6 +81,7 @@ const SKIP_PREFIXES = [
   '/admin',
   '/.well-known',
   '/v3',          // static v3 redesign preview in public/v3 — never geo-redirect
+  '/school-term-dates', // public term-dates directory, proxied to the API backend (vercel.json) — never geo-redirect
 ];
 
 // User-agent patterns for crawlers and link-preview fetchers. Includes
