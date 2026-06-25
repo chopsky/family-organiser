@@ -22,6 +22,7 @@ import Login from './pages/Login';
 
 // Lazy load everything else - only downloaded when the route is visited
 const Signup          = lazy(() => import('./pages/Signup'));
+const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
@@ -200,6 +201,12 @@ function AppRoutes() {
             user, and the new account row ends up half-created (no verification
             email sent, wrong household, etc). Bounce authed users to /dashboard. */}
         <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
+        {/* TEMPORARY build route for the rebuilt onboarding flow. No guard: it
+            renders pre-auth (steps 1-4) AND post-auth-not-onboarded (steps 5-9),
+            and self-redirects to /dashboard once fully onboarded. The final phase
+            mounts this flow at /signup and removes this route (and its
+            middleware SKIP_PATHS entry). */}
+        <Route path="/signup-next" element={<OnboardingFlow />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
             the promo on every device. */}
