@@ -10,6 +10,9 @@
  * coupling.
  */
 
+const tls = require('node:tls');
+const https = require('node:https');
+const http = require('node:http');
 const pdfParse = require('pdf-parse');
 const { callWithFailover, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { validateTermDates } = require('./termDateValidator');
@@ -217,6 +220,100 @@ Do NOT wrap in markdown code fences.`,
 }
 
 /**
+ * AIA chain completion.
+ *
+ * Some servers - commonly UK council *.gov.uk sites - are misconfigured to send
+ * ONLY their leaf certificate and omit the intermediate CA cert, so a strict TLS
+ * client can't build a chain to a trusted root (Node: UNABLE_TO_VERIFY_LEAF_
+ * SIGNATURE, "unable to verify the first certificate"). Browsers paper over this
+ * by fetching the missing intermediate from the leaf's AIA extension; we do the
+ * same and retry with the chain completed. Verification stays ON for the data
+ * fetch, so this never trusts a cert that doesn't ultimately chain to a real
+ * root - it only supplies the intermediate the server forgot to send.
+ */
+
+// Read the leaf cert's "CA Issuers" (AIA) URL. The handshake skips verification
+// PURELY to inspect the presented certificate - no application data is read from
+// this socket (closed immediately); the real fetch re-validates the full chain.
+function getAiaIssuerUrl(host) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    const socket = tls.connect(
+      { host, servername: host, port: 443, rejectUnauthorized: false, timeout: 8000 },
+      () => {
+        const cert = socket.getPeerCertificate(true);
+        socket.end();
+        const uris = cert && cert.infoAccess && cert.infoAccess['CA Issuers - URI'];
+        done(Array.isArray(uris) && uris.length ? uris[0] : null);
+      },
+    );
+    socket.on('error', () => done(null));
+    socket.on('timeout', () => { socket.destroy(); done(null); });
+  });
+}
+
+// Minimal GET → { status, headers, body:Buffer }, following a few redirects.
+// `ca`, when given, replaces the trust store for the request.
+function rawGet(targetUrl, { headers = {}, ca, redirectsLeft = 3 } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(targetUrl);
+    const lib = u.protocol === 'http:' ? http : https;
+    const req = lib.request(
+      u,
+      { method: 'GET', headers, servername: u.hostname, timeout: 15000, ...(ca ? { ca } : {}) },
+      (res) => {
+        if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirectsLeft > 0) {
+          res.resume();
+          resolve(rawGet(new URL(res.headers.location, targetUrl).toString(), { headers, ca, redirectsLeft: redirectsLeft - 1 }));
+          return;
+        }
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+      },
+    );
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.end();
+  });
+}
+
+function derToPem(buf) {
+  if (buf.toString('latin1').includes('-----BEGIN CERTIFICATE-----')) return buf.toString('latin1');
+  const b64 = buf.toString('base64').match(/.{1,64}/g).join('\n');
+  return `-----BEGIN CERTIFICATE-----\n${b64}\n-----END CERTIFICATE-----\n`;
+}
+
+// On an incomplete-chain failure: fetch the missing intermediate via AIA and
+// retry with the completed chain (verification ON). Returns a fetch Response, or
+// null if completion isn't possible. The AIA URL is SSRF-guarded - it comes from
+// a cert presented over an UNVERIFIED handshake, so a hostile server could
+// otherwise point it at an internal address.
+async function fetchWithAiaCompletion(targetUrl, headers) {
+  const aiaUrl = await getAiaIssuerUrl(new URL(targetUrl).hostname);
+  if (!aiaUrl) return null;
+  try { assertFetchableUrl(aiaUrl); } catch { return null; }
+
+  let intermediatePem;
+  try {
+    const r = await rawGet(aiaUrl, { headers: { 'User-Agent': headers['User-Agent'] || 'Mozilla/5.0' }, redirectsLeft: 0 });
+    if (r.status !== 200 || !r.body || !r.body.length) return null;
+    intermediatePem = derToPem(r.body);
+  } catch {
+    return null;
+  }
+
+  // Trust = default roots + the fetched intermediate. A forged intermediate is
+  // useless: the chain must still terminate at a genuine trusted root.
+  const res = await rawGet(targetUrl, { headers, ca: [...tls.rootCertificates, intermediatePem] });
+  return new Response(res.body, {
+    status: res.status,
+    headers: { 'content-type': res.headers['content-type'] || 'text/html' },
+  });
+}
+
+/**
  * Fetch a term-dates web page (or PDF) and return its plain text, ready for
  * extractTermDatesPreview. Mirrors the fetch/strip/pdfParse pipeline in the
  * /import-website route, but is reusable and SSRF-guarded - important here
@@ -234,7 +331,13 @@ async function fetchTermDatesPageText(url) {
   try {
     response = await fetch(trimmed, { headers: TERM_FETCH_HEADERS });
   } catch (err) {
-    throw new Error(`Could not reach that page: ${err.message}`);
+    // Incomplete TLS chain (server omitted the intermediate)? Complete it via
+    // AIA - the way browsers do - and retry with verification still on. Any
+    // other error (or a failed completion) rethrows the original message.
+    if (err && err.cause && err.cause.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+      response = await fetchWithAiaCompletion(trimmed, TERM_FETCH_HEADERS).catch(() => null);
+    }
+    if (!response) throw new Error(`Could not reach that page: ${err.message}`);
   }
   if (!response.ok) {
     throw new Error(`That page returned HTTP ${response.status}.`);
