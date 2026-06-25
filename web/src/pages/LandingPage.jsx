@@ -4,7 +4,10 @@ import { useLocale } from '../hooks/useLocale'
 import HreflangTags from '../components/HreflangTags'
 import { APP_STORE_URL, APP_STORE_CONFIGURED, isIos } from '../lib/app-store'
 
-const SIGNUP_URL = '/signup'
+// Primary "Get started" destination: the unified onboarding flow (welcome →
+// account → finish). The legacy /signup route stays live for direct links,
+// invite (?invite=) and promo (?promo=) URLs.
+const SIGNUP_URL = '/start'
 const SIGNIN_URL = '/login'
 
 const NAV_LINKS = [

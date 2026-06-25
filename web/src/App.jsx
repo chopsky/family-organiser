@@ -110,10 +110,11 @@ function LocaleRedirect({ children }) {
 function RequireAuth({ children }) {
   const { token, needsHousehold, needsOnboarding } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (needsHousehold) return <Navigate to="/setup" replace />;
-  // Any authenticated in-app route bounces to /onboarding until the wizard
-  // is done. Skipping the wizard by typing the URL directly is blocked too.
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
+  // A half-finished signup (no household, or not-yet-onboarded) funnels into the
+  // unified flow at /start, which resumes from auth state via entryIndex. The
+  // legacy /setup + /onboarding routes stay mounted as a fallback (reachable by
+  // direct URL) but the gates no longer point at them.
+  if (needsHousehold || needsOnboarding) return <Navigate to="/start" replace />;
   return children;
 }
 
@@ -172,10 +173,11 @@ function AppRoutes() {
       <RouteTransition>
       <Routes>
         {/* On iOS / native: a fresh install almost always means a brand-new
-            user, so /signup is the more useful default. Returning users can
-            tap the "Already have an account? Log in" link on Signup. On
-            web the LandingPage handles its own login/signup CTAs. */}
-        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/signup" replace /> : <LocaleRedirect><LandingPage /></LocaleRedirect>)} />
+            user, so the unified onboarding flow at /start is the default (it
+            opens on the welcome step and carries them through account creation).
+            Returning users can tap "Already have an account? Log in". On web the
+            LandingPage handles its own login/signup CTAs. */}
+        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/start" replace /> : <LocaleRedirect><LandingPage /></LocaleRedirect>)} />
         {/* Country-specific marketing variants. Same LandingPage component;
             it reads pricing, audience tagline, and feature flags via
             useLocale() based on the route path. Each variant emits its
