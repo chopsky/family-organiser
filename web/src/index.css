@@ -167,6 +167,56 @@
     to   { opacity: 1; transform: none; }
   }
 
+  /* Welcome-step notifications: staggered drop-in, gentle hover, drift outward
+     on leave. Decorative + stage-level. Hidden under 880px; the global
+     prefers-reduced-motion rule neutralises the animations, and the .ob-reduced
+     class drops the float so the cards simply sit still. */
+  .ob-notifs { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+  .ob-notif {
+    position: absolute; width: 300px; display: flex; align-items: flex-start; gap: 11px;
+    background: rgba(250,248,245,0.78);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 0.5px solid rgba(255,255,255,0.7); border-radius: 20px; padding: 12px 14px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 22px 44px -16px rgba(26,22,32,0.28);
+    animation: ob-droprot .6s cubic-bezier(0.22,1.15,0.36,1) backwards, ob-floatn 8s ease-in-out infinite;
+  }
+  .ob-notif-ico { width: 40px; height: 40px; flex-shrink: 0; }
+  .ob-notif-tile { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.14); overflow: hidden; }
+  .ob-notif-bd { flex: 1; min-width: 0; text-align: left; }
+  .ob-notif-r1 { display: flex; align-items: baseline; gap: 6px; }
+  .ob-notif-t { font-size: 14.5px; font-weight: 700; color: #1A1620; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ob-notif-tm { font-size: 11.5px; color: #8A8493; flex-shrink: 0; }
+  .ob-notif-sub { font-size: 13px; font-weight: 600; color: #1A1620; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ob-notif-bo { font-size: 13px; color: #4A4453; line-height: 1.35; margin-top: 1px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .ob-n1 { left: 6%;  top: 16%;    --rot: -4deg;   animation-delay: .35s, 1.6s; }
+  .ob-n2 { right: 6%; top: 12%;    --rot: 3.5deg;  animation-delay: .6s, 2.3s; animation-duration: .6s, 9s; }
+  .ob-n3 { left: 8%;  bottom: 15%; --rot: 3deg;    animation-delay: .85s, 1.9s; animation-duration: .6s, 7.5s; }
+  .ob-n4 { right: 7%; bottom: 12%; --rot: -3.5deg; animation-delay: 1.1s, 2.6s; animation-duration: .6s, 8.5s; }
+
+  @keyframes ob-droprot { 0% { opacity: 0; transform: translateY(-30px) scale(.94) rotate(var(--rot)); } 60% { opacity: 1; } 100% { opacity: 1; transform: rotate(var(--rot)); } }
+  @keyframes ob-floatn {
+    0%   { transform: translate(0,0) rotate(var(--rot)); }
+    25%  { transform: translate(5px,-9px) rotate(calc(var(--rot) + 1deg)); }
+    50%  { transform: translate(-4px,4px) rotate(calc(var(--rot) - 1deg)); }
+    75%  { transform: translate(4px,8px) rotate(calc(var(--rot) + 0.6deg)); }
+    100% { transform: translate(0,0) rotate(var(--rot)); }
+  }
+
+  .ob-notifs.ob-leaving .ob-notif { animation-duration: .5s; animation-iteration-count: 1; animation-fill-mode: forwards; animation-timing-function: cubic-bezier(0.4,0,1,1); animation-delay: 0s; }
+  .ob-notifs.ob-leaving .ob-n1 { animation-name: ob-rise-a; }
+  .ob-notifs.ob-leaving .ob-n2 { animation-name: ob-rise-b; }
+  .ob-notifs.ob-leaving .ob-n3 { animation-name: ob-rise-c; }
+  .ob-notifs.ob-leaving .ob-n4 { animation-name: ob-rise-d; }
+  @keyframes ob-rise-a { to { opacity: 0; transform: translate(-90px,-70px) scale(.92) rotate(-7deg); } }
+  @keyframes ob-rise-b { to { opacity: 0; transform: translate(90px,-70px) scale(.92) rotate(6.5deg); } }
+  @keyframes ob-rise-c { to { opacity: 0; transform: translate(-90px,70px) scale(.92) rotate(6deg); } }
+  @keyframes ob-rise-d { to { opacity: 0; transform: translate(90px,70px) scale(.92) rotate(-6.5deg); } }
+
+  .ob-notifs.ob-reduced .ob-notif { animation: none; transform: rotate(var(--rot)); }
+
+  @media (max-width: 880px) { .ob-notif { display: none; } }
+
   /* ── iOS safe-area insets (Capacitor / PWA) ── */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
