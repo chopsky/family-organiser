@@ -154,10 +154,6 @@ export default function OnboardingFlow() {
     }
   };
 
-  // Escape hatch - a half-finished signup would otherwise be trapped here by
-  // RequireAuth's redirect. Logging out clears the token so the landing renders.
-  const signOut = () => { clearStoredStep(); auth.logout(); window.location.href = '/'; };
-
   const ctx = {
     auth, navigate, reduced,
     form, update,
@@ -170,7 +166,11 @@ export default function OnboardingFlow() {
   return (
     <div
       className="relative min-h-screen overflow-hidden flex flex-col"
-      style={{ background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)' }}
+      style={{
+        background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
+        // Keep the card clear of the iOS status bar / notch. 0 on the web.
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}
     >
       {/* Ambient blobs (decorative) - same treatment as Login/Signup/SetupHousehold. */}
       <div aria-hidden="true" className="pointer-events-none absolute" style={{ width: 760, height: 760, borderRadius: '50%', left: -180, bottom: -300, background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)', filter: 'blur(20px)' }} />
@@ -216,16 +216,6 @@ export default function OnboardingFlow() {
           {renderStep(key, ctx)}
         </div>
       </main>
-
-      {/* Sign-out escape hatch, only once a session exists. Omitting the footer
-          pre-auth lets <main> fill the full height so the welcome card centres. */}
-      {auth.token && (
-        <footer className="relative z-10 safe-bottom">
-          <div className="max-w-[480px] mx-auto px-5 py-4 flex items-center justify-end text-xs">
-            <button type="button" onClick={signOut} className="text-cocoa hover:text-bark transition-colors">Sign out</button>
-          </div>
-        </footer>
-      )}
     </div>
   );
 }
