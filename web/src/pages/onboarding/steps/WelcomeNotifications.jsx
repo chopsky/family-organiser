@@ -5,9 +5,12 @@
 // (ob-*) and are neutralised by the global prefers-reduced-motion rule; the
 // `reduced` prop also drops the float so the cards simply sit still.
 
-const MsgIcon = () => (
-  <span className="ob-notif-tile" style={{ background: '#2BD24A' }}>
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 4C6.9 4 3 7.2 3 11.2c0 1.8.8 3.4 2.1 4.6L4 20l4.5-1.6c1.1.3 2.3.5 3.5.5 5.1 0 9-3.2 9-7.2S17.1 4 12 4z" /></svg>
+// Real iOS app icons (the rounded-square shape + gradient are baked into each
+// SVG), copied to /public/onboarding-icons. Rendered edge-to-edge in the tile,
+// so no coloured background of our own.
+const AppIcon = ({ src }) => (
+  <span className="ob-notif-tile" style={{ background: 'transparent' }}>
+    <img src={src} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
   </span>
 );
 const CalIcon = () => (
@@ -18,22 +21,12 @@ const CalIcon = () => (
     </span>
   </span>
 );
-const MailIcon = () => (
-  <span className="ob-notif-tile" style={{ background: '#1F8EF1' }}>
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M4 7l8 6 8-6" /></svg>
-  </span>
-);
-const WaIcon = () => (
-  <span className="ob-notif-tile" style={{ background: '#25A35A' }}>
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3zm0 2a7 7 0 1 1-3.6 13l-.3-.2-2.4.6.6-2.3-.2-.3A7 7 0 0 1 12 5z" /></svg>
-  </span>
-);
 
 const NOTES = [
-  { cls: 'ob-n1', icon: <MsgIcon />, title: 'Sam', time: 'now', body: "Who's getting the kids today? We're out of milk." },
+  { cls: 'ob-n1', icon: <AppIcon src="/onboarding-icons/messages.svg" />, title: 'Sam', time: 'now', body: "Who's getting the kids today? We're out of milk." },
   { cls: 'ob-n2', icon: <CalIcon />, title: "Leo's birthday party 🎂", time: '9:02', body: "Saturday 14:00 · don't forget a present!" },
-  { cls: 'ob-n3', icon: <MailIcon />, title: 'Oakfield Primary', time: '08:14', sub: 'Non-uniform day Friday', body: 'Just a reminder children may wear their own clothes this Friday…' },
-  { cls: 'ob-n4', icon: <WaIcon />, title: 'Class Parents 💬', time: '07:48', sub: 'Priya', body: "Don't forget World Book Day costumes tomorrow! 📚" },
+  { cls: 'ob-n3', icon: <AppIcon src="/onboarding-icons/mail.svg" />, title: 'Oakfield Primary', time: '08:14', sub: 'Non-uniform day Friday', body: 'Just a reminder children may wear their own clothes this Friday…' },
+  { cls: 'ob-n4', icon: <AppIcon src="/onboarding-icons/whatsapp.svg" />, title: 'Class Parents 💬', time: '07:48', sub: 'Priya', body: "Don't forget World Book Day costumes tomorrow! 📚" },
 ];
 
 export default function WelcomeNotifications({ leaving = false, reduced = false }) {
