@@ -96,7 +96,11 @@ export default function CalendarStep({ form, update, next, setError }) {
             <span style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src={TILE[p.id]?.icon} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-charcoal)', textAlign: 'center', lineHeight: 1.2 }}>{TILE[p.id]?.name || p.label}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-charcoal)', textAlign: 'center', lineHeight: 1.25 }}>
+              {(TILE[p.id]?.name || p.label).split(' ').map((w, i) => (
+                <span key={i} style={{ display: 'block' }}>{w}</span>
+              ))}
+            </span>
           </button>
         ))}
       </div>
