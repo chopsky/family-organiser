@@ -1,6 +1,8 @@
 // Shared visual primitives for the onboarding steps - mapped to our plum
 // tokens + Instrument Serif (loaded app-wide). British English, no em dashes.
-export const SERIF = "'Instrument Serif', serif";
+// Plain shared constants (SERIF, inputStyle, labelStyle) live in ./_styles so
+// this module only exports components (react-refresh).
+import { SERIF } from './_styles';
 
 export function Title({ children, size = 44 }) {
   return (
@@ -52,5 +54,25 @@ export function FiveStars() {
         <svg key={i} width="15" height="15" viewBox="0 0 24 24" fill="#D89B3A" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.4 4.1 1.2 6L12 16.9 6.6 19.4l1.2-6L3.4 9.3l6-.7L12 3z" /></svg>
       ))}
     </span>
+  );
+}
+
+// Pill segmented control (Start new / Join existing).
+export function Segmented({ value, onChange, options }) {
+  return (
+    <div role="tablist" style={{ display: 'flex', gap: 4, background: 'var(--color-oat)', border: '1px solid rgba(26,22,32,0.06)', borderRadius: 12, padding: 4 }}>
+      {options.map((o) => {
+        const active = value === o.key;
+        return (
+          <button
+            key={o.key} role="tab" type="button" aria-selected={active}
+            onClick={() => onChange(o.key)}
+            style={{ flex: 1, padding: '9px 10px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, background: active ? '#fff' : 'transparent', color: active ? 'var(--color-charcoal)' : 'var(--color-warm-grey)', boxShadow: active ? '0 1px 2px rgba(26,22,32,0.08)' : 'none', transition: 'all .15s ease' }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
