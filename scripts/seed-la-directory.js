@@ -50,6 +50,16 @@ function isNonLA(name) {
   return /^does not apply$/i.test(name) || /bfpo|overseas/i.test(name);
 }
 
+// Real LAs we intentionally keep OUT of the directory: tiny/atypical authorities
+// that don't publish a council-wide school calendar (their schools set their own
+// dates), so an import only ever yields a "no dates" failure. City of London (a
+// ~9-school LEA, almost all independent schools) is the clear case. Distinct from
+// the non-authority junk in isNonLA. To un-hide one, remove it here and re-seed.
+const HIDDEN_LAS = new Set(['city of london']);
+function isHiddenLA(name) {
+  return HIDDEN_LAS.has(name.toLowerCase().trim());
+}
+
 function regionFor(name) {
   return WELSH_LAS.has(name.toLowerCase().trim()) ? 'Wales' : 'England';
 }
@@ -92,6 +102,7 @@ function buildDirectory(csvPath) {
 
   const counts = new Map();   // la name -> open school count
   const skipped = new Set();
+  const hidden = new Set();
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
     const values = parseCSVLine(lines[i]);
@@ -99,6 +110,7 @@ function buildDirectory(csvPath) {
     const la = (values[laIdx] || '').trim();
     if (!la) continue;
     if (isNonLA(la)) { skipped.add(la); continue; }
+    if (isHiddenLA(la)) { hidden.add(la); continue; }
     counts.set(la, (counts.get(la) || 0) + 1);
   }
 
@@ -109,13 +121,13 @@ function buildDirectory(csvPath) {
     school_count: counts.get(name),
     import_status: 'pending',
   }));
-  return { rows, skipped: [...skipped] };
+  return { rows, skipped: [...skipped], hidden: [...hidden] };
 }
 
 async function seed(csvPath) {
   console.log(`Reading GIAS CSV: ${csvPath}`);
-  const { rows, skipped } = buildDirectory(csvPath);
-  console.log(`Found ${rows.length} local education authorities (excluded non-LA buckets: ${skipped.join(', ') || 'none'})`);
+  const { rows, skipped, hidden } = buildDirectory(csvPath);
+  console.log(`Found ${rows.length} local education authorities (excluded non-LA buckets: ${skipped.join(', ') || 'none'}${hidden.length ? `; hidden by choice: ${hidden.join(', ')}` : ''})`);
   const england = rows.filter((r) => r.region === 'England').length;
   const wales = rows.filter((r) => r.region === 'Wales').length;
   console.log(`  England: ${england}   Wales: ${wales}`);
