@@ -560,6 +560,11 @@ router.get('/me', requireAuth, async (req, res) => {
       email: fresh.email || null,
       auth_provider: fresh.auth_provider || null,
       signup_promo_code: fresh.signup_promo_code || null,
+      // Always include onboarded_at (null or timestamp) so the web client can
+      // refresh it on boot. Completing onboarding on one device used to leave
+      // other devices stuck redirecting into the flow, because their cached
+      // user kept onboarded_at = null forever.
+      onboarded_at: fresh.onboarded_at || null,
     });
   } catch (err) {
     console.error('GET /api/auth/me error:', err);

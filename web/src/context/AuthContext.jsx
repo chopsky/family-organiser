@@ -89,6 +89,21 @@ export function AuthProvider({ children }) {
     }
   }, [household?.id]);
 
+  // ── Boot refresh of the cached user ─────────────────────────────
+  // On every load with a session, re-sync the user from the server so fields
+  // that can change on ANOTHER device don't go stale - chiefly onboarded_at.
+  // Without this, finishing onboarding on one device left other devices stuck
+  // forever redirecting into the flow (their cached onboarded_at stayed null),
+  // even though the account was already onboarded server-side.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    api.get('/auth/me')
+      .then(({ data }) => { if (!cancelled && data?.id) updateUser(data); })
+      .catch(() => { /* 401s are handled by the axios refresh interceptor */ });
+    return () => { cancelled = true; };
+  }, [token, updateUser]);
+
   // ── Visibility-change idle check ────────────────────────────────
   // When the user returns to the tab after a long absence, fire any
   // authenticated request. If the access token has expired, the axios
