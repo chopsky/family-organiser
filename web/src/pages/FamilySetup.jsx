@@ -1192,16 +1192,38 @@ export default function FamilySetup() {
       const termGroups = termLabels.map((def) => ({ ...def, dates: [] }));
 
       if (termStarts.length > 0) {
+        // Collapse term_starts into season boundaries. A year can have MORE
+        // term_start events than season labels when the source lists each
+        // HALF-term start separately (the LA directory does: "Autumn Term
+        // second half start" etc.). Mapping term_start[i] -> season[i] then
+        // breaks: the extra starts overflow past the 3 UK labels, so their
+        // events get dropped or pushed under the wrong heading. For UK we
+        // instead classify each term_start into a season by month and use the
+        // EARLIEST start in each season as that season's boundary. SA keeps the
+        // 1:1 index mapping (4 terms, 4 labels, one start each, sometimes
+        // crossing calendar quarters).
+        let boundaries;
+        if (isSa) {
+          boundaries = termStarts.map((t, i) => ({ group: i, date: t.date }));
+        } else {
+          const seasonOf = (d) => { const m = new Date(d).getMonth(); return m >= 7 ? 0 : m <= 2 ? 1 : 2; };
+          const firstPerSeason = {};
+          for (const t of termStarts) {
+            const s = seasonOf(t.date);
+            if (!firstPerSeason[s] || t.date < firstPerSeason[s]) firstPerSeason[s] = t.date;
+          }
+          boundaries = Object.keys(firstPerSeason)
+            .map((s) => ({ group: Number(s), date: firstPerSeason[s] }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+        }
         for (const td of yearEvents) {
-          // Find the latest term_start <= this event's date.
-          let termIdx = 0;
-          for (let i = 0; i < termStarts.length; i++) {
-            if (td.date >= termStarts[i].date) termIdx = i;
+          // Bucket to the latest season boundary on or before this date.
+          let group = boundaries[0]?.group ?? 0;
+          for (const b of boundaries) {
+            if (td.date >= b.date) group = b.group;
             else break;
           }
-          if (termIdx < termGroups.length) {
-            termGroups[termIdx].dates.push(td);
-          }
+          if (group < termGroups.length) termGroups[group].dates.push(td);
         }
       } else {
         // Fallback: month-based bucketing. Only triggers when no
