@@ -185,12 +185,12 @@ export default function OnboardingFlow() {
           card). Hidden under 880px via CSS. */}
       {key === 'welcome' && <WelcomeNotifications leaving={leavingWelcome} reduced={reduced} />}
 
-      {/* Welcome is short, so centre it vertically; the later (often taller)
-          steps stay top-aligned so they never clip on short viewports. */}
-      {/* The stage's env(safe-area-inset-top) padding already clears the iOS
-          status bar, so the card only needs a small gap below it on mobile
-          (pt-3); desktop keeps a roomier top. */}
-      <main className={`relative z-10 flex-1 flex justify-center px-4 ${key === 'welcome' ? 'items-center py-8' : 'items-start pt-3 pb-8 md:pt-14 md:pb-10'}`}>
+      {/* All steps vertically centred. A short card sits in the middle; a card
+          taller than the screen grows the page and scrolls from the top (so its
+          top never clips). The stage's env(safe-area-inset-top) already clears
+          the iOS status bar, so the small pt just keeps a tight gap below it for
+          the tall, top-aligned cards. */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-3 pb-8 md:pt-14 md:pb-10">
         <div
           key={reduced ? 'static' : key /* re-mount per step so the enter animation fires */}
           className={`ob-card ${reduced ? '' : 'ob-card-in'}`}
