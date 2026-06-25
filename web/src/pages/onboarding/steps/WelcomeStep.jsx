@@ -21,10 +21,10 @@ export default function WelcomeStep({ onContinue, navigate }) {
           Log in →
         </button>
       </div>
-      <div style={{ marginTop: 16, fontSize: 12, color: 'var(--color-warm-grey)', lineHeight: 1.5 }}>
+      <div style={{ marginTop: 14, fontFamily: 'var(--font-sans)', fontSize: 12, color: '#8A8493', lineHeight: 1.45 }}>
         By creating an account, you agree to our{' '}
-        <a href="/terms" style={{ color: 'var(--color-cocoa)', fontWeight: 500 }}>Terms</a> and{' '}
-        <a href="/privacy" style={{ color: 'var(--color-cocoa)', fontWeight: 500 }}>Privacy Policy</a>.
+        <a href="/terms" style={{ color: '#4A4453', textDecoration: 'none' }}>Terms</a> and{' '}
+        <a href="/privacy" style={{ color: '#4A4453', textDecoration: 'none' }}>Privacy Policy</a>.
       </div>
     </div>
   );
