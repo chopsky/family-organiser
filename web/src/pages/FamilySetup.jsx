@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
@@ -492,6 +493,24 @@ export default function FamilySetup() {
   }
 
   useEffect(() => { loadMembers(); loadSchools(); loadActivities(); }, []);
+
+  // Deep link from Settings -> the canonical profile editor:
+  // /family?editProfile=1 opens the current user's edit-profile sheet once
+  // members have loaded, then strips the param so a refresh/back won't reopen.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editProfileOpened = useRef(false);
+  useEffect(() => {
+    if (editProfileOpened.current) return;
+    if (!searchParams.get('editProfile') || !members.length) return;
+    const me = members.find((m) => m.id === user?.id);
+    if (!me) return;
+    editProfileOpened.current = true;
+    openEditProfile(me);
+    const next = new URLSearchParams(searchParams);
+    next.delete('editProfile');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, members, user?.id]);
 
   function loadSchools() {
     loadCached(

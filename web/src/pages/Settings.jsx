@@ -12,7 +12,6 @@ import { isDeviceCalendarSupported } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos } from '../lib/platform';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
-import { FAMILY_ROLES } from '../lib/familyRoles';
 import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
@@ -20,27 +19,13 @@ import {
 } from '../components/Icons';
 import { TrialIndicatorSubtle } from '../components/TrialIndicator';
 import { useSubscription } from '../context/SubscriptionContext';
-import { pickPhoto } from '../lib/photo-picker';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import { MEMBER_HEX } from '../lib/memberColors';
 import { useChildMode } from '../context/ChildModeContext';
-import resizeImage from '../lib/resizeImage';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
 } from '../lib/location';
-
-const avatarColors = {
-  red: 'bg-red text-white', 'burnt-orange': 'bg-burnt-orange text-white',
-  amber: 'bg-amber text-white', gold: 'bg-gold text-white',
-  leaf: 'bg-leaf text-white', emerald: 'bg-emerald text-white',
-  teal: 'bg-teal text-white', sky: 'bg-sky text-white',
-  cobalt: 'bg-cobalt text-white', indigo: 'bg-indigo text-white',
-  purple: 'bg-purple text-white', magenta: 'bg-magenta text-white',
-  rose: 'bg-rose text-white', terracotta: 'bg-terracotta text-white',
-  moss: 'bg-moss text-white', slate: 'bg-slate text-white',
-  sage: 'bg-sage text-white', plum: 'bg-plum text-white', coral: 'bg-coral text-white', lavender: 'bg-indigo text-white',
-};
 
 // Canonical 16-colour palette - same order as the member-theme picker
 // in FamilySetup so the two pickers feel consistent and a user who's
@@ -383,114 +368,6 @@ function PlanSection() {
   );
 }
 
-/**
- * EditProfileForm - the form body of the Edit-profile modal. Extracted
- * so the iOS popup wrapper and the web centered-modal wrapper can both
- * render the same form without duplicating ~80 lines of JSX. All state
- * + handlers come in via props (the Settings component owns them).
- */
-function EditProfileForm({
-  profileAvatar, profileName, profileColor, profileRole, profileBirthday,
-  uploadingAvatar, savingProfile, avatarColors,
-  setProfileName, setProfileRole, setProfileBirthday, setProfileColor,
-  handlePickAvatar, handleAvatarRemove, handleSaveProfile, onCancel,
-}) {
-  return (
-    <>
-      <div className="space-y-4">
-        {/* Avatar upload */}
-        <div className="flex flex-col items-center gap-2">
-          {profileAvatar ? (
-            <img src={profileAvatar} alt={profileName} className="w-20 h-20 rounded-full object-cover" />
-          ) : (
-            <div className={`w-20 h-20 rounded-full ${avatarColors[profileColor] || avatarColors.teal} flex items-center justify-center font-bold text-2xl`}>
-              {profileName?.[0]?.toUpperCase() || '?'}
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handlePickAvatar}
-              disabled={uploadingAvatar}
-              className={`text-sm font-medium ${uploadingAvatar ? 'text-cocoa' : 'text-primary hover:text-primary-pressed'} transition-colors`}
-            >
-              {uploadingAvatar ? 'Uploading…' : 'Upload photo'}
-            </button>
-            {profileAvatar && (
-              <button type="button" onClick={handleAvatarRemove} disabled={uploadingAvatar} className="text-sm text-error hover:text-error/80 transition-colors">
-                Remove
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
-          <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="Your name" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-          <select value={profileRole} onChange={(e) => setProfileRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white">
-            <option value="">Select role…</option>
-            {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            {profileRole && !FAMILY_ROLES.includes(profileRole) && <option value={profileRole}>{profileRole}</option>}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-bark mb-1">Birthday</label>
-          <input type="date" value={profileBirthday} onChange={(e) => setProfileBirthday(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-bark mb-1.5">Colour theme</label>
-          <div className="grid grid-cols-8 gap-2.5">
-            {[
-              { key: 'red',           bg: 'bg-red',           ring: 'ring-red' },
-              { key: 'burnt-orange',  bg: 'bg-burnt-orange',  ring: 'ring-burnt-orange' },
-              { key: 'amber',         bg: 'bg-amber',         ring: 'ring-amber' },
-              { key: 'gold',          bg: 'bg-gold',          ring: 'ring-gold' },
-              { key: 'leaf',          bg: 'bg-leaf',          ring: 'ring-leaf' },
-              { key: 'emerald',       bg: 'bg-emerald',       ring: 'ring-emerald' },
-              { key: 'teal',          bg: 'bg-teal',          ring: 'ring-teal' },
-              { key: 'sky',           bg: 'bg-sky',           ring: 'ring-sky' },
-              { key: 'cobalt',        bg: 'bg-cobalt',        ring: 'ring-cobalt' },
-              { key: 'indigo',        bg: 'bg-indigo',        ring: 'ring-indigo' },
-              { key: 'purple',        bg: 'bg-purple',        ring: 'ring-purple' },
-              { key: 'magenta',       bg: 'bg-magenta',       ring: 'ring-magenta' },
-              { key: 'rose',          bg: 'bg-rose',          ring: 'ring-rose' },
-              { key: 'terracotta',    bg: 'bg-terracotta',    ring: 'ring-terracotta' },
-              { key: 'moss',          bg: 'bg-moss',          ring: 'ring-moss' },
-              { key: 'slate',         bg: 'bg-slate',         ring: 'ring-slate' },
-            ].map(({ key, bg, ring }) => (
-              <button key={key} type="button" onClick={() => setProfileColor(key)}
-                className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center transition-all ${profileColor === key ? `ring-2 ${ring} ring-offset-2` : 'hover:scale-110'}`}
-                title={key.charAt(0).toUpperCase() + key.slice(1)}
-              >
-                {profileColor === key && (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white drop-shadow" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-      </div>
-
-      <div className="flex gap-3 mt-6">
-        <button onClick={onCancel} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors">
-          Cancel
-        </button>
-        <button onClick={handleSaveProfile} disabled={savingProfile} className="flex-1 bg-primary hover:bg-primary-pressed disabled:bg-primary/50 text-white font-semibold py-2.5 rounded-2xl transition-colors">
-          {savingProfile ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    </>
-  );
-}
 
 /**
  * AccordionItem - collapsible row. Uses native <details>/<summary> so
@@ -866,15 +743,6 @@ export default function Settings() {
   const [rejections, setRejections] = useState([]);
   const [allowingRejected, setAllowingRejected] = useState(null); // email being allowed
 
-  // Edit profile state
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileName, setProfileName] = useState('');
-  const [profileRole, setProfileRole] = useState('');
-  const [profileBirthday, setProfileBirthday] = useState('');
-  const [profileColor, setProfileColor] = useState('teal');
-  const [profileAvatar, setProfileAvatar] = useState(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
 
   function loadMembers() {
     return api.get('/household')
@@ -933,92 +801,6 @@ export default function Settings() {
     }
   }
 
-  async function openEditProfile() {
-    let me = members.find((m) => m.id === user?.id);
-    // If members haven't loaded yet, fetch directly
-    if (!me) {
-      try {
-        const { data } = await api.get('/household');
-        if (data.members) setMembers(data.members);
-        me = data.members?.find((m) => m.id === user?.id);
-      } catch {
-        // Fall back to auth context
-      }
-    }
-    setProfileName(me?.name || user?.name || '');
-    setProfileRole(me?.family_role || '');
-    setProfileBirthday(me?.birthday || '');
-    setProfileColor(me?.color_theme || user?.color_theme || 'sage');
-    setProfileAvatar(me?.avatar_url || user?.avatar_url || null);
-    setEditingProfile(true);
-  }
-
-  async function uploadAvatarBlob(blob) {
-    if (!blob) return;
-    setUploadingAvatar(true);
-    try {
-      const resized = await resizeImage(blob);
-      const formData = new FormData();
-      // Camera-plugin Blobs don't carry a filename - the backend needs
-      // one for multipart, so synthesize a stable jpg name.
-      formData.append('avatar', resized, resized.name || blob.name || 'avatar.jpg');
-      const { data } = await api.post('/household/profile/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setProfileAvatar(data.avatar_url);
-      await loadMembers();
-      login({ token, user: { ...user, avatar_url: data.avatar_url }, household });
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to upload image.');
-    } finally {
-      setUploadingAvatar(false);
-    }
-  }
-
-  // iOS: opens the native photo picker (with "Take Photo" / "Photo Library").
-  // Web: falls back inside pickPhoto() to a hidden <input type="file">.
-  async function handlePickAvatar() {
-    if (uploadingAvatar) return;
-    const blob = await pickPhoto();
-    if (blob) await uploadAvatarBlob(blob);
-  }
-
-  async function handleAvatarRemove() {
-    setUploadingAvatar(true);
-    try {
-      await api.delete('/household/profile/avatar');
-      setProfileAvatar(null);
-      await loadMembers();
-      login({ token, user: { ...user, avatar_url: null }, household });
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to remove image.');
-    } finally {
-      setUploadingAvatar(false);
-    }
-  }
-
-  async function handleSaveProfile() {
-    if (!profileName.trim()) { setError('Name is required.'); return; }
-    setSavingProfile(true);
-    try {
-      await api.patch('/household/profile', {
-        name: profileName.trim(),
-        family_role: profileRole.trim(),
-        birthday: profileBirthday || null,
-        color_theme: profileColor,
-      });
-      await loadMembers();
-      const updatedUser = { ...user, name: profileName.trim(), color_theme: profileColor };
-      login({ token, user: updatedUser, household });
-      setEditingProfile(false);
-      setSuccess('Profile updated!');
-      setTimeout(() => setSuccess(''), 2000);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to update profile.');
-    } finally {
-      setSavingProfile(false);
-    }
-  }
 
   // Load calendar connections
   // Fetch existing feed token on mount without creating one. We need this
@@ -1584,7 +1366,7 @@ export default function Settings() {
                 {me?.family_role && <p className="text-xs text-cocoa">{me.family_role}</p>}
               </div>
               <button
-                onClick={openEditProfile}
+                onClick={() => navigate('/family?editProfile=1')}
                 className="flex items-center gap-1.5 border border-cream-border text-cocoa font-medium px-4 py-2 rounded-xl text-sm hover:bg-oat transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -2862,98 +2644,9 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Edit Profile Modal - on iOS uses the same full-screen popup
-          pattern as the section rows (sticky header with title + X,
-          scrollable card content below) so the Edit-profile surface
-          feels consistent with the other tap-to-popup interactions.
-          On web, keeps the centered overlay - a full-screen takeover
-          on desktop would feel disproportionate.
-
-          The form body is rendered inline below in BOTH branches; the
-          duplication is acceptable here because the alternative
-          (extracting ~80 lines of form JSX into a const) would
-          create a less-readable shape for a single modal. */}
-      {editingProfile && isIosPlatform && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-cream"
-          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Edit profile"
-        >
-          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-cream-border bg-cream">
-            <h2 className="flex-1 text-base md:text-medium font-semibold truncate text-bark">Edit profile</h2>
-            <button
-              type="button"
-              onClick={() => setEditingProfile(false)}
-              aria-label="Close"
-              className="-mr-2 p-2 rounded-lg text-cocoa hover:text-bark hover:bg-oat transition-colors"
-            >
-              <IconX className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)' }}>
-            <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-              <EditProfileForm
-                profileAvatar={profileAvatar}
-                profileName={profileName}
-                profileColor={profileColor}
-                profileRole={profileRole}
-                profileBirthday={profileBirthday}
-                uploadingAvatar={uploadingAvatar}
-                savingProfile={savingProfile}
-                avatarColors={avatarColors}
-                setProfileName={setProfileName}
-                setProfileRole={setProfileRole}
-                setProfileBirthday={setProfileBirthday}
-                setProfileColor={setProfileColor}
-                handlePickAvatar={handlePickAvatar}
-                handleAvatarRemove={handleAvatarRemove}
-                handleSaveProfile={handleSaveProfile}
-                onCancel={() => setEditingProfile(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingProfile && !isIosPlatform && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingProfile(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base md:text-medium font-semibold text-bark">Edit profile</h2>
-              <button onClick={() => setEditingProfile(false)} className="text-cocoa hover:text-bark p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-
-            <EditProfileForm
-              profileAvatar={profileAvatar}
-              profileName={profileName}
-              profileColor={profileColor}
-              profileRole={profileRole}
-              profileBirthday={profileBirthday}
-              uploadingAvatar={uploadingAvatar}
-              savingProfile={savingProfile}
-              avatarColors={avatarColors}
-              setProfileName={setProfileName}
-              setProfileRole={setProfileRole}
-              setProfileBirthday={setProfileBirthday}
-              setProfileColor={setProfileColor}
-              handlePickAvatar={handlePickAvatar}
-              handleAvatarRemove={handleAvatarRemove}
-              handleSaveProfile={handleSaveProfile}
-              onCancel={() => setEditingProfile(false)}
-            />
-          </div>
-        </div>
-      )}
+      {/* Profile editing lives on the Family page (the canonical editor with
+          avatars/colour/role). The "Edit" button in My profile deep-links to
+          /family?editProfile=1, so there is no second edit form here. */}
     </div>
   );
 }
