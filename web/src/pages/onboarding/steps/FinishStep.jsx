@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import api from '../../../lib/api';
 import { Title, Em, Kicker, PrimaryButton } from './_ui';
 
 const AVATAR_COLOURS = ['#6C3DD9', '#D8788A', '#5B8DE0', '#D89B3A', '#6BA368', '#B05B9E'];
@@ -5,9 +7,31 @@ const initialOf = (s) => (s || '?').trim().charAt(0).toUpperCase() || '?';
 
 // Step 9. Personalised wrap-up: the first name, the household, the people just
 // added. The button marks onboarding complete and lands on the dashboard.
-export default function FinishStep({ firstName, householdName, invited = [], finishing, onFinish }) {
-  // The current user leads the avatar stack, then everyone invited.
-  const people = [{ label: firstName }, ...invited];
+export default function FinishStep({ firstName, householdName, userId, invited = [], finishing, onFinish }) {
+  // The avatar stack must reflect the REAL household (you + everyone added),
+  // not the in-memory invited list - that list is lost across the email-verify
+  // round trip / a reload / a different device, which left only "you" showing
+  // even when a child had been added. Fetch the members and rebuild it; fall
+  // back to firstName + invited only if the fetch fails.
+  const [people, setPeople] = useState(() => [{ label: firstName }, ...invited]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/household');
+        const members = data?.members || [];
+        if (cancelled || members.length === 0) return;
+        const me = members.find((m) => m.id === userId);
+        const others = members.filter((m) => m.id !== userId);
+        setPeople([
+          { label: me?.name || firstName },
+          ...others.map((m) => ({ label: m.name })),
+        ]);
+      } catch { /* keep the firstName-led fallback */ }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, firstName]);
+
   return (
     <div>
       <div style={{ width: 60, height: 60, borderRadius: 18, margin: '4px auto 0', position: 'relative', background: 'var(--color-plum-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>

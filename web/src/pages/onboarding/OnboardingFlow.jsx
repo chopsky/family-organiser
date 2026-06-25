@@ -86,6 +86,11 @@ export default function OnboardingFlow() {
     if (e >= 4 && auth.household?.id) {
       const stored = loadStoredStep(auth.household.id);
       if (stored != null && stored > e) return Math.min(stored, STEPS.length - 1);
+      // No saved progress on THIS device (a different device, or cleared
+      // storage) but the household already exists: everything left is optional
+      // (invite/WhatsApp/calendar, all re-promptable later). Land on the finish
+      // screen to wrap up in one tap rather than re-walking the invite step.
+      if (stored == null && e === STEPS.indexOf('invite')) return STEPS.indexOf('finish');
     }
     return e;
   });
@@ -244,7 +249,7 @@ function renderStep(key, ctx) {
     case 'calendar':
       return <CalendarStep form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     case 'finish':
-      return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} invited={ctx.form.invited} finishing={ctx.finishing} onFinish={ctx.finish} />;
+      return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} userId={ctx.auth.user?.id} invited={ctx.form.invited} finishing={ctx.finishing} onFinish={ctx.finish} />;
     default:
       return null;
   }
