@@ -177,7 +177,7 @@ function SlotToggle({ slot, active, color, done, total, onClick }) {
           <circle cx="25" cy="25" r={R} fill={active ? '#fff' : 'rgba(255,255,255,0.4)'} stroke="rgba(26,22,32,0.10)" strokeWidth="2" />
           {has && <circle cx="25" cy="25" r={R} fill="none" stroke={allDone ? '#6BA368' : color} strokeWidth="3.2" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - pct)} style={{ transition: 'stroke-dashoffset .3s ease' }} />}
         </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{allDone && active ? <Tick s={20} /> : meta.emoji}</div>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{allDone && active ? <Tick s={20} c="#6BA368" /> : meta.emoji}</div>
       </div>
       <span style={{ fontSize: 11, fontWeight: active ? 700 : 600, color: active ? INK : INK3 }}>{meta.label}</span>
     </button>
