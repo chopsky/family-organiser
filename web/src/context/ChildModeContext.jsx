@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from './AuthContext';
@@ -36,6 +36,29 @@ export function ChildModeProvider({ children }) {
       setSettingsUnlocked(false);
     }
   }, [location.pathname, settingsUnlocked]);
+
+  // Reset Child Mode whenever the auth identity changes - a fresh login, a
+  // logout, or a household switch. Re-authenticating is an adult action, so the
+  // device must come back in ADULT mode and never inherit the previous session's
+  // lock. We skip the FIRST run so a plain reload with the same restored session
+  // keeps Child Mode on (a child reopening the app stays locked). Without this,
+  // the per-device flag survived logout/login and re-locked the next sign-in.
+  const hhRef = useRef(undefined);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    const id = household?.id || null;
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      hhRef.current = id;
+      return;
+    }
+    if (id !== hhRef.current) {
+      hhRef.current = id;
+      safeRemoveItem('childMode');
+      setEnabled(false);
+      setSettingsUnlocked(false);
+    }
+  }, [household?.id]);
 
   // Enabling requires a PIN to exist (otherwise the device could be locked with
   // no way back in).
