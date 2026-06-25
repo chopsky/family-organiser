@@ -161,7 +161,7 @@
   /* ── Onboarding flow (OnboardingFlow.jsx) ── */
   /* Card padding: tighter on mobile (30px all round), roomier sides on
      desktop. A class (not an inline style) so the breakpoint can win. */
-  .ob-card { padding: 30px 30px; }
+  .ob-card { padding: 28px 22px 22px; }
   @media (min-width: 768px) { .ob-card { padding: 30px 40px; } }
 
   /* Glass card enter, re-keyed per step so it replays on each advance. */
