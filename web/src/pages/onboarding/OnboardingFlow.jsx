@@ -29,6 +29,8 @@ import PlanStep from './steps/PlanStep';
 import AccountStep from './steps/AccountStep';
 import HouseholdStep from './steps/HouseholdStep';
 import InviteStep from './steps/InviteStep';
+import WhatsAppStep from './steps/WhatsAppStep';
+import CalendarStep from './steps/CalendarStep';
 
 // Instrument Serif is loaded app-wide (web/index.html); apply it inline so the
 // flow doesn't depend on the page-scoped .serif class from landing.css.
@@ -190,6 +192,10 @@ function renderStep(key, ctx) {
       return <HouseholdStep auth={ctx.auth} form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     case 'invite':
       return <InviteStep auth={ctx.auth} form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
+    case 'whatsapp':
+      return <WhatsAppStep next={ctx.next} setError={ctx.setError} />;
+    case 'calendar':
+      return <CalendarStep form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     default:
       return <StepPlaceholder stepKey={key} ctx={ctx} />;
   }
