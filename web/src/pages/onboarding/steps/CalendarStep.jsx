@@ -1,8 +1,14 @@
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import api from '../../../lib/api';
 import { FEED_PROVIDERS } from '../../../lib/feedProviders';
 import { Title, Em, Kicker, Lead, PrimaryButton, Ghost } from './_ui';
 import { inputStyle } from './_styles';
+
+// On the iPhone, the native Calendar app is where you make a calendar public and
+// copy its share link - iCloud.com is the desktop path. calshow:// opens
+// Calendar; Capacitor hands non-http schemes to iOS.
+const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 
 // Friendly display order + the real brand icon per provider (in /public).
 const TILE = {
@@ -48,16 +54,28 @@ export default function CalendarStep({ form, update, next, setError }) {
 
   // Provider chosen: show the instructions + paste field.
   if (provider) {
-    const steps = provider.steps || [];
+    // On the iPhone, Apple's share link lives in the Calendar app, not
+    // iCloud.com - so use the iosSteps and open the Calendar app (calshow://)
+    // instead of the website. Google/Outlook have no native equivalent, so they
+    // keep their web links (with the "request desktop site" iosTip).
+    const useIosCalendar = isNativeIos && !!provider.iosSteps;
+    const steps = (useIosCalendar ? provider.iosSteps : provider.steps) || [];
+    const linkLabel = useIosCalendar ? 'Open the Calendar app' : provider.linkLabel;
+    const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 8, margin: '18px 0 4px', padding: '11px 16px', borderRadius: 12, background: 'var(--color-plum-light)', color: 'var(--color-plum-dark)', fontSize: 14, fontWeight: 700, textDecoration: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' };
     return (
       <div>
         <Kicker>Connect {TILE[provider.id]?.name || provider.label}</Kicker>
         <Title>Grab the <Em>link.</Em></Title>
 
-        <a href={provider.link} target="_blank" rel="noopener noreferrer"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '18px 0 4px', padding: '11px 16px', borderRadius: 12, background: 'var(--color-plum-light)', color: 'var(--color-plum-dark)', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
-          {provider.linkLabel} ↗
-        </a>
+        {useIosCalendar ? (
+          <button type="button" onClick={() => { window.location.href = 'calshow://'; }} style={linkStyle}>
+            {linkLabel} ↗
+          </button>
+        ) : (
+          <a href={provider.link} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+            {linkLabel} ↗
+          </a>
+        )}
 
         <ol style={{ textAlign: 'left', margin: '16px 0 4px', paddingLeft: 0, listStyle: 'none' }}>
           {steps.map((s, i) => (
