@@ -42,12 +42,12 @@ export default function Verify() {
         // login() stores the JWT and household + member context. After
         // this, RequireAuth routes will recognise the user as authed.
         login(data);
-        // Resume the unified onboarding flow at /start - it picks up at the
-        // right step from auth state (no household -> household step; household
-        // but not onboarded -> invite onward). Fully-onboarded users (e.g. a
-        // re-verify) go straight to the dashboard.
-        if (!data.household || !data.user?.onboarded_at) {
-          navigate('/start', { replace: true });
+        // Branch on whether the user already has a household (invite
+        // flow) or needs to create one. Onboarding handles the rest.
+        if (!data.household) {
+          navigate('/setup', { replace: true });
+        } else if (!data.user?.onboarded_at) {
+          navigate('/onboarding', { replace: true });
         } else {
           navigate('/dashboard', { replace: true });
         }

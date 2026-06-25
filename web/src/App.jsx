@@ -21,9 +21,7 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 
 // Lazy load everything else - only downloaded when the route is visited
-// Signup.jsx is retired - /signup now redirects into the unified flow at /start
-// (see StartRedirect). The file is kept on disk only as the design reference the
-// account step's styling was lifted from.
+const Signup          = lazy(() => import('./pages/Signup'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
@@ -32,7 +30,6 @@ const Verified        = lazy(() => import('./pages/Verified'));
 const Verify          = lazy(() => import('./pages/Verify'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
-const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStandalone'));
 const Dashboard       = lazy(() => import('./pages/Dashboard'));
 // Tasks → the chores/routines/stars rebuild (Chores); Shopping folded into
@@ -112,27 +109,16 @@ function LocaleRedirect({ children }) {
 function RequireAuth({ children }) {
   const { token, needsHousehold, needsOnboarding } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  // A half-finished signup (no household, or not-yet-onboarded) funnels into the
-  // unified flow at /start, which resumes from auth state via entryIndex. The
-  // legacy /setup + /onboarding routes stay mounted as a fallback (reachable by
-  // direct URL) but the gates no longer point at them.
-  if (needsHousehold || needsOnboarding) return <Navigate to="/start" replace />;
+  if (needsHousehold) return <Navigate to="/setup" replace />;
+  // Any authenticated in-app route bounces to /onboarding until the wizard
+  // is done. Skipping the wizard by typing the URL directly is blocked too.
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
   return children;
 }
 
 function RequireAuthOnly({ children }) {
   const { token } = useAuth();
   return token ? children : <Navigate to="/login" replace />;
-}
-
-// /signup is retired: the unified flow at /start is the single onboarding
-// process. Redirect every /signup hit into /start, preserving the query string
-// so invite (?invite=) and promo (?promo=) links from emails, /fair and the
-// marketing site keep working. /start resolves the session itself (welcome for
-// new users, resume for half-finished signups, /dashboard once onboarded).
-function StartRedirect() {
-  const { search } = useLocation();
-  return <Navigate to={`/start${search}`} replace />;
 }
 
 function RequirePlatformAdmin({ children }) {
@@ -185,11 +171,10 @@ function AppRoutes() {
       <RouteTransition>
       <Routes>
         {/* On iOS / native: a fresh install almost always means a brand-new
-            user, so the unified onboarding flow at /start is the default (it
-            opens on the welcome step and carries them through account creation).
-            Returning users can tap "Already have an account? Log in". On web the
-            LandingPage handles its own login/signup CTAs. */}
-        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/start" replace /> : <LocaleRedirect><LandingPage /></LocaleRedirect>)} />
+            user, so /signup is the more useful default. Returning users can
+            tap the "Already have an account? Log in" link on Signup. On
+            web the LandingPage handles its own login/signup CTAs. */}
+        <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : (Capacitor.isNativePlatform() ? <Navigate to="/signup" replace /> : <LocaleRedirect><LandingPage /></LocaleRedirect>)} />
         {/* Country-specific marketing variants. Same LandingPage component;
             it reads pricing, audience tagline, and feature flags via
             useLocale() based on the route path. Each variant emits its
@@ -214,7 +199,7 @@ function AppRoutes() {
             the flow, every API call inside onboarding acts as the original
             user, and the new account row ends up half-created (no verification
             email sent, wrong household, etc). Bounce authed users to /dashboard. */}
-        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <StartRedirect />} />
+        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
             the promo on every device. */}
@@ -232,12 +217,6 @@ function AppRoutes() {
             NOT a completed onboarding (that's what it sets). Renders without
             the regular Layout so the wizard owns the full viewport. */}
         <Route path="/onboarding" element={<RequireAuthOnly><Onboarding /></RequireAuthOnly>} />
-        {/* New unified onboarding flow (rebuilt prototype). No guard: it renders
-            pre-auth (steps 1-4) AND post-auth-not-onboarded (steps 5-9), and
-            self-redirects to /dashboard once fully onboarded. The live CTA/gate
-            cutover happens in the final phase; until then it's reachable by URL
-            for build-up + review without affecting the existing funnel. */}
-        <Route path="/start" element={<OnboardingFlow />} />
         {/* Standalone WhatsApp pairing surface for the T+24h re-engagement
             email's CTA. RequireAuthOnly (not RequireAuth) so users who
             never completed the wizard AND users who did but skipped
