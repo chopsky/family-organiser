@@ -658,6 +658,11 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
 
     const now = new Date();
     const academicYear = now.getMonth() >= 8 ? `${now.getFullYear()}-${now.getFullYear() + 1}` : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+    // Import the current AND next academic year. Councils (and the directory)
+    // publish next year's dates well ahead, and families want them on the
+    // calendar now - not just up to this July.
+    const nextAY = `${parseInt(academicYear.split('-')[1])}-${parseInt(academicYear.split('-')[1]) + 1}`;
+    const academicYears = [academicYear, nextAY];
     // ?refresh=1 / { refresh: true } skips every cache (directory + scrape
     // cache) and forces a fresh live fetch of the council's page.
     const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true' || req.body?.refresh === true;
@@ -670,11 +675,11 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     //    is the whole point of the directory - families stop re-scraping the
     //    same councils one by one.
     if (!forceRefresh) {
-      const dirDates = await laDb.getDirectoryTermDatesByName(school.local_authority, academicYear);
+      const dirDates = await laDb.getDirectoryTermDatesByName(school.local_authority, academicYears);
       if (dirDates.length) {
         dates = dirDates;
         source = 'directory';
-        console.log(`[import-la] Directory hit for ${school.local_authority} ${academicYear} (${dirDates.length} dates)`);
+        console.log(`[import-la] Directory hit for ${school.local_authority} (${dirDates.length} dates across ${academicYears.join(', ')})`);
       }
     }
 
@@ -712,8 +717,7 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
         }
 
         // Run the same validated extractor the website/PDF import uses, then
-        // keep only this academic year's dates.
-        const nextAY = `${parseInt(academicYear.split('-')[1])}-${parseInt(academicYear.split('-')[1]) + 1}`;
+        // keep the current and next academic year's dates.
         const result = await extractTermDatesPreview({
           pageText,
           country: 'GB',
@@ -726,7 +730,7 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
         if (!result.ok) {
           return res.status(result.status || 502).json(result.body);
         }
-        dates = (result.body.dates || []).filter((d) => d.academic_year === academicYear);
+        dates = (result.body.dates || []).filter((d) => academicYears.includes(d.academic_year));
         if (dates.length === 0) {
           return res.status(404).json({
             error: `Read ${school.local_authority}'s page but couldn't find ${academicYear} term dates on it. Use "Import from school website", or add the dates manually.`,
@@ -739,19 +743,24 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
       }
     }
 
-    // Add academic year and source to each date
+    // Tag each date as local-authority sourced. Keep each date's OWN academic
+    // year (current vs next) - do NOT force them all to the current year, or
+    // next year's dates would be mislabelled and cleared on the next import.
     const termDates = dates.map(d => ({
       ...d,
-      academic_year: academicYear,
+      academic_year: d.academic_year || academicYear,
       source: 'local_authority',
     }));
 
-    // If source changed (e.g. website_scrape → local_authority), clear ALL existing dates first
-    // Otherwise just clear the matching academic year for a clean merge
+    // If the source changed (e.g. website_scrape → local_authority), clear ALL
+    // existing dates first. Otherwise clear just the years we're re-importing,
+    // for a clean per-year replace.
     if (school.term_dates_source && school.term_dates_source !== 'local_authority') {
       await db.deleteAllTermDatesBySchool(req.params.schoolId);
     } else {
-      await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, academicYear);
+      for (const ay of academicYears) {
+        await db.deleteTermDatesBySchoolAndAcademicYear(req.params.schoolId, ay);
+      }
     }
     await db.addSchoolTermDates(req.params.schoolId, termDates);
 
@@ -766,11 +775,14 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     const sourceNote = source === 'directory'
       ? ' Imported from the local-authority directory.'
       : source === 'scrape' ? ' These dates are now saved for other families.' : '';
+    // Name the years we actually imported (next year is often not published yet).
+    const yearsImported = academicYears.filter((ay) => termDates.some((d) => d.academic_year === ay));
     return res.json({
       imported: termDates.length,
       local_authority: school.local_authority,
+      academic_years: yearsImported,
       source,
-      message: `Updated ${termDates.length} dates for ${academicYear}.${sourceNote}`,
+      message: `Updated ${termDates.length} dates for ${yearsImported.join(' and ')}.${sourceNote}`,
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-la-dates error:', err);
