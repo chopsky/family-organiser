@@ -21,7 +21,9 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 
 // Lazy load everything else - only downloaded when the route is visited
-const Signup          = lazy(() => import('./pages/Signup'));
+// Signup.jsx is retired - /signup now redirects into the unified flow at /start
+// (see StartRedirect). The file is kept on disk only as the design reference the
+// account step's styling was lifted from.
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
@@ -123,6 +125,16 @@ function RequireAuthOnly({ children }) {
   return token ? children : <Navigate to="/login" replace />;
 }
 
+// /signup is retired: the unified flow at /start is the single onboarding
+// process. Redirect every /signup hit into /start, preserving the query string
+// so invite (?invite=) and promo (?promo=) links from emails, /fair and the
+// marketing site keep working. /start resolves the session itself (welcome for
+// new users, resume for half-finished signups, /dashboard once onboarded).
+function StartRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/start${search}`} replace />;
+}
+
 function RequirePlatformAdmin({ children }) {
   const { token, isPlatformAdmin } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
@@ -202,7 +214,7 @@ function AppRoutes() {
             the flow, every API call inside onboarding acts as the original
             user, and the new account row ends up half-created (no verification
             email sent, wrong household, etc). Bounce authed users to /dashboard. */}
-        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
+        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <StartRedirect />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
             the promo on every device. */}

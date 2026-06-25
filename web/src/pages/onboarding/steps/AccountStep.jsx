@@ -70,14 +70,37 @@ export default function AccountStep({ form, update, setError, goAfterAuth, invit
     <div>
       <Kicker>Almost there</Kicker>
       <Title>Create your <Em>free account.</Em></Title>
-      <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-warm-grey)', margin: '12px 0 24px' }}>
-        Free for 30 days. No card needed.
-      </p>
+      {inviteToken ? (
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-plum)', margin: '12px 0 24px' }}>
+          You&apos;ve been invited to join a household.
+        </p>
+      ) : (
+        <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-warm-grey)', margin: '12px 0 24px' }}>
+          Free for 30 days. No card needed.
+        </p>
+      )}
 
-      {/* Google SSO popup resolves in place; success advances the flow. */}
+      {/* Google SSO popup resolves in place; success advances the flow. The
+          scoped style below re-skins SocialButtons' first button (Google) to
+          the plum-primary treatment used on the old /signup screen. */}
       <div className="ob-account-google">
         <SocialButtons inviteToken={inviteToken} promoCode={promoCode} onSuccess={goAfterAuth} onError={setError} />
       </div>
+      <style>{`
+        .ob-account-google > div.space-y-3 > button:first-child {
+          background: var(--color-plum) !important;
+          color: #fff !important;
+          border: 1px solid transparent !important;
+          border-radius: 12px !important;
+          padding: 15px 18px !important;
+          font-size: 15px !important;
+          font-weight: 700 !important;
+          box-shadow: 0 10px 24px -10px rgba(109,56,173,0.55) !important;
+        }
+        .ob-account-google > div.space-y-3 > button:first-child:hover {
+          background: var(--color-plum-dark) !important;
+        }
+      `}</style>
 
       {!showEmail ? (
         <button

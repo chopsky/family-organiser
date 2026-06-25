@@ -60,7 +60,15 @@ export default function OnboardingFlow() {
   // dropping the /fair promo feature or invite auto-join.
   const inviteToken = searchParams.get('invite') || undefined;
 
-  const [idx, setIdx] = useState(() => entryIndex(auth));
+  const [idx, setIdx] = useState(() => {
+    const e = entryIndex(auth);
+    // Invited users arrive via /signup?invite= -> /start?invite=. Skip the
+    // marketing pitch (welcome/heaviest/plan) and land straight on account
+    // creation; after auth they auto-join the household and get the "you're in"
+    // confirmation, matching the old /signup invite experience.
+    if (e === 0 && inviteToken) return STEPS.indexOf('account');
+    return e;
+  });
   const [form, setForm] = useState(() => ({
     pains: ['head', 'nag'],   // sensible defaults so the plan screen is never empty
     accName: '',
