@@ -74,17 +74,22 @@ async function getEntriesForLA(laId) {
 /**
  * Look up an authority by the name stored on household_schools.local_authority
  * (the GIAS "LA (name)" string, which the directory is keyed by too) and return
- * its term-date entries for the given academic year(s) - ready to drop into a
- * school. `academicYears` may be a single string or an array (the importer
- * pulls both the current and next year). Case-insensitive exact name match;
- * only authorities with usable data (ok/partial) count. Returns [] when the LA
- * isn't in the directory or has no dates for those years yet, so the caller can
- * fall back to the live scrape. This is how Housemait's "Import from local
- * authority" reads the directory.
+ * its term-date entries - ready to drop into a school. `academicYears` may be:
+ * omitted/null to return EVERY year the directory holds for the LA (the default
+ * the importer now uses); a string or array to restrict to those years; an
+ * empty array means "nothing". Case-insensitive exact name match; only
+ * authorities with usable data (ok/partial) count. Returns [] when the LA isn't
+ * in the directory or has no matching dates yet, so the caller can fall back to
+ * the live scrape. This is how Housemait's "Import from local authority" reads
+ * the directory.
  */
-async function getDirectoryTermDatesByName(localAuthority, academicYears) {
-  const years = (Array.isArray(academicYears) ? academicYears : [academicYears]).filter(Boolean);
-  if (!localAuthority || !years.length) return [];
+async function getDirectoryTermDatesByName(localAuthority, academicYears = null) {
+  if (!localAuthority) return [];
+  const years = academicYears == null
+    ? null // all years
+    : (Array.isArray(academicYears) ? academicYears : [academicYears]).filter(Boolean);
+  if (Array.isArray(years) && years.length === 0) return [];
+
   const { data: la, error: laErr } = await supabase
     .from('la_directory')
     .select('id, name, import_status')
@@ -94,12 +99,12 @@ async function getDirectoryTermDatesByName(localAuthority, academicYears) {
   if (laErr) throw laErr;
   if (!la) return [];
 
-  const { data, error } = await supabase
+  let q = supabase
     .from('la_term_date_entries')
     .select('academic_year, event_type, date, end_date, label')
-    .eq('la_id', la.id)
-    .in('academic_year', years)
-    .order('date', { ascending: true });
+    .eq('la_id', la.id);
+  if (years) q = q.in('academic_year', years);
+  const { data, error } = await q.order('date', { ascending: true });
   if (error) throw error;
   return data || [];
 }
