@@ -2,10 +2,11 @@
 // that file only exports components (react-refresh/only-export-components).
 export const SERIF = "'Instrument Serif', serif";
 
+// Matches the Login/Signup form fields + labels (14px input, 12px medium label).
 export const inputStyle = {
-  width: '100%', padding: '13px 14px', borderRadius: 12, background: '#fff',
-  border: '1px solid rgba(26,22,32,0.12)', fontFamily: 'var(--font-sans)',
-  fontSize: 15, color: 'var(--color-charcoal)', outline: 'none',
+  width: '100%', padding: '12px 14px', borderRadius: 12, background: '#fff',
+  border: '1px solid rgba(26,22,32,0.10)', fontFamily: 'var(--font-sans)',
+  fontSize: 14, color: 'var(--color-charcoal)', outline: 'none',
 };
 
-export const labelStyle = { display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--color-cocoa)', marginBottom: 5 };
+export const labelStyle = { display: 'block', fontSize: 12, fontWeight: 500, color: '#4A4453', marginBottom: 4 };

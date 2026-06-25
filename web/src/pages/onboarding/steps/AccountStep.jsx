@@ -102,7 +102,7 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
 
   return (
     <div>
-      <Title size={38}>Your calmer family life<Em block>starts here.</Em></Title>
+      <Title>Your calmer family life<Em block>starts here.</Em></Title>
 
       {inviteToken ? (
         <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-plum)', margin: '14px 0 0' }}>
@@ -133,11 +133,13 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
           background: var(--color-plum) !important;
           color: #fff !important;
           border: 1px solid transparent !important;
-          border-radius: 13px !important;
+          border-radius: 12px !important;
           padding: 14px 18px !important;
-          font-size: 15px !important;
-          font-weight: 700 !important;
-          box-shadow: 0 10px 22px -8px rgba(107,63,160,0.45) !important;
+          font-family: var(--font-sans) !important;
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          line-height: 1.45 !important;
+          box-shadow: 0 6px 16px -8px rgba(107,63,160,0.45) !important;
         }
         .ob-account-google > div.space-y-3 > button:first-child:hover { background: var(--color-plum-dark) !important; }
       `}</style>
@@ -145,7 +147,7 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
       {!showEmail ? (
         <button
           type="button" onClick={() => setShowEmail(true)}
-          style={{ width: '100%', marginTop: 10, padding: '14px 18px', borderRadius: 13, background: '#fff', color: 'var(--color-charcoal)', border: '1.5px solid var(--color-light-grey)', fontFamily: 'inherit', fontWeight: 600, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+          style={{ width: '100%', marginTop: 10, padding: '14px 18px', borderRadius: 12, background: '#fff', color: 'var(--color-charcoal)', border: '1px solid rgba(26,22,32,0.10)', boxShadow: '0 1px 0 rgba(26,22,32,0.04)', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, lineHeight: 1.45, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
           Continue with Email

@@ -6,7 +6,7 @@ import { SERIF } from './_styles';
 
 export function Title({ children, size = 40 }) {
   return (
-    <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.05, letterSpacing: '-0.01em', color: 'var(--color-charcoal)', margin: 0 }}>
+    <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.05, letterSpacing: '-0.02em', color: 'var(--color-charcoal)', margin: 0 }}>
       {children}
     </h1>
   );
@@ -19,20 +19,22 @@ export function Em({ children, block = false, color = 'var(--color-plum)' }) {
 }
 
 export function Kicker({ children, color = 'var(--color-plum)' }) {
-  return <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color, marginBottom: 12 }}>{children}</div>;
+  return <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color, marginBottom: 12 }}>{children}</div>;
 }
 
 export function Lead({ children }) {
-  return <p style={{ fontSize: 15, color: 'var(--color-cocoa)', lineHeight: 1.5, margin: '14px auto 0', maxWidth: 400 }}>{children}</p>;
+  return <p style={{ fontSize: 14, color: 'var(--color-cocoa)', lineHeight: 1.5, margin: '14px auto 0', maxWidth: 400 }}>{children}</p>;
 }
 
+// Matches the Login/Signup primary button: Inter 14/600, 14x18 padding, 12px
+// radius, soft plum shadow (green variant for the WhatsApp step).
 export function PrimaryButton({ children, onClick, disabled = false, green = false, type = 'button', style }) {
   const bg = green ? '#25A35A' : 'var(--color-plum)';
-  const shadow = green ? '0 12px 26px -8px rgba(37,163,90,0.5)' : '0 10px 22px -8px rgba(107,63,160,0.45)';
+  const shadow = green ? '0 6px 16px -8px rgba(37,163,90,0.5)' : '0 6px 16px -8px rgba(107,63,160,0.45)';
   return (
     <button
       type={type} onClick={onClick} disabled={disabled}
-      style={{ width: '100%', padding: 15, border: 0, borderRadius: 13, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit', background: bg, color: '#fff', fontSize: 15.5, fontWeight: 700, opacity: disabled ? 0.45 : 1, boxShadow: disabled ? 'none' : shadow, ...style }}
+      style={{ width: '100%', padding: '14px 18px', border: 0, borderRadius: 12, cursor: disabled ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', background: bg, color: '#fff', fontSize: 14, fontWeight: 600, lineHeight: 1.45, opacity: disabled ? 0.45 : 1, boxShadow: disabled ? 'none' : shadow, ...style }}
     >
       {children}
     </button>
@@ -41,7 +43,7 @@ export function PrimaryButton({ children, onClick, disabled = false, green = fal
 
 export function Ghost({ children, onClick }) {
   return (
-    <button type="button" onClick={onClick} style={{ width: '100%', padding: 13, border: 0, background: 'transparent', color: 'var(--color-warm-grey)', fontFamily: 'inherit', fontSize: 14, fontWeight: 500, cursor: 'pointer', marginTop: 4 }}>
+    <button type="button" onClick={onClick} style={{ width: '100%', padding: 13, border: 0, background: 'transparent', color: 'var(--color-warm-grey)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, cursor: 'pointer', marginTop: 4 }}>
       {children}
     </button>
   );

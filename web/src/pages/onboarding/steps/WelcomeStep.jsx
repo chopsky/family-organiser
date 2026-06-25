@@ -7,7 +7,7 @@ export default function WelcomeStep({ onContinue, navigate }) {
   return (
     <div>
       <img src="/housemait-logo-web.svg" alt="Housemait" style={{ height: 28, width: 'auto', margin: '2px auto 24px', display: 'block' }} />
-      <Title size={44}>Ready to share<Em block>the mental load?</Em></Title>
+      <Title>Ready to share<Em block>the mental load?</Em></Title>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, margin: '24px 0 22px', fontSize: 13, fontWeight: 600, color: 'var(--color-cocoa)' }}>
         <FiveStars />Made for busy families
