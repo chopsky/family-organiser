@@ -23,6 +23,10 @@ import { useAuth } from '../../context/AuthContext';
 import ErrorBanner from '../../components/ErrorBanner';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo } from '../../lib/signupPromo';
+import WelcomeStep from './steps/WelcomeStep';
+import WelcomeNotifications from './steps/WelcomeNotifications';
+import HeaviestStep from './steps/HeaviestStep';
+import PlanStep from './steps/PlanStep';
 
 // Step keys in order + the progress-bar fill per step (mirrors the prototype).
 const STEPS = ['welcome', 'heaviest', 'plan', 'account', 'household', 'invite', 'whatsapp', 'calendar', 'finish'];
@@ -66,6 +70,7 @@ export default function OnboardingFlow() {
     calProvider: null, calUrl: '',
   }));
   const [error, setError] = useState('');
+  const [leavingWelcome, setLeavingWelcome] = useState(false);
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   // A fully-onboarded session should never see the flow (e.g. typed /signup).
@@ -79,6 +84,14 @@ export default function OnboardingFlow() {
   const next = () => setIdx((i) => Math.min(i + 1, STEPS.length - 1));
   const back = () => setIdx((i) => Math.max(i - 1, 0));
 
+  // Welcome continue: let the corner notifications drift out to their corners,
+  // then advance. Under reduced motion there is nothing to wait for.
+  const leaveWelcome = () => {
+    if (reduced) { next(); return; }
+    setLeavingWelcome(true);
+    setTimeout(() => { setLeavingWelcome(false); next(); }, 480);
+  };
+
   // Escape hatch - a half-finished signup would otherwise be trapped here by
   // RequireAuth's redirect. Logging out clears the token so the landing renders.
   const signOut = () => { auth.logout(); window.location.href = '/'; };
@@ -87,6 +100,7 @@ export default function OnboardingFlow() {
     auth, navigate, reduced,
     form, update,
     next, back, setError,
+    leaveWelcome,
     inviteToken, promoCode: form.promoCode,
     firstName: firstNameOf(auth.user),
   };
@@ -99,6 +113,10 @@ export default function OnboardingFlow() {
       {/* Ambient blobs (decorative) - same treatment as Login/Signup/SetupHousehold. */}
       <div aria-hidden="true" className="pointer-events-none absolute" style={{ width: 760, height: 760, borderRadius: '50%', left: -180, bottom: -300, background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)', filter: 'blur(20px)' }} />
       <div aria-hidden="true" className="pointer-events-none absolute" style={{ width: 600, height: 600, borderRadius: '50%', right: -160, top: -200, background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)', filter: 'blur(20px)' }} />
+
+      {/* Welcome-step corner notifications (decorative, stage-level, behind the
+          card). Hidden under 880px via CSS. */}
+      {key === 'welcome' && <WelcomeNotifications leaving={leavingWelcome} reduced={reduced} />}
 
       <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-10 pb-8 md:pt-14 md:pb-10">
         <div
@@ -146,10 +164,19 @@ export default function OnboardingFlow() {
   );
 }
 
-// Step renderer. Phase 0 ships navigable placeholders; later phases replace each
-// branch with the real step component.
+// Step renderer. Pre-auth steps are live; the authenticated steps land in later
+// phases and still show navigable placeholders for now.
 function renderStep(key, ctx) {
-  return <StepPlaceholder stepKey={key} ctx={ctx} />;
+  switch (key) {
+    case 'welcome':
+      return <WelcomeStep onContinue={ctx.leaveWelcome} navigate={ctx.navigate} />;
+    case 'heaviest':
+      return <HeaviestStep form={ctx.form} update={ctx.update} next={ctx.next} />;
+    case 'plan':
+      return <PlanStep form={ctx.form} next={ctx.next} />;
+    default:
+      return <StepPlaceholder stepKey={key} ctx={ctx} />;
+  }
 }
 
 function StepPlaceholder({ stepKey, ctx }) {
