@@ -1829,6 +1829,9 @@ export default function FamilySetup() {
       <PageHeader
         kicker={`${members.length} ${members.length === 1 ? 'member' : 'members'}`}
         title={familyTitle(household?.name)}
+        actions={isAdmin ? (
+          <PillBtn onClick={openHouseholdEdit} icon={<IconEdit className="h-3.5 w-3.5" />} aria-label="Edit household name">Edit</PillBtn>
+        ) : null}
       />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
