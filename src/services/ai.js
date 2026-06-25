@@ -534,4 +534,34 @@ async function runWebSearch(query, { householdId, userId, address, timezone } = 
   }
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch };
+/**
+ * Find the OFFICIAL local-authority web page that publishes school term dates,
+ * using Claude's web_search tool. Returns the single best URL (a council's own
+ * page, usually *.gov.uk, or a direct PDF) or null. Used by the schools
+ * "import from local authority" flow, which then FETCHES that page and extracts
+ * the dates from its real text - so the dates come from the council, not the
+ * model's memory. Claude-only (web_search is a Claude tool); failures return
+ * null and the caller falls back to a helpful "try website/PDF import" message.
+ */
+async function findOfficialTermDatesUrl({ localAuthority, academicYear } = {}) {
+  if (!localAuthority) return null;
+  const system = `You locate the OFFICIAL web page where a UK local authority publishes its school term dates. Use the web_search tool to find it. Strongly prefer the council's own domain (usually *.gov.uk); a direct link to the council's term-dates PDF is also fine. Return ONLY a JSON object on a single line: {"url":"<the one best official council URL>"}. Use a URL that actually appeared in the search results - never invent one. If you cannot find an official council term-dates page, return {"url":null}.`;
+  try {
+    const { text } = await callClaude({
+      system,
+      messages: [{ role: 'user', content: `Find the official ${localAuthority} council web page that lists school term dates for the ${academicYear} academic year.` }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      maxTokens: 1024,
+      timeoutMs: REASONING_TIMEOUT_MS,
+    });
+    const match = (text || '').match(/\{[\s\S]*?\}/);
+    if (!match) return null;
+    const { url } = JSON.parse(match[0]);
+    return typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null;
+  } catch (err) {
+    console.warn('[la-term-dates] URL resolution failed:', err.message);
+    return null;
+  }
+}
+
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch, findOfficialTermDatesUrl };

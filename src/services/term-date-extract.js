@@ -10,8 +10,10 @@
  * coupling.
  */
 
+const pdfParse = require('pdf-parse');
 const { callWithFailover, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { validateTermDates } = require('./termDateValidator');
+const { assertFetchableUrl } = require('../utils/ssrf-guard');
 
 const VALID_EVENT_TYPES = new Set([
   'term_start', 'term_end',
@@ -167,6 +169,74 @@ Do NOT wrap in markdown code fences.`,
 }
 
 /**
+ * Fetch a term-dates web page (or PDF) and return its plain text, ready for
+ * extractTermDatesPreview. Mirrors the fetch/strip/pdfParse pipeline in the
+ * /import-website route, but is reusable and SSRF-guarded - important here
+ * because the "import from local authority" flow feeds in a URL chosen by a
+ * web search, not a human. Throws an Error with a user-facing message on any
+ * failure (bad URL, HTTP error, empty/scanned PDF) so the caller can surface it.
+ */
+async function fetchTermDatesPageText(url) {
+  const trimmed = (url || '').trim();
+  // SSRF guard: http(s) only, no credentials, no literal private IPs.
+  assertFetchableUrl(trimmed);
+
+  const looksLikePdfUrl = /\.pdf(\?|#|$)/i.test(trimmed);
+  let response;
+  try {
+    response = await fetch(trimmed, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SchoolDatesBot/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/pdf',
+      },
+    });
+  } catch (err) {
+    throw new Error(`Could not reach that page: ${err.message}`);
+  }
+  if (!response.ok) {
+    throw new Error(`That page returned HTTP ${response.status}.`);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (looksLikePdfUrl || contentType.includes('application/pdf')) {
+    const pdfBuffer = Buffer.from(await response.arrayBuffer());
+    const pdfData = await pdfParse(pdfBuffer);
+    const text = (pdfData.text || '').trim().substring(0, 16000);
+    if (text.length < 50) {
+      throw new Error('The PDF appears to be a scanned image with no readable text.');
+    }
+    return text;
+  }
+
+  const rawHtml = await response.text();
+  // Strip HTML but preserve table/list structure so dates stay on their own
+  // lines for the extractor (identical treatment to the website-import route).
+  const text = rawHtml
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n/g, '\n')
+    .trim()
+    .substring(0, 12000);
+  if (text.length < 50) {
+    throw new Error('That page had very little readable text. The dates may be in a PDF or image.');
+  }
+  return text;
+}
+
+/**
  * Compute current + next academic-year strings for the household's country.
  * UK uses Sept-Aug, SA uses calendar-year.
  */
@@ -185,4 +255,4 @@ function academicYearsForCountry(country) {
   return { currentAY, nextAY };
 }
 
-module.exports = { extractTermDatesPreview, academicYearsForCountry, VALID_EVENT_TYPES };
+module.exports = { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES };

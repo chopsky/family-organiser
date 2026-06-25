@@ -9,7 +9,8 @@ const externalFeed = require('../services/externalFeed');
 const { validateTermDates } = require('../services/termDateValidator');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
-const { extractTermDatesPreview, academicYearsForCountry, VALID_EVENT_TYPES } = require('../services/term-date-extract');
+const { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES } = require('../services/term-date-extract');
+const { findOfficialTermDatesUrl } = require('../services/ai');
 
 // Memory-storage multer for direct PDF uploads to the term-dates
 // preview route. School term-date PDFs are tiny (a few KB to ~200KB);
@@ -621,6 +622,18 @@ router.post('/:schoolId/import-sa-term-dates', requireAuth, requireHousehold, re
   }
 });
 
+/**
+ * POST /api/schools/:schoolId/import-la-dates
+ *
+ * Import term dates for a school from its LOCAL AUTHORITY. We share results
+ * across families in the same LA via a cache. On a cache miss we web-search for
+ * the council's OWN term-dates page, fetch it, and run the validated extractor
+ * over its real text - so the dates come from the council, not from the model's
+ * memory. (The previous version asked the model to recall/approximate the dates,
+ * which produced confident but wrong dates that were then cached as canonical.)
+ * Schools that set their own dates can instead use "Import from school website",
+ * the PDF upload, or manual entry.
+ */
 router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   try {
     // Get the school's LA
@@ -652,52 +665,56 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
       fromCache = true;
       console.log(`[import-la] Cache hit for ${school.local_authority} ${academicYear}`);
     } else {
-      console.log(`[import-la] Cache miss for ${school.local_authority} ${academicYear} - calling AI`);
+      console.log(`[import-la] Cache miss for ${school.local_authority} ${academicYear} - finding the official council page`);
 
-      // Use AI to find and extract LA term dates
-      const { text } = await callWithFailover({
-        system: `You are a UK school term date researcher. When given a local authority name, provide the term dates for the ${academicYear} academic year.
+      // Step 1: find the council's OWN term-dates page via web search. We then
+      // extract the dates from that real page, rather than asking the model to
+      // recall them - which used to produce plausible but wrong dates that we
+      // then saved as authoritative and shared with every other family in the LA.
+      const sourceUrl = await findOfficialTermDatesUrl({
+        localAuthority: school.local_authority,
+        academicYear,
+      });
+      if (!sourceUrl) {
+        return res.status(404).json({
+          error: `Could not find an official term-dates page for ${school.local_authority}. Use "Import from school website" with the council or school URL, or add the dates manually.`,
+        });
+      }
 
-You should know the standard UK school term structure:
-- Autumn term: September to December (with October half term)
-- Spring term: January to March/April (with February half term)
-- Summer term: April to July (with May/June half term)
+      // Step 2: fetch that page (SSRF-guarded; handles HTML and PDF).
+      let pageText;
+      try {
+        pageText = await fetchTermDatesPageText(sourceUrl);
+      } catch (fetchErr) {
+        return res.status(502).json({
+          error: `Found ${school.local_authority}'s term-dates page but couldn't read it (${fetchErr.message}). Use "Import from school website" with the link, or add the dates manually.`,
+        });
+      }
 
-Provide your best knowledge of the dates for this specific local authority. If you're not certain of exact dates, use typical dates for that region.
-
-Return ONLY a valid JSON array with objects like:
-[
-  {"event_type": "term_start", "date": "2025-09-03", "label": "Autumn term starts"},
-  {"event_type": "half_term_start", "date": "2025-10-27", "end_date": "2025-10-31", "label": "Autumn half term"},
-  {"event_type": "term_end", "date": "2025-12-19", "label": "Autumn term ends"},
-  ...
-]
-
-Valid event_types: term_start, term_end, half_term_start, half_term_end, inset_day, bank_holiday
-For half terms, use half_term_start with an end_date spanning the week.
-Include all 6 terms (3 terms × start + end) plus 3 half terms.`,
-        messages: [{ role: 'user', content: `What are the school term dates for ${school.local_authority} council for the ${academicYear} academic year?` }],
-        timeoutMs: REASONING_TIMEOUT_MS,
-        maxTokens: 4096,
-        useThinking: true,
-        preferClaude: true,
-        feature: 'school_la_term_dates',
+      // Step 3: run the same validated extractor the website/PDF import uses,
+      // then keep only this academic year's dates (the extractor may also
+      // surface next year's, but downstream we relabel and clear per AY).
+      const nextAY = `${parseInt(academicYear.split('-')[1])}-${parseInt(academicYear.split('-')[1]) + 1}`;
+      const result = await extractTermDatesPreview({
+        pageText,
+        country: 'GB',
+        currentAY: academicYear,
+        nextAY,
         householdId: req.householdId,
         userId: req.user.id,
+        sourceLabel: sourceUrl,
       });
-
-      try {
-        const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-        dates = JSON.parse(cleaned);
-      } catch {
-        return res.status(500).json({ error: 'Could not parse term dates from AI response.' });
+      if (!result.ok) {
+        return res.status(result.status || 502).json(result.body);
+      }
+      dates = (result.body.dates || []).filter((d) => d.academic_year === academicYear);
+      if (dates.length === 0) {
+        return res.status(404).json({
+          error: `Read ${school.local_authority}'s page but couldn't find ${academicYear} term dates on it. Use "Import from school website", or add the dates manually.`,
+        });
       }
 
-      if (!Array.isArray(dates) || dates.length === 0) {
-        return res.status(500).json({ error: 'No term dates found.' });
-      }
-
-      // Cache the results for other families in the same LA
+      // Cache the real, extracted dates for other families in the same LA.
       await db.cacheLATermDates(school.local_authority, academicYear, dates);
     }
 
