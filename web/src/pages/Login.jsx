@@ -82,13 +82,14 @@ export default function Login() {
     navigate(postLoginRoute(data));
   }
 
-  // Shared router for every post-login path:
-  //   1. No household yet → create one first
-  //   2. Household exists but onboarding wizard not done → run wizard
-  //   3. Otherwise → straight to the dashboard
+  // Shared router for every post-login path. A half-finished account (no
+  // household yet, or onboarding not marked done) resumes the unified flow at
+  // /signup, which entryIndex() picks up at the right step from auth state -
+  // the same target RequireAuth and Verify use. Routing to the legacy
+  // /setup + /onboarding pages here was the one spot the cutover missed, and
+  // it dropped logged-in half-finished users back onto the OLD signup.
   function postLoginRoute(data) {
-    if (!data.household) return '/setup';
-    if (!data.user?.onboarded_at) return '/onboarding';
+    if (!data.household || !data.user?.onboarded_at) return '/signup';
     return '/dashboard';
   }
 
