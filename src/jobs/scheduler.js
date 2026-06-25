@@ -710,12 +710,20 @@ function startScheduler() {
   console.log('✓ Public holiday refresh scheduled (Dec 1 yearly)');
 
   // ── Monthly LA term-dates import: 1st of the month, 03:00 UTC ──────────────
-  // Re-imports every UK local authority's published term dates (picks up newly
-  // published academic years, retries previously-failed councils). Internally
-  // guarded by a per-month scheduler lock so only one instance runs it. 03:00
-  // UTC is a quiet window that dodges the top-of-hour reminder ticks.
-  cron.schedule('0 3 1 * *', () => runMonthlyLAImport());
-  console.log('✓ Monthly LA term-dates import scheduled (03:00 UTC, 1st of month)');
+  // Stale-refreshes UK local authority term dates (picks up newly published
+  // academic years, retries winnable councils). Internally guarded by a
+  // per-month scheduler lock so only one instance runs it. 03:00 UTC is a quiet
+  // window that dodges the top-of-hour reminder ticks.
+  //
+  // OFF by default: this spends Claude credit (web_search) unattended, so it
+  // only runs when explicitly enabled with LA_IMPORT_CRON_ENABLED=true. The
+  // dataset can always be refreshed on demand with scripts/run-la-import.js.
+  if (process.env.LA_IMPORT_CRON_ENABLED === 'true') {
+    cron.schedule('0 3 1 * *', () => runMonthlyLAImport());
+    console.log('✓ Monthly LA term-dates import scheduled (03:00 UTC, 1st of month)');
+  } else {
+    console.log('• Monthly LA term-dates import disabled (set LA_IMPORT_CRON_ENABLED=true to enable)');
+  }
 
   // ── Stale device-calendar nudge: daily at 17:30 Europe/London ──────────────
   // Pushes the OWNER of a device-synced calendar whose phone hasn't synced
