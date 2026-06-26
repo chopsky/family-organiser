@@ -1682,6 +1682,25 @@ export default function FamilySetup() {
     }
   }
 
+  // Remove the family photo straight from the card (the obvious place to look,
+  // vs. burying it in the Edit modal). Reuses the same DELETE the modal does.
+  async function handleRemoveHouseholdAvatar() {
+    if (!isAdmin || uploadingHouseholdAvatar) return;
+    if (!window.confirm('Remove the family photo?')) return;
+    setUploadingHouseholdAvatar(true);
+    setError('');
+    try {
+      const { data } = await api.delete('/household/avatar');
+      login({ token, user, household: data?.household || { ...household, avatar_url: null } });
+      setSuccess('Family photo removed.');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove the photo.');
+    } finally {
+      setUploadingHouseholdAvatar(false);
+    }
+  }
+
   function removeAvatarInEdit() {
     setHhEditAvatarFile(null);
     setHhEditAvatarRemove(true);
@@ -1872,6 +1891,7 @@ export default function FamilySetup() {
       >
         {/* Identity zone */}
         <div className="flex-1 min-w-0 flex items-center gap-5 sm:gap-6 px-5 py-5 sm:px-[30px] sm:py-[26px]">
+          <div className="relative shrink-0">
           <button
             type="button"
             disabled={!isAdmin || uploadingHouseholdAvatar}
@@ -1880,7 +1900,7 @@ export default function FamilySetup() {
               const blob = await pickPhoto();
               if (blob) await handleDirectHouseholdAvatarUpload(blob);
             }}
-            className={`shrink-0 relative group rounded-[20px] overflow-hidden ${isAdmin && !uploadingHouseholdAvatar ? 'cursor-pointer' : 'cursor-default'}`}
+            className={`block relative group rounded-[20px] overflow-hidden ${isAdmin && !uploadingHouseholdAvatar ? 'cursor-pointer' : 'cursor-default'}`}
             aria-label={isAdmin ? 'Upload a family photo' : 'Family photo'}
             title={isAdmin ? 'Upload a family photo' : ''}
           >
@@ -1909,6 +1929,18 @@ export default function FamilySetup() {
               </span>
             )}
           </button>
+            {isAdmin && household?.avatar_url && householdPhotoErrUrl !== household.avatar_url && !uploadingHouseholdAvatar && (
+              <button
+                type="button"
+                onClick={handleRemoveHouseholdAvatar}
+                aria-label="Remove family photo"
+                title="Remove family photo"
+                className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-white text-[var(--ink-2)] hover:text-coral flex items-center justify-center shadow-md border border-[var(--cream-border)]"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            )}
+          </div>
 
           <div className="min-w-0">
             {/* Members: avatar stack + count */}
