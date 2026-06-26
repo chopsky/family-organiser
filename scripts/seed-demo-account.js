@@ -23,6 +23,7 @@ require('dotenv').config();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { supabaseAdmin: db } = require('../src/db/client');
+const RECIPE_CONTENT = require('./demo-recipes'); // ingredients + method keyed by recipe name
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ async function seedContent({ household, sarah, james, olivia, henry }) {
     { household_id: hid, name: 'Fish & chips',                category: 'dinner',    servings: 4, prep_time_mins: 10, cook_time_mins: 25 },
     { household_id: hid, name: 'Tacos al pastor',             category: 'dinner',    servings: 4, prep_time_mins: 20, cook_time_mins: 20 },
     { household_id: hid, name: 'Butternut squash risotto',    category: 'dinner',    servings: 4, prep_time_mins: 15, cook_time_mins: 35 },
-  ]);
+  ].map((rc) => ({ ...rc, ...(RECIPE_CONTENT[rc.name] || {}) }))); // merge ingredients + method
   const r = Object.fromEntries(recipes.map((x) => [x.name, x.id]));
 
   const dayOfWeek = (TODAY.getDay() + 6) % 7; // 0 = Mon
