@@ -4,7 +4,7 @@ import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ChildModeProvider, useChildMode } from './context/ChildModeContext';
 import ChildModePinScreen from './components/ChildModePinScreen';
 import { CHILD_OPEN_ROUTES, CHILD_HOME_ROUTE } from './lib/childMode';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { localeHomePath } from './hooks/useLocale';
 import { useUniversalLinks } from './hooks/useUniversalLinks';
@@ -154,6 +154,13 @@ function ChildGate({ children }) {
  */
 function RouteTransition({ children }) {
   const location = useLocation();
+  // Reset scroll to top on every route change. Most pages window-scroll (only
+  // /tasks, /lists, /rewards use a full-height inner scroller), and React
+  // Router doesn't reset window.scrollY between routes - so without this a
+  // scrolled Dashboard would carry its offset onto the next page (e.g.
+  // Calendar opening part-scrolled). Keyed on pathname only, so query-only
+  // changes (?list=, ?member=) don't yank the scroll.
+  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   return (
     <div key={location.pathname} className="page-transition">
       {children}
