@@ -183,7 +183,12 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg', { householdId, u
         },
       ],
       useThinking: false,
-      maxTokens: 2048,
+      // Generous budget: a full grocery shop is 20-40 line items, each a JSON
+      // object with name/original/quantity/price (+ substitution metadata). At
+      // 2048 the extraction truncated mid-list and parseJSON threw, surfacing
+      // as "trouble reading that image" even on a perfectly clear receipt.
+      // Mirrors the scanImage bump for the same reason.
+      maxTokens: 8192,
       feature: 'receipt_scan',
       responseFormat: 'json',
       householdId,
@@ -216,7 +221,11 @@ async function matchReceiptToList(receiptItems, shoppingList, { householdId, use
       system: RECEIPT_MATCHING_SYSTEM,
       messages: [{ role: 'user', content: userMessage }],
       useThinking: false,
-      maxTokens: 1024,
+      // One match object (id + names + confidence + reason) per receipt item;
+      // a 30-item shop overflows 1024 and the matches array truncates, which
+      // throws the same "trouble reading that image" error after extraction
+      // already succeeded. Keep this in step with the receipt_scan budget.
+      maxTokens: 4096,
       feature: 'receipt_match',
       responseFormat: 'json',
       householdId,
