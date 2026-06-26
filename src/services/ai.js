@@ -602,13 +602,39 @@ For multi-day breaks use half_term_start (or bank_holiday) with an end_date.
 source_quote MUST be copied verbatim from the retrieved content (include a weekday name if shown). If you cannot find a verbatim snippet for an entry, omit that entry. Return [] if you find nothing concrete.`;
 
   const userContent = `Find and extract the official ${localAuthority} council school term dates for ${ays}. Return the JSON array only.`;
-  const parseDates = (text) => {
+  // Pull the JSON array of date objects out of the reply, robustly. Sonnet +
+  // web_search sometimes wraps the array in prose and citation markers (a
+  // leading "[1]" reference, or 【1†src】) - a naive first-'[' / last-']' slice
+  // then mis-parses (e.g. it grabs "[1]" and chokes on the rest). So: strip
+  // citation markers, locate the array by its "[{" opening (a bare "[1]" can't
+  // match), then balance-scan to the matching ']' respecting string literals.
+  const parseDates = (raw) => {
+    const text = (raw || '')
+      .replace(/```(?:json)?\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .replace(/【[^】]*】/g, '')
+      .trim();
+    const start = text.search(/\[\s*\{/);
+    if (start === -1) return [];
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let end = -1;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') inStr = true;
+      else if (ch === '[') depth += 1;
+      else if (ch === ']') { depth -= 1; if (depth === 0) { end = i; break; } }
+    }
+    if (end === -1) return [];
     try {
-      const cleaned = (text || '').replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
-      const first = cleaned.indexOf('[');
-      const last = cleaned.lastIndexOf(']');
-      if (first === -1 || last <= first) return [];
-      const dates = JSON.parse(cleaned.substring(first, last + 1));
+      const dates = JSON.parse(text.slice(start, end + 1));
       return Array.isArray(dates) ? dates.filter((d) => d && typeof d === 'object' && d.date) : [];
     } catch {
       return [];
