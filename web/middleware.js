@@ -66,14 +66,19 @@ const NO_STAMP_PATHS = new Set(['/privacy', '/terms', '/support']);
 // anything useful, and a few well-known infra endpoints.
 const SKIP_PREFIXES = [
   '/dashboard',
-  '/shopping',
   '/tasks',
+  '/chores',      // legacy alias - redirects to /tasks in the SPA
+  '/lists',
+  '/shopping',
+  '/rewards',
   '/calendar',
   '/meals',
   '/receipt',
   '/documents',
   '/family',
   '/settings',
+  '/help',
+  '/connect-whatsapp',
   '/subscribe',
   '/subscription',
   '/setup',
