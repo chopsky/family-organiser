@@ -2230,7 +2230,7 @@ export default function Calendar() {
                 <div
                   key={item.id}
                   className="flex items-center gap-3 py-3 px-4 bg-white cursor-pointer hover:shadow-[0_2px_8px_rgba(107,63,160,0.06)] transition-shadow"
-                  style={{ borderLeft: `4px solid ${hex}`, borderRadius: '0 12px 12px 0' }}
+                  style={{ borderLeft: `4px solid ${hex}`, borderRadius: '12px' }}
                   onClick={() => {
                     if (item._type === 'task') openTaskEditForm(item);
                     else if (item.category !== 'public_holiday' && item.category !== 'birthday') openEditForm(item);
