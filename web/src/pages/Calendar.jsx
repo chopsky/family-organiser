@@ -1275,20 +1275,19 @@ export default function Calendar() {
 
   // ── Today's events (for panel below month/week view) ───
 
-  const todayEvents = useMemo(() => {
+  // Items for whichever day is selected in the month grid. Clicking a day
+  // cell sets selectedDate; the rail below the grid renders this so desktop
+  // reaches parity with mobile (where tapping a day already swaps the list).
+  // selectedDate defaults to today, so this covers the today case too.
+  const selectedDayItems = useMemo(() => {
+    if (!selectedDate) return [];
     const items = [];
-    const todayEvs = eventsForDate(today);
-    const todayTasks = tasksForDate(today);
-    todayEvs.forEach(ev => items.push({ ...ev, _type: 'event' }));
-    todayTasks.forEach(t => items.push({ ...t, _type: 'task', start_time: t.due_time ? `${t.due_date}T${t.due_time}` : null }));
-    // Sort by start time
-    items.sort((a, b) => {
-      const at = a.start_time || '';
-      const bt = b.start_time || '';
-      return at.localeCompare(bt);
-    });
+    eventsForDate(selectedDate).forEach(ev => items.push({ ...ev, _type: 'event' }));
+    tasksForDate(selectedDate).forEach(t => items.push({ ...t, _type: 'task', start_time: t.due_time ? `${t.due_date}T${t.due_time}` : null }));
+    items.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
     return items;
-  }, [events, tasks, activeFilters, activeMemberFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, events, tasks, activeFilters, activeMemberFilters]);
 
   // Helper to get member initials + color
   function getMemberInfo(name) {
@@ -1752,6 +1751,7 @@ export default function Calendar() {
                 ) : (
                   calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
                     const isToday_ = isSameDay(date, today);
+                    const isSelected = selectedDate && isSameDay(date, selectedDate);
                     const dayEvents = eventsForDate(date);
                     const dayTasks = tasksForDate(date);
                     const allItems = [...dayEvents.map(e => ({ ...e, _isEvent: true })), ...dayTasks.map(t => ({ ...t, _isTask: true }))];
@@ -1761,9 +1761,16 @@ export default function Calendar() {
                     return (
                       <div
                         key={idx}
+                        // Current-month cells are clickable: selecting a day
+                        // drives the "events for this day" rail below the grid
+                        // (parity with the mobile month view). Padding cells
+                        // from the prev/next month stay inert.
+                        onClick={isCurrent ? () => setSelectedDate(new Date(date)) : undefined}
                         className={`min-h-[90px] p-1.5 transition-colors border-b border-[rgba(26,22,32,0.07)] ${
                           idx % 7 !== 6 ? 'border-r' : ''
-                        } ${isToday_ ? 'bg-plum-light' : 'bg-white'}`}
+                        } ${isCurrent ? 'cursor-pointer hover:bg-plum-light/60' : ''} ${
+                          isToday_ ? 'bg-plum-light' : isSelected ? 'bg-plum-light/50 ring-1 ring-inset ring-plum/30' : 'bg-white'
+                        }`}
                       >
                         {/* Padding cells for the previous/next month are left
                             empty (no day number, no events) - only the current
@@ -2211,15 +2218,24 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* ── Today's Events Panel (month view only - week view shows its
-            own timed events inline, day view IS today's events). On mobile
-            month view we still hide it because the selected-day panel
-            above already lists the day's events. ── */}
-      {viewMode === 'month' && todayEvents.length > 0 && (
+      {/* ── Selected-day events panel (desktop month view only - week view
+            shows its own timed events inline, day view IS the day's events;
+            mobile month has its own selected-day panel above). Clicking a day
+            cell sets selectedDate, which this rail follows. We keep it hidden
+            when the default (today) is selected and empty, but show it for any
+            explicitly-picked day so the click always has a visible result. ── */}
+      {viewMode === 'month' && selectedDate && (selectedDayItems.length > 0 || !isSameDay(selectedDate, today)) && (
         <div className="mt-5 hidden md:block">
-          <h3 className="text-[17px] font-semibold mb-3" style={{ fontFamily: 'var(--font-display)' }}>Today's events</h3>
+          <h3 className="text-[17px] font-semibold mb-3" style={{ fontFamily: 'var(--font-display)' }}>
+            {isSameDay(selectedDate, today)
+              ? "Today's events"
+              : selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })}
+          </h3>
           <div className="flex flex-col gap-2">
-            {todayEvents.map(item => {
+            {selectedDayItems.length === 0 && (
+              <p className="text-sm text-warm-grey py-2">No events or tasks for this day</p>
+            )}
+            {selectedDayItems.map(item => {
               const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
               const badge = getTypeBadge(item);
               // Tasks and events share the multi-assignee model; the
