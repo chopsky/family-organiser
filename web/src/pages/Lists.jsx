@@ -108,6 +108,7 @@ export default function Lists() {
         setItems((data.items || []).map((i) => ({
           id: i.id, done: !!i.completed, section: i.aisle_category || 'Other', emoji: getItemEmoji(i.item, i.aisle_category),
           text: i.quantity ? `${cap(i.item)} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : cap(i.item),
+          completed_at: i.completed_at || null, // drives the "most recently checked off first" Done order
           // raw fields kept so the Edit-item form can prefill
           item: i.item, quantity: i.quantity || '', unit: i.unit || '', description: i.description || '', aisle_category: i.aisle_category || 'Other',
         })));
@@ -226,7 +227,12 @@ export default function Lists() {
   // visible items (To-dos filter by assignee) + grouping
   const filtered = isTodos && toFilter ? items.filter((i) => (i.whoIds || []).includes(toFilter)) : items;
   const openItems = filtered.filter((i) => !i.done);
-  const doneItems = filtered.filter((i) => i.done);
+  // Done items most-recently-checked-off first. Shopping items carry
+  // completed_at; To-dos don't (they keep their /tasks/recent order, which is
+  // already recent-first), and the empty-string fallback leaves them stable.
+  const doneItems = filtered
+    .filter((i) => i.done)
+    .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
   const sections = isTodos ? [{ name: null, items: openItems }]
     : Object.entries(openItems.reduce((acc, i) => { (acc[i.section] ||= []).push(i); return acc; }, {})).map(([name, its]) => ({ name, items: its }));
   const memberOf = (id) => members.find((m) => m.id === id);
