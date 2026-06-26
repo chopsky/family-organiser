@@ -64,7 +64,7 @@ export default function Lists() {
   const isTodos = active?.id === TODOS_ID;
 
   // Switching lists clears the filter + transient mobile UI.
-  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); }, [activeId]);
+  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); setDoneOpen(false); }, [activeId]);
   // Mirror the active list into ?list=<id> so a refresh lands back on it.
   // To-dos is the default, so it drops the param to keep the URL clean.
   // replace:true keeps each list switch out of the back-button history, and
@@ -362,12 +362,19 @@ export default function Lists() {
                 ))}
                 {doneItems.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK3, padding: '4px 4px 6px' }}>Done · {doneItems.length}</div>
-                    <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', opacity: 0.65 }}>
-                      {doneItems.map((it, i, arr) => (
-                        <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} doneRow />
-                      ))}
-                    </div>
+                    {/* Collapsible Done section — matches the desktop accordion. */}
+                    <button onClick={() => setDoneOpen((o) => !o)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '4px 4px 6px', border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK3 }}>Done · {doneItems.length}</span>
+                      <span style={{ transform: doneOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', display: 'flex' }}><IcChevDown s={14} c={INK3} /></span>
+                    </button>
+                    {doneOpen && (
+                      <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', opacity: 0.65 }}>
+                        {doneItems.map((it, i, arr) => (
+                          <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} doneRow />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

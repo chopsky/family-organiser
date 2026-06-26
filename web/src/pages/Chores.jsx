@@ -121,6 +121,12 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
   const { enabled: childMode } = useChildMode();
   const [hover, setHover] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  // Touch devices have no hover: the hover-reveal of the edit/delete actions
+  // made the FIRST tap synthesize mouseenter (showing the actions) and the
+  // browser swallowed that tap's click, so completing a chore took two taps.
+  // On touch we drop the hover handlers (so the first tap toggles) and show
+  // the actions inline instead.
+  const noHover = useMediaQuery('(hover: none)');
   // "Anyone" chores have a single shared done state plus an attributed
   // completer; assigned chores are done per-member.
   const done = anyone ? !!task.completed : !!task.done?.[mid];
@@ -133,8 +139,18 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
     onDragLeave: () => setDragOver(false),
     onDrop: (e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/chore'); if (id && id !== task.id) onReorder(id, task.id); },
   } : {};
+  // Edit + delete/skip controls. Reused by the desktop hover overlay and the
+  // touch inline cluster; align controls which side the delete menu opens.
+  const actions = (align) => (
+    <>
+      <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
+      <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align={align} />
+    </>
+  );
+  // Hover handlers only where hover exists — on touch they steal the first tap.
+  const hoverProps = noHover ? {} : { onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) };
   return (
-    <div {...dragProps} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onToggle(task, mid)}
+    <div {...dragProps} {...hoverProps} onClick={() => onToggle(task, mid)}
       style={{ position: 'relative', cursor: 'pointer', background: '#fff', borderRadius: 16, padding: '12px 14px', opacity: done ? 0.62 : 1, transition: 'opacity .12s, box-shadow .12s', boxShadow: dragOver ? `inset 0 2px 0 ${tint}` : 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {/* 44x44 emoji tile to the left of the title; no-icon tasks drop it entirely */}
@@ -149,16 +165,20 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
           </div>
         </div>
         {completer && <Avatar member={completer} size={26} bg="#fff" />}
+        {/* Touch: inline always-visible actions (each stops propagation so a tap
+            on them doesn't toggle); the rest of the card tap toggles on first tap. */}
+        {noHover && !childMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>{actions('right')}</div>
+        )}
         <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
           {done && <Tick s={13} />}
         </span>
       </div>
-      {/* hover actions — absolutely positioned top-left so they never squeeze
-          the title. Hidden in Child Mode, which is complete-only. */}
-      {!childMode && (
+      {/* Desktop hover actions — absolutely positioned top-left so they never
+          squeeze the title. Hidden in Child Mode, which is complete-only. */}
+      {!noHover && !childMode && (
         <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
-          <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-          <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="left" />
+          {actions('left')}
         </div>
       )}
     </div>
