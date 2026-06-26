@@ -39,7 +39,10 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 export default function Lists() {
   const [members, setMembers] = useState([]);
   const [lists, setLists] = useState([]); // descriptors
-  const [activeId, setActiveId] = useState(TODOS_ID);
+  // Seed from ?list=<id> so a refresh restores the list you were on (a fresh
+  // nav to /lists has no param and still defaults to To-dos). Read straight off
+  // the URL to avoid a TDZ on searchParams, which is declared below.
+  const [activeId, setActiveId] = useState(() => new URLSearchParams(window.location.search).get('list') || TODOS_ID);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -52,7 +55,7 @@ export default function Lists() {
   const [draftWho, setDraftWho] = useState(null); // To-dos: single assignee for the next add (mobile + desktop)
   const [whoPickerOpen, setWhoPickerOpen] = useState(false); // mobile quick-add assignee picker
   const [confirmDel, setConfirmDel] = useState(false); // mobile inline delete-list confirm
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const quickAdd = !!searchParams.get('quickAdd'); // iOS "Add to list" shortcut
   const isMobile = useIsMobile();
   const iosNative = isIos(); // native iOS → swipe-to-delete; else a delete button
@@ -62,6 +65,18 @@ export default function Lists() {
 
   // Switching lists clears the filter + transient mobile UI.
   useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); }, [activeId]);
+  // Mirror the active list into ?list=<id> so a refresh lands back on it.
+  // To-dos is the default, so it drops the param to keep the URL clean.
+  // replace:true keeps each list switch out of the back-button history, and
+  // the functional updater preserves other params (e.g. quickAdd).
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (activeId && activeId !== TODOS_ID) next.set('list', activeId);
+      else next.delete('list');
+      return next;
+    }, { replace: true });
+  }, [activeId, setSearchParams]);
   // Mobile coupling: the next item's assignee mirrors the active filter —
   // picking a member defaults new items to them, "All" clears it (items added
   // under All are unassigned). The picker can still override independently.
