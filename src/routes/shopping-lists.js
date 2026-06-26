@@ -53,6 +53,43 @@ router.post('/shopping-lists', requireAuth, requireHousehold, async (req, res) =
 });
 
 /**
+ * PATCH /api/shopping-lists/:id
+ * Rename / re-style a custom shopping list. Body: { name?, emoji?, color? }.
+ * Protected staples (Shopping/Groceries/Default) cannot be renamed - their
+ * names are load-bearing (the bot + dedupe target them by name).
+ */
+router.patch('/shopping-lists/:id', requireAuth, requireHousehold, async (req, res) => {
+  const { name, emoji, color } = req.body || {};
+  if (name !== undefined && (!name || !name.trim())) {
+    return res.status(400).json({ error: 'List name is required' });
+  }
+
+  try {
+    const lists = await db.getShoppingLists(req.householdId);
+    const target = lists.find((l) => l.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    if (target.protected || ['Default', 'Shopping', 'Groceries'].includes(target.name)) {
+      return res.status(400).json({ error: 'This list is protected and cannot be renamed' });
+    }
+
+    const fields = {};
+    if (name !== undefined) fields.name = name.trim();
+    if (emoji !== undefined) fields.emoji = emoji;
+    if (color !== undefined) fields.color = color;
+
+    const list = await db.updateShoppingList(req.params.id, req.householdId, fields);
+    cache.invalidate(`shopping-lists:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ list });
+  } catch (err) {
+    console.error('PATCH /api/shopping-lists/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * DELETE /api/shopping-lists/:id
  * Delete a shopping list (cannot delete "Default").
  */

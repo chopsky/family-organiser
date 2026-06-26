@@ -29,6 +29,7 @@ const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
 const IcClose = (p) => <Svg {...p}><path d="M18 6L6 18M6 6l12 12" /></Svg>;
 const IcTrash = (p) => <Svg {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></Svg>;
 const IcChevDown = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;
+const IcPencil = (p) => <Svg {...p}><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></Svg>;
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 const DEFAULT_TINTS = ['#6C3DD9', '#6BA368', '#5B8DE0', '#D8788A', '#D89B3A', '#3AADA0'];
@@ -50,6 +51,7 @@ export default function Lists() {
   const [toFilter, setToFilter] = useState(null); // member id for To-dos filter
   const [doneOpen, setDoneOpen] = useState(false);
   const [newList, setNewList] = useState(false);
+  const [editList, setEditList] = useState(null); // list descriptor being renamed
   const [editItem, setEditItem] = useState(null); // grocery item being edited
   const [counts, setCounts] = useState({}); // listId -> open count, for the rail
   const [draftWho, setDraftWho] = useState(null); // To-dos: single assignee for the next add (mobile + desktop)
@@ -222,6 +224,16 @@ export default function Lists() {
     } catch (e) { alert(e.response?.data?.error || 'Could not create the list.'); }
   }, [buildDescriptors]);
 
+  const renameList = useCallback(async (list, { name, emoji, color }) => {
+    if (!list || list.protected) return;
+    try {
+      await api.patch(`/shopping-lists/${list.id}`, { name, emoji, color });
+      const sl = (await api.get('/shopping-lists')).data.lists;
+      setLists(buildDescriptors(sl));
+      setEditList(null);
+    } catch (e) { alert(e.response?.data?.error || 'Could not update the list.'); }
+  }, [buildDescriptors]);
+
   const deleteListRaw = useCallback(async () => {
     if (!active || active.protected) return;
     try {
@@ -336,8 +348,12 @@ export default function Lists() {
           <div style={{ background: (active?.color || BRAND) + '14', borderRadius: 22, padding: '16px 14px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px 12px' }}>
               <span style={{ fontSize: 22 }}>{active?.emoji}</span>
-              <span style={{ fontFamily: SERIF, fontSize: 24, color: INK, flex: 1, minWidth: 0 }}>{active?.name}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: active?.color || BRAND }}>{openItems.length} left</span>
+              <span style={{ fontFamily: SERIF, fontSize: 24, color: INK, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active?.name}</span>
+              {active && !active.protected && (
+                <button onClick={() => setEditList(active)} aria-label="Rename list" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcPencil s={14} c={INK3} /></button>
+              )}
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: active?.color || BRAND, flexShrink: 0 }}>{openItems.length} left</span>
             </div>
 
             {quickAddBar()}
@@ -424,6 +440,9 @@ export default function Lists() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0 }}>
                 <span style={{ fontSize: 26 }}>{active?.emoji}</span>
                 <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{active?.name}</h2>
+                {active && !active.protected && (
+                  <button onClick={() => setEditList(active)} aria-label="Rename list" style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcPencil s={16} c={INK3} /></button>
+                )}
               </div>
 
               {quickAddBar()}
@@ -466,7 +485,8 @@ export default function Lists() {
         </div>
       )}
 
-      {newList && <NewListModal onClose={() => setNewList(false)} onSave={createList} />}
+      {newList && <ListModal onClose={() => setNewList(false)} onSave={createList} />}
+      {editList && <ListModal initial={editList} title="Edit list" cta="Save" onClose={() => setEditList(null)} onSave={(fields) => renameList(editList, fields)} />}
       {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSave={saveEdit} />}
     </div>
   );
@@ -633,15 +653,15 @@ function EditItemModal({ item, onClose, onSave }) {
 }
 
 const LIST_EMOJIS = ['📋', '🛒', '🧳', '🔧', '🎒', '🎁', '🏖️', '🎄', '📦', '🧺', '🛠️', '🐶'];
-function NewListModal({ onClose, onSave }) {
-  const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('📋');
-  const [color, setColor] = useState(DEFAULT_TINTS[0]);
+function ListModal({ initial, title = 'New list', cta = 'Create', onClose, onSave }) {
+  const [name, setName] = useState(initial?.name || '');
+  const [emoji, setEmoji] = useState(initial?.emoji || '📋');
+  const [color, setColor] = useState(initial?.color || DEFAULT_TINTS[0]);
   return (
     <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[440px]">
       <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>New list</h2>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{title}</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
         </div>
         <div style={{ marginBottom: 16 }}>
@@ -662,7 +682,7 @@ function NewListModal({ onClose, onSave }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, background: '#fff', cursor: 'pointer', fontWeight: 600, fontFamily: INTER, fontSize: 14, color: INK2 }}>Cancel</button>
-          <button onClick={() => name.trim() && onSave({ name: name.trim(), emoji, color })} disabled={!name.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: name.trim() ? 1 : 0.5 }}>Create</button>
+          <button onClick={() => name.trim() && onSave({ name: name.trim(), emoji, color })} disabled={!name.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: name.trim() ? 1 : 0.5 }}>{cta}</button>
         </div>
       </div>
     </BottomSheet>

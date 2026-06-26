@@ -2534,6 +2534,27 @@ async function deleteShoppingList(listId, householdId, db = supabase) {
   return data;
 }
 
+// Rename / re-style a custom shopping list. Scoped by household_id so a list
+// from another household can't be touched. emoji/color come from the
+// lists-adapter migration, which may not be applied yet - if updating them
+// fails on a missing column, retry with just the name so the rename still lands.
+async function updateShoppingList(listId, householdId, fields = {}, db = supabase) {
+  const updates = {};
+  if (typeof fields.name === 'string') updates.name = fields.name;
+  if ('emoji' in fields) updates.emoji = fields.emoji;
+  if ('color' in fields) updates.color = fields.color;
+  if (Object.keys(updates).length === 0) return null;
+
+  let { data, error } = await db
+    .from('shopping_lists').update(updates).eq('id', listId).eq('household_id', householdId).select().single();
+  if (error && ('emoji' in updates || 'color' in updates) && typeof updates.name === 'string') {
+    ({ data, error } = await db
+      .from('shopping_lists').update({ name: updates.name }).eq('id', listId).eq('household_id', householdId).select().single());
+  }
+  if (error) throw error;
+  return data;
+}
+
 // Resolve the household's single staple shopping list - the SAME list the Lists
 // page maintains via ensureShoppingList (named "Shopping", protected). The
 // WhatsApp bot, meal-plan "add ingredients", and chat all funnel through here,
@@ -7946,6 +7967,7 @@ module.exports = {
   getShoppingList,
   getShoppingLists,
   createShoppingList,
+  updateShoppingList,
   ensureShoppingList,
   deleteShoppingList,
   getDefaultShoppingList,
