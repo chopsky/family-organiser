@@ -2290,11 +2290,26 @@ async function handlePhoto(imageBuffer, mimeType, user, household, caption = '')
     const shoppingList = await db.getShoppingList(household.id);
     const matchResult = await matchReceiptToList(extracted.items, shoppingList, ctx);
 
+    // The matcher echoes shopping-list UUIDs back from the prompt, and the
+    // model occasionally mangles a long hex id (drops a character → not a
+    // valid uuid) or invents one. Passing that to the uuid column threw
+    // "invalid input syntax for type uuid", which killed the ENTIRE receipt
+    // scan - even when extraction succeeded and other matches were valid.
+    // Ground every match against the real list ids; skip anything unknown,
+    // and never let one bad row abort the batch.
+    const validIds = new Set((shoppingList || []).map((i) => i.id));
     const checkedOff = [];
     for (const match of matchResult.matches || []) {
-      if (match.confidence >= 0.7) {
+      if (match.confidence < 0.7) continue;
+      if (!validIds.has(match.list_item_id)) {
+        console.warn(`[whatsapp] receipt match skipped - unknown list_item_id "${match.list_item_id}"`);
+        continue;
+      }
+      try {
         await db.completeShoppingItemById(match.list_item_id);
         checkedOff.push(match.list_item_name);
+      } catch (err) {
+        console.warn(`[whatsapp] receipt match failed for ${match.list_item_id}:`, err.message);
       }
     }
 
