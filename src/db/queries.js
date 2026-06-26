@@ -7661,6 +7661,40 @@ async function getChoreSkipsForDate(householdId, dateStr, db = supabase) {
   return (data || []).map((r) => r.definition_id);
 }
 
+// Range variants for the desktop Week view: completions + skips across a
+// (fromStr..toStr) inclusive window, so the grid can read REAL per-day history
+// for past cells instead of assuming complete. Same slot-missing fallback as
+// the single-date query.
+async function getChoreCompletionsForRange(householdId, fromStr, toStr, db = supabase) {
+  let { data, error } = await db
+    .from('chore_completions')
+    .select('definition_id, member_id, slot, date')
+    .eq('household_id', householdId)
+    .gte('date', fromStr)
+    .lte('date', toStr);
+  if (error) {
+    ({ data, error } = await db
+      .from('chore_completions')
+      .select('definition_id, member_id, date')
+      .eq('household_id', householdId)
+      .gte('date', fromStr)
+      .lte('date', toStr));
+  }
+  if (error) throw error;
+  return data || [];
+}
+
+async function getChoreSkipsForRange(householdId, fromStr, toStr, db = supabase) {
+  const { data, error } = await db
+    .from('chore_skips')
+    .select('definition_id, date')
+    .eq('household_id', householdId)
+    .gte('date', fromStr)
+    .lte('date', toStr);
+  if (error) throw error;
+  return data || [];
+}
+
 // ─── Star economy: rewards, redemptions, ledger ──────────────────────────────
 
 async function getStarBalances(householdId, db = supabase) {
@@ -7812,10 +7846,12 @@ module.exports = {
   archiveChoreDefinition,
   reorderChoreDefinitions,
   getChoreCompletionsForDate,
+  getChoreCompletionsForRange,
   addChoreCompletion,
   removeChoreCompletion,
   addChoreSkip,
   getChoreSkipsForDate,
+  getChoreSkipsForRange,
   getStarBalances,
   addStarTransaction,
   removeStarTransactionByRef,

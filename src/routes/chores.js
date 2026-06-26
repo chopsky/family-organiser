@@ -20,6 +20,24 @@ async function householdToday(householdId) {
   return new Date().toLocaleDateString('en-CA', { timeZone: tz });
 }
 
+// Date-string helpers (parsed as local calendar dates, never UTC, so they don't
+// drift across a timezone boundary - the string already encodes the day).
+function ymd(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() + n); return ymd(dt);
+}
+// Monday of the week containing dateStr (week is Monday-anchored, like the view).
+function mondayOf(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dow = dt.getDay(); // 0=Sun..6=Sat
+  dt.setDate(dt.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return ymd(dt);
+}
+
 // Validate + normalise an incoming definition body. Returns { def } or { error }.
 function normaliseDef(body, memberIds) {
   if (!body || typeof body.title !== 'string' || !body.title.trim()) return { error: 'title is required' };
@@ -72,6 +90,32 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     return res.json({ date, tasks, balances });
   } catch (err) {
     console.error('GET /api/chores error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/chores/week?date= — raw data for the desktop Week grid: every
+ * definition + the week's REAL completion/skip history, for the Monday-anchored
+ * week containing `date` (defaults to the household's today). The client mirrors
+ * appliesOn() to lay the grid out, and reads completions for past-day cells
+ * instead of assuming complete.
+ */
+router.get('/week', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const today = await householdToday(req.householdId);
+    const ref = DATE_RE.test(req.query.date) ? req.query.date : today;
+    const from = mondayOf(ref);
+    const to = addDays(from, 6);
+    const [defs, completions, skips, balances] = await Promise.all([
+      db.getChoreDefinitions(req.householdId),
+      db.getChoreCompletionsForRange(req.householdId, from, to),
+      db.getChoreSkipsForRange(req.householdId, from, to).catch(() => []), // pre-migration tolerant
+      db.getStarBalances(req.householdId),
+    ]);
+    return res.json({ from, to, today, defs, completions, skips, balances });
+  } catch (err) {
+    console.error('GET /api/chores/week error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

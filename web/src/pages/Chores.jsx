@@ -11,7 +11,9 @@ import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
-import { useIsMobile } from '../hooks/useMediaQuery';
+import { useIsMobile, useMediaQuery } from '../hooks/useMediaQuery';
+import { buildWeek } from '../lib/choreRecurrence';
+import DesktopChoresWeek from './chores/DesktopChoresWeek';
 import { useChildMode } from '../context/ChildModeContext';
 import { useAuth } from '../context/AuthContext';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
@@ -395,6 +397,13 @@ export default function Chores() {
   const [balances, setBalances] = useState({});
   const [loading, setLoading] = useState(true);
   const [dayOffset, setDayOffset] = useState(0);
+  // Desktop-only "Week" view: a separate mode (toggled in the header) with its
+  // own week reference date, selected member, and raw /chores/week payload.
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [view, setView] = useState('day'); // 'day' | 'week'
+  const [weekRefStr, setWeekRefStr] = useState(null); // 'YYYY-MM-DD' anchor; null = today
+  const [weekWho, setWeekWho] = useState(null);
+  const [weekData, setWeekData] = useState(null); // { from, to, today, defs, completions, skips, balances }
   const [visibleIds, setVisibleIds] = useState(null); // null = everyone (desktop people filter)
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef(null);
@@ -527,6 +536,49 @@ export default function Chores() {
     else setClaim(task);
   }, [setAnyoneDone]);
 
+  // ── Week view (desktop) ──────────────────────────────────────────────────
+  const weekMode = view === 'week' && isDesktop;
+  const loadWeek = useCallback(async (refStr) => {
+    const { data } = await api.get('/chores/week', { params: refStr ? { date: refStr } : {} });
+    setWeekData(data);
+  }, []);
+  useEffect(() => { if (weekMode) loadWeek(weekRefStr); }, [weekMode, weekRefStr, loadWeek]);
+  // Default the selected week-member to the first shown member.
+  useEffect(() => {
+    if (weekMode && !weekWho && members.length) {
+      const pool = childMode ? members.filter(isKid) : members;
+      setWeekWho((pool[0] || members[0]).id);
+    }
+  }, [weekMode, weekWho, members, childMode]);
+
+  const weekDays = weekData ? buildWeek(weekData.from, weekData.today) : [];
+  const weekIsThis = weekDays.some((d) => d.isToday);
+  const fmtDay = (s, opts) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-GB', opts); };
+  const weekLabel = !weekData ? 'Week' : weekIsThis ? 'This week' : `${fmtDay(weekData.from, { day: 'numeric' })}–${fmtDay(weekData.to, { day: 'numeric', month: 'short' })}`;
+  const shiftWeek = (deltaDays) => {
+    const base = weekRefStr || weekData?.today || dateStrLocal(new Date());
+    const [y, m, d] = base.split('-').map(Number);
+    const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() + deltaDays);
+    setWeekRefStr(dateStrLocal(dt));
+  };
+  // Toggle a Week cell (today only). Optimistic over weekData.completions; the
+  // write hits the same /complete endpoint with that cell's date.
+  const weekToggle = useCallback(async (def, slot, dateStr, memberId, nextDone) => {
+    const k = (c) => `${c.definition_id}|${c.slot || ''}|${c.member_id}|${c.date}`;
+    const target = `${def.id}|${slot || ''}|${memberId}|${dateStr}`;
+    setWeekData((wd) => {
+      if (!wd) return wd;
+      const completions = nextDone
+        ? [...wd.completions, { definition_id: def.id, member_id: memberId, slot: slot || '', date: dateStr }]
+        : wd.completions.filter((c) => k(c) !== target);
+      return { ...wd, completions };
+    });
+    try {
+      const { data } = await api.post(`/chores/${def.id}/complete`, { member_id: memberId, date: dateStr, done: nextDone, slot: slot || '' });
+      if (data.balances) setWeekData((wd) => (wd ? { ...wd, balances: data.balances } : wd));
+    } catch { loadWeek(weekRefStr); }
+  }, [weekRefStr, loadWeek]);
+
   // Child Mode shows only dependents across the board (columns, mobile pills,
   // swipe). loadDay/tasksFor still operate on real ids.
   const baseMembers = childMode ? members.filter(isKid) : members;
@@ -598,10 +650,28 @@ export default function Chores() {
               )}
             </div>
             )}
+            {/* Day/Week toggle — desktop only (the 7-day grid needs the width). */}
+            {isDesktop && !childMode && (
+              <div style={{ display: 'inline-flex', background: BG_SOFT, borderRadius: 99, padding: 3 }}>
+                {['day', 'week'].map((v) => (
+                  <button key={v} onClick={() => setView(v)} style={{ padding: '6px 15px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, textTransform: 'capitalize', background: view === v ? '#fff' : 'transparent', color: view === v ? INK : INK2, boxShadow: view === v ? '0 1px 4px rgba(26,22,32,0.12)' : 'none' }}>{v}</button>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
-              <button onClick={() => setDayOffset(0)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 96 }}>{dayLabel}</button>
-              <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
+              {weekMode ? (
+                <>
+                  <button onClick={() => shiftWeek(-7)} aria-label="Previous week" style={dayNav}><IcChevL s={18} c={INK2} /></button>
+                  <button onClick={() => setWeekRefStr(null)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 112 }}>{weekLabel}</button>
+                  <button onClick={() => shiftWeek(7)} aria-label="Next week" style={dayNav}><IcChevR s={18} c={INK2} /></button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day" style={dayNav}><IcChevL s={18} c={INK2} /></button>
+                  <button onClick={() => setDayOffset(0)} style={{ padding: '9px 20px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: BG_SOFT, color: INK, minWidth: 96 }}>{dayLabel}</button>
+                  <button onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day" style={dayNav}><IcChevR s={18} c={INK2} /></button>
+                </>
+              )}
             </div>
             {!childMode && (isMobile
               ? <PillBtn primary aria-label="Add task" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
@@ -668,6 +738,20 @@ export default function Chores() {
             </div>
           )}
         </div>
+      ) : weekMode ? (
+        <DesktopChoresWeek
+          members={shown}
+          who={weekWho}
+          setWho={setWeekWho}
+          defs={weekData?.defs || []}
+          completions={weekData?.completions || []}
+          skips={weekData?.skips || []}
+          weekDays={weekDays}
+          today={weekData?.today}
+          balances={weekData?.balances || balances}
+          onToggle={weekToggle}
+          onEdit={(def) => setModal({ mode: 'edit', task: def })}
+        />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {shown.map((m) => (
