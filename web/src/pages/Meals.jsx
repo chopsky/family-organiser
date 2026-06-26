@@ -811,6 +811,10 @@ const MealDetailPopup = forwardRef(function MealDetailPopup({ meal, onClose, onE
           )}
         </div>
 
+        {recipe?.image_url && (
+          <img src={recipe.image_url} alt={recipe.name || meal.meal_name} className="w-full h-48 object-cover" />
+        )}
+
         <div className="p-5 space-y-4">
           {/* Ingredients */}
           {recipe?.ingredients?.length > 0 && (
@@ -1565,8 +1569,28 @@ function RecipeFormModal({ recipe, onSave, onClose }) {
   const [cookTime, setCookTime] = useState(recipe.cook_time_mins || recipe.cook_time || '');
   const [tags, setTags] = useState(recipe.dietary_tags || recipe.tags || []);
   const [notes, setNotes] = useState(recipe.notes || '');
+  const [imageUrl, setImageUrl] = useState(recipe.image_url || '');
+  const [uploadingImg, setUploadingImg] = useState(false);
   const [saving, setSaving] = useState(false);
   const modalRef = useRef(null);
+  const imgInputRef = useRef(null);
+
+  async function handleImagePick(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file || !file.type.startsWith('image/')) return;
+    setUploadingImg(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const { data } = await api.post('/recipes/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setImageUrl(data.url);
+    } catch {
+      alert('Could not upload the image. Please try a smaller photo.');
+    } finally {
+      setUploadingImg(false);
+    }
+  }
 
   useEffect(() => {
     function handleClick(e) {
@@ -1610,6 +1634,7 @@ function RecipeFormModal({ recipe, onSave, onClose }) {
       cook_time_mins: cookTime ? Number(cookTime) : null,
       dietary_tags: tags,
       notes: notes.trim() || null,
+      image_url: imageUrl || null,
     };
     await onSave(data);
     setSaving(false);
@@ -1636,6 +1661,25 @@ function RecipeFormModal({ recipe, onSave, onClose }) {
               className="w-full border border-cream-border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
               required
             />
+          </div>
+
+          {/* Photo */}
+          <div>
+            <label className="block text-xs font-medium text-bark mb-1.5">Photo</label>
+            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
+            {imageUrl ? (
+              <div className="relative">
+                <img src={imageUrl} alt="Recipe" className="w-full h-40 object-cover rounded-xl border border-cream-border" />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button type="button" onClick={() => imgInputRef.current?.click()} disabled={uploadingImg} className="text-xs font-medium bg-white/90 text-bark px-2.5 py-1 rounded-lg border border-cream-border disabled:opacity-60">{uploadingImg ? 'Uploading…' : 'Change'}</button>
+                  <button type="button" onClick={() => setImageUrl('')} className="text-xs font-medium bg-white/90 text-primary px-2.5 py-1 rounded-lg border border-cream-border">Remove</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => imgInputRef.current?.click()} disabled={uploadingImg} className="w-full h-24 rounded-xl border border-dashed border-cream-border bg-white text-sm text-cocoa flex items-center justify-center gap-2 hover:border-accent transition-colors disabled:opacity-60">
+                {uploadingImg ? 'Uploading…' : (<><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg> Add a photo</>)}
+              </button>
+            )}
           </div>
 
           {/* Category + Servings row */}
@@ -1926,6 +1970,10 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
             </div>
           )}
         </div>
+
+        {recipe.image_url && (
+          <img src={recipe.image_url} alt={recipe.name} className="w-full h-52 object-cover shrink-0" />
+        )}
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Servings adjuster */}

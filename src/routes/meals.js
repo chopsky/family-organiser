@@ -1,11 +1,25 @@
 const { Router } = require('express');
+const path = require('path');
+const crypto = require('crypto');
+const multer = require('multer');
 const db = require('../db/queries');
+const { supabaseAdmin } = require('../db/client');
 const { callWithFailover } = require('../services/ai-client');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 const push = require('../services/push');
 
 const router = Router();
+
+// Recipe photos: in-memory, images only, 5 MB cap (mirrors the avatar upload).
+const recipeImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Only image files are accepted'));
+    cb(null, true);
+  },
+});
 
 // ─── Meal Plan ──────────────────────────────────────────────────────────────
 
@@ -743,6 +757,35 @@ Return ONLY valid JSON:
  * PATCH /api/recipes/:id
  * Update recipe.
  */
+/**
+ * POST /api/recipes/image
+ * Upload a recipe photo. Stored in Supabase Storage (avatars bucket, under a
+ * recipes/<household>/ prefix), returns the public URL. The caller then saves
+ * it as the recipe's image_url via POST/PATCH /recipes. Decoupled from a
+ * recipe id so it works while creating a brand-new recipe too.
+ */
+router.post('/recipes/image', requireAuth, requireHousehold, recipeImageUpload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image uploaded. Use field name "image".' });
+  }
+  try {
+    const ext = (path.extname(req.file.originalname || '') || '.jpg').toLowerCase();
+    const storagePath = `recipes/${req.householdId}/${crypto.randomUUID()}${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from('avatars')
+      .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+    if (upErr) {
+      console.error('Recipe image upload error:', upErr);
+      return res.status(500).json({ error: 'Failed to upload image.' });
+    }
+    const { data: urlData } = supabaseAdmin.storage.from('avatars').getPublicUrl(storagePath);
+    return res.json({ url: `${urlData.publicUrl}?t=${Date.now()}` });
+  } catch (err) {
+    console.error('POST /api/recipes/image error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.patch('/recipes/:id', requireAuth, requireHousehold, async (req, res) => {
   const { name, category, ingredients, method, prep_time_mins, cook_time_mins, servings, dietary_tags, image_url, notes, is_favourite } = req.body;
   const updates = {};
