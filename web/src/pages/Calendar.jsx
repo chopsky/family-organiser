@@ -4,6 +4,7 @@ import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
 import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
 import PageHeader from '../components/ui/PageHeader';
+import Avatar from '../components/ui/Avatar';
 import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Segmented from '../components/ui/Segmented';
@@ -1290,61 +1291,29 @@ export default function Calendar() {
   }, [selectedDate, events, tasks, activeFilters, activeMemberFilters]);
 
   // Helper to get member initials + color
-  function getMemberInfo(name) {
-    const m = members.find(member => member.name === name);
-    return {
-      initial: name?.[0]?.toUpperCase() || '?',
-      hex: m?.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage,
-    };
-  }
-
   /**
-   * Returns an array of { name, hex, initial, avatar_url } for an event.
+   * Returns the household member objects assigned to an event/task, for the
+   * shared <Avatar> stack.
    * Source preference: the row's own `assigned_to_names[]` (the source
    * of truth post-migration), then the event_assignees join table
    * (still populated for reminder fanout), then the legacy single name.
    */
   function getEventMembers(ev) {
-    const list = [];
+    // Resolve each assignee name to the real household member so the avatar
+    // stack can render their actual avatar (illustrated avatar_id, uploaded
+    // photo, or coloured initial) via the shared <Avatar>. Falls back to a
+    // synthetic member for an unmatched name so it still shows an initial.
+    const resolve = (names) => names
+      .filter(Boolean)
+      .map((name) => members.find((x) => x.name === name) || { name, color_theme: null });
+
     const fromArray = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0
-      ? ev.assigned_to_names.filter(Boolean)
+      ? ev.assigned_to_names
       : null;
-    if (fromArray) {
-      for (const name of fromArray) {
-        const m = members.find(x => x.name === name) || null;
-        const info = getMemberInfo(name);
-        list.push({
-          name,
-          initial: info.initial,
-          hex: info.hex,
-          avatar_url: m?.avatar_url || null,
-        });
-      }
-      return list;
-    }
-    if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
-      for (const a of ev.assignees) {
-        const m = members.find(x => x.name === a.member_name) || null;
-        list.push({
-          name: a.member_name,
-          initial: a.member_name?.[0]?.toUpperCase() || '?',
-          hex: m?.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage,
-          avatar_url: m?.avatar_url || null,
-        });
-      }
-      return list;
-    }
-    if (ev.assigned_to_name) {
-      const info = getMemberInfo(ev.assigned_to_name);
-      const m = members.find(x => x.name === ev.assigned_to_name);
-      list.push({
-        name: ev.assigned_to_name,
-        initial: info.initial,
-        hex: info.hex,
-        avatar_url: m?.avatar_url || null,
-      });
-    }
-    return list;
+    if (fromArray) return resolve(fromArray);
+    if (Array.isArray(ev.assignees) && ev.assignees.length > 0) return resolve(ev.assignees.map((a) => a.member_name));
+    if (ev.assigned_to_name) return resolve([ev.assigned_to_name]);
+    return [];
   }
 
   /**
@@ -1359,23 +1328,7 @@ export default function Calendar() {
     return (
       <div className="flex -space-x-2 shrink-0">
         {visible.map((m, i) => (
-          m.avatar_url ? (
-            <img
-              key={`${m.name}-${i}`}
-              src={m.avatar_url}
-              alt={m.name}
-              className="rounded-full object-cover"
-              style={{ width: size, height: size, boxShadow: `0 0 0 2px ${ringColor}` }}
-            />
-          ) : (
-            <div
-              key={`${m.name}-${i}`}
-              className="rounded-full flex items-center justify-center font-bold text-white"
-              style={{ width: size, height: size, background: m.hex, fontSize, boxShadow: `0 0 0 2px ${ringColor}` }}
-            >
-              {m.initial}
-            </div>
-          )
+          <Avatar key={`${m.name}-${i}`} member={m} size={size} style={{ boxShadow: `0 0 0 2px ${ringColor}` }} />
         ))}
         {overflow > 0 && (
           <div
