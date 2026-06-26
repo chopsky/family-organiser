@@ -45,6 +45,11 @@ export default function Lists() {
   // the URL to avoid a TDZ on searchParams, which is declared below.
   const [activeId, setActiveId] = useState(() => new URLSearchParams(window.location.search).get('list') || TODOS_ID);
   const [items, setItems] = useState([]);
+  // Which item ids were already done when the list was loaded. Section
+  // placement (open vs Done) is frozen to this, so checking an item off just
+  // strikes it through in place — it only moves to Done on the next load
+  // (refresh / leave + return / switch list).
+  const [doneAtLoad, setDoneAtLoad] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [draft, setDraft] = useState('');
@@ -112,6 +117,8 @@ export default function Lists() {
   const loadItems = useCallback(async (list) => {
     if (!list) return;
     setLoadingItems(true);
+    // Snapshot the open/Done partition for this load; toggles won't re-segment.
+    const apply = (arr) => { setItems(arr); setDoneAtLoad(new Set(arr.filter((i) => i.done).map((i) => i.id))); };
     try {
       if (list.kind === 'todos') {
         const [{ data: open }, { data: done }] = await Promise.all([
@@ -119,10 +126,10 @@ export default function Lists() {
           api.get('/tasks/recent'),
         ]);
         const map = (t, isDone) => ({ id: t.id, text: t.title, done: isDone, section: null, whoIds: t.assigned_to_ids || [] });
-        setItems([...(open.tasks || []).map((t) => map(t, false)), ...(done.tasks || []).map((t) => map(t, true))]);
+        apply([...(open.tasks || []).map((t) => map(t, false)), ...(done.tasks || []).map((t) => map(t, true))]);
       } else {
         const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
-        setItems((data.items || []).map((i) => ({
+        apply((data.items || []).map((i) => ({
           id: i.id, done: !!i.completed, section: i.aisle_category || 'Other', emoji: getItemEmoji(i.item, i.aisle_category),
           text: i.quantity ? `${cap(i.item)} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : cap(i.item),
           completed_at: i.completed_at || null, // drives the "most recently checked off first" Done order
@@ -130,7 +137,7 @@ export default function Lists() {
           item: i.item, quantity: i.quantity || '', unit: i.unit || '', description: i.description || '', aisle_category: i.aisle_category || 'Other',
         })));
       }
-    } catch { setItems([]); } finally { setLoadingItems(false); }
+    } catch { apply([]); } finally { setLoadingItems(false); }
   }, []);
 
   useEffect(() => {
@@ -253,13 +260,18 @@ export default function Lists() {
 
   // visible items (To-dos filter by assignee) + grouping
   const filtered = isTodos && toFilter ? items.filter((i) => (i.whoIds || []).includes(toFilter)) : items;
-  const openItems = filtered.filter((i) => !i.done);
+  // Section placement is frozen to the load-time snapshot: checking an item off
+  // strikes it through but keeps it in Open until the next load; un-checking
+  // keeps it in Done. openCount is the live not-done total for the badges, so
+  // those still update immediately when you tick something.
+  const openItems = filtered.filter((i) => !doneAtLoad.has(i.id));
   // Done items most-recently-checked-off first. Shopping items carry
   // completed_at; To-dos don't (they keep their /tasks/recent order, which is
   // already recent-first), and the empty-string fallback leaves them stable.
   const doneItems = filtered
-    .filter((i) => i.done)
+    .filter((i) => doneAtLoad.has(i.id))
     .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
+  const openCount = filtered.filter((i) => !i.done).length;
   const sections = isTodos ? [{ name: null, items: openItems }]
     : Object.entries(openItems.reduce((acc, i) => { (acc[i.section] ||= []).push(i); return acc; }, {})).map(([name, its]) => ({ name, items: its }));
   const memberOf = (id) => members.find((m) => m.id === id);
@@ -319,7 +331,7 @@ export default function Lists() {
 
   return (
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
-      <PageHeader kicker={isMobile ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : (active ? `${openItems.length} open` : '')} title="Lists"
+      <PageHeader kicker={isMobile ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : (active ? `${openCount} open` : '')} title="Lists"
         actions={isMobile
           ? <PillBtn primary aria-label="New list" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setNewList(true)} />
           : <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setNewList(true)}>New list</PillBtn>} />
@@ -333,7 +345,7 @@ export default function Lists() {
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 16, WebkitOverflowScrolling: 'touch' }}>
             {lists.map((l) => {
               const on = l.id === activeId;
-              const n = on ? openItems.length : (counts[l.id] ?? 0);
+              const n = on ? openCount : (counts[l.id] ?? 0);
               return (
                 <button key={l.id} onClick={() => setActiveId(l.id)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, fontFamily: INTER, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, background: on ? l.color : '#fff', color: on ? '#fff' : INK2, border: `1px solid ${on ? l.color : LINE}` }}>
                   <span style={{ fontSize: 14 }}>{l.emoji}</span>{l.name}
@@ -353,7 +365,7 @@ export default function Lists() {
                 <button onClick={() => setEditList(active)} aria-label="Rename list" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcPencil s={14} c={INK3} /></button>
               )}
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: active?.color || BRAND, flexShrink: 0 }}>{openItems.length} left</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: active?.color || BRAND, flexShrink: 0 }}>{openCount} left</span>
             </div>
 
             {quickAddBar()}
@@ -428,7 +440,7 @@ export default function Lists() {
                   style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 11, padding: isMobile ? '8px 14px 8px 8px' : '11px 12px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, textAlign: 'left', flexShrink: isMobile ? 0 : undefined, whiteSpace: 'nowrap', border: on ? `1.5px solid ${l.color}` : '1px solid transparent', background: on ? '#fff' : (isMobile ? '#fff' : 'transparent'), boxShadow: on ? '0 2px 10px rgba(26,22,32,0.05)' : 'none' }}>
                   <span style={{ width: isMobile ? 28 : 34, height: isMobile ? 28 : 34, borderRadius: 10, flexShrink: 0, fontSize: isMobile ? 15 : 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: l.color + '1F' }}>{l.emoji}</span>
                   <span style={{ flex: isMobile ? 'none' : 1, fontSize: 14, fontWeight: 600, color: INK }}>{l.name}</span>
-                  {!isMobile && <span style={{ fontSize: 12, fontWeight: 700, color: on ? l.color : INK3 }}>{l.id === activeId ? openItems.length : (counts[l.id] ?? '')}</span>}
+                  {!isMobile && <span style={{ fontSize: 12, fontWeight: 700, color: on ? l.color : INK3 }}>{l.id === activeId ? openCount : (counts[l.id] ?? '')}</span>}
                 </button>
               );
             })}
@@ -542,8 +554,8 @@ function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, on
   if (doneRow) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderBottom: border }}>
-        <button onClick={() => onToggle(it)} aria-label="Mark not done" style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${color}`, background: color }}><Tick s={12} /></button>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: INK3, textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+        <button onClick={() => onToggle(it)} aria-label={it.done ? 'Mark not done' : 'Mark done'} style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: it.done ? `2px solid ${color}` : `1.5px solid ${LINE_STRONG}`, background: it.done ? color : 'transparent' }}>{it.done && <Tick s={12} />}</button>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
       </div>
     );
   }

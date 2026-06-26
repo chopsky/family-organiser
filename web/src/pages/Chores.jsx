@@ -787,7 +787,7 @@ export default function Chores() {
       )}
 
       {modal && <TaskModal modal={modal} members={members} onClose={() => setModal(null)} onSave={handleSave} />}
-      {celebrate && <Celebration data={celebrate} onClose={() => setCelebrate(null)} onGo={() => { setCelebrate(null); navigate('/rewards'); }} />}
+      {celebrate && <Celebration data={celebrate} onClose={() => setCelebrate(null)} onGo={() => { const mid = celebrate.member?.id; setCelebrate(null); navigate(mid ? `/rewards?member=${mid}` : '/rewards'); }} />}
       {claim && <WhoCompletedModal task={claim} members={members} currentUserId={user?.id} onClose={() => setClaim(null)} onPick={(mid) => { setAnyoneDone(claim, mid, true); setClaim(null); }} />}
     </div>
   );
