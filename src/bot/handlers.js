@@ -2322,10 +2322,6 @@ async function handlePhoto(imageBuffer, mimeType, user, household, caption = '')
       lines.push('\n✅ No shopping list items matched this receipt.');
     }
 
-    if (matchResult.unmatched_receipt_items?.length) {
-      lines.push(`\n❓ *Not on your list:* ${matchResult.unmatched_receipt_items.join(', ')}`);
-    }
-
     return {
       response: lines.join('\n'),
       actions: { ...noActions, shoppingCompleted: checkedOff },
