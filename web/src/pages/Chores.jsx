@@ -220,7 +220,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
   const visible = groups.filter((g) => active.includes(g.key));
 
   return (
-    <div style={{ flex: mobile ? 'none' : '0 0 300px', width: mobile ? '100%' : undefined, minWidth: mobile ? 0 : 300, background: bare ? 'transparent' : hex + '12', borderRadius: bare ? 0 : 24, padding: bare ? 0 : '18px 14px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ flex: mobile ? 'none' : '0 0 320px', width: mobile ? '100%' : undefined, minWidth: mobile ? 0 : 320, background: bare ? 'transparent' : hex + '12', borderRadius: bare ? 0 : 24, padding: bare ? 0 : '18px 16px 14px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* header (pinned) */}
       {!bare && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
