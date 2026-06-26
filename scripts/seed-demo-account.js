@@ -283,12 +283,15 @@ async function seedContent({ household, sarah, james, olivia, henry }) {
   await insertMany('star_transactions', starRows);
   console.log(`✓ Stars: Olivia 9 ⭐, Henry 8 ⭐`);
 
+  // Rewards are scoped to the children only (who_ids); the frontend filters
+  // purely on who_ids, so the adults don't see them.
+  const kidIds = [olivia.id, henry.id];
   const rewards = await insertMany('rewards', [
-    { household_id: hid, title: '30 mins extra screen time', emoji: '📺', cost: 5,  who: 'any', who_ids: [], position: 0, created_by: sarah.id },
-    { household_id: hid, title: 'Stay up 30 mins late',      emoji: '🌙', cost: 6,  who: 'any', who_ids: [], position: 1, created_by: sarah.id },
-    { household_id: hid, title: 'Choose family dinner',      emoji: '🍕', cost: 8,  who: 'any', who_ids: [], position: 2, created_by: sarah.id },
-    { household_id: hid, title: '£5 pocket money',           emoji: '💷', cost: 10, who: 'any', who_ids: [], position: 3, created_by: sarah.id },
-    { household_id: hid, title: 'Trip to the cinema',        emoji: '🎬', cost: 20, who: 'any', who_ids: [], position: 4, created_by: sarah.id },
+    { household_id: hid, title: '30 mins extra screen time', emoji: '📺', cost: 5,  who: 'any', who_ids: kidIds, position: 0, created_by: sarah.id },
+    { household_id: hid, title: 'Stay up 30 mins late',      emoji: '🌙', cost: 6,  who: 'any', who_ids: kidIds, position: 1, created_by: sarah.id },
+    { household_id: hid, title: 'Choose family dinner',      emoji: '🍕', cost: 8,  who: 'any', who_ids: kidIds, position: 2, created_by: sarah.id },
+    { household_id: hid, title: '£5 pocket money',           emoji: '💷', cost: 10, who: 'any', who_ids: kidIds, position: 3, created_by: sarah.id },
+    { household_id: hid, title: 'Trip to the cinema',        emoji: '🎬', cost: 20, who: 'any', who_ids: kidIds, position: 4, created_by: sarah.id },
   ]);
   const screenTime = rewards.find((x) => x.title.startsWith('30 mins'));
   await insert('reward_redemptions', {
