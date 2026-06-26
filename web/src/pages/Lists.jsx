@@ -14,6 +14,7 @@ import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { getItemEmoji, AISLE_CATEGORIES } from '../lib/shopping-constants';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { isIos } from '../lib/platform';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -133,6 +134,23 @@ export default function Lists() {
     if (active) loadItems(active);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, lists.length]);
+
+  // Pull-to-refresh (iOS native only; no-op on web). Re-fetches the list
+  // rail + counts and the active list's items, so a change made elsewhere
+  // (another member, or the WhatsApp bot adding "juice") can be pulled in
+  // on demand. Resolves the active descriptor from the freshly-fetched
+  // lists in case it was deleted while we were looking at it.
+  const refreshAll = useCallback(async () => {
+    try {
+      const [{ data: hh }, { data: sl }] = await Promise.all([api.get('/household'), api.get('/shopping-lists')]);
+      setMembers(hh.members || []);
+      const descriptors = buildDescriptors(sl.lists);
+      setLists(descriptors);
+      loadCounts(descriptors);
+      await loadItems(descriptors.find((l) => l.id === activeId) || descriptors[0]);
+    } catch { /* keep existing data on a failed pull */ }
+  }, [activeId, buildDescriptors, loadCounts, loadItems]);
+  const ptr = usePullToRefresh(refreshAll);
 
   const addItem = useCallback(async () => {
     const text = draft.trim();
@@ -276,7 +294,8 @@ export default function Lists() {
       {loading ? (
         <Center>Loading…</Center>
       ) : isMobile ? (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 160 }}>
+        <div {...ptr.bindings} style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 160, touchAction: 'pan-y' }}>
+          <PullIndicator state={ptr.state} />
           {/* list pills */}
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 16, WebkitOverflowScrolling: 'touch' }}>
             {lists.map((l) => {
