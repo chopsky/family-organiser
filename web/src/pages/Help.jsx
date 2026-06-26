@@ -166,14 +166,15 @@ export default function Help() {
           question="How do I add an external calendar (Apple, Google, school)?"
         >
           <p>
-            On the{' '}
-            <Link to="/calendar" className="text-plum hover:underline">
-              Calendar
+            Open{' '}
+            <Link to="/settings?section=calendars" className="text-plum hover:underline">
+              Settings &rarr; Connect Calendars
             </Link>{' '}
-            page, use "Add feed" and paste the public iCal/.ics URL from
-            Apple Calendar, Google Calendar, or your child's school calendar
-            page. We refresh feeds in the background - events typically
-            appear within a few minutes.
+            and tap "Add calendar", then follow the guided steps for Apple,
+            Google, Outlook or a school's calendar - you'll paste its public
+            iCal/webcal URL. On the iPhone app you can also sync the calendars
+            already on your device, no link needed. A new feed's events import
+            as soon as you add it.
           </p>
         </FaqAccordion>
 
@@ -182,11 +183,15 @@ export default function Help() {
           question="Why don't I see my events for next month?"
         >
           <p>
-            Calendar fetches events for the visible month plus a small
-            buffer either side. If you scroll forward, the next month
-            loads on demand. External-feed events refresh on a schedule
-            (currently every few hours) - pull the page to refresh, or
-            wait for the next sync.
+            Calendar loads the visible month and prefetches the months
+            either side, so moving forward a month pulls those events in.
+            Subscribed iCal feeds refresh in the background about every 6
+            hours (connected Google calendars roughly every 30 minutes). To
+            pull the latest right away, open{' '}
+            <Link to="/settings?section=calendars" className="text-plum hover:underline">
+              Settings &rarr; Connect Calendars
+            </Link>{' '}
+            and refresh the feed.
           </p>
         </FaqAccordion>
 
