@@ -1352,9 +1352,13 @@ function RecipeBoxView({ setError }) {
                   onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   <div className="relative shrink-0 flex items-center justify-center" style={{ height: 110, background: c.bg }}>
-                    <span style={{ fontFamily: '"Instrument Serif", serif', fontSize: 40, color: 'rgba(0,0,0,0.15)' }}>
-                      {recipe.name?.charAt(0)?.toUpperCase()}
-                    </span>
+                    {recipe.image_url ? (
+                      <img src={recipe.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <span style={{ fontFamily: '"Instrument Serif", serif', fontSize: 40, color: 'rgba(0,0,0,0.15)' }}>
+                        {recipe.name?.charAt(0)?.toUpperCase()}
+                      </span>
+                    )}
                     <span
                       role="button"
                       tabIndex={0}
