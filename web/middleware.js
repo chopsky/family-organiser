@@ -1,25 +1,33 @@
 /**
- * Strict regional redirect - Vercel Edge Middleware.
+ * Minimal regional redirect - Vercel Edge Middleware.
  *
- * Every "marketing-ish" request is forced to the locale page matching
- * the visitor's IP-derived country. This explicitly includes typo /
- * 404-style paths (`/asdfkjaskdj`, `/old-link-from-2022`, etc.) - those
- * would otherwise fall through to the SPA rewrite and render the
- * default-locale landing, which makes the geo enforcement leaky.
+ * Only the marketing landing roots are geo-aware. A request to `/` (or to a
+ * locale root that doesn't match the visitor's country) is redirected to the
+ * locale page matching the visitor's IP-derived country. Everything else -
+ * app routes, auth pages, typo / 404 URLs - falls through untouched to the
+ * SPA, where React Router renders the right page (or a real 404).
  *
- * The set of paths that bypass the redirect is enumerated below:
- *   - SKIP_PATHS: exact-match public pages (auth flow, support, legal)
- *   - SKIP_PREFIXES: authenticated app routes + well-known endpoints
- *   - Matcher exclusions: static assets, API rewrites
+ * This is the key behaviour change from the old "strict" model: unknown URLs
+ * are NO LONGER force-redirected to a locale landing. They reach the SPA's
+ * catch-all route, which renders a proper 404 with a "Housemait home" button.
  *
- * Search-engine crawlers also bypass entirely. Without this, Googlebot
- * crawling from US IPs would always be redirected to /us and never
+ * The geo logic therefore guards exactly one surface:
+ *   - LOCALE_ROOTS: `/` and the per-country landing pages (`/gb`, `/us`, ...)
+ *
+ * Plus one piece of non-redirect bookkeeping:
+ *   - SKIP_PATHS: transactional pages (the signup/auth flow) get the
+ *     housemait-locale cookie stamped from the visitor's IP if it's missing,
+ *     so a direct visit to /signup still carries the geo-derived country into
+ *     the signup flow (UK households import school term dates; SA ones don't).
+ *
+ * Search-engine crawlers bypass the geo redirect entirely. Without this,
+ * Googlebot crawling from US IPs would always be redirected to /us and never
  * index /gb, /eu, /au, /ca, /za - collapsing the hreflang setup.
  *
- * Choice of 307 (not 301): geo redirects are temporary by their
- * nature - the destination depends on where the visitor is right now,
- * not where they "should" be canonically. Using 301 would teach search
- * engines and browsers to permanently associate / with /gb.
+ * Choice of 307 (not 301): geo redirects are temporary by their nature - the
+ * destination depends on where the visitor is right now, not where they
+ * "should" be canonically. 301 would teach engines to permanently associate
+ * / with /gb.
  */
 
 // EU + EEA + Switzerland → /eu. Switzerland is included because we
@@ -32,8 +40,15 @@ const EU_OR_EEA = new Set([
   'NO', 'IS', 'LI', 'CH',
 ]);
 
-// Exact-match paths the middleware MUST NOT redirect. These render the
-// same content for every visitor regardless of country.
+// The only paths the geo redirect touches. `/` is the international default
+// (x-default in hreflang); the rest are the per-country marketing landings.
+// A request to any other path falls straight through to the SPA.
+const LOCALE_ROOTS = new Set(['/', '/gb', '/us', '/eu', '/au', '/ca', '/za']);
+
+// Transactional pages that get the housemait-locale cookie stamped from the
+// visitor's IP (if missing) so the signup flow knows the country without a
+// prior marketing-page render. These are NOT geo-redirected - they render the
+// same content everywhere; the cookie just carries the country forward.
 const SKIP_PATHS = new Set([
   '/login',
   '/signup',
@@ -42,52 +57,11 @@ const SKIP_PATHS = new Set([
   '/check-email',
   '/verify',
   '/verified',
-  '/privacy',
-  '/terms',
-  '/support',
-  // Campaign smart-link: must reach the SPA (FairRedirect) which routes
-  // iPhone -> App Store and everyone else -> /signup?promo=... Without this
-  // the geo redirect bounces /fair to the locale landing page instead.
+  // Campaign smart-link: FairRedirect (in the SPA) routes iPhone -> App Store
+  // and everyone else -> /signup?promo=... Stamping the cookie here means a SA
+  // visitor who taps /fair lands on the SA signup flow.
   '/fair',
 ]);
-
-// Of the SKIP_PATHS, these country-agnostic legal / support pages must pass
-// straight through with NO cookie-stamp self-redirect. They render identically
-// everywhere, so the locale cookie buys nothing - and the 307-to-self below
-// loops forever for any client that doesn't echo the cookie back on the second
-// hit (Googlebot, the Google OAuth verification privacy-policy fetcher, curl).
-// That loop made /privacy unreachable to Google, which would fail OAuth
-// verification. Humans in a browser never noticed (the cookie resolves it in
-// one hop), so the bug only bit headless fetchers.
-const NO_STAMP_PATHS = new Set(['/privacy', '/terms', '/support']);
-
-// Prefix-match paths - anything starting with one of these is bypassed.
-// Mostly authenticated app routes that already require a JWT to render
-// anything useful, and a few well-known infra endpoints.
-const SKIP_PREFIXES = [
-  '/dashboard',
-  '/tasks',
-  '/chores',      // legacy alias - redirects to /tasks in the SPA
-  '/lists',
-  '/shopping',
-  '/rewards',
-  '/calendar',
-  '/meals',
-  '/receipt',
-  '/documents',
-  '/family',
-  '/settings',
-  '/help',
-  '/connect-whatsapp',
-  '/subscribe',
-  '/subscription',
-  '/setup',
-  '/onboarding',
-  '/admin',
-  '/.well-known',
-  '/v3',          // static v3 redesign preview in public/v3 — never geo-redirect
-  '/school-term-dates', // public term-dates directory, proxied to the API backend (vercel.json) — never geo-redirect
-];
 
 // User-agent patterns for crawlers and link-preview fetchers. Includes
 // the main search engines, the Facebook/Twitter/LinkedIn card-renderers
@@ -119,29 +93,13 @@ export default function middleware(request) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // Skip non-locale pages. Split into two buckets:
-  //
-  //   1. SKIP_PREFIXES - machine endpoints like /.well-known/ and /api/.
-  //      Returned as-is, with NO redirects and NO cookie stamping. Apple's
-  //      apps_swcd daemon fetching /.well-known/apple-app-site-association
-  //      is cookie-less; if we 307-self-redirected to install a cookie it
-  //      would never set the cookie and we'd loop forever (which is what
-  //      was breaking iOS Password AutoFill on the iOS app login form).
-  //
-  //   2. SKIP_PATHS - transactional human-facing pages like /signup.
-  //      Stamp the housemait-locale cookie if it's missing so a direct
-  //      visit to /signup (no prior marketing-page render) still carries
-  //      the visitor's geo-derived country into the signup flow. Browser
-  //      keeps the cookie on the second hit so the self-redirect resolves
-  //      after one pass; no loop.
-  if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
-    return;
-  }
+  // Transactional pages: stamp the housemait-locale cookie from the visitor's
+  // IP if it's missing, so a direct visit to /signup (no prior marketing-page
+  // render) still carries the geo-derived country into the signup flow. The
+  // browser keeps the cookie on the second hit so the self-redirect resolves
+  // after one pass; no loop. Cookieless clients (curl, bots) just get a 307
+  // they don't follow, which is harmless on these pages.
   if (SKIP_PATHS.has(path)) {
-    // Country-agnostic legal/support pages: return immediately, never stamp a
-    // cookie via a self-redirect (it loops for cookieless clients - see
-    // NO_STAMP_PATHS). This keeps /privacy reachable for Google's verifier.
-    if (NO_STAMP_PATHS.has(path)) return;
     const cookieHeader = request.headers.get('cookie') || '';
     if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return; // already set
     const country = request.headers.get('x-vercel-ip-country') || '';
@@ -156,6 +114,11 @@ export default function middleware(request) {
     headers.set('Location', request.url);
     return new Response(null, { status: 307, headers });
   }
+
+  // Everything that isn't a locale landing root falls through to the SPA with
+  // no redirect: app routes, /privacy, /terms, /support, and unknown / typo
+  // URLs (which the SPA renders as a real 404).
+  if (!LOCALE_ROOTS.has(path)) return;
 
   // Bot bypass MUST come before the geo check. Googlebot's IP geolocates
   // to the US, but we still want it to be able to crawl /gb so that
@@ -179,10 +142,10 @@ export default function middleware(request) {
 }
 
 export const config = {
-  // Match almost everything - the SKIP_PATHS / SKIP_PREFIXES lists
-  // above do the heavy lifting inside the function. The matcher itself
-  // only excludes things that should never invoke the middleware at
-  // all: static assets, API rewrites, and Vercel internals.
+  // Match almost everything - the function body decides what to act on
+  // (only LOCALE_ROOTS get geo-redirected; SKIP_PATHS get a cookie stamp).
+  // The matcher only excludes things that should never invoke the edge
+  // function at all: static assets, API rewrites, and Vercel internals.
   //
   // The negative-lookahead pattern means "any path that doesn't start
   // with one of these prefixes and isn't a file with one of these

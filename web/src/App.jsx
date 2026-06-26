@@ -51,6 +51,7 @@ const Privacy         = lazy(() => import('./pages/Privacy'));
 const Terms           = lazy(() => import('./pages/Terms'));
 const Support         = lazy(() => import('./pages/Support'));
 const Help            = lazy(() => import('./pages/Help'));
+const NotFound        = lazy(() => import('./pages/NotFound'));
 const Subscribe       = lazy(() => import('./pages/Subscribe'));
 const SubscribeSuccess = lazy(() => import('./pages/SubscribeSuccess'));
 const SubscribeCancel  = lazy(() => import('./pages/SubscribeCancel'));
@@ -269,7 +270,7 @@ function AppRoutes() {
         <Route path="/admin/analytics" element={<RequirePlatformAdmin><AdminLayout><AdminAnalytics /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/promo-codes" element={<RequirePlatformAdmin><AdminLayout><AdminPromoCodes /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/audit-log" element={<RequirePlatformAdmin><AdminLayout><AdminAuditLog /></AdminLayout></RequirePlatformAdmin>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       </RouteTransition>
     </Suspense>
