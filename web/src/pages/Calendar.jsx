@@ -1769,7 +1769,7 @@ export default function Calendar() {
                         className={`min-h-[90px] p-1.5 transition-colors border-b border-[rgba(26,22,32,0.07)] ${
                           idx % 7 !== 6 ? 'border-r' : ''
                         } ${isCurrent ? 'cursor-pointer hover:bg-plum-light/60' : ''} ${
-                          isToday_ ? 'bg-plum-light' : isSelected ? 'bg-plum-light/50 ring-1 ring-inset ring-plum/30' : 'bg-white'
+                          isToday_ ? 'bg-plum-light' : isSelected ? 'bg-plum-light/50' : 'bg-white'
                         }`}
                       >
                         {/* Padding cells for the previous/next month are left
