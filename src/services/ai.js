@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { callWithFailover, callClaude, CLAUDE_HAIKU_MODEL, REASONING_TIMEOUT_MS } = require('./ai-client');
+const { callWithFailover, callClaude, CLAUDE_MODEL, CLAUDE_HAIKU_MODEL, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { getCityFromTimezone } = require('./weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { formatPreferenceLines } = require('./preferences-format');
@@ -601,36 +601,45 @@ Valid event_type: term_start, term_end, half_term_start, half_term_end, inset_da
 For multi-day breaks use half_term_start (or bank_holiday) with an end_date.
 source_quote MUST be copied verbatim from the retrieved content (include a weekday name if shown). If you cannot find a verbatim snippet for an entry, omit that entry. Return [] if you find nothing concrete.`;
 
-  let text;
-  try {
-    ({ text } = await callClaude({
-      system,
-      messages: [{ role: 'user', content: `Find and extract the official ${localAuthority} council school term dates for ${ays}. Return the JSON array only.` }],
-      // Haiku + capped searches: this fallback is the priciest step (a web
-      // search whose result content dominates the token bill). Haiku quarters
-      // the per-token rate; max_uses bounds how much it pulls. validateTermDates
-      // downstream still guards quality against the verbatim source quotes.
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
-      model: CLAUDE_HAIKU_MODEL,
-      maxTokens: 8192,
-      timeoutMs: REASONING_TIMEOUT_MS,
-    }));
-  } catch (err) {
-    console.warn(`[la-term-dates] search extraction failed for ${localAuthority}:`, err.message);
-    return [];
-  }
+  const userContent = `Find and extract the official ${localAuthority} council school term dates for ${ays}. Return the JSON array only.`;
+  const parseDates = (text) => {
+    try {
+      const cleaned = (text || '').replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
+      const first = cleaned.indexOf('[');
+      const last = cleaned.lastIndexOf(']');
+      if (first === -1 || last <= first) return [];
+      const dates = JSON.parse(cleaned.substring(first, last + 1));
+      return Array.isArray(dates) ? dates.filter((d) => d && typeof d === 'object' && d.date) : [];
+    } catch {
+      return [];
+    }
+  };
 
-  try {
-    const cleaned = (text || '').replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
-    const first = cleaned.indexOf('[');
-    const last = cleaned.lastIndexOf(']');
-    if (first === -1 || last <= first) return [];
-    const dates = JSON.parse(cleaned.substring(first, last + 1));
-    return Array.isArray(dates) ? dates.filter((d) => d && typeof d === 'object' && d.date) : [];
-  } catch (err) {
-    console.warn(`[la-term-dates] search extraction parse failed for ${localAuthority}:`, err.message);
-    return [];
+  // Haiku first (cheap); escalate to Sonnet only when Haiku finds nothing. The
+  // hard councils (WAF-blocked or messy pages) need the stronger model to pull
+  // dates out of the search results, but the bulk succeed on Haiku - so only the
+  // few that fail Haiku pay for Sonnet, keeping the web_search bill bounded.
+  for (const model of [CLAUDE_HAIKU_MODEL, CLAUDE_MODEL]) {
+    let text;
+    try {
+      ({ text } = await callClaude({
+        system,
+        messages: [{ role: 'user', content: userContent }],
+        // web_search result content dominates the token bill; max_uses bounds
+        // how much it pulls, and validateTermDates downstream guards quality.
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+        model,
+        maxTokens: 8192,
+        timeoutMs: REASONING_TIMEOUT_MS,
+      }));
+    } catch (err) {
+      console.warn(`[la-term-dates] search extraction (${model}) failed for ${localAuthority}:`, err.message);
+      continue;
+    }
+    const dates = parseDates(text);
+    if (dates.length) return dates;
   }
+  return [];
 }
 
 module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch, findOfficialTermDatesUrl, extractTermDatesViaSearch };

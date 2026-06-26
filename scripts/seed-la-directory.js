@@ -47,7 +47,7 @@ const WELSH_LAS = new Set([
 
 // Buckets in the "LA (name)" column that are NOT term-date-publishing LAs.
 function isNonLA(name) {
-  return /^does not apply$/i.test(name) || /bfpo|overseas/i.test(name);
+  return /^does not apply$/i.test(name) || /bfpo|overseas|offshore/i.test(name);
 }
 
 // Real LAs we intentionally keep OUT of the directory: tiny/atypical authorities
