@@ -1920,7 +1920,7 @@ export default function Calendar() {
                   return (
                     <div
                       key={item.occurrence_key || `${item._type}-${item.id}`}
-                      className="flex items-center gap-2.5 p-3 bg-white rounded-r-xl mb-2"
+                      className="flex items-center gap-2.5 p-3 bg-white rounded-xl mb-2"
                       style={{ borderLeft: `4px solid ${hex}` }}
                       onClick={() => {
                         if (item._type === 'task') openTaskEditForm(item);
