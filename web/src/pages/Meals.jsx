@@ -1951,7 +1951,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <span className={`text-xs font-semibold ${colors.text} uppercase tracking-wide`}>{recipe.category}</span>
-              <h3 className="text-lg font-bold text-bark mt-1">{recipe.name}</h3>
+              <h3 className="text-lg font-semibold text-bark mt-1">{recipe.name}</h3>
               {recipe.source_url && (
                 <a href={recipe.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 block truncate">
                   Source: {recipe.source_url}
@@ -1975,11 +1975,11 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
           )}
         </div>
 
-        {recipe.image_url && (
-          <img src={recipe.image_url} alt={recipe.name} className="w-full h-52 object-cover shrink-0" />
-        )}
-
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Photo scrolls with the content (full-bleed inside the padded body) */}
+          {recipe.image_url && (
+            <img src={recipe.image_url} alt={recipe.name} className="w-[calc(100%+2.5rem)] max-w-none h-52 object-cover -mx-5 -mt-5" />
+          )}
           {/* Servings adjuster */}
           <div className="flex items-center gap-3 bg-oat rounded-xl px-4 py-2.5">
             <span className="text-sm font-medium text-bark">Servings:</span>
