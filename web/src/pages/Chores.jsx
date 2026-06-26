@@ -752,7 +752,7 @@ export default function Chores() {
           ) : activeMember && (
             <div key={activeMember.id} onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
-              <MemberDayCard member={activeMember} done={tasksFor(activeMember.id).filter((t) => t.done?.[activeMember.id]).length} total={tasksFor(activeMember.id).length} balance={balances[activeMember.id]} showRewards={isKid(activeMember) || (balances[activeMember.id] || 0) > 0} onRewards={() => navigate('/rewards')} />
+              <MemberDayCard member={activeMember} done={tasksFor(activeMember.id).filter((t) => t.done?.[activeMember.id]).length} total={tasksFor(activeMember.id).length} balance={balances[activeMember.id]} showRewards={isKid(activeMember) || (balances[activeMember.id] || 0) > 0} onRewards={() => navigate(`/rewards?member=${activeMember.id}`)} />
               <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare
                 onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
             </div>

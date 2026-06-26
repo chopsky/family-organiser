@@ -3,6 +3,7 @@
 // Tasks page. Rebuilt from design_handoff_tasks_rewards_lists, wired to
 // /api/rewards (+ /api/household for members). Mounted at /rewards.
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
@@ -96,6 +97,8 @@ export default function Rewards() {
   const [redeemingId, setRedeemingId] = useState(null);
   const [modal, setModal] = useState(false);
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
+  const focusParam = searchParams.get('member'); // deep-link from the Tasks page "Rewards ›"
 
   // Everyone earns + redeems stars now. In Child Mode the device is locked to
   // kids, so we still show only dependents there (a kid shouldn't spend a
@@ -114,9 +117,20 @@ export default function Rewards() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => { try { const m = await load(); if (!cancelled) setFocusKid((m[0] || {}).id || null); } catch { /* empty */ } finally { if (!cancelled) setLoading(false); } })();
+    (async () => {
+      try {
+        const m = await load();
+        if (cancelled) return;
+        // Honour ?member=<id> (deep-link from a member's "Rewards ›" on Tasks):
+        // focus that member and switch to the focused view; else default to the
+        // first member.
+        const wanted = focusParam && m.some((x) => x.id === focusParam);
+        setFocusKid(wanted ? focusParam : (m[0] || {}).id || null);
+        if (wanted) setView('focused');
+      } catch { /* empty */ } finally { if (!cancelled) setLoading(false); }
+    })();
     return () => { cancelled = true; };
-  }, [load]);
+  }, [load, focusParam]);
 
   // A reward shows for a member if it lists them, or if it lists nobody
   // (who_ids empty = everyone — kept for legacy "Anyone" rewards).
