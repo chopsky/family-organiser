@@ -437,7 +437,6 @@ export default function Chores() {
   const { enabled: childMode } = useChildMode();
   const [activeWho, setActiveWho] = useState(null); // mobile: which member's column is shown
   const [slideDir, setSlideDir] = useState(0); // mobile: column slide-in direction (-1 prev, +1 next)
-  const swipeRef = useRef(null); // mobile: horizontal-swipe touch start
   useEffect(() => {
     if (document.getElementById('chore-swipe-css')) return;
     const s = document.createElement('style');
@@ -623,17 +622,6 @@ export default function Chores() {
     setSlideDir(nxt > cur ? 1 : nxt < cur ? -1 : 0);
     setActiveWho(id);
   };
-  const onColTouchStart = (e) => { const t = e.touches[0]; swipeRef.current = { x: t.clientX, y: t.clientY }; };
-  const onColTouchEnd = (e) => {
-    const s = swipeRef.current; swipeRef.current = null;
-    if (!s) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - s.x, dy = t.clientY - s.y;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignore vertical scrolls / taps
-    const idx = selectables.findIndex((m) => m.id === selectedId);
-    const next = idx + (dx < 0 ? 1 : -1);
-    if (next >= 0 && next < selectables.length) goToMember(selectables[next].id);
-  };
   const tasksFor = (mid) => tasks.filter((t) => !t.anyone && (t.assignee_ids || []).includes(mid));
   const toggleVisible = (id) => setVisibleIds((prev) => {
     const cur = prev || members.map((m) => m.id);
@@ -743,14 +731,14 @@ export default function Chores() {
             )}
           </div>
           {anyoneActive ? (
-            <div key="anyone" onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
+            <div key="anyone"
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <AnyoneColumn tasks={anyoneTasks} members={members} mobile onClaim={claimAnyone}
                 onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip}
                 onAdd={() => setModal({ mode: 'add', anyone: true })} />
             </div>
           ) : activeMember && (
-            <div key={activeMember.id} onTouchStart={onColTouchStart} onTouchEnd={onColTouchEnd}
+            <div key={activeMember.id}
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <MemberDayCard member={activeMember} done={tasksFor(activeMember.id).filter((t) => t.done?.[activeMember.id]).length} total={tasksFor(activeMember.id).length} balance={balances[activeMember.id]} showRewards={isKid(activeMember) || (balances[activeMember.id] || 0) > 0} onRewards={() => navigate(`/rewards?member=${activeMember.id}`)} />
               <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare
