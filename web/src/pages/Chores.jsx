@@ -121,66 +121,124 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
   const { enabled: childMode } = useChildMode();
   const [hover, setHover] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  // Touch devices have no hover: the hover-reveal of the edit/delete actions
-  // made the FIRST tap synthesize mouseenter (showing the actions) and the
-  // browser swallowed that tap's click, so completing a chore took two taps.
-  // On touch we drop the hover handlers (so the first tap toggles) and show
-  // the actions inline instead.
+  // No hover = touch device. There we swipe a card left to reveal the actions
+  // instead of showing them inline / on hover.
   const noHover = useMediaQuery('(hover: none)');
   // "Anyone" chores have a single shared done state plus an attributed
   // completer; assigned chores are done per-member.
   const done = anyone ? !!task.completed : !!task.done?.[mid];
   const completer = (anyone && done && members) ? members.find((m) => m.id === task.completed_by) : null;
-  // Child Mode is complete-only: no reorder, edit or delete.
-  const dragProps = (onReorder && !childMode) ? {
+  // Drag-to-reorder is a desktop (mouse) affordance; keep it off the touch
+  // swipe path so the two gestures don't fight. Child Mode is complete-only.
+  const dragProps = (onReorder && !childMode && !noHover) ? {
     draggable: true,
     onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/chore', task.id); },
     onDragOver: (e) => { if (e.dataTransfer.types.includes('text/chore')) { e.preventDefault(); setDragOver(true); } },
     onDragLeave: () => setDragOver(false),
     onDrop: (e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/chore'); if (id && id !== task.id) onReorder(id, task.id); },
   } : {};
-  // Edit + delete/skip controls. Reused by the desktop hover overlay and the
-  // touch inline cluster; align controls which side the delete menu opens.
-  const actions = (align) => (
-    <>
-      <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
-      <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align={align} />
-    </>
+
+  // Card content, shared by the desktop and the swipe render paths.
+  const inner = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* 44x44 emoji tile to the left of the title; no-icon tasks drop it entirely */}
+      {task.emoji && (
+        <span style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? BG_SOFT : `${tint}1F`, filter: done ? 'grayscale(.4)' : 'none' }}>{task.emoji}</span>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: done ? INK3 : INK, textDecoration: done ? 'line-through' : 'none', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <MetaChips task={task} />
+          {task.reward && task.stars ? <span style={{ marginTop: 4, display: 'inline-flex' }}><StarPill n={task.stars} small /></span> : null}
+        </div>
+      </div>
+      {completer && <Avatar member={completer} size={26} bg="#fff" />}
+      <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
+        {done && <Tick s={13} />}
+      </span>
+    </div>
   );
-  // Hover handlers only where hover exists — on touch they steal the first tap.
+
+  // ── Touch: swipe the card left to reveal Edit / (Skip) / Delete ──
+  if (noHover && !childMode) {
+    return <SwipeChoreCard task={task} mid={mid} done={done} inner={inner} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} />;
+  }
+
+  // ── Desktop / Child Mode: tap toggles; desktop reveals actions on hover ──
   const hoverProps = noHover ? {} : { onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) };
   return (
     <div {...dragProps} {...hoverProps} onClick={() => onToggle(task, mid)}
       style={{ position: 'relative', cursor: 'pointer', background: '#fff', borderRadius: 16, padding: '12px 14px', opacity: done ? 0.62 : 1, transition: 'opacity .12s, box-shadow .12s', boxShadow: dragOver ? `inset 0 2px 0 ${tint}` : 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* 44x44 emoji tile to the left of the title; no-icon tasks drop it entirely */}
-        {task.emoji && (
-          <span style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? BG_SOFT : `${tint}1F`, filter: done ? 'grayscale(.4)' : 'none' }}>{task.emoji}</span>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: done ? INK3 : INK, textDecoration: done ? 'line-through' : 'none', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <MetaChips task={task} />
-            {task.reward && task.stars ? <span style={{ marginTop: 4, display: 'inline-flex' }}><StarPill n={task.stars} small /></span> : null}
-          </div>
-        </div>
-        {completer && <Avatar member={completer} size={26} bg="#fff" />}
-        {/* Touch: inline always-visible actions (each stops propagation so a tap
-            on them doesn't toggle); the rest of the card tap toggles on first tap. */}
-        {noHover && !childMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>{actions('right')}</div>
-        )}
-        <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: done ? `2px solid ${tint}` : `1.5px solid ${LINE_STRONG}`, background: done ? tint : 'transparent' }}>
-          {done && <Tick s={13} />}
-        </span>
-      </div>
+      {inner}
       {/* Desktop hover actions — absolutely positioned top-left so they never
           squeeze the title. Hidden in Child Mode, which is complete-only. */}
       {!noHover && !childMode && (
         <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity .12s', background: '#fff', borderRadius: 9, padding: 2, boxShadow: '0 2px 8px rgba(26,22,32,0.12)' }}>
-          {actions('left')}
+          <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} aria-label="Edit task" style={cardBtn}><IcPencil s={13} c={INK3} /></button>
+          <DeleteMenu task={task} onDelete={onDelete} onSkip={onSkip} align="left" />
         </div>
       )}
+    </div>
+  );
+}
+
+// Touch chore card: swipe left to reveal Edit / (Skip, if it repeats) / Delete.
+// A plain tap toggles completion; tapping while open just closes the reveal.
+function SwipeChoreCard({ task, mid, done, inner, onToggle, onEdit, onDelete, onSkip }) {
+  const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
+  const BTN = 64;
+  const swipeActions = [
+    { key: 'edit', label: 'Edit', bg: '#EAE7E0', color: INK2, icon: <IcPencil s={16} c={INK2} />, run: () => onEdit(task) },
+    ...(repeats ? [{ key: 'skip', label: 'Skip', bg: '#F3E7CF', color: '#A9772A', icon: <IcClock s={16} c="#A9772A" />, run: () => onSkip(task) }] : []),
+    { key: 'del', label: 'Delete', bg: '#D7556A', color: '#fff', icon: <IcTrash s={16} c="#fff" />, run: () => onDelete(task) },
+  ];
+  const REVEAL = swipeActions.length * BTN;
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dxRef = useRef(0);
+  const start = useRef(null); // { x, y, tx }
+  const axis = useRef(null);  // 'h' | 'v' | null
+  const moved = useRef(false); // a horizontal swipe happened this gesture
+  const setTx = (v) => { dxRef.current = v; setDx(v); };
+
+  const onDown = (e) => { start.current = { x: e.clientX, y: e.clientY, tx: dxRef.current }; axis.current = null; moved.current = false; };
+  const onMove = (e) => {
+    const s = start.current; if (!s) return;
+    const ddx = e.clientX - s.x, ddy = e.clientY - s.y;
+    if (!axis.current) {
+      if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return; // slop
+      axis.current = Math.abs(ddx) > Math.abs(ddy) ? 'h' : 'v';
+      if (axis.current === 'h') { setDragging(true); moved.current = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ } }
+    }
+    if (axis.current === 'h') setTx(Math.max(-REVEAL, Math.min(0, s.tx + ddx)));
+  };
+  const onUp = () => {
+    const s = start.current; start.current = null; setDragging(false);
+    if (s && axis.current === 'h') setTx(dxRef.current < -REVEAL / 2 ? -REVEAL : 0); // snap open/closed
+    axis.current = null;
+  };
+  const onCancel = () => { start.current = null; axis.current = null; setDragging(false); setTx(dxRef.current < -REVEAL / 2 ? -REVEAL : 0); };
+  const onCardClick = () => {
+    if (dxRef.current !== 0) { setTx(0); return; } // open → tap closes (no toggle)
+    if (moved.current) return;                      // just swiped → ignore
+    onToggle(task, mid);
+  };
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16 }}>
+      {/* Revealed actions, behind the card on the right. */}
+      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, display: 'flex' }}>
+        {swipeActions.map((a) => (
+          <button key={a.key} onClick={(e) => { e.stopPropagation(); setTx(0); a.run(); }} aria-label={a.label}
+            style={{ width: BTN, border: 0, cursor: 'pointer', background: a.bg, color: a.color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, fontFamily: INTER, fontSize: 11, fontWeight: 700 }}>
+            {a.icon}{a.label}
+          </button>
+        ))}
+      </div>
+      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel} onClick={onCardClick}
+        style={{ position: 'relative', background: '#fff', cursor: 'pointer', opacity: done ? 0.62 : 1, padding: '12px 14px', transform: `translateX(${dx}px)`, transition: dragging ? 'none' : 'transform .22s ease, opacity .12s', touchAction: 'pan-y' }}>
+        {inner}
+      </div>
     </div>
   );
 }
