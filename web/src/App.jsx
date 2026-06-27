@@ -4,7 +4,7 @@ import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ChildModeProvider, useChildMode } from './context/ChildModeContext';
 import ChildModePinScreen from './components/ChildModePinScreen';
 import { CHILD_OPEN_ROUTES, CHILD_HOME_ROUTE } from './lib/childMode';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useLayoutEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { localeHomePath } from './hooks/useLocale';
 import { useUniversalLinks } from './hooks/useUniversalLinks';
@@ -160,7 +160,13 @@ function RouteTransition({ children }) {
   // scrolled Dashboard would carry its offset onto the next page (e.g.
   // Calendar opening part-scrolled). Keyed on pathname only, so query-only
   // changes (?list=, ?member=) don't yank the scroll.
-  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
+  //
+  // useLayoutEffect (not useEffect) so the reset runs BEFORE the browser
+  // paints: pages like Calendar render tall cached content synchronously on
+  // mount, so a post-paint reset showed one frame at the inherited offset (a
+  // visible "drop"). Resetting pre-paint means the page is never painted
+  // scrolled.
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   return (
     <div key={location.pathname} className="page-transition">
       {children}
