@@ -159,9 +159,9 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
     </div>
   );
 
-  // ── Touch: swipe the card left to reveal Edit / (Skip) / Delete ──
+  // ── Touch: swipe the card left to reveal Edit / Delete ──
   if (noHover && !childMode) {
-    return <SwipeChoreCard task={task} mid={mid} done={done} inner={inner} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} onSkip={onSkip} />;
+    return <SwipeChoreCard task={task} mid={mid} done={done} inner={inner} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />;
   }
 
   // ── Desktop / Child Mode: tap toggles; desktop reveals actions on hover ──
@@ -182,14 +182,12 @@ function ChoreCard({ task, mid, tint, onToggle, onEdit, onDelete, onSkip, onReor
   );
 }
 
-// Touch chore card: swipe left to reveal Edit / (Skip, if it repeats) / Delete.
+// Touch chore card: swipe left to reveal Edit / Delete.
 // A plain tap toggles completion; tapping while open just closes the reveal.
-function SwipeChoreCard({ task, mid, done, inner, onToggle, onEdit, onDelete, onSkip }) {
-  const repeats = task.repeat === 'daily' || task.repeat === 'weekly';
+function SwipeChoreCard({ task, mid, done, inner, onToggle, onEdit, onDelete }) {
   const BTN = 64;
   const swipeActions = [
     { key: 'edit', label: 'Edit', bg: '#EAE7E0', color: INK2, icon: <IcPencil s={16} c={INK2} />, run: () => onEdit(task) },
-    ...(repeats ? [{ key: 'skip', label: 'Skip', bg: '#F3E7CF', color: '#A9772A', icon: <IcClock s={16} c="#A9772A" />, run: () => onSkip(task) }] : []),
     { key: 'del', label: 'Delete', bg: '#D7556A', color: '#fff', icon: <IcTrash s={16} c="#fff" />, run: () => onDelete(task) },
   ];
   const REVEAL = swipeActions.length * BTN;
@@ -226,8 +224,10 @@ function SwipeChoreCard({ task, mid, done, inner, onToggle, onEdit, onDelete, on
 
   return (
     <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16 }}>
-      {/* Revealed actions, behind the card on the right. */}
-      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, display: 'flex' }}>
+      {/* Revealed actions, behind the card on the right. Kept fully hidden until
+          the card is actually pulled open (dx !== 0) so they can't bleed through
+          a completed card's translucent (opacity .62) background. */}
+      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, display: 'flex', opacity: dx === 0 ? 0 : 1, pointerEvents: dx === 0 ? 'none' : 'auto', transition: dragging ? 'none' : 'opacity .18s ease' }}>
         {swipeActions.map((a) => (
           <button key={a.key} onClick={(e) => { e.stopPropagation(); setTx(0); a.run(); }} aria-label={a.label}
             style={{ width: BTN, border: 0, cursor: 'pointer', background: a.bg, color: a.color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, fontFamily: INTER, fontSize: 11, fontWeight: 700 }}>
