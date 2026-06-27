@@ -58,6 +58,7 @@ export default function Lists() {
   const [newList, setNewList] = useState(false);
   const [editList, setEditList] = useState(null); // list descriptor being renamed
   const [editItem, setEditItem] = useState(null); // grocery item being edited
+  const [editTodo, setEditTodo] = useState(null); // to-do being edited
   const [counts, setCounts] = useState({}); // listId -> open count, for the rail
   const [draftWho, setDraftWho] = useState(null); // To-dos: single assignee for the next add (mobile + desktop)
   const [whoPickerOpen, setWhoPickerOpen] = useState(false); // mobile quick-add assignee picker
@@ -215,6 +216,19 @@ export default function Lists() {
     setEditItem(null);
     if (active) loadItems(active);
   }, [editItem, active, loadItems]);
+
+  // Edit a to-do (title + assignees) via PATCH /tasks/:id. assigned_to_names
+  // replaces the whole assignee list ([] unassigns); names resolve to member
+  // ids on the backend, same as the quick-add path.
+  const saveTodoEdit = useCallback(async (fields) => {
+    if (!editTodo || !fields.title?.trim()) return;
+    const names = (fields.whoIds || []).map((id) => members.find((m) => m.id === id)?.name).filter(Boolean);
+    try {
+      await api.patch(`/tasks/${editTodo.id}`, { title: fields.title.trim(), assigned_to_names: names });
+    } catch { /* fall through to reload */ }
+    setEditTodo(null);
+    if (active) loadItems(active);
+  }, [editTodo, active, loadItems, members]);
 
   const toggle = useCallback(async (it) => {
     const next = !it.done;
@@ -478,7 +492,7 @@ export default function Lists() {
                           <div key={sec.name || 'all'} style={{ marginBottom: 14 }}>
                             {sec.name && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: INK3, padding: '0 4px 8px' }}>{sec.name}</div>}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {sec.items.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={setEditItem} />)}
+                              {sec.items.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={isTodos ? setEditTodo : setEditItem} />)}
                             </div>
                           </div>
                         ))}
@@ -488,7 +502,7 @@ export default function Lists() {
                               <span style={{ transform: doneOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', display: 'flex' }}><IcChevDown s={14} c={INK3} /></span>
                               Done · {doneItems.length}
                             </button>
-                            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>{doneItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={setEditItem} />)}</div>}
+                            {doneOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>{doneItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={isTodos ? setEditTodo : setEditItem} />)}</div>}
                           </div>
                         )}
                       </>
@@ -507,6 +521,7 @@ export default function Lists() {
       {newList && <ListModal onClose={() => setNewList(false)} onSave={createList} />}
       {editList && <ListModal initial={editList} title="Edit list" cta="Save" onClose={() => setEditList(null)} onSave={(fields) => renameList(editList, fields)} />}
       {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSave={saveEdit} />}
+      {editTodo && <EditTodoModal item={editTodo} members={members} onClose={() => setEditTodo(null)} onSave={saveTodoEdit} />}
     </div>
   );
 }
@@ -515,7 +530,7 @@ function Center({ children }) { return <div style={{ flex: 1, display: 'flex', a
 
 function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit }) {
   const [hover, setHover] = useState(false);
-  const editable = !isTodos && !!onEdit; // grocery items open an Edit-item form
+  const editable = !!onEdit; // grocery items + to-dos open an edit form
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 13, padding: '11px 14px', opacity: it.done ? 0.6 : 1 }}>
@@ -523,7 +538,7 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit })
         style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: it.done ? `2px solid ${color}` : `1.5px solid ${LINE_STRONG}`, background: it.done ? color : 'transparent' }}>
         {it.done && <Tick s={12} />}
       </button>
-      <div onClick={editable ? () => onEdit(it) : undefined} title={editable ? 'Edit item' : undefined}
+      <div onClick={editable ? () => onEdit(it) : undefined} title={editable ? (isTodos ? 'Edit to-do' : 'Edit item') : undefined}
         style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, cursor: editable ? 'pointer' : 'default' }}>
         {!isTodos && <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT }}>{it.emoji}</span>}
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
@@ -665,6 +680,52 @@ function EditItemModal({ item, onClose, onSave }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, background: '#fff', cursor: 'pointer', fontWeight: 600, fontFamily: INTER, fontSize: 14, color: INK2 }}>Cancel</button>
           <button onClick={() => f.item.trim() && onSave(f)} disabled={!f.item.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: f.item.trim() ? 1 : 0.5 }}>Save</button>
+        </div>
+      </div>
+    </BottomSheet>
+  );
+}
+
+// Edit a to-do — title + assignees. To-dos live in the tasks table, so this
+// PATCHes /tasks/:id (title + assigned_to_names, which replaces the assignee
+// list; [] unassigns). Mirrors the grocery Edit-item form for parity.
+function EditTodoModal({ item, members, onClose, onSave }) {
+  const [title, setTitle] = useState(item.text || '');
+  const [whoIds, setWhoIds] = useState(item.whoIds || []);
+  const toggleWho = (id) => setWhoIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const field = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff', color: INK };
+  const label = { fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 };
+  const save = () => { if (title.trim()) onSave({ title, whoIds }); };
+  return (
+    <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[440px]">
+      <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>Edit to-do</h2>
+          <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={label}>To-do</div>
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} style={field} />
+        </div>
+        {members.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={label}>Assign to</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {members.map((m) => {
+                const on = whoIds.includes(m.id); const mc = hexFor(m);
+                return (
+                  <button key={m.id} onClick={() => toggleWho(m.id)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 12px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, color: on ? mc : INK2, border: 0, background: on ? mc + '22' : '#fff', boxShadow: on ? `inset 0 0 0 1.5px ${mc}` : `inset 0 0 0 1px ${LINE}` }}>
+                    <Avatar member={m} size={24} />{m.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, background: '#fff', cursor: 'pointer', fontWeight: 600, fontFamily: INTER, fontSize: 14, color: INK2 }}>Cancel</button>
+          <button onClick={save} disabled={!title.trim()} style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: INTER, background: BRAND, color: '#fff', opacity: title.trim() ? 1 : 0.5 }}>Save</button>
         </div>
       </div>
     </BottomSheet>
