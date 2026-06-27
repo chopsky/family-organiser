@@ -308,7 +308,7 @@ function RedeemedLog({ redemptions, members, onToggle, onUndo, readOnly }) {
                     Undo
                   </button>
                   <button onClick={() => onToggle(r)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: r.fulfilled ? 0 : `1.5px solid ${LINE_STRONG}`, background: r.fulfilled ? '#E5F0E2' : '#fff', color: r.fulfilled ? '#3F6E3D' : INK2 }}>
-                    {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Mark fulfilled'}
+                    {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Fulfilled'}
                   </button>
                 </div>
               )}
