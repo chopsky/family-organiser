@@ -191,4 +191,70 @@ module.exports = [
       return null;
     },
   },
+
+  // ── Route-by-time: action-to-do vs timed calendar event ──
+  {
+    name: 'routing: "take the car in for a service" is a to-do, not a calendar event',
+    message: 'I need to take the car in for a service',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent === 'create_event' || r.calendar_event) return `routed to calendar, expected a to-do (${JSON.stringify(r.calendar_event)})`;
+      const a = adds(r);
+      if (a.length < 1) return `expected a to-do add, got intent ${r.intent} / ${a.length} adds`;
+      if (!/car|service/i.test(a[0].title || '')) return `wrong to-do title: "${a[0].title}"`;
+      return null;
+    },
+  },
+  {
+    name: 'routing: "Dentist appointment Tuesday at 3pm" is a timed calendar event',
+    message: 'Dentist appointment Tuesday at 3pm',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent !== 'create_event' || !r.calendar_event) return `expected create_event, got ${r.intent}`;
+      if (!/dentist/i.test(r.calendar_event.title || '')) return `wrong title: "${r.calendar_event.title}"`;
+      if (r.calendar_event.start_time !== '15:00') return `expected start_time 15:00, got ${r.calendar_event.start_time}`;
+      if (r.calendar_event.all_day === true) return `should not be all_day`;
+      if (adds(r).length) return `should not also add a to-do: ${JSON.stringify(r.tasks)}`;
+      return null;
+    },
+  },
+  {
+    name: 'routing: "Remind Lynn to call the plumber" is a to-do assigned to Lynn',
+    message: 'Remind Lynn to call the plumber',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.calendar_event) return `routed to calendar, expected a to-do`;
+      const a = adds(r);
+      if (a.length < 1) return `expected a to-do, got intent ${r.intent}`;
+      if (!/plumber|call/i.test(a[0].title || '')) return `wrong title: "${a[0].title}"`;
+      if (!(a[0].assigned_to_names || []).some((n) => /lynn/i.test(n))) return `not assigned to Lynn: ${JSON.stringify(a[0].assigned_to_names)}`;
+      return null;
+    },
+  },
+  {
+    name: 'routing: "book a dentist appointment" (no time) is a to-do',
+    message: 'I need to book a dentist appointment',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent === 'create_event' || r.calendar_event) return `routed to calendar, expected a to-do`;
+      const a = adds(r);
+      if (a.length !== 1) return `expected exactly 1 to-do, got ${a.length}`;
+      if (!/dentist/i.test(a[0].title || '')) return `wrong title: "${a[0].title}"`;
+      return null;
+    },
+  },
+  {
+    name: 'graduation: "my dentist appointment is Tuesday at 3" → event, handler (not model) ticks the to-do',
+    message: 'My dentist appointment is on Tuesday at 3',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [{ id: 't1', title: 'Book dentist appointment' }] },
+    check: (r) => {
+      if (r.intent !== 'create_event' || !r.calendar_event) return `expected create_event, got ${r.intent}`;
+      if (!/dentist/i.test(r.calendar_event.title || '')) return `wrong title: "${r.calendar_event.title}"`;
+      if (r.calendar_event.start_time !== '15:00') return `expected start_time 15:00, got ${r.calendar_event.start_time}`;
+      // The handler graduates the "Book..." to-do deterministically; the model
+      // must NOT emit a completion for it.
+      if (completions(r).length) return `model emitted a completion; handler should graduate instead: ${JSON.stringify(completions(r))}`;
+      return null;
+    },
+  },
 ];

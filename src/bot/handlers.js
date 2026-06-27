@@ -185,6 +185,57 @@ function parseAffirmative(text) {
   return null;
 }
 
+// ─── Pending "set a reminder time?" follow-up (in-memory, 5-min TTL) ──
+// After the bot creates a to-do or event with no reminder, it offers to set
+// one. The user's next "yes, 1 hour before" / "9am" is resolved here
+// deterministically (apply it to the just-created item) instead of being
+// re-classified as an update intent - the fragile path that fails today,
+// because the follow-up has no reliable handle on which item it targets.
+const pendingReminderTarget = new Map(); // userId → { itemId, itemType:'task'|'event', householdId, label, dueTime, startTime, pendingOffset, timestamp }
+function rememberReminderTarget(userId, entry) {
+  if (!userId || !entry?.itemId) return;
+  pendingReminderTarget.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popReminderTarget(userId) {
+  const entry = pendingReminderTarget.get(userId);
+  if (!entry) return null;
+  pendingReminderTarget.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+
+// Parse a clock time of day out of a short reply ("9am", "9:30 pm", "15:00",
+// "noon"). Returns "HH:MM" (24h) or null. Deliberately conservative: a bare
+// number with no am/pm and no ":mm" (e.g. "9", or the "1" in "1 hour before")
+// returns null, so it never collides with reminder OFFSET phrases.
+function parseTimeOfDay(text) {
+  if (typeof text !== 'string') return null;
+  const t = text.toLowerCase();
+  if (/\b(noon|midday)\b/.test(t)) return '12:00';
+  if (/\bmidnight\b/.test(t)) return '00:00';
+  const m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/) || t.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  const ap = m[3];
+  if (h > 23 || min > 59) return null;
+  if (ap === 'pm' && h < 12) h += 12;
+  if (ap === 'am' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+// "14:30" → "2:30 pm" for friendly confirmations.
+function formatTime12(hhmm) {
+  const [hStr, mStr] = String(hhmm || '').split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  if (!Number.isFinite(h)) return hhmm;
+  const ap = h >= 12 ? 'pm' : 'am';
+  h %= 12;
+  if (h === 0) h = 12;
+  return `${h}:${m} ${ap}`;
+}
+
 // ─── Pending "which school?" for a term-dates import (in-memory, 5-min TTL) ──
 const pendingTermDatesImport = new Map(); // userId → { dates, sourceLabel, country, householdId, schools:[{id,name}], timestamp }
 function rememberTermDatesImport(userId, entry) {
@@ -416,7 +467,7 @@ function formatCandidate(kind, row) {
  * context + optional assignee) and, for updates, `result.updates` with only
  * the fields to change. This function does the fuzzy lookup + disambiguation.
  */
-async function handleModifyIntent(result, user, household, { openTasks = [], calendarEvents = [] } = {}) {
+async function handleModifyIntent(result, user, household, { openTasks = [], calendarEvents = [], originalText = '' } = {}) {
   const actions = {
     shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [],
   };
@@ -439,7 +490,7 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     const hit = groundedList[ref - 1];
     if (hit) {
       return await executeModifyAction({
-        intent: result.intent, kind: isEvent ? 'event' : 'task', hit, updates, user, household, actions,
+        intent: result.intent, kind: isEvent ? 'event' : 'task', hit, updates, user, household, actions, originalText,
       });
     }
   }
@@ -509,6 +560,7 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     user,
     household,
     actions,
+    originalText,
   });
 }
 
@@ -517,7 +569,7 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
  * Used by both the single-match path in handleModifyIntent and the
  * disambiguation-reply path in handleTextMessage.
  */
-async function executeModifyAction({ intent, kind, hit, updates, user, household, actions }) {
+async function executeModifyAction({ intent, kind, hit, updates, user, household, actions, originalText = '' }) {
   const isDelete = intent.startsWith('delete_');
   const isEvent = kind === 'event';
   const isTask = kind === 'task';
@@ -542,8 +594,15 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       // Reminders are stored in a separate table (event_reminders), so they
       // aren't part of the column patch. Treat updates.reminders as a full
       // replacement set: a non-null array (even []) replaces existing
-      // reminders. null means "leave reminders alone".
-      const hasReminderUpdate = Array.isArray(updates?.reminders);
+      // reminders. null means "leave reminders alone". Backstop: if the
+      // classifier dropped the field but the message clearly asks for one
+      // ("set a 30-min reminder on it"), parse it straight from the text.
+      let reminderSet = Array.isArray(updates?.reminders) ? updates.reminders : null;
+      if (!reminderSet && originalText && messageMentionsReminder(originalText)) {
+        const parsed = parseRemindersFromMessage(originalText);
+        if (parsed.length > 0) reminderSet = parsed;
+      }
+      const hasReminderUpdate = Array.isArray(reminderSet);
       if (Object.keys(eventUpdates).length === 0 && !hasReminderUpdate) {
         return { response: "Got it, but I didn't see any field to change. Tell me what to update (time, date, location…).", actions };
       }
@@ -552,7 +611,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         : hit;
       if (hasReminderUpdate) {
         try {
-          await db.saveEventReminders(hit.id, household.id, updates.reminders, updated.start_time);
+          await db.saveEventReminders(hit.id, household.id, reminderSet, updated.start_time);
         } catch (err) {
           console.error('[handlers] saveEventReminders failed for update:', err.message);
         }
@@ -581,6 +640,14 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: `🗑️ Cancelled task "${hit.title}".`, actions };
       }
       const taskUpdates = buildTaskUpdates(updates, hit, household);
+      // Reminder-only update backstop: if the classifier didn't emit a
+      // notification but the message asks for one ("set a 1-hour reminder on
+      // it"), parse + snap it to the task notification enum.
+      if (!taskUpdates.notification && originalText && messageMentionsReminder(originalText)) {
+        const parsed = parseRemindersFromMessage(originalText);
+        const snap = parsed.length > 0 ? snapToTaskNotification(parsed[0]) : null;
+        if (snap?.value) taskUpdates.notification = snap.value;
+      }
       if (Object.keys(taskUpdates).length === 0) {
         return { response: "Got it, but I didn't see any field to change. Tell me what to update (due date, assignee, priority…).", actions };
       }
@@ -789,6 +856,7 @@ function buildTaskUpdates(updates, existing, household) {
   if (updates.due_date !== undefined && updates.due_date !== null) patch.due_date = updates.due_date;
   if (updates.priority) patch.priority = updates.priority;
   if (updates.recurrence !== undefined) patch.recurrence = updates.recurrence;
+  if (updates.notification !== undefined && updates.notification !== null) patch.notification = updates.notification;
 
   if (Array.isArray(updates.assigned_to_names)) {
     const { ids, names } = db.resolveAssignees(updates.assigned_to_names, household.members);
@@ -932,6 +1000,61 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
 }
 
 /**
+ * Appointment graduation: when an appointment EVENT is created, tick off any
+ * open "Book <X> appointment" to-do it fulfils ("to-do, then calendar"). It's
+ * deterministic and conservative - only completes on a UNIQUE booking-shaped
+ * to-do that shares the event's key noun, so it never guesses. Returns the
+ * completed to-do's title, or null. Wired into the create_event branch only;
+ * the COMPLETION + SCHEDULING path (intent "remove"/"mixed") does its own
+ * completion, so graduating there would double-complete.
+ */
+async function graduateAppointmentTodo(eventTitle, household, actions) {
+  // Key noun: drop scheduling verbs + "appointment/booking" + a leading
+  // article/possessive/name. "Dentist appointment" → "dentist";
+  // "Doctor's appointment for Mason" → "doctor"; "Car service" → "car service".
+  const noun = String(eventTitle || '')
+    .toLowerCase()
+    .replace(/\b(book|schedule|arrange|make|set up|sort)\b/g, ' ')
+    .replace(/\b(appointment|appt|booking)s?\b/g, ' ')
+    .replace(/'s\b/g, ' ')
+    .replace(/\b(my|the|a|an|for|with)\b/g, ' ')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (noun.length < 3) return null;
+
+  let candidates;
+  try {
+    candidates = await db.findTasksByFuzzyTitle(household.id, noun);
+  } catch (err) {
+    console.error('[handlers] graduation lookup failed:', err.message);
+    return null;
+  }
+  // Keep only open to-dos that look like a booking task for this noun: a
+  // scheduling verb AND the noun present in the title.
+  const bookish = (candidates || []).filter((t) => {
+    const title = String(t.title || '').toLowerCase();
+    return /\b(book|schedule|arrange|make|set up|sort)\b/.test(title) && title.includes(noun);
+  });
+  // Act ONLY on a unique match - never guess between two booking to-dos.
+  if (bookish.length !== 1) return null;
+
+  const hit = bookish[0];
+  try {
+    await db.completeTask(hit.id);
+  } catch (err) {
+    console.error('[handlers] graduation completeTask failed:', err.message);
+    return null;
+  }
+  if (actions) {
+    actions.tasksCompleted = Array.isArray(actions.tasksCompleted) ? actions.tasksCompleted : [];
+    actions.tasksCompleted.push(hit.title);
+    actions.appointmentGraduated = hit.title;
+  }
+  return hit.title;
+}
+
+/**
  * Answer a "what's on the calendar?" question by fetching the requested date
  * range DIRECTLY from the database, with no window/count limit. The classifier
  * pre-load (used only for disambiguation) is capped for speed, so calendar
@@ -1014,6 +1137,54 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     return await runUndo(user, household);
   }
 
+  // Pending "set a reminder time?" reply - apply the user's offset/time to the
+  // item we just created, deterministically (no LLM round-trip). Events take an
+  // offset (→ event_reminders). To-dos need a due time to count back from, so a
+  // time sets due_time and an offset sets the notification enum; an offset with
+  // no time yet asks for the time and keeps the target alive.
+  const pendingRem = popReminderTarget(user.id);
+  if (pendingRem && pendingRem.householdId === household.id) {
+    const remActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+    const offsets = parseRemindersFromMessage(text);
+    const timeOfDay = pendingRem.itemType === 'task' ? parseTimeOfDay(text) : null;
+    const isReminderReply = offsets.length > 0 || timeOfDay || parseAffirmative(text) === 'yes' || messageMentionsReminder(text);
+    if (isReminderReply) {
+      ctx.intent = 'reminder_followup';
+      try {
+        if (pendingRem.itemType === 'event') {
+          if (offsets.length > 0) {
+            await db.saveEventReminders(pendingRem.itemId, household.id, offsets, pendingRem.startTime);
+            return { response: `Done - I'll remind you before **${pendingRem.label}**.`, actions: remActions };
+          }
+          rememberReminderTarget(user.id, pendingRem);
+          return { response: 'Sure - how long before should I remind you? (e.g. "1 hour before", "the day before")', actions: remActions };
+        }
+        // to-do (task)
+        const offset = offsets[0] || pendingRem.pendingOffset || null;
+        const snap = offset ? snapToTaskNotification(offset) : null;
+        const dueTime = timeOfDay || pendingRem.dueTime || null;
+        if (dueTime) {
+          await db.updateTask(pendingRem.itemId, household.id, { due_time: dueTime, notification: snap?.value || 'at_time' });
+          const lead = snap?.value && snap.value !== 'at_time' ? `${snap.chosenLabel} before ` : 'at ';
+          return { response: `Done - I'll remind you ${lead}${formatTime12(dueTime)} about **${pendingRem.label}**.`, actions: remActions };
+        }
+        if (snap?.value) {
+          // Offset but no time to anchor to - ask for a time, keep the target.
+          rememberReminderTarget(user.id, { ...pendingRem, pendingOffset: offset });
+          return { response: `Got it - ${snap.chosenLabel} ahead. What time is **${pendingRem.label}** due? I need a time to count back from (e.g. "9am").`, actions: remActions };
+        }
+        // bare "yes" with no offset/time
+        rememberReminderTarget(user.id, pendingRem);
+        return { response: `Sure - what time should I remind you about **${pendingRem.label}**? (e.g. "9am", or how far ahead like "1 hour before")`, actions: remActions };
+      } catch (err) {
+        console.error('[handlers] reminder follow-up failed:', err.message);
+        return { response: "I couldn't set that reminder just now - try again in a moment.", actions: remActions };
+      }
+    }
+    // Not a reminder reply (e.g. "no thanks", or an unrelated request) - the
+    // target is already popped; fall through to normal classification.
+  }
+
   // Pending "repeat this birthday every year?" reply - resolve a bare yes/no
   // deterministically against the birthday event we just created.
   const pendingBday = popBirthdayRecurrence(user.id);
@@ -1060,6 +1231,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           user,
           household,
           actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] },
+          // The reply here is "1" / "the second one" - inert for reminder
+          // parsing. Any reminder lives in pendingDisamb.updates already.
+          originalText: null,
         });
       }
       // Couldn't map to a candidate - drop the entry (we've already popped
@@ -1525,7 +1699,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (outcome.kind === 'error') {
       return { response: `⚠️ I understood the event but couldn't save it: ${outcome.message}`, actions };
     }
-    return { response: result.response_message || '📅 Event added! ✅', actions };
+    // Appointment graduation: if this event fulfils an open "Book X appointment"
+    // to-do, tick it off and say so. Soft-fail so it never blocks the event.
+    let eventReply = result.response_message || '📅 Event added! ✅';
+    const ticked = await graduateAppointmentTodo(result.calendar_event.title, household, actions).catch(() => null);
+    if (ticked) eventReply += `\n\n✓ Also ticked off "${ticked}" from your to-do list.`;
+    return { response: eventReply, actions };
   }
 
   // ── Update / Delete intents (events, tasks, shopping items) ──
@@ -1538,7 +1717,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   //
   // Broadcasts fire on success so other household members see the change.
   if (['update_event', 'delete_event', 'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item'].includes(result.intent)) {
-    return await handleModifyIntent(result, user, household, { openTasks, calendarEvents });
+    return await handleModifyIntent(result, user, household, { openTasks, calendarEvents, originalText: text });
   }
 
   // Handle school activity add/remove
@@ -1770,6 +1949,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         }
       }
       const saved = await db.addTasks(household.id, toAdd, user.id, household.members);
+      // Keep the saved rows (with ids + due_time) so the reminder-offer
+      // follow-up below can target the exact to-do the user just made.
+      actions.tasksAddedRows = Array.isArray(saved) ? saved : [];
       // Source from the SAVED rows, not raw toAdd, so assigned_to_names are the
       // roster-RESOLVED names that were actually persisted. addTasks drops any
       // name that isn't a household member (resolveAssignees), so using toAdd
@@ -1985,6 +2167,17 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       followUp = eventAdded
         ? 'Want me to add a reminder for it?'
         : 'Want me to set a reminder time?';
+      // Stash the just-created item so a "yes, 1 hour before" / "9am" reply
+      // resolves deterministically against it (see popReminderTarget at the
+      // top of handleTextMessage).
+      const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
+      const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;
+      const target = ev
+        ? { itemId: ev.id, itemType: 'event', label: ev.title, startTime: ev.start_time }
+        : tk
+          ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
+          : null;
+      if (target?.itemId) rememberReminderTarget(user.id, { ...target, householdId: household.id });
     }
     if (followUp) {
       response += `\n\n${followUp}`;
@@ -2621,6 +2814,10 @@ function formatRecipeResponse(recipe) {
 module.exports = {
   handleTextMessage,
   createCalendarEventFromResult,
+  graduateAppointmentTodo,
+  parseTimeOfDay,
+  rememberReminderTarget,
+  popReminderTarget,
   handleCalendarQuery,
   handleVoiceNote,
   handlePhoto,
