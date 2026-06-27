@@ -1299,18 +1299,21 @@ export default function Calendar() {
    * (still populated for reminder fanout), then the legacy single name.
    */
   function getEventMembers(ev) {
-    // Resolve each assignee name to the real household member so the avatar
-    // stack can render their actual avatar (illustrated avatar_id, uploaded
-    // photo, or coloured initial) via the shared <Avatar>. Falls back to a
-    // synthetic member for an unmatched name so it still shows an initial.
+    // Prefer assigned_to_ids: it's stable across renames, whereas
+    // assigned_to_names goes stale the moment a member is renamed (e.g.
+    // "James Bennett" → "James"), which left renamed members showing a plain
+    // coloured initial instead of their avatar. Resolving to the real member
+    // object lets the shared <Avatar> render their illustrated avatar_id /
+    // photo / initial. Fall back to name matching for rows without ids.
+    const byId = Array.isArray(ev.assigned_to_ids)
+      ? ev.assigned_to_ids.map((id) => members.find((m) => m.id === id)).filter(Boolean)
+      : [];
+    if (byId.length) return byId;
+
     const resolve = (names) => names
       .filter(Boolean)
       .map((name) => members.find((x) => x.name === name) || { name, color_theme: null });
-
-    const fromArray = Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0
-      ? ev.assigned_to_names
-      : null;
-    if (fromArray) return resolve(fromArray);
+    if (Array.isArray(ev.assigned_to_names) && ev.assigned_to_names.length > 0) return resolve(ev.assigned_to_names);
     if (Array.isArray(ev.assignees) && ev.assignees.length > 0) return resolve(ev.assignees.map((a) => a.member_name));
     if (ev.assigned_to_name) return resolve([ev.assigned_to_name]);
     return [];
