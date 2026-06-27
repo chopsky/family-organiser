@@ -2516,9 +2516,9 @@ export default function Calendar() {
                     <button
                       type="button"
                       onClick={() => setFormReminders([...formReminders, { time: '10', unit: 'minutes' }])}
-                      className="text-xs font-semibold text-plum hover:text-plum-dark transition-colors"
+                      className="pt-2 text-xs font-semibold text-plum hover:text-plum-dark transition-colors"
                     >
-                      + Add notification
+                      + Add reminder
                     </button>
                   </div>
                 </div>
