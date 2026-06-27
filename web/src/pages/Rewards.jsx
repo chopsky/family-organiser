@@ -31,8 +31,11 @@ const StarFill = ({ s = 12, c = STAR }) => <svg width={s} height={s} viewBox="0 
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 function relWhen(iso) {
-  const d = new Date(iso); const now = new Date();
-  const days = Math.floor((now - d) / 86400000);
+  const d = new Date(iso);
+  // Compare calendar days (local midnight to local midnight), not elapsed
+  // hours - otherwise something redeemed late yesterday still reads "Today".
+  const midnight = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((midnight(new Date()) - midnight(d)) / 86400000);
   if (days <= 0) return 'Today'; if (days === 1) return 'Yesterday'; if (days < 7) return `${days} days ago`;
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
@@ -152,6 +155,15 @@ export default function Rewards() {
     catch { setRedemptions((rs) => rs.map((r) => (r.id === red.id ? { ...r, fulfilled: !next } : r))); }
   }, []);
 
+  const undoRedemption = useCallback(async (red) => {
+    if (!window.confirm(`Undo "${red.title}"? The ${red.cost} ${red.cost === 1 ? 'star' : 'stars'} will be refunded.`)) return;
+    try {
+      const { data } = await api.delete(`/rewards/redemptions/${red.id}`);
+      setRedemptions((rs) => rs.filter((r) => r.id !== red.id));
+      if (data?.balances) setBalances(data.balances);
+    } catch (e) { alert(e.response?.data?.error || 'Could not undo the redemption.'); }
+  }, []);
+
   const removeReward = useCallback(async (reward) => {
     if (!window.confirm(`Remove the reward "${reward.title}"? Past redemptions are kept.`)) return;
     setRewards((rs) => rs.filter((r) => r.id !== reward.id));
@@ -199,7 +211,7 @@ export default function Rewards() {
       ) : earners.length === 0 ? (
         <Center>Add family members to start the star economy.</Center>
       ) : effView === 'redeemed' ? (
-        <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} readOnly={childMode} />
+        <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} onUndo={undoRedemption} readOnly={childMode} />
       ) : effView === 'focused' ? (
         <Focused kids={earners} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} />
       ) : (
@@ -265,7 +277,7 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
   );
 }
 
-function RedeemedLog({ redemptions, members, onToggle, readOnly }) {
+function RedeemedLog({ redemptions, members, onToggle, onUndo, readOnly }) {
   const memberOf = (id) => members.find((m) => m.id === id);
   if (redemptions.length === 0) return <Center>Nothing redeemed yet.</Center>;
   return (
@@ -290,9 +302,15 @@ function RedeemedLog({ redemptions, members, onToggle, readOnly }) {
                   {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Waiting'}
                 </span>
               ) : (
-                <button onClick={() => onToggle(r)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: r.fulfilled ? 0 : `1.5px solid ${LINE_STRONG}`, background: r.fulfilled ? '#E5F0E2' : '#fff', color: r.fulfilled ? '#3F6E3D' : INK2 }}>
-                  {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Mark fulfilled'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  {/* Undo refunds the stars and removes the redemption. */}
+                  <button onClick={() => onUndo(r)} style={{ padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: `1.5px solid ${LINE_STRONG}`, background: '#fff', color: '#C24A5E' }}>
+                    Undo
+                  </button>
+                  <button onClick={() => onToggle(r)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: r.fulfilled ? 0 : `1.5px solid ${LINE_STRONG}`, background: r.fulfilled ? '#E5F0E2' : '#fff', color: r.fulfilled ? '#3F6E3D' : INK2 }}>
+                    {r.fulfilled ? <><Tick s={12} c="#3F6E3D" /> Fulfilled</> : 'Mark fulfilled'}
+                  </button>
+                </div>
               )}
             </div>
           );
