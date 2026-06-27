@@ -164,9 +164,16 @@ function RouteTransition({ children }) {
   // useLayoutEffect (not useEffect) so the reset runs BEFORE the browser
   // paints: pages like Calendar render tall cached content synchronously on
   // mount, so a post-paint reset showed one frame at the inherited offset (a
-  // visible "drop"). Resetting pre-paint means the page is never painted
-  // scrolled.
-  useLayoutEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
+  // visible "drop"/flicker). Resetting pre-paint means the page is never
+  // painted scrolled. scrollRestoration:'manual' stops the browser re-applying
+  // a remembered position, and we zero documentElement/body too in case the
+  // active scroller isn't window.
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [location.pathname]);
   return (
     <div key={location.pathname} className="page-transition">
       {children}
