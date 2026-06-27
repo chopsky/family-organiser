@@ -150,6 +150,13 @@ export default function Lists() {
         const descriptors = buildDescriptors(sl.lists);
         setLists(descriptors);
         loadCounts(descriptors);
+        // ?list=shopping is a sentinel (the Dashboard's "Open list" links here
+        // without knowing the grocery list's real id): resolve it to the
+        // grocery staple once the lists are loaded.
+        if (new URLSearchParams(window.location.search).get('list') === 'shopping') {
+          const staple = descriptors.find((d) => d.kind === 'shopping');
+          if (staple) setActiveId(staple.id);
+        }
       } catch { /* empty */ } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };

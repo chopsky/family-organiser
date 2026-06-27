@@ -851,13 +851,13 @@ export default function Dashboard() {
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-2)' }}> · {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}</span>
               )}
             </h2>
-            <Link to="/shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
+            <Link to="/lists?list=shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
           </div>
           {shoppingItems.length === 0 ? (
             <div className="py-6 text-center">
               <p className="text-sm text-bark font-medium">Shopping list is empty</p>
               <p className="text-xs text-cocoa mt-1.5 leading-relaxed">
-                Tap <Link to="/shopping" className="text-primary font-medium hover:underline">Open list →</Link> to
+                Tap <Link to="/lists?list=shopping" className="text-primary font-medium hover:underline">Open list →</Link> to
                 add items, or message <span className="italic">"add milk and eggs to the list"</span> to the WhatsApp bot.
               </p>
             </div>
