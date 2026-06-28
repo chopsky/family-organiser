@@ -1,11 +1,13 @@
 /**
  * OnboardingFlow - the single continuous new-user flow, rebuilt from the
- * design_handoff_onboarding prototype. Nine linear steps spanning the auth
+ * design_handoff_onboarding prototype. Linear steps spanning the auth
  * boundary in ONE mounted component:
  *
- *   1 welcome   2 heaviest   3 plan      (pre-auth, local state)
- *   4 account                            (creates the account)
- *   5 household 6 invite  7 whatsapp  8 calendar  9 finish  (authenticated)
+ *   1 account                            (creates the account; pre-auth entry)
+ *   2 household 3 invite 4 whatsapp 5 calendar 6 finish     (authenticated)
+ *
+ * The account card is the landing screen, surrounded by the four corner
+ * notifications. (The earlier welcome/heaviest/plan pitch steps were removed.)
  *
  * Google SSO is a popup (no full-page redirect), so the flow stays mounted
  * through account creation and continues in place. The email path pauses at
@@ -26,10 +28,7 @@ import api from '../../lib/api';
 import ErrorBanner from '../../components/ErrorBanner';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
-import WelcomeStep from './steps/WelcomeStep';
 import WelcomeNotifications from './steps/WelcomeNotifications';
-import HeaviestStep from './steps/HeaviestStep';
-import PlanStep from './steps/PlanStep';
 import AccountStep from './steps/AccountStep';
 import HouseholdStep from './steps/HouseholdStep';
 import InviteStep from './steps/InviteStep';
@@ -51,18 +50,19 @@ import FinishStep from './steps/FinishStep';
 const APP_STORE_BUILD_CURRENT = false;
 const SHOW_GET_APP = APP_STORE_BUILD_CURRENT && !Capacitor.isNativePlatform() && isIos() && APP_STORE_CONFIGURED;
 
-// Step keys in order + the progress-bar fill per step (mirrors the prototype).
-// 'get-app' sits just before 'finish' and is skipped for non-iPhone-web users.
-const STEPS = ['welcome', 'heaviest', 'plan', 'account', 'household', 'invite', 'whatsapp', 'calendar', 'get-app', 'finish'];
-const PROGRESS = { welcome: 14, heaviest: 28, plan: 43, account: 57, household: 63, invite: 75, whatsapp: 88, calendar: 100, 'get-app': 100, finish: 100 };
+// Step keys in order + the progress-bar fill per step. The account card is the
+// pre-auth entry screen; 'get-app' sits just before 'finish' and is skipped for
+// non-iPhone-web users.
+const STEPS = ['account', 'household', 'invite', 'whatsapp', 'calendar', 'get-app', 'finish'];
+const PROGRESS = { account: 16, household: 34, invite: 52, whatsapp: 72, calendar: 100, 'get-app': 100, finish: 100 };
 
 // Where to drop the user in based on auth state, so a refresh / email-verify
 // return resumes correctly instead of restarting. -1 => already onboarded.
 function entryIndex({ token, household, user }) {
-  if (!token) return 0;                  // welcome (pre-auth)
-  if (!household) return 4;              // account done, needs a household
-  if (!user?.onboarded_at) return 5;     // household done, finish the setup
-  return -1;                             // fully onboarded
+  if (!token) return 0;                                    // account (pre-auth entry)
+  if (!household) return STEPS.indexOf('household');       // account done, needs a household
+  if (!user?.onboarded_at) return STEPS.indexOf('invite'); // household done, finish the setup
+  return -1;                                               // fully onboarded
 }
 
 const firstNameOf = (user) => (user?.name || '').trim().split(/\s+/)[0] || 'there';
@@ -95,12 +95,9 @@ export default function OnboardingFlow() {
 
   const [idx, setIdx] = useState(() => {
     const e = entryIndex(auth);
-    // Invited users arrive via /signup?invite= and join a specific household, so
-    // skip the marketing pitch (welcome/heaviest/plan) and start at account.
-    if (e === 0 && inviteToken) return STEPS.indexOf('account');
     // Resume the furthest post-auth step for THIS household, so reopening the
     // browser mid-flow doesn't dump the user back at the invite step.
-    if (e >= 4 && auth.household?.id) {
+    if (e >= STEPS.indexOf('household') && auth.household?.id) {
       const stored = loadStoredStep(auth.household.id);
       if (stored != null && stored > e) return Math.min(stored, STEPS.length - 1);
       // No saved progress on THIS device (a different device, or cleared
@@ -120,7 +117,6 @@ export default function OnboardingFlow() {
     calProvider: null, calUrl: '',
   }));
   const [error, setError] = useState('');
-  const [leavingWelcome, setLeavingWelcome] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -152,14 +148,6 @@ export default function OnboardingFlow() {
     return n;
   });
 
-  // Welcome continue: let the corner notifications drift out to their corners,
-  // then advance. Under reduced motion there is nothing to wait for.
-  const leaveWelcome = () => {
-    if (reduced) { next(); return; }
-    setLeavingWelcome(true);
-    setTimeout(() => { setLeavingWelcome(false); next(); }, 480);
-  };
-
   // Account created/authenticated (Google popup or an invite auto-join). Store
   // the session, consume the promo, then resume at the right step: an existing
   // household jumps to invite (the top-level guard sends fully-onboarded users
@@ -190,7 +178,7 @@ export default function OnboardingFlow() {
     auth, navigate, reduced,
     form, update,
     next, back, setError,
-    leaveWelcome, goAfterAuth, finish, finishing,
+    goAfterAuth, finish, finishing,
     inviteToken, promoCode: form.promoCode,
     firstName: firstNameOf(auth.user),
   };
@@ -208,9 +196,9 @@ export default function OnboardingFlow() {
       <div aria-hidden="true" className="pointer-events-none absolute" style={{ width: 760, height: 760, borderRadius: '50%', left: -180, bottom: -300, background: 'radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%)', filter: 'blur(20px)' }} />
       <div aria-hidden="true" className="pointer-events-none absolute" style={{ width: 600, height: 600, borderRadius: '50%', right: -160, top: -200, background: 'radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%)', filter: 'blur(20px)' }} />
 
-      {/* Welcome-step corner notifications (decorative, stage-level, behind the
-          card). Hidden under 880px via CSS. */}
-      {key === 'welcome' && <WelcomeNotifications leaving={leavingWelcome} reduced={reduced} />}
+      {/* Entry-step corner notifications (decorative, stage-level, behind the
+          card). Shown around the first (account) card. Hidden under 880px. */}
+      {key === 'account' && <WelcomeNotifications reduced={reduced} />}
 
       {/* All steps vertically centred. A short card sits in the middle; a card
           taller than the screen grows the page and scrolls from the top (so its
@@ -259,14 +247,8 @@ export default function OnboardingFlow() {
 // phases and still show navigable placeholders for now.
 function renderStep(key, ctx) {
   switch (key) {
-    case 'welcome':
-      return <WelcomeStep onContinue={ctx.leaveWelcome} navigate={ctx.navigate} />;
-    case 'heaviest':
-      return <HeaviestStep form={ctx.form} update={ctx.update} next={ctx.next} />;
-    case 'plan':
-      return <PlanStep form={ctx.form} next={ctx.next} />;
     case 'account':
-      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} />;
+      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} navigate={ctx.navigate} />;
     case 'household':
       return <HouseholdStep auth={ctx.auth} form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     case 'invite':

@@ -18,7 +18,7 @@ function promoDiscountLabel(info) {
   return 'A discount';
 }
 
-// Step 4. Creates the account. Google SSO is a popup, so it resolves in place
+// Entry step. Creates the account. Google SSO is a popup, so it resolves in place
 // and the flow advances without leaving the page. Email register has no token
 // for normal signups, so it pauses on a "check your inbox" panel; verifying
 // logs the user in and the auth gate funnels them back to resume.
@@ -26,7 +26,7 @@ function promoDiscountLabel(info) {
 // Discount/promo parity with Signup.jsx: the captured promoCode is confirmed
 // for the banner, passed to BOTH register and the SSO buttons, and cleared once
 // the account exists.
-export default function AccountStep({ update, setError, goAfterAuth, inviteToken, promoCode }) {
+export default function AccountStep({ update, setError, goAfterAuth, inviteToken, promoCode, navigate }) {
   const [showEmail, setShowEmail] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -185,7 +185,18 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
         </>
       )}
 
-      <p style={{ marginTop: 18, fontFamily: 'var(--font-sans)', fontSize: 12, color: '#8A8493', lineHeight: 1.45 }}>
+      {/* This is the landing screen now (the welcome/pitch steps were removed),
+          so keep a path to sign in for returning users. */}
+      {navigate && (
+        <p style={{ marginTop: 18, fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-cocoa)' }}>
+          Already have an account?{' '}
+          <button type="button" onClick={() => navigate('/login')} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-plum-dark)', fontWeight: 700, borderBottom: '1.5px solid var(--color-plum-dark)' }}>
+            Log in →
+          </button>
+        </p>
+      )}
+
+      <p style={{ marginTop: 14, fontFamily: 'var(--font-sans)', fontSize: 12, color: '#8A8493', lineHeight: 1.45 }}>
         By creating an account, you agree to our{' '}
         <a href="/terms" style={{ color: '#4A4453', textDecoration: 'none' }}>Terms</a> and{' '}
         <a href="/privacy" style={{ color: '#4A4453', textDecoration: 'none' }}>Privacy Policy</a>.
