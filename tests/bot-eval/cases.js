@@ -257,4 +257,16 @@ module.exports = [
       return null;
     },
   },
+  {
+    name: 'no false completion: "Need to book a doctor appointment" (future intent) is NOT done',
+    message: 'Need to book a doctor appointment',
+    ctx: { sender: 'Sarah', memberNames: ['Sarah', 'James'], tasks: [{ id: 't1', title: 'Book doctor appointment' }] },
+    check: (r) => {
+      // "Need to" is future intent - it must NEVER complete the matching open task.
+      if (completions(r).length) return `wrongly completed the existing task: ${JSON.stringify(completions(r))}`;
+      // It should route as an add (the handler then asks about the duplicate).
+      if (r.intent !== 'add' && adds(r).length === 0) return `expected an add (future intent), got intent ${r.intent}`;
+      return null;
+    },
+  },
 ];

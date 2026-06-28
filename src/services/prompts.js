@@ -239,7 +239,10 @@ TASK COMPLETION SIGNALS:
   ✓ User: "Got the milk" (shopping item "milk" exists) → intent: remove, shopping_items: [{ item: "milk", action: "remove" }]
   ✓ OPEN TASKS has [7] "Book car service". User: "Booked the car service" → tasks: [{ title: "Book car service", task_id: 7, action: "complete" }]
 - If there is NO matching task, fall through to normal handling (chat reply, or add as a new task only if the user explicitly asked to add one).
-- Do NOT over-match. "I need to pay Elementor" (future intent) is NOT a completion - it's a chat/ack. Only treat it as a completion when the user is reporting the thing is already DONE.
+- FUTURE INTENT IS NEVER A COMPLETION (the #1 false-completion bug - read carefully). Words that describe something STILL TO DO - "need to", "I should", "have to", "must", "want to", "would like to", "going to", "got to", "remember to", "can you", "please", "let's" + a verb - are NOT a report that it is done, EVEN WHEN a matching open task already exists. Route them as the normal request (almost always an "add" to-do), never action: "complete".
+    ✗ WRONG: "Need to book a doctor appointment" with open task "Book doctor appointment" -> complete it. NO - they have NOT booked it; they are restating a to-do they STILL need to do.
+    ✓ RIGHT: "Need to book a doctor appointment" -> intent "add", tasks: [{ title: "Book doctor appointment", action: "add", ... }]. (The handler then notices the existing one and asks whether to add a second - you do NOT need to handle the duplicate yourself.)
+  Treat a message as a completion ONLY when the user reports the thing is ALREADY DONE - past tense / done / finished / paid / sorted / booked / collected. "I booked the doctor" = done. "Need to book the doctor" = NOT done. When in doubt, it is an add or a chat, never a completion.
 
 COMPLETION + SCHEDULING (do both at once):
 - When a completion message ALSO contains a date/time for the underlying activity - e.g. "Booked my car in for a service on Wednesday morning", "Paid Elementor, next instalment due 15 May", "Collected Jake from tennis - next session Thursday at 5" - populate BOTH fields in the same reply:

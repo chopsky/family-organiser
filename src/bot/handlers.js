@@ -236,6 +236,36 @@ function formatTime12(hhmm) {
   return `${h}:${m} ${ap}`;
 }
 
+// ─── Pending "you already have this - add another?" duplicate-to-do follow-up ──
+// When asked to add a to-do the household already has open, the bot asks before
+// adding a duplicate (instead of silently double-adding - or, the bug this
+// guards, letting a "need to X" phrasing tick the existing one off). The user's
+// "yes"/"no" is resolved deterministically here.
+const pendingDuplicateTodo = new Map(); // userId → { tasks, householdId, timestamp }
+function rememberDuplicateTodo(userId, entry) {
+  if (!userId || !Array.isArray(entry?.tasks)) return;
+  pendingDuplicateTodo.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popDuplicateTodo(userId) {
+  const entry = pendingDuplicateTodo.get(userId);
+  if (!entry) return null;
+  pendingDuplicateTodo.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+
+// Normalise a to-do title for duplicate detection: lowercase, drop punctuation
+// and articles, collapse whitespace - so "Book a doctor appointment" and "Book
+// doctor appointment" compare equal.
+function normalizeTaskTitle(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\b(a|an|the)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ─── Pending "which school?" for a term-dates import (in-memory, 5-min TTL) ──
 const pendingTermDatesImport = new Map(); // userId → { dates, sourceLabel, country, householdId, schools:[{id,name}], timestamp }
 function rememberTermDatesImport(userId, entry) {
@@ -1185,6 +1215,25 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     // target is already popped; fall through to normal classification.
   }
 
+  // Pending "you already have this - add another?" reply for a duplicate to-do.
+  const pendingDup = popDuplicateTodo(user.id);
+  if (pendingDup && pendingDup.householdId === household.id) {
+    const dupActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+    const ans = parseAffirmative(text);
+    if (ans === 'yes') {
+      ctx.intent = 'duplicate_todo_confirm';
+      const saved = await db.addTasks(household.id, pendingDup.tasks, user.id, household.members).catch(() => []);
+      const titles = (Array.isArray(saved) && saved.length ? saved : pendingDup.tasks).map((t) => t.title).join(', ');
+      return { response: `Done - I've added a second "${titles}" to your to-do list.`, actions: dupActions };
+    }
+    if (ans === 'no') {
+      ctx.intent = 'duplicate_todo_decline';
+      return { response: "No problem - I'll leave the existing one as is.", actions: dupActions };
+    }
+    // Neither yes nor no - the user moved on; the entry is already popped, so
+    // let the message classify normally.
+  }
+
   // Pending "repeat this birthday every year?" reply - resolve a bare yes/no
   // deterministically against the birthday event we just created.
   const pendingBday = popBirthdayRecurrence(user.id);
@@ -1946,6 +1995,22 @@ async function handleTextMessage(text, user, household, ctx = {}) {
               actions.notificationSnap = snap;
             }
           }
+        }
+      }
+      // Duplicate-to-do guard: a single new to-do that matches one the
+      // household already has open shouldn't be silently double-added - ask
+      // first. Scoped to a pure single-to-do turn so it never swallows a mixed
+      // "add milk and book X" (completions/shopping/events skip it).
+      const otherActions = toComplete.length > 0 || (result.shopping_items && result.shopping_items.length) || !!result.calendar_event;
+      if (toAdd.length === 1 && !otherActions) {
+        const newNorm = normalizeTaskTitle(toAdd[0].title);
+        const dup = newNorm && (openTasks || []).find((t) => normalizeTaskTitle(t.title) === newNorm);
+        if (dup) {
+          const who = (dup.assigned_to_names || []).filter(Boolean).join(' & ');
+          const dueStr = dup.due_date ? ` (due ${dup.due_date})` : '';
+          rememberDuplicateTodo(user.id, { tasks: toAdd, householdId: household.id });
+          ctx.intent = 'duplicate_todo_ask';
+          return { response: `You already have "${dup.title}"${who ? ` for ${who}` : ''}${dueStr} on your to-do list. Want me to add another? (reply yes or no)`, actions };
         }
       }
       const saved = await db.addTasks(household.id, toAdd, user.id, household.members);
@@ -2816,8 +2881,11 @@ module.exports = {
   createCalendarEventFromResult,
   graduateAppointmentTodo,
   parseTimeOfDay,
+  normalizeTaskTitle,
   rememberReminderTarget,
   popReminderTarget,
+  rememberDuplicateTodo,
+  popDuplicateTodo,
   handleCalendarQuery,
   handleVoiceNote,
   handlePhoto,

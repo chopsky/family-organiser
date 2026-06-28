@@ -13,6 +13,7 @@ jest.mock('../db/queries', () => ({
   completeTask: jest.fn((id) => Promise.resolve({ id })),
   updateTask: jest.fn((id, hid, patch) => Promise.resolve({ id, ...patch })),
   saveEventReminders: jest.fn(() => Promise.resolve()),
+  addTasks: jest.fn((hid, tasks) => Promise.resolve(tasks.map((t, i) => ({ id: `new-${i}`, ...t })))),
   resolveAssignees: jest.fn(() => ({ ids: [], names: [] })),
 }));
 jest.mock('../services/ai', () => ({ classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(), scanImage: jest.fn(), runWebSearch: jest.fn() }));
@@ -122,5 +123,35 @@ describe('reminder follow-up (the "Yes 1 hour before" fix)', () => {
     handlers.rememberReminderTarget('u1', { itemId: 't4', itemType: 'task', householdId: 'h1', label: 'X', dueTime: '08:00' });
     const res = await handlers.handleTextMessage('Yes 1 hour before', user, household, {});
     expect(res.response).not.toMatch(/didn't see any field/i);
+  });
+});
+
+describe('normalizeTaskTitle (duplicate detection)', () => {
+  test('"Book a doctor appointment" normalises equal to "Book doctor appointment"', () => {
+    expect(handlers.normalizeTaskTitle('Book a doctor appointment'))
+      .toBe(handlers.normalizeTaskTitle('Book doctor appointment'));
+  });
+  test('strips punctuation + case', () => {
+    expect(handlers.normalizeTaskTitle('Pay Council Tax!')).toBe('pay council tax');
+  });
+  test('keeps genuinely different to-dos distinct', () => {
+    expect(handlers.normalizeTaskTitle('Book doctor appointment'))
+      .not.toBe(handlers.normalizeTaskTitle('Book dentist appointment'));
+  });
+});
+
+describe('duplicate to-do follow-up', () => {
+  test('"yes" adds a second copy', async () => {
+    handlers.rememberDuplicateTodo('u1', { tasks: [{ title: 'Book doctor appointment', action: 'add' }], householdId: 'h1' });
+    const res = await handlers.handleTextMessage('yes', user, household, {});
+    expect(db.addTasks).toHaveBeenCalledWith('h1', [{ title: 'Book doctor appointment', action: 'add' }], 'u1', household.members);
+    expect(res.response).toMatch(/added a second/i);
+  });
+
+  test('"no" leaves the existing one and adds nothing', async () => {
+    handlers.rememberDuplicateTodo('u1', { tasks: [{ title: 'Book doctor appointment', action: 'add' }], householdId: 'h1' });
+    const res = await handlers.handleTextMessage('no', user, household, {});
+    expect(db.addTasks).not.toHaveBeenCalled();
+    expect(res.response).toMatch(/leave the existing one/i);
   });
 });
