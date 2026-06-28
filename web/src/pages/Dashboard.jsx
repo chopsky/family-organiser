@@ -535,28 +535,33 @@ export default function Dashboard() {
     meals: weekMeals.filter(m => m.date === todayDate && m.category?.toLowerCase() === key),
   }));
 
-  // Find member info for events
-  function getMemberForEvent(ev) {
-    return members.find(m => m.name === ev.assigned_to_name);
-  }
-
-  // Multi-assignee aware. Events created via the new "Select members"
-  // UI store the full list in `ev.assignees`; older events only set
-  // `assigned_to_name`. Returns members in source order, deduped against
-  // the household roster - anyone removed from the household post-hoc
-  // is silently dropped.
+  // Resolve every household member assigned to an event, deduped, in source
+  // order (anyone removed from the household post-hoc is silently dropped).
+  // Events from the "Select members" picker store the list in the
+  // event_assignees join table (surfaced as ev.assignees) - but most events
+  // (synced calendars, quick-adds, recurring instances) only carry the row's
+  // own assigned_to_names / assigned_to_ids arrays and have NO join rows, so we
+  // must resolve those too, exactly the way to-dos do (getTaskAssignee). The
+  // old code only checked ev.assignees + a singular ev.assigned_to_name that
+  // isn't even a real column, which is why those events showed no avatar.
   function getMembersForEvent(ev) {
-    if (Array.isArray(ev.assignees) && ev.assignees.length > 0) {
-      const seen = new Set();
-      const out = [];
-      for (const a of ev.assignees) {
-        const m = members.find(x => x.name === a.member_name);
-        if (m && !seen.has(m.id)) { seen.add(m.id); out.push(m); }
-      }
-      if (out.length) return out;
+    const seen = new Set();
+    const out = [];
+    const push = (m) => { if (m && !seen.has(m.id)) { seen.add(m.id); out.push(m); } };
+
+    if (Array.isArray(ev.assignees)) {
+      for (const a of ev.assignees) push(members.find(x => x.name === a.member_name));
     }
-    const single = getMemberForEvent(ev);
-    return single ? [single] : [];
+    if (Array.isArray(ev.assigned_to_names)) {
+      for (const nm of ev.assigned_to_names) push(members.find(x => x.name === nm));
+    }
+    if (Array.isArray(ev.assigned_to_ids)) {
+      for (const id of ev.assigned_to_ids) push(members.find(x => x.id === id));
+    }
+    // Legacy singular fallback (very old rows).
+    if (out.length === 0 && ev.assigned_to_name) push(members.find(m => m.name === ev.assigned_to_name));
+
+    return out;
   }
 
   function getMemberAvatar(member, size = 28) {
