@@ -192,6 +192,7 @@ export default function Rewards() {
   return (
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
+        className="mb-5 md:mb-7"
         kicker="Spend stars"
         title="Rewards"
         actions={(

@@ -16,10 +16,11 @@
  *   title    - the page title (serif)
  *   subtitle - one-line description under the title
  *   actions  - node(s) rendered top-right (usually PillBtn)
+ *   className - overrides the default bottom-margin spacing (default mb-7)
  */
-export default function PageHeader({ kicker, title, subtitle, actions }) {
+export default function PageHeader({ kicker, title, subtitle, actions, className = 'mb-7' }) {
   return (
-    <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
+    <div className={`flex items-end justify-between gap-4 flex-wrap ${className}`}>
       <div className="min-w-0">
         {kicker && (
           <div className="hidden md:block text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">

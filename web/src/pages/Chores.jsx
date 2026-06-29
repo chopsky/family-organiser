@@ -690,6 +690,7 @@ export default function Chores() {
   return (
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader
+        className="mb-5 md:mb-7"
         kicker={kicker}
         title="Tasks"
         actions={(
