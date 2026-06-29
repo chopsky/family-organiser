@@ -171,7 +171,7 @@
     to   { opacity: 1; transform: none; }
   }
 
-  /* Welcome-step corner notifications: staggered drop-in, gentle hover, then
+  /* Welcome-step corner notifications: staggered fade-in, gentle hover, then
      drift outward to each card's own corner + fade on continue (.ob-leaving).
      Decorative + stage-level. Hidden under 880px; the global
      prefers-reduced-motion rule neutralises the animation, and .ob-reduced
@@ -183,7 +183,11 @@
     backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
     border: 0.5px solid rgba(255,255,255,0.7); border-radius: 20px; padding: 12px 14px;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 22px 44px -16px rgba(26,22,32,0.28);
-    animation: ob-droprot .6s cubic-bezier(0.22,1.15,0.36,1) backwards, ob-floatn 8s ease-in-out infinite;
+    /* Resting tilt lives on the base style now (it used to be baked into the
+       drop keyframe), so the fade has no movement and the card stays tilted in
+       the gap between the fade ending and the float starting. */
+    transform: rotate(var(--rot));
+    animation: ob-fadein .6s ease-out backwards, ob-floatn 8s ease-in-out infinite;
   }
   .ob-notif-ico { width: 40px; height: 40px; flex-shrink: 0; }
   .ob-notif-tile { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.14); overflow: hidden; }
@@ -199,7 +203,7 @@
   .ob-n3 { left: 8%;  bottom: 15%; --rot: 3deg;    animation-delay: .85s, 1.9s; animation-duration: .6s, 7.5s; }
   .ob-n4 { right: 7%; bottom: 12%; --rot: -3.5deg; animation-delay: 1.1s, 2.6s; animation-duration: .6s, 8.5s; }
 
-  @keyframes ob-droprot { 0% { opacity: 0; transform: translateY(-30px) scale(.94) rotate(var(--rot)); } 60% { opacity: 1; } 100% { opacity: 1; transform: rotate(var(--rot)); } }
+  @keyframes ob-fadein { from { opacity: 0; } to { opacity: 1; } }
   @keyframes ob-floatn {
     0%   { transform: translate(0,0) rotate(var(--rot)); }
     25%  { transform: translate(5px,-9px) rotate(calc(var(--rot) + 1deg)); }
