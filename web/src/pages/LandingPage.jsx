@@ -961,7 +961,7 @@ export default function LandingPage() {
               Just tell it what's happening. <em>It&nbsp;does&nbsp;the&nbsp;rest.</em>
             </h2>
             <p className="sec-lede" style={{ margin: '0 auto' }}>
-              No forms, no dropdowns, no retyping. Type it, snap it, or forward the email, and Housemait files real life into the right calendar entry, shopping line, task or meal.
+              Type it, snap it, or forward the email, and Housemait files real life into the right calendar entry, shopping line, task or meal.
             </p>
           </div>
 
