@@ -404,7 +404,9 @@ export default function Layout({ children }) {
           desktop sidebar already exposes everything in this menu. */}
       {!childMode && moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
 
-      {!childMode && <Suspense fallback={null}><ChatWidget /></Suspense>}
+      {/* Floating AI chat button + panel. Hidden on the dashboard, which has
+          its own AI composer, so the FAB isn't redundant there. */}
+      {!childMode && !isDashboard && <Suspense fallback={null}><ChatWidget /></Suspense>}
 
       {/* Trial-ended overlay - only renders for expired households who
           haven't dismissed it this session. Scoped to Layout so it
