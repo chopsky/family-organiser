@@ -7,6 +7,10 @@
  * (plum kicker, charcoal title, warm-grey subtitle). Instrument Serif is
  * loaded in web/index.html.
  *
+ * The kicker + subtitle are desktop-only (`hidden md:block`): on mobile every
+ * page shows just the big title, for a cleaner header. The Dashboard keeps its
+ * date kicker because it renders its own header, not this component.
+ *
  * Props:
  *   kicker   - small uppercase line above the title (e.g. "12 files · 6 folders")
  *   title    - the page title (serif)
@@ -18,7 +22,7 @@ export default function PageHeader({ kicker, title, subtitle, actions }) {
     <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
       <div className="min-w-0">
         {kicker && (
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
+          <div className="hidden md:block text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
             {kicker}
           </div>
         )}
@@ -29,7 +33,7 @@ export default function PageHeader({ kicker, title, subtitle, actions }) {
           {title}
         </h1>
         {subtitle && (
-          <div className="text-sm text-[var(--ink-2)] mt-1.5">{subtitle}</div>
+          <div className="hidden md:block text-sm text-[var(--ink-2)] mt-1.5">{subtitle}</div>
         )}
       </div>
       {actions && <div className="flex gap-2.5 shrink-0">{actions}</div>}
