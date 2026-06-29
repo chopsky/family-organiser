@@ -598,7 +598,15 @@ function WhatsAppPhone() {
   const [shown, setShown] = useState(0)
   const [typing, setTyping] = useState(false)
   const phoneRef = useRef(null)
+  const logRef = useRef(null)
   const timers = useRef([])
+
+  // Keep the thread pinned to the newest message as it plays out (and on
+  // the reduced-motion path, open on the latest). The log stays freely
+  // scrollable afterwards so you can read back to the start.
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
+  }, [shown, typing])
 
   useEffect(() => {
     const reduce = typeof window !== 'undefined'
@@ -639,7 +647,7 @@ function WhatsAppPhone() {
           <div className="wa-status">Family Bot · online</div>
         </div>
       </div>
-      <div className="wa-log">
+      <div className="wa-log" ref={logRef}>
         {WA_MESSAGES.slice(0, shown).map((m, i) => (
           <div key={i} className={`wa-bubble ${m.side}`} style={m.voice ? { padding: '8px 12px' } : undefined}>
             {m.voice ? (

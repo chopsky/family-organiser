@@ -460,9 +460,14 @@ h2.sec em { font-style: italic; color: var(--purple); }
 .wa-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
 .wa-name { font-size: 14px; font-weight: 600; line-height: 1.1; }
 .wa-status { font-size: 11px; color: #3f9c5f; }
-/* Fixed height + flex-end so the thread anchors to the newest message and
-   older ones clip off the top as it "scrolls", like a real WhatsApp chat. */
-.wa-log { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; height: 440px; overflow: hidden; background: #E7DDD1; margin: 0 -14px -14px; padding: 14px; border-radius: 0 0 18px 18px; }
+/* Fixed-height, scrollable thread. The first bubble's auto top-margin
+   keeps the conversation anchored to the bottom when it's short, while
+   still letting you scroll up to the start once it overflows (plain
+   justify-content:flex-end would make the top unreachable). */
+.wa-log { display: flex; flex-direction: column; gap: 8px; height: 520px; overflow-y: auto; overscroll-behavior: contain; background: #E7DDD1; margin: 0 -14px -14px; padding: 14px; border-radius: 0 0 18px 18px; }
+.wa-log > :first-child { margin-top: auto; }
+.wa-log::-webkit-scrollbar { width: 5px; }
+.wa-log::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .18); border-radius: 999px; }
 .wa-bubble {
   padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; max-width: 82%;
   box-shadow: 0 1px 0 rgba(0, 0, 0, .04);
