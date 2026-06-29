@@ -143,21 +143,9 @@ export default function Login() {
           padding: '40px 36px 32px',
         }}
       >
-        {/* Glyph chip - uses the existing Housemait logomark rather
-            than the abstract house glyph from the design (user's
-            instruction: keep the current logomark). */}
-        <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: 60, height: 60,
-              borderRadius: 18,
-              background: '#EFE9FB',
-              border: '1px solid rgba(107,63,160,0.18)',
-            }}
-          >
-            <img src="/housemait-logomark.svg" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
-          </div>
+        {/* Full wordmark, matching the /signup (onboarding) entry card. */}
+        <Link to={localeHomePath()} aria-label="Housemait home" className="block">
+          <img src="/housemait-logo-web.svg" alt="Housemait" style={{ width: 140, height: 'auto', margin: '0 auto 22px', display: 'block' }} />
         </Link>
 
         <h1
