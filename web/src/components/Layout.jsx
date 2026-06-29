@@ -313,9 +313,7 @@ export default function Layout({ children }) {
         className="md:hidden z-30 sticky top-0 safe-top"
         style={{
           borderBottom: 0,
-          background: 'linear-gradient(to bottom, rgba(251, 248, 243, 0.95) 60%, rgba(251, 248, 243, 0.6) 80%, rgba(251, 248, 243, 0))',
-          backdropFilter: 'blur(14px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+          background: 'var(--color-cream)',
         }}
       >
         <div className="px-4 py-3 flex items-center justify-between">
@@ -345,22 +343,12 @@ export default function Layout({ children }) {
 
       {/* ── Mobile Bottom Tab Bar ──────────────────────────────────
           Five tabs from the iOS design handoff: Home · Calendar · Tasks
-          · Shopping · More. The background is a vertical cream gradient
-          (opaque at the bottom, fading to transparent at the top) plus
-          a saturated backdrop-blur - so page content visibly fades
-          *under* the bar instead of slamming into a hard top border.
-          The cream rgba values match Tailwind token `--color-cream`
-          (#FBF8F3 → rgb 251,248,243).
-
-          A `pointer-events-none` spacer over the gradient's top stripe
-          would be overkill: the buttons themselves are the only
-          interactive surfaces and they sit comfortably below the fade. */}
+          · Shopping · More. Solid cream background (`--color-cream`), no
+          backdrop blur - page content scrolls behind the opaque bar. */}
       <nav
         className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-start justify-around pt-2 safe-bottom"
         style={{
-          background: 'linear-gradient(to top, rgba(251,248,243,0.95) 60%, rgba(251,248,243,0.6) 80%, rgba(251,248,243,0))',
-          backdropFilter: 'blur(14px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+          background: 'var(--color-cream)',
         }}
       >
         {visibleMobileNav.map(({ to, label, Icon }) => (
