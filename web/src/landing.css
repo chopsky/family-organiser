@@ -460,7 +460,9 @@ h2.sec em { font-style: italic; color: var(--purple); }
 .wa-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
 .wa-name { font-size: 14px; font-weight: 600; line-height: 1.1; }
 .wa-status { font-size: 11px; color: #3f9c5f; }
-.wa-log { display: flex; flex-direction: column; gap: 8px; background: #E7DDD1; margin: 0 -14px -14px; padding: 14px; border-radius: 0 0 18px 18px; }
+/* Fixed height + flex-end so the thread anchors to the newest message and
+   older ones clip off the top as it "scrolls", like a real WhatsApp chat. */
+.wa-log { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; height: 440px; overflow: hidden; background: #E7DDD1; margin: 0 -14px -14px; padding: 14px; border-radius: 0 0 18px 18px; }
 .wa-bubble {
   padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; max-width: 82%;
   box-shadow: 0 1px 0 rgba(0, 0, 0, .04);
@@ -469,6 +471,21 @@ h2.sec em { font-style: italic; color: var(--purple); }
 .wa-bubble.in { background: #fff; align-self: flex-start; border-top-left-radius: 4px; }
 .wa-bubble .t { font-size: 10px; color: rgba(0, 0, 0, .35); display: block; text-align: right; margin-top: 2px; }
 .wa-bubble.in .sys { font-size: 11px; color: #3f9c5f; font-weight: 600; margin-bottom: 3px; }
+
+/* Each bubble pops in as it's "sent". Typing indicator = three bouncing
+   dots before a bot reply. Animations only run when motion is allowed; the
+   reduced-motion path renders the whole thread statically. */
+@media (prefers-reduced-motion: no-preference) {
+  .wa-log .wa-bubble { animation: wa-pop .3s ease-out both; }
+  .wa-dots i { animation: wa-typing-dot 1.2s infinite ease-in-out; }
+  .wa-dots i:nth-child(2) { animation-delay: .18s; }
+  .wa-dots i:nth-child(3) { animation-delay: .36s; }
+}
+@keyframes wa-pop { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+.wa-typing { display: inline-flex; }
+.wa-dots { display: inline-flex; gap: 4px; align-items: center; padding: 2px 0; }
+.wa-dots i { width: 6px; height: 6px; border-radius: 50%; background: #9aa0a6; display: block; }
+@keyframes wa-typing-dot { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-4px); opacity: 1; } }
 
 .wa-float-sticker {
   position: absolute; font-weight: 600; font-size: 12px; padding: 6px 12px; border-radius: 999px;

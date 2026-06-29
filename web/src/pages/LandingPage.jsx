@@ -567,6 +567,105 @@ function DownloadQR({ preferUp = false }) {
   )
 }
 
+// Waveform bar heights for the voice-note bubble (px); the first 9 are
+// "played" (filled), the rest are upcoming (faint).
+const WA_WAVE = [5, 12, 7, 16, 9, 4, 14, 8, 11, 6, 15, 10, 7, 13, 5, 17, 9, 12, 6, 10, 14, 8]
+
+// The scripted WhatsApp exchange shown in the phone mock. `think` is how
+// long the bot "types" (ms) before an incoming reply appears.
+const WA_MESSAGES = [
+  { side: 'out', time: '7:42 ✓✓', body: 'Can you add milk, bread and eggs to the shopping list?' },
+  { side: 'in', time: '7:42', think: 1200, body: (
+    <>
+      <div className="sys">✓ Added to list</div>
+      Done! I've added 3 items:<br />• Milk (dairy)<br />• Bread (bakery)<br />• Eggs (dairy)<br /><br />Anything else?
+    </>
+  ) },
+  { side: 'out', time: '7:43 ✓✓', body: "What's for dinner tonight?" },
+  { side: 'in', time: '7:43', think: 1200, body: (
+    <>Tonight's meal plan: Chicken stir-fry 🥢<br /><br />Need me to add the ingredients to your shopping list?</>
+  ) },
+  { side: 'out', time: '7:44 ✓✓', voice: true },
+  { side: 'in', time: '7:44', think: 1300, body: 'Got it! I\'ve added "Pick up dry cleaning" to Sarah\'s tasks for tomorrow.' },
+]
+
+/** Animated WhatsApp phone mock. When the phone scrolls into view the
+ *  scripted exchange plays out one message at a time — a typing indicator
+ *  precedes each bot reply — with the log anchored to the newest message
+ *  so older ones scroll off the top like a real thread. Under
+ *  prefers-reduced-motion the full thread renders at once, no timers. */
+function WhatsAppPhone() {
+  const [shown, setShown] = useState(0)
+  const [typing, setTyping] = useState(false)
+  const phoneRef = useRef(null)
+  const timers = useRef([])
+
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) { setShown(WA_MESSAGES.length); return }
+
+    const el = phoneRef.current
+    if (!el) return
+    let started = false
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting || started) return
+        started = true
+        let delay = 450
+        WA_MESSAGES.forEach((m, i) => {
+          if (m.side === 'in') {
+            timers.current.push(setTimeout(() => setTyping(true), delay))
+            delay += m.think || 1100
+            timers.current.push(setTimeout(() => { setTyping(false); setShown(i + 1) }, delay))
+            delay += 650
+          } else {
+            timers.current.push(setTimeout(() => setShown(i + 1), delay))
+            delay += 800
+          }
+        })
+      })
+    }, { threshold: 0.35 })
+    io.observe(el)
+    return () => { io.disconnect(); timers.current.forEach(clearTimeout) }
+  }, [])
+
+  return (
+    <div className="wa-phone" ref={phoneRef}>
+      <div className="wa-head">
+        <img className="wa-avatar" src="/housemait-iOS-icon.png" alt="housemait" />
+        <div>
+          <div className="wa-name">housemait</div>
+          <div className="wa-status">Family Bot · online</div>
+        </div>
+      </div>
+      <div className="wa-log">
+        {WA_MESSAGES.slice(0, shown).map((m, i) => (
+          <div key={i} className={`wa-bubble ${m.side}`} style={m.voice ? { padding: '8px 12px' } : undefined}>
+            {m.voice ? (
+              <div className="wa-voice">
+                <span className="mic">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2" /></svg>
+                </span>
+                <span className="wave">
+                  {WA_WAVE.map((h, j) => (<span key={j} className={j < 9 ? 'played' : ''} style={{ height: h }} />))}
+                </span>
+                <span className="dur">0:03</span>
+              </div>
+            ) : m.body}
+            <span className="t">{m.time}</span>
+          </div>
+        ))}
+        {typing && (
+          <div className="wa-bubble in wa-typing">
+            <span className="wa-dots"><i /><i /><i /></span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function LandingPage() {
   const locale = useLocale()
   const [billing, setBilling] = useState('monthly')
@@ -942,43 +1041,7 @@ export default function LandingPage() {
                 </ul>
               </div>
               <div style={{ position: 'relative' }}>
-                <div className="wa-phone">
-                  <div className="wa-head">
-                    <img className="wa-avatar" src="/housemait-iOS-icon.png" alt="housemait" />
-                    <div>
-                      <div className="wa-name">housemait</div>
-                      <div className="wa-status">Family Bot · online</div>
-                    </div>
-                  </div>
-                  <div className="wa-log">
-                    <div className="wa-bubble out">Can you add milk, bread and eggs to the shopping list?<span className="t">7:42 ✓✓</span></div>
-                    <div className="wa-bubble in">
-                      <div className="sys">✓ Added to list</div>
-                      Done! I've added 3 items:<br />• Milk (dairy)<br />• Bread (bakery)<br />• Eggs (dairy)<br /><br />Anything else?
-                      <span className="t">7:42</span>
-                    </div>
-                    <div className="wa-bubble out">What's for dinner tonight?<span className="t">7:43 ✓✓</span></div>
-                    <div className="wa-bubble in">
-                      Tonight's meal plan: Chicken stir-fry 🥢<br /><br />Need me to add the ingredients to your shopping list?
-                      <span className="t">7:43</span>
-                    </div>
-                    <div className="wa-bubble out" style={{ padding: '8px 12px' }}>
-                      <div className="wa-voice">
-                        <span className="mic">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2" /></svg>
-                        </span>
-                        <span className="wave">
-                          {[5, 12, 7, 16, 9, 4, 14, 8, 11, 6, 15, 10, 7, 13, 5, 17, 9, 12, 6, 10, 14, 8].map((h, i) => (
-                            <span key={i} className={i < 9 ? 'played' : ''} style={{ height: h }} />
-                          ))}
-                        </span>
-                        <span className="dur">0:03</span>
-                      </div>
-                      <span className="t">7:44 ✓✓</span>
-                    </div>
-                    <div className="wa-bubble in">Got it! I've added "Pick up dry cleaning" to Sarah's tasks for tomorrow.<span className="t">7:44</span></div>
-                  </div>
-                </div>
+                <WhatsAppPhone />
                 <div className="wa-float-sticker" style={{ top: -14, right: '6%', transform: 'rotate(4deg)', background: 'var(--coral-soft)', color: '#a84522' }}>3 items added ✓</div>
                 <div className="wa-float-sticker" style={{ top: '34%', left: '-6%', transform: 'rotate(-4deg)', background: 'var(--sage-soft)', color: '#2e5a2a' }}>Meal planned 🍽️</div>
                 <div className="wa-float-sticker" style={{ bottom: '8%', right: '-4%', transform: 'rotate(3deg)', background: 'var(--purple-soft)', color: 'var(--purple-deep)' }}>Task assigned to Dad</div>
