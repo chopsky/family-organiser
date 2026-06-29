@@ -184,7 +184,11 @@ export default function Layout({ children }) {
         const me = data.members?.find(m => m.id === user.id);
         if (me && (
           (me.color_theme && me.color_theme !== user.color_theme) ||
-          (me.avatar_url !== undefined && me.avatar_url !== user.avatar_url)
+          (me.avatar_url !== undefined && me.avatar_url !== user.avatar_url) ||
+          // avatar_id (the illustrated avatars) was never synced onto `user`,
+          // so a user whose avatar is an illustration showed only their initial
+          // in the mobile header. Sync it too.
+          (me.avatar_id !== undefined && me.avatar_id !== user.avatar_id)
         )) {
           // Pass the FRESH household from the API response, not the
           // closure `household` from useAuth(). The closure value was
@@ -192,7 +196,7 @@ export default function Layout({ children }) {
           // and another tab/path may have updated the household in
           // between (most often the household avatar upload, which
           // would otherwise get overwritten back to null here).
-          login({ token, user: { ...user, color_theme: me.color_theme || user.color_theme, avatar_url: me.avatar_url || null }, household: data.household || household });
+          login({ token, user: { ...user, color_theme: me.color_theme || user.color_theme, avatar_url: me.avatar_url || null, avatar_id: me.avatar_id || null }, household: data.household || household });
         }
       })
       .catch(() => {});
