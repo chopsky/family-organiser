@@ -621,7 +621,7 @@ export default function Dashboard() {
           className="m-0 text-[38px] md:text-[52px] leading-[1.05] font-normal text-charcoal"
           style={{ fontFamily: '"Instrument Serif", serif', letterSpacing: '-0.01em' }}
         >
-          {getGreeting()},<br /><i>{user?.name}</i>.
+          {getGreeting()},{' '}<br className="hidden md:inline" /><i>{user?.name}</i>.
         </h1>
       </div>
 
