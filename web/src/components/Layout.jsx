@@ -252,6 +252,7 @@ export default function Layout({ children }) {
   // window. Constrain the shell + content wrapper for just these routes so
   // every other page keeps its normal window scroll.
   const appHeight = ['/tasks', '/lists', '/rewards'].includes(location.pathname);
+  const isDashboard = location.pathname === '/dashboard';
 
   // Child Mode trims the nav to the kid-safe routes. Desktop groups drop empty;
   // the mobile bar swaps Lists out for Rewards and loses the More button.
@@ -305,27 +306,32 @@ export default function Layout({ children }) {
       </aside>
 
       {/* ── Mobile Top Bar ──────────────────────────────────────────
-           Minimal: wordmark logo on the left, avatar-as-settings on the
-           right. Page title/household name intentionally omitted - each
-           page renders its own H1 at the top of the body so mobile gets
-           the same editorial feel as desktop. */}
-      <header
-        className="md:hidden z-30 sticky top-0 safe-top"
-        style={{
-          borderBottom: 0,
-          background: 'var(--color-cream)',
-        }}
-      >
-        <div className="px-4 py-3 flex items-center justify-between">
-          <Link to="/dashboard" className="shrink-0 flex items-center">
-            <img src="/housemait-logo-web.svg" alt="Housemait" className="h-6 w-auto" />
-          </Link>
-          {childMode && <ChildModeChip />}
-          <Link to="/settings" className="shrink-0">
-            {renderAvatar()}
-          </Link>
-        </div>
-      </header>
+           Wordmark logo + avatar-as-settings. Shown ONLY on the dashboard;
+           every other page hides it so the page's own H1 leads. Off the
+           dashboard we keep a sticky cream strip the height of the iOS
+           status-bar inset, so content never slides under the notch.
+           (Settings stays reachable via the More tab.) */}
+      {isDashboard ? (
+        <header
+          className="md:hidden z-30 sticky top-0 safe-top"
+          style={{
+            borderBottom: 0,
+            background: 'var(--color-cream)',
+          }}
+        >
+          <div className="px-4 py-3 flex items-center justify-between">
+            <Link to="/dashboard" className="shrink-0 flex items-center">
+              <img src="/housemait-logo-web.svg" alt="Housemait" className="h-6 w-auto" />
+            </Link>
+            {childMode && <ChildModeChip />}
+            <Link to="/settings" className="shrink-0">
+              {renderAvatar()}
+            </Link>
+          </div>
+        </header>
+      ) : (
+        <div className="md:hidden sticky top-0 z-30 safe-top" style={{ background: 'var(--color-cream)' }} aria-hidden="true" />
+      )}
 
       {/* ── Main Content ── */}
       <main className={`flex-1 md:ml-60 min-w-0 overflow-x-hidden${appHeight ? ' flex flex-col min-h-0' : ''}`}>
