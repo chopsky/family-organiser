@@ -517,7 +517,7 @@ export default function Chores() {
 
   const selDate = new Date(); selDate.setDate(selDate.getDate() + dayOffset);
   const selDateStr = dateStrLocal(selDate);
-  const kicker = selDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' });
+  const kicker = selDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   const dayLabel = dayOffset === 0 ? 'Today' : selDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
   const loadDay = useCallback(async (dateStr) => {
