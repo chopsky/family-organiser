@@ -268,8 +268,8 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
           </button>
         ))}
       </div>
-      <div style={{ background: hex + '14', borderRadius: 22, padding: '28px 24px', textAlign: 'center', marginBottom: 22 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><StarFill s={34} /><span style={{ fontSize: 52, fontWeight: 800, color: INK, lineHeight: 1 }}>{balances[kid.id] || 0}</span></div>
+      <div style={{ background: hex + '14', borderRadius: 22, padding: `${isMobile ? 18 : 28}px 24px`, textAlign: 'center', marginBottom: 22 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><StarFill s={34} /><span style={{ fontSize: isMobile ? 44 : 52, fontWeight: 800, color: INK, lineHeight: 1 }}>{balances[kid.id] || 0}</span></div>
         <div style={{ fontSize: 13, color: INK2, marginTop: 6, fontWeight: 600 }}>{kid.name}'s stars</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
