@@ -211,9 +211,9 @@ export default function Rewards() {
       ) : earners.length === 0 ? (
         <Center>Add family members to start the star economy.</Center>
       ) : effView === 'redeemed' ? (
-        <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} onUndo={undoRedemption} readOnly={childMode} />
+        <RedeemedLog redemptions={redemptions} members={members} onToggle={toggleFulfilled} onUndo={undoRedemption} readOnly={childMode} isMobile={isMobile} />
       ) : effView === 'focused' ? (
-        <Focused kids={earners} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} />
+        <Focused kids={earners} focusKid={focusKid} setFocusKid={setFocusKid} balances={balances} rewardsFor={rewardsFor} redeem={redeem} redeemingId={redeemingId} removeReward={childMode ? undefined : removeReward} editReward={childMode ? undefined : setModal} isMobile={isMobile} />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {earners.map((k) => {
@@ -252,11 +252,12 @@ function Center({ children }) {
   return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24, textAlign: 'center' }}>{children}</div>;
 }
 
-function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, redeemingId, removeReward, editReward }) {
+function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, redeemingId, removeReward, editReward, isMobile }) {
   const kid = kids.find((k) => k.id === focusKid) || kids[0];
   const hex = hexFor(kid);
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+    // paddingBottom (mobile) clears the floating AI button + tab bar at the end.
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: isMobile ? 160 : undefined }}>
       {/* Single horizontally-scrollable row of who-to-view buttons (no wrap),
           so a large family scrolls sideways instead of stacking onto a 2nd row. */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'nowrap', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
@@ -277,11 +278,11 @@ function Focused({ kids, focusKid, setFocusKid, balances, rewardsFor, redeem, re
   );
 }
 
-function RedeemedLog({ redemptions, members, onToggle, onUndo, readOnly }) {
+function RedeemedLog({ redemptions, members, onToggle, onUndo, readOnly, isMobile }) {
   const memberOf = (id) => members.find((m) => m.id === id);
   if (redemptions.length === 0) return <Center>Nothing redeemed yet.</Center>;
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', maxWidth: 720 }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', maxWidth: 720, paddingBottom: isMobile ? 160 : undefined }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {redemptions.map((r) => {
           const m = memberOf(r.member_id);
