@@ -4151,6 +4151,42 @@ async function getLatestRecipe(householdId, db = supabase) {
   return data || null;
 }
 
+// Pre-populate a household with the curated starter recipe set (see
+// src/lib/starterRecipes.js). Idempotent: a household is "already seeded" if it
+// has any recipe whose image lives under the stable starter-recipes/ path - a
+// path no user upload ever uses - so this is safe to run repeatedly (new
+// household on creation + a one-off backfill of existing ones).
+async function seedStarterRecipes(householdId, db = supabase) {
+  const STARTER_RECIPES = require('../lib/starterRecipes');
+  const { data: existing, error: exErr } = await db
+    .from('recipes')
+    .select('id')
+    .eq('household_id', householdId)
+    .ilike('image_url', '%/starter-recipes/%')
+    .limit(1);
+  if (exErr) throw exErr;
+  if (existing && existing.length) return { seeded: 0, skipped: true };
+
+  const rows = STARTER_RECIPES.map((r) => ({
+    household_id: householdId,
+    name: r.name,
+    category: r.category || 'dinner',
+    ingredients: r.ingredients || [],
+    method: r.method || null,
+    prep_time_mins: r.prep_time_mins || null,
+    cook_time_mins: r.cook_time_mins || null,
+    servings: r.servings || null,
+    dietary_tags: r.dietary_tags || [],
+    image_url: r.image_url || null,
+    source_type: 'manual',
+    notes: r.notes || null,
+    is_favourite: false,
+  }));
+  const { error } = await db.from('recipes').insert(rows);
+  if (error) throw error;
+  return { seeded: rows.length, skipped: false };
+}
+
 async function createRecipe(householdId, recipeData, db = supabase) {
   const { data, error } = await db
     .from('recipes')
@@ -8222,6 +8258,7 @@ module.exports = {
   deleteDocumentFolder,
   createDocument,
   createDocumentNote,
+  seedStarterRecipes,
   getDocuments,
   getRecentDocuments,
   createReceiptWithItems,

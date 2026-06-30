@@ -388,6 +388,11 @@ router.post('/create-household', requireAuth, async (req, res) => {
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id, household.country)
       .catch((err) => console.error('Failed to seed public holidays:', err));
 
+    // Pre-populate the recipe box with the starter set (background, never block
+    // signup). Idempotent, so a retry won't double-seed.
+    db.seedStarterRecipes(household.id)
+      .catch((err) => console.error('Failed to seed starter recipes:', err.message));
+
     // Send the welcome email - fire-and-forget. Dedupes via
     // sent_emails.(household_id, email_type) so if the user somehow
     // triggers this twice (double-click, rollback + retry) only one

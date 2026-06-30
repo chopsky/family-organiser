@@ -666,6 +666,7 @@ describe('POST /api/auth/create-household', () => {
     db.createHousehold.mockResolvedValue({ id: 'hh-new', name: 'New Fam' });
     db.updateUser.mockResolvedValue({ id: 'u-3', name: 'New User', role: 'admin', household_id: 'hh-new' });
     db.getHouseholdById.mockResolvedValue({ id: 'hh-new', name: 'New Fam', join_code: 'XYZ789', reminder_time: '08:00:00' });
+    db.seedStarterRecipes.mockResolvedValue({ seeded: 0, skipped: true });
 
     const res = await request(app).post('/api/auth/create-household')
       .set({ Authorization: `Bearer ${noHouseholdToken}` })
