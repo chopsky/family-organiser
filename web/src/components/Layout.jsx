@@ -20,7 +20,7 @@ const ChatWidget = lazy(() => import('./ChatWidget'));
 // Mobile uses its own arrays (mobileNav / moreNav / moreTiles) below - this
 // only drives the desktop <aside>.
 const navGroups = [
-  { label: 'Overview', items: [
+  { label: null, items: [ // Home — no group heading
     { to: '/dashboard', label: 'Home', Icon: IconHome },
   ] },
   { label: 'Plan', items: [
@@ -292,10 +292,12 @@ export default function Layout({ children }) {
         {/* Grouped nav - labelled sections; active item is a solid-brand pill. */}
         <nav className="flex-1 px-3 flex flex-col gap-[18px] overflow-y-auto">
           {visibleGroups.map((g) => (
-            <div key={g.label}>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-2)]">
-                {g.label}
-              </div>
+            <div key={g.label || g.items[0]?.to}>
+              {g.label && (
+                <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-2)]">
+                  {g.label}
+                </div>
+              )}
               <div className="flex flex-col gap-0.5">
                 {g.items.map(renderNavLink)}
               </div>
