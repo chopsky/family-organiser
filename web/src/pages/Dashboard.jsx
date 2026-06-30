@@ -667,7 +667,7 @@ export default function Dashboard() {
           ? `${who.name} · ${nextUp.title}`
           : (nextUp.title || 'Event');
         const when = inMins <= 0 ? 'now' : inMins < 60 ? `in ${inMins} min` : `at ${formatTime(nextUp.start_time)}`;
-        const endStr = nextUp.end_time ? `–${formatTime(nextUp.end_time)}` : '';
+        const endStr = nextUp.end_time ? ` – ${formatTime(nextUp.end_time)}` : '';
         const sub = `${formatTime(nextUp.start_time)}${endStr}${nextUp.location ? ` · ${nextUp.location}` : ''}`;
         // Lead-up window = 60 min; bar fills as the event approaches.
         const progress = Math.min(1, Math.max(0, 1 - inMins / 60));
