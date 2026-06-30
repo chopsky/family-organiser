@@ -117,8 +117,8 @@ router.delete('/folders/:id', requireAuth, requireHousehold, async (req, res) =>
     // Get all documents in those folders to clean up R2 storage
     const docs = await db.getDocumentsByFolderIds(allFolderIds);
     if (docs.length > 0) {
-      const keys = docs.map(d => d.file_path);
-      try {
+      const keys = docs.map(d => d.file_path).filter(Boolean); // notes have no file
+      if (keys.length > 0) try {
         await r2.deleteFiles(keys);
       } catch (r2Err) {
         console.error('R2 batch delete error (continuing with DB delete):', r2Err.message);
@@ -335,6 +335,37 @@ router.post('/upload', requireAuth, requireHousehold, upload.single('file'), asy
 });
 
 /**
+ * POST /api/documents/notes
+ * Create a text note (a folder item with body text, not a file).
+ */
+router.post('/notes', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const { title, body, folder_id } = req.body;
+    const name = (title || '').trim() || 'Untitled note';
+
+    const folderId = folder_id || null;
+    if (folderId) {
+      const folder = await db.getDocumentFolderById(folderId, req.householdId);
+      if (!folder) return res.status(404).json({ error: 'Folder not found' });
+      if (folder.visibility === 'private' && folder.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Cannot add to another user\'s private folder' });
+      }
+    }
+
+    const note = await db.createDocumentNote(req.householdId, {
+      title: name,
+      body: typeof body === 'string' ? body : '',
+      uploaded_by: req.user.id,
+      folder_id: folderId,
+    });
+    return res.status(201).json(note);
+  } catch (err) {
+    console.error('POST /api/documents/notes error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/documents/:id/url
  * Get a signed download URL (valid for 1 hour).
  *
@@ -454,11 +485,13 @@ router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Delete from R2
-    try {
-      await r2.deleteFile(doc.file_path);
-    } catch (r2Err) {
-      console.error('R2 delete error (continuing with DB delete):', r2Err.message);
+    // Delete from R2 (notes have no file).
+    if (doc.kind !== 'note' && doc.file_path) {
+      try {
+        await r2.deleteFile(doc.file_path);
+      } catch (r2Err) {
+        console.error('R2 delete error (continuing with DB delete):', r2Err.message);
+      }
     }
 
     // Delete from database

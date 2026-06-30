@@ -77,6 +77,8 @@ export default function Documents() {
   const [renamingDoc, setRenamingDoc] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [showNewNote, setShowNewNote] = useState(false);
+  const [editingNote, setEditingNote] = useState(null); // note row being edited
   const fileInputRef = useRef(null);
 
   const atRoot = !currentFolder;
@@ -249,6 +251,28 @@ export default function Documents() {
     }
   }
 
+  // ─── Note Actions ───────────────────────────────────────────────────────
+
+  async function handleCreateNote({ title, body, folder_id }) {
+    try {
+      await api.post('/documents/notes', { title, body, folder_id: folder_id || null });
+      setShowNewNote(false);
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save note');
+    }
+  }
+
+  async function handleUpdateNote(noteId, { title, body, folder_id }) {
+    try {
+      await api.patch(`/documents/${noteId}`, { name: title, body, folder_id: folder_id || null });
+      setEditingNote(null);
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save note');
+    }
+  }
+
   // ─── Render ─────────────────────────────────────────────────────────────
 
   const totalFiles = usage?.fileCount ?? 0;
@@ -264,6 +288,9 @@ export default function Documents() {
         actions={<>
           <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => setShowNewFolder(true)}>
             New folder
+          </PillBtn>
+          <PillBtn icon={<IconFileText className="h-3.5 w-3.5" />} onClick={() => setShowNewNote(true)}>
+            New note
           </PillBtn>
           <PillBtn
             primary
@@ -358,6 +385,7 @@ export default function Documents() {
                     onDownload={() => handleDownload(doc)}
                     onRename={() => setRenamingDoc(doc)}
                     onDelete={() => handleDeleteDocument(doc.id)}
+                    onOpenNote={() => setEditingNote(doc)}
                   />
                 ))}
               </div>
@@ -389,6 +417,23 @@ export default function Documents() {
           url={previewUrl}
           onClose={() => { setPreviewDoc(null); setPreviewUrl(''); }}
           onDownload={() => window.open(previewUrl, '_blank')}
+        />
+      )}
+      {showNewNote && (
+        <NoteModal
+          folders={folders}
+          currentFolder={currentFolder}
+          onSave={handleCreateNote}
+          onClose={() => setShowNewNote(false)}
+        />
+      )}
+      {editingNote && (
+        <NoteModal
+          note={editingNote}
+          folders={folders}
+          currentFolder={currentFolder}
+          onSave={(data) => handleUpdateNote(editingNote.id, data)}
+          onClose={() => setEditingNote(null)}
         />
       )}
     </div>
@@ -506,12 +551,17 @@ function FileGlyph({ doc }) {
 
 /* ─── Document Row ─────────────────────────────────────────────────────────── */
 
-function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, onRename, onDelete }) {
+function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, onRename, onDelete, onOpenNote }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const isNote = doc.kind === 'note';
   const folderName = doc.folder?.name;
-  const sub = showFolder && folderName
-    ? `${folderName} · ${formatFileSize(doc.file_size)}`
-    : formatFileSize(doc.file_size);
+  const open = isNote ? onOpenNote : onPreview;
+
+  // Note sub-line: at root show its folder, otherwise a one-line body snippet.
+  const snippet = (doc.body || '').replace(/\s+/g, ' ').trim();
+  const sub = isNote
+    ? (showFolder && folderName ? folderName : (snippet || 'Note'))
+    : (showFolder && folderName ? `${folderName} · ${formatFileSize(doc.file_size)}` : formatFileSize(doc.file_size));
 
   return (
     <div
@@ -520,10 +570,10 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
       onMouseOver={(e) => { e.currentTarget.style.background = SOFT; }}
       onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
     >
-      <button onClick={onPreview} aria-label={`Preview ${doc.name}`} className="shrink-0">
-        <FileGlyph doc={doc} />
+      <button onClick={open} aria-label={`${isNote ? 'Open' : 'Preview'} ${doc.name}`} className="shrink-0">
+        {isNote ? <NoteGlyph /> : <FileGlyph doc={doc} />}
       </button>
-      <button onClick={onPreview} className="flex-1 min-w-0 text-left">
+      <button onClick={open} className="flex-1 min-w-0 text-left">
         <div className="text-sm font-semibold text-charcoal truncate">{doc.name}</div>
         <div className="text-xs text-warm-grey mt-0.5 truncate">{sub}</div>
       </button>
@@ -548,12 +598,20 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
               className="absolute right-0 z-50 mt-1 min-w-[150px] bg-white rounded-xl border border-light-grey p-1.5"
               style={{ top: '100%', boxShadow: '0 8px 24px rgba(26,22,32,0.12)' }}
             >
-              <MenuItem icon={<IconDownload className="h-3.5 w-3.5" />} onClick={() => { setMenuOpen(false); onDownload(); }}>
-                Download
-              </MenuItem>
-              <MenuItem icon={<IconEdit className="h-3.5 w-3.5" />} onClick={() => { setMenuOpen(false); onRename(); }}>
-                Rename
-              </MenuItem>
+              {isNote ? (
+                <MenuItem icon={<IconEdit className="h-3.5 w-3.5" />} onClick={() => { setMenuOpen(false); onOpenNote(); }}>
+                  Edit
+                </MenuItem>
+              ) : (
+                <>
+                  <MenuItem icon={<IconDownload className="h-3.5 w-3.5" />} onClick={() => { setMenuOpen(false); onDownload(); }}>
+                    Download
+                  </MenuItem>
+                  <MenuItem icon={<IconEdit className="h-3.5 w-3.5" />} onClick={() => { setMenuOpen(false); onRename(); }}>
+                    Rename
+                  </MenuItem>
+                </>
+              )}
               <MenuItem icon={<IconTrash className="h-3.5 w-3.5" />} danger onClick={() => { setMenuOpen(false); onDelete(); }}>
                 Delete
               </MenuItem>
@@ -561,6 +619,16 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─── Note Glyph ───────────────────────────────────────────────────────────── */
+
+function NoteGlyph() {
+  return (
+    <div className="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center" style={{ background: '#6B3FA01F', color: '#6B3FA0' }}>
+      <IconFileText className="h-5 w-5" />
     </div>
   );
 }
@@ -752,6 +820,87 @@ function FilePreviewModal({ doc, url, onClose, onDownload }) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Note Modal ───────────────────────────────────────────────────────────── */
+
+function NoteModal({ note, folders = [], currentFolder, onSave, onClose }) {
+  const [title, setTitle] = useState(note?.name || '');
+  const [body, setBody] = useState(note?.body || '');
+  const [folderId, setFolderId] = useState(note?.folder_id ?? currentFolder?.id ?? '');
+
+  // Folder dropdown options from what the page knows: the current folder, its
+  // sibling folders, and (when editing) the note's own folder. A safety entry
+  // keeps an unresolved folder selected so saving never silently moves the note.
+  const optMap = new Map();
+  if (currentFolder?.id) optMap.set(currentFolder.id, currentFolder.name);
+  for (const f of folders) optMap.set(f.id, f.name);
+  if (note?.folder?.id && note.folder.name) optMap.set(note.folder.id, note.folder.name);
+  if (folderId && !optMap.has(folderId)) optMap.set(folderId, 'Current folder');
+  const options = [...optMap.entries()].map(([id, name]) => ({ id, name }));
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const t = title.trim();
+    if (!t && !body.trim()) return; // nothing to save
+    onSave({ title: t || 'Untitled note', body, folder_id: folderId || null });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-light-grey">
+          <div className="flex items-center gap-3">
+            <span className="w-9 h-9 rounded-[10px] bg-plum-light flex items-center justify-center">
+              <IconFileText className="h-5 w-5 text-plum" />
+            </span>
+            <h2 className="font-display text-lg font-medium text-charcoal">{note ? 'Edit note' : 'New note'}</h2>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-lg bg-cream flex items-center justify-center text-warm-grey hover:text-charcoal transition-colors">
+            <IconX className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Note title"
+              className="w-full font-display text-[28px] text-charcoal placeholder:text-warm-grey/50 outline-none bg-transparent"
+              autoFocus
+            />
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Start writing… guest lists, instructions, anything the household should keep."
+              rows={9}
+              className="w-full mt-3 text-[15px] leading-relaxed text-charcoal placeholder:text-warm-grey outline-none bg-transparent resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-light-grey">
+            <div className="flex items-center gap-2 min-w-0">
+              <label htmlFor="note-folder" className="text-sm text-warm-grey shrink-0">Folder</label>
+              <select
+                id="note-folder"
+                value={folderId}
+                onChange={e => setFolderId(e.target.value)}
+                className="px-3 py-2 border-[1.5px] border-light-grey bg-white rounded-[10px] text-sm font-semibold text-charcoal outline-none focus:border-plum max-w-[200px] truncate"
+              >
+                <option value="">No folder</option>
+                {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+            <button type="submit" className="px-6 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum/90 transition-colors shrink-0">
+              Save note
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

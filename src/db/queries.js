@@ -6475,6 +6475,29 @@ async function createDocument(householdId, { name, file_path, file_size, mime_ty
   return data;
 }
 
+// A note is a documents row with kind='note' + body text and no file (so it
+// shows up in the same folder lists as files). file_size 0 keeps the storage
+// SUM happy; notes carry no bytes.
+async function createDocumentNote(householdId, { title, body = '', uploaded_by, folder_id = null }) {
+  const { data, error } = await supabase
+    .from('documents')
+    .insert({
+      household_id: householdId,
+      name: title,
+      body,
+      kind: 'note',
+      file_path: null,
+      file_size: 0,
+      mime_type: null,
+      uploaded_by,
+      folder_id,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function getDocuments(householdId, userId, folderId = null) {
   let query = supabase
     .from('documents')
@@ -6536,6 +6559,7 @@ async function updateDocument(docId, householdId, updates) {
   const allowed = {};
   if (updates.name !== undefined) allowed.name = updates.name;
   if (updates.folder_id !== undefined) allowed.folder_id = updates.folder_id;
+  if (updates.body !== undefined) allowed.body = updates.body; // editing a note's text
 
   const { data, error } = await supabase
     .from('documents')
@@ -8197,6 +8221,7 @@ module.exports = {
   updateDocumentFolder,
   deleteDocumentFolder,
   createDocument,
+  createDocumentNote,
   getDocuments,
   getRecentDocuments,
   createReceiptWithItems,
