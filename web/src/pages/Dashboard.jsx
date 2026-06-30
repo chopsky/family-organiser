@@ -742,7 +742,7 @@ export default function Dashboard() {
                             formatted start_time - otherwise a midnight-UTC
                             row shows up as "01:00" in BST. */}
                         <p className="text-xs text-cocoa truncate mt-0.5 leading-[1.45]">
-                          {ev.all_day ? 'All day' : formatTime(ev.start_time)}{ev.location ? ` · ${ev.location}` : ''}
+                          {ev.all_day ? 'All day' : (ev.end_time ? `${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}` : formatTime(ev.start_time))}{ev.location ? ` · ${ev.location}` : ''}
                         </p>
                       </div>
                       {visibleAvatars.length > 0 && (
