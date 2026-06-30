@@ -735,7 +735,7 @@ export default function Dashboard() {
                   const overflowCount = assignees.length - visibleAvatars.length;
                   return (
                     <div key={ev.id || i} className="flex items-center gap-3 px-3 py-2.5 bg-cream rounded-2xl">
-                      <span className={`w-1 self-stretch min-h-[2.25rem] rounded-full shrink-0 ${barColor}`} />
+                      <span className={`w-1 min-h-[2.25rem] rounded-full shrink-0 ${barColor}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-bark truncate leading-[1.45]">{ev.title}</p>
                         {/* All-day events render "All day" instead of the
