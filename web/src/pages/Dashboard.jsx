@@ -717,7 +717,7 @@ export default function Dashboard() {
         <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">Today's schedule</h2>
-            <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">Week →</Link>
+            <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">View more →</Link>
           </div>
           {todayEvents.length === 0 ? (
             <p className="text-sm text-cocoa py-4 text-center">No events today</p>
