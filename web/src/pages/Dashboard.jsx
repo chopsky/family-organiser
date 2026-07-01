@@ -11,7 +11,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
 import Avatar from '../components/ui/Avatar';
-import { loadCached } from '../lib/offlineCache';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
@@ -397,10 +397,27 @@ export default function Dashboard() {
   const { user, household } = useAuth();
   const { enabled: childMode } = useChildMode();
   const navigate = useNavigate();
-  const [digest, setDigest] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [schoolData, setSchoolData] = useState([]);
+  const queryClient = useQueryClient();
+  const hid = household?.id;
+
+  // Cache-first: the digest (today's events, tasks, shopping, meals, members)
+  // and schools paint instantly from the persisted cache on a cold launch, then
+  // revalidate in the background - so opening the app feels instant.
+  const { data: digest, isPending, isError } = useQuery({
+    queryKey: ['digest', hid],
+    queryFn: () => api.get('/digest').then(r => r.data),
+    enabled: !!hid,
+  });
+  // Warm the schools cache in the background (read on other screens); the
+  // dashboard itself doesn't render it, so we don't bind the result.
+  useQuery({
+    queryKey: ['schools', hid],
+    queryFn: () => api.get('/schools').then(r => { const s = r.data?.schools; return Array.isArray(s) ? s : []; }),
+    enabled: !!hid,
+  });
+  const loading = isPending;
+  const [errorDismissed, setErrorDismissed] = useState(false);
+  const error = isError && !errorDismissed ? 'Could not load dashboard data.' : '';
 
   // NL input state (kept for quick action modals later)
   const [nlModalOpen, setNlModalOpen] = useState(false);
@@ -409,33 +426,16 @@ export default function Dashboard() {
   const [nlSending, setNlSending] = useState(false);
   const [nlResult, setNlResult] = useState('');
 
-  // Pull-to-refresh: refetches digest + schools. No-op on web.
+  // Pull-to-refresh + foreground refresh (iOS): revalidate digest + schools.
+  // React Query does the initial fetch on mount, so there's no load effect.
   const refreshAll = useCallback(async () => {
     await Promise.all([
-      api.get('/digest').then(r => setDigest(r.data)).catch(() => {}),
-      api.get('/schools').then(r => {
-        const s = r.data?.schools;
-        setSchoolData(Array.isArray(s) ? s : []);
-      }).catch(() => {}),
+      queryClient.invalidateQueries({ queryKey: ['digest', hid] }),
+      queryClient.invalidateQueries({ queryKey: ['schools', hid] }),
     ]);
-  }, []);
+  }, [queryClient, hid]);
   const ptr = usePullToRefresh(refreshAll);
-
-  // Refresh when the app comes back to foreground (iOS). Throttled
-  // to 30s so quick app-switches don't volley refreshes.
   useAppForegroundRefresh(refreshAll);
-
-  useEffect(() => {
-    loadCached('digest', () => api.get('/digest').then(r => r.data), setDigest)
-      .catch(() => setError('Could not load dashboard data.'))
-      .finally(() => setLoading(false));
-
-    loadCached(
-      'schools',
-      () => api.get('/schools').then(r => { const s = r.data?.schools; return Array.isArray(s) ? s : []; }),
-      setSchoolData,
-    ).catch(() => {});
-  }, []);
 
   async function handleNlSubmit(e) {
     e.preventDefault();
@@ -447,8 +447,7 @@ export default function Dashboard() {
       const { data } = await api.post('/classify', { text: prefix + nlText.trim() });
       setNlResult(data.result?.response_message || 'Done!');
       setNlText('');
-      const { data: d2 } = await api.get('/digest');
-      setDigest(d2);
+      await queryClient.invalidateQueries({ queryKey: ['digest', hid] });
       setTimeout(() => { setNlModalOpen(false); setNlResult(''); }, 1500);
     } catch {
       setNlResult('Could not process that. Please try again.');
@@ -462,8 +461,7 @@ export default function Dashboard() {
     hapticConfirm();
     try {
       await api.patch(`/tasks/${task.id}`, { completed: !task.completed });
-      const { data } = await api.get('/digest');
-      setDigest(data);
+      await queryClient.invalidateQueries({ queryKey: ['digest', hid] });
     } catch {
       // silently fail
     }
@@ -632,7 +630,7 @@ export default function Dashboard() {
           event the dashboard input uses. */}
       <WeatherStrip onOpenAI={() => window.dispatchEvent(new CustomEvent('openChatWidget', { detail: {} }))} />
 
-      <ErrorBanner message={error} onDismiss={() => setError('')} />
+      <ErrorBanner message={error} onDismiss={() => setErrorDismissed(true)} />
 
       {/* Trial reminder card - only renders when the household is trialing
           and has ≤10 days remaining. Silently no-ops otherwise (active,
