@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, persistOptions } from './lib/queryClient';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ChildModeProvider, useChildMode } from './context/ChildModeContext';
 import ChildModePinScreen from './components/ChildModePinScreen';
@@ -299,6 +301,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
+    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
     <BrowserRouter>
       <AuthProvider>
         {/* SubscriptionProvider lives inside AuthProvider so it can call
@@ -316,5 +319,6 @@ export default function App() {
         </ChildModeProvider>
       </AuthProvider>
     </BrowserRouter>
+    </PersistQueryClientProvider>
   );
 }
