@@ -2721,14 +2721,19 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
   const expanded = expandRecurringEvents(recurringRows, startDate, endDate);
   let merged = [...nonRecurring, ...expanded];
 
-  // Birthdays are derived live from members' birthday field (single source of
-  // truth, recurs yearly). Drop any legacy stored birthday rows to avoid
-  // duplicates, then append the synthesised occurrences.
-  if (birthdays) {
-    merged = merged.filter((e) => e.category !== 'birthday');
-    if (!category || category === 'birthday') {
-      merged = merged.concat(await getBirthdayEvents(householdId, startDate, endDate, db));
-    }
+  // MEMBER birthdays are derived live from members' birthday field (single
+  // source of truth, recurs yearly). Drop a stored birthday-category row ONLY
+  // when it duplicates a synthesised member birthday (same title + same day) -
+  // the legacy rows this dedupe exists for. A user-created birthday event for
+  // someone OUTSIDE the household (e.g. "Arthur's Birthday" for a friend) must
+  // survive: blanket-dropping category='birthday' made those events findable
+  // in search but invisible on the calendar.
+  if (birthdays && (!category || category === 'birthday')) {
+    const synthesised = await getBirthdayEvents(householdId, startDate, endDate, db);
+    const synthKeys = new Set(synthesised.map((s) => `${(s.title || '').toLowerCase()}|${String(s.start_time).slice(0, 10)}`));
+    merged = merged.filter((e) => e.category !== 'birthday'
+      || !synthKeys.has(`${(e.title || '').toLowerCase()}|${String(e.start_time).slice(0, 10)}`));
+    merged = merged.concat(synthesised);
   }
 
   return merged.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
