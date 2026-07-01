@@ -96,6 +96,32 @@ function monthParam(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+// Dedup calendar events. Recurring events reuse their base row id across every
+// expanded occurrence (only occurrence_key is unique), so key on occurrence_key
+// first. Then prefer a NATIVE event over a read-only SYNCED copy on a title+date
+// collision (a subscribed event deleted at the source lingers in our copy until
+// the feed pull confirms removal, and would otherwise hide the user's re-created
+// event). Finally drop exact dupes by title + START TIME (keying on the time so
+// two same-title events on one day both survive). Shared by load() and the
+// cache-first seed so both surfaces agree.
+function dedupeEvents(allEvents) {
+  const byId = [...new Map(allEvents.map(e => [e.occurrence_key || e.id, e])).values()];
+  byId.sort((a, b) => (a.external_feed_id ? 1 : 0) - (b.external_feed_id ? 1 : 0));
+  const nativeTitleDates = new Set(
+    byId.filter(e => !e.external_feed_id)
+      .map(e => `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}`),
+  );
+  const seen = new Set();
+  return byId.filter(e => {
+    const title = (e.title || '').toLowerCase().trim();
+    if (e.external_feed_id && nativeTitleDates.has(`${title}|${(e.start_time || '').split('T')[0]}`)) return false;
+    const key = `${title}|${e.start_time || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -297,8 +323,13 @@ export default function Calendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(new Date(today));
   const [morePopup, setMorePopup] = useState(null); // { date, items, rect }
-  const [events, setEvents] = useState([]);
-  const [tasks, setTasks] = useState([]);
+  // Cache-first seed: paint the last-persisted current month instantly on a cold
+  // launch so the calendar never opens blank (within-session month navigation is
+  // already instant via monthCacheRef). load() revalidates right after.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- read once, at mount
+  const seedMonth = useMemo(() => readCache(`calendar:month:${monthParam(new Date(today.getFullYear(), today.getMonth(), 1))}`)?.data || null, []);
+  const [events, setEvents] = useState(() => (seedMonth ? dedupeEvents(Array.isArray(seedMonth.events) ? seedMonth.events : []) : []));
+  const [tasks, setTasks] = useState(() => (seedMonth ? [...new Map((Array.isArray(seedMonth.tasks) ? seedMonth.tasks : []).map(t => [t.id, t])).values()] : []));
   const [members, setMembers] = useState([]);
   const { enabled: childMode } = useChildMode();
   const [schoolData, setSchoolData] = useState(null);
@@ -311,7 +342,7 @@ export default function Calendar() {
   // 'yours' vs 'pulled from someone else's calendar'.
   const [externalFeeds, setExternalFeeds] = useState([]);
   const [syncedEvent, setSyncedEvent] = useState(null); // read-only detail sheet for synced events
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!seedMonth);
   const [error, setError] = useState('');
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -462,34 +493,9 @@ export default function Calendar() {
       // a single day - which is why a recurring event showed on the dashboard
       // (single-day window) but vanished from the calendar's month grid. Key on
       // the unique occurrence_key when present, falling back to id.
-      const byId = [...new Map(allEvents.map(e => [e.occurrence_key || e.id, e])).values()];
-      // Prefer a NATIVE event over a read-only SYNCED copy when they collide on
-      // title+date below (stable sort: native first). Without this, a
-      // subscribed-calendar event the user deleted at the source - but which
-      // lingers in our copy until the feed pull confirms the removal - hides the
-      // user's own re-created event. (The API already orders native-first; this
-      // keeps the dedup correct regardless of payload order.)
-      byId.sort((a, b) => (a.external_feed_id ? 1 : 0) - (b.external_feed_id ? 1 : 0));
-      // Collapse a read-only SYNCED copy only when a NATIVE event shares its
-      // title+date (the deleted-at-source ghost case above). Then drop exact
-      // dupes by title + START TIME — keying on the time, not just the date, so
-      // two genuinely-different same-title events on one day (e.g. "Flicky" at
-      // 12:00 AND 14:00) both survive instead of the later one silently
-      // vanishing. Mirrors the dashboard digest's dedupeTodayEvents so the two
-      // surfaces agree.
-      const nativeTitleDates = new Set(
-        byId.filter(e => !e.external_feed_id)
-          .map(e => `${(e.title || '').toLowerCase().trim()}|${(e.start_time || '').split('T')[0]}`),
-      );
-      const seen = new Set();
-      const uniqueEvents = byId.filter(e => {
-        const title = (e.title || '').toLowerCase().trim();
-        if (e.external_feed_id && nativeTitleDates.has(`${title}|${(e.start_time || '').split('T')[0]}`)) return false;
-        const key = `${title}|${e.start_time || ''}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+      // Dedup events (recurring occurrences, synced-vs-native collisions, exact
+      // title+time dupes) - shared with the cache-first seed. See dedupeEvents.
+      const uniqueEvents = dedupeEvents(allEvents);
       const uniqueTasks = [...new Map(allTasks.map(t => [t.id, t])).values()];
 
       const rawSchools = freshSchoolData ? freshSchoolData.data?.schools : schoolData;
@@ -586,7 +592,10 @@ export default function Calendar() {
   }, [currentMonth, selectedDate, viewMode, members, childMode]);
 
   useEffect(() => {
-    setLoading(true);
+    // No setLoading(true) here: keep the current (stale) events visible while
+    // revalidating, so switching month/view - and the cache-first cold start -
+    // never flash a skeleton over data we can already show. The skeleton shows
+    // only on a genuinely empty first launch (initial `loading` state above).
     load();
   }, [load]);
 
