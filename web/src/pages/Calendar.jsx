@@ -12,6 +12,8 @@ import { useCanWrite } from '../context/SubscriptionContext';
 import { useChildMode } from '../context/ChildModeContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
+import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
+import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
 
 // ── Colour map ──────────────────────────────────────────────
@@ -598,6 +600,15 @@ export default function Calendar() {
     // only on a genuinely empty first launch (initial `loading` state above).
     load();
   }, [load]);
+
+  // Pull-to-refresh (iOS gesture) + refresh on app foreground, matching the
+  // Dashboard. Both clear the 5-min in-memory month cache so they pull fresh.
+  const refresh = useCallback(async () => {
+    monthCacheRef.current = {};
+    await load();
+  }, [load]);
+  const ptr = usePullToRefresh(refresh);
+  useAppForegroundRefresh(refresh);
 
   useEffect(() => {
     loadCached(
@@ -1479,7 +1490,8 @@ export default function Calendar() {
   // ── Render ─────────────────────────────────────────────
 
   return (
-    <div className="mx-auto space-y-4">
+    <div {...ptr.bindings} className="mx-auto space-y-4">
+      <PullIndicator state={ptr.state} />
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
 
