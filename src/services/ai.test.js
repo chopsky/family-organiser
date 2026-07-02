@@ -357,8 +357,11 @@ describe('classify()', () => {
     expect(sys).toContain('BEFORE adding a new task, check the OPEN TASKS list');
     expect(sys).toContain('Elementor paid');
     expect(sys).toContain('Pay Elementor');
-    // And guards against over-matching future-intent phrasing.
-    expect(sys).toMatch(/Do NOT over-match/i);
+    // And guards against over-matching future-intent phrasing ("need to
+    // book X" must never complete an existing "Book X" task). The old
+    // "Do NOT over-match" line was reworded into this stronger block.
+    expect(sys).toContain('FUTURE INTENT IS NEVER A COMPLETION');
+    expect(sys).toMatch(/NOT a report that it is done/i);
   });
 
   test('prompt includes COMPLETION + SCHEDULING rules so "booked car service for Wednesday" creates an event too', async () => {
