@@ -257,6 +257,96 @@ module.exports = [
       return null;
     },
   },
+  // ── Weak-target matches (real failure 2026-07-01: a voice note asking for
+  // a reminder to "cancel Logan's swimming" instead moved the unrelated task
+  // "Do Logan's citizenship" to today, because both mentioned Logan) ──
+  {
+    name: 'weak target: "remind me to cancel Logan\'s swimming" must NOT touch the citizenship task',
+    message: 'Please set a reminder for Grant to cancel Logan\'s swimming lessons next week. Set the reminder for today.',
+    ctx: {
+      sender: 'Lynn',
+      memberNames: ['Grant', 'Lynn', 'Logan'],
+      tasks: [
+        { id: 't1', title: 'Do Logan\'s citizenship', due_date: futureISO(14) },
+        { id: 't2', title: 'Renew car insurance' },
+      ],
+    },
+    check: (r) => {
+      // Must NOT update or delete the citizenship task.
+      if (r.intent === 'update_task' || r.intent === 'delete_task') {
+        return `targeted an existing task (${r.intent}, target_id ${r.target?.target_id}) instead of adding the errand`;
+      }
+      const updates = (r.tasks || []).filter((t) => t.action === 'update' || t.action === 'delete');
+      if (updates.length) return `emitted task updates/deletes: ${JSON.stringify(updates)}`;
+      if (completions(r).length) return `wrongly completed a task: ${JSON.stringify(completions(r))}`;
+      // Must ADD a to-do about cancelling swimming, assigned to Grant.
+      const a = adds(r);
+      if (a.length < 1) return `expected a new to-do, got intent ${r.intent}`;
+      if (!/swim|cancel/i.test(a[0].title || '')) return `wrong to-do title: "${a[0].title}"`;
+      if (!(a[0].assigned_to_names || []).some((n) => /grant/i.test(n))) return `not assigned to Grant: ${JSON.stringify(a[0].assigned_to_names)}`;
+      return null;
+    },
+  },
+  {
+    name: 'weak target: "cancel Ella\'s dentist" with no matching item creates an errand, not a delete',
+    message: 'Cancel Ella\'s dentist',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Ella'],
+      tasks: [{ id: 't1', title: 'Order Ella\'s school shoes' }],
+      calendarEvents: [{ id: 'e1', title: 'Ella swimming gala', start_time: futureISO(4), all_day: false }],
+    },
+    check: (r) => {
+      if (r.intent === 'delete_task' || r.intent === 'delete_event') {
+        return `deleted an unrelated item (${r.intent}, target_id ${r.target?.target_id}) — "cancel X" with no matching item should become a to-do`;
+      }
+      if (completions(r).length) return `wrongly completed: ${JSON.stringify(completions(r))}`;
+      const a = adds(r);
+      if (a.length < 1) return `expected an errand to-do, got intent ${r.intent}`;
+      if (!/dentist|cancel/i.test(a[0].title || '')) return `wrong title: "${a[0].title}"`;
+      return null;
+    },
+  },
+  {
+    name: 'shared name only: "Logan finished his homework" does not complete "Do Logan\'s citizenship"',
+    message: 'Logan finished his homework',
+    ctx: {
+      sender: 'Lynn',
+      memberNames: ['Grant', 'Lynn', 'Logan'],
+      tasks: [
+        { id: 't1', title: 'Do Logan\'s citizenship' },
+        { id: 't2', title: 'Logan homework: maths worksheet' },
+      ],
+    },
+    check: (r) => {
+      const c = completions(r);
+      // Completing the homework task (t2) is right; completing citizenship (t1) is the bug.
+      const badTarget = c.some((t) => Number(t.task_id) === 1 || /citizenship/i.test(t.title || ''));
+      if (badTarget) return `completed the unrelated citizenship task: ${JSON.stringify(c)}`;
+      return null;
+    },
+  },
+  {
+    name: 'voice-note phrasing: "can you move the citizenship thing to Friday" targets by topic, not by person',
+    message: 'Can you move the citizenship thing to Friday',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Logan'],
+      tasks: [
+        { id: 't1', title: 'Do Logan\'s citizenship', due_date: futureISO(14) },
+        { id: 't2', title: 'Book Logan swimming lessons' },
+      ],
+    },
+    check: (r) => {
+      // This one SHOULD be an update - action+object match ("citizenship").
+      const isUpdate = r.intent === 'update_task'
+        || (r.tasks || []).some((t) => t.action === 'update');
+      if (!isUpdate) return `expected update_task, got intent ${r.intent}`;
+      const targetId = Number(r.target?.target_id ?? (r.tasks || []).find((t) => t.action === 'update')?.task_id);
+      if (targetId !== 1) return `expected target 1 (citizenship), got ${targetId}`;
+      return null;
+    },
+  },
   {
     name: 'no false completion: "Need to book a doctor appointment" (future intent) is NOT done',
     message: 'Need to book a doctor appointment',

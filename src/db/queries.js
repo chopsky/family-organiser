@@ -2232,6 +2232,27 @@ async function deleteShoppingItem(itemId, householdId, db = supabase) {
   if (error) throw error;
 }
 
+// Tables the WhatsApp bot's "undo" may re-insert into after a hard delete.
+const RESTORABLE_TABLES = new Set(['tasks', 'shopping_items']);
+
+/**
+ * Re-insert a row captured before a hard delete, so the WhatsApp bot's
+ * "undo" can restore a task or shopping item exactly (assignees, due dates,
+ * notes) rather than recreating a lossy approximation. Identity/volatile
+ * columns are stripped; the restored row gets a fresh id.
+ */
+async function restoreDeletedRow(table, householdId, row, db = supabase) {
+  if (!RESTORABLE_TABLES.has(table)) throw new Error(`restoreDeletedRow: unsupported table "${table}"`);
+  const { id, created_at, updated_at, ...rest } = row || {};
+  const { data, error } = await db
+    .from(table)
+    .insert({ ...rest, household_id: householdId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 /**
  * Delete *prior* completed shopping items with the same name in the same
  * (household, list), keeping the row identified by `keepItemId`.
@@ -8057,6 +8078,7 @@ module.exports = {
   deleteShoppingItem,
   purgePriorPurchases,
   deleteTask,
+  restoreDeletedRow,
   findTasksByFuzzyTitle,
   findShoppingItemsByFuzzyName,
   findEventsByFuzzyTitle,

@@ -17,6 +17,15 @@ jest.mock('../db/queries', () => ({
   createCalendarEvent: jest.fn((hid, data) => Promise.resolve({ id: 'e-1', ...data })),
   saveEventAssignees: jest.fn(() => Promise.resolve()),
   saveEventReminders: jest.fn(() => Promise.resolve()),
+  // confirm-before-modify / undo surface
+  getRecentWhatsAppTurns: jest.fn(() => Promise.resolve([])),
+  getHouseholdNotes: jest.fn(() => Promise.resolve([])),
+  getAllIncompleteTasks: jest.fn(() => Promise.resolve([])),
+  getTermDatesBySchoolIds: jest.fn(() => Promise.resolve([])),
+  updateTask: jest.fn((id, hid, updates) => Promise.resolve({ id, title: 'x', ...updates })),
+  deleteTask: jest.fn(() => Promise.resolve()),
+  restoreDeletedRow: jest.fn((table, hid, row) => Promise.resolve({ id: 'restored', ...row })),
+  updateCalendarEvent: jest.fn((id, hid, updates) => Promise.resolve({ id, title: 'x', ...updates })),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -313,5 +322,124 @@ describe('generateAndSaveRecipe - learned preferences', () => {
     expect(recipe.name).toBe('Toast');
     // No constraint block when prefs couldn't be read.
     expect(aiClient.callWithFailover.mock.calls[0][0].messages[0].content).not.toMatch(/ALLERGIES/);
+  });
+});
+
+describe('isGroundedTarget — weak-target guard', () => {
+  const members = ['Grant', 'Lynn', 'Logan'];
+
+  test('the Logan failure: "cancel Logan\'s swimming" is NOT grounded against the citizenship task', () => {
+    expect(handlers.isGroundedTarget(
+      "Please set a reminder for Grant to cancel Logan's swimming lessons next week. Set the reminder for today.",
+      "Do Logan's citizenship",
+      members,
+    )).toBe(false);
+  });
+
+  test('naming the thing is grounded: "cancel my haircut" vs "Haircut"', () => {
+    expect(handlers.isGroundedTarget('cancel my haircut', 'Haircut', members)).toBe(true);
+  });
+
+  test('topic word grounds even with a shared name: "move the citizenship thing to Friday"', () => {
+    expect(handlers.isGroundedTarget('move the citizenship thing to Friday', "Do Logan's citizenship", members)).toBe(true);
+  });
+
+  test('a member name + schedule words alone are never grounds to mutate', () => {
+    expect(handlers.isGroundedTarget("cancel Logan's thing today", "Do Logan's citizenship", members)).toBe(false);
+  });
+
+  test('simple inflections still match (swim/swimming)', () => {
+    expect(handlers.isGroundedTarget('cancel the swim class', 'Book Logan swimming lessons', members)).toBe(true);
+  });
+
+  test('no message context (internal call) trusts the caller', () => {
+    expect(handlers.isGroundedTarget('', 'Anything', members)).toBe(true);
+  });
+});
+
+describe('handleTextMessage — confirm-before-modify + undo', () => {
+  const ai = require('../services/ai');
+  const hh = {
+    id: 'h9',
+    timezone: 'Europe/London',
+    members: [
+      { id: 'u1', name: 'Grant' },
+      { id: 'u2', name: 'Lynn' },
+      { id: 'u3', name: 'Logan' },
+    ],
+  };
+  const citizenship = { id: 'task-cit', title: "Do Logan's citizenship", due_date: '2026-07-15' };
+  const dentist = { id: 'task-den', title: 'Book dentist appointment', due_date: '2026-07-10' };
+
+  beforeEach(() => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    db.getHouseholdSchools.mockResolvedValue([]);
+    db.getHouseholdPreferences.mockResolvedValue([]);
+  });
+
+  test('weak ID-grounded update asks to confirm; "yes" executes; "undo" restores the pre-image', async () => {
+    const userA = { id: 'user-a', name: 'Lynn' };
+    db.getAllIncompleteTasks.mockResolvedValue([citizenship]);
+    ai.classify.mockResolvedValue({
+      intent: 'update_task',
+      target: { target_id: 1, title: "Do Logan's citizenship" },
+      updates: { due_date: '2026-07-02' },
+    });
+
+    // 1. Weak target (only overlap with the message is the child's name) → confirm, no mutation.
+    const ask = await handlers.handleTextMessage(
+      "Set a reminder for Grant to cancel Logan's swimming next week",
+      userA, hh, {},
+    );
+    expect(ask.response).toMatch(/did you mean/i);
+    expect(db.updateTask).not.toHaveBeenCalled();
+
+    // 2. "yes" executes the stashed update deterministically.
+    const confirmed = await handlers.handleTextMessage('yes', userA, hh, {});
+    expect(db.updateTask).toHaveBeenCalledWith('task-cit', 'h9', expect.objectContaining({ due_date: expect.anything() }));
+    expect(confirmed.response).toMatch(/updated/i);
+
+    // 3. "undo" restores the changed columns to their pre-image.
+    const undone = await handlers.handleTextMessage('undo', userA, hh, {});
+    const lastUpdate = db.updateTask.mock.calls[db.updateTask.mock.calls.length - 1];
+    expect(lastUpdate[0]).toBe('task-cit');
+    expect(lastUpdate[2]).toEqual(expect.objectContaining({ due_date: '2026-07-15' }));
+    expect(undone.response).toMatch(/undone/i);
+  });
+
+  test('weak delete declined with "no" leaves the item alone', async () => {
+    const userB = { id: 'user-b', name: 'Grant' };
+    db.getAllIncompleteTasks.mockResolvedValue([citizenship]);
+    ai.classify.mockResolvedValue({
+      intent: 'delete_task',
+      target: { target_id: 1, title: "Do Logan's citizenship" },
+      updates: {},
+    });
+
+    const ask = await handlers.handleTextMessage("cancel Logan's thing", userB, hh, {});
+    expect(ask.response).toMatch(/did you mean/i);
+    const declined = await handlers.handleTextMessage('no', userB, hh, {});
+    expect(db.deleteTask).not.toHaveBeenCalled();
+    expect(declined.response).toMatch(/left it alone/i);
+  });
+
+  test('strong delete executes instantly; "undo" re-inserts the captured row', async () => {
+    const userC = { id: 'user-c', name: 'Grant' };
+    db.getAllIncompleteTasks.mockResolvedValue([dentist]);
+    ai.classify.mockResolvedValue({
+      intent: 'delete_task',
+      target: { target_id: 1, title: 'Book dentist appointment' },
+      updates: {},
+    });
+
+    // "dentist" appears in the item title → grounded, no confirmation friction.
+    const res = await handlers.handleTextMessage('cancel the dentist task', userC, hh, {});
+    expect(db.deleteTask).toHaveBeenCalledWith('task-den', 'h9');
+    expect(res.response).toMatch(/cancelled task/i);
+    expect(res.response).toMatch(/undo/i);
+
+    const undone = await handlers.handleTextMessage('undo', userC, hh, {});
+    expect(db.restoreDeletedRow).toHaveBeenCalledWith('tasks', 'h9', expect.objectContaining({ title: 'Book dentist appointment' }));
+    expect(undone.response).toMatch(/undone/i);
   });
 });

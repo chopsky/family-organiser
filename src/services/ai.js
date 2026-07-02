@@ -138,18 +138,26 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     const { text } = await callWithFailover({
       system: systemPrompt,
       messages,
+      // Claude-primary for classification. Gemini Flash (with thinking
+      // zeroed out) is fine for cheap chat volume but is where our real
+      // misclassifications came from - weak target matches, moved/deleted
+      // wrong items. Sonnet 5 runs adaptive thinking by default, so hard
+      // messages (ambiguous voice notes) get actual deliberation before
+      // the JSON is emitted; trivial ones barely think at all. Gemini
+      // stays as the failover.
+      preferClaude: true,
       useThinking: false,
-      // 4096 gives chat responses (recommendations, advice) room to breathe.
-      // The JSON schema overhead alone is ~400 tokens, so 2048 was too tight
-      // for longer response_message values and caused truncation → JSON parse errors.
-      maxTokens: 4096,
+      // Adaptive thinking counts against max_tokens on Sonnet 5, and the
+      // JSON schema overhead alone is ~400 tokens - 8192 leaves room for
+      // deliberation + a long response_message without truncating the JSON.
+      maxTokens: 8192,
       // classify doubles as the chat/advice responder (the answer lands in
-      // response_message). Generating a long recommendation can exceed the 12s
-      // chat default, which then times out on BOTH providers (~24s) and fails.
-      // The WhatsApp webhook acks Twilio immediately and replies async, so a
-      // longer budget is safe. A healthy provider still answers in a few
-      // seconds; this only buys headroom for genuinely long generations.
-      timeoutMs: 22000,
+      // response_message). Long generations - and now thinking on hard
+      // messages - can exceed the 12s chat default. The WhatsApp webhook
+      // acks Twilio immediately and replies async, so a longer budget is
+      // safe. A healthy provider still answers in a few seconds; this only
+      // buys headroom, and a timeout still fails over to Gemini.
+      timeoutMs: 30000,
       feature: 'classify',
       responseFormat: 'json', // force Gemini into structured-output mode
       householdId,

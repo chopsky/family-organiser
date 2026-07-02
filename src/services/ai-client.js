@@ -12,7 +12,10 @@ const OpenAI = require('openai');
 const { supabaseAdmin: supabase } = require('../db/client');
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
-const CLAUDE_MODEL = 'claude-sonnet-4-6';
+// Sonnet 5 runs adaptive thinking by default (the model decides per-message
+// how much to reason before answering) - thinking tokens count against
+// max_tokens, so callers that expect long outputs need headroom.
+const CLAUDE_MODEL = 'claude-sonnet-5';
 // Cheap Claude tier (~1/4 the input price of Sonnet). For simple, high-volume
 // calls where Sonnet is overkill - e.g. "return one URL" or "copy dates out of
 // these search results". callClaude accepts a `model` override to opt in.

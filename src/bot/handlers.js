@@ -58,9 +58,9 @@ function matchTrivialMessage(text) {
 //
 // Tracks the last add so the user can reverse it with 'undo' / 'scrap that'
 // within a short window. In-memory is fine for v1: Railway rarely restarts,
-// and if it does, the undo window expires within minutes anyway. Only ADDs
-// are tracked - deletes/updates get their own undo story later (need to
-// store the prior state to revert).
+// and if it does, the undo window expires within minutes anyway. Deletes,
+// updates and completions of EXISTING items are tracked separately in
+// recentMutations below (they need the prior state captured to revert).
 const recentAdds = new Map(); // userId → { kind, ids: uuid[], label: string, timestamp }
 const UNDO_WINDOW_MS = 2 * 60 * 1000;
 
@@ -69,14 +69,127 @@ function rememberAdd(userId, kind, ids, label) {
   recentAdds.set(userId, { kind, ids: Array.isArray(ids) ? ids : [ids], label, timestamp: Date.now() });
 }
 
-function popRecentAdd(userId) {
-  const entry = recentAdds.get(userId);
+// Peek an entry if it's still inside its undo window (expired entries are
+// dropped). Shared by the add + mutation stores so runUndo can compare
+// timestamps before consuming only the one it actually reverts.
+function peekFresh(map, userId, windowMs) {
+  const entry = map.get(userId);
   if (!entry) return null;
-  if (Date.now() - entry.timestamp > UNDO_WINDOW_MS) {
-    recentAdds.delete(userId);
+  if (Date.now() - entry.timestamp > windowMs) {
+    map.delete(userId);
     return null;
   }
-  recentAdds.delete(userId);
+  return entry;
+}
+
+function popRecentAdd(userId) {
+  const entry = peekFresh(recentAdds, userId, UNDO_WINDOW_MS);
+  if (entry) recentAdds.delete(userId);
+  return entry;
+}
+
+// ─── Undo for updates / deletes / completions (pre-image memory) ─────────────
+//
+// recentAdds above covers "scrap that" for freshly ADDED items. This store
+// covers the higher-stakes case: the bot updated, deleted or completed an
+// EXISTING item off a misheard voice note or misclassified message (real
+// failure: "cancel Logan's swimming" moved "Do Logan's citizenship" to
+// today). We capture the pre-image before mutating so "undo" restores it
+// exactly. Window is longer than for adds - you notice a wrong delete when
+// you next look at the list, not instantly.
+const recentMutations = new Map(); // userId → { kind:'task'|'event'|'shopping', op:'update'|'delete'|'complete', id, ids, preImage, label, timestamp }
+const MUTATION_UNDO_WINDOW_MS = 10 * 60 * 1000;
+
+function rememberMutation(userId, entry) {
+  if (!userId || !entry) return;
+  recentMutations.set(userId, { ...entry, timestamp: Date.now() });
+}
+
+// Pre-image of only the columns an update touches - enough to revert the
+// patch without replaying columns that didn't change. A key the row doesn't
+// have reverts to null (the update introduced it).
+function pickPreImage(row, updates) {
+  const pre = {};
+  for (const k of Object.keys(updates || {})) {
+    pre[k] = Object.prototype.hasOwnProperty.call(row || {}, k) ? row[k] : null;
+  }
+  return pre;
+}
+
+// ─── Weak-target guard (confirm before update/delete) ────────────────────────
+//
+// Real failure this prevents: "set a reminder for Grant to cancel Logan's
+// swimming" was classified as update_task against "Do Logan's citizenship" -
+// the only overlap was the child's name, and the ID-grounded handler executed
+// it silently. The classifier's own target.title can't be trusted for this
+// check (a wrong pick comes with a matching paraphrase), so we ground against
+// the user's ORIGINAL words: at least one significant word of the message -
+// after discarding member names, action verbs, day/time words and stopwords -
+// must appear in the chosen item's title. Strong matches (the overwhelming
+// majority: people name the thing they mean) execute instantly; weak ones get
+// a one-tap "did you mean...?" confirmation instead of a silent mutation.
+const MATCH_STOPWORDS = new Set([
+  // articles / glue
+  'the', 'a', 'an', 'and', 'or', 'to', 'for', 'of', 'on', 'at', 'in', 'it',
+  'that', 'this', 'my', 'our', 'his', 'her', 'their', 'your', 'me', 'us',
+  'please', 'can', 'you', 'could', 'would', 'will', 'just', 'from', 'with',
+  'about', 'one', 'thing', 'item', 'stuff',
+  // action verbs the intent already encodes
+  'cancel', 'delete', 'remove', 'update', 'change', 'move', 'reschedule',
+  'rebook', 'edit', 'rename', 'set', 'make', 'mark', 'add', 'remind',
+  'reminder', 'need', 'want',
+  // generic item words
+  'task', 'todo', 'todos', 'event', 'appointment', 'appt', 'meeting',
+  'list', 'shopping', 'calendar',
+  // schedule words (they describe WHEN, not WHICH)
+  'today', 'tomorrow', 'tonight', 'yesterday', 'next', 'last', 'week',
+  'month', 'morning', 'afternoon', 'evening', 'monday', 'tuesday',
+  'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'january',
+  'february', 'march', 'april', 'may', 'june', 'july', 'august',
+  'september', 'october', 'november', 'december', 'am', 'pm',
+]);
+
+function normaliseMatchWords(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[’']s\b/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function isGroundedTarget(originalText, itemTitle, memberNames = []) {
+  if (!originalText) return true; // internal call with no message context - trust the caller
+  const members = new Set(memberNames.flatMap((n) => normaliseMatchWords(n)));
+  const msgWords = normaliseMatchWords(originalText)
+    .filter((w) => w.length >= 3 && !MATCH_STOPWORDS.has(w) && !members.has(w));
+  // The message identifies nothing beyond names/verbs/schedule words
+  // ("cancel Logan's thing today") - not enough to mutate silently.
+  if (msgWords.length === 0) return false;
+  const titleWords = normaliseMatchWords(itemTitle).filter((w) => w.length >= 3);
+  // Prefix-match on the first 4 chars tolerates simple inflections
+  // (swim/swimming, drop/drops) without a stemmer.
+  return msgWords.some((w) => titleWords.some((t) =>
+    w === t
+    || (t.length >= 4 && w.startsWith(t.slice(0, 4)))
+    || (w.length >= 4 && t.startsWith(w.slice(0, 4)))));
+}
+
+// Pending "did you mean X?" confirmation for a weak-target update/delete.
+// Same shape as the other pending stores: per-user, TTL, popped on the next
+// message; "yes" executes the stashed action deterministically (no LLM
+// round-trip), "no" drops it, anything else falls through to classification.
+const pendingModifyConfirm = new Map(); // userId → { intent, kind, hit, updates, householdId, originalText, timestamp }
+const MODIFY_CONFIRM_TTL_MS = 5 * 60 * 1000;
+
+function rememberModifyConfirm(userId, entry) {
+  if (!userId || !entry) return;
+  pendingModifyConfirm.set(userId, { ...entry, timestamp: Date.now() });
+}
+
+function popModifyConfirm(userId) {
+  const entry = peekFresh(pendingModifyConfirm, userId, MODIFY_CONFIRM_TTL_MS);
+  if (entry) pendingModifyConfirm.delete(userId);
   return entry;
 }
 
@@ -341,19 +454,61 @@ function resolveDisambiguationChoice(text, entry) {
 
 async function runUndo(user, household) {
   const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
-  const entry = popRecentAdd(user.id);
-  if (!entry) {
-    return { response: "Nothing to undo - either I haven't added anything recently, or the 2-minute window passed. You can still remove it from the app.", actions };
-  }
-  try {
-    if (entry.kind === 'event') {
-      for (const id of entry.ids) await db.softDeleteCalendarEvent(id, household.id);
-    } else if (entry.kind === 'task') {
-      for (const id of entry.ids) await db.deleteTask(id, household.id);
-    } else if (entry.kind === 'shopping') {
-      for (const id of entry.ids) await db.deleteShoppingItem(id, household.id);
+
+  // Two undo stores: fresh adds (remove them again) and mutations of
+  // existing items (restore the pre-image). Peek both, revert whichever
+  // happened most recently, and consume only that one.
+  const add = peekFresh(recentAdds, user.id, UNDO_WINDOW_MS);
+  const mut = peekFresh(recentMutations, user.id, MUTATION_UNDO_WINDOW_MS);
+
+  if (mut && (!add || mut.timestamp > add.timestamp)) {
+    recentMutations.delete(user.id);
+    try {
+      if (mut.op === 'delete') {
+        if (mut.kind === 'event') {
+          // Event deletes are soft - clear the tombstone.
+          await db.updateCalendarEvent(mut.id, household.id, { deleted_at: null });
+          return { response: `↩️ Undone - "${mut.label}" is back on the calendar.`, actions };
+        }
+        // Tasks and shopping items are hard-deleted - re-insert the captured row.
+        const table = mut.kind === 'task' ? 'tasks' : 'shopping_items';
+        await db.restoreDeletedRow(table, household.id, mut.preImage);
+        return { response: `↩️ Undone - "${mut.label}" is back on the ${mut.kind === 'task' ? 'to-do' : 'shopping'} list.`, actions };
+      }
+      if (mut.op === 'complete') {
+        for (const id of mut.ids || []) {
+          await db.updateTask(id, household.id, { completed: false, completed_at: null });
+        }
+        return { response: `↩️ Undone - marked "${mut.label}" as not done.`, actions };
+      }
+      // op === 'update' - replay the pre-image of the changed columns.
+      if (mut.kind === 'event') {
+        await db.updateCalendarEvent(mut.id, household.id, mut.preImage);
+      } else if (mut.kind === 'task') {
+        await db.updateTask(mut.id, household.id, mut.preImage);
+      } else {
+        await db.updateShoppingItem(mut.id, household.id, mut.preImage);
+      }
+      return { response: `↩️ Undone - put "${mut.label}" back how it was.`, actions };
+    } catch (err) {
+      console.error('[handlers] mutation undo failed:', err.message);
+      return { response: "⚠️ I couldn't undo that - please fix it in the app.", actions };
     }
-    return { response: `↩️ Undone - removed ${entry.label}.`, actions };
+  }
+
+  if (!add) {
+    return { response: "Nothing to undo - either I haven't changed anything recently, or the undo window passed. You can still fix it in the app.", actions };
+  }
+  recentAdds.delete(user.id);
+  try {
+    if (add.kind === 'event') {
+      for (const id of add.ids) await db.softDeleteCalendarEvent(id, household.id);
+    } else if (add.kind === 'task') {
+      for (const id of add.ids) await db.deleteTask(id, household.id);
+    } else if (add.kind === 'shopping') {
+      for (const id of add.ids) await db.deleteShoppingItem(id, household.id);
+    }
+    return { response: `↩️ Undone - removed ${add.label}.`, actions };
   } catch (err) {
     console.error('[handlers] undo failed:', err.message);
     return { response: "⚠️ I couldn't undo that - please remove it from the app.", actions };
@@ -519,6 +674,14 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
   if (groundedList && Number.isInteger(ref) && ref >= 1 && ref <= groundedList.length) {
     const hit = groundedList[ref - 1];
     if (hit) {
+      // A valid target_id still isn't proof of intent - the model can pick
+      // the wrong reference number confidently (the Logan failure came
+      // through this exact path). If the item's title has no footing in the
+      // user's own words, ask before mutating.
+      const weakCheck = confirmIfWeakTarget({
+        intent: result.intent, kind: isEvent ? 'event' : 'task', hit, updates, user, household, originalText, actions,
+      });
+      if (weakCheck) return weakCheck;
       return await executeModifyAction({
         intent: result.intent, kind: isEvent ? 'event' : 'task', hit, updates, user, household, actions, originalText,
       });
@@ -581,7 +744,12 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     };
   }
 
-  // 4. One match - act
+  // 4. One match - act, unless the match is weak (fuzzy title lookup can
+  // land on an item the user never actually named - confirm first).
+  const weakCheck = confirmIfWeakTarget({
+    intent: result.intent, kind, hit: candidates[0], updates, user, household, originalText, actions,
+  });
+  if (weakCheck) return weakCheck;
   return await executeModifyAction({
     intent: result.intent,
     kind,
@@ -592,6 +760,30 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     actions,
     originalText,
   });
+}
+
+/**
+ * If the chosen update/delete target isn't grounded in the user's own words
+ * (see isGroundedTarget), stash the action and return a "did you mean...?"
+ * confirmation response instead of executing. Returns null when the match is
+ * strong and the caller should execute immediately. Never fires for
+ * disambiguation replies - the user explicitly picked from a list there.
+ */
+function confirmIfWeakTarget({ intent, kind, hit, updates, user, household, originalText, actions }) {
+  const label = kind === 'shopping' ? hit.item : hit.title;
+  const memberNames = (household.members || []).map((m) => m.name);
+  if (isGroundedTarget(originalText, label, memberNames)) return null;
+
+  rememberModifyConfirm(user.id, {
+    intent, kind, hit, updates, householdId: household.id, originalText,
+  });
+  const isDelete = intent.startsWith('delete_');
+  const verb = isDelete ? (kind === 'shopping' ? 'remove' : 'cancel') : 'update';
+  console.log(`[handlers] Weak ${intent} target "${label}" for "${String(originalText).slice(0, 60)}" - asking to confirm`);
+  return {
+    response: `Just to check - did you mean ${kind === 'shopping' ? '' : `the ${kind} `}*"${label}"*? Reply *yes* to ${verb} it, or *no* to leave it alone.`,
+    actions,
+  };
 }
 
 /**
@@ -617,8 +809,9 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       }
       if (isDelete) {
         await db.softDeleteCalendarEvent(hit.id, household.id);
+        rememberMutation(user.id, { kind: 'event', op: 'delete', id: hit.id, label: hit.title });
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
-        return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ''}`, actions };
+        return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ' Reply *undo* to restore it.'}`, actions };
       }
       const eventUpdates = buildEventUpdates(updates, hit, household, user);
       // Reminders are stored in a separate table (event_reminders), so they
@@ -639,6 +832,11 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       const updated = Object.keys(eventUpdates).length > 0
         ? await db.updateCalendarEvent(hit.id, household.id, eventUpdates)
         : hit;
+      if (Object.keys(eventUpdates).length > 0) {
+        // Pre-image for "undo". Reminder changes (separate table) aren't
+        // captured - undo restores the event's own columns only.
+        rememberMutation(user.id, { kind: 'event', op: 'update', id: hit.id, preImage: pickPreImage(hit, eventUpdates), label: hit.title });
+      }
       if (hasReminderUpdate) {
         try {
           await db.saveEventReminders(hit.id, household.id, reminderSet, updated.start_time);
@@ -666,8 +864,10 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
     if (isTask) {
       if (isDelete) {
         await db.deleteTask(hit.id, household.id);
+        // Task deletes are hard - keep the whole row so undo can re-insert it.
+        rememberMutation(user.id, { kind: 'task', op: 'delete', id: hit.id, preImage: hit, label: hit.title });
         broadcast.toHousehold(user.id, household.members, `📋 ${user.name} cancelled task: ${hit.title}`);
-        return { response: `🗑️ Cancelled task "${hit.title}".`, actions };
+        return { response: `🗑️ Cancelled task "${hit.title}". Reply *undo* to restore it.`, actions };
       }
       const taskUpdates = buildTaskUpdates(updates, hit, household);
       // Reminder-only update backstop: if the classifier didn't emit a
@@ -682,6 +882,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: "Got it, but I didn't see any field to change. Tell me what to update (due date, assignee, priority…).", actions };
       }
       const updated = await db.updateTask(hit.id, household.id, taskUpdates);
+      rememberMutation(user.id, { kind: 'task', op: 'update', id: hit.id, preImage: pickPreImage(hit, taskUpdates), label: hit.title });
       const { summariseTaskChanges } = require('../utils/notification-format');
       const taskDiff = summariseTaskChanges(hit, taskUpdates, household.timezone || 'Europe/London');
       const taskTail = taskDiff ? ` - ${taskDiff}` : '';
@@ -692,14 +893,16 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
     // shopping
     if (isDelete) {
       await db.deleteShoppingItem(hit.id, household.id);
+      rememberMutation(user.id, { kind: 'shopping', op: 'delete', id: hit.id, preImage: hit, label: hit.item });
       broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} removed: ${hit.item}`);
-      return { response: `🗑️ Removed "${hit.item}" from the shopping list.`, actions };
+      return { response: `🗑️ Removed "${hit.item}" from the shopping list. Reply *undo* to restore it.`, actions };
     }
     const shopUpdates = buildShoppingUpdates(updates);
     if (Object.keys(shopUpdates).length === 0) {
       return { response: "Got it, but I didn't see any field to change.", actions };
     }
     const updated = await db.updateShoppingItem(hit.id, household.id, shopUpdates);
+    rememberMutation(user.id, { kind: 'shopping', op: 'update', id: hit.id, preImage: pickPreImage(hit, shopUpdates), label: hit.item });
     broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} updated: ${updated.item}`);
     return { response: `✏️ Updated "${updated.item}".`, actions };
   } catch (err) {
@@ -1256,6 +1459,33 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       return { response: `No problem — I've left ${pendingBday.label} as ${pendingBday.eventIds.length === 1 ? 'a one-off' : 'one-offs'}.`, actions: noActions };
     }
     // Neither yes nor no - drop the pending question and classify normally.
+  }
+
+  // Pending "did you mean X?" reply for a weak-target update/delete - the
+  // stashed action executes deterministically on "yes" (no LLM round-trip),
+  // drops on "no", and anything else classifies normally.
+  const pendingConfirm = popModifyConfirm(user.id);
+  if (pendingConfirm && pendingConfirm.householdId === household.id) {
+    const ans = parseAffirmative(text);
+    const confirmActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+    if (ans === 'yes') {
+      ctx.intent = pendingConfirm.intent;
+      return await executeModifyAction({
+        intent: pendingConfirm.intent,
+        kind: pendingConfirm.kind,
+        hit: pendingConfirm.hit,
+        updates: pendingConfirm.updates,
+        user,
+        household,
+        actions: confirmActions,
+        originalText: pendingConfirm.originalText || '',
+      });
+    }
+    if (ans === 'no') {
+      ctx.intent = 'modify_confirm_decline';
+      return { response: "No problem - I've left it alone.", actions: confirmActions };
+    }
+    // Neither yes nor no - the user moved on; classify normally.
   }
 
   // Pending disambiguation reply - if we just asked "which one?", a number /
@@ -2033,6 +2263,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       }
     }
     const unmatchedCompletions = [];
+    const completedForUndo = [];
     for (const t of toComplete) {
       // The classifier may emit either the new assigned_to_names (array)
       // or the legacy singular assigned_to_name. Take the first name in
@@ -2074,9 +2305,21 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       // Push the ACTUAL completed titles so actions mirror reality -
       // important for the broadcast notification other members see.
       actions.tasksCompleted.push(...done.map((d) => d.title));
+      completedForUndo.push(...done);
       for (const completedTask of done) {
         if (completedTask.recurrence) await db.generateNextRecurrence(completedTask);
       }
+    }
+    if (completedForUndo.length > 0) {
+      // "Undo" re-opens these tasks. If a recurring task already spawned its
+      // next occurrence above, that new row is left in place - re-opening
+      // the original is still the right call for a mis-matched completion.
+      rememberMutation(user.id, {
+        kind: 'task',
+        op: 'complete',
+        ids: completedForUndo.map((d) => d.id),
+        label: completedForUndo.map((d) => d.title).join(', '),
+      });
     }
     actions.tasksUnmatched = unmatchedCompletions;
   }
@@ -2878,6 +3121,7 @@ function formatRecipeResponse(recipe) {
 
 module.exports = {
   handleTextMessage,
+  isGroundedTarget,
   createCalendarEventFromResult,
   graduateAppointmentTodo,
   parseTimeOfDay,
