@@ -258,6 +258,25 @@ describe('classify()', () => {
     expect(call.system).toContain('"force": boolean');
   });
 
+  test('prompt forbids weak update/delete target matches (shared person name is not a topic match)', async () => {
+    mockMessagesStream.mockReturnValue(mockStream({
+      intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
+    }));
+
+    await classify('hi', ['Grant'], [], { sender: 'Grant' });
+
+    const call = mockMessagesStream.mock.calls[0][0];
+    // Real failure this guards: "cancel Logan's swimming" moved the unrelated
+    // task "Do Logan's citizenship" to today because both mentioned Logan.
+    expect(call.system).toContain('NO WEAK TARGET MATCHES');
+    expect(call.system).toMatch(/shared person'?s name is NEVER a match/i);
+    // "cancel X" with no matching item = create a to-do for the errand.
+    expect(call.system).toContain('CANCEL/CHASE/REBOOK ERRANDS');
+    expect(call.system).toContain("Cancel Logan's swimming");
+    // The update-over-add bias must not extend to unrelated tasks.
+    expect(call.system).toMatch(/NEVER justifies updating an unrelated task/i);
+  });
+
   test('formats calendar event times in the user timezone, not the server timezone', async () => {
     mockMessagesStream.mockReturnValue(mockStream({
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
