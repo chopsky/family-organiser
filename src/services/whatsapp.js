@@ -154,6 +154,45 @@ async function sendOneMessage(to, bodyText, msid) {
   return data;
 }
 
+/**
+ * Show the WhatsApp "typing…" indicator while the bot works on a reply.
+ *
+ * Twilio's v3 Typing Indicators resource (Public Beta) - referenced by the
+ * INBOUND message's SID (the MessageSid Twilio posts to our webhook). The
+ * indicator displays for up to 25 seconds or until our reply is delivered,
+ * whichever comes first, and also marks the referenced message as read
+ * (blue ticks). The twilio npm SDK doesn't wrap /v3/Indicators, so this
+ * hits the endpoint directly, same as sendOneMessage does for /Messages.
+ *
+ * Fire-and-forget by design: the indicator is cosmetic, so any failure is
+ * logged and swallowed - it must never delay or block the actual reply.
+ */
+async function sendTypingIndicator(inboundMessageSid) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken || !inboundMessageSid) return false;
+
+  try {
+    const response = await fetch('https://messaging.twilio.com/v3/Indicators/Typing.json', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ channel: 'WHATSAPP', messageId: inboundMessageSid }),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      console.warn(`[WhatsApp] typing indicator failed (${response.status}): ${text.slice(0, 200)}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[WhatsApp] typing indicator error:', err.message);
+    return false;
+  }
+}
+
 async function sendMessage(phone, body) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -345,6 +384,7 @@ module.exports = {
   isConfigured,
   sendMessage,
   sendTemplate,
+  sendTypingIndicator,
   downloadMedia,
   sendVerificationCode,
   formatPhone,

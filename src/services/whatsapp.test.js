@@ -108,3 +108,48 @@ describe('normalizeWhatsAppMarkdown', () => {
     });
   });
 });
+
+describe('sendTypingIndicator', () => {
+  const { sendTypingIndicator } = require('./whatsapp');
+  const ENV_KEYS = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'];
+  const saved = {};
+
+  beforeEach(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    process.env.TWILIO_ACCOUNT_SID = 'ACtest';
+    process.env.TWILIO_AUTH_TOKEN = 'token';
+    global.fetch = jest.fn();
+  });
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+    delete global.fetch;
+  });
+
+  it('POSTs the inbound MessageSid to the v3 typing endpoint with basic auth', async () => {
+    global.fetch.mockResolvedValue({ ok: true });
+    const ok = await sendTypingIndicator('SMabc123');
+    expect(ok).toBe(true);
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toBe('https://messaging.twilio.com/v3/Indicators/Typing.json');
+    expect(opts.method).toBe('POST');
+    expect(opts.headers.Authorization).toBe('Basic ' + Buffer.from('ACtest:token').toString('base64'));
+    expect(JSON.parse(opts.body)).toEqual({ channel: 'WHATSAPP', messageId: 'SMabc123' });
+  });
+
+  it('no-ops without a MessageSid or without Twilio credentials', async () => {
+    expect(await sendTypingIndicator('')).toBe(false);
+    delete process.env.TWILIO_ACCOUNT_SID;
+    expect(await sendTypingIndicator('SMabc123')).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('swallows HTTP failures and network errors (cosmetic - must never throw)', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 400, text: () => Promise.resolve('bad sid') });
+    await expect(sendTypingIndicator('SMabc123')).resolves.toBe(false);
+    global.fetch.mockRejectedValue(new Error('ECONNRESET'));
+    await expect(sendTypingIndicator('SMabc123')).resolves.toBe(false);
+  });
+});

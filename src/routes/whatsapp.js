@@ -96,7 +96,7 @@ router.post('/webhook', async (req, res) => {
   res.status(200).send('');
 
   try {
-    const { From, Body, NumMedia, ProfileName } = req.body;
+    const { From, Body, NumMedia, ProfileName, MessageSid } = req.body;
 
     if (!From) return;
 
@@ -290,6 +290,14 @@ router.post('/webhook', async (req, res) => {
     const household = householdRow
       ? { ...householdRow, members }
       : { id: user.household_id, members };
+
+    // Show "typing…" while the AI works on the reply. Placed AFTER the
+    // pairing/paywall gates (those reply instantly) and before the AI-bound
+    // media/text branches, so the user sees life during the multi-second
+    // classify/transcribe wait instead of a silent gap. Fire-and-forget -
+    // sendTypingIndicator never throws, and a failed indicator must not
+    // delay the reply. Lasts up to 25s or until our reply is delivered.
+    whatsapp.sendTypingIndicator(MessageSid);
 
     // Handle media attachments (voice notes, photos). numMedia was computed
     // near the top of the handler (single source of truth, also used by the

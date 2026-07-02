@@ -28,6 +28,7 @@ jest.mock('../db/queries', () => ({
 }));
 jest.mock('../services/whatsapp', () => ({
   sendMessage: jest.fn(() => Promise.resolve()),
+  sendTypingIndicator: jest.fn(() => Promise.resolve(true)),
   isConfigured: jest.fn(() => true),
 }));
 jest.mock('../services/broadcast', () => ({ toHousehold: jest.fn(() => Promise.resolve()) }));
