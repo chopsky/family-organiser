@@ -163,8 +163,42 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       householdId,
       userId,
     });
-    return parseJSON(text, 'classification');
+    try {
+      return parseJSON(text, 'classification');
+    } catch (err) {
+      // Prose salvage: despite the JSON-only instruction, the model
+      // occasionally answers meta/chat questions ("which AI model are you?")
+      // in plain conversational prose - seen consistently on Sonnet 5 when
+      // the history shows prior assistant turns as plain text. That prose IS
+      // the right chat answer; deliver it instead of erroring at the user.
+      const salvaged = salvageProseAsChat(text);
+      if (salvaged) {
+        console.warn('[ai] classify returned prose instead of JSON - salvaging as a chat reply');
+        return salvaged;
+      }
+      throw err;
+    }
   });
+}
+
+/**
+ * Turn a plain-prose classify response into a chat-intent result. Only fires
+ * when the text contains no braces at all - a response with any '{' is
+ * treated as broken/truncated JSON (which parseJSON already tried to repair)
+ * rather than a conversational answer, so a malformed ACTION payload can
+ * never be silently downgraded to chat.
+ */
+function salvageProseAsChat(text) {
+  const stripped = String(text || '').trim();
+  if (!stripped || stripped.includes('{') || stripped.includes('}')) return null;
+  return {
+    intent: 'chat',
+    response_message: stripped,
+    tasks: [],
+    shopping_items: [],
+    calendar_event: null,
+    note: null,
+  };
 }
 
 /**
@@ -685,4 +719,4 @@ source_quote MUST be copied verbatim from the retrieved content (include a weekd
   return [];
 }
 
-module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, buildEmailExtractionContext, runWebSearch, findOfficialTermDatesUrl, extractTermDatesViaSearch };
+module.exports = { classify, scanReceipt, matchReceiptToList, scanImage, extractFromEmail, parseJSON, salvageProseAsChat, buildEmailExtractionContext, runWebSearch, findOfficialTermDatesUrl, extractTermDatesViaSearch };

@@ -428,19 +428,40 @@ describe('classify()', () => {
     expect(result.intent).toBe('add');
   });
 
-  test('throws on malformed JSON response', async () => {
-    // Override the mock for this test only
+  test('throws on malformed JSON response (brace-containing = broken action payload)', async () => {
+    // Override the mock for this test only. Text WITH braces is treated as
+    // broken JSON and must throw - never be salvaged as chat (a dropped
+    // action while the prose claims it happened).
     Anthropic.mockImplementation(() => ({
       messages: {
         stream: jest.fn().mockReturnValue({
           finalMessage: jest.fn().mockResolvedValue({
-            content: [{ type: 'text', text: 'not json at all' }],
+            content: [{ type: 'text', text: '{"intent": "add", "tasks": [ oops not json' }],
           }),
         }),
       },
     }));
 
     await expect(classify("test", [])).rejects.toThrow('Failed to parse classification JSON');
+  });
+
+  test('salvages a pure-prose response as a chat reply instead of erroring', async () => {
+    // Real prod failure 2026-07-02: Sonnet 5 answered "Which Claude model?"
+    // in plain prose. Brace-free prose IS the chat answer - deliver it.
+    Anthropic.mockImplementation(() => ({
+      messages: {
+        stream: jest.fn().mockReturnValue({
+          finalMessage: jest.fn().mockResolvedValue({
+            content: [{ type: 'text', text: "I'm built on Anthropic's Claude - happy to help!" }],
+          }),
+        }),
+      },
+    }));
+
+    const result = await classify('Which Claude model?', []);
+    expect(result.intent).toBe('chat');
+    expect(result.response_message).toBe("I'm built on Anthropic's Claude - happy to help!");
+    expect(result.tasks).toEqual([]);
   });
 });
 

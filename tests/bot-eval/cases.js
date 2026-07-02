@@ -348,6 +348,28 @@ module.exports = [
     },
   },
   {
+    name: 'meta question: "Which Claude model?" stays in the JSON envelope as chat (real prose failure 2026-07-02)',
+    message: 'Which Claude model?',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn'],
+      tasks: [{ id: 't1', title: 'Buy milk' }],
+      history: [
+        { role: 'user', content: 'What AI model are you using?' },
+        { role: 'assistant', content: "I'm the Housemait assistant, built on Claude (Anthropic's AI model). I use that to help manage your family's shopping lists, to-dos, calendar, and household notes right here on WhatsApp!" },
+      ],
+    },
+    check: (r) => {
+      // classify() must not throw (the prose salvage counts as a pass) and
+      // the user must get a real answer, with no invented actions.
+      if (r.intent !== 'chat') return `expected chat, got ${r.intent}`;
+      if (!(r.response_message || '').trim()) return 'empty response_message';
+      if (adds(r).length || completions(r).length) return `invented task actions: ${JSON.stringify(r.tasks)}`;
+      if (!/claude|anthropic/i.test(r.response_message)) return `answer doesn't mention Claude/Anthropic: "${r.response_message.slice(0, 100)}"`;
+      return null;
+    },
+  },
+  {
     name: 'no false completion: "Need to book a doctor appointment" (future intent) is NOT done',
     message: 'Need to book a doctor appointment',
     ctx: { sender: 'Sarah', memberNames: ['Sarah', 'James'], tasks: [{ id: 't1', title: 'Book doctor appointment' }] },
