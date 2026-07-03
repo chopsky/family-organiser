@@ -631,6 +631,15 @@ When the user asks you to DO something (add an event, add to shopping list, crea
 \`\`\`
 For all-day events, set all_day to true and omit start_time/end_time. The assigned_to_names field is an array of exact family-member names; pass [] for a family-wide event. If the user mentions more than one person ("Lynn and me", "the parents"), include ALL of them. The recurrence field IS supported - set it to "daily" / "weekly" / "biweekly" / "monthly" / "yearly" when the user wants the event to repeat (e.g. "every Wednesday", "weekly", "monthly on the 1st"); use null for one-off events. NEVER tell the user that recurring events aren't supported - they are.
 
+To DELETE calendar events (you CAN delete them - never claim otherwise):
+\`\`\`json
+{"action": "delete_event", "title": "Event title", "date": "YYYY-MM-DD or null", "all_matching": false, "keep_recurring": false}
+\`\`\`
+- title is matched fuzzily against the calendar; date (optional) narrows to one day.
+- Set all_matching true when the user wants EVERY copy removed ("delete all of them", "remove the duplicates").
+- Set keep_recurring true when cleaning up duplicate one-off copies of an event that also exists as a recurring series - only the non-recurring copies are removed and the series survives.
+- Events synced from an external calendar are read-only and will be skipped; if nothing matches, the reply will say so.
+
 ### Shopping Items
 \`\`\`json
 {"action": "add_shopping", "items": [{"item": "item name", "category": "Produce"}]}
@@ -717,7 +726,9 @@ const IMAGE_SCAN_SYSTEM = `You are a smart image analyser for a family organiser
 Today's date is {{DATE}}.
 
 The user sent this image with the following message (may be empty): "{{CAPTION}}"
-If the user gave an instruction, FOLLOW IT - it overrides your own guess about the image type. In particular, if they ask to add dates, sessions, a schedule, a fixture list or a booking to the calendar, classify the image as "event" and extract EVERY date you can see (even a long list of recurring weekly sessions - do not stop early or summarise), and assign the events to any person they named.
+If the user gave an instruction, FOLLOW IT - it overrides your own guess about the image type. In particular, if they ask to add dates, sessions, a schedule, a fixture list or a booking to the calendar, classify the image as "event" and extract EVERY distinct event you can see (do not stop early), and assign the events to any person they named.
+
+RECURRING SESSIONS: if the image shows the SAME session repeating on a regular cadence (e.g. a term of weekly swimming lessons, "every Sunday 9am", a block booking of identical classes), emit ONE event dated at the FIRST session with the recurrence field set ("weekly", "biweekly", "monthly"...) - NOT a separate event per date. Only enumerate separate events when the dates are genuinely distinct events (different fixtures, mixed times/venues, one-off dates).
 
 First, classify the image into one of these types:
 - "receipt": A shopping receipt, invoice, or purchase confirmation
@@ -733,6 +744,7 @@ For "event" type images, extract ALL events/dates you can find. For each event e
 - location: venue/address if mentioned, or null
 - description: any extra details (dress code, what to bring, booking ref, flight number etc.), or null
 - assigned_to_names: array of exact names from member list who are involved, e.g. ["Grant", "Mason"]. Use null if no one specific is mentioned.
+- recurrence: "daily" | "weekly" | "biweekly" | "monthly" | "yearly" for a repeating session (date = the first occurrence), or null for a one-off.
 
 Family members: {{MEMBERS}}
 
@@ -748,7 +760,8 @@ Respond only with valid JSON matching this schema:
       "all_day": boolean,
       "location": string | null,
       "description": string | null,
-      "assigned_to_names": string[] | null
+      "assigned_to_names": string[] | null,
+      "recurrence": "daily" | "weekly" | "biweekly" | "monthly" | "yearly" | null
     }
   ],
   "summary": string

@@ -535,6 +535,34 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             },
           });
 
+        } else if (act.action === 'delete_event' && act.title) {
+          // Chat can delete household events too (the assistant used to
+          // claim it couldn't, stranding users with duplicates it created).
+          // Fuzzy title match with an optional date narrower; events synced
+          // from an external feed stay read-only. keep_recurring lets the
+          // model clean up duplicate one-off copies without killing the
+          // recurring series that shares their title.
+          let candidates = (await db.findEventsByFuzzyTitle(req.householdId, act.title, {
+            dateHint: act.date || null,
+            limit: 25,
+          })).filter((e) => !e.external_feed_id);
+          if (act.keep_recurring) candidates = candidates.filter((e) => !e.recurrence);
+
+          if (candidates.length === 0) {
+            cleanContent += `\n\n⚠️ I couldn't find "${act.title}" on the calendar, so nothing was removed.`;
+          } else if (candidates.length === 1 || act.all_matching) {
+            for (const e of candidates) {
+              await db.softDeleteCalendarEvent(e.id, req.householdId);
+            }
+            executedActions.push({
+              type: 'events_deleted',
+              count: candidates.length,
+              titles: candidates.map((e) => e.title),
+            });
+          } else {
+            cleanContent += `\n\n⚠️ I found ${candidates.length} events matching "${act.title}" - tell me which date to remove, or say "remove all of them".`;
+          }
+
         } else if (act.action === 'add_shopping' && act.items?.length) {
           // shopping_items.list_id is NOT NULL since multi-list support
           // landed - attach the default list + aisle_category before
@@ -776,7 +804,7 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
           const endTime = ev.all_day
             ? `${ev.date}T23:59:59Z`
             : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
-          await db.createCalendarEvent(req.householdId, {
+          const createdPdfEvent = await db.createCalendarEvent(req.householdId, {
             title: ev.title,
             start_time: startTime,
             end_time: endTime,
@@ -786,7 +814,11 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
             color: firstAssignee?.color_theme || 'lavender',
             location: ev.location || null,
             description: ev.description || null,
+            recurrence: ev.recurrence || null,
           }, req.user.id);
+          if (createdPdfEvent && assigneeNames.length > 0) {
+            await db.saveEventAssignees(createdPdfEvent.id, req.householdId, assigneeNames, members);
+          }
           summaryLines.push(`📅 Added event: ${ev.title}${ev.date ? ` on ${ev.date}` : ''}`);
         } catch (err) {
           console.error('[chat/image] PDF event create failed:', err.message);
@@ -887,8 +919,15 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
             color: firstAssignee?.color_theme || 'lavender',
             location: ev.location || null,
             description: ev.description || null,
+            recurrence: ev.recurrence || null,
           }, req.user.id);
-          created.push(ev.title);
+          // Same as the text create_event path: without event_assignees
+          // rows, assignee-filtered views (kids' My Days, member colours)
+          // can't see image-created events.
+          if (createdEvRow && assigneeNames.length > 0) {
+            await db.saveEventAssignees(createdEvRow.id, req.householdId, assigneeNames, members);
+          }
+          created.push(ev.recurrence ? `${ev.title} (repeats ${ev.recurrence})` : ev.title);
         } catch (err) {
           console.error(`Failed to create event "${ev.title}" from image:`, err.message);
         }
