@@ -82,7 +82,7 @@ export default function KidsShell() {
       {/* tablet / desktop left rail */}
       <Rail tab={tab} navigate={navigate} theme={theme} kids={kids} kid={kid} pickKid={pickKid} balance={balance} />
 
-      <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto safe-top" style={{ scrollbarWidth: 'none' }}>
         <div className="mx-auto w-full md:max-w-[860px] md:px-9 md:pt-8" style={{ paddingBottom: 120 }}>
           {!loaded ? null : !kid ? <NoKids theme={theme} /> : screen}
         </div>

@@ -4,7 +4,6 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, persistOptions } from './lib/queryClient';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ChildModeProvider, useChildMode } from './context/ChildModeContext';
-import ChildModePinScreen from './components/ChildModePinScreen';
 import { CHILD_OPEN_ROUTES, CHILD_HOME_ROUTE } from './lib/childMode';
 import { lazy, Suspense, useLayoutEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
