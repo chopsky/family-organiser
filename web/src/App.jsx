@@ -27,6 +27,7 @@ import Login from './pages/Login';
 // file is kept on disk only as the design reference the account step was lifted
 // from.
 const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
+const KidsShell       = lazy(() => import('./pages/kids/KidsShell'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
@@ -135,15 +136,18 @@ function RequirePlatformAdmin({ children }) {
   return children;
 }
 
-// Child Mode route gate (per-device). Allowed kid routes render through;
-// /settings is replaced by the PIN screen until unlocked; every other in-app
-// route redirects Home. A no-op when Child Mode is off.
+// Child Mode route gate (per-device). In Child Mode the kid routes render the
+// dedicated KidsShell (the bright Kids skin) instead of the adult Layout+page;
+// every other in-app route redirects to the kids' home. /settings has one
+// escape hatch: once a grown-up has PIN-unlocked (from the Me screen), it
+// renders the ADULT Settings so parents can manage Child Mode itself.
+// A no-op when Child Mode is off.
 function ChildGate({ children }) {
   const { enabled, settingsUnlocked } = useChildMode();
   const path = useLocation().pathname;
   if (!enabled) return children;
-  if (CHILD_OPEN_ROUTES.includes(path)) return children;
-  if (path === '/settings') return settingsUnlocked ? children : <ChildModePinScreen />;
+  if (path === '/settings' && settingsUnlocked) return children;
+  if (CHILD_OPEN_ROUTES.includes(path) || path === '/settings') return <KidsShell />;
   return <Navigate to={CHILD_HOME_ROUTE} replace />;
 }
 
