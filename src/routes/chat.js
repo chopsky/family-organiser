@@ -254,40 +254,71 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
  * Extract all action JSON blocks from assistant response.
  * Returns { cleanContent, actions[] } where actions may be empty.
  */
+// Return the balanced {...} JSON substring starting at `start` (string-aware
+// so braces inside quoted values don't miscount), or null if unbalanced.
+function balancedJson(text, start) {
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (esc) { esc = false; continue; }
+    if (ch === '\\') { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) return text.slice(start, i + 1); }
+  }
+  return null;
+}
+
 function extractActions(content) {
   const actions = [];
   let cleanContent = content;
 
-  // 1. Extract fenced ```json ... ``` blocks
-  const fencedRegex = /```json\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```/g;
-  let m;
-  while ((m = fencedRegex.exec(content)) !== null) {
-    try {
-      const parsed = JSON.parse(m[1]);
-      if (parsed.action) {
-        actions.push(parsed);
-      } else if (parsed.note_action) {
-        if (parsed.note_action === 'save') actions.push({ action: 'save_note', key: parsed.key, value: parsed.value });
-        else if (parsed.note_action === 'delete') actions.push({ action: 'delete_note', key: parsed.key });
-      }
-      cleanContent = cleanContent.replace(m[0], '');
-    } catch {
-      // Skip malformed JSON
+  const take = (parsed) => {
+    if (parsed.action) {
+      actions.push(parsed);
+      return true;
     }
+    if (parsed.note_action === 'save') { actions.push({ action: 'save_note', key: parsed.key, value: parsed.value }); return true; }
+    if (parsed.note_action === 'delete') { actions.push({ action: 'delete_note', key: parsed.key }); return true; }
+    return false;
+  };
+
+  // 1. Fenced blocks. Tolerant of the fence tag (```json / ```JSON / bare
+  // ```) and of nested objects/arrays inside the payload - the old
+  // lazy-to-first-} regex silently dropped any block with nesting, and the
+  // lowercase-only tag dropped ```JSON. A dropped block = an action the
+  // model emitted but we never executed, while the prose claims success.
+  const fenceOpen = /```[a-zA-Z]*\s*\n?\s*(?=\{)/g;
+  let m;
+  while ((m = fenceOpen.exec(content)) !== null) {
+    const jsonText = balancedJson(content, m.index + m[0].length);
+    if (!jsonText) continue;
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (take(parsed)) {
+        // Strip the whole fence (opening tag + JSON + closing backticks if present).
+        const closeAt = content.indexOf('```', m.index + m[0].length + jsonText.length);
+        const fullBlock = content.slice(m.index, closeAt >= 0 ? closeAt + 3 : m.index + m[0].length + jsonText.length);
+        cleanContent = cleanContent.replace(fullBlock, '');
+      }
+    } catch { /* skip malformed JSON */ }
   }
 
-  // 2. Extract bare inline {"action": ...} objects (not in fences)
-  const bareRegex = /\s*(\{"action"\s*:\s*"[^"]*"[^}]*\})/g;
-  while ((m = bareRegex.exec(cleanContent)) !== null) {
+  // 2. Bare inline {"action": ...} objects (not in fences) - brace-balanced
+  // for the same nesting reason.
+  const bareOpen = /\{"action"\s*:/g;
+  while ((m = bareOpen.exec(cleanContent)) !== null) {
+    const jsonText = balancedJson(cleanContent, m.index);
+    if (!jsonText) continue;
     try {
-      const parsed = JSON.parse(m[1]);
+      const parsed = JSON.parse(jsonText);
       if (parsed.action) {
         actions.push(parsed);
-        cleanContent = cleanContent.replace(m[0], '');
+        cleanContent = cleanContent.replace(jsonText, '');
+        bareOpen.lastIndex = 0; // indices shifted after the splice
       }
-    } catch {
-      // Skip malformed JSON
-    }
+    } catch { /* skip malformed JSON */ }
   }
 
   return { cleanContent: cleanContent.trim(), actions };
