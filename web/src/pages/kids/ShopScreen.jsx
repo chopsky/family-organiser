@@ -11,7 +11,7 @@ import { StarPill, Celebrate } from './ui';
 
 export default function ShopScreen({ kid, theme, balance, onBalance }) {
   const isMobile = useIsMobile();
-  const [rewards, setRewards] = useState(null);
+  const [rewards, setRewards] = useState(null); // all active household rewards
   const [celebrate, setCelebrate] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
 
@@ -25,6 +25,14 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch; state lands after the await
   useEffect(() => { load(); }, [load]);
+
+  // Only rewards that apply to THIS child: who_ids scopes a reward to
+  // specific members; empty means the whole household (same rule as the
+  // adult Rewards page).
+  const myRewards = (rewards || []).filter((r) => {
+    const ids = r.who_ids || [];
+    return ids.length === 0 || ids.includes(kid.id);
+  });
 
   const redeem = async (r) => {
     if (redeemingId) return;
@@ -66,9 +74,9 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
         </div>
       )}
 
-      {rewards && rewards.length > 0 && <div style={{ fontSize: isMobile ? 19 : 21, fontWeight: 700, padding: isMobile ? '0 4px 12px' : '0 4px 14px' }}>Pick a treat 🎁</div>}
+      {rewards && myRewards.length > 0 && <div style={{ fontSize: isMobile ? 19 : 21, fontWeight: 700, padding: isMobile ? '0 4px 12px' : '0 4px 14px' }}>Pick a treat 🎁</div>}
       <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: isMobile ? 14 : 16 }}>
-        {(rewards || []).map((r) => {
+        {myRewards.map((r) => {
           const can = balance >= r.cost;
           const pct = Math.min(1, r.cost ? balance / r.cost : 1);
           return (
@@ -96,7 +104,7 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
         })}
       </div>
 
-      {rewards && rewards.length === 0 && (
+      {rewards && myRewards.length === 0 && (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
           <div style={{ fontSize: 64 }}>🎁</div>
           <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>No treats in the shop yet</div>

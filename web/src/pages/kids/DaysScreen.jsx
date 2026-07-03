@@ -28,13 +28,16 @@ function dayName(dateStr) {
 }
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-// An event belongs on the kid's calendar when they're an assignee or it's a
-// family-wide one (no assignees) — same visibility a kid gets on the adult
-// calendar, minus other members' personal items.
-const forKid = (e, kidId) => {
-  const a = e.assignees || [];
-  return a.length === 0 || a.some((x) => (x.user_id || x.id) === kidId);
-};
+// Only events that relate to THIS child: they must be an assignee. Untagged
+// events (no assignees) stay off the kids' calendar - most parent-created
+// events carry no assignees, and showing them all drowned the kid's own
+// schedule. Family-relevant moments still reach kids via big days (school
+// holidays, birthdays, parent-pinned countdowns).
+const forKid = (e, kidId) => (e.assignees || []).some((x) => (x.user_id || x.id) === kidId);
+
+// Big days from the server may arrive without an emoji (e.g. a pinned event
+// with no stored kids_emoji) - derive one from the title, same as events.
+const bigEmoji = (b) => b.emoji || kidsEventEmoji({ title: b.title });
 
 export default function DaysScreen({ kid, theme }) {
   const isMobile = useIsMobile();
@@ -79,7 +82,7 @@ export default function DaysScreen({ kid, theme }) {
     }
   }
   for (const b of myBigs) {
-    items.push({ id: `big:${b.date}:${b.title}`, date: b.date, emoji: b.emoji || '🎉', title: b.title, sub: '', family: true, big: true });
+    items.push({ id: `big:${b.date}:${b.title}`, date: b.date, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
   }
   const seen = new Set();
   const deduped = items.filter((it) => { if (seen.has(it.id)) return false; seen.add(it.id); return true; });
@@ -105,7 +108,7 @@ export default function DaysScreen({ kid, theme }) {
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, margin: '4px 0 8px' }}>
               {myBigs.filter((b) => b !== hero).slice(0, 6).map((b) => (
                 <div key={`${b.date}:${b.title}`} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 999, padding: '7px 14px 7px 9px' }}>
-                  <span style={{ fontSize: 20 }}>{b.emoji || '🎉'}</span>
+                  <span style={{ fontSize: 20 }}>{bigEmoji(b)}</span>
                   <span>
                     <b style={{ fontSize: 13, display: 'block', lineHeight: 1.1 }}>{b.title}</b>
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: theme.accent }}>in {sleepText(sleepsTo(b.date))}</span>
@@ -123,7 +126,7 @@ export default function DaysScreen({ kid, theme }) {
               <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase', color: KIDS_INK.ink3 }}>Also coming up</div>
               {myBigs.filter((b) => b !== hero).slice(0, 3).map((b) => (
                 <div key={`${b.date}:${b.title}`} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 18, padding: '10px 14px' }}>
-                  <span style={{ fontSize: 26 }}>{b.emoji || '🎉'}</span>
+                  <span style={{ fontSize: 26 }}>{bigEmoji(b)}</span>
                   <span style={{ minWidth: 0 }}>
                     <b style={{ fontSize: 14, display: 'block', lineHeight: 1.15 }}>{b.title}</b>
                     <span style={{ fontSize: 12, fontWeight: 600, color: theme.accent }}>in {sleepText(sleepsTo(b.date))}</span>
@@ -192,10 +195,10 @@ function Countdown({ hero, theme, isMobile }) {
   const n = sleepsTo(hero.date);
   return (
     <div style={{ flex: isMobile ? undefined : 1, background: theme.grad, borderRadius: 28, padding: isMobile ? '22px 24px' : '24px 28px', color: '#fff', marginBottom: isMobile ? 14 : 0, position: 'relative', overflow: 'hidden', boxShadow: '0 12px 30px rgba(49,43,75,0.2)' }}>
-      <div style={{ position: 'absolute', right: isMobile ? -10 : -6, top: isMobile ? -16 : -14, fontSize: isMobile ? 120 : 150, opacity: .2 }}>{hero.emoji || '🎉'}</div>
+      <div style={{ position: 'absolute', right: isMobile ? -10 : -6, top: isMobile ? -16 : -14, fontSize: isMobile ? 120 : 150, opacity: .2 }}>{bigEmoji(hero)}</div>
       <div style={{ position: 'relative' }}>
         <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, opacity: .92 }}>Counting down to…</div>
-        <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 700, lineHeight: 1.1, margin: '2px 0 10px' }}>{hero.emoji || '🎉'} {hero.title}</div>
+        <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 700, lineHeight: 1.1, margin: '2px 0 10px' }}>{bigEmoji(hero)} {hero.title}</div>
         <div style={{ fontSize: isMobile ? 46 : 58, fontWeight: 700, lineHeight: 1 }}>
           {n === 0 ? 'Today! 🎉' : n}
           {n > 0 && <span style={{ fontSize: isMobile ? 20 : 24, fontWeight: 600, opacity: .9 }}> {n === 1 ? 'sleep to go!' : 'sleeps to go!'}</span>}

@@ -33,5 +33,7 @@ export function kidsEventEmoji(event) {
   for (const [re, emoji] of RULES) {
     if (re.test(s)) return emoji;
   }
-  return '🎉';
+  // Neutral fallback when nothing matches - a generic date marker, not a
+  // celebration (🎉 misread as "party" for plain appointments).
+  return '🗓️';
 }
