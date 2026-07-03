@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { configure as configureRevenueCat } from './lib/revenuecat.js'
 import { initAnalytics } from './lib/analytics.js'
 import { setupNativeShell } from './lib/native-shell.js'
+import { markAppSeen } from './lib/appReview.js'
 import { isIos } from './lib/platform.js'
 
 // Stamp the document with a platform class so CSS can target iOS-only
@@ -22,6 +23,10 @@ configureRevenueCat();
 // Wire the small native-feel plugins (status bar, splash, keyboard).
 // No-op on web. See lib/native-shell.js.
 setupNativeShell();
+
+// Stamp first use so the App Store review prompt's 14-day gate has a
+// starting point (lib/appReview.js). Harmless on web.
+markAppSeen();
 
 // Re-attach Google Analytics if the user previously accepted the cookie
 // banner. No-op for new visitors and for anyone who declined; the banner

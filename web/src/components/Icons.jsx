@@ -212,3 +212,7 @@ export function IconGraduation(p) {
 export function IconCreditCard(p) {
   return <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></Icon>;
 }
+
+export function IconStar(p) {
+  return <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></Icon>;
+}

@@ -15,10 +15,11 @@ import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
-  IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
+  IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin, IconStar,
 } from '../components/Icons';
 import { LOCALES, getLocaleByCountry } from '../lib/locales';
 import { readLocaleCookie } from '../hooks/useLocale';
+import { openWriteReview } from '../lib/appReview';
 import { useSubscription } from '../context/SubscriptionContext';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
@@ -500,12 +501,15 @@ const IOS_SECTIONS = [
   { slug: 'sessions',     title: 'Active sessions',   icon: 'IconShield',        group: 'Notifications & privacy' },
   { slug: 'data',         title: 'Your data',         icon: 'IconDownload',      group: 'Account' },
   { slug: 'account',      title: 'Account',           icon: 'IconUser',          group: 'Account' },
+  // `action` rows fire immediately instead of opening a popup - Rate
+  // Housemait jumps straight to the App Store review composer.
+  { slug: 'rate',         title: 'Rate Housemait',    icon: 'IconStar',          group: 'Account', action: openWriteReview },
   { slug: 'delete',       title: 'Delete account',    icon: 'IconTrash', danger: true, group: 'Account' },
 ];
 const IOS_GROUPS = [...new Set(IOS_SECTIONS.map((s) => s.group))];
 const IOS_SECTION_ICONS = {
   IconMessageCircle, IconCalendar, IconMail, IconBell, IconMapPin,
-  IconShield, IconDownload, IconUser, IconTrash,
+  IconShield, IconDownload, IconUser, IconTrash, IconStar,
 };
 
 export default function Settings() {
@@ -602,7 +606,8 @@ export default function Settings() {
     const section = new URLSearchParams(window.location.search).get('section');
     // child-mode is a standalone card (not a popup section) on every
     // platform, so it always takes the scroll path.
-    if (!section || (section !== 'child-mode' && !IOS_SECTIONS.some((s) => s.slug === section))) return undefined;
+    // Action rows (e.g. rate) have no popup/anchor - never deep-link them.
+    if (!section || (section !== 'child-mode' && !IOS_SECTIONS.some((s) => s.slug === section && !s.action))) return undefined;
     if (isIosPlatform && section !== 'child-mode') {
       setPopupSlug(section);
       return undefined;
@@ -1496,7 +1501,7 @@ export default function Settings() {
                 <button
                   key={sec.slug}
                   type="button"
-                  onClick={() => setPopupSlug(sec.slug)}
+                  onClick={() => (sec.action ? sec.action() : setPopupSlug(sec.slug))}
                   className="w-full flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none border-b border-cream-border last:border-b-0 text-left"
                 >
                   {Icon && <Icon className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}

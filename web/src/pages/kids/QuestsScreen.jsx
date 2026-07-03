@@ -9,6 +9,7 @@ import { useState } from 'react';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
+import { maybeRequestReview } from '../../lib/appReview';
 import { StarPill, Section, Celebrate, KidsLogo } from './ui';
 import { KidSwitch } from './KidsShell';
 
@@ -125,7 +126,11 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
         </div>
       )}
 
-      {celebrate && <Celebrate data={celebrate} onDone={() => setCelebrate(null)} />}
+      {/* When the trophy overlay closes, ask iOS for the native App Store
+          review sheet - the all-quests-done moment is the app's peak
+          goodwill. Heavily guarded (14 days of use, once per version,
+          Apple's own 3-per-year cap) and a silent no-op on web. */}
+      {celebrate && <Celebrate data={celebrate} onDone={() => { setCelebrate(null); maybeRequestReview(); }} />}
     </div>
   );
 }
