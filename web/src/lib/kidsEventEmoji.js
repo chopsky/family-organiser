@@ -5,11 +5,20 @@
 // value. Only surfaces in Kids mode.
 
 const RULES = [
-  [/tennis|football|soccer|swim|gym|park ?run|sport|rugby|cricket|netball|basketball|athletic|match|training/, '⚽'],
+  // Specific sports first, so swimming isn't a football.
+  [/swim/, '🏊'],
+  [/tennis/, '🎾'],
+  [/rugby/, '🏉'],
+  [/cricket/, '🏏'],
+  [/netball|basketball/, '🏀'],
+  [/karate|judo|martial|taekwondo/, '🥋'],
+  [/bike|cycling|scooter/, '🚲'],
+  [/run(ning)?\b|park ?run|athletic/, '🏃'],
+  [/football|soccer|gym\b|sport|match|training/, '⚽'],
   [/ballet|dance|recital|gymnastic/, '🩰'],
   [/choir|music|piano|guitar|violin|drum|band|orchestra/, '🎵'],
   [/art|craft|paint|drawing/, '🎨'],
-  [/coding|code|robot|lego|chess|club/, '🎨'],
+  [/coding|code|robot|lego|chess/, '🤖'],
   [/birthday|bday/, '🎂'],
   [/party/, '🥳'],
   [/dinner|brunch|lunch|breakfast|meal|restaurant|nonna|grandparent|granny|grandma|grandpa/, '🍽️'],

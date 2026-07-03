@@ -44,10 +44,31 @@ const forKid = (e, kid) =>
 // with no stored kids_emoji) - derive one from the title, same as events.
 const bigEmoji = (b) => b.emoji || kidsEventEmoji({ title: b.title });
 
+// Weekly extracurriculars (child_weekly_schedule) expanded onto real dates.
+// day_of_week uses the app-wide 0=Monday convention; an activity with a term
+// window (start_date/end_date) only occurs inside it, one without a window
+// occurs every week.
+const fmtClock = (t) => (t ? String(t).slice(0, 5) : '');
+function actsOn(dateStr, acts) {
+  const wd = (toLocalDate(dateStr).getDay() + 6) % 7;
+  return acts
+    .filter((a) => a.day_of_week === wd
+      && (!a.start_date || dateStr >= a.start_date)
+      && (!a.end_date || dateStr <= a.end_date))
+    .map((a) => ({
+      id: `act:${a.id}:${dateStr}`,
+      date: dateStr,
+      emoji: kidsEventEmoji({ title: a.activity }),
+      title: a.activity,
+      sub: [fmtClock(a.time_start), fmtClock(a.time_end)].filter(Boolean).join(' – '),
+    }));
+}
+
 export default function DaysScreen({ kid, theme }) {
   const isMobile = useIsMobile();
   const [view, setView] = useState('list');
   const [bigDays, setBigDays] = useState([]);
+  const [activities, setActivities] = useState([]); // weekly extracurriculars
   const [monthEvents, setMonthEvents] = useState({}); // 'YYYY-MM' → events[]
   const [open, setOpen] = useState({});
   // List view is scoped to one month at a time (busy kids have something on
@@ -74,7 +95,8 @@ export default function DaysScreen({ kid, theme }) {
     loadMonth(monthParam(now));
     loadMonth(monthParam(new Date(now.getFullYear(), now.getMonth() + 1, 1)));
     api.get('/kids/big-days').then(({ data }) => setBigDays(data.bigDays || [])).catch(() => {});
-  }, [loadMonth]);
+    api.get(`/schools/activities/${kid.id}`).then(({ data }) => setActivities(data.activities || [])).catch(() => {});
+  }, [loadMonth, kid.id]);
 
   const myBigs = bigDays.filter((b) => sleepsTo(b.date) >= 0);
   const hero = myBigs.find((b) => b.big) || myBigs[0] || null;
@@ -99,6 +121,11 @@ export default function DaysScreen({ kid, theme }) {
   for (const b of myBigs) {
     if (b.date.slice(0, 7) !== listMp) continue;
     items.push({ id: `big:${b.date}:${b.title}`, date: b.date, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
+  }
+  // Weekly extracurriculars, expanded across the selected month's remaining days.
+  const listEnd = new Date(listFirst.getFullYear(), listFirst.getMonth() + 1, 0);
+  for (const d = new Date(Math.max(listFirst, toLocalDate(todayStr()))); d <= listEnd; d.setDate(d.getDate() + 1)) {
+    items.push(...actsOn(ymd(d), activities));
   }
   const seen = new Set();
   const deduped = items.filter((it) => { if (seen.has(it.id)) return false; seen.add(it.id); return true; });
@@ -154,7 +181,7 @@ export default function DaysScreen({ kid, theme }) {
         )
       )}
 
-      {view === 'month' && <MonthView theme={theme} kid={kid} monthEvents={monthEvents} loadMonth={loadMonth} bigDays={myBigs} isMobile={isMobile} />}
+      {view === 'month' && <MonthView theme={theme} kid={kid} monthEvents={monthEvents} loadMonth={loadMonth} bigDays={myBigs} activities={activities} isMobile={isMobile} />}
 
       {view === 'list' && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '4px 2px 2px' : '2px 2px 4px' }}>
@@ -240,7 +267,7 @@ const MONTH_WD_FULL = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const mvNav = { width: 38, height: 38, borderRadius: 12, border: 0, background: '#fff', cursor: 'pointer', fontSize: 22, fontWeight: 600, color: KIDS_INK.ink2, boxShadow: '0 2px 0 rgba(49,43,75,0.06)', fontFamily: 'inherit' };
 const mvNavT = { width: 42, height: 42, borderRadius: 14, border: 0, background: '#fff', cursor: 'pointer', fontSize: 24, fontWeight: 600, color: KIDS_INK.ink2, boxShadow: '0 2px 0 rgba(49,43,75,0.06)', fontFamily: 'inherit' };
 
-function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, isMobile }) {
+function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, isMobile }) {
   const now = new Date();
   const [offset, setOffset] = useState(0); // months from the current month
   const [sel, setSel] = useState(todayStr());
@@ -258,6 +285,7 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, isMobile }) {
     for (const b of bigDays) {
       if (b.date === dateStr) out.push({ id: `big:${b.title}`, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
     }
+    out.push(...actsOn(dateStr, activities));
     return out;
   };
 
