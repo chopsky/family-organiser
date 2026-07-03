@@ -46,8 +46,8 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
   };
 
   return (
-    <div style={{ padding: '20px 18px 0' }}>
-      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: '16px 0 14px' }}>
+    <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: isMobile ? '16px 0 14px' : '0 0 16px' }}>
         Star Shop <span className="kids-wobble">🛍️</span>
       </div>
 

@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { kidTheme, isKidMember, KIDS_INK } from '../../lib/kidsTheme';
 import { KidsLogo } from './ui';
 import QuestsScreen from './QuestsScreen';
@@ -22,6 +23,7 @@ function safeGet(key) { try { return localStorage.getItem(key); } catch { return
 function safeSet(key, value) { try { localStorage.setItem(key, value); } catch { /* private browsing */ } }
 
 export default function KidsShell() {
+  const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
   const tab = PATH_TAB[location.pathname] || 'quests';
@@ -83,7 +85,10 @@ export default function KidsShell() {
       <Rail tab={tab} navigate={navigate} theme={theme} kids={kids} kid={kid} pickKid={pickKid} balance={balance} />
 
       <div className="flex-1 min-h-0 overflow-y-auto safe-top" style={{ scrollbarWidth: 'none' }}>
-        <div className="mx-auto w-full md:max-w-[860px] md:px-9 md:pt-8" style={{ paddingBottom: 120 }}>
+        {/* Tablet content padding comes from the scroll area (34px 38px, per
+            the tablet spec); phone screens pad themselves and get clearance
+            for the floating bottom nav. */}
+        <div className="mx-auto w-full md:max-w-[860px]" style={isMobile ? { paddingBottom: 120 } : { padding: '34px 38px' }}>
           {!loaded ? null : !kid ? <NoKids theme={theme} /> : screen}
         </div>
       </div>

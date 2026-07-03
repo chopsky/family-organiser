@@ -43,8 +43,8 @@ export default function MeScreen({ kid, theme, onSaved }) {
   };
 
   return (
-    <div style={{ padding: '20px 18px 0', maxWidth: isMobile ? undefined : 680 }}>
-      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: isMobile ? '16px 0' : '16px 0 20px' }}>
+    <div style={{ padding: isMobile ? '20px 18px 0' : 0, maxWidth: isMobile ? undefined : 680 }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: isMobile ? '16px 0' : '0 0 20px' }}>
         My Profile <span className="kids-wobble">⚙️</span>
       </div>
 

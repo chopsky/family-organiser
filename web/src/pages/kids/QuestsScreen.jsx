@@ -72,14 +72,22 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
   if (pooled.length) sections.push({ k: 'pool', label: 'Help the family', em: '🤝', tasks: pooled, hint: 'First to finish gets the stars!' });
 
   return (
-    <div style={{ padding: '20px 18px 0' }}>
-      <div className="md:hidden" style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
-        <KidsLogo c1={theme.c1} c2={theme.c2} size={30} />
-      </div>
-      <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <KidSwitch kids={kids || []} kid={kid} pickKid={pickKid} />
-        <StarPill n={(day?.balances && day.balances[kid.id]) || 0} />
-      </div>
+    <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
+      {/* Phone-only brand row + kid switcher + star pill. The tablet rail
+          already carries all three, so the tablet content starts directly
+          with the greeting (conditional render - a md:hidden class would
+          lose to these rows' inline display:flex). */}
+      {isMobile && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
+            <KidsLogo c1={theme.c1} c2={theme.c2} size={30} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <KidSwitch kids={kids || []} kid={kid} pickKid={pickKid} />
+            <StarPill n={(day?.balances && day.balances[kid.id]) || 0} />
+          </div>
+        </>
+      )}
 
       <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, marginBottom: 2 }}>
         Hi, {kid.name}! <span className="kids-wobble">👋</span>
