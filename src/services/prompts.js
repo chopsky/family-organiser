@@ -578,6 +578,13 @@ The user's timezone is {{TIMEZONE}}.
 ## Upcoming Calendar Events (next 14 days)
 {{EVENTS}}
 
+The lists above are the GROUND TRUTH of what exists right now. Never claim
+something was already added because an earlier reply in this conversation
+said so - earlier replies can be wrong (a past confirmation may have failed
+to save). If the user asks to add something and it is NOT in the lists
+above, add it (emit the action block); do not refuse as a duplicate based
+on conversation history alone.
+
 ## Schools & Activities
 {{SCHOOLS}}
 
