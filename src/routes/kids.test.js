@@ -45,7 +45,7 @@ describe('GET /api/kids/big-days', () => {
     db.getHouseholdSchools.mockResolvedValue([{ id: 's1' }]);
     db.getTermDatesBySchoolIds.mockResolvedValue([
       { event_type: 'half_term_start', date: iso(10), label: 'Half term' },
-      { event_type: 'term_start', date: iso(12), label: 'Term starts' }, // not a holiday - excluded
+      { event_type: 'term_start', date: iso(12), label: 'Term starts' }, // back-to-school days count too
       { event_type: 'term_end', date: iso(60), label: null },
     ]);
     db.getHouseholdMembers.mockResolvedValue([
@@ -56,8 +56,8 @@ describe('GET /api/kids/big-days', () => {
     const res = await request(app()).get('/api/kids/big-days');
     expect(res.status).toBe(200);
     const days = res.body.bigDays;
-    expect(days.map((d) => d.title)).toEqual(['Half term', "Logan's birthday", 'Summer holiday!', 'School holidays!']);
-    expect(days.map((d) => d.date)).toEqual([iso(10), iso(20), iso(40), iso(60)]);
+    expect(days.map((d) => d.title)).toEqual(['Half term', 'Term starts', "Logan's birthday", 'Summer holiday!', 'School holidays!']);
+    expect(days.map((d) => d.date)).toEqual([iso(10), iso(12), iso(20), iso(40), iso(60)]);
     // Only the parent-pinned event is a hero candidate.
     expect(days.filter((d) => d.big).map((d) => d.title)).toEqual(['Summer holiday!']);
     // The stored kids_emoji override rides along; term_end falls back to its label default.
