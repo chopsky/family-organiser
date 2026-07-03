@@ -407,10 +407,14 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       { role: 'user', content: message.trim() },
     ];
 
-    // Call AI (Claude primary, GPT-4o fallback)
+    // Claude-primary, same as the WhatsApp classifier: the in-app assistant
+    // executes actions parsed from the reply, and Gemini Flash was the source
+    // of prose-claims-without-action-blocks ("I've added X" with no JSON, so
+    // nothing saved). Gemini stays as the failover.
     const { text: aiText, provider } = await callWithFailover({
       system: systemPrompt,
       messages,
+      preferClaude: true,
       feature: 'chat',
       householdId: req.householdId,
       userId: req.user.id,
@@ -421,6 +425,16 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     // Extract and process all actions
     let { cleanContent, actions } = extractActions(aiText);
+
+    // Truth guard (real failure: "Okay, I've added Mason's tennis lesson…"
+    // with NO action block, so nothing was saved and the user only found out
+    // days later). If the prose claims a save/add/create but zero action
+    // blocks parsed, correct the reply instead of letting the claim stand.
+    if (actions.length === 0 && /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted)\b|\bI (?:added|created|scheduled|saved)\b/i.test(cleanContent)) {
+      console.warn('[chat] reply claimed an action but no action block parsed - correcting. Raw length:', aiText.length);
+      cleanContent += '\n\n⚠️ Actually - I wasn\'t able to save that just now. Please ask me again.';
+    }
+
     const members = await db.getHouseholdMembers(req.householdId);
     const currentUser = members.find(m => m.id === req.user.id);
     const userTz = currentUser?.timezone || household?.timezone || 'Europe/London';
