@@ -9,6 +9,7 @@
 // the tapped day.
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../lib/api';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
 import { kidsEventEmoji } from '../../lib/kidsEventEmoji';
 
@@ -36,6 +37,7 @@ const forKid = (e, kidId) => {
 };
 
 export default function DaysScreen({ kid, theme }) {
+  const isMobile = useIsMobile();
   const [view, setView] = useState('list');
   const [bigDays, setBigDays] = useState([]);
   const [monthEvents, setMonthEvents] = useState({}); // 'YYYY-MM' → events[]
@@ -88,7 +90,7 @@ export default function DaysScreen({ kid, theme }) {
   return (
     <div style={{ padding: '20px 18px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '16px 0 14px' }}>
-        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: -0.5 }}>My Days <span className="kids-wobble">📅</span></div>
+        <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6 }}>My Days <span className="kids-wobble">📅</span></div>
         <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 14, border: '2px solid rgba(49,43,75,0.06)' }}>
           {[['list', 'List'], ['month', 'Month']].map(([k, l]) => (
             <button key={k} onClick={() => setView(k)} style={{ padding: '6px 13px', borderRadius: 10, border: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, background: view === k ? theme.grad : 'transparent', color: view === k ? '#fff' : KIDS_INK.ink3 }}>{l}</button>
@@ -96,23 +98,44 @@ export default function DaysScreen({ kid, theme }) {
         </div>
       </div>
 
-      {hero && <Countdown hero={hero} theme={theme} />}
-
-      {view === 'list' && myBigs.filter((b) => b !== hero).length > 0 && (
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, margin: '4px 0 8px' }}>
-          {myBigs.filter((b) => b !== hero).slice(0, 6).map((b) => (
-            <div key={`${b.date}:${b.title}`} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 999, padding: '7px 14px 7px 9px' }}>
-              <span style={{ fontSize: 20 }}>{b.emoji || '🎉'}</span>
-              <span>
-                <b style={{ fontSize: 13, display: 'block', lineHeight: 1.1 }}>{b.title}</b>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: theme.accent }}>in {sleepText(sleepsTo(b.date))}</span>
-              </span>
+      {isMobile ? (
+        <>
+          {hero && <Countdown hero={hero} theme={theme} isMobile />}
+          {view === 'list' && myBigs.filter((b) => b !== hero).length > 0 && (
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, margin: '4px 0 8px' }}>
+              {myBigs.filter((b) => b !== hero).slice(0, 6).map((b) => (
+                <div key={`${b.date}:${b.title}`} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 999, padding: '7px 14px 7px 9px' }}>
+                  <span style={{ fontSize: 20 }}>{b.emoji || '🎉'}</span>
+                  <span>
+                    <b style={{ fontSize: 13, display: 'block', lineHeight: 1.1 }}>{b.title}</b>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: theme.accent }}>in {sleepText(sleepsTo(b.date))}</span>
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
+      ) : (
+        (hero || myBigs.length > 1) && (
+          <div style={{ display: 'flex', gap: 16, marginBottom: 20, alignItems: 'stretch' }}>
+            {hero && <Countdown hero={hero} theme={theme} />}
+            <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase', color: KIDS_INK.ink3 }}>Also coming up</div>
+              {myBigs.filter((b) => b !== hero).slice(0, 3).map((b) => (
+                <div key={`${b.date}:${b.title}`} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 18, padding: '10px 14px' }}>
+                  <span style={{ fontSize: 26 }}>{b.emoji || '🎉'}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <b style={{ fontSize: 14, display: 'block', lineHeight: 1.15 }}>{b.title}</b>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: theme.accent }}>in {sleepText(sleepsTo(b.date))}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
 
-      {view === 'month' && <MonthView theme={theme} kid={kid} monthEvents={monthEvents} loadMonth={loadMonth} bigDays={myBigs} />}
+      {view === 'month' && <MonthView theme={theme} kid={kid} monthEvents={monthEvents} loadMonth={loadMonth} bigDays={myBigs} isMobile={isMobile} />}
 
       {view === 'list' && days.length === 0 && (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
@@ -140,7 +163,7 @@ export default function DaysScreen({ kid, theme }) {
               {!today && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={KIDS_INK.ink3} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" /></svg>}
             </button>
             {isOpen && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 12 } : { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 {g.map((it) => <EventCard key={it.id} it={it} theme={theme} />)}
               </div>
             )}
@@ -165,19 +188,19 @@ function EventCard({ it, theme }) {
   );
 }
 
-function Countdown({ hero, theme }) {
+function Countdown({ hero, theme, isMobile }) {
   const n = sleepsTo(hero.date);
   return (
-    <div style={{ background: theme.grad, borderRadius: 28, padding: '22px 24px', color: '#fff', marginBottom: 14, position: 'relative', overflow: 'hidden', boxShadow: '0 12px 30px rgba(49,43,75,0.2)' }}>
-      <div style={{ position: 'absolute', right: -10, top: -16, fontSize: 120, opacity: .2 }}>{hero.emoji || '🎉'}</div>
+    <div style={{ flex: isMobile ? undefined : 1, background: theme.grad, borderRadius: 28, padding: isMobile ? '22px 24px' : '24px 28px', color: '#fff', marginBottom: isMobile ? 14 : 0, position: 'relative', overflow: 'hidden', boxShadow: '0 12px 30px rgba(49,43,75,0.2)' }}>
+      <div style={{ position: 'absolute', right: isMobile ? -10 : -6, top: isMobile ? -16 : -14, fontSize: isMobile ? 120 : 150, opacity: .2 }}>{hero.emoji || '🎉'}</div>
       <div style={{ position: 'relative' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, opacity: .92 }}>Counting down to…</div>
-        <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.1, margin: '2px 0 10px' }}>{hero.emoji || '🎉'} {hero.title}</div>
-        <div style={{ fontSize: 46, fontWeight: 700, lineHeight: 1 }}>
+        <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, opacity: .92 }}>Counting down to…</div>
+        <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 700, lineHeight: 1.1, margin: '2px 0 10px' }}>{hero.emoji || '🎉'} {hero.title}</div>
+        <div style={{ fontSize: isMobile ? 46 : 58, fontWeight: 700, lineHeight: 1 }}>
           {n === 0 ? 'Today! 🎉' : n}
-          {n > 0 && <span style={{ fontSize: 20, fontWeight: 600, opacity: .9 }}> {n === 1 ? 'sleep to go!' : 'sleeps to go!'}</span>}
+          {n > 0 && <span style={{ fontSize: isMobile ? 20 : 24, fontWeight: 600, opacity: .9 }}> {n === 1 ? 'sleep to go!' : 'sleeps to go!'}</span>}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 500, opacity: .9, marginTop: 6 }}>{toLocalDate(hero.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+        <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 500, opacity: .9, marginTop: isMobile ? 6 : 8 }}>{toLocalDate(hero.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
       </div>
     </div>
   );
@@ -185,9 +208,11 @@ function Countdown({ hero, theme }) {
 
 // ── Month grid: cross off past days, count sleeps to events ──
 const MONTH_WD = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const MONTH_WD_FULL = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const mvNav = { width: 38, height: 38, borderRadius: 12, border: 0, background: '#fff', cursor: 'pointer', fontSize: 22, fontWeight: 700, color: KIDS_INK.ink2, boxShadow: '0 2px 0 rgba(49,43,75,0.06)', fontFamily: 'inherit' };
+const mvNavT = { width: 42, height: 42, borderRadius: 14, border: 0, background: '#fff', cursor: 'pointer', fontSize: 24, fontWeight: 700, color: KIDS_INK.ink2, boxShadow: '0 2px 0 rgba(49,43,75,0.06)', fontFamily: 'inherit' };
 
-function MonthView({ theme, kid, monthEvents, loadMonth, bigDays }) {
+function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, isMobile }) {
   const now = new Date();
   const [offset, setOffset] = useState(0); // months from the current month
   const [sel, setSel] = useState(todayStr());
@@ -216,44 +241,53 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays }) {
   const selEv = evOn(sel);
   const n = sleepsTo(sel);
 
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 2px 12px' }}>
-        <button onClick={() => setOffset((m) => Math.max(0, m - 1))} disabled={offset <= 0} style={{ ...mvNav, opacity: offset <= 0 ? 0.35 : 1 }}>‹</button>
-        <b style={{ fontSize: 18 }}>{first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</b>
-        <button onClick={() => setOffset((m) => Math.min(6, m + 1))} disabled={offset >= 6} style={{ ...mvNav, opacity: offset >= 6 ? 0.35 : 1 }}>›</button>
+  // Tablet: two panes — the month grid (flex) with a fixed 340px selected-day
+  // panel beside it. Mobile: grid stacked above the selected-day section.
+  const grid = (
+    <div style={isMobile ? undefined : { flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '4px 2px 12px' : '2px 2px 14px' }}>
+        <button onClick={() => setOffset((m) => Math.max(0, m - 1))} disabled={offset <= 0} style={{ ...(isMobile ? mvNav : mvNavT), opacity: offset <= 0 ? 0.35 : 1 }}>‹</button>
+        <b style={{ fontSize: isMobile ? 18 : 22 }}>{first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</b>
+        <button onClick={() => setOffset((m) => Math.min(6, m + 1))} disabled={offset >= 6} style={{ ...(isMobile ? mvNav : mvNavT), opacity: offset >= 6 ? 0.35 : 1 }}>›</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, marginBottom: 6 }}>
-        {MONTH_WD.map((w, i) => <div key={i} style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: KIDS_INK.ink3 }}>{w}</div>)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8 }}>
+        {(isMobile ? MONTH_WD : MONTH_WD_FULL).map((w, i) => <div key={i} style={{ textAlign: 'center', fontSize: isMobile ? 12 : 13, fontWeight: 700, color: KIDS_INK.ink3 }}>{w}</div>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? 6 : 8 }}>
         {cells.map((d, i) => {
           if (!d) return <div key={i} />;
           const dateStr = ymd(new Date(first.getFullYear(), first.getMonth(), d));
           const sl = sleepsTo(dateStr), past = sl < 0, today = sl === 0, on = dateStr === sel;
           const dayEvs = evOn(dateStr);
           return (
-            <button key={i} onClick={() => setSel(dateStr)} style={{ position: 'relative', aspectRatio: '1', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
+            <button key={i} onClick={() => setSel(dateStr)} style={{ position: 'relative', aspectRatio: '1', borderRadius: isMobile ? 14 : 16, cursor: 'pointer', fontFamily: 'inherit',
               border: (today || on) ? `2.5px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', background: (today || on) ? theme.soft : '#fff',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, opacity: past ? 0.5 : 1, overflow: 'hidden' }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: today ? theme.accent : KIDS_INK.ink }}>{d}</span>
-              {dayEvs.length > 0 && !past && <span style={{ display: 'flex', gap: 1 }}>{dayEvs.slice(0, 3).map((e, j) => <span key={j} style={{ fontSize: 9 }}>{e.emoji}</span>)}</span>}
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 1 : 3, opacity: past ? 0.5 : 1, overflow: 'hidden' }}>
+              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, color: today ? theme.accent : KIDS_INK.ink }}>{d}</span>
+              {dayEvs.length > 0 && !past && <span style={{ display: 'flex', gap: isMobile ? 1 : 2 }}>{dayEvs.slice(0, 3).map((e, j) => <span key={j} style={{ fontSize: isMobile ? 9 : 12 }}>{e.emoji}</span>)}</span>}
               {past && <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 40 40" preserveAspectRatio="none"><line x1="7" y1="33" x2="33" y2="7" stroke={theme.accent} strokeWidth="3" strokeLinecap="round" opacity="0.5" /></svg>}
-              {today && <span style={{ position: 'absolute', bottom: 3, fontSize: 7, fontWeight: 800, letterSpacing: .5, color: theme.accent }}>TODAY</span>}
+              {today && <span style={{ position: 'absolute', bottom: isMobile ? 3 : 4, fontSize: isMobile ? 7 : 8, fontWeight: 800, letterSpacing: .5, color: theme.accent }}>TODAY</span>}
             </button>
           );
         })}
       </div>
-      <div style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, padding: '0 2px 8px', color: n === 0 ? theme.accent : KIDS_INK.ink }}>
-          {dayName(sel)}
-          {n > 1 && <span style={{ fontSize: 12.5, fontWeight: 600, color: KIDS_INK.ink3 }}> · in {sleepText(n)}</span>}
-          {n < 0 && <span style={{ fontSize: 12.5, fontWeight: 600, color: KIDS_INK.ink3 }}> · all crossed off ✓</span>}
-        </div>
-        {selEv.length === 0
-          ? <div style={{ fontSize: 14, fontWeight: 600, color: KIDS_INK.ink3, padding: '6px 2px' }}>Nothing on this day 🎈</div>
-          : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{selEv.map((it) => <EventCard key={it.id} it={it} theme={theme} />)}</div>}
-      </div>
     </div>
   );
+
+  const dayPanel = (
+    <div style={isMobile ? { marginTop: 16 } : { width: 340, flexShrink: 0 }}>
+      <div style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, padding: isMobile ? '0 2px 8px' : '0 2px 12px', color: n === 0 ? theme.accent : KIDS_INK.ink }}>
+        {dayName(sel)}
+        {n > 1 && <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 600, color: KIDS_INK.ink3 }}> · in {sleepText(n)}</span>}
+        {n < 0 && <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 600, color: KIDS_INK.ink3 }}> · all crossed off ✓</span>}
+      </div>
+      {selEv.length === 0
+        ? <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: KIDS_INK.ink3, padding: isMobile ? '6px 2px' : '8px 2px' }}>Nothing on this day 🎈</div>
+        : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{selEv.map((it) => <EventCard key={it.id} it={it} theme={theme} />)}</div>}
+    </div>
+  );
+
+  return isMobile
+    ? <div>{grid}{dayPanel}</div>
+    : <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start' }}>{grid}{dayPanel}</div>;
 }

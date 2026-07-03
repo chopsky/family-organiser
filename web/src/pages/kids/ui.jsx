@@ -72,9 +72,9 @@ export function KidsLogo({ c1, c2, size = 30, showWord = true }) {
   );
 }
 
-export function Section({ title, emoji, count, accent, hint, children }) {
+export function Section({ title, emoji, count, accent, hint, style, children }) {
   return (
-    <div className="kids-card-in" style={{ marginBottom: 20 }}>
+    <div className="kids-card-in" style={{ marginBottom: 20, ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 10px' }}>
         <span style={{ fontSize: 20 }}>{emoji}</span>
         <span style={{ fontSize: 19, fontWeight: 700 }}>{title}</span>

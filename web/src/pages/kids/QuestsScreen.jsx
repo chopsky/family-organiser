@@ -7,6 +7,7 @@
 // flashes "+N⭐"; finishing every rewarded quest earns the trophy celebration.
 import { useState } from 'react';
 import api from '../../lib/api';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
 import { StarPill, Section, Celebrate, KidsLogo } from './ui';
 import { KidSwitch } from './KidsShell';
@@ -15,6 +16,7 @@ const SLOTS = [['morning', 'Morning', '☀️'], ['afternoon', 'Afternoon', '�
 const MASCOTS = ['😴', '🙂', '😃', '🤩', '🥳'];
 
 export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid }) {
+  const isMobile = useIsMobile();
   const [celebrate, setCelebrate] = useState(null);
   const tasks = (day?.tasks || []).filter((t) => t.anyone || (t.assignee_ids || []).includes(kid.id));
 
@@ -65,6 +67,9 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
   // Personal chores + slotless routines both live under "My jobs".
   const jobs = tasks.filter((t) => !t.anyone && !(t.type === 'routine' && t.slot));
   const pooled = tasks.filter((t) => t.anyone);
+  const sections = [...groups];
+  if (jobs.length) sections.push({ k: 'jobs', label: 'My jobs', em: '🧹', tasks: jobs });
+  if (pooled.length) sections.push({ k: 'pool', label: 'Help the family', em: '🤝', tasks: pooled, hint: 'First to finish gets the stars!' });
 
   return (
     <div style={{ padding: '20px 18px 0' }}>
@@ -76,39 +81,34 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
         <StarPill n={(day?.balances && day.balances[kid.id]) || 0} />
       </div>
 
-      <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: -0.5, marginBottom: 2 }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, marginBottom: 2 }}>
         Hi, {kid.name}! <span className="kids-wobble">👋</span>
       </div>
-      <div style={{ fontSize: 16, color: KIDS_INK.ink2, fontWeight: 500, marginBottom: 16 }}>
+      <div style={{ fontSize: isMobile ? 16 : 17, color: KIDS_INK.ink2, fontWeight: 500, marginBottom: isMobile ? 16 : 18 }}>
         {total === 0 ? 'No quests today - enjoy it!' : doneCount === total ? 'You finished everything! 🎉' : "Here are today's quests."}
       </div>
 
       {total > 0 && (
-        <div style={{ background: theme.grad, borderRadius: 30, padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 18, marginBottom: 22, boxShadow: '0 10px 26px rgba(49,43,75,0.2)' }}>
-          <ProgressRing pct={pct} mascot={mascot} />
+        <div style={{ background: theme.grad, borderRadius: isMobile ? 30 : 28, padding: isMobile ? '20px 22px' : '22px 26px', display: 'flex', alignItems: 'center', gap: isMobile ? 18 : 22, marginBottom: isMobile ? 22 : 24, boxShadow: isMobile ? '0 10px 26px rgba(49,43,75,0.2)' : '0 12px 30px rgba(49,43,75,0.2)' }}>
+          <ProgressRing pct={pct} mascot={mascot} size={isMobile ? 84 : 98} />
           <div style={{ color: '#fff' }}>
-            <div style={{ fontSize: 15, fontWeight: 600, opacity: .92 }}>Quest progress</div>
-            <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1.1 }}>{doneCount} <span style={{ fontSize: 18, opacity: .85 }}>of {total} done</span></div>
-            <div style={{ fontSize: 14, fontWeight: 500, opacity: .92, marginTop: 2 }}>{pct === 1 ? 'Legend! ⭐' : pct >= .5 ? 'Over halfway!' : 'You can do it!'}</div>
+            <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, opacity: .92 }}>Quest progress</div>
+            <div style={{ fontSize: isMobile ? 30 : 38, fontWeight: 700, lineHeight: 1.1 }}>{doneCount} <span style={{ fontSize: isMobile ? 18 : 22, opacity: .85 }}>of {total} done</span></div>
+            <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, opacity: .92, marginTop: 2 }}>{pct === 1 ? 'Legend! ⭐' : pct >= .5 ? (isMobile ? 'Over halfway!' : 'Over halfway, keep going!') : 'You can do it!'}</div>
           </div>
         </div>
       )}
 
-      {groups.map((g) => (
-        <Section key={g.k} title={g.label} emoji={g.em} count={`${g.tasks.filter(isDone).length}/${g.tasks.length}`} accent={theme.accent}>
-          {g.tasks.map((t) => <Quest key={t.occurrence_key} t={t} theme={theme} done={isDone(t)} onTap={() => toggle(t)} />)}
-        </Section>
-      ))}
-      {jobs.length > 0 && (
-        <Section title="My jobs" emoji="🧹" count={`${jobs.filter(isDone).length}/${jobs.length}`} accent={theme.accent}>
-          {jobs.map((t) => <Quest key={t.occurrence_key} t={t} theme={theme} done={isDone(t)} onTap={() => toggle(t)} />)}
-        </Section>
-      )}
-      {pooled.length > 0 && (
-        <Section title="Help the family" emoji="🤝" count={`${pooled.filter(isDone).length}/${pooled.length}`} accent={theme.accent} hint="First to finish gets the stars!">
-          {pooled.map((t) => <Quest key={t.occurrence_key} t={t} theme={theme} done={isDone(t)} lockedBy={doneByOther(t)} onTap={() => toggle(t)} />)}
-        </Section>
-      )}
+      {/* Tablet: sections flow into 2 columns (each section unbreakable);
+          mobile: the same sections stack. */}
+      <div style={isMobile ? undefined : { columns: 2, columnGap: 22 }}>
+        {sections.map((g) => (
+          <Section key={g.k} title={g.label} emoji={g.em} count={`${g.tasks.filter(isDone).length}/${g.tasks.length}`} accent={theme.accent} hint={g.hint}
+            style={isMobile ? undefined : { breakInside: 'avoid', marginBottom: 22 }}>
+            {g.tasks.map((t) => <Quest key={t.occurrence_key} t={t} theme={theme} done={isDone(t)} lockedBy={doneByOther(t)} onTap={() => toggle(t)} />)}
+          </Section>
+        ))}
+      </div>
 
       {total === 0 && (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
@@ -122,16 +122,17 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
   );
 }
 
-function ProgressRing({ pct, mascot }) {
-  const R = 34, C = 2 * Math.PI * R;
+function ProgressRing({ pct, mascot, size = 84 }) {
+  const stroke = size > 90 ? 9 : 8;
+  const R = (size / 2) - stroke, C = 2 * Math.PI * R, c = size / 2;
   return (
-    <div style={{ position: 'relative', width: 84, height: 84, flexShrink: 0 }}>
-      <svg width="84" height="84" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="42" cy="42" r={R} fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.35)" strokeWidth="8" />
-        <circle cx="42" cy="42" r={R} fill="none" stroke="#fff" strokeWidth="8" strokeLinecap="round"
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={c} cy={c} r={R} fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.35)" strokeWidth={stroke} />
+        <circle cx={c} cy={c} r={R} fill="none" stroke="#fff" strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={C} strokeDashoffset={C * (1 - pct)} style={{ transition: 'stroke-dashoffset .5s cubic-bezier(.22,1,.36,1)' }} />
       </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34 }}>{mascot}</div>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.42 }}>{mascot}</div>
     </div>
   );
 }

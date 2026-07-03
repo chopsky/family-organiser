@@ -5,10 +5,12 @@
 // the celebration overlay.
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
 import { StarPill, Celebrate } from './ui';
 
 export default function ShopScreen({ kid, theme, balance, onBalance }) {
+  const isMobile = useIsMobile();
   const [rewards, setRewards] = useState(null);
   const [celebrate, setCelebrate] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
@@ -37,22 +39,35 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
 
   return (
     <div style={{ padding: '20px 18px 0' }}>
-      <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: -0.5, margin: '16px 0 14px' }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: '16px 0 14px' }}>
         Star Shop <span className="kids-wobble">🛍️</span>
       </div>
 
-      <div style={{ background: theme.grad, borderRadius: 30, padding: '22px 24px', color: '#fff', marginBottom: 22, position: 'relative', overflow: 'hidden', boxShadow: '0 10px 26px rgba(49,43,75,0.2)' }}>
-        <div style={{ position: 'absolute', right: -14, top: -14, fontSize: 120, opacity: .18 }}>⭐</div>
-        <div style={{ fontSize: 15, fontWeight: 600, opacity: .92 }}>{kid.name}, you have</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-          <span style={{ fontSize: 54, lineHeight: 1 }}>⭐</span>
-          <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1 }}>{balance}</span>
+      {/* Balance banner: stacked on mobile, horizontal on tablet (per the
+          tablet spec: big star + inline "N stars"). */}
+      {isMobile ? (
+        <div style={{ background: theme.grad, borderRadius: 30, padding: '22px 24px', color: '#fff', marginBottom: 22, position: 'relative', overflow: 'hidden', boxShadow: '0 10px 26px rgba(49,43,75,0.2)' }}>
+          <div style={{ position: 'absolute', right: -14, top: -14, fontSize: 120, opacity: .18 }}>⭐</div>
+          <div style={{ fontSize: 15, fontWeight: 600, opacity: .92 }}>{kid.name}, you have</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+            <span style={{ fontSize: 54, lineHeight: 1 }}>⭐</span>
+            <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1 }}>{balance}</span>
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 500, opacity: .92, marginTop: 6 }}>stars to spend!</div>
         </div>
-        <div style={{ fontSize: 15, fontWeight: 500, opacity: .92, marginTop: 6 }}>stars to spend!</div>
-      </div>
+      ) : (
+        <div style={{ background: theme.grad, borderRadius: 28, padding: '24px 28px', color: '#fff', marginBottom: 24, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 12px 30px rgba(49,43,75,0.2)' }}>
+          <div style={{ position: 'absolute', right: 20, top: -16, fontSize: 130, opacity: .18 }}>⭐</div>
+          <span style={{ fontSize: 64 }}>⭐</span>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 600, opacity: .92 }}>{kid.name}, you have</div>
+            <div style={{ fontSize: 52, fontWeight: 700, lineHeight: 1 }}>{balance} <span style={{ fontSize: 22, fontWeight: 600, opacity: .9 }}>stars</span></div>
+          </div>
+        </div>
+      )}
 
-      {rewards && rewards.length > 0 && <div style={{ fontSize: 19, fontWeight: 700, padding: '0 4px 12px' }}>Pick a treat 🎁</div>}
-      <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: 14 }}>
+      {rewards && rewards.length > 0 && <div style={{ fontSize: isMobile ? 19 : 21, fontWeight: 700, padding: isMobile ? '0 4px 12px' : '0 4px 14px' }}>Pick a treat 🎁</div>}
+      <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: isMobile ? 14 : 16 }}>
         {(rewards || []).map((r) => {
           const can = balance >= r.cost;
           const pct = Math.min(1, r.cost ? balance / r.cost : 1);
