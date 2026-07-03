@@ -168,6 +168,7 @@ app.use('/api', require('./routes/shopping-lists'));
 app.use('/api/tasks',    require('./routes/tasks'));
 app.use('/api/chores',   require('./routes/chores'));
 app.use('/api/rewards',  require('./routes/rewards'));
+app.use('/api/kids',     require('./routes/kids'));
 app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/classify', require('./routes/classify'));
 app.use('/api/receipt',  require('./routes/receipt'));

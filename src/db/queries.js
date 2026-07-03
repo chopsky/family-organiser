@@ -930,6 +930,23 @@ async function getSchoolTermDateById(dateId, db = supabase) {
   return data || null;
 }
 
+// Kids mode "My Days": events a parent pinned as a countdown (the
+// kids_countdown toggle on the event modal). Future instances only; the
+// nearest one becomes the countdown hero on the kids' calendar.
+async function getKidsCountdownEvents(householdId, fromISO, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_events')
+    .select('id, title, start_time, all_day, kids_emoji')
+    .eq('household_id', householdId)
+    .eq('kids_countdown', true)
+    .is('deleted_at', null)
+    .gte('start_time', fromISO)
+    .order('start_time')
+    .limit(10);
+  if (error) throw error;
+  return data || [];
+}
+
 async function getTermDatesBySchoolIds(schoolIds, db = supabase) {
   if (!schoolIds.length) return [];
   const { data, error } = await db
@@ -8180,6 +8197,7 @@ module.exports = {
   getSchoolTermDates,
   getSchoolTermDateById,
   getTermDatesBySchoolIds,
+  getKidsCountdownEvents,
   deleteSchoolTermDate,
   updateSchoolTermDate,
   updateHouseholdSchoolMeta,
