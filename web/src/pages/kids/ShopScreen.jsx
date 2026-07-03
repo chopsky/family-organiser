@@ -47,7 +47,7 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
-      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: isMobile ? '16px 0 14px' : '0 0 16px' }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, margin: isMobile ? '16px 0 14px' : '0 0 16px' }}>
         Star Shop <span className="kids-wobble">🛍️</span>
       </div>
 
@@ -59,7 +59,7 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
           <div style={{ fontSize: 15, fontWeight: 600, opacity: .92 }}>{kid.name}, you have</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
             <span style={{ fontSize: 54, lineHeight: 1 }}>⭐</span>
-            <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1 }}>{balance}</span>
+            <span style={{ fontSize: 56, fontWeight: 600, lineHeight: 1 }}>{balance}</span>
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, opacity: .92, marginTop: 6 }}>stars to spend!</div>
         </div>
@@ -69,12 +69,12 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
           <span style={{ fontSize: 64 }}>⭐</span>
           <div>
             <div style={{ fontSize: 17, fontWeight: 600, opacity: .92 }}>{kid.name}, you have</div>
-            <div style={{ fontSize: 52, fontWeight: 700, lineHeight: 1 }}>{balance} <span style={{ fontSize: 22, fontWeight: 600, opacity: .9 }}>stars</span></div>
+            <div style={{ fontSize: 52, fontWeight: 600, lineHeight: 1 }}>{balance} <span style={{ fontSize: 22, fontWeight: 600, opacity: .9 }}>stars</span></div>
           </div>
         </div>
       )}
 
-      {rewards && myRewards.length > 0 && <div style={{ fontSize: isMobile ? 19 : 21, fontWeight: 700, padding: isMobile ? '0 4px 12px' : '0 4px 14px' }}>Pick a treat 🎁</div>}
+      {rewards && myRewards.length > 0 && <div style={{ fontSize: isMobile ? 19 : 21, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 4px 14px' }}>Pick a treat 🎁</div>}
       <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: isMobile ? 14 : 16 }}>
         {myRewards.map((r) => {
           const can = balance >= r.cost;
@@ -88,7 +88,7 @@ export default function ShopScreen({ kid, theme, balance, onBalance }) {
               <div style={{ margin: '8px 0 12px', display: 'flex', justifyContent: 'center' }}><StarPill n={r.cost} /></div>
               {can ? (
                 <button onClick={() => redeem(r)} disabled={redeemingId === r.id} style={{ width: '100%', padding: '11px', borderRadius: 16, border: 0, cursor: 'pointer', fontFamily: 'inherit',
-                  background: theme.grad, color: '#fff', fontSize: 15, fontWeight: 700, boxShadow: '0 5px 0 rgba(49,43,75,0.12)', opacity: redeemingId === r.id ? .7 : 1 }}>
+                  background: theme.grad, color: '#fff', fontSize: 15, fontWeight: 600, boxShadow: '0 5px 0 rgba(49,43,75,0.12)', opacity: redeemingId === r.id ? .7 : 1 }}>
                   {redeemingId === r.id ? '…' : 'Get it!'}
                 </button>
               ) : (

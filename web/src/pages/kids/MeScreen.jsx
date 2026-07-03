@@ -38,7 +38,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0, maxWidth: isMobile ? undefined : 680 }}>
-      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, margin: isMobile ? '16px 0' : '0 0 20px' }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, margin: isMobile ? '16px 0' : '0 0 20px' }}>
         My Profile <span className="kids-wobble">⚙️</span>
       </div>
 
@@ -47,19 +47,19 @@ export default function MeScreen({ kid, theme, onSaved }) {
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <div style={{ width: 112, height: 112, borderRadius: '50%', background: theme.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 62, boxShadow: '0 12px 28px rgba(49,43,75,0.22)' }}>{theme.emoji}</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{kid.name}</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>{kid.name}</div>
         </div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28 }}>
           <div style={{ width: 120, height: 120, borderRadius: '50%', background: theme.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 66, boxShadow: '0 12px 28px rgba(49,43,75,0.22)', flexShrink: 0 }}>{theme.emoji}</div>
           <div>
-            <div style={{ fontSize: 26, fontWeight: 700 }}>{kid.name}</div>
+            <div style={{ fontSize: 26, fontWeight: 600 }}>{kid.name}</div>
             <div style={{ fontSize: 15, color: KIDS_INK.ink2, fontWeight: 500 }}>Pick your colour and avatar!</div>
           </div>
         </div>
       )}
 
-      <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 700, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My colour 🎨</div>
+      <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My colour 🎨</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 14 : 16, marginBottom: isMobile ? 28 : 30, padding: '0 2px' }}>
         {KID_COLOR_PRESETS.map((c) => {
           const on = theme.key === c.key;
@@ -72,7 +72,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
         })}
       </div>
 
-      <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 700, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My avatar 😀</div>
+      <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My avatar 😀</div>
       <div className="grid grid-cols-5 md:grid-cols-8" style={{ gap: isMobile ? 10 : 12 }}>
         {KID_AVATARS.map((a) => {
           const on = theme.emoji === a;
@@ -86,7 +86,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
       {/* PIN-gated exit. One button only: leaving Child Mode already gives a
           grown-up the full adult app, Settings included. */}
       <button onClick={openGate} style={{ width: isMobile ? '100%' : undefined, marginTop: isMobile ? 28 : 32, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
-        fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: KIDS_INK.ink2, display: isMobile ? 'inline-flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+        fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2, display: isMobile ? 'inline-flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <LockIcon />
         Exit Child Mode
       </button>
@@ -130,7 +130,7 @@ function PinSheet({ theme, verifyPin, onSuccess, onClose }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(49,43,75,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="kids-anim" style={{ background: '#fff', borderRadius: 32, padding: '30px 26px', textAlign: 'center', width: '100%', maxWidth: 320, boxShadow: '0 20px 60px rgba(49,43,75,0.4)', animation: 'kids-burst-pop .4s ease forwards' }}>
         <div style={{ fontSize: 44 }}>🔒</div>
-        <div style={{ fontSize: 21, fontWeight: 700, marginTop: 6, color: KIDS_INK.ink }}>Grown-ups only</div>
+        <div style={{ fontSize: 21, fontWeight: 600, marginTop: 6, color: KIDS_INK.ink }}>Grown-ups only</div>
         <div style={{ fontSize: 14, fontWeight: 500, color: KIDS_INK.ink2, marginTop: 4 }}>
           Enter the PIN to exit Child Mode.
         </div>
@@ -143,11 +143,11 @@ function PinSheet({ theme, verifyPin, onSuccess, onClose }) {
           maxLength={6}
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          style={{ width: '100%', marginTop: 16, padding: '13px 14px', borderRadius: 16, border: `2.5px solid ${error ? '#E84B75' : theme.accent}`, fontSize: 24, fontWeight: 700, textAlign: 'center', letterSpacing: 10, fontFamily: 'inherit', color: KIDS_INK.ink, outline: 'none' }}
+          style={{ width: '100%', marginTop: 16, padding: '13px 14px', borderRadius: 16, border: `2.5px solid ${error ? '#E84B75' : theme.accent}`, fontSize: 24, fontWeight: 600, textAlign: 'center', letterSpacing: 10, fontFamily: 'inherit', color: KIDS_INK.ink, outline: 'none' }}
         />
         {error && <div style={{ fontSize: 13, fontWeight: 600, color: '#E84B75', marginTop: 8 }}>{error}</div>}
         <button type="submit" disabled={busy || pin.length < 4} style={{ width: '100%', marginTop: 14, padding: 13, borderRadius: 16, border: 0, cursor: 'pointer', fontFamily: 'inherit',
-          background: theme.grad, color: '#fff', fontSize: 15, fontWeight: 700, opacity: busy || pin.length < 4 ? .6 : 1 }}>
+          background: theme.grad, color: '#fff', fontSize: 15, fontWeight: 600, opacity: busy || pin.length < 4 ? .6 : 1 }}>
           {busy ? 'Checking…' : 'Unlock'}
         </button>
         <button type="button" onClick={onClose} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 14, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: KIDS_INK.ink3 }}>

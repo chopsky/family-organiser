@@ -105,7 +105,7 @@ function NoKids({ theme }) {
   return (
     <div style={{ padding: '80px 24px', textAlign: 'center' }}>
       <div style={{ fontSize: 64 }}>🧒</div>
-      <div style={{ fontSize: 24, fontWeight: 700, marginTop: 10 }}>No kids here yet!</div>
+      <div style={{ fontSize: 24, fontWeight: 600, marginTop: 10 }}>No kids here yet!</div>
       <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, marginTop: 8, maxWidth: 340, margin: '8px auto 0' }}>
         Ask a grown-up to add children on the Family page, then Kids mode will light up.
       </div>
@@ -127,7 +127,7 @@ export function KidSwitch({ kids, kid, pickKid, stacked = false }) {
           <button key={k.id} onClick={() => pickKid(k.id)} style={{ display: 'flex', alignItems: 'center', gap: stacked ? 11 : 7, padding: stacked ? '8px 12px 8px 8px' : '6px 14px 6px 6px', borderRadius: stacked ? 18 : 999, border: 0, cursor: 'pointer', fontFamily: 'inherit',
             background: on ? th.grad : (stacked ? '#fff' : 'transparent'), boxShadow: on ? '0 4px 12px rgba(49,43,75,0.18)' : (stacked ? '0 2px 0 rgba(49,43,75,0.05)' : 'none') }}>
             <span style={{ width: stacked ? 40 : 30, height: stacked ? 40 : 30, borderRadius: '50%', background: on ? 'rgba(255,255,255,0.3)' : th.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: stacked ? 22 : 17 }}>{th.emoji}</span>
-            <b style={{ fontSize: stacked ? 16 : 14, color: on ? '#fff' : KIDS_INK.ink2 }}>{k.name}</b>
+            <b style={{ fontWeight: 600, fontSize: stacked ? 16 : 14, color: on ? '#fff' : KIDS_INK.ink2 }}>{k.name}</b>
           </button>
         );
       })}
@@ -158,7 +158,7 @@ function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {
             <button key={k} onClick={() => navigate(TAB_PATH[k])} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', borderRadius: 18, border: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
               background: on ? theme.grad : 'transparent', color: on ? '#fff' : KIDS_INK.ink2, boxShadow: on ? '0 6px 16px rgba(49,43,75,0.16)' : 'none' }}>
               <span style={{ fontSize: 24, filter: on ? 'none' : 'grayscale(.3)' }}>{em}</span>
-              <b style={{ fontSize: 17 }}>{label}</b>
+              <b style={{ fontWeight: 600, fontSize: 17 }}>{label}</b>
             </button>
           );
         })}
@@ -168,7 +168,7 @@ function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {
       <div style={{ background: theme.grad, borderRadius: 22, padding: '16px 18px', color: '#fff', textAlign: 'center', boxShadow: '0 8px 20px rgba(49,43,75,0.18)' }}>
         <div style={{ fontSize: 13, fontWeight: 600, opacity: .9 }}>My stars</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }}>
-          <span style={{ fontSize: 38 }}>⭐</span><span style={{ fontSize: 40, fontWeight: 700 }}>{balance}</span>
+          <span style={{ fontSize: 38 }}>⭐</span><span style={{ fontSize: 40, fontWeight: 600 }}>{balance}</span>
         </div>
       </div>
     </div>
@@ -186,7 +186,7 @@ function BottomNav({ tab, navigate, theme }) {
             <button key={k} onClick={() => navigate(TAB_PATH[k])} style={{ flex: 1, padding: '10px 0', borderRadius: 19, border: 0, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               background: on ? theme.grad : 'transparent' }}>
               <span style={{ fontSize: 22, filter: on ? 'none' : 'grayscale(.3)', transform: on ? 'scale(1.05)' : 'none' }}>{em}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: on ? '#fff' : KIDS_INK.ink3 }}>{label}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: on ? '#fff' : KIDS_INK.ink3 }}>{label}</span>
             </button>
           );
         })}

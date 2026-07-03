@@ -89,7 +89,7 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
         </>
       )}
 
-      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 700, letterSpacing: -0.6, marginBottom: 2 }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, marginBottom: 2 }}>
         Hi, {kid.name}! <span className="kids-wobble">👋</span>
       </div>
       <div style={{ fontSize: isMobile ? 16 : 17, color: KIDS_INK.ink2, fontWeight: 500, marginBottom: isMobile ? 16 : 18 }}>
@@ -101,7 +101,7 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
           <ProgressRing pct={pct} mascot={mascot} size={isMobile ? 84 : 98} />
           <div style={{ color: '#fff' }}>
             <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, opacity: .92 }}>Quest progress</div>
-            <div style={{ fontSize: isMobile ? 30 : 38, fontWeight: 700, lineHeight: 1.1 }}>{doneCount} <span style={{ fontSize: isMobile ? 18 : 22, opacity: .85 }}>of {total} done</span></div>
+            <div style={{ fontSize: isMobile ? 30 : 38, fontWeight: 600, lineHeight: 1.1 }}>{doneCount} <span style={{ fontSize: isMobile ? 18 : 22, opacity: .85 }}>of {total} done</span></div>
             <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, opacity: .92, marginTop: 2 }}>{pct === 1 ? 'Legend! ⭐' : pct >= .5 ? (isMobile ? 'Over halfway!' : 'Over halfway, keep going!') : 'You can do it!'}</div>
           </div>
         </div>
@@ -171,7 +171,7 @@ function Quest({ t, theme, done, lockedBy, onTap }) {
         background: done ? theme.accent : '#fff', border: done ? `2px solid ${theme.accent}` : '3px solid #E4E1EE' }}>
         {done && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12l5 5L20 6" /></svg>}
       </span>
-      {flash && <span className="kids-anim" style={{ position: 'absolute', right: 44, top: 6, fontSize: 16, fontWeight: 700, color: '#B77B10', animation: 'kids-float-up .9s ease forwards', pointerEvents: 'none' }}>+{t.stars}⭐</span>}
+      {flash && <span className="kids-anim" style={{ position: 'absolute', right: 44, top: 6, fontSize: 16, fontWeight: 600, color: '#B77B10', animation: 'kids-float-up .9s ease forwards', pointerEvents: 'none' }}>+{t.stars}⭐</span>}
     </button>
   );
 }
