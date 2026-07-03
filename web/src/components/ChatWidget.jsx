@@ -585,7 +585,13 @@ I'm always here if you need me!`;
             }
             setIsOpen(true);
           }}
-          className="flex fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-plum hover:bg-plum/90 text-white shadow-lg items-center justify-center transition-all hover:scale-105"
+          className="flex fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full text-white items-center justify-center transition-all hover:scale-105"
+          style={{
+            // Gradient AI orb from the floating-nav handoff. bottom-24
+            // lands it just above the floating pill's right edge.
+            background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)',
+            boxShadow: '0 12px 28px rgba(109,56,173,0.5), inset 0 2px 0 rgba(255,255,255,0.3)',
+          }}
           title="Chat with AI Assistant"
         >
           <SparklesIcon className="h-6 w-6" />

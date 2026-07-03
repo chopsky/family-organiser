@@ -116,6 +116,28 @@ const moreAccountRows = [
   { to: '/help',     label: 'Help & support', Icon: IconHelp },
 ];
 
+// One tab inside the floating pill. Per the handoff, the active state
+// wraps BOTH the icon and its label in a single plum-light rounded pill
+// (earlier iterations highlighted only the icon - the whole item must
+// highlight). Active keeps the bolder-stroke icon treatment in place of
+// filled variants, per our icon set.
+function TabItem({ label, Icon, active }) {
+  return (
+    <span
+      className={`flex flex-col items-center gap-[3px] ${active ? 'text-plum' : 'text-warm-grey'}`}
+      style={{
+        padding: '7px 14px 6px',
+        borderRadius: 16,
+        background: active ? 'var(--color-plum-light)' : 'transparent',
+        transition: 'background .18s ease',
+      }}
+    >
+      <Icon className="h-[23px] w-[23px]" strokeWidth={active ? 2.4 : 1.5} />
+      <span className={`text-[10.5px] tracking-[0.01em] ${active ? 'font-bold' : 'font-semibold'}`}>{label}</span>
+    </span>
+  );
+}
+
 // Small non-interactive badge shown by the logo while Child Mode is active.
 function ChildModeChip() {
   return (
@@ -350,54 +372,61 @@ export default function Layout({ children }) {
       </main>
 
       {/* ── Mobile Bottom Tab Bar ──────────────────────────────────
-          Five tabs from the iOS design handoff: Home · Calendar · Tasks
-          · Shopping · More. Solid cream background (`--color-cream`), no
-          backdrop blur - page content scrolls behind the opaque bar. */}
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-start justify-around pt-2 safe-bottom"
+          Floating frosted pill from the floating-nav design handoff:
+          the bar sits inset from the screen edges rather than flush to
+          the bottom, and page content fades out beneath it through the
+          wrapper's cream gradient. The wrapper ignores taps so the faded
+          margin around the pill still scrolls/clicks the page. */}
+      <div
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 pointer-events-none"
         style={{
-          background: 'var(--color-cream)',
+          padding: '18px 16px',
+          // The handoff's flat 22px doesn't cover the iPhone home
+          // indicator - grow with the safe area but never shrink below it.
+          paddingBottom: 'max(22px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
+          background: 'linear-gradient(to top, rgba(251,248,243,0.9) 55%, rgba(251,248,243,0))',
         }}
       >
-        {visibleMobileNav.map(({ to, label, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={() => { hapticTap(); }}
-            className={({ isActive }) =>
-              `flex-1 max-w-[80px] flex flex-col items-center gap-[3px] py-1 ${
-                isActive ? 'text-plum' : 'text-warm-grey'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {/* Bolder stroke when active - mimics the SF Symbols
-                    active-state look without needing filled icon variants. */}
-                <Icon className="h-[26px] w-[26px]" strokeWidth={isActive ? 2.4 : 1.5} />
-                <span className="text-[11px] font-semibold tracking-[0.01em]">{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-
-        {/* More tab - opens the redesigned bottom sheet. The sheet itself
-            is rendered outside the <nav> so it can take the full viewport
-            instead of being clipped by the tab bar. The button matches
-            the layout/sizing of the NavLinks above so the row stays
-            visually balanced. */}
-        {!childMode && (
-        <button
-          onClick={() => setMoreOpen(v => !v)}
-          aria-expanded={moreOpen}
-          aria-haspopup="dialog"
-          className={`flex-1 max-w-[80px] flex flex-col items-center gap-[3px] py-1 ${isMoreActive || moreOpen ? 'text-plum' : 'text-warm-grey'}`}
+        <nav
+          className="pointer-events-auto flex items-center justify-around"
+          style={{
+            padding: '10px 8px',
+            borderRadius: 26,
+            background: 'rgba(255,255,255,0.72)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            border: '1px solid rgba(255,255,255,0.6)',
+            boxShadow: '0 10px 30px rgba(26,22,32,0.14), 0 1px 0 rgba(255,255,255,0.7) inset',
+          }}
         >
-          <IconMore className="h-[26px] w-[26px]" />
-          <span className="text-[11px] font-semibold tracking-[0.01em]">More</span>
-        </button>
-        )}
-      </nav>
+          {visibleMobileNav.map(({ to, label, Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={() => { hapticTap(); }}
+              className="flex-1 max-w-[76px] flex flex-col items-center"
+            >
+              {({ isActive }) => <TabItem label={label} Icon={Icon} active={isActive} />}
+            </NavLink>
+          ))}
+
+          {/* More tab - opens the redesigned bottom sheet. The sheet itself
+              is rendered outside the <nav> so it can take the full viewport
+              instead of being clipped by the tab bar. The button matches
+              the layout/sizing of the NavLinks above so the row stays
+              visually balanced. */}
+          {!childMode && (
+          <button
+            onClick={() => setMoreOpen(v => !v)}
+            aria-expanded={moreOpen}
+            aria-haspopup="dialog"
+            className="flex-1 max-w-[76px] flex flex-col items-center"
+          >
+            <TabItem label="More" Icon={IconMore} active={isMoreActive || moreOpen} />
+          </button>
+          )}
+        </nav>
+      </div>
 
       {/* ── More bottom sheet ──────────────────────────────────────
           A native-feeling iOS-style sheet: backdrop fades in over 250ms;
