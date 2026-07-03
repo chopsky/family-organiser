@@ -17,6 +17,7 @@ import DesktopChoresWeek from './chores/DesktopChoresWeek';
 import { useChildMode } from '../context/ChildModeContext';
 import { useAuth } from '../context/AuthContext';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
+import { maybeRequestReview } from '../lib/appReview';
 
 // Design-handoff tokens (page-local; member colours come from each record).
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -834,7 +835,11 @@ export default function Chores() {
       )}
 
       {modal && <TaskModal modal={modal} members={members} onClose={() => setModal(null)} onSave={handleSave} />}
-      {celebrate && <Celebration data={celebrate} onClose={() => setCelebrate(null)} onGo={() => { const mid = celebrate.member?.id; setCelebrate(null); navigate(mid ? `/rewards?member=${mid}` : '/rewards'); }} />}
+      {/* When the celebration closes, ask iOS for the native App Store review
+          sheet. This page only renders OUTSIDE Child Mode (ChildGate swaps
+          /tasks to KidsShell), so unlike the kids' quest celebration an adult
+          is holding the device. Guarded in lib/appReview.js. */}
+      {celebrate && <Celebration data={celebrate} onClose={() => { setCelebrate(null); maybeRequestReview(); }} onGo={() => { const mid = celebrate.member?.id; setCelebrate(null); maybeRequestReview(); navigate(mid ? `/rewards?member=${mid}` : '/rewards'); }} />}
       {claim && <WhoCompletedModal task={claim} members={members} currentUserId={user?.id} onClose={() => setClaim(null)} onPick={(mid) => { setAnyoneDone(claim, mid, true); setClaim(null); }} />}
     </div>
   );

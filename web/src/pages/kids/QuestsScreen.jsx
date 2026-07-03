@@ -9,7 +9,6 @@ import { useState } from 'react';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
-import { maybeRequestReview } from '../../lib/appReview';
 import { StarPill, Section, Celebrate, KidsLogo } from './ui';
 import { KidSwitch } from './KidsShell';
 
@@ -126,11 +125,11 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
         </div>
       )}
 
-      {/* When the trophy overlay closes, ask iOS for the native App Store
-          review sheet - the all-quests-done moment is the app's peak
-          goodwill. Heavily guarded (14 days of use, once per version,
-          Apple's own 3-per-year cap) and a silent no-op on web. */}
-      {celebrate && <Celebrate data={celebrate} onDone={() => { setCelebrate(null); maybeRequestReview(); }} />}
+      {/* No review prompt here: this celebration fires in Child Mode where a
+          kid is often alone with the device - the App Store sheet would land
+          in front of a child. The prompt lives on the ADULT Tasks page's
+          celebration instead (Chores.jsx). */}
+      {celebrate && <Celebrate data={celebrate} onDone={() => setCelebrate(null)} />}
     </div>
   );
 }
