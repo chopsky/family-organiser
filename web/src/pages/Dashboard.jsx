@@ -519,19 +519,26 @@ export default function Dashboard() {
   // Per-member progress on today's chores/routines for the "Today's tasks" card.
   const taskScores = digest?.taskScores ?? [];
 
-  // Today's meals by category
+  // This week's meals, one chip per day (Mon-Sun). Each chip shows the
+  // day's dinner (or the first planned meal of the day when there's no
+  // dinner); tapping opens the planner on that date.
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const TODAY_MEAL_CATEGORIES = [
-    { key: 'breakfast', label: 'Breakfast' },
-    { key: 'lunch', label: 'Lunch' },
-    { key: 'dinner', label: 'Dinner' },
-    { key: 'snack', label: 'Snack' },
-  ];
-  const todayMeals = TODAY_MEAL_CATEGORIES.map(({ key, label }) => ({
-    key,
-    label,
-    meals: weekMeals.filter(m => m.date === todayDate && m.category?.toLowerCase() === key),
-  }));
+  const weekDays = (() => {
+    const monday = getMonday(now);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dayMeals = weekMeals.filter(m => m.date === date);
+      const meal = dayMeals.find(m => m.category?.toLowerCase() === 'dinner') || dayMeals[0] || null;
+      return {
+        date,
+        dow: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase(),
+        dm: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        meal,
+      };
+    });
+  })();
 
   // Resolve every household member assigned to an event, deduped, in source
   // order (anyone removed from the household post-hoc is silently dropped).
@@ -893,45 +900,44 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Card 4 - Today's meals (hidden in Child Mode - Meal Plan is off-limits) */}
-        <div className={`${childMode ? 'hidden ' : ''}bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5`} style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+      </div>
+
+      {/* This week's meals - a full-row card below the 2-column grid
+          (dashboard handoff): one chip per day Mon-Sun showing the day's
+          dinner (or first planned meal), today outlined in plum. Hidden in
+          Child Mode - Meal Plan is off-limits. */}
+      {!childMode && (
+        <div className="bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-sans font-semibold text-bark">Today's meals</h2>
+            <h2 className="text-base font-sans font-semibold text-bark">This week&apos;s meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
-          <div className="space-y-2">
-            {todayMeals.map(({ key, label, meals }) => (
-              meals.length === 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0">
+            {weekDays.map(({ date, dow, dm, meal }) => {
+              const today = date === todayDate;
+              return (
                 <Link
-                  key={key}
-                  to={`/meals?open=${key}&date=${todayDate}&return=dashboard`}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cream hover:bg-plum-light/60 transition-colors"
+                  key={date}
+                  to={`/meals?open=dinner&date=${date}&return=dashboard`}
+                  className={`flex-none w-32 md:w-auto rounded-xl p-3 transition-colors ${
+                    today
+                      ? 'bg-plum-light border-[1.5px] border-plum'
+                      : 'bg-cream border-[1.5px] border-transparent hover:bg-plum-light/60'
+                  }`}
                 >
-                  <span className="text-[11px] font-bold w-16 shrink-0 text-cocoa uppercase">{label}</span>
-                  <span className="text-sm italic text-cocoa/60 flex-1">Tap to add</span>
-                  <span className="text-cocoa/60 text-lg leading-none">+</span>
+                  <div className={`text-[11px] font-bold uppercase tracking-[0.04em] ${today ? 'text-primary' : 'text-cocoa'}`}>{dow}</div>
+                  <div className="text-xs text-cocoa mt-0.5">{dm}</div>
+                  {meal ? (
+                    <div className="text-sm font-medium text-bark mt-2 leading-snug line-clamp-2">{meal.meal_name}</div>
+                  ) : (
+                    <div className="text-sm italic text-cocoa/60 mt-2">Not planned</div>
+                  )}
                 </Link>
-              ) : (
-                <div key={key} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-plum-light">
-                  <span className="text-[11px] font-bold w-16 shrink-0 text-primary uppercase pt-0.5">{label}</span>
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    {meals.map((meal, i) => (
-                      <div key={meal.id ?? `${key}-${i}`} className="flex items-center justify-between min-w-0">
-                        <span className="text-sm font-medium text-bark truncate">{meal.meal_name}</span>
-                        {(meal.recipe?.prep_time_mins || meal.prep_time_mins) && (
-                          <span className="shrink-0 text-[10px] font-medium text-sage bg-sage-light px-2 py-0.5 rounded-full ml-2">
-                            {meal.recipe?.prep_time_mins || meal.prep_time_mins} min
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            ))}
+              );
+            })}
           </div>
         </div>
-      </div>
+      )}
 
       {/* NL input modal */}
       <BottomSheet open={nlModalOpen} onDismiss={() => setNlModalOpen(false)} desktopWidthClass="sm:w-[440px]">
