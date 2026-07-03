@@ -110,7 +110,7 @@ function NoKids({ theme }) {
         Ask a grown-up to add children on the Family page, then Kids mode will light up.
       </div>
       <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
-        <KidsLogo c1={theme.c1} c2={theme.c2} size={26} />
+        <KidsLogo c1={theme.c1} c2={theme.c2} />
       </div>
     </div>
   );
@@ -145,7 +145,7 @@ function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {
   const items = [...NAV_ITEMS, ['me', 'Me', theme.emoji]];
   return (
     <div className="hidden md:flex" style={{ width: 236, flexShrink: 0, background: 'rgba(255,255,255,0.6)', borderRight: '2px solid rgba(49,43,75,0.06)', flexDirection: 'column', padding: '26px 18px' }}>
-      <div style={{ padding: '2px 2px 18px' }}><KidsLogo c1={theme.c1} c2={theme.c2} size={30} /></div>
+      <div style={{ padding: '2px 2px 18px' }}><KidsLogo c1={theme.c1} c2={theme.c2} /></div>
 
       <div style={{ marginBottom: 22 }}>
         <KidSwitch kids={kids} kid={kid} pickKid={pickKid} stacked />

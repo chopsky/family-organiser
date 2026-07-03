@@ -80,7 +80,7 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
       {isMobile && (
         <>
           <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
-            <KidsLogo c1={theme.c1} c2={theme.c2} size={30} />
+            <KidsLogo c1={theme.c1} c2={theme.c2} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <KidSwitch kids={kids || []} kid={kid} pickKid={pickKid} />
