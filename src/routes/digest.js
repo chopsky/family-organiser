@@ -51,12 +51,20 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     const now = new Date();
     const todayStr = now.toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
 
-    // Meals: today + next 6 days (covers the dashboard's "today + 3 days" view
-    // even when it spans across a Mon-Sun week boundary)
-    const mealsEnd = new Date(now);
-    mealsEnd.setDate(now.getDate() + 6);
-    const weekStart = todayStr;
-    const weekEnd = mealsEnd.toLocaleDateString('en-CA', { timeZone: tz });
+    // Meals: the full current calendar week, Monday-Sunday in the
+    // household's timezone. The dashboard's week strip renders every day
+    // of this week, so the window must include days already gone - the
+    // old today-forward window made a meal planned on Monday vanish from
+    // the card by Tuesday.
+    const [ty, tm, td] = todayStr.split('-').map(Number);
+    const todayLocal = new Date(ty, tm - 1, td);
+    const monday = new Date(todayLocal);
+    monday.setDate(todayLocal.getDate() - ((todayLocal.getDay() + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const ymdLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const weekStart = ymdLocal(monday);
+    const weekEnd = ymdLocal(sunday);
 
     const [
       { tasks: completedTasks, shoppingItems: completedShopping },
