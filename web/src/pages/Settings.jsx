@@ -487,18 +487,22 @@ function AccordionItem({ title, icon: IconCmp, defaultOpen = false, danger = fal
 // `slug` is the URL fragment, `match` lists which AccordionItem title
 // (or 'delete' for the danger one) belongs to this sub-page. Order
 // here drives the order of the row list on the iOS landing.
+// Child Mode is NOT in this list - it renders as a standalone gradient
+// card on every platform (settings handoff), not behind a row + popup.
+// `group` drives the labelled card grouping on the iOS landing so the
+// list mirrors the web page's section labels.
 const IOS_SECTIONS = [
-  { slug: 'whatsapp',     title: 'Connect WhatsApp',  icon: 'IconMessageCircle' },
-  { slug: 'calendars',    title: 'Connect Calendars', icon: 'IconCalendar' },
-  { slug: 'emails-to-ai', title: 'Send Emails to AI', icon: 'IconMail' },
-  { slug: 'child-mode',   title: 'Child Mode',        icon: 'IconShield' },
-  { slug: 'notifications',title: 'Notifications',     icon: 'IconBell' },
-  { slug: 'location',     title: 'Location',          icon: 'IconMapPin' },
-  { slug: 'sessions',     title: 'Active sessions',   icon: 'IconShield' },
-  { slug: 'data',         title: 'Your data',         icon: 'IconDownload' },
-  { slug: 'account',      title: 'Account',           icon: 'IconUser' },
-  { slug: 'delete',       title: 'Delete account',    icon: 'IconTrash', danger: true },
+  { slug: 'whatsapp',     title: 'Connect WhatsApp',  icon: 'IconMessageCircle', group: 'Connected services' },
+  { slug: 'calendars',    title: 'Connect Calendars', icon: 'IconCalendar',      group: 'Connected services' },
+  { slug: 'emails-to-ai', title: 'Send Emails to AI', icon: 'IconMail',          group: 'Connected services' },
+  { slug: 'notifications',title: 'Notifications',     icon: 'IconBell',          group: 'Notifications & privacy' },
+  { slug: 'location',     title: 'Location',          icon: 'IconMapPin',        group: 'Notifications & privacy' },
+  { slug: 'sessions',     title: 'Active sessions',   icon: 'IconShield',        group: 'Notifications & privacy' },
+  { slug: 'data',         title: 'Your data',         icon: 'IconDownload',      group: 'Account' },
+  { slug: 'account',      title: 'Account',           icon: 'IconUser',          group: 'Account' },
+  { slug: 'delete',       title: 'Delete account',    icon: 'IconTrash', danger: true, group: 'Account' },
 ];
+const IOS_GROUPS = [...new Set(IOS_SECTIONS.map((s) => s.group))];
 const IOS_SECTION_ICONS = {
   IconMessageCircle, IconCalendar, IconMail, IconBell, IconMapPin,
   IconShield, IconDownload, IconUser, IconTrash,
@@ -596,8 +600,10 @@ export default function Settings() {
   // scrolls to the card once the page has rendered.
   useEffect(() => {
     const section = new URLSearchParams(window.location.search).get('section');
-    if (!section || !IOS_SECTIONS.some((s) => s.slug === section)) return undefined;
-    if (isIosPlatform) {
+    // child-mode is a standalone card (not a popup section) on every
+    // platform, so it always takes the scroll path.
+    if (!section || (section !== 'child-mode' && !IOS_SECTIONS.some((s) => s.slug === section))) return undefined;
+    if (isIosPlatform && section !== 'child-mode') {
       setPopupSlug(section);
       return undefined;
     }
@@ -1460,47 +1466,48 @@ export default function Settings() {
       {/* Profile card (settings handoff): identity header + Family plan
           + Billing rows, wired to the real subscription. */}
       <div>
-        {!isIosPlatform && <SectionLabel>Your profile</SectionLabel>}
+        <SectionLabel>Your profile</SectionLabel>
         <ProfileCard me={members.find((m) => m.id === user?.id)} members={members} />
       </div>
 
       {/* Child mode - standalone gradient card on web (a hero feature, not
-          an accordion row). iOS keeps its section row + popup below. The id
-          anchors the ?section=child-mode deep link. */}
-      {!isIosPlatform && (
-        <div id="settings-section-child-mode">
-          <SectionLabel>Child mode</SectionLabel>
-          {childModeCard}
-        </div>
-      )}
+          an accordion row); on iOS it sits between the profile card and the
+          grouped section list. The id anchors the ?section=child-mode deep
+          link on both platforms. */}
+      <div id="settings-section-child-mode">
+        <SectionLabel>Child mode</SectionLabel>
+        {childModeCard}
+      </div>
 
-      {/* iOS list mode: list of nav rows, each opens a popup overlay
-          for that section. Visual mirrors the accordion summaries
-          (icon + title + chevron) so the landing surface stays
-          familiar - the chevron implies "tap to see more", which is
-          true whether the more is inline (accordion), a sub-page, or
-          a popup. */}
-      {iosListMode && (
-        <div className={`${SET_CARD_CLASS} px-5 md:px-6`} style={{ boxShadow: SET_CARD_SHADOW }}>
-          {IOS_SECTIONS.map((sec) => {
-            const Icon = IOS_SECTION_ICONS[sec.icon];
-            const iconColor = sec.danger ? 'text-error' : 'text-plum';
-            const titleColor = sec.danger ? 'text-error' : 'text-bark';
-            return (
-              <button
-                key={sec.slug}
-                type="button"
-                onClick={() => setPopupSlug(sec.slug)}
-                className="w-full flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none border-b border-cream-border last:border-b-0 text-left"
-              >
-                {Icon && <Icon className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}
-                <h2 className={`flex-1 text-base md:text-medium font-semibold ${titleColor}`}>{sec.title}</h2>
-                <IconChevronRight className="w-4 h-4 md:w-5 md:h-5 text-cocoa shrink-0" />
-              </button>
-            );
-          })}
+      {/* iOS list mode: nav rows grouped into labelled cards (same groups
+          + labels as the web page's sections), each row opening a popup
+          overlay for that section. The chevron implies "tap to see more",
+          which is true whether the more is inline (accordion), a sub-page,
+          or a popup. */}
+      {iosListMode && IOS_GROUPS.map((group) => (
+        <div key={group}>
+          <SectionLabel>{group}</SectionLabel>
+          <div className={`${SET_CARD_CLASS} px-5 md:px-6`} style={{ boxShadow: SET_CARD_SHADOW }}>
+            {IOS_SECTIONS.filter((sec) => sec.group === group).map((sec) => {
+              const Icon = IOS_SECTION_ICONS[sec.icon];
+              const iconColor = sec.danger ? 'text-error' : 'text-plum';
+              const titleColor = sec.danger ? 'text-error' : 'text-bark';
+              return (
+                <button
+                  key={sec.slug}
+                  type="button"
+                  onClick={() => setPopupSlug(sec.slug)}
+                  className="w-full flex items-center gap-3 py-4 md:py-5 cursor-pointer select-none border-b border-cream-border last:border-b-0 text-left"
+                >
+                  {Icon && <Icon className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${iconColor}`} />}
+                  <h2 className={`flex-1 text-base md:text-medium font-semibold ${titleColor}`}>{sec.title}</h2>
+                  <IconChevronRight className="w-4 h-4 md:w-5 md:h-5 text-cocoa shrink-0" />
+                </button>
+              );
+            })}
+          </div>
         </div>
-      )}
+      ))}
 
       {/* Sections - each renders via SectionWrapper which picks the
           right wrapper for the platform/sub-page state:
@@ -2224,13 +2231,8 @@ export default function Settings() {
         style={isIosPlatform ? undefined : { boxShadow: SET_CARD_SHADOW }}
       >
 
-      {/* Child Mode - iOS only here (section row + popup). Web renders the
-          same gradient card standalone near the top of the page. */}
-      {isIosPlatform && (
-        <SectionWrapper slug="child-mode" title="Child Mode" icon={IconShield} accordion>
-          {childModeCard}
-        </SectionWrapper>
-      )}
+      {/* Child Mode renders as a standalone gradient card near the top of
+          the page on every platform - no accordion row or iOS popup. */}
 
       {/* Notifications - unified on every platform. Two subsections:
           Push (iOS only, where APNs delivers) and WhatsApp (any platform
