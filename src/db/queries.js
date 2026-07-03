@@ -3753,13 +3753,27 @@ async function recordExternalFeedFailure(feedId, message, db = supabase) {
 }
 
 async function getExternalFeedEvents(feedId, db = supabase) {
-  const { data, error } = await db
-    .from('calendar_events')
-    .select('id, external_uid, start_time, end_time')
-    .eq('external_feed_id', feedId)
-    .is('deleted_at', null);
-  if (error) throw error;
-  return data || [];
+  // Paginate past Supabase's silent 1000-row cap. This list is what feed
+  // reconciliation diffs against: with the cap, a feed holding more than
+  // 1000 expanded rows (big iCloud Family calendars easily do) had most of
+  // its rows invisible to the stale-detection pass, so deletions at the
+  // provider never propagated for them (real failure: a recurring event
+  // truncated with an RRULE UNTIL kept 75 stale future instances alive).
+  const PAGE = 1000;
+  const all = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from('calendar_events')
+      .select('id, external_uid, start_time, end_time')
+      .eq('external_feed_id', feedId)
+      .is('deleted_at', null)
+      .order('id')
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    all.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  return all;
 }
 
 async function createExternalFeedEvent(row, db = supabase) {
