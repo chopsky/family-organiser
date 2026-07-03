@@ -585,7 +585,7 @@ I'm always here if you need me!`;
             }
             setIsOpen(true);
           }}
-          className="flex fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full text-white items-center justify-center transition-all hover:scale-105"
+          className="flex fixed ai-orb-bottom right-4 md:right-6 z-50 w-14 h-14 rounded-full text-white items-center justify-center transition-all hover:scale-105"
           style={{
             // Gradient AI orb from the floating-nav handoff. bottom-24
             // lands it just above the floating pill's right edge.

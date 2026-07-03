@@ -266,6 +266,20 @@
        real ~34px safe-area value wins, so nothing changes there. */
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
   }
+  /* The AI orb (ChatWidget launcher) floats above the mobile tab pill's
+     right edge. Its offset mirrors the pill wrapper's safe-area-aware
+     bottom inset (Layout.jsx) plus the pill's own height, so the orb
+     rises with the home indicator on iOS instead of colliding with the
+     More button. Desktop has no bottom bar - plain 24px corner offset. */
+  .ai-orb-bottom {
+    /* 85px = the pill's rendered height (~77px) + an 8px breathing gap. */
+    bottom: calc(max(22px, env(safe-area-inset-bottom, 0px) + 8px) + 85px);
+  }
+  @media (min-width: 768px) {
+    .ai-orb-bottom {
+      bottom: 24px;
+    }
+  }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
