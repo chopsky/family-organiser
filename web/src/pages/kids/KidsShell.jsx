@@ -22,13 +22,25 @@ const TAB_PATH = { quests: '/tasks', shop: '/rewards', days: '/calendar', me: '/
 function safeGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function safeSet(key, value) { try { localStorage.setItem(key, value); } catch { /* private browsing */ } }
 
+// Last-known member snapshot (slim: only what the shell needs to paint) so
+// the first render shows the right avatar/colour/kid list instead of
+// flashing the 🦖 defaults while /household loads. Refreshed after every
+// successful fetch and after a Me-screen save.
+function readMemberSnapshot() {
+  try { return JSON.parse(safeGet('kidsMembers') || '[]'); } catch { return []; }
+}
+function writeMemberSnapshot(members) {
+  const slim = (members || []).map(({ id, name, member_type, kid_color, kid_avatar }) => ({ id, name, member_type, kid_color, kid_avatar }));
+  safeSet('kidsMembers', JSON.stringify(slim));
+}
+
 export default function KidsShell() {
   const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
   const tab = PATH_TAB[location.pathname] || 'quests';
 
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState(readMemberSnapshot);
   const [loaded, setLoaded] = useState(false);
   const kids = useMemo(() => members.filter(isKidMember), [members]);
 
@@ -53,7 +65,8 @@ export default function KidsShell() {
     try {
       const { data } = await api.get('/household');
       setMembers(data.members || []);
-    } catch { /* keep whatever we had */ }
+      writeMemberSnapshot(data.members || []);
+    } catch { /* keep whatever we had (possibly the snapshot) */ }
     setLoaded(true);
   }, []);
 
@@ -61,9 +74,14 @@ export default function KidsShell() {
   useEffect(() => { loadMembers(); loadDay(); }, [loadMembers, loadDay]);
 
   // Local patch after the Me screen saves a colour/avatar, so the re-theme is
-  // instant without waiting for a refetch.
+  // instant without waiting for a refetch. The snapshot updates too, so the
+  // next cold load paints the new choice straight away.
   const patchMember = useCallback((id, patch) => {
-    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    setMembers((ms) => {
+      const next = ms.map((m) => (m.id === id ? { ...m, ...patch } : m));
+      writeMemberSnapshot(next);
+      return next;
+    });
   }, []);
 
   const theme = kidTheme(kid, kidIndex);
@@ -89,7 +107,10 @@ export default function KidsShell() {
             the tablet spec); phone screens pad themselves and get clearance
             for the floating bottom nav. */}
         <div className="mx-auto w-full md:max-w-[860px]" style={isMobile ? { paddingBottom: 120 } : { padding: '34px 38px' }}>
-          {!loaded ? null : !kid ? <NoKids theme={theme} /> : screen}
+          {/* With a snapshot the screens render immediately; only a genuinely
+              cold start (no snapshot) waits for the fetch before deciding
+              between content and the no-kids state. */}
+          {kid ? screen : loaded ? <NoKids theme={theme} /> : null}
         </div>
       </div>
 
