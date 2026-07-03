@@ -15,7 +15,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
   const isMobile = useIsMobile();
   const { verifyPin, disable, pinIsSet } = useChildMode();
   const navigate = useNavigate();
-  const [gate, setGate] = useState(null); // null | 'exit' | 'settings'
+  const [gate, setGate] = useState(false); // PIN sheet open for Exit Child Mode
 
   const save = (patch) => {
     // Optimistic: the shell re-themes instantly; the PATCH persists to the
@@ -25,21 +25,15 @@ export default function MeScreen({ kid, theme, onSaved }) {
     api.patch('/household/profile', { user_id: kid.id, ...patch }).catch(() => {});
   };
 
-  const openGate = (mode) => {
+  const openGate = () => {
     // No PIN configured (edge: enabled before the PIN was cleared) - don't
-    // dead-bolt the device; both actions just work.
-    if (!pinIsSet) { finishGate(mode); return; }
-    setGate(mode);
+    // dead-bolt the device; exiting just works.
+    if (!pinIsSet) { exit(); return; }
+    setGate(true);
   };
-  const finishGate = (mode) => {
-    if (mode === 'exit') {
-      disable();
-      navigate('/dashboard', { replace: true });
-    } else {
-      // verifyPin already flipped settingsUnlocked; ChildGate now renders the
-      // adult Settings for this path.
-      navigate('/settings');
-    }
+  const exit = () => {
+    disable();
+    navigate('/dashboard', { replace: true });
   };
 
   return (
@@ -89,21 +83,16 @@ export default function MeScreen({ kid, theme, onSaved }) {
         })}
       </div>
 
-      {/* Full-width stacked buttons on mobile; inline row on tablet. */}
-      <div style={isMobile ? undefined : { display: 'flex', alignItems: 'center', gap: 14, marginTop: 32 }}>
-        <button onClick={() => openGate('exit')} style={{ width: isMobile ? '100%' : undefined, marginTop: isMobile ? 28 : 0, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
-          fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: KIDS_INK.ink2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
-          <LockIcon />
-          Exit Child Mode
-        </button>
-        <button onClick={() => openGate('settings')} style={{ width: isMobile ? '100%' : undefined, marginTop: isMobile ? 12 : 0, padding: isMobile ? 13 : '14px 18px', borderRadius: 18, border: 0, background: 'transparent', cursor: 'pointer',
-          fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: KIDS_INK.ink3 }}>
-          Grown-up settings
-        </button>
-      </div>
+      {/* PIN-gated exit. One button only: leaving Child Mode already gives a
+          grown-up the full adult app, Settings included. */}
+      <button onClick={openGate} style={{ width: isMobile ? '100%' : undefined, marginTop: isMobile ? 28 : 32, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: KIDS_INK.ink2, display: isMobile ? 'inline-flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+        <LockIcon />
+        Exit Child Mode
+      </button>
       <div style={{ height: 20 }} />
 
-      {gate && <PinSheet mode={gate} theme={theme} verifyPin={verifyPin} onSuccess={() => { const m = gate; setGate(null); finishGate(m); }} onClose={() => setGate(null)} />}
+      {gate && <PinSheet theme={theme} verifyPin={verifyPin} onSuccess={() => { setGate(false); exit(); }} onClose={() => setGate(false)} />}
     </div>
   );
 }
@@ -118,7 +107,7 @@ function LockIcon() {
 
 // A kid-styled "grown-ups only" PIN sheet over the current screen. Verifies
 // against the household Child Mode PIN (rate-limited server-side).
-function PinSheet({ mode, theme, verifyPin, onSuccess, onClose }) {
+function PinSheet({ theme, verifyPin, onSuccess, onClose }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -143,7 +132,7 @@ function PinSheet({ mode, theme, verifyPin, onSuccess, onClose }) {
         <div style={{ fontSize: 44 }}>🔒</div>
         <div style={{ fontSize: 21, fontWeight: 700, marginTop: 6, color: KIDS_INK.ink }}>Grown-ups only</div>
         <div style={{ fontSize: 14, fontWeight: 500, color: KIDS_INK.ink2, marginTop: 4 }}>
-          {mode === 'exit' ? 'Enter the PIN to exit Child Mode.' : 'Enter the PIN to open settings.'}
+          Enter the PIN to exit Child Mode.
         </div>
         <input
           ref={inputRef}
