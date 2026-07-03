@@ -15,6 +15,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { encryptToken } = require('../utils/calendar-token-crypto');
+const { localToUTC } = require('../utils/local-time');
 const googleCal = require('../services/googleCalendar');
 const deviceCalendarSync = require('../services/deviceCalendarSync');
 const cache = require('../services/cache');
@@ -411,6 +412,67 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
           allDay: true,
         });
       }
+    }
+
+    // Weekly extracurriculars flagged "show on the family calendar".
+    // These live in child_weekly_schedule, not calendar_events, so the
+    // feed materialises them: one VEVENT per occurrence over a bounded
+    // window (last week → next ~13 weeks), inside the activity's term
+    // window when one is set. Per-occurrence UTC conversion from the
+    // household's wall-clock time keeps DST transitions correct - an
+    // RRULE anchored to a fixed UTC DTSTART would drift by an hour.
+    // Stable per-occurrence UIDs, same contract as events/tasks above.
+    // Best-effort: a failure here never breaks the rest of the feed.
+    try {
+      const [activities, actMembers] = await Promise.all([
+        db.getHouseholdActivities(tokenData.household_id),
+        db.getHouseholdMembers(tokenData.household_id),
+      ]);
+      const flagged = activities.filter((a) => a.show_on_calendar !== false);
+      if (flagged.length > 0) {
+        const nameById = new Map(actMembers.map((m) => [m.id, m.name]));
+        const tz = household?.timezone || 'Europe/London';
+        // Anchor on "today" in the household tz; the Y-M-D constructor
+        // keeps getDay() correct for that calendar date regardless of
+        // the server's own timezone.
+        const [ay, am, ad] = new Date().toLocaleDateString('en-CA', { timeZone: tz }).split('-').map(Number);
+        const anchor = new Date(ay, am - 1, ad);
+        anchor.setDate(anchor.getDate() - 7);
+        for (let i = 0; i < 98; i++) {
+          const d = new Date(anchor);
+          d.setDate(anchor.getDate() + i);
+          const wd = (d.getDay() + 6) % 7; // 0=Monday, app-wide convention
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          for (const act of flagged) {
+            if (act.day_of_week !== wd) continue;
+            if (act.start_date && dateStr < act.start_date) continue;
+            if (act.end_date && dateStr > act.end_date) continue;
+            const childName = nameById.get(act.child_id);
+            const summary = childName ? `${childName} - ${act.activity}` : act.activity;
+            if (act.time_start) {
+              const startIso = localToUTC(dateStr, String(act.time_start).slice(0, 5), tz);
+              const endIso = act.time_end
+                ? localToUTC(dateStr, String(act.time_end).slice(0, 5), tz)
+                : new Date(new Date(startIso).getTime() + 3600000).toISOString();
+              calendar.createEvent({
+                id: `housemait-act-${act.id}-${dateStr}@housemait.com`,
+                start: new Date(startIso),
+                end: new Date(endIso),
+                summary,
+              });
+            } else {
+              calendar.createEvent({
+                id: `housemait-act-${act.id}-${dateStr}@housemait.com`,
+                start: new Date(`${dateStr}T00:00:00Z`),
+                summary,
+                allDay: true,
+              });
+            }
+          }
+        }
+      }
+    } catch (actErr) {
+      console.warn('outbound feed: activities skipped:', actErr.message);
     }
 
     res.set('Content-Type', 'text/calendar; charset=utf-8');

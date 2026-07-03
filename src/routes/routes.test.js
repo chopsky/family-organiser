@@ -1435,4 +1435,44 @@ describe('outbound calendar feed emits stable UIDs', () => {
     expect(uids1).toContain('UID:housemait-task-t1@housemait.com');
     expect(uidsOf(second.text)).toEqual(uids1);
   });
+
+  // Weekly extracurriculars flagged show_on_calendar are materialised into
+  // per-occurrence VEVENTs (child name in the summary, stable UIDs), inside
+  // the activity's term window; unflagged activities stay out of the feed.
+  test('flagged activities appear as per-occurrence VEVENTs, unflagged do not', async () => {
+    armFeed();
+    const todayDow = (new Date().getDay() + 6) % 7; // 0=Monday
+    const iso = (daysAhead) => {
+      const d = new Date();
+      d.setDate(d.getDate() + daysAhead);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    db.getHouseholdActivities.mockResolvedValue([
+      // Ongoing (no term window): one occurrence per week across the whole
+      // 98-day render window = exactly 14 VEVENTs.
+      { id: 'a1', child_id: 'kid1', activity: 'Dance', day_of_week: todayDow, time_start: '17:30:00', time_end: '18:00:00', show_on_calendar: true },
+      // Term-limited to [today, today+13]: exactly 2 occurrences.
+      { id: 'a2', child_id: 'kid1', activity: 'Football', day_of_week: todayDow, time_start: '10:00:00', start_date: iso(0), end_date: iso(13), show_on_calendar: true },
+      // Unticked "show on the family calendar": excluded entirely.
+      { id: 'a3', child_id: 'kid1', activity: 'Chess', day_of_week: todayDow, time_start: '16:00:00', show_on_calendar: false },
+    ]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Olivia', member_type: 'dependent' }]);
+
+    const res = await request(app).get('/api/calendar/feed/tok123.ics');
+    expect(res.status).toBe(200);
+    const uids = uidsOf(res.text);
+    expect(uids.filter((u) => u.startsWith('UID:housemait-act-a1-'))).toHaveLength(14);
+    expect(uids.filter((u) => u.startsWith('UID:housemait-act-a2-'))).toHaveLength(2);
+    expect(uids.some((u) => u.startsWith('UID:housemait-act-a3-'))).toBe(false);
+    expect(res.text).toContain('Olivia - Dance');
+    // Re-render must emit identical occurrence UIDs (stable-UID contract).
+    armFeed();
+    db.getHouseholdActivities.mockResolvedValue([
+      { id: 'a1', child_id: 'kid1', activity: 'Dance', day_of_week: todayDow, time_start: '17:30:00', time_end: '18:00:00', show_on_calendar: true },
+    ]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Olivia', member_type: 'dependent' }]);
+    const again = await request(app).get('/api/calendar/feed/tok123.ics');
+    expect(uidsOf(again.text).filter((u) => u.startsWith('UID:housemait-act-a1-')))
+      .toEqual(uids.filter((u) => u.startsWith('UID:housemait-act-a1-')));
+  });
 });
