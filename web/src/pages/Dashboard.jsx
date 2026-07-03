@@ -519,23 +519,25 @@ export default function Dashboard() {
   // Per-member progress on today's chores/routines for the "Today's tasks" card.
   const taskScores = digest?.taskScores ?? [];
 
-  // This week's meals, one chip per day (Mon-Sun). Each chip shows the
-  // day's dinner (or the first planned meal of the day when there's no
-  // dinner); tapping opens the planner on that date.
+  // This week's meals, one chip per day (Mon-Sun). Each chip lists ALL of
+  // the day's planned meals in meal-time order (breakfast → snack);
+  // tapping opens the planner on that date.
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const MEAL_ORDER = { breakfast: 0, lunch: 1, dinner: 2, snack: 3 };
   const weekDays = (() => {
     const monday = getMonday(now);
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const dayMeals = weekMeals.filter(m => m.date === date);
-      const meal = dayMeals.find(m => m.category?.toLowerCase() === 'dinner') || dayMeals[0] || null;
+      const dayMeals = weekMeals
+        .filter(m => m.date === date)
+        .sort((a, b) => (MEAL_ORDER[a.category?.toLowerCase()] ?? 9) - (MEAL_ORDER[b.category?.toLowerCase()] ?? 9));
       return {
         date,
         dow: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase(),
         dm: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-        meal,
+        dayMeals,
       };
     });
   })();
@@ -913,7 +915,7 @@ export default function Dashboard() {
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0">
-            {weekDays.map(({ date, dow, dm, meal }) => {
+            {weekDays.map(({ date, dow, dm, dayMeals }) => {
               const today = date === todayDate;
               return (
                 <Link
@@ -927,10 +929,17 @@ export default function Dashboard() {
                 >
                   <div className={`text-[11px] font-bold uppercase tracking-[0.04em] ${today ? 'text-primary' : 'text-cocoa'}`}>{dow}</div>
                   <div className="text-xs text-cocoa mt-0.5">{dm}</div>
-                  {meal ? (
-                    <div className="text-sm font-medium text-bark mt-2 leading-snug line-clamp-2">{meal.meal_name}</div>
-                  ) : (
+                  {dayMeals.length === 0 ? (
                     <div className="text-sm italic text-cocoa/60 mt-2">Not planned</div>
+                  ) : (
+                    <div className="mt-2 space-y-1">
+                      {dayMeals.slice(0, 3).map((m, i) => (
+                        <div key={m.id ?? i} className="text-sm font-medium text-bark leading-snug line-clamp-1">{m.meal_name}</div>
+                      ))}
+                      {dayMeals.length > 3 && (
+                        <div className="text-xs font-medium text-cocoa">+{dayMeals.length - 3} more</div>
+                      )}
+                    </div>
                   )}
                 </Link>
               );
