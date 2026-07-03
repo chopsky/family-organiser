@@ -50,6 +50,10 @@ export default function DaysScreen({ kid, theme }) {
   const [bigDays, setBigDays] = useState([]);
   const [monthEvents, setMonthEvents] = useState({}); // 'YYYY-MM' → events[]
   const [open, setOpen] = useState({});
+  // List view is scoped to one month at a time (busy kids have something on
+  // almost every day, so an unbounded list grew very long) - same ‹ › month
+  // stepping as the Month grid, sharing its 6-month horizon.
+  const [listOffset, setListOffset] = useState(0);
   const monthsLoading = useRef(new Set());
 
   const loadMonth = useCallback(async (mp) => {
@@ -75,25 +79,32 @@ export default function DaysScreen({ kid, theme }) {
   const myBigs = bigDays.filter((b) => sleepsTo(b.date) >= 0);
   const hero = myBigs.find((b) => b.big) || myBigs[0] || null;
 
-  // Flatten the fetched months into upcoming per-day groups for the list.
+  // The list's selected month. Only that month's upcoming days render;
+  // stepping to a not-yet-fetched month loads it on demand.
+  const now = new Date();
+  const listFirst = new Date(now.getFullYear(), now.getMonth() + listOffset, 1);
+  const listMp = monthParam(listFirst);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch; state lands after the await
+  useEffect(() => { loadMonth(listMp); }, [listMp, loadMonth]);
+
+  // Flatten the selected month into upcoming per-day groups for the list.
   const items = [];
-  for (const evs of Object.values(monthEvents)) {
-    for (const e of evs) {
-      if (!forKid(e, kid)) continue;
-      const date = String(e.start_time).slice(0, 10);
-      if (date < todayStr()) continue;
-      const sub = [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · ');
-      items.push({ id: `${e.id}:${date}`, date, emoji: kidsEventEmoji(e), title: e.title, sub, family: (e.assignees || []).length === 0 });
-    }
+  for (const e of monthEvents[listMp] || []) {
+    if (!forKid(e, kid)) continue;
+    const date = String(e.start_time).slice(0, 10);
+    if (date < todayStr()) continue;
+    const sub = [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · ');
+    items.push({ id: `${e.id}:${date}`, date, emoji: kidsEventEmoji(e), title: e.title, sub, family: (e.assignees || []).length === 0 });
   }
   for (const b of myBigs) {
+    if (b.date.slice(0, 7) !== listMp) continue;
     items.push({ id: `big:${b.date}:${b.title}`, date: b.date, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
   }
   const seen = new Set();
   const deduped = items.filter((it) => { if (seen.has(it.id)) return false; seen.add(it.id); return true; });
   const groups = {};
   for (const it of deduped) (groups[it.date] = groups[it.date] || []).push(it);
-  const days = Object.keys(groups).sort().slice(0, 21);
+  const days = Object.keys(groups).sort();
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
@@ -145,10 +156,20 @@ export default function DaysScreen({ kid, theme }) {
 
       {view === 'month' && <MonthView theme={theme} kid={kid} monthEvents={monthEvents} loadMonth={loadMonth} bigDays={myBigs} isMobile={isMobile} />}
 
+      {view === 'list' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '4px 2px 2px' : '2px 2px 4px' }}>
+          <button onClick={() => setListOffset((m) => Math.max(0, m - 1))} disabled={listOffset <= 0} style={{ ...(isMobile ? mvNav : mvNavT), opacity: listOffset <= 0 ? 0.35 : 1 }}>‹</button>
+          <b style={{ fontWeight: 600, fontSize: isMobile ? 18 : 22 }}>{listOffset === 0 ? 'This month' : listFirst.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</b>
+          <button onClick={() => setListOffset((m) => Math.min(6, m + 1))} disabled={listOffset >= 6} style={{ ...(isMobile ? mvNav : mvNavT), opacity: listOffset >= 6 ? 0.35 : 1 }}>›</button>
+        </div>
+      )}
+
       {view === 'list' && days.length === 0 && (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
           <div style={{ fontSize: 64 }}>🎈</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>Nothing coming up yet</div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>
+            {listOffset === 0 ? 'Nothing else this month' : `Nothing in ${listFirst.toLocaleDateString('en-GB', { month: 'long' })} yet`}
+          </div>
         </div>
       )}
 
