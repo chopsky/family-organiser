@@ -301,6 +301,8 @@ router.post('/activities', requireAuth, requireHousehold, requireAdmin, async (r
       start_date: start_date || null,
       end_date: end_date || null,
       term_label: term_label || null,
+      // Absent = true: the adult-calendar toggle defaults to on.
+      show_on_calendar: req.body.show_on_calendar !== false,
     });
     cache.invalidate(`schools:${req.householdId}`);
     return res.status(201).json({ activity: created });
@@ -337,6 +339,7 @@ router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAd
     if ('start_date' in req.body) fields.start_date = req.body.start_date || null;
     if ('end_date' in req.body) fields.end_date = req.body.end_date || null;
     if ('term_label' in req.body) fields.term_label = req.body.term_label || null;
+    if ('show_on_calendar' in req.body) fields.show_on_calendar = !!req.body.show_on_calendar;
     const updated = await db.updateChildActivity(req.params.activityId, fields);
     cache.invalidate(`schools:${req.householdId}`);
     return res.json({ activity: updated });

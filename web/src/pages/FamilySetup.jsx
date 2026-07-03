@@ -409,6 +409,9 @@ export default function FamilySetup() {
   const [addActivityStart, setAddActivityStart] = useState('');
   const [addActivityEnd, setAddActivityEnd] = useState('');
   const [addActivityPickup, setAddActivityPickup] = useState(''); // member id or ''
+  // Also surface the activity on the main adult calendar (kids always see
+  // theirs in Child Mode). Checked by default for new activities.
+  const [addActivityOnCalendar, setAddActivityOnCalendar] = useState(true);
   // Term-aware activities: the child's school terms, which term the grid is
   // showing (a term label | 'ongoing' | 'custom'), and custom-window inputs.
   const [activityTerms, setActivityTerms] = useState([]);
@@ -759,6 +762,7 @@ export default function FamilySetup() {
     setAddActivityStart('');
     setAddActivityEnd('');
     setAddActivityPickup('');
+    setAddActivityOnCalendar(true);
     setCustomStart('');
     setCustomEnd('');
     loadActivityTerms(c.id);
@@ -776,6 +780,7 @@ export default function FamilySetup() {
     setAddActivityStart(a.time_start ? a.time_start.substring(0, 5) : '');
     setAddActivityEnd(a.time_end ? a.time_end.substring(0, 5) : '');
     setAddActivityPickup(a.pickup_member_id || '');
+    setAddActivityOnCalendar(a.show_on_calendar !== false);
     loadActivityTerms(c.id);
     setActivityModalOpen(true);
   }
@@ -796,6 +801,7 @@ export default function FamilySetup() {
         time_start: addActivityStart || null,
         time_end: addActivityEnd || null,
         pickup_member_id: addActivityPickup || null,
+        show_on_calendar: addActivityOnCalendar,
       };
       // New activities inherit the selected term's window so they only show
       // that term (and next term can be prepared without touching this one).
@@ -2508,6 +2514,18 @@ export default function FamilySetup() {
                   {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
+
+              {/* Kids always see their activities in Child Mode; this toggle
+                  additionally surfaces them on the main adult calendar. */}
+              <label className="flex gap-2 items-center text-xs text-cocoa cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={addActivityOnCalendar}
+                  onChange={(e) => setAddActivityOnCalendar(e.target.checked)}
+                  className="h-4 w-4 rounded border-cream-border accent-[var(--color-plum)]"
+                />
+                Show on the family calendar
+              </label>
             </div>
 
             <div className="flex items-center gap-2 mt-5">

@@ -1037,24 +1037,38 @@ async function getSchoolsWithIcalUrls(db = supabase) {
 }
 
 async function addChildActivity(data, db = supabase) {
-  const { data: activity, error } = await db
+  const row = {
+    child_id: data.child_id,
+    day_of_week: data.day_of_week,
+    activity: data.activity,
+    time_start: data.time_start || null,
+    time_end: data.time_end || null,
+    reminder_text: data.reminder_text || null,
+    reminder_offset: data.reminder_offset || 'morning_of',
+    term_only: data.term_only !== false,
+    pickup_member_id: data.pickup_member_id || null,
+    start_date: data.start_date || null,
+    end_date: data.end_date || null,
+    term_label: data.term_label || null,
+    show_on_calendar: data.show_on_calendar !== false,
+  };
+  let { data: activity, error } = await db
     .from('child_weekly_schedule')
-    .insert({
-      child_id: data.child_id,
-      day_of_week: data.day_of_week,
-      activity: data.activity,
-      time_start: data.time_start || null,
-      time_end: data.time_end || null,
-      reminder_text: data.reminder_text || null,
-      reminder_offset: data.reminder_offset || 'morning_of',
-      term_only: data.term_only !== false,
-      pickup_member_id: data.pickup_member_id || null,
-      start_date: data.start_date || null,
-      end_date: data.end_date || null,
-      term_label: data.term_label || null,
-    })
+    .insert(row)
     .select()
     .single();
+  // Missing column (PostgREST schema cache: PGRST204; raw Postgres: 42703):
+  // migration-activity-show-on-calendar.sql not applied yet. Retry without
+  // the flag so adding activities keeps working (the column's DEFAULT true
+  // takes over once migrated).
+  if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+    delete row.show_on_calendar;
+    ({ data: activity, error } = await db
+      .from('child_weekly_schedule')
+      .insert(row)
+      .select()
+      .single());
+  }
   if (error) throw error;
   return activity;
 }
@@ -1073,12 +1087,24 @@ async function updateChildActivity(activityId, fields, db = supabase) {
   if ('start_date' in fields) patch.start_date = fields.start_date || null;
   if ('end_date' in fields) patch.end_date = fields.end_date || null;
   if ('term_label' in fields) patch.term_label = fields.term_label || null;
-  const { data: activity, error } = await db
+  if ('show_on_calendar' in fields) patch.show_on_calendar = fields.show_on_calendar !== false;
+  let { data: activity, error } = await db
     .from('child_weekly_schedule')
     .update(patch)
     .eq('id', activityId)
     .select()
     .single();
+  // Same pre-migration tolerance as addChildActivity: drop the flag and
+  // retry when the column doesn't exist yet.
+  if (error && (error.code === 'PGRST204' || error.code === '42703') && 'show_on_calendar' in patch) {
+    delete patch.show_on_calendar;
+    ({ data: activity, error } = await db
+      .from('child_weekly_schedule')
+      .update(patch)
+      .eq('id', activityId)
+      .select()
+      .single());
+  }
   if (error) throw error;
   return activity;
 }

@@ -550,10 +550,13 @@ export default function Calendar() {
       // matches a school, so a child with no linked school - the common case,
       // since a child carries no school by default - would otherwise never
       // surface here. Resolve each child_id to a member for the name + colour.
-      // Extracurriculars only appear on the calendar in Child Mode; in the
-      // normal parent view they live on the Family page's Activities card.
+      // Child Mode shows every activity; the parent view shows the ones
+      // flagged show_on_calendar (the "Show on the family calendar" toggle
+      // in the Family page's activity modal - default on, absent = true for
+      // rows created before the flag existed).
       const memberById = new Map(members.map((m) => [m.id, m]));
-      for (const act of (childMode ? activities : [])) {
+      const visibleActs = childMode ? activities : activities.filter((a) => a.show_on_calendar !== false);
+      for (const act of visibleActs) {
         const child = memberById.get(act.child_id);
         if (!child) continue;
         const start = new Date(firstY, firstM - 1, 1);
