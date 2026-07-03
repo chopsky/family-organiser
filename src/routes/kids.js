@@ -30,10 +30,12 @@ function nextBirthday(birthday, todayStr) {
   return thisYear >= todayStr ? thisYear : `${year + 1}-${m[1]}-${m[2]}`;
 }
 
+// All school-sourced big days carry the school emoji - a "School Closed"
+// day isn't a celebration, and 🎉 is reserved for actual celebrations.
 const HOLIDAY_TYPES = {
-  term_end: { emoji: '🏖️', fallback: 'School holidays!' },
-  half_term_start: { emoji: '🎈', fallback: 'Half term!' },
-  bank_holiday: { emoji: '🎉', fallback: 'Day off school!' },
+  term_end: { emoji: '🏫', fallback: 'School holidays!' },
+  half_term_start: { emoji: '🏫', fallback: 'Half term!' },
+  bank_holiday: { emoji: '🏫', fallback: 'Day off school!' },
 };
 
 router.get('/big-days', requireAuth, requireHousehold, async (req, res) => {

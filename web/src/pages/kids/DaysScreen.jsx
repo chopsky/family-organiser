@@ -28,12 +28,17 @@ function dayName(dateStr) {
 }
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-// Only events that relate to THIS child: they must be an assignee. Untagged
-// events (no assignees) stay off the kids' calendar - most parent-created
-// events carry no assignees, and showing them all drowned the kid's own
-// schedule. Family-relevant moments still reach kids via big days (school
-// holidays, birthdays, parent-pinned countdowns).
-const forKid = (e, kidId) => (e.assignees || []).some((x) => (x.user_id || x.id) === kidId);
+// Only events that relate to THIS child. Assignment lives in two places
+// depending on which surface created the event: event_assignees rows
+// (attached as e.assignees) AND the denormalised assigned_to_ids/names on
+// the event row itself - chat-created events historically only had the
+// latter, which made a kid's own events vanish here. Untagged events (no
+// assignment anywhere) stay off the kids' calendar; family-relevant moments
+// still reach kids via big days.
+const forKid = (e, kid) =>
+  (e.assignees || []).some((x) => (x.user_id || x.id) === kid.id)
+  || (e.assigned_to_ids || []).includes(kid.id)
+  || (e.assigned_to_names || []).some((n) => String(n).toLowerCase() === String(kid.name || '').toLowerCase());
 
 // Big days from the server may arrive without an emoji (e.g. a pinned event
 // with no stored kids_emoji) - derive one from the title, same as events.
@@ -74,7 +79,7 @@ export default function DaysScreen({ kid, theme }) {
   const items = [];
   for (const evs of Object.values(monthEvents)) {
     for (const e of evs) {
-      if (!forKid(e, kid.id)) continue;
+      if (!forKid(e, kid)) continue;
       const date = String(e.start_time).slice(0, 10);
       if (date < todayStr()) continue;
       const sub = [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · ');
@@ -186,7 +191,6 @@ function EventCard({ it, theme }) {
         <div style={{ fontSize: 16, fontWeight: 600 }}>{it.title}</div>
         {it.sub && <div style={{ fontSize: 13.5, color: KIDS_INK.ink3, fontWeight: 500, marginTop: 1 }}>{it.sub}</div>}
       </div>
-      {it.big ? <span style={{ fontSize: 20 }}>🎉</span> : it.family && <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: KIDS_INK.grape, padding: '3px 9px', borderRadius: 999 }}>FAMILY</span>}
     </div>
   );
 }
@@ -225,13 +229,13 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, isMobile }) {
    
   useEffect(() => { loadMonth(mp); }, [mp, loadMonth]);  
 
-  const evs = (monthEvents[mp] || []).filter((e) => forKid(e, kid.id));
+  const evs = (monthEvents[mp] || []).filter((e) => forKid(e, kid));
   const evOn = (dateStr) => {
     const out = evs
       .filter((e) => String(e.start_time).slice(0, 10) === dateStr)
       .map((e) => ({ id: e.id, emoji: kidsEventEmoji(e), title: e.title, sub: [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · '), family: (e.assignees || []).length === 0 }));
     for (const b of bigDays) {
-      if (b.date === dateStr) out.push({ id: `big:${b.title}`, emoji: b.emoji || '🎉', title: b.title, sub: '', family: true, big: true });
+      if (b.date === dateStr) out.push({ id: `big:${b.title}`, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
     }
     return out;
   };

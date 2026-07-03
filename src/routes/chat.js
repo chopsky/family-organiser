@@ -480,6 +480,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             description: act.description || null,
             recurrence: act.recurrence || null,
           }, req.user.id);
+          // Persist assignees to event_assignees, same as every bot-handler
+          // creation path. Without this, chat-created events had names on the
+          // row but no assignee rows - so anything filtering by assignees
+          // (the kids' My Days calendar, member colour-coding) missed them.
+          if (createdActEvent && assigneeNames.length > 0) {
+            await db.saveEventAssignees(createdActEvent.id, req.householdId, assigneeNames, members);
+          }
           // Rich card payload: the frontend renders a confirmation card
           // from this. Names + colours are resolved client-side from the
           // household roster so we only ship the canonical fields.
