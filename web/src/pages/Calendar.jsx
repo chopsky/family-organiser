@@ -613,6 +613,15 @@ export default function Calendar() {
   const ptr = usePullToRefresh(refresh);
   useAppForegroundRefresh(refresh);
 
+  // The AI chat overlay creates/deletes events while this page stays
+  // mounted; its broadcast busts the 5-min month cache so the new event
+  // shows up immediately rather than after the TTL or a manual refresh.
+  useEffect(() => {
+    const onDataChanged = () => { refresh(); };
+    window.addEventListener('housemait:data-changed', onDataChanged);
+    return () => window.removeEventListener('housemait:data-changed', onDataChanged);
+  }, [refresh]);
+
   useEffect(() => {
     loadCached(
       'household:members',

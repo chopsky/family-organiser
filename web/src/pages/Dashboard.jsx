@@ -453,6 +453,15 @@ export default function Dashboard() {
   const ptr = usePullToRefresh(refreshAll);
   useAppForegroundRefresh(refreshAll);
 
+  // The AI chat overlay mutates digest data (events, tasks, shopping)
+  // while this page stays mounted - refetch on its broadcast so the
+  // cards don't sit stale behind the chat panel.
+  useEffect(() => {
+    const onDataChanged = () => { refreshAll(); };
+    window.addEventListener('housemait:data-changed', onDataChanged);
+    return () => window.removeEventListener('housemait:data-changed', onDataChanged);
+  }, [refreshAll]);
+
   async function handleNlSubmit(e) {
     e.preventDefault();
     if (!nlText.trim()) return;

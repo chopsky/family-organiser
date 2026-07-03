@@ -12,6 +12,7 @@ const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 const { transcribeVoice } = require('../services/transcribe');
+const cache = require('../services/cache');
 
 // Multer config for chat attachments. Accepts both images (receipts,
 // event invitations, screenshots) and PDFs (school newsletters, party
@@ -705,6 +706,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     await db.saveChatMessage(req.householdId, req.user.id, 'assistant', cleanContent, conversationId);
     await db.touchConversation(conversationId);
 
+    // Chat actions mutate digest data (events, tasks, shopping, meals) -
+    // bust the 5-min digest cache so the dashboard reflects them on its
+    // next fetch instead of serving the pre-action snapshot.
+    if (executedActions.length > 0) cache.invalidate(`digest:${req.householdId}`);
+
     return res.json({
       message: cleanContent,
       conversation_id: conversationId,
@@ -825,6 +831,7 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         }
       }
 
+      if (summaryLines.length > 0) cache.invalidate(`digest:${req.householdId}`);
       const msg = summaryLines.length > 0
         ? `📄 Read your PDF.\n\n${summaryLines.join('\n')}`
         : (result.response_message || "📄 I read the PDF but didn't find anything actionable to add (no clear events, tasks, or items).");
@@ -871,6 +878,7 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         }
 
         executedActions.push({ type: 'receipt_scan', checked_off: checkedOff.length });
+        if (checkedOff.length > 0) cache.invalidate(`digest:${req.householdId}`);
 
         await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent a receipt image]', conversationId);
         await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
@@ -938,6 +946,7 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         created.forEach(t => { msg += `• ${t}\n`; });
         if (scan.summary) msg += `\n${scan.summary}`;
         executedActions.push({ type: 'create_events', count: created.length });
+        cache.invalidate(`digest:${req.householdId}`);
 
         await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]', conversationId);
         await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);

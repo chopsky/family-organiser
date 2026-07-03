@@ -437,6 +437,16 @@ I'm always here if you need me!`;
         created_at: new Date().toISOString(),
       };
       setMessages(prev => [...prev, assistantMsg]);
+
+      // The chat executed real actions (event created/deleted, task added,
+      // items ticked…). Pages cache their data (Calendar's 5-min month
+      // cache, Dashboard's digest query) and have no idea the chat changed
+      // anything - broadcast so the mounted page refetches immediately
+      // instead of the user staring at a stale view. ("I told the AI to
+      // add Padel, it confirmed, but there's nothing there.")
+      if (data.actions?.length) {
+        window.dispatchEvent(new Event('housemait:data-changed'));
+      }
     } catch {
       const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble responding. Please try again.', created_at: new Date().toISOString() };
       setMessages(prev => [...prev, errorMsg]);
@@ -495,6 +505,12 @@ I'm always here if you need me!`;
 
       const assistantMsg = { role: 'assistant', content: data.message, created_at: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
+
+      // Same stale-view broadcast as the text path: an attachment can
+      // create events or tick off shopping items.
+      if (data.actions?.length) {
+        window.dispatchEvent(new Event('housemait:data-changed'));
+      }
     } catch {
       const errorMsg = {
         role: 'assistant',
