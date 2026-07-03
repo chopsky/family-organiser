@@ -9,6 +9,7 @@ const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
 const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
+const { runCalendarTombstonePurge } = require('./calendar-tombstone-purge');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
@@ -682,6 +683,17 @@ function startScheduler() {
   // operational logs past 90 days and purges expired auth tokens.
   cron.schedule('0 4 * * *', () => runRetentionCleanup());
   console.log('✓ Data retention cleanup scheduled (04:00 UTC daily)');
+
+  // ── Calendar tombstone purge: weekly, Sunday 04:30 UTC ─────────────────────
+  // Hard-deletes calendar_events soft-deleted >30 days ago so the tombstone
+  // graveyard never regrows (the 2.3M-row sync-era backlog once let a stuck
+  // pg_dump COPY block ALTER TABLE migrations). Batched via the
+  // purge_calendar_tombstones() SQL function; no-ops with a hint until
+  // supabase/migration-calendar-tombstone-purge.sql is applied. 04:30 sits
+  // just after the daily retention job's 04:00 slot on the quietest day.
+  cron.schedule('30 4 * * 0', () => runCalendarTombstonePurge()
+    .catch((err) => console.error('[tombstone-purge] run failed:', err.message)));
+  console.log('✓ Calendar tombstone purge scheduled (Sunday 04:30 UTC weekly)');
 
   // ── Daily iCal feed sync: 06:00 UTC ─────────────────────────────────────────
   cron.schedule('0 6 * * *', () => syncAllIcalFeeds());
