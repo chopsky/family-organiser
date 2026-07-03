@@ -219,6 +219,25 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   }
   if (school_id !== undefined) updates.school_id = school_id || null;
 
+  // Kids-mode profile (chosen by the kid in the Me screen, persisted to the
+  // member record so their theme follows them across devices). Separate from
+  // color_theme, which drives the parent-facing palette.
+  const VALID_KID_COLORS = ['sky', 'coral', 'grape', 'sun', 'mint', 'teal', 'orange', 'berry'];
+  if (req.body.kid_color !== undefined) {
+    if (req.body.kid_color !== null && !VALID_KID_COLORS.includes(req.body.kid_color)) {
+      return res.status(400).json({ error: 'Invalid kid colour.' });
+    }
+    updates.kid_color = req.body.kid_color;
+  }
+  if (req.body.kid_avatar !== undefined) {
+    const av = req.body.kid_avatar;
+    // A single emoji (possibly multi-codepoint) - cap length, no whitespace.
+    if (av !== null && (typeof av !== 'string' || av.length === 0 || av.length > 16 || /\s/.test(av))) {
+      return res.status(400).json({ error: 'Invalid kid avatar.' });
+    }
+    updates.kid_avatar = av;
+  }
+
   // Illustrated avatar (e.g. 'set2/n07'). Picking one clears any uploaded photo
   // so the precedence photo -> illustration -> initial keeps at most one set.
   if (avatar_id !== undefined) {
