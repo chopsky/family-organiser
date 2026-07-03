@@ -32,9 +32,15 @@ function nextBirthday(birthday, todayStr) {
 
 // All school-sourced big days carry the school emoji - a "School Closed"
 // day isn't a celebration, and 🎉 is reserved for actual celebrations.
+// Every imported term-date type is a day kids count down to: holidays
+// starting (term_end / half_term_start), days off (bank_holiday /
+// inset_day) AND going back to school (term_start / half_term_end).
 const HOLIDAY_TYPES = {
+  term_start: { emoji: '🏫', fallback: 'Back to school!' },
   term_end: { emoji: '🏫', fallback: 'School holidays!' },
   half_term_start: { emoji: '🏫', fallback: 'Half term!' },
+  half_term_end: { emoji: '🏫', fallback: 'Back to school!' },
+  inset_day: { emoji: '🏫', fallback: 'Day off school!' },
   bank_holiday: { emoji: '🏫', fallback: 'Day off school!' },
 };
 
