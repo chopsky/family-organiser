@@ -17,7 +17,8 @@ import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin,
 } from '../components/Icons';
-import { TrialIndicatorSubtle } from '../components/TrialIndicator';
+import { LOCALES, getLocaleByCountry } from '../lib/locales';
+import { readLocaleCookie } from '../hooks/useLocale';
 import { useSubscription } from '../context/SubscriptionContext';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
@@ -182,24 +183,67 @@ function CollapsibleRow({ icon, label, sub, defaultOpen = false, className = '',
 // FEED_PROVIDERS now lives in ../lib/feedProviders so the onboarding calendar
 // step and this add-calendar form share one source.
 
+// ── Settings design system (design_handoff_settings) ────────────────
+// Reusable card + Row styling: white 18px-radius card with a hairline
+// border and soft double shadow; an uppercase section label above it;
+// rows of title/sub + a right-side control, split by hairline dividers.
+const SET_CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
+const SET_CARD_CLASS = 'bg-white rounded-[18px] border border-[rgba(26,22,32,0.07)]';
+
+function SectionLabel({ children }) {
+  return (
+    <div className="text-[11px] font-bold uppercase text-warm-grey mb-3 ml-1" style={{ letterSpacing: '0.1em' }}>
+      {children}
+    </div>
+  );
+}
+
+function SetRow({ title, sub, control, last = false }) {
+  return (
+    <div className={`flex items-center justify-between gap-4 px-5 py-[15px] ${last ? '' : 'border-b border-[rgba(26,22,32,0.07)]'}`}>
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-bark">{title}</div>
+        {sub && <div className="text-xs text-warm-grey mt-0.5">{sub}</div>}
+      </div>
+      {control}
+    </div>
+  );
+}
+
+// Outlined select-style button (value + chevron-down) used as a row control.
+function SelectBtn({ value, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 px-3 py-[7px] rounded-[9px] border border-[rgba(26,22,32,0.12)] bg-white text-[13px] font-semibold text-cocoa whitespace-nowrap disabled:opacity-50 hover:bg-oat transition-colors"
+    >
+      {value}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M6 9l6 6 6-6" /></svg>
+    </button>
+  );
+}
+
 /**
- * Settings → Plan card. Renders subscription state + the right CTA for
- * the current status. Extracted into its own component so the Settings
- * page layout stays readable; it only reads from SubscriptionContext
- * and doesn't need any props.
+ * Settings → Profile card (settings handoff). One card: an identity
+ * header (avatar + name + email · role + Edit profile pill), then a
+ * divider and the Family plan + Billing rows wired to the real
+ * subscription:
  *
- *   • internal  → "Internal account - unlimited access"
- *   • trialing  → "Free trial · X days left" + Subscribe CTA
- *   • active    → Plan name + "Manage subscription" (opens Stripe Portal)
- *   • expired   → "Your subscription has ended" + Subscribe CTA
- *   • cancelled → same as expired
- *   • loading   → subtle loading state (no spinner - this card is ambient)
+ *   • internal  → "Internal" badge, no billing controls
+ *   • trialing  → "Free trial" badge + days left + Subscribe CTA
+ *   • active    → "✦ Premium" badge + real locale price + Manage
+ *   • expired   → "Ended" badge + Subscribe CTA
+ *
+ * Billing controls stay owner-only (server enforces this too).
  */
-function PlanSection() {
+function ProfileCard({ me, members }) {
   const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
   // Billing is owner-only: non-owners see the plan status but not the
   // subscribe/manage controls (the server also enforces this).
-  const { isOwner } = useAuth();
+  const { isOwner, user, household } = useAuth();
+  const navigate = useNavigate();
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
 
@@ -256,114 +300,90 @@ function PlanSection() {
     }
   }
 
-  // Don't render anything while we don't know the state yet - the subtle
-  // indicator in My profile covers the "I know nothing" case silently.
-  if (loading && !isActive && !isTrialing && !isExpired && !isInternal) return null;
+  // Real locale price so the plan badge shows what the household actually
+  // pays (same cascade as /subscribe: household country → locale cookie →
+  // international default).
+  const locale = (household?.country && getLocaleByCountry(household.country))
+    || LOCALES[readLocaleCookie()] || LOCALES.default;
+  const priceLabel = plan === 'annual'
+    ? `${locale.pricing.annual}/yr`
+    : `${locale.pricing.monthly}/mo`;
+
+  const subStateKnown = isActive || isTrialing || isExpired || isInternal;
+  const fmtDate = (d) => new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London',
+  }).format(new Date(d));
+
+  const badge = (label, cls) => (
+    <span className={`inline-flex items-center gap-1.5 px-[11px] py-1 rounded-full text-[12.5px] font-bold ${cls}`}>{label}</span>
+  );
+  const planBadge = isInternal ? badge('Internal', 'bg-plum-light text-plum')
+    : isActive ? badge(<><span className="text-[13px]">✦</span> Premium</>, 'bg-plum-light text-plum')
+    : isTrialing ? badge('Free trial', 'bg-plum-light text-plum')
+    : isExpired ? badge('Ended', 'bg-coral-light text-coral')
+    : null;
+  const planMeta = isInternal ? null
+    : isActive ? priceLabel
+    : isTrialing && daysRemaining != null ? `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left`
+    : null;
+
+  const billingSub = isInternal ? 'No billing applies to this household'
+    : isTrialing ? (trialEndsAt ? `Trial ends ${fmtDate(trialEndsAt)}` : 'Subscribe any time to avoid interruption')
+    : isActive ? (provider === 'apple' ? 'Billed through your Apple ID' : 'Billed by card via Stripe')
+    : isExpired ? "Your data's still here - subscribe to unlock everything"
+    : '';
+  const billingControl = isInternal ? null
+    : !isOwner
+      ? <span className="text-xs text-warm-grey whitespace-nowrap">Managed by the owner</span>
+      : isActive
+        ? <SelectBtn value={portalLoading ? 'Opening…' : 'Manage'} onClick={openCustomerPortal} disabled={portalLoading} />
+        : (isTrialing || isExpired)
+          ? (
+            <Link to="/subscribe" className="inline-flex items-center px-4 py-2 rounded-[11px] bg-plum hover:bg-plum-pressed text-white text-[13px] font-semibold transition-colors whitespace-nowrap">
+              Subscribe
+            </Link>
+          )
+          : null;
 
   return (
-    <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-      <h2 className="text-base md:text-medium font-semibold text-bark mb-2">Plan</h2>
-
-      {isInternal && (
-        <p className="text-sm text-cocoa">
-          <span className="inline-block bg-plum-light text-plum font-semibold text-xs px-2 py-0.5 rounded mr-2">
-            Internal
-          </span>
-          Unlimited access. No billing applies to this household.
-        </p>
-      )}
-
-      {!isInternal && isTrialing && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-sm text-cocoa">
-              <strong className="text-plum font-semibold">Free trial</strong>
-              {daysRemaining != null && (
-                <span> · {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left</span>
-              )}
-              {trialEndsAt && (
-                <span className="text-warm-grey">
-                  {' '}(ends {new Intl.DateTimeFormat('en-GB', {
-                    day: 'numeric', month: 'long', timeZone: 'Europe/London',
-                  }).format(new Date(trialEndsAt))})
-                </span>
-              )}
-            </p>
-            <p className="text-xs text-warm-grey mt-1">
-              Subscribe any time to avoid interruption.
-            </p>
+    <div className={SET_CARD_CLASS} style={{ boxShadow: SET_CARD_SHADOW, overflow: 'hidden' }}>
+      {/* Identity header */}
+      <div className="flex items-center gap-[18px] p-[22px]">
+        <Avatar member={me || user} size={60} />
+        <div className="flex-1 min-w-0">
+          <div className="text-lg font-bold text-bark truncate">{user?.name}</div>
+          <div className="text-[13px] text-warm-grey mt-0.5 truncate">
+            {[user?.email, me?.family_role || (isOwner ? 'Owner' : 'Member')].filter(Boolean).join(' · ')}
           </div>
-          {isOwner ? (
-            <Link
-              to="/subscribe"
-              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Subscribe
-            </Link>
-          ) : (
-            <span className="text-xs text-warm-grey">Managed by the account owner</span>
-          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/family?editProfile=1')}
+          className="shrink-0 px-4 py-[9px] rounded-[10px] border border-[rgba(26,22,32,0.12)] bg-white text-[13px] font-semibold text-bark hover:bg-oat transition-colors whitespace-nowrap"
+        >
+          Edit profile
+        </button>
+      </div>
+
+      {/* Plan + billing, from the real subscription. Hidden only while the
+          state is still unknown - the identity header always renders. */}
+      {(subStateKnown || !loading) && (
+        <div className="border-t border-[rgba(26,22,32,0.07)]">
+          <SetRow
+            title="Family plan"
+            sub={`${household?.name || 'Your household'} · ${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+            control={
+              <div className="flex items-center gap-3">
+                {planBadge}
+                {planMeta && <span className="text-[13px] font-semibold text-warm-grey whitespace-nowrap">{planMeta}</span>}
+              </div>
+            }
+          />
+          <SetRow title="Billing" sub={billingSub} control={billingControl} last />
         </div>
       )}
 
-      {!isInternal && isActive && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-sm text-cocoa">
-              <strong className="text-emerald font-semibold">Active</strong>
-              {plan && (
-                <span className="text-charcoal">
-                  {' '}· {plan === 'annual' ? 'Annual plan' : 'Monthly plan'}
-                </span>
-              )}
-            </p>
-            <p className="text-xs text-warm-grey mt-1">
-              {provider === 'apple'
-                ? 'Update card, switch plans, or cancel anytime in your Apple ID subscriptions.'
-                : 'Update card, switch plans, or cancel anytime from the Stripe portal.'}
-            </p>
-          </div>
-          {isOwner ? (
-            <button
-              type="button"
-              onClick={openCustomerPortal}
-              disabled={portalLoading}
-              className="inline-flex items-center px-4 py-2 rounded-xl border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {portalLoading ? 'Opening…' : 'Manage subscription'}
-            </button>
-          ) : (
-            <span className="text-xs text-warm-grey">Managed by the account owner</span>
-          )}
-        </div>
-      )}
-
-      {!isInternal && isExpired && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-sm text-cocoa">
-              <strong className="text-coral font-semibold">Subscription ended</strong>
-            </p>
-            <p className="text-xs text-warm-grey mt-1">
-              Your data's still here. Subscribe to unlock everything again.
-            </p>
-          </div>
-          {isOwner ? (
-            <Link
-              to="/subscribe"
-              className="inline-flex items-center px-4 py-2 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Subscribe
-            </Link>
-          ) : (
-            <span className="text-xs text-warm-grey">Managed by the account owner</span>
-          )}
-        </div>
-      )}
-
-      {portalError && (
-        <p className="text-sm text-coral mt-3">{portalError}</p>
-      )}
+      {portalError && <p className="text-sm text-coral px-5 pb-4">{portalError}</p>}
     </div>
   );
 }
@@ -402,8 +422,8 @@ function PlanSection() {
 function SettingsCard({ title, icon: IconCmp, danger = false, children }) {
   const baseStyle = danger
     ? { background: 'rgba(215, 99, 83, 0.04)', borderColor: 'rgba(215, 99, 83, 0.25)' }
-    : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' };
-  const wrapClass = danger ? 'rounded-2xl border p-5 md:p-6' : 'bg-linen rounded-2xl p-4.5 md:p-6';
+    : { boxShadow: SET_CARD_SHADOW };
+  const wrapClass = danger ? 'rounded-[18px] border p-5 md:p-6' : `${SET_CARD_CLASS} p-4.5 md:p-6`;
   const iconColor = danger ? 'text-error' : 'text-plum';
   const titleColor = danger ? 'text-error' : 'text-bark';
   return (
@@ -519,6 +539,33 @@ export default function Settings() {
     } catch (err) {
       setPinMsg(err.response?.data?.error || 'Could not remove PIN.');
     } finally { setPinBusy(false); }
+  }
+
+  // ── Child Mode launcher ("Whose turn is it?") ───────────────────
+  // Start opens a per-child picker; choosing a kid shows a short
+  // "Hi [name]! 👋" hand-off, seeds KidsShell's active kid, then locks
+  // the device into Child Mode. Exit stays PIN-gated (ChildGate).
+  const [pickKidOpen, setPickKidOpen] = useState(false);
+  const [enteringKid, setEnteringKid] = useState(null);
+  function launchChildModeFor(kid) {
+    const go = () => {
+      if (kid?.id) { try { localStorage.setItem('kidsActiveKid', kid.id); } catch { /* private browsing */ } }
+      setPickKidOpen(false);
+      setEnteringKid(null);
+      if (enableChildMode()) navigate('/tasks');
+    };
+    if (!kid) return go(); // no dependents yet - skip the hand-off beat
+    setEnteringKid(kid);
+    setTimeout(go, 900);
+  }
+  function startChildMode() {
+    if (!pinIsSet) {
+      setPinFormOpen(true);
+      setPinMsg('Set a PIN first - you need it to switch back out.');
+      return;
+    }
+    setEnteringKid(null);
+    setPickKidOpen(true);
   }
 
   // iOS native shell: the Settings landing is a list of section rows
@@ -1338,6 +1385,71 @@ export default function Settings() {
     setRejections((prev) => prev.filter((r) => r.email !== email));
   }
 
+  // ── Child mode gradient card (settings handoff) ─────────────────
+  // Explainer + Start button up top; a translucent footer row holds the
+  // Exit PIN control (the existing set/change/remove PIN form drops down
+  // inside the footer). Rendered standalone on web, inside the section
+  // popup on iOS - one JSX tree so the two stay identical.
+  const kidMembers = members.filter((m) => m.member_type === 'dependent');
+  const childModeCard = (
+    <div className={SET_CARD_CLASS} style={{ boxShadow: SET_CARD_SHADOW, overflow: 'hidden', background: 'linear-gradient(140deg,#F3EDFC,#E3F4FE)' }}>
+      <div className="flex items-center gap-[18px] p-[22px] flex-wrap sm:flex-nowrap">
+        <div className="w-[54px] h-[54px] rounded-2xl bg-white flex items-center justify-center text-[28px] shrink-0">🧸</div>
+        <div className="flex-1 min-w-0 basis-48">
+          <div className="text-base font-bold text-bark">Hand the device to your kids</div>
+          <div className="text-[13px] text-cocoa mt-[3px] leading-[1.45] max-w-[440px]">
+            A simpler, playful space with only their quests, star shop and calendar. You&apos;ll need your PIN to switch back.
+          </div>
+        </div>
+        {!childMode ? (
+          <button
+            type="button"
+            onClick={startChildMode}
+            className="shrink-0 px-5 py-[11px] rounded-[11px] bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            style={{ boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}
+          >
+            Start Child mode
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { disableChildMode(); navigate('/dashboard'); }}
+            className="shrink-0 px-5 py-[11px] rounded-[11px] border-[1.5px] border-plum text-plum text-sm font-semibold bg-white/70"
+          >
+            Turn off Child mode
+          </button>
+        )}
+      </div>
+      <div className="border-t border-[rgba(26,22,32,0.06)]" style={{ background: 'rgba(255,255,255,0.5)' }}>
+        <SetRow
+          title="Exit PIN"
+          sub={pinIsSet ? 'Required to leave Child mode' : 'No PIN yet - set one to use Child mode'}
+          control={isAdmin ? (
+            <div className="flex items-center gap-2.5">
+              <SelectBtn value={pinIsSet ? '••••' : 'Set PIN'} onClick={() => { setPinFormOpen((v) => !v); setPinMsg(''); }} />
+              {pinIsSet && !childMode && (
+                <button type="button" onClick={removeChildPin} disabled={pinBusy} className="text-[13px] font-semibold text-coral disabled:opacity-50">Remove</button>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-warm-grey">Set by an adult admin</span>
+          )}
+          last
+        />
+        {pinFormOpen && (
+          <div className="px-5 pb-4 space-y-2">
+            <input type="password" inputMode="numeric" maxLength={6} value={pinDraft} onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))} placeholder="New PIN (4-6 digits)" className="w-full h-11 rounded-lg border border-cream-border px-3 text-sm bg-white focus:border-plum outline-none" />
+            <input type="password" inputMode="numeric" maxLength={6} value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))} placeholder="Confirm PIN" className="w-full h-11 rounded-lg border border-cream-border px-3 text-sm bg-white focus:border-plum outline-none" />
+            <div className="flex gap-2 pt-1">
+              <button onClick={saveChildPin} disabled={pinBusy} className="flex-1 h-11 rounded-lg bg-plum text-white text-sm font-semibold disabled:opacity-50">{pinBusy ? 'Saving…' : 'Save PIN'}</button>
+              <button onClick={() => { setPinFormOpen(false); setPinDraft(''); setPinConfirm(''); setPinMsg(''); }} className="px-4 h-11 rounded-lg border border-cream-border text-sm font-medium text-cocoa bg-white">Cancel</button>
+            </div>
+          </div>
+        )}
+        {pinMsg && <p className="text-xs text-coral px-5 pb-3">{pinMsg}</p>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -1345,43 +1457,22 @@ export default function Settings() {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
-      {/* My profile */}
-      <>
-      {/* My profile */}
-      {(() => {
-        const me = members.find((m) => m.id === user?.id);
-        return (
-          <div className="bg-linen rounded-2xl p-4.5 md:p-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
-            <div className="flex items-start justify-between mb-3">
-              <h2 className="text-base md:text-medium font-semibold text-bark">My profile</h2>
-              {/* Subtle trial indicator - renders nothing unless the household
-                  is trialing. Safe to leave always-mounted; the component
-                  guards its own visibility. */}
-              <TrialIndicatorSubtle />
-            </div>
-            <div className="flex items-center gap-4">
-              <Avatar member={me || user} size={72} />
-              <div className="flex-1">
-                <p className="font-medium text-bark">{user?.name}</p>
-                {me?.family_role && <p className="text-xs text-cocoa">{me.family_role}</p>}
-              </div>
-              <button
-                onClick={() => navigate('/family?editProfile=1')}
-                className="flex items-center gap-1.5 border border-cream-border text-cocoa font-medium px-4 py-2 rounded-xl text-sm hover:bg-oat transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-                Edit
-              </button>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Profile card (settings handoff): identity header + Family plan
+          + Billing rows, wired to the real subscription. */}
+      <div>
+        {!isIosPlatform && <SectionLabel>Your profile</SectionLabel>}
+        <ProfileCard me={members.find((m) => m.id === user?.id)} members={members} />
+      </div>
 
-      {/* Plan / subscription */}
-      <PlanSection />
-      </>
+      {/* Child mode - standalone gradient card on web (a hero feature, not
+          an accordion row). iOS keeps its section row + popup below. The id
+          anchors the ?section=child-mode deep link. */}
+      {!isIosPlatform && (
+        <div id="settings-section-child-mode">
+          <SectionLabel>Child mode</SectionLabel>
+          {childModeCard}
+        </div>
+      )}
 
       {/* iOS list mode: list of nav rows, each opens a popup overlay
           for that section. Visual mirrors the accordion summaries
@@ -1390,7 +1481,7 @@ export default function Settings() {
           true whether the more is inline (accordion), a sub-page, or
           a popup. */}
       {iosListMode && (
-        <div className="bg-linen rounded-2xl px-5 md:px-6" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className={`${SET_CARD_CLASS} px-5 md:px-6`} style={{ boxShadow: SET_CARD_SHADOW }}>
           {IOS_SECTIONS.map((sec) => {
             const Icon = IOS_SECTION_ICONS[sec.icon];
             const iconColor = sec.danger ? 'text-error' : 'text-plum';
@@ -1422,9 +1513,10 @@ export default function Settings() {
           three "how Housemait talks to the outside world" sections, grouped
           into one shared card of accordions (mirrors the Notifications /
           Location / Active sessions group below). */}
+      {!isIosPlatform && <SectionLabel>Connected services</SectionLabel>}
       <div
-        className={isIosPlatform ? '' : 'bg-linen rounded-2xl px-5 md:px-6'}
-        style={isIosPlatform ? undefined : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+        className={isIosPlatform ? '' : `${SET_CARD_CLASS} px-5 md:px-6 !mt-0`}
+        style={isIosPlatform ? undefined : { boxShadow: SET_CARD_SHADOW }}
       >
 
       {/* Connect WhatsApp */}
@@ -2126,66 +2218,19 @@ export default function Settings() {
           Wrapper must always render so children stay mounted - the
           previous bug was gating the wrapper conditionally, which
           dropped the children too. */}
+      {!isIosPlatform && <SectionLabel>Notifications &amp; privacy</SectionLabel>}
       <div
-        className={isIosPlatform ? '' : 'bg-linen rounded-2xl px-5 md:px-6'}
-        style={isIosPlatform ? undefined : { boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}
+        className={isIosPlatform ? '' : `${SET_CARD_CLASS} px-5 md:px-6 !mt-0`}
+        style={isIosPlatform ? undefined : { boxShadow: SET_CARD_SHADOW }}
       >
 
-      {/* Child Mode - kid-safe device lock; PIN to exit. */}
-      <SectionWrapper slug="child-mode" title="Child Mode" icon={IconShield} accordion>
-        <div className="space-y-4">
-          <p className="text-sm text-cocoa">
-            Lock this device to a kid-safe view - Home, Tasks, Rewards and a calendar
-            of just their events. Adults unlock Settings with a PIN. It's a guardrail to
-            keep kids on track, not a hard security lock.
-          </p>
-
-          {isAdmin && (
-            <div className="rounded-xl border border-cream-border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-bark">Access PIN</p>
-                  <p className="text-xs text-cocoa mt-0.5">{pinIsSet ? 'A PIN is set for this household.' : 'No PIN yet - set one to use Child Mode.'}</p>
-                </div>
-                {!pinFormOpen && (
-                  <div className="flex gap-2 shrink-0">
-                    <button onClick={() => { setPinFormOpen(true); setPinMsg(''); }} className="px-3 py-2 rounded-lg border border-cream-border text-sm font-medium text-bark hover:bg-oat transition-colors">{pinIsSet ? 'Change' : 'Set PIN'}</button>
-                    {pinIsSet && !childMode && <button onClick={removeChildPin} disabled={pinBusy} className="px-3 py-2 rounded-lg text-sm font-medium text-coral hover:bg-oat disabled:opacity-50 transition-colors">Remove</button>}
-                  </div>
-                )}
-              </div>
-              {pinFormOpen && (
-                <div className="mt-3 space-y-2">
-                  <input type="password" inputMode="numeric" maxLength={6} value={pinDraft} onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))} placeholder="New PIN (4-6 digits)" className="w-full h-11 rounded-lg border border-cream-border px-3 text-sm bg-white focus:border-plum outline-none" />
-                  <input type="password" inputMode="numeric" maxLength={6} value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))} placeholder="Confirm PIN" className="w-full h-11 rounded-lg border border-cream-border px-3 text-sm bg-white focus:border-plum outline-none" />
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={saveChildPin} disabled={pinBusy} className="flex-1 h-11 rounded-lg bg-plum text-white text-sm font-semibold disabled:opacity-50">{pinBusy ? 'Saving…' : 'Save PIN'}</button>
-                    <button onClick={() => { setPinFormOpen(false); setPinDraft(''); setPinConfirm(''); setPinMsg(''); }} className="px-4 h-11 rounded-lg border border-cream-border text-sm font-medium text-cocoa">Cancel</button>
-                  </div>
-                </div>
-              )}
-              {pinMsg && <p className="text-xs text-coral mt-2">{pinMsg}</p>}
-            </div>
-          )}
-
-          {!childMode ? (
-            <>
-              <button
-                onClick={() => { if (enableChildMode()) navigate('/tasks'); }}
-                disabled={!pinIsSet}
-                className="w-full h-12 rounded-xl bg-plum text-white font-semibold disabled:opacity-50 transition-opacity"
-              >
-                Turn on Child Mode (this device)
-              </button>
-              {!pinIsSet && <p className="text-xs text-cocoa text-center">Set a PIN first to enable Child Mode.</p>}
-            </>
-          ) : (
-            <button onClick={() => { disableChildMode(); navigate('/dashboard'); }} className="w-full h-12 rounded-xl border-[1.5px] border-plum text-plum font-semibold">
-              Turn off Child Mode
-            </button>
-          )}
-        </div>
-      </SectionWrapper>
+      {/* Child Mode - iOS only here (section row + popup). Web renders the
+          same gradient card standalone near the top of the page. */}
+      {isIosPlatform && (
+        <SectionWrapper slug="child-mode" title="Child Mode" icon={IconShield} accordion>
+          {childModeCard}
+        </SectionWrapper>
+      )}
 
       {/* Notifications - unified on every platform. Two subsections:
           Push (iOS only, where APNs delivers) and WhatsApp (any platform
@@ -2437,6 +2482,7 @@ export default function Settings() {
 
       {/* Your data - GDPR right to portability (Article 20). Sits below
           Active sessions; non-destructive action, no surprises. */}
+      {!isIosPlatform && <SectionLabel>Account</SectionLabel>}
       <SectionWrapper slug="data" title="Your data" icon={IconDownload}>
         <p className="text-sm text-cocoa">
           Download a JSON file with every row Housemait holds about you and
@@ -2640,6 +2686,62 @@ export default function Settings() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Child-mode launcher: "Whose turn is it?" per-child picker with a
+          short hand-off beat, then the device locks into Child Mode. */}
+      {pickKidOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ background: 'rgba(26,22,32,0.45)', backdropFilter: 'blur(4px)' }}
+          onClick={() => { if (!enteringKid) setPickKidOpen(false); }}
+        >
+          <div
+            className="w-[420px] max-w-[92vw] bg-white rounded-[22px] p-7"
+            style={{ boxShadow: '0 30px 80px rgba(26,22,32,0.35)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {enteringKid ? (
+              <div className="text-center py-3">
+                <div className="mx-auto mb-4 flex items-center justify-center"><Avatar member={enteringKid} size={96} /></div>
+                <div className="text-[30px] text-bark" style={{ fontFamily: 'var(--font-display)' }}>Hi {enteringKid.name}! 👋</div>
+                <div className="text-sm text-warm-grey mt-1.5">Opening your space…</div>
+              </div>
+            ) : (
+              <>
+                <div className="text-[26px] text-bark text-center" style={{ fontFamily: 'var(--font-display)' }}>Whose turn is it?</div>
+                <div className="text-[13.5px] text-warm-grey text-center mt-1.5 mb-5">Open Child mode for…</div>
+                <div className="flex flex-col gap-2.5">
+                  {kidMembers.map((k) => (
+                    <button
+                      key={k.id}
+                      type="button"
+                      onClick={() => launchChildModeFor(k)}
+                      className="flex items-center gap-3.5 p-3 rounded-[14px] border border-[rgba(26,22,32,0.07)] bg-white text-left hover:bg-oat transition-colors"
+                    >
+                      <Avatar member={k} size={46} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-base font-bold text-bark">{k.name}</div>
+                        <div className="text-[12.5px] text-warm-grey">Quests · Star Shop · My Days</div>
+                      </div>
+                      <IconChevronRight className="w-4 h-4 text-warm-grey/60 shrink-0" />
+                    </button>
+                  ))}
+                  {kidMembers.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => launchChildModeFor(null)}
+                      className="p-3 rounded-[14px] border border-[rgba(26,22,32,0.07)] bg-white text-sm font-semibold text-bark hover:bg-oat transition-colors"
+                    >
+                      Start Child mode on this device
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs text-warm-grey text-center mt-4">🔒 You&apos;ll need your PIN to switch back out.</div>
+              </>
+            )}
           </div>
         </div>
       )}
