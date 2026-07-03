@@ -55,8 +55,9 @@ export function Celebrate({ data, onDone }) {
 }
 
 // The Housemait logomark (extracted from housemait-logo-web.svg: the house +
-// its two window dots, all recoloured to the kid's gradient) plus the yellow
-// KIDS badge. No wordmark in Kids mode.
+// its two window dots, all recoloured to the kid's gradient) with the brand
+// name set as TEXT (21px Fredoka, not the SVG wordmark) + the yellow KIDS
+// badge.
 export function KidsLogo({ c1, c2, size = 30 }) {
   const gid = 'klg_' + String(c1 || '').replace('#', '');
   return (
@@ -67,6 +68,7 @@ export function KidsLogo({ c1, c2, size = 30 }) {
         <path fill={`url(#${gid})`} d="M68.91,88.98c-12.99-3.42-15.25-21.12-3.81-27.97,10.83-6.74,25.17,2.44,23.15,15.15-1.08,8.84-10.55,15.28-19.15,12.86l-.19-.05Z" />
         <path fill={`url(#${gid})`} d="M125.88,89c-12.51-2.66-16.19-19.3-6.07-27.06,9.59-7.72,24.58-1.08,25.02,11.28.67,9.77-9.22,18.12-18.75,15.82l-.19-.04Z" />
       </svg>
+      <span style={{ fontSize: 21, fontWeight: 600, letterSpacing: -0.5, color: KIDS_INK.ink }}>Housemait</span>
       <span style={{ fontSize: Math.max(10, size * 0.3), fontWeight: 600, letterSpacing: 1, color: '#fff', background: KIDS_INK.sun, padding: '3px 8px', borderRadius: 999, boxShadow: '0 3px 0 rgba(233,154,18,0.35)' }}>KIDS</span>
     </div>
   );
