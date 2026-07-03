@@ -423,6 +423,22 @@ export default function Dashboard() {
   const [nlModalOpen, setNlModalOpen] = useState(false);
   const [nlMode, setNlMode] = useState('event'); // 'event' | 'task'
   const [nlText, setNlText] = useState('');
+
+  // On mobile the meals week strip scrolls horizontally from Monday -
+  // centre today's chip once the dashboard has rendered, so late-week
+  // days don't start off-screen. Direct scrollLeft (not scrollIntoView)
+  // so the page never jumps vertically. No-op on desktop, where the
+  // strip is a 7-col grid. Keyed on `loading`: the strip only exists
+  // after the skeleton gives way to the real layout.
+  const mealsStripRef = useRef(null);
+  useEffect(() => {
+    if (loading) return;
+    const c = mealsStripRef.current;
+    const t = c?.querySelector('[data-today="1"]');
+    if (c && t && c.scrollWidth > c.clientWidth) {
+      c.scrollLeft = Math.max(0, t.offsetLeft - c.offsetLeft - (c.clientWidth - t.clientWidth) / 2);
+    }
+  }, [loading]);
   const [nlSending, setNlSending] = useState(false);
   const [nlResult, setNlResult] = useState('');
 
@@ -914,12 +930,13 @@ export default function Dashboard() {
             <h2 className="text-base font-sans font-semibold text-bark">This week&apos;s meals</h2>
             <Link to="/meals" className="text-xs font-medium text-primary hover:underline">Plan meals →</Link>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0">
+          <div ref={mealsStripRef} className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0">
             {weekDays.map(({ date, dow, dm, dayMeals }) => {
               const today = date === todayDate;
               return (
                 <Link
                   key={date}
+                  data-today={today ? '1' : undefined}
                   to={`/meals?open=dinner&date=${date}&return=dashboard`}
                   className={`flex-none w-32 md:w-auto rounded-xl p-3 transition-colors ${
                     today
