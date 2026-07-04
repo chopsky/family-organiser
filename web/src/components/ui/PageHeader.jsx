@@ -25,7 +25,7 @@ export default function PageHeader({ kicker, title, subtitle, actions, className
     <div className={`flex items-end justify-between gap-4 flex-wrap ${className}`}>
       <div className="min-w-0">
         <h1
-          className="m-0 text-[34px] md:text-[38px] leading-[1.05] font-normal text-charcoal"
+          className="m-0 text-[34px] md:text-[32px] leading-[1.05] font-normal text-charcoal"
           style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
         >
           {title}
