@@ -274,7 +274,7 @@ function ReceiptCard({ r, onView, onKeep, onDelete, symbol = '£' }) {
         </div>
       </div>
 
-      <div className="text-[34px] leading-none text-charcoal" style={{ fontFamily: '"Instrument Serif", serif' }}>
+      <div className="text-[34px] leading-none text-charcoal" style={{ fontFamily: 'var(--font-serif-display)' }}>
         {withCurrency(r.total_text, symbol)}
       </div>
 

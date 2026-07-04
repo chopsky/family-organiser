@@ -1035,7 +1035,7 @@ export default function LandingPage() {
                   </span>
                   WhatsApp AI Assistant
                 </span>
-                <h3 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 'clamp(36px,4.4vw,56px)', lineHeight: 1.05, letterSpacing: '-.015em', margin: '18px 0' }}>
+                <h3 style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 'clamp(36px,4.4vw,56px)', lineHeight: 1.05, letterSpacing: '-.015em', margin: '18px 0' }}>
                   Your family's assistant, <em style={{ fontStyle: 'italic', color: 'var(--purple)' }}>right in WhatsApp.</em>
                 </h3>
                 <p style={{ color: 'var(--ink-soft)', fontSize: 17, maxWidth: 480, margin: 0 }}>

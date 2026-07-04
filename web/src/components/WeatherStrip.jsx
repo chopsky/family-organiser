@@ -226,7 +226,7 @@ export default function WeatherStrip({ onOpenAI }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: '"Instrument Serif"', fontSize: 34, lineHeight: 1, color: INK, letterSpacing: -0.5 }}>{w.now}°</span>
+            <span style={{ fontFamily: 'var(--font-serif-display)', fontSize: 34, lineHeight: 1, color: INK, letterSpacing: -0.5 }}>{w.now}°</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: INK2 }}>{w.cond}</span>
           </div>
           <div style={{ fontSize: 12, color: INK3, marginTop: 3, display: 'flex', gap: 10, whiteSpace: 'nowrap' }}>

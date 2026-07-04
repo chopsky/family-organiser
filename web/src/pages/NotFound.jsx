@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const SERIF = '"Instrument Serif", serif';
+const SERIF = 'var(--font-serif-display)';
 
 // Real 404 for unrecognised URLs. The edge middleware now lets unknown paths
 // fall through (instead of bouncing them to a locale landing), and the SPA's

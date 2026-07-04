@@ -151,7 +151,7 @@ export default function Login() {
         <h1
           className="text-center"
           style={{
-            fontFamily: "'Instrument Serif', serif",
+            fontFamily: 'var(--font-serif-display)',
             fontWeight: 400,
             fontSize: 40,
             lineHeight: 1.05,

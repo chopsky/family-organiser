@@ -173,7 +173,7 @@ export default function Subscribe() {
         <div className="text-center mb-10">
           <h1
             className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400 }}
+            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400 }}
           >
             {copy.headline}
           </h1>
@@ -324,11 +324,11 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
       <div className="mb-5">
         <div className="flex items-baseline gap-2 flex-wrap">
           {discount && (
-            <span className="text-warm-grey line-through leading-none" style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, fontSize: 30 }}>
+            <span className="text-warm-grey line-through leading-none" style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 30 }}>
               {discount.originalDisplay}
             </span>
           )}
-          <span className="text-charcoal leading-none" style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400, fontSize: 46 }}>
+          <span className="text-charcoal leading-none" style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 46 }}>
             {discount ? discount.discountedDisplay : p.priceDisplay}
           </span>
           <span className="text-sm text-warm-grey">{p.periodDisplay}{discount ? ' · first year' : ''}</span>

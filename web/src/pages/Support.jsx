@@ -28,7 +28,7 @@ export default function Support() {
           <h1
             className="text-bark"
             style={{
-              fontFamily: "'Instrument Serif', serif",
+              fontFamily: 'var(--font-serif-display)',
               fontWeight: 400,
               fontSize: 42,
               lineHeight: 1.1,

@@ -8,6 +8,33 @@
   padding: calc(var(--spacing) * 4.5);
 }
 
+/* ── Recoleta: the app's display/title face (self-hosted) ──
+   Replaces Instrument Serif for page titles and editorial moments.
+   Regular (400) is the default title weight; Medium (500) is available
+   where a heavier display cut is wanted. No italic files - browsers
+   synthesise an oblique for italic spans (e.g. the dashboard greeting's
+   name). Components reference --font-serif-display, never the family
+   name, so the next font experiment is a one-line change here. */
+@font-face {
+  font-family: 'Recoleta';
+  src: url('/fonts/Recoleta-Regular.woff2') format('woff2'),
+       url('/fonts/Recoleta-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Recoleta';
+  src: url('/fonts/Recoleta-Medium.woff2') format('woff2'),
+       url('/fonts/Recoleta-Medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --font-serif-display: 'Recoleta', 'Instrument Serif', serif;
+}
+
 @theme {
   /* Inter (loaded in index.html) is the app's default UI face - same as the
      Tasks/Rewards pages - with a system + emoji fallback. */

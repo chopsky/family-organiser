@@ -18,7 +18,7 @@ import { REWARD_PLUS_TASK_CATS, searchRewardPlusTaskEmojis } from '../lib/reward
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
 const BRAND = '#6C3DD9', BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
-const SERIF = '"Instrument Serif", serif';
+const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
 const isKid = (m) => m?.member_type === 'dependent';
 

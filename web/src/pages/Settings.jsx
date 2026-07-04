@@ -2713,12 +2713,12 @@ export default function Settings() {
             {enteringKid ? (
               <div className="text-center py-3">
                 <div className="mx-auto mb-4 flex items-center justify-center"><Avatar member={enteringKid} size={96} /></div>
-                <div className="text-[30px] text-bark" style={{ fontFamily: 'var(--font-display)' }}>Hi {enteringKid.name}! 👋</div>
+                <div className="text-[30px] text-bark" style={{ fontFamily: 'var(--font-serif-display)' }}>Hi {enteringKid.name}! 👋</div>
                 <div className="text-sm text-warm-grey mt-1.5">Opening your space…</div>
               </div>
             ) : (
               <>
-                <div className="text-[26px] text-bark text-center" style={{ fontFamily: 'var(--font-display)' }}>Whose turn is it?</div>
+                <div className="text-[26px] text-bark text-center" style={{ fontFamily: 'var(--font-serif-display)' }}>Whose turn is it?</div>
                 <div className="text-[13.5px] text-warm-grey text-center mt-1.5 mb-5">Open Child mode for…</div>
                 <div className="flex flex-col gap-2.5">
                   {kidMembers.map((k) => (

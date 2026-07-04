@@ -1,6 +1,6 @@
 // Plain shared style constants for the onboarding steps. Kept out of _ui.jsx so
 // that file only exports components (react-refresh/only-export-components).
-export const SERIF = "'Instrument Serif', serif";
+export const SERIF = 'var(--font-serif-display)';
 
 // Matches the Login/Signup form fields + labels (14px input, 12px medium label).
 export const inputStyle = {

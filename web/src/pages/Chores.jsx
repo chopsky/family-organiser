@@ -25,7 +25,7 @@ const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
 const BRAND = '#6C3DD9', BRAND_SOFT = '#EFE9FB';
 const BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
 const BG_APP = '#FBF8F3'; // page background — the gap colour in the selected-avatar halo
-const SERIF = '"Instrument Serif", serif';
+const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
 
 const SLOT_META = {

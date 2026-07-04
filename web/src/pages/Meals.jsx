@@ -432,7 +432,7 @@ function MealPlanView({ setError }) {
               alt="Housemait"
               style={{ height: '36px', display: 'inline-block', marginBottom: '12px' }}
             />
-            <h1 style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
+            <h1 style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 600, fontSize: '22px', margin: '0 0 4px' }}>
               Weekly Meal Plan
             </h1>
             <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>
@@ -465,7 +465,7 @@ function MealPlanView({ setError }) {
                       <div className={`text-[11px] font-bold uppercase tracking-[0.12em] ${isToday ? 'text-plum' : 'text-cocoa'}`}>
                         {DAY_HEADERS[dayIdx]}{isToday ? ' · TODAY' : ''}
                       </div>
-                      <div className="text-[34px] leading-none mt-1" style={{ fontFamily: '"Instrument Serif", serif', fontWeight: 400 }}>
+                      <div className="text-[34px] leading-none mt-1" style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400 }}>
                         {date.getDate()}
                       </div>
                     </div>
@@ -530,7 +530,7 @@ function MealPlanView({ setError }) {
                       return (
                         <th key={i} className="py-3 px-2 text-center border-b border-l border-light-grey" style={{ background: isToday ? 'var(--color-plum-light)' : 'transparent' }}>
                           <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: isToday ? 'var(--color-plum-dark)' : 'var(--color-warm-grey)' }}>{DAY_HEADERS[i]}</div>
-                          <div className="mt-0.5" style={{ fontFamily: '"Instrument Serif", serif', fontSize: 22, fontWeight: 400, color: isToday ? 'var(--color-plum)' : 'var(--color-charcoal)' }}>
+                          <div className="mt-0.5" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 22, fontWeight: 400, color: isToday ? 'var(--color-plum)' : 'var(--color-charcoal)' }}>
                             {date.getDate()}
                           </div>
                         </th>
@@ -1355,7 +1355,7 @@ function RecipeBoxView({ setError }) {
                     {recipe.image_url ? (
                       <img src={recipe.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
-                      <span style={{ fontFamily: '"Instrument Serif", serif', fontSize: 40, color: 'rgba(0,0,0,0.15)' }}>
+                      <span style={{ fontFamily: 'var(--font-serif-display)', fontSize: 40, color: 'rgba(0,0,0,0.15)' }}>
                         {recipe.name?.charAt(0)?.toUpperCase()}
                       </span>
                     )}
