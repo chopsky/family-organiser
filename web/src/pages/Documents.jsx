@@ -284,7 +284,6 @@ export default function Documents() {
       <PageHeader
         kicker={kicker}
         title="Documents"
-        subtitle="Family documents, organised and easy to find."
         actions={<>
           <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => setShowNewFolder(true)}>
             New folder

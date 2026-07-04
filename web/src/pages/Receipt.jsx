@@ -146,7 +146,6 @@ export default function Receipt() {
       <PageHeader
         kicker={receipts.length ? `${receipts.length} saved · ${symbol}${totalSpend.toFixed(2)}` : 'No receipts yet'}
         title="Receipts"
-        subtitle="Scan a receipt to tick off groceries and track your monthly spend."
         actions={
           <PillBtn primary icon={<IconPlus className="h-3.5 w-3.5" />} onClick={() => fileRef.current?.click()} disabled={scanning}>
             {scanning ? 'Scanning…' : 'Scan receipt'}

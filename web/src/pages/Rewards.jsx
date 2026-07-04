@@ -225,7 +225,7 @@ export default function Rewards() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
                   <Avatar member={k} size={48} bg="#fff" />
                   <div>
-                    <div style={{ fontFamily: SERIF, fontSize: 26, color: INK, lineHeight: 1 }}>{k.name}</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 20, color: INK, lineHeight: 1 }}>{k.name}</div>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><StarFill s={16} /><span style={{ fontSize: 18, fontWeight: 800, color: '#A9772A' }}>{balances[k.id] || 0}</span></div>
                   </div>
                 </div>
@@ -335,7 +335,7 @@ function RewardModal({ onClose, onSave, kids, reward }) {
     <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[460px]">
       <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 30, fontWeight: 400, color: INK }}>{editing ? 'Edit reward' : 'New reward'}</h2>
+          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{editing ? 'Edit reward' : 'New reward'}</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
         </div>
         <div style={{ marginBottom: 16 }}>
