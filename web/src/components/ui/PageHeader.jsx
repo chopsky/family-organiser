@@ -22,7 +22,7 @@ export default function PageHeader({ kicker, title, subtitle, actions, className
   // component and unaffected.
   void kicker;
   return (
-    <div className={`flex items-end justify-between gap-4 flex-wrap ${className}`}>
+    <div className={`flex items-center justify-between gap-4 flex-wrap ${className}`}>
       <div className="min-w-0">
         <h1
           className="m-0 text-[34px] md:text-[32px] leading-[1.05] font-normal text-charcoal"
