@@ -233,6 +233,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   let prompt = CHAT_ASSISTANT_SYSTEM
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
+    .replace(/{{SENDER}}/g, currentUser?.name || 'the user')
     .replace(/{{TIMEZONE}}/g, userTz)
     .replace(/{{LOCATION}}/g, locationStr)
     .replace(/{{MEMBERS}}/g, membersStr)
@@ -462,7 +463,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // with NO action block, so nothing was saved and the user only found out
     // days later). If the prose claims a save/add/create but zero action
     // blocks parsed, correct the reply instead of letting the claim stand.
-    if (actions.length === 0 && /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted)\b|\bI (?:added|created|scheduled|saved)\b/i.test(cleanContent)) {
+    // Three phrasings caught: "I've added…", "I added…", and confirmations
+    // that lead with the bare past-tense verb ("Removed Padel on Sunday…",
+    // "Done, both entries deleted") - the last one slipped through and let
+    // a no-op deletion read as success.
+    const claimsAction = /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted)\b|\bI (?:added|created|scheduled|saved|removed|deleted)\b|(?:^|\n)\s*(?:Removed|Deleted|Added|Created|Updated|Rescheduled|Cancelled)\b|(?:^|\n)\s*(?:Done|All set|Sorted)[,.!]/im;
+    if (actions.length === 0 && claimsAction.test(cleanContent)) {
       console.warn('[chat] reply claimed an action but no action block parsed - correcting. Raw length:', aiText.length);
       cleanContent += '\n\n⚠️ Actually - I wasn\'t able to save that just now. Please ask me again.';
     }
