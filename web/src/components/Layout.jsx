@@ -293,7 +293,7 @@ export default function Layout({ children }) {
 
   return (
     <div
-      className={`bg-cream flex flex-col md:flex-row ${appHeight ? 'overflow-hidden' : 'min-h-screen'}`}
+      className={`app-shell bg-cream flex flex-col md:flex-row ${appHeight ? 'overflow-hidden' : 'min-h-screen'}`}
       style={appHeight ? { height: '100dvh' } : undefined}
     >
       {/* ── Desktop Sidebar ── */}

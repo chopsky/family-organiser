@@ -281,6 +281,19 @@
     .kids-anim { animation: none !important; }
   }
 
+  /* ── Desktop h2 size: one global 22px (founder call, 2026-07-04) ──
+     Scoped to .app-shell (the Layout root) so the marketing/landing and
+     auth pages - which share this bundle and use much larger h2s - are
+     untouched, as are Kids mode (KidsShell) and mobile. !important so
+     the per-component Tailwind size utilities (text-base, text-lg…)
+     can't out-cascade it; remove a component's size class rather than
+     fighting this rule if a one-off ever needs to differ. */
+  @media (min-width: 768px) {
+    .app-shell h2 {
+      font-size: 22px !important;
+    }
+  }
+
   /* ── iOS safe-area insets (Capacitor / PWA) ── */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
