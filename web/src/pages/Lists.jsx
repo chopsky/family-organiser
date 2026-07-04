@@ -381,7 +381,7 @@ export default function Lists() {
           <div style={{ background: (active?.color || BRAND) + '14', borderRadius: 22, padding: '16px 14px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px 12px' }}>
               <span style={{ fontSize: 22 }}>{active?.emoji}</span>
-              <span style={{ fontFamily: SERIF, fontSize: 24, color: INK, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active?.name}</span>
+              <span style={{ fontFamily: SERIF, fontSize: 22, color: INK, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active?.name}</span>
               {active && !active.protected && (
                 <button onClick={() => setEditList(active)} aria-label="Rename list" style={{ width: 28, height: 28, borderRadius: 8, border: 0, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcPencil s={14} c={INK3} /></button>
               )}
@@ -471,8 +471,8 @@ export default function Lists() {
           <div style={{ flex: isMobile ? 'none' : 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: isMobile ? undefined : 0 }}>
             <div style={{ background: (active?.color || BRAND) + '12', borderRadius: 22, padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: isMobile ? undefined : 0, flex: isMobile ? 'none' : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0 }}>
-                <span style={{ fontSize: 26 }}>{active?.emoji}</span>
-                <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 24, fontWeight: 400, color: INK }}>{active?.name}</h2>
+                <span style={{ fontSize: 22 }}>{active?.emoji}</span>
+                <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{active?.name}</h2>
                 {active && !active.protected && (
                   <button onClick={() => setEditList(active)} aria-label="Rename list" style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcPencil s={16} c={INK3} /></button>
                 )}
