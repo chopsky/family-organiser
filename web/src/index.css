@@ -282,18 +282,13 @@
   }
 
   /* ── Global heading sizes (founder calls, 2026-07-04) ──
-     h2 is 22px on every breakpoint; h1 is 30px on mobile (desktop h1
-     sizes stay per-component: 42px dashboard greeting, 32px page
-     titles). Scoped to .app-shell (the Layout root) so the marketing/
-     landing and auth pages - which share this bundle and use much
-     larger headings - are untouched, as is Kids mode (KidsShell).
-     !important so per-component Tailwind size utilities (text-base,
-     text-[34px]…) can't out-cascade these; remove a component's size
-     class rather than fighting these rules if a one-off ever needs to
-     differ. */
-  .app-shell h2 {
-    font-size: 22px !important;
-  }
+     h1 is 30px on mobile (desktop h1 sizes stay per-component: 42px
+     dashboard greeting, 32px page titles). h2 sizes are per-component
+     - a global 22px was tried on 2026-07-04 and reverted the same day.
+     Scoped to .app-shell (the Layout root) so the marketing/landing
+     and auth pages - which share this bundle and use much larger
+     headings - are untouched, as is Kids mode (KidsShell). !important
+     so per-component Tailwind size utilities can't out-cascade it. */
   @media (max-width: 767px) {
     .app-shell h1 {
       font-size: 30px !important;
