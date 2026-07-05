@@ -96,7 +96,7 @@ nav.top ul a:hover { color: var(--purple); }
 h1.display {
   font-family: var(--font-serif-display);
   font-weight: 400;
-  font-size: clamp(44px, 5.7vw, 78px);
+  font-size: clamp(44px, 5.7vw, 66px);
   line-height: 1.04;
   letter-spacing: -.02em;
   margin: 18px 0 20px;
