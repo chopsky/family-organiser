@@ -349,7 +349,7 @@ export default function Layout({ children }) {
             </Link>
             {childMode && <ChildModeChip />}
             <Link to="/settings" className="shrink-0">
-              {renderAvatar()}
+              {renderAvatar(44)}
             </Link>
           </div>
         </header>
