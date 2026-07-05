@@ -5,7 +5,6 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
-import { localeHomePath } from '../hooks/useLocale';
 
 export default function Login() {
   const [email, setEmail]         = useState('');
@@ -143,17 +142,12 @@ export default function Login() {
           padding: '40px 36px 32px',
         }}
       >
-        {/* Full wordmark, matching the /signup (onboarding) entry card. */}
-        <Link to={localeHomePath()} aria-label="Housemait home" className="block">
-          <img src="/housemait-logo-web.svg" alt="Housemait" style={{ width: 140, height: 'auto', margin: '0 auto 22px', display: 'block' }} />
-        </Link>
-
         <h1
           className="text-center"
           style={{
             fontFamily: 'var(--font-serif-display)',
             fontWeight: 400,
-            fontSize: 36,
+            fontSize: 32,
             lineHeight: 1.08,
             letterSpacing: '-0.02em',
             color: '#1A1620',

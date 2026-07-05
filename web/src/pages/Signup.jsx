@@ -5,7 +5,6 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
-import { localeHomePath } from '../hooks/useLocale';
 import { resolveSignupPromo, clearSignupPromo } from '../lib/signupPromo';
 
 // Human label for a confirmed promo, e.g. "25% off" or "£10 off".
@@ -158,26 +157,12 @@ export default function Signup() {
           padding: '40px 36px 32px',
         }}
       >
-        <Link to={localeHomePath()} aria-label="Housemait home" className="block mx-auto mb-[18px]" style={{ width: 60, height: 60 }}>
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: 60, height: 60,
-              borderRadius: 18,
-              background: '#EFE9FB',
-              border: '1px solid rgba(107,63,160,0.18)',
-            }}
-          >
-            <img src="/housemait-logomark.svg" alt="" aria-hidden="true" style={{ width: 36, height: 36, objectFit: 'contain' }} />
-          </div>
-        </Link>
-
         <h1
           className="text-center"
           style={{
             fontFamily: 'var(--font-serif-display)',
             fontWeight: 400,
-            fontSize: 36,
+            fontSize: 32,
             lineHeight: 1.08,
             letterSpacing: '-0.02em',
             color: '#1A1620',
