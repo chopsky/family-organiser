@@ -101,7 +101,7 @@ h1.display {
   letter-spacing: -.02em;
   margin: 18px 0 20px;
 }
-h1.display em { font-style: italic; color: var(--purple); }
+h1.display em { font-style: normal; color: var(--purple); }
 
 .lede { font-size: 19px; color: var(--ink-soft); max-width: 520px; margin: 0 0 28px; }
 .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -250,7 +250,7 @@ h1.display em { font-style: italic; color: var(--purple); }
 .collage .app-mock .app-mock-head { padding: 4px 4px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .collage .app-mock .kicker { font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
 .collage .app-mock .greet { font-family: var(--font-serif-display); font-size: 20px; line-height: 1.12; margin-top: 4px; letter-spacing: -.01em; }
-.collage .app-mock .greet em { font-style: italic; color: var(--purple); }
+.collage .app-mock .greet em { font-style: normal; color: var(--purple); }
 .collage .app-mock .app-mock-sec { margin-bottom: 12px; }
 .collage .app-mock .app-mock-sec:last-child { margin-bottom: 0; }
 .collage .app-mock .app-mock-sec-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .1em; font-weight: 700; margin: 0 4px 8px; }
@@ -316,7 +316,7 @@ h2.sec {
   font-size: clamp(32px, 4.1vw, 53px); line-height: 1.06; letter-spacing: -.015em;
   margin: 0 0 16px; max-width: 720px;
 }
-h2.sec em { font-style: italic; color: var(--purple); }
+h2.sec em { font-style: normal; color: var(--purple); }
 .sec-lede { font-size: 18px; color: var(--ink-soft); max-width: 620px; margin: 0 0 56px; }
 
 /* feature strip */
@@ -351,7 +351,7 @@ h2.sec em { font-style: italic; color: var(--purple); }
 .bigrow.flip { grid-template-columns: 1.2fr 1fr; }
 .bigrow.flip .col-text { order: 2; }
 .bigrow h3, .showcase-panel h3, .showcase-mitem h3 { font-family: var(--font-serif-display); font-weight: 400; font-size: 39px; line-height: 1.1; margin: 6px 0 18px; letter-spacing: -.01em; }
-.bigrow h3 em, .showcase-panel h3 em, .showcase-mitem h3 em { font-style: italic; color: var(--purple); }
+.bigrow h3 em, .showcase-panel h3 em, .showcase-mitem h3 em { font-style: normal; color: var(--purple); }
 .bigrow p, .showcase-panel p, .showcase-mitem p { color: var(--ink-soft); font-size: 17px; max-width: 460px; }
 
 .bullets { margin: 24px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
@@ -555,7 +555,7 @@ h2.sec em { font-style: italic; color: var(--purple); }
   padding: 72px; text-align: center; position: relative; overflow: hidden;
 }
 .cta h2 { font-family: var(--font-serif-display); font-weight: 400; font-size: clamp(36px, 4.4vw, 60px); line-height: 1.06; margin: 0 0 16px; letter-spacing: -.015em; }
-.cta h2 em { font-style: italic; color: #D5B8F5; }
+.cta h2 em { font-style: normal; color: #D5B8F5; }
 .cta p { color: rgba(255, 255, 255, .7); font-size: 18px; max-width: 520px; margin: 0 auto 28px; }
 .cta .bg1 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(107, 47, 184, .6), transparent 60%); top: -100px; right: -60px; }
 .cta .bg2 { position: absolute; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(244, 196, 194, .35), transparent 70%); bottom: -120px; left: -40px; }
