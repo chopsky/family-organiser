@@ -151,7 +151,7 @@ export default function Login() {
             fontWeight: 400,
             fontSize: 32,
             lineHeight: 1.08,
-            letterSpacing: '-0.02em',
+            letterSpacing: '-0.01em',
             color: '#1A1620',
             margin: 0,
           }}

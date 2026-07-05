@@ -6,7 +6,7 @@ import { SERIF } from './_styles';
 
 export function Title({ children, size = 32 }) {
   return (
-    <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.08, letterSpacing: '-0.02em', color: 'var(--color-charcoal)', margin: 0 }}>
+    <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.08, letterSpacing: '-0.01em', color: 'var(--color-charcoal)', margin: 0 }}>
       {children}
     </h1>
   );
