@@ -472,7 +472,7 @@ export default function Lists() {
             <div style={{ background: (active?.color || BRAND) + '12', borderRadius: 22, padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: isMobile ? undefined : 0, flex: isMobile ? 'none' : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0 }}>
                 <span style={{ fontSize: 22 }}>{active?.emoji}</span>
-                <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{active?.name}</h2>
+                <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 24, fontWeight: 400, color: INK }}>{active?.name}</h2>
                 {active && !active.protected && (
                   <button onClick={() => setEditList(active)} aria-label="Rename list" style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcPencil s={16} c={INK3} /></button>
                 )}
