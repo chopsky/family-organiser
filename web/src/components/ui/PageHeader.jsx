@@ -14,7 +14,7 @@
  *   actions  - node(s) rendered top-right (usually PillBtn)
  *   className - overrides the default bottom-margin spacing (default mb-7)
  */
-export default function PageHeader({ kicker, title, subtitle, actions, className = 'mb-7' }) {
+export default function PageHeader({ kicker, title, subtitle, actions, className = 'mb-5 md:mb-7' }) {
   // The kicker (small plum uppercase line above the title) is deliberately
   // not rendered (founder call, 2026-07-04): page headers go straight to
   // the serif title. Callers still pass the prop, so restoring it is a
