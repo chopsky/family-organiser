@@ -225,7 +225,7 @@ export default function Rewards() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
                   <Avatar member={k} size={48} bg="#fff" />
                   <div>
-                    <div style={{ fontFamily: SERIF, fontSize: 20, color: INK, lineHeight: 1 }}>{k.name}</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 24, color: INK, lineHeight: 1 }}>{k.name}</div>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><StarFill s={16} /><span style={{ fontSize: 18, fontWeight: 800, color: '#A9772A' }}>{balances[k.id] || 0}</span></div>
                   </div>
                 </div>

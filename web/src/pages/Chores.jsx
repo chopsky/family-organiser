@@ -305,7 +305,7 @@ function MemberColumn({ m, balance, tasks, onToggle, onEdit, onDelete, onSkip, o
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
         <Avatar member={m} size={48} bg="#fff" />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 20, color: INK, lineHeight: 1 }}>{m.name}</div>
+          <div style={{ fontFamily: SERIF, fontSize: mobile ? 20 : 24, color: INK, lineHeight: 1 }}>{m.name}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: '#fff', fontSize: 11.5, fontWeight: 700, color: INK2 }}>
               <Tick s={11} c={INK2} />{done}/{total}
@@ -415,7 +415,7 @@ function AnyoneColumn({ tasks, members, onClaim, onEdit, onDelete, onSkip, onAdd
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 14px', flexShrink: 0 }}>
         <span style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: '#fff', border: `1px solid ${LINE_STRONG}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcPeople s={22} c={INK3} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 20, color: INK, lineHeight: 1 }}>Anyone</div>
+          <div style={{ fontFamily: SERIF, fontSize: mobile ? 20 : 24, color: INK, lineHeight: 1 }}>Anyone</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: '#fff', fontSize: 11.5, fontWeight: 700, color: INK2 }}>
               <Tick s={11} c={INK2} />{done}/{total}
