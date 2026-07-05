@@ -40,38 +40,35 @@ const navGroups = [
   ] },
 ];
 
-// Mobile bottom-tab order from the iOS design handoff: Home · Calendar ·
-// Tasks · Shopping · More. Meal Plan, Receipt, Documents, Family and
-// Settings live behind the More sheet (see `MoreSheet` below) - that's
-// the design's deliberate pattern: keep the bottom bar to four
-// destinations the user touches every day, plus a curated "More" set.
+// Mobile bottom tabs: the five destinations a family touches daily,
+// plus More. Lower-frequency pages (Rewards, Receipts, Documents,
+// Family, Settings, Help) live behind the More sheet (see `MoreSheet`
+// below).
 const mobileNav = [
   { to: '/dashboard',  label: 'Home',      Icon: IconHome     },
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck    },
   { to: '/lists',      label: 'Lists',     Icon: IconList     },
-  { to: '/settings',   label: 'Settings',  Icon: IconSettings },
+  { to: '/meals',      label: 'Meals',     Icon: IconUtensils },
 ];
 
 // Routes considered "behind the More button" for active-tab styling.
 // (The bottom-sheet redesign exposes these as feature tiles - from a
-// navigation-state perspective they all live under More. Settings has
-// its own tab, so it's not here.)
+// navigation-state perspective they all live under More.)
 const moreNav = [
   { to: '/rewards' },
-  { to: '/meals' },
   { to: '/family' },
   { to: '/documents' },
   { to: '/receipt' },
+  { to: '/settings' },
   { to: '/help' },
 ];
 
 // Feature tiles filling the More sheet (2 columns × 3 rows). Everything
-// that used to hide in the Account list is now a tile - Settings moved
-// to its own bottom-nav tab and Log out lives at the foot of the
-// Settings page. Accent colours come from the founder's mock and are
-// tile-only, so they're inlined rather than promoted to Tailwind
-// utilities.
+// that used to hide in the Account list is now a tile - Log out lives
+// at the foot of the Settings page. Accent colours come from the
+// founder's mock and are tile-only, so they're inlined rather than
+// promoted to Tailwind utilities.
 const moreTiles = [
   {
     to: '/rewards',
@@ -80,14 +77,6 @@ const moreTiles = [
     Icon: IconStar,
     bg: '#FBF1DE',
     fg: '#D89B3A',
-  },
-  {
-    to: '/meals',
-    label: 'Meal Plan',
-    sub: 'Weekly dinners & recipes',
-    Icon: IconUtensils,
-    bg: '#FDEEE4',
-    fg: '#D0693B',
   },
   {
     to: '/receipt',
@@ -114,6 +103,14 @@ const moreTiles = [
     fg: '#5F8F63',
   },
   {
+    to: '/settings',
+    label: 'Settings',
+    sub: 'Account & preferences',
+    Icon: IconSettings,
+    bg: '#F1EEE9',
+    fg: '#6B6774',
+  },
+  {
     to: '/help',
     label: 'Help & Support',
     sub: 'Guides & contact us',
@@ -134,7 +131,7 @@ function TabItem({ label, Icon, active }) {
       className={`flex flex-col items-center gap-[3px] ${active ? 'text-plum' : 'text-warm-grey'}`}
       style={{
         // 9px horizontal (not the handoff's 14px): six tabs share the pill
-        // since Settings joined, and 14px overflows a 375px viewport.
+        // and 14px overflows a 375px viewport.
         padding: '7px 9px 6px',
         borderRadius: 16,
         background: active ? 'var(--color-plum-light)' : 'transparent',
@@ -442,9 +439,9 @@ export default function Layout({ children }) {
  * Anatomy (top → bottom):
  *   • Drag handle (5×40 pill)
  *   • Header row: "More" title + circular X close button
- *   • 2×3 grid of feature tiles (Rewards / Meal Plan / Receipts /
- *     Documents / Family Setup / Help & Support) - nothing else. The old
- *     Account list is gone: Settings is a bottom-nav tab and Log out
+ *   • 2×3 grid of feature tiles (Rewards / Receipts / Documents /
+ *     Family Setup / Settings / Help & Support) - nothing else. The old
+ *     Account list is gone: Meals is a bottom-nav tab and Log out
  *     lives at the foot of the Settings page.
  *
  * Layout in the source tree maps to the Housemait iOS design handoff
