@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { isIos, APP_STORE_CONFIGURED } from '../../lib/app-store';
 import api from '../../lib/api';
 import ErrorBanner from '../../components/ErrorBanner';
+import AuthHeader from '../../components/AuthHeader';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
 import WelcomeNotifications from './steps/WelcomeNotifications';
@@ -200,12 +201,17 @@ export default function OnboardingFlow() {
           card). Shown around the first (account) card. Hidden under 880px. */}
       {key === 'account' && <WelcomeNotifications reduced={reduced} />}
 
+      {/* Auth header (logo + "Log in") only on the entry/account card - the
+          rest of the flow is post-signup, where a "Log in" link makes no
+          sense. The account card's top padding below is bumped to clear it. */}
+      {key === 'account' && <AuthHeader cta={{ label: 'Log in', to: '/login' }} />}
+
       {/* All steps vertically centred. A short card sits in the middle; a card
           taller than the screen grows the page and scrolls from the top (so its
           top never clips). The stage's env(safe-area-inset-top) already clears
           the iOS status bar, so the small pt just keeps a tight gap below it for
           the tall, top-aligned cards. */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-3 pb-8 md:pt-14 md:pb-10">
+      <main className={`relative z-10 flex-1 flex flex-col items-center justify-center px-4 pb-8 md:pb-10 ${key === 'account' ? 'pt-20 md:pt-20' : 'pt-3 md:pt-14'}`}>
         <div
           key={reduced ? 'static' : key /* re-mount per step so the enter animation fires */}
           className={`ob-card ${reduced ? '' : 'ob-card-in'}`}

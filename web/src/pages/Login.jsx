@@ -5,6 +5,7 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
+import AuthHeader from '../components/AuthHeader';
 
 export default function Login() {
   const [email, setEmail]         = useState('');
@@ -100,9 +101,10 @@ export default function Login() {
       className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
       style={{
         background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)',
       }}
     >
+      <AuthHeader cta={{ label: 'Sign up free', to: '/signup' }} />
       {/* Coral blob (bottom-left) - purely decorative ambient lighting. */}
       <div
         aria-hidden="true"
