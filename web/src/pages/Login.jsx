@@ -153,14 +153,14 @@ export default function Login() {
           style={{
             fontFamily: 'var(--font-serif-display)',
             fontWeight: 400,
-            fontSize: 40,
-            lineHeight: 1.05,
+            fontSize: 36,
+            lineHeight: 1.08,
             letterSpacing: '-0.02em',
             color: '#1A1620',
             margin: 0,
           }}
         >
-          Welcome <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>home.</em>
+          Welcome <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>home.</em>
         </h1>
 
         {/* Sub-copy slot. We don't have the household-preview endpoint
