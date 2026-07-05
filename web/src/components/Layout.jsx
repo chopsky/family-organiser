@@ -138,6 +138,15 @@ function TabItem({ label, Icon, active }) {
   );
 }
 
+// Time-of-day greeting for the mobile dashboard header (same wording as
+// the Dashboard page's own greeting, which stays the desktop title).
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 // Small non-interactive badge shown by the logo while Child Mode is active.
 function ChildModeChip() {
   return (
@@ -343,10 +352,16 @@ export default function Layout({ children }) {
             background: 'var(--color-cream)',
           }}
         >
-          <div className="px-4 py-3 flex items-center justify-between">
-            <Link to="/dashboard" className="shrink-0 flex items-center">
-              <img src="/housemait-logo-web.svg" alt="Housemait" className="h-6 w-auto" />
-            </Link>
+          {/* Mobile dashboard header: the greeting IS the page title (the
+              logo moved out; Dashboard hides its own h1 on mobile so the
+              greeting isn't rendered twice). */}
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <h1
+              className="m-0 flex-1 min-w-0 truncate font-normal text-charcoal"
+              style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
+            >
+              {getGreeting()}, {user?.name}.
+            </h1>
             {childMode && <ChildModeChip />}
             <Link to="/settings" className="shrink-0">
               {renderAvatar(44)}

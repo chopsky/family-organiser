@@ -650,7 +650,7 @@ export default function Dashboard() {
           {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
         </div>
         <h1
-          className="m-0 text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
+          className="m-0 hidden md:block text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
           style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
         >
           {getGreeting()},{' '}<br className="hidden md:inline" />{user?.name}.
