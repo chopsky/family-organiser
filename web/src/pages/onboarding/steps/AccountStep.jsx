@@ -102,7 +102,6 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
 
   return (
     <div>
-      <img src="/housemait-logo-web.svg" alt="Housemait" style={{ width: 140, height: 'auto', margin: '0 auto 22px', display: 'block' }} />
       <Title>Your calmer family life<Em block>starts here.</Em></Title>
 
       {inviteToken ? (

@@ -4,18 +4,19 @@
 // module only exports components (react-refresh).
 import { SERIF } from './_styles';
 
-export function Title({ children, size = 40 }) {
+export function Title({ children, size = 32 }) {
   return (
-    <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.05, letterSpacing: '-0.02em', color: 'var(--color-charcoal)', margin: 0 }}>
+    <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.08, letterSpacing: '-0.02em', color: 'var(--color-charcoal)', margin: 0 }}>
       {children}
     </h1>
   );
 }
 
-// The emphasised phrase in each title: serif italic, plum (or WhatsApp green on
-// step 7). `block` drops it onto its own line (welcome + account screens).
+// The emphasised phrase in each title: serif, plum (or WhatsApp green on
+// step 7). Upright, not italic - Recoleta has no true italic. `block` drops
+// it onto its own line (welcome + account screens).
 export function Em({ children, block = false, color = 'var(--color-plum)' }) {
-  return <span style={{ fontStyle: 'italic', color, display: block ? 'block' : 'inline' }}>{children}</span>;
+  return <span style={{ fontStyle: 'normal', color, display: block ? 'block' : 'inline' }}>{children}</span>;
 }
 
 export function Kicker({ children, color = 'var(--color-plum)' }) {
