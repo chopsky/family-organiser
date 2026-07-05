@@ -27,7 +27,7 @@ export default function AuthHeader({ cta }) {
             color: 'var(--color-plum)',
             textDecoration: 'none',
             padding: '9px 18px',
-            borderRadius: 999,
+            borderRadius: 8, // match the "Continue with..." buttons (Tailwind rounded-lg)
             border: '1px solid rgba(107, 63, 160, 0.28)',
             background: 'rgba(255, 255, 255, 0.65)',
             backdropFilter: 'blur(8px)',
