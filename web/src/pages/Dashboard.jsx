@@ -11,6 +11,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import TrialIndicatorCard from '../components/TrialIndicator';
 import { WriteGate } from '../components/SubscribePrompt';
 import Avatar from '../components/ui/Avatar';
+import { ChildModeChip } from '../components/Layout';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { confirm as hapticConfirm } from '../lib/haptics';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
@@ -643,18 +644,28 @@ export default function Dashboard() {
       {/* Header - mirrors the shared PageHeader used on Tasks/Meals/Shopping:
           a plum uppercase kicker (here the date) on top, then the serif
           title, then a warm-grey subtitle. Only the h1 size stays larger -
-          the home-screen greeting keeps its editorial 38/52px treatment. */}
-      <div className="mb-4 md:mb-2">
-        <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
-          {todayStr}
-          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
+          the home-screen greeting keeps its editorial 38/52px treatment.
+          On mobile this block IS the page header (the Layout logo bar is
+          gone), so the 44px settings avatar sits to its right. */}
+      <div className="mb-4 md:mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
+            {todayStr}
+            {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
+          </div>
+          <h1
+            className="m-0 text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
+            style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
+          >
+            {getGreeting()},{' '}<br className="hidden md:inline" />{user?.name}.
+          </h1>
         </div>
-        <h1
-          className="m-0 hidden md:block text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
-          style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
-        >
-          {getGreeting()},{' '}<br className="hidden md:inline" />{user?.name}.
-        </h1>
+        <div className="md:hidden shrink-0 flex items-center gap-2">
+          {childMode && <ChildModeChip />}
+          <Link to="/settings" aria-label="Settings">
+            <Avatar member={user} size={44} />
+          </Link>
+        </div>
       </div>
 
       {/* Weather widget - sits directly below the greeting and above the

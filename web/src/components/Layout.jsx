@@ -13,7 +13,6 @@ import { tap as hapticTap } from '../lib/haptics';
 import { onShortcutTapped } from '../lib/app-shortcuts';
 import { syncDeviceCalendarsQuietly } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
-import Avatar from './ui/Avatar';
 const ChatWidget = lazy(() => import('./ChatWidget'));
 
 // Desktop sidebar nav, split into labelled groups (the "Grouped" design).
@@ -138,17 +137,9 @@ function TabItem({ label, Icon, active }) {
   );
 }
 
-// Time-of-day greeting for the mobile dashboard header (same wording as
-// the Dashboard page's own greeting, which stays the desktop title).
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
-// Small non-interactive badge shown by the logo while Child Mode is active.
-function ChildModeChip() {
+// Small non-interactive badge shown while Child Mode is active. Exported:
+// the Dashboard's mobile greeting row renders it next to the avatar.
+export function ChildModeChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-plum-light text-plum text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-0.5">
       <IconShield className="h-3 w-3" /> Child
@@ -247,12 +238,6 @@ export default function Layout({ children }) {
     navigate('/');
   }
 
-  // The shared Avatar handles both states (solid colour + initial, or photo
-  // wrapped in the member's colour ring) and the broken-photo fallback.
-  function renderAvatar(size = 32) {
-    return <Avatar member={user} size={size} />;
-  }
-
   const isMoreActive = moreNav.some(n => location.pathname === n.to);
 
   function renderNavLink({ to, label, Icon }) {
@@ -344,33 +329,11 @@ export default function Layout({ children }) {
            dashboard we keep a sticky cream strip the height of the iOS
            status-bar inset, so content never slides under the notch.
            (Settings stays reachable via the More tab.) */}
-      {isDashboard ? (
-        <header
-          className="md:hidden z-30 sticky top-0 safe-top"
-          style={{
-            borderBottom: 0,
-            background: 'var(--color-cream)',
-          }}
-        >
-          {/* Mobile dashboard header: the greeting IS the page title (the
-              logo moved out; Dashboard hides its own h1 on mobile so the
-              greeting isn't rendered twice). */}
-          <div className="px-4 py-3 flex items-center justify-between gap-3">
-            <h1
-              className="m-0 flex-1 min-w-0 truncate font-normal text-charcoal"
-              style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
-            >
-              {getGreeting()}, {user?.name}.
-            </h1>
-            {childMode && <ChildModeChip />}
-            <Link to="/settings" className="shrink-0">
-              {renderAvatar(44)}
-            </Link>
-          </div>
-        </header>
-      ) : (
-        <div className="md:hidden sticky top-0 z-30 safe-top" style={{ background: 'var(--color-cream)' }} aria-hidden="true" />
-      )}
+      {/* Mobile top strip: just the safe-area backing on every page. The
+          dashboard's old logo header is gone - its greeting row (kicker +
+          title + avatar) now renders inside Dashboard itself, which owns
+          the event-count data the kicker needs. */}
+      <div className="md:hidden sticky top-0 z-30 safe-top" style={{ background: 'var(--color-cream)' }} aria-hidden="true" />
 
       {/* ── Main Content ── */}
       <main className={`flex-1 md:ml-60 min-w-0 overflow-x-hidden${appHeight ? ' flex flex-col min-h-0' : ''}`}>
