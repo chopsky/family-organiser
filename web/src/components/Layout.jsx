@@ -5,7 +5,7 @@ import { useChildMode } from '../context/ChildModeContext';
 import { CHILD_VISIBLE_ROUTES } from '../lib/childMode';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconChevronRight, IconHelp, IconList, IconGift } from './Icons';
+import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconHelp, IconList, IconGift, IconStar, IconSparkles } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -50,31 +50,34 @@ const mobileNav = [
   { to: '/calendar',   label: 'Calendar',  Icon: IconCalendar },
   { to: '/tasks',      label: 'Tasks',     Icon: IconCheck    },
   { to: '/lists',      label: 'Lists',     Icon: IconList     },
+  { to: '/settings',   label: 'Settings',  Icon: IconSettings },
 ];
 
 // Routes considered "behind the More button" for active-tab styling.
-// (The bottom-sheet redesign exposes these as feature tiles + an account
-// list, but from a navigation-state perspective they all live under More.)
+// (The bottom-sheet redesign exposes these as feature tiles - from a
+// navigation-state perspective they all live under More. Settings has
+// its own tab, so it's not here.)
 const moreNav = [
   { to: '/rewards' },
   { to: '/meals' },
   { to: '/family' },
   { to: '/documents' },
   { to: '/receipt' },
-  { to: '/settings' },
   { to: '/help' },
 ];
 
-// 2×2 feature tiles that head the More sheet. Colours are taken from the
-// Housemait iOS design handoff (warm amber / brand plum / sky blue / dusty
-// rose) - they're tile-only accents, not part of the global token set, so
-// they're inlined rather than promoted to Tailwind utilities.
+// Feature tiles filling the More sheet (2 columns × 3 rows). Everything
+// that used to hide in the Account list is now a tile - Settings moved
+// to its own bottom-nav tab and Log out lives at the foot of the
+// Settings page. Accent colours come from the founder's mock and are
+// tile-only, so they're inlined rather than promoted to Tailwind
+// utilities.
 const moreTiles = [
   {
     to: '/rewards',
     label: 'Rewards',
-    sub: 'Kids earn & spend stars',
-    Icon: IconGift,
+    sub: 'Stars & kid rewards',
+    Icon: IconStar,
     bg: '#FBF1DE',
     fg: '#D89B3A',
   },
@@ -83,14 +86,14 @@ const moreTiles = [
     label: 'Meal Plan',
     sub: 'Weekly dinners & recipes',
     Icon: IconUtensils,
-    bg: '#EFE9FB',
-    fg: '#6B3FA0',
+    bg: '#FDEEE4',
+    fg: '#D0693B',
   },
   {
     to: '/receipt',
     label: 'Receipts',
     sub: 'Scan & auto-match',
-    Icon: IconCamera,
+    Icon: IconSparkles,
     bg: '#EFE9FB',
     fg: '#6B3FA0',
   },
@@ -102,17 +105,22 @@ const moreTiles = [
     bg: '#E2ECFA',
     fg: '#5B8DE0',
   },
-];
-
-// Account section rows. Notifications, Connected apps and Privacy &
-// data are intentionally omitted - they're all reachable from inside
-// Settings, and surfacing them as separate rows promised destinations
-// we don't yet deep-link cleanly. Help & support links to /help, which
-// hosts the FAQ + contact form (logged-out users have /support).
-const moreAccountRows = [
-  { to: '/family',   label: 'Family Setup', Icon: IconUsers },
-  { to: '/settings', label: 'Settings', Icon: IconSettings },
-  { to: '/help',     label: 'Help & support', Icon: IconHelp },
+  {
+    to: '/family',
+    label: 'Family Setup',
+    sub: 'Members & household',
+    Icon: IconUsers,
+    bg: '#EDF5EE',
+    fg: '#5F8F63',
+  },
+  {
+    to: '/help',
+    label: 'Help & Support',
+    sub: 'Guides & contact us',
+    Icon: IconHelp,
+    bg: '#FBE7E7',
+    fg: '#D25454',
+  },
 ];
 
 // One tab inside the floating pill. Per the handoff, the active state
@@ -125,7 +133,9 @@ function TabItem({ label, Icon, active }) {
     <span
       className={`flex flex-col items-center gap-[3px] ${active ? 'text-plum' : 'text-warm-grey'}`}
       style={{
-        padding: '7px 14px 6px',
+        // 9px horizontal (not the handoff's 14px): six tabs share the pill
+        // since Settings joined, and 14px overflows a 375px viewport.
+        padding: '7px 9px 6px',
         borderRadius: 16,
         background: active ? 'var(--color-plum-light)' : 'transparent',
         transition: 'background .18s ease',
@@ -382,7 +392,7 @@ export default function Layout({ children }) {
               key={to}
               to={to}
               onClick={() => { hapticTap(); }}
-              className="flex-1 max-w-[76px] flex flex-col items-center"
+              className="flex-1 max-w-[64px] flex flex-col items-center"
             >
               {({ isActive }) => <TabItem label={label} Icon={Icon} active={isActive} />}
             </NavLink>
@@ -398,7 +408,7 @@ export default function Layout({ children }) {
             onClick={() => setMoreOpen(v => !v)}
             aria-expanded={moreOpen}
             aria-haspopup="dialog"
-            className="flex-1 max-w-[76px] flex flex-col items-center"
+            className="flex-1 max-w-[64px] flex flex-col items-center"
           >
             <TabItem label="More" Icon={IconMore} active={isMoreActive || moreOpen} />
           </button>
@@ -427,15 +437,15 @@ export default function Layout({ children }) {
 }
 
 /**
- * MoreSheet - iOS-style bottom sheet exposed from the 5th tab on mobile.
+ * MoreSheet - iOS-style bottom sheet exposed from the last tab on mobile.
  *
  * Anatomy (top → bottom):
  *   • Drag handle (5×40 pill)
  *   • Header row: "More" title + circular X close button
- *   • 2×2 grid of feature tiles (Meal Plan / Receipts / Documents / Family)
- *   • "Account" caption
- *   • Grouped list (Settings / Notifications / Connected apps /
- *     Privacy & data / Help & support)
+ *   • 2×3 grid of feature tiles (Rewards / Meal Plan / Receipts /
+ *     Documents / Family Setup / Help & Support) - nothing else. The old
+ *     Account list is gone: Settings is a bottom-nav tab and Log out
+ *     lives at the foot of the Settings page.
  *
  * Layout in the source tree maps to the Housemait iOS design handoff
  * (`design_handoff_housemait_ios/README.md` § "More sheet"). Tile accent
@@ -466,18 +476,8 @@ export default function Layout({ children }) {
  * panel transform reads it on render.
  */
 function MoreSheet({ onClose }) {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  function handleLogout() {
-    setShowLogoutConfirm(false);
-    onClose();
-    logout();
-    navigate('/');
-  }
 
   // `isDragging` lives in state because the panel's `transition` prop
   // depends on it (none while dragging, spring-easing otherwise) and
@@ -584,7 +584,7 @@ function MoreSheet({ onClose }) {
           {/* Header row */}
           <div className="flex items-center justify-between px-5 pt-1 pb-3">
           <h2
-            className="text-[19px] font-bold text-charcoal m-0"
+            className="text-[24px] font-bold text-charcoal m-0"
           >
             More
           </h2>
@@ -592,9 +592,9 @@ function MoreSheet({ onClose }) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-[30px] h-[30px] rounded-full bg-white border border-light-grey flex items-center justify-center text-warm-grey hover:text-charcoal active:scale-95 transition-transform"
+            className="w-10 h-10 rounded-full bg-[#F1EEE9] flex items-center justify-center text-charcoal/70 hover:text-charcoal active:scale-95 transition-transform"
           >
-            <IconX className="h-4 w-4" />
+            <IconX className="h-[18px] w-[18px]" />
           </button>
           </div>
         </div>
@@ -602,8 +602,8 @@ function MoreSheet({ onClose }) {
         {/* Scrollable body - only flexes when content overflows the
             88vh cap (rare on a phone, common on a small landscape view). */}
         <div className="flex-1 overflow-y-auto">
-          {/* 2×2 feature tiles */}
-          <div className="grid grid-cols-2 gap-3 px-5 pt-1 pb-5">
+          {/* 2×3 feature tiles - the whole sheet */}
+          <div className="grid grid-cols-2 gap-3 px-5 pt-1 pb-4">
             {moreTiles.map(({ to, label, sub, Icon, bg, fg }) => (
               <NavLink
                 key={to}
@@ -628,97 +628,8 @@ function MoreSheet({ onClose }) {
               </NavLink>
             ))}
           </div>
-
-          {/* Account section */}
-          <div className="px-5 pb-2">
-            <div className="text-[11px] font-bold tracking-[0.1em] uppercase text-warm-grey px-1 pb-2">
-              Account
-            </div>
-            <div className="bg-white rounded-2xl border border-light-grey overflow-hidden">
-              {moreAccountRows.map((row) => {
-                // All nav rows now have a divider below - Logout is the
-                // bottom-most row with no border-bottom, so we render the
-                // borders unconditionally on the link/anchor rows.
-                const rowClasses = 'flex items-center px-4 py-3.5 border-b border-light-grey';
-                const labelClasses = `flex-1 text-[14px] text-charcoal ${row.bold ? 'font-semibold' : 'font-normal'}`;
-                const Leading = row.Icon ? (
-                  <row.Icon className="h-5 w-5 text-warm-grey mr-3 shrink-0" />
-                ) : null;
-                const Chevron = (
-                  <IconChevronRight className="h-3.5 w-3.5 text-warm-grey/60 ml-2" />
-                );
-
-                if (row.href) {
-                  return (
-                    <a key={row.label} href={row.href} className={rowClasses}>
-                      {Leading}
-                      <span className={labelClasses}>{row.label}</span>
-                      {Chevron}
-                    </a>
-                  );
-                }
-                return (
-                  <NavLink key={row.label} to={row.to} className={rowClasses}>
-                    {Leading}
-                    <span className={labelClasses}>{row.label}</span>
-                    {Chevron}
-                  </NavLink>
-                );
-              })}
-
-              {/* Logout - destructive, hence coral text + no chevron.
-                  Tapped → confirmation modal renders below.            */}
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="w-full flex items-center px-4 py-3.5 text-left active:bg-cream"
-              >
-                <span className="flex-1 text-[14px] font-semibold text-coral">
-                  Log out
-                </span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
-
-      {/* Logout confirmation modal - sits ABOVE the bottom sheet (z-[70]
-          vs sheet's z-[60]). Click outside the dialog cancels. */}
-      {showLogoutConfirm && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center px-6"
-          style={{ background: 'rgba(45,42,51,0.55)' }}
-          onClick={() => setShowLogoutConfirm(false)}
-        >
-          <div
-            className="bg-cream rounded-2xl shadow-xl max-w-sm w-full p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-[18px] font-semibold text-charcoal mb-2">
-              Log out of Housemait?
-            </h3>
-            <p className="text-sm text-cocoa mb-5">
-              You'll need to sign back in next time you open the app.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-light-grey text-charcoal text-sm font-semibold hover:bg-light-grey/30 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-coral text-white text-sm font-semibold hover:bg-coral/90 transition-colors"
-              >
-                Log out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
