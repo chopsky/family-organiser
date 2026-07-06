@@ -50,6 +50,7 @@ const OPTIONAL = [
   { key: 'TWILIO_TEMPLATE_DAILY_REMINDER', hint: 'Twilio Content SID (HX...) for the approved daily-reminder template - lets the 07:00 digest land outside the 24h customer-service window' },
   { key: 'FRONTEND_URL', hint: 'OAuth redirect URL (falls back to WEB_URL)' },
   { key: 'STRIPE_PUBLISHABLE_KEY', hint: 'Stripe publishable key - only needed if the frontend ever calls Stripe.js directly' },
+  { key: 'ADMIN_ALERT_EMAIL', hint: 'Operator alerts: new-household signups + trials expiring tomorrow (falls back to SUPPORT_EMAIL)' },
 ];
 
 function checkEnv() {

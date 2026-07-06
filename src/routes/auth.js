@@ -416,6 +416,26 @@ router.post('/create-household', requireAuth, async (req, res) => {
       }
     })();
 
+    // Operator alert: new household signed up. Fire-and-forget - never
+    // block signup on it. Names are user-controlled, so escape before
+    // interpolating into the HTML email body.
+    (async () => {
+      try {
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const adminUrl = `${process.env.WEB_URL || 'https://www.housemait.com'}/admin/households/${household.id}`;
+        await email.sendAdminAlert(
+          `New household: ${household.name}`,
+          `<strong>${esc(household.name)}</strong> just signed up.<br/>` +
+          `Created by ${esc(user.name)} (${esc(user.email)})<br/>` +
+          `Country: ${esc(household.country || 'GB')} · Timezone: ${esc(household.timezone || 'Europe/London')}<br/>` +
+          `Trial ends: ${household.trial_ends_at ? new Date(household.trial_ends_at).toLocaleDateString('en-GB') : 'n/a'}<br/><br/>` +
+          `<a href="${adminUrl}">View in admin dashboard</a>`
+        );
+      } catch (err) {
+        console.error('[admin-alert] new-household alert failed for', household.id, err.message);
+      }
+    })();
+
     const response = await authResponse(user, req);
     return res.status(201).json(response);
   } catch (err) {

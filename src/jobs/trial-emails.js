@@ -51,12 +51,52 @@ async function runTrialEmailCheck() {
       await processNudgeDay(step);
     }
     await processExpiredDay();
+    await processAdminExpiryAlerts();
   } catch (err) {
     // One step's failure shouldn't take down the whole run, but log
     // loudly so monitoring can pick it up.
     console.error('[trial-emails] Daily run failed with:', err);
   }
   console.log(`[trial-emails] Daily run complete in ${Date.now() - started}ms`);
+}
+
+/**
+ * Operator alert: email the admin (ADMIN_ALERT_EMAIL / SUPPORT_EMAIL) for
+ * each household whose trial expires roughly tomorrow. Day 29 of a 30-day
+ * trial = expiry lands 24-48h after this 09:00 run, which is the last
+ * comfortable window to reach out before the paywall drops.
+ *
+ * Reuses the sent_emails (household_id, email_type) dedupe so a re-run
+ * (deploy, manual trigger) can't double-alert on the same household.
+ * Separate email per household - volume is low and per-household subjects
+ * ("Trial expires tomorrow: Bennett Family") beat a digest for actioning.
+ */
+async function processAdminExpiryAlerts() {
+  const households = await db.findHouseholdsAtTrialDay(29);
+  if (households.length === 0) {
+    console.log('[trial-emails] No households at day 29 - no admin expiry alerts');
+    return;
+  }
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  for (const household of households) {
+    try {
+      const claimed = await db.markEmailSentIfNew(household.id, 'admin_trial_expiry_alert');
+      if (!claimed) continue;
+      const expires = household.trial_ends_at
+        ? new Date(household.trial_ends_at).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })
+        : 'unknown';
+      const adminUrl = `${process.env.WEB_URL || 'https://www.housemait.com'}/admin/households/${household.id}`;
+      await email.sendAdminAlert(
+        `Trial expires tomorrow: ${household.name}`,
+        `<strong>${esc(household.name)}</strong>'s free trial expires ${esc(expires)}.<br/>` +
+        `They have not subscribed yet.<br/><br/>` +
+        `<a href="${adminUrl}">View in admin dashboard</a>`
+      );
+      console.log(`[trial-emails] admin expiry alert sent for household ${household.id}`);
+    } catch (err) {
+      console.error(`[trial-emails] admin expiry alert failed for household ${household.id}:`, err.message);
+    }
+  }
 }
 
 async function processNudgeDay({ dayCount, emailType, sender, respectOptOut }) {
@@ -150,5 +190,5 @@ async function dispatchEmail({ household, emailType, sender }) {
 module.exports = {
   runTrialEmailCheck,
   // Exposed for tests + manual triggers
-  _internal: { NUDGE_SCHEDULE, processNudgeDay, processExpiredDay, dispatchEmail },
+  _internal: { NUDGE_SCHEDULE, processNudgeDay, processExpiredDay, processAdminExpiryAlerts, dispatchEmail },
 };
