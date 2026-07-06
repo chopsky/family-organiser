@@ -11,6 +11,37 @@ function isChunkLoadError(error) {
 
 const RELOAD_TS_KEY = 'housemait_chunk_reload_ts';
 
+// A plain window.location.reload() can re-serve the SAME stale index.html from
+// the HTTP cache - which just lands back on the missing-chunk error, trapping
+// the user on this banner forever. So we reload with a cache-busting query
+// param (the browser keys its cache on the full URL, so a fresh param forces a
+// network fetch of index.html), after best-effort clearing any Cache Storage.
+// The param is harmless - React Router ignores unknown query keys - and
+// location.replace() avoids piling up history entries.
+function hardReload() {
+  const bust = () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('_r', String(Date.now()));
+      window.location.replace(url.toString());
+    } catch {
+      window.location.reload();
+    }
+  };
+  // There's no service worker today, but clear Cache Storage anyway so this
+  // stays correct if one is ever added. Never let it block the reload.
+  try {
+    if (typeof caches !== 'undefined' && caches.keys) {
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .catch(() => {})
+        .finally(bust);
+      return;
+    }
+  } catch { /* caches unavailable - fall through */ }
+  bust();
+}
+
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -30,7 +61,7 @@ export default class ErrorBoundary extends Component {
       try { last = Number(sessionStorage.getItem(RELOAD_TS_KEY)) || 0; } catch { /* private mode */ }
       if (Date.now() - last > 15000) {
         try { sessionStorage.setItem(RELOAD_TS_KEY, String(Date.now())); } catch { /* private mode */ }
-        window.location.reload();
+        hardReload();
       }
     }
   }
@@ -51,7 +82,7 @@ export default class ErrorBoundary extends Component {
                 : (this.state.error?.message || 'An unexpected error occurred.')}
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={hardReload}
               className="bg-primary hover:bg-primary-pressed text-white font-medium px-6 py-2.5 rounded-2xl transition-colors"
             >
               {isChunk ? 'Reload now' : 'Reload app'}
