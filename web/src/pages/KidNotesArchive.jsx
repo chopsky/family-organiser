@@ -126,11 +126,8 @@ export default function KidNotesArchive() {
   };
 
   return (
-    <div className="max-w-[720px] mx-auto">
-      <PageHeader
-        title="Notes from the kids"
-        subtitle="Every note your children have sent you - keep them, react, or print."
-      />
+    <div className="max-w-[1160px] mx-auto pb-24">
+      <PageHeader title="Notes from the kids" />
 
       {kidsWithNotes.length > 1 && (
         <div className="flex flex-wrap" style={{ gap: 8, marginBottom: 6 }}>
