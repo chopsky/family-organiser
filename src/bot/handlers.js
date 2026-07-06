@@ -2009,7 +2009,24 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       if (!child) {
         return { response: `I couldn't find a child called "${sa.child_name}" in your family. Check the name and try again!`, actions };
       }
-      if (sa.action === 'remove') {
+      if (sa.action === 'skip') {
+        // "No swimming today" - hide ONE date, keep the series weekly.
+        // Same fuzzy match as remove; day narrowing comes from the skip
+        // date's weekday when the classifier didn't set day_of_week.
+        const activities = await db.getChildActivities(child.id);
+        const match = activities.find(a =>
+          a.activity.toLowerCase() === sa.activity.toLowerCase() &&
+          (sa.day_of_week === undefined || sa.day_of_week === null || a.day_of_week === sa.day_of_week)
+        );
+        if (!match) {
+          return { response: `I couldn't find "${sa.activity}" in ${child.name}'s weekly activities, so nothing was skipped.`, actions };
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(sa.skip_date || '')) {
+          return { response: `Which date should I skip ${child.name}'s ${match.activity}? Tell me the day (e.g. "today" or "Thursday").`, actions };
+        }
+        await db.addActivitySkip(match.id, household.id, sa.skip_date, null);
+        return { response: result.response_message || `🏫 Skipped ${child.name}'s ${match.activity} on ${sa.skip_date} - back to normal the week after. ✅`, actions };
+      } else if (sa.action === 'remove') {
         // Find and remove the activity
         const activities = await db.getChildActivities(child.id);
         const match = activities.find(a =>

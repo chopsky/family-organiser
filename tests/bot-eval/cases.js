@@ -381,4 +381,33 @@ module.exports = [
       return null;
     },
   },
+  {
+    name: 'activity skip: "remove wraparound care for today only" is a SKIP, not a remove (real failure 2026-07-06)',
+    message: 'Remove Logan wraparound care from calendar for today only',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Logan'] },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action !== 'skip') return `expected action "skip", got "${sa.action}" (a "today only" removal must never delete the series)`;
+      const today = new Date().toISOString().split('T')[0];
+      if (sa.skip_date !== today) return `expected skip_date ${today}, got ${sa.skip_date}`;
+      if (!/wraparound/i.test(sa.activity || '')) return `wrong activity: "${sa.activity}"`;
+      if ((sa.child_name || '').toLowerCase() !== 'logan') return `wrong child: "${sa.child_name}"`;
+      return null;
+    },
+  },
+  {
+    name: 'activity remove: "Logan has quit football club" deletes the series (no skip_date)',
+    message: 'Logan has quit football club, take it off his schedule',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Logan'] },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action !== 'remove') return `expected action "remove" (quit = whole series), got "${sa.action}"`;
+      if (!/football/i.test(sa.activity || '')) return `wrong activity: "${sa.activity}"`;
+      return null;
+    },
+  },
 ];
