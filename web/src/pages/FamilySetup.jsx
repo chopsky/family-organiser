@@ -599,6 +599,9 @@ export default function FamilySetup() {
       });
       setShowAddDependent(false);
       await loadMembers();
+      // Kid-gated surfaces (Kids' Notes nav, Child Mode card) listen for
+      // this and appear the moment the first child is added.
+      window.dispatchEvent(new Event('housemait:members-changed'));
       const updatedSchools = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(updatedSchools);
       setSuccess('Member added!');
@@ -662,6 +665,8 @@ export default function FamilySetup() {
     setMembers((cur) => cur.filter((m) => m.id !== member.id));
     try {
       await api.delete(`/household/dependents/${member.id}`);
+      // Removing the last child hides the kid-gated surfaces again.
+      window.dispatchEvent(new Event('housemait:members-changed'));
     } catch (err) {
       // Rollback the optimistic removal.
       setMembers(prevMembers);

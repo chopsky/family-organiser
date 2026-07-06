@@ -25,6 +25,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import { MEMBER_HEX } from '../lib/memberColors';
 import { useChildMode } from '../context/ChildModeContext';
+import useHasChildren from '../hooks/useHasChildren';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
 } from '../lib/location';
@@ -518,6 +519,7 @@ export default function Settings() {
   // owner-only (isOwner), enforced on the server too.
   const { household, user, canManage: isAdmin, isOwner, login, logout, token, updateHousehold } = useAuth();
   const { enabled: childMode, enable: enableChildMode, disable: disableChildMode, pinIsSet } = useChildMode();
+  const hasChildren = useHasChildren();
   const navigate = useNavigate();
 
   // ── Child Mode PIN management ──────────────────────────────────
@@ -1478,11 +1480,16 @@ export default function Settings() {
       {/* Child mode - standalone gradient card on web (a hero feature, not
           an accordion row); on iOS it sits between the profile card and the
           grouped section list. The id anchors the ?section=child-mode deep
-          link on both platforms. */}
-      <div id="settings-section-child-mode">
-        <SectionLabel>Child mode</SectionLabel>
-        {childModeCard}
-      </div>
+          link on both platforms. Hidden until the household has a child -
+          UNLESS Child Mode is already in use (PIN set or this device locked):
+          the controls for an active lock must never vanish, even if the last
+          child profile is removed. */}
+      {(hasChildren || pinIsSet || childMode) && (
+        <div id="settings-section-child-mode">
+          <SectionLabel>Child mode</SectionLabel>
+          {childModeCard}
+        </div>
+      )}
 
       {/* iOS list mode: nav rows grouped into labelled cards (same groups
           + labels as the web page's sections), each row opening a popup

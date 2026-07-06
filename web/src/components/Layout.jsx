@@ -7,6 +7,7 @@ import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconHelp, IconList, IconGift, IconStar, IconMail } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
+import useHasChildren from '../hooks/useHasChildren';
 import KidNoteAlert from './KidNoteAlert';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -158,6 +159,7 @@ export function ChildModeChip() {
 export default function Layout({ children }) {
   const { household, user, token, login, logout, isPlatformAdmin } = useAuth();
   const { enabled: childMode } = useChildMode();
+  const hasChildren = useHasChildren();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -278,11 +280,18 @@ export default function Layout({ children }) {
   const appHeight = ['/tasks', '/lists', '/rewards'].includes(location.pathname);
   const isDashboard = location.pathname === '/dashboard';
 
+  // Kid-only destinations hide until the household has a child - the app
+  // grows as the family is set up (same rule as the Child Mode card in
+  // Settings). The routes stay reachable; only the nav adapts.
+  const groupsForHousehold = hasChildren
+    ? navGroups
+    : navGroups.map((g) => ({ ...g, items: g.items.filter((i) => i.to !== '/notes') })).filter((g) => g.items.length);
+
   // Child Mode trims the nav to the kid-safe routes. Desktop groups drop empty;
   // the mobile bar swaps Lists out for Rewards and loses the More button.
   const visibleGroups = childMode
-    ? navGroups.map((g) => ({ ...g, items: g.items.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)) })).filter((g) => g.items.length)
-    : navGroups;
+    ? groupsForHousehold.map((g) => ({ ...g, items: g.items.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)) })).filter((g) => g.items.length)
+    : groupsForHousehold;
   const visibleMobileNav = childMode
     ? [
       ...mobileNav.filter((i) => CHILD_VISIBLE_ROUTES.includes(i.to)),
@@ -480,6 +489,7 @@ export default function Layout({ children }) {
  * panel transform reads it on render.
  */
 function MoreSheet({ onClose }) {
+  const hasChildren = useHasChildren();
   const [mounted, setMounted] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
 
@@ -608,7 +618,7 @@ function MoreSheet({ onClose }) {
         <div className="flex-1 overflow-y-auto">
           {/* 2×3 feature tiles - the whole sheet */}
           <div className="grid grid-cols-2 gap-3 px-5 pt-1 pb-4">
-            {moreTiles.map(({ to, label, sub, Icon, bg, fg }) => (
+            {moreTiles.filter((t) => hasChildren || t.to !== '/notes').map(({ to, label, sub, Icon, bg, fg }) => (
               <NavLink
                 key={to}
                 to={to}

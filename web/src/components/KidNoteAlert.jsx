@@ -23,12 +23,15 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import { confirmDestructive } from '../lib/action-sheet';
 import { prettyNoteDate } from '../lib/kidNotes';
+import useHasChildren from '../hooks/useHasChildren';
 import KidNotePopup from './KidNotePopup';
 
 const INK3 = '#8A8493';
 
 export default function KidNoteAlert() {
   const { user } = useAuth();
+  // No children → no notes can ever exist; skip the 60s polling entirely.
+  const hasChildren = useHasChildren();
   const [notes, setNotes] = useState([]);
   // Snoozed-for-this-session note ids (the banner's ✕). Deliberately NOT
   // persisted: a note the parent hasn't reacted to must never be lost - it
@@ -41,6 +44,7 @@ export default function KidNoteAlert() {
     // One-time cleanup of the old localStorage flag: earlier builds hid a
     // note forever the moment it was opened, stranding un-reacted notes.
     try { localStorage.removeItem('kidNotesSeen'); } catch { /* private browsing */ }
+    if (!hasChildren) return undefined; // polling starts if a child is added
     let cancelled = false;
     const load = async () => {
       try {
@@ -54,7 +58,7 @@ export default function KidNoteAlert() {
     load();
     const t = setInterval(load, 60000);
     return () => { cancelled = true; clearInterval(t); };
-  }, []);
+  }, [hasChildren]);
 
   const snooze = (noteId) => setSnoozed((s) => new Set(s).add(noteId));
 
