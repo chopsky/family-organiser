@@ -134,10 +134,11 @@ async function householdChild(householdId, childId) {
 // failure here is swallowed after logging.
 async function saveNoteToDocuments(householdId, child, buffer, uploadedBy, tz) {
   try {
-    let folder = await db.findDocumentFolderByName(householdId, child.name);
+    const folderName = `${child.name} - Notes`;
+    let folder = await db.findDocumentFolderByName(householdId, folderName);
     if (!folder) {
       folder = await db.createDocumentFolder(householdId, {
-        name: child.name, visibility: 'shared', created_by: uploadedBy, icon: 'image', color: '#6C3DD9',
+        name: folderName, visibility: 'shared', created_by: uploadedBy, icon: 'image', color: '#6C3DD9',
       });
     }
     // Human-readable timestamp in the household's timezone, e.g.

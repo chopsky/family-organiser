@@ -153,7 +153,7 @@ describe('kids notes', () => {
     // Keepsake copy: a folder named after the child + a timestamped doc.
     // (Fire-and-forget in the route, so let the microtasks flush first.)
     await new Promise((r) => setImmediate(r));
-    expect(db.createDocumentFolder).toHaveBeenCalledWith('h1', expect.objectContaining({ name: 'Olivia', visibility: 'shared' }));
+    expect(db.createDocumentFolder).toHaveBeenCalledWith('h1', expect.objectContaining({ name: 'Olivia - Notes', visibility: 'shared' }));
     const docCall = db.createDocument.mock.calls[0][1];
     expect(docCall.folder_id).toBe('f1');
     expect(docCall.mime_type).toBe('image/png');
