@@ -194,7 +194,7 @@ const SET_CARD_CLASS = 'bg-white rounded-[18px] border border-[rgba(26,22,32,0.0
 
 function SectionLabel({ children }) {
   return (
-    <div className="text-[11px] font-semibold uppercase text-warm-grey mb-3 ml-1" style={{ letterSpacing: '0.1em' }}>
+    <div className="text-[11px] font-bold uppercase text-warm-grey mb-3 ml-1" style={{ letterSpacing: '0.1em' }}>
       {children}
     </div>
   );
@@ -317,7 +317,7 @@ function ProfileCard({ me, members }) {
   }).format(new Date(d));
 
   const badge = (label, cls) => (
-    <span className={`inline-flex items-center gap-1.5 px-[11px] py-1 rounded-full text-[12.5px] font-semibold ${cls}`}>{label}</span>
+    <span className={`inline-flex items-center gap-1.5 px-[11px] py-1 rounded-full text-[12.5px] font-bold ${cls}`}>{label}</span>
   );
   const planBadge = isInternal ? badge('Internal', 'bg-plum-light text-plum')
     : isActive ? badge(<><span className="text-[13px]">✦</span> Premium</>, 'bg-plum-light text-plum')
@@ -353,7 +353,7 @@ function ProfileCard({ me, members }) {
       <div className="flex items-center gap-[18px] p-[22px]">
         <Avatar member={me || user} size={60} />
         <div className="flex-1 min-w-0">
-          <div className="text-lg font-semibold text-bark truncate">{user?.name}</div>
+          <div className="text-lg font-bold text-bark truncate">{user?.name}</div>
           <div className="text-[13px] text-warm-grey mt-0.5 truncate">
             {[user?.email, me?.family_role || (isOwner ? 'Owner' : 'Member')].filter(Boolean).join(' · ')}
           </div>
@@ -1409,7 +1409,7 @@ export default function Settings() {
       <div className="flex items-center gap-[18px] p-[22px] flex-wrap sm:flex-nowrap">
         <div className="w-[54px] h-[54px] rounded-2xl bg-white flex items-center justify-center text-[28px] shrink-0">🧸</div>
         <div className="flex-1 min-w-0 basis-48">
-          <div className="text-base font-semibold text-bark">Hand the device to your kids</div>
+          <div className="text-base font-bold text-bark">Hand the device to your kids</div>
           <div className="text-[13px] text-cocoa mt-[3px] leading-[1.45] max-w-[440px]">
             A simpler, playful space with only their quests, star shop and calendar. You&apos;ll need your PIN to switch back.
           </div>
@@ -2737,7 +2737,7 @@ export default function Settings() {
                     >
                       <Avatar member={k} size={46} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-base font-semibold text-bark">{k.name}</div>
+                        <div className="text-base font-bold text-bark">{k.name}</div>
                         <div className="text-[12.5px] text-warm-grey">Quests · Star Shop · My Days</div>
                       </div>
                       <IconChevronRight className="w-4 h-4 text-warm-grey/60 shrink-0" />
