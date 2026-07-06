@@ -1171,6 +1171,58 @@ describe('GET /api/schools/activities (household-wide)', () => {
   });
 });
 
+// ─── Activity skips ("skip just this day") ──────────────────────────────────────
+// One (activity, date) row hides a single occurrence of a weekly activity
+// everywhere it's expanded, without touching the series. The routes must be
+// household-scoped (no skipping another household's activity) and validate the
+// date shape, since it lands in a DATE column and in ICS/calendar filters.
+describe('activity skips', () => {
+  const ACTIVITY = { id: 'act-1', child_id: 'u-2', day_of_week: 0, activity: 'Wraparound Care' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.getChildActivityById.mockResolvedValue(ACTIVITY);
+    db.getHouseholdMembers.mockResolvedValue(MEMBERS);
+  });
+
+  test('POST creates a skip for one date', async () => {
+    const res = await request(app)
+      .post('/api/schools/activities/act-1/skips')
+      .set(AUTH)
+      .send({ date: '2026-07-06' });
+    expect(res.status).toBe(201);
+    expect(db.addActivitySkip).toHaveBeenCalledWith('act-1', 'hh-1', '2026-07-06', 'u-1');
+  });
+
+  test('POST rejects a malformed date', async () => {
+    const res = await request(app)
+      .post('/api/schools/activities/act-1/skips')
+      .set(AUTH)
+      .send({ date: 'today' });
+    expect(res.status).toBe(400);
+    expect(db.addActivitySkip).not.toHaveBeenCalled();
+  });
+
+  test('POST 404s for an activity outside the household', async () => {
+    // Child u-99 is not in MEMBERS, so childInHousehold fails.
+    db.getChildActivityById.mockResolvedValue({ ...ACTIVITY, child_id: 'u-99' });
+    const res = await request(app)
+      .post('/api/schools/activities/act-1/skips')
+      .set(AUTH)
+      .send({ date: '2026-07-06' });
+    expect(res.status).toBe(404);
+    expect(db.addActivitySkip).not.toHaveBeenCalled();
+  });
+
+  test('DELETE removes a skip (un-skip)', async () => {
+    const res = await request(app)
+      .delete('/api/schools/activities/act-1/skips/2026-07-06')
+      .set(AUTH);
+    expect(res.status).toBe(200);
+    expect(db.removeActivitySkip).toHaveBeenCalledWith('act-1', '2026-07-06');
+  });
+});
+
 // ─── GET /api/schools must not delete brand-new schools ─────────────────────────
 // A school just added via "Add a school" has no children, no term dates and no
 // iCal feed yet. GET is a pure read - it must return it (so the add-then-import

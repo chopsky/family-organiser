@@ -19,6 +19,12 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/.claude/"
+    ]
+  },
   "engines": {
     "node": ">=20"
   },

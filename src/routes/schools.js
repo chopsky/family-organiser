@@ -429,6 +429,59 @@ router.delete('/activities/:activityId', requireAuth, requireHousehold, requireA
   }
 });
 
+// Matches the DATE column format; anything else is a client bug.
+const SKIP_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * POST /api/schools/activities/:activityId/skips
+ * "Skip just this day": hide one occurrence of a weekly activity on one
+ * date (body: { date: 'YYYY-MM-DD' }). The series is untouched; every
+ * expansion surface (calendar, Kids Mode, After-School card, digest, ICS
+ * feed) filters skipped dates out. Idempotent - re-skipping is a no-op.
+ */
+router.post('/activities/:activityId/skips', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { date } = req.body;
+  if (!date || !SKIP_DATE_RE.test(date)) {
+    return res.status(400).json({ error: 'date (YYYY-MM-DD) is required.' });
+  }
+  try {
+    const existing = await db.getChildActivityById(req.params.activityId);
+    if (!existing || !(await childInHousehold(existing.child_id, req.householdId))) {
+      return res.status(404).json({ error: 'Activity not found.' });
+    }
+    await db.addActivitySkip(req.params.activityId, req.householdId, date, req.user?.id || null);
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.status(201).json({ message: 'Skipped.', activity_id: req.params.activityId, date });
+  } catch (err) {
+    console.error('POST /api/schools/activities/:activityId/skips error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/schools/activities/:activityId/skips/:date
+ * Un-skip: restore a previously skipped occurrence.
+ */
+router.delete('/activities/:activityId/skips/:date', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  if (!SKIP_DATE_RE.test(req.params.date)) {
+    return res.status(400).json({ error: 'date must be YYYY-MM-DD.' });
+  }
+  try {
+    const existing = await db.getChildActivityById(req.params.activityId);
+    if (!existing || !(await childInHousehold(existing.child_id, req.householdId))) {
+      return res.status(404).json({ error: 'Activity not found.' });
+    }
+    await db.removeActivitySkip(req.params.activityId, req.params.date);
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ message: 'Skip removed.' });
+  } catch (err) {
+    console.error('DELETE /api/schools/activities/:activityId/skips/:date error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * POST /api/schools/:schoolId/import-ical
  * Import events from a school's iCal feed URL.

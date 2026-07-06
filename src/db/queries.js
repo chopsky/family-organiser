@@ -1116,7 +1116,7 @@ async function getChildActivities(childId, db = supabase) {
     .eq('child_id', childId)
     .order('day_of_week');
   if (error) throw error;
-  return data || [];
+  return attachActivitySkips(data || [], db);
 }
 
 // All weekly activities across every child in a household, regardless of
@@ -1133,7 +1133,7 @@ async function getHouseholdActivities(householdId, db = supabase) {
     .order('day_of_week');
   if (error) throw error;
   // Strip the joined users object so callers get clean activity rows.
-  return (data || []).map(({ users, ...activity }) => activity);
+  return attachActivitySkips((data || []).map(({ users, ...activity }) => activity), db);
 }
 
 // Fetch a single activity by id (used by the routes to resolve its child_id
@@ -1154,6 +1154,74 @@ async function deleteChildActivity(activityId, db = supabase) {
     .delete()
     .eq('id', activityId);
   if (error) throw error;
+}
+
+// ─── Activity skips ("skip just this day" for a weekly activity) ────────────
+// Mirrors chore_skips: one row per (activity, date) hides that single
+// occurrence everywhere activities are expanded (calendar, Kids Mode,
+// After-School card, digest, ICS feed) without touching the series.
+
+// PostgREST error codes that mean "activity_skips doesn't exist yet"
+// (migration-activity-skips.sql not applied): 42P01 = undefined_table,
+// PGRST205 = table missing from schema cache, PGRST200 = unknown
+// relationship (embed variant). Reads degrade to "no skips" on these so
+// activities keep working pre-migration; writes surface a clear error.
+function isMissingSkipsTable(error) {
+  return error && (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST200');
+}
+
+// Attach `skips: ['YYYY-MM-DD', …]` to each activity row (single query for
+// the whole batch). Pre-migration the column is just an empty array.
+async function attachActivitySkips(activities, db = supabase) {
+  if (!activities.length) return activities;
+  const { data, error } = await db
+    .from('activity_skips')
+    .select('activity_id, date')
+    .in('activity_id', activities.map((a) => a.id));
+  if (error) {
+    if (isMissingSkipsTable(error)) return activities.map((a) => ({ ...a, skips: [] }));
+    throw error;
+  }
+  const byActivity = new Map();
+  for (const row of data || []) {
+    if (!byActivity.has(row.activity_id)) byActivity.set(row.activity_id, []);
+    byActivity.get(row.activity_id).push(row.date);
+  }
+  return activities.map((a) => ({ ...a, skips: (byActivity.get(a.id) || []).sort() }));
+}
+
+async function addActivitySkip(activityId, householdId, dateStr, createdBy = null, db = supabase) {
+  const { error } = await db
+    .from('activity_skips')
+    .upsert(
+      { activity_id: activityId, household_id: householdId, date: dateStr, created_by: createdBy },
+      { onConflict: 'activity_id,date', ignoreDuplicates: true }
+    );
+  if (error) throw error;
+}
+
+async function removeActivitySkip(activityId, dateStr, db = supabase) {
+  const { error } = await db
+    .from('activity_skips')
+    .delete()
+    .eq('activity_id', activityId)
+    .eq('date', dateStr);
+  if (error) throw error;
+}
+
+// All skips for a household (small table; callers build a lookup set). Used
+// by the ICS feed and the reminders job, which work server-side without the
+// embedded `skips` arrays.
+async function getActivitySkipsForHousehold(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('activity_skips')
+    .select('activity_id, date')
+    .eq('household_id', householdId);
+  if (error) {
+    if (isMissingSkipsTable(error)) return [];
+    throw error;
+  }
+  return data || [];
 }
 
 async function addChildSchoolEvent(data, db = supabase) {
@@ -8305,6 +8373,9 @@ module.exports = {
   getHouseholdActivities,
   getActivitiesByChildIds,
   deleteChildActivity,
+  addActivitySkip,
+  removeActivitySkip,
+  getActivitySkipsForHousehold,
   addChildSchoolEvent,
   getChildSchoolEvents,
   // Meals
