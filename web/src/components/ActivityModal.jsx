@@ -1,27 +1,32 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
+import Avatar from './ui/Avatar';
 
 /**
  * ActivityModal - add/edit form for a child's weekly extracurricular
- * activity (child_weekly_schedule). Extracted from FamilySetup so the
- * Calendar's activity sheet (and its "Extracurricular" create flow) can
- * open the exact same form; visuals are unchanged from the FamilySetup
- * original.
+ * activity (child_weekly_schedule), shared by Family Setup and the
+ * Calendar's activity sheet / create flow.
+ *
+ * Styled to the app's shared modal language (the Tasks/Rewards modals and
+ * the Calendar create sheet): serif 22px heading, 12px/600 field labels,
+ * white rounded-10 inputs, day-chip pills, avatar-ring child picker and a
+ * right-aligned white-Cancel + solid-primary footer.
  *
  * Self-contained: owns its form state, loads the child's school terms for
  * the term selector (add mode only - edits keep their existing window),
- * and performs the POST/PATCH/DELETE + un-skip calls itself.
+ * and performs the POST/PATCH/DELETE + un-skip calls itself. ADD mode
+ * supports MULTI-day selection (one schedule row per chosen weekday, the
+ * same model as the Calendar create flow); EDIT mode moves the single row.
  *
  * Props:
  *   child        - { id, name } the activity belongs to. May be null in ADD
  *                  mode when childOptions is provided (the modal then shows
- *                  a child selector - the Calendar's "new extracurricular"
- *                  path, where no child is implied yet).
+ *                  an avatar child picker).
  *   childOptions - dependents to choose from when `child` is null
  *   members      - household members for the pickup selector
  *   activity     - existing activity row (edit mode) or null (add mode).
- *                  In edit mode its `skips` array renders as removable
- *                  "skipped date" chips (upcoming dates only).
+ *                  In edit mode its `skips` / `overrides` render as
+ *                  removable "one-off changes" chips (upcoming dates only).
  *   presetDay    - 0-6 (Mon-Sun) initial weekday for ADD mode (e.g. the
  *                  calendar cell the user started from)
  *   onClose      - dismiss without necessarily saving
@@ -31,11 +36,42 @@ import api from '../lib/api';
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const todayYmd = () => new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
 
-// "2026-07-06" → "Mon 6 Jul" for the skipped-date chips.
+// Shared modal tokens - mirrored from Chores.jsx / Calendar.jsx so every
+// create/edit dialog reads as one family.
+const M_INK = '#1A1620', M_INK2 = '#4A4453', M_INK3 = '#8A8493';
+const M_LINE_STRONG = 'rgba(26,22,32,0.12)';
+const M_BRAND = '#6C3DD9', M_BRAND_SOFT = '#EFE9FB';
+const M_BG_SOFT = '#F3EEE5';
+const M_SERIF = 'var(--font-serif-display)';
+const mInput = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${M_LINE_STRONG}`, fontSize: 14, color: M_INK, outline: 'none', background: '#fff', fontFamily: 'inherit' };
+
+function Field({ label, right, children, style }) {
+  return (
+    <div style={{ marginBottom: 16, ...style }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: M_INK2 }}>{label}</div>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// "2026-07-06" → "Mon 6 Jul" for the one-off-change chips.
 function fmtSkipDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
+
+const COLOR_HEX = {
+  red: '#E25555', 'burnt-orange': '#E07A3A', amber: '#E8A040', gold: '#C5A833',
+  leaf: '#7BAE4E', emerald: '#3A9E6E', teal: '#3AADA0', sky: '#4A9FCC',
+  cobalt: '#3A6FD4', indigo: '#6558C7', purple: '#9050B5', magenta: '#C74E95',
+  rose: '#E06888', terracotta: '#C47A5E', moss: '#7C8A6E', slate: '#7A8694',
+  sage: '#7DAE82', plum: '#6B3FA0', coral: '#E8724A', pink: '#D4537E',
+  lavender: '#6558C7', orange: '#E8A040', blue: '#4A9FCC', green: '#7DAE82', gray: '#7A8694',
+};
+const hexFor = (m) => (m?.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage);
 
 export default function ActivityModal({ child = null, childOptions = [], members = [], activity = null, presetDay = 0, onClose, onChanged }) {
   const editing = !!activity;
@@ -43,7 +79,8 @@ export default function ActivityModal({ child = null, childOptions = [], members
   // Calendar's create path). All child-dependent logic uses `kid`.
   const [childSelId, setChildSelId] = useState(child?.id || childOptions[0]?.id || '');
   const kid = child || childOptions.find((c) => c.id === childSelId) || null;
-  const [day, setDay] = useState(editing ? (activity.day_of_week ?? 0) : presetDay);
+  // EDIT moves the one row; ADD creates one row per selected day.
+  const [days, setDays] = useState(editing ? [activity.day_of_week ?? 0] : [presetDay]);
   const [name, setName] = useState(editing ? (activity.activity || '') : '');
   const [timeStart, setTimeStart] = useState(editing && activity.time_start ? activity.time_start.substring(0, 5) : '');
   const [timeEnd, setTimeEnd] = useState(editing && activity.time_end ? activity.time_end.substring(0, 5) : '');
@@ -68,7 +105,7 @@ export default function ActivityModal({ child = null, childOptions = [], members
   const [customEnd, setCustomEnd] = useState('');
 
   useEffect(() => {
-    if (editing || !kid?.id) return;
+    if (editing || !kid?.id) return undefined;
     let cancelled = false;
     setTermsLoading(true);
     api.get(`/schools/terms/${kid.id}`)
@@ -86,12 +123,11 @@ export default function ActivityModal({ child = null, childOptions = [], members
   }, [editing, kid?.id]);
 
   async function handleSave() {
-    if (!name.trim() || !kid) return;
+    if (!name.trim() || !kid || days.length === 0) return;
     setSaving(true);
     setError('');
     try {
       const body = {
-        day_of_week: day,
         activity: name.trim(),
         time_start: timeStart || null,
         time_end: timeEnd || null,
@@ -113,9 +149,11 @@ export default function ActivityModal({ child = null, childOptions = [], members
         }
       }
       if (editing) {
-        await api.patch(`/schools/activities/${activity.id}`, body);
+        await api.patch(`/schools/activities/${activity.id}`, { ...body, day_of_week: days[0] });
       } else {
-        await api.post('/schools/activities', { ...body, child_id: kid.id });
+        for (const day of [...days].sort((a, b) => a - b)) {
+          await api.post('/schools/activities', { ...body, day_of_week: day, child_id: kid.id });
+        }
       }
       onChanged?.();
       onClose?.();
@@ -152,151 +190,204 @@ export default function ActivityModal({ child = null, childOptions = [], members
   }
 
   if (!kid) return null;
+  const disabled = saving || !name.trim() || days.length === 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
-      <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-5 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base md:text-medium font-semibold text-bark">{editing ? 'Edit activity' : 'Add activity'}</h2>
-          <button onClick={onClose} className="text-cocoa hover:text-bark p-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
+      <div className="relative bg-white rounded-2xl shadow-lg p-5 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ border: `1px solid ${M_LINE_STRONG}` }} onClick={(e) => e.stopPropagation()}>
+        {/* Header - serif 22 + soft square close, matching the Calendar /
+            Tasks / Rewards modals. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <h2 style={{ margin: 0, fontFamily: M_SERIF, fontSize: 22, fontWeight: 400, color: M_INK }}>
+            {editing ? 'Edit activity' : 'Add activity'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{ width: 34, height: 34, borderRadius: 10, border: 0, background: M_BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={M_INK2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
+
+        {/* Who's it for - avatar-ring picker when the caller lets the user
+            choose; a fixed-child caption chip otherwise. */}
         {!child && childOptions.length > 0 ? (
-          <div className="flex items-center gap-2 mb-4">
-            <label className="text-xs text-cocoa">For:</label>
-            <select value={childSelId} onChange={(e) => setChildSelId(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
-              {childOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          <Field label="Who's it for">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {childOptions.map((c) => {
+                const on = childSelId === c.id;
+                const hx = hexFor(c);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setChildSelId(c.id)}
+                    title={c.name}
+                    style={{ position: 'relative', border: on ? `2px solid ${hx}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <Avatar member={c} size={50} bg="#fff" />
+                    {on && (
+                      <span style={{ position: 'absolute', right: -2, bottom: -2, width: 18, height: 18, borderRadius: '50%', background: hx, border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
         ) : (
-          <p className="text-xs text-cocoa mb-4">For {kid.name}</p>
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: M_INK3 }}>For {kid.name}</p>
         )}
 
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <select value={day} onChange={(e) => setDay(Number(e.target.value))} className="border border-cream-border rounded-lg px-2 py-2 text-sm bg-white">
-              {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-            </select>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Swimming" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" autoFocus />
+        {/* Activity name */}
+        <Field label="Activity name">
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Swimming" style={mInput} />
+        </Field>
+
+        {/* Day chips - multi-select when adding (one row per day, matching
+            the Calendar create flow); single-select when editing the row. */}
+        <Field label={editing ? 'Day' : 'Repeats on'}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {DAY_LABELS.map((d, i) => {
+              const on = days.includes(i);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={on}
+                  aria-label={d}
+                  onClick={() => {
+                    if (editing) setDays([i]);
+                    else setDays((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]));
+                  }}
+                  style={{ padding: '6px 10px', borderRadius: 99, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', border: on ? `1.5px solid ${M_BRAND}` : `1px solid ${M_LINE_STRONG}`, background: on ? M_BRAND_SOFT : '#fff', color: on ? M_BRAND : M_INK2 }}
+                >
+                  {d.slice(0, 2)}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex gap-2 items-center flex-wrap">
-            <label className="text-xs text-cocoa">Starts at:</label>
-            <input type="time" value={timeStart} onChange={(e) => setTimeStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-            <label className="text-xs text-cocoa">Ends at:</label>
-            <input type="time" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-          </div>
+        </Field>
 
-          {/* Term window applies only to NEW activities. Edits keep their
-              existing window (the term concept is per-activity, not a move). */}
-          {!editing && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <label className="text-xs text-cocoa font-medium">Term:</label>
-                <select value={termKey} onChange={(e) => setTermKey(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
-                  {terms.map((t) => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
-                  <option value="ongoing">Ongoing (every term)</option>
-                  <option value="custom">Custom dates…</option>
-                </select>
-                {termsLoading && <span className="text-[11px] text-cocoa">Loading…</span>}
-              </div>
-              {termKey === 'custom' ? (
-                <div className="flex gap-2 items-center flex-wrap">
-                  <label className="text-xs text-cocoa">Runs:</label>
-                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                  <span className="text-xs text-cocoa">to</span>
-                  <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                </div>
-              ) : (
-                <p className="text-[11px] text-cocoa">
-                  {termKey === 'ongoing'
-                    ? 'Will show every term, until you remove it.'
-                    : `Will be set for ${(terms.find((t) => t.start_date === termKey)?.label) || 'this term'} only.`}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-2 items-center">
-            <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
-            {/* Adults only - a child can't collect a child. */}
-            <select value={pickup} onChange={(e) => setPickup(e.target.value)} className="flex-1 border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
-              <option value="">No pickup set</option>
-              {members.filter((m) => m.member_type !== 'dependent').map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
-
-          {/* Kids always see their activities in Child Mode; this toggle
-              additionally surfaces them on the main adult calendar. */}
-          <label className="flex gap-2 items-center text-xs text-cocoa cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={onCalendar}
-              onChange={(e) => setOnCalendar(e.target.checked)}
-              className="h-4 w-4 rounded border-cream-border accent-[var(--color-plum)]"
-            />
-            Show on the family calendar
-          </label>
-
-          {/* Upcoming per-date exceptions from the calendar or the AI:
-              skipped dates and one-off changed dates. Removing a chip
-              restores that occurrence to the usual schedule. */}
-          {editing && (skips.length > 0 || overrideDates.length > 0) && (
-            <div className="space-y-1.5">
-              <div className="text-xs text-cocoa font-medium">One-off changes:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {skips.map((d) => (
-                  <span key={d} className="inline-flex items-center gap-1 rounded-full bg-white border border-cream-border px-2.5 py-1 text-xs text-bark">
-                    {fmtSkipDate(d)} · skipped
-                    <button
-                      type="button"
-                      onClick={() => handleUnskip(d)}
-                      aria-label={`Restore ${fmtSkipDate(d)}`}
-                      className="text-cocoa hover:text-coral leading-none"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                {overrideDates.map((d) => {
-                  const o = activity.overrides?.[d] || {};
-                  const t = o.time_start ? ` ${String(o.time_start).slice(0, 5)}` : '';
-                  return (
-                    <span key={d} className="inline-flex items-center gap-1 rounded-full bg-white border border-cream-border px-2.5 py-1 text-xs text-bark">
-                      {fmtSkipDate(d)} · changed{t}
-                      <button
-                        type="button"
-                        onClick={() => handleUnskip(d)}
-                        aria-label={`Restore ${fmtSkipDate(d)}`}
-                        className="text-cocoa hover:text-coral leading-none"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {error && <p className="text-xs text-coral">{error}</p>}
+        {/* Time */}
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Field label="Starts" style={{ flex: 1 }}>
+            <input type="time" value={timeStart} onChange={(e) => setTimeStart(e.target.value)} style={{ ...mInput, WebkitAppearance: 'none', appearance: 'none' }} />
+          </Field>
+          <Field label="Ends" style={{ flex: 1 }}>
+            <input type="time" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} style={{ ...mInput, WebkitAppearance: 'none', appearance: 'none' }} />
+          </Field>
         </div>
 
-        <div className="flex items-center gap-2 mt-5">
+        {/* Term window applies only to NEW activities. Edits keep their
+            existing window (the term concept is per-activity, not a move). */}
+        {!editing && (
+          <Field label={termsLoading ? 'Term (loading…)' : 'Term'}>
+            <select value={termKey} onChange={(e) => setTermKey(e.target.value)} style={mInput}>
+              {terms.map((t) => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
+              <option value="ongoing">Ongoing (every term)</option>
+              <option value="custom">Custom dates…</option>
+            </select>
+            {termKey === 'custom' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ ...mInput, minWidth: 0, flex: 1 }} />
+                <span style={{ fontSize: 12, color: M_INK3 }}>to</span>
+                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} min={customStart || undefined} style={{ ...mInput, minWidth: 0, flex: 1 }} />
+              </div>
+            ) : (
+              <p style={{ fontSize: 12, color: M_INK3, margin: '8px 0 0' }}>
+                {termKey === 'ongoing'
+                  ? 'Repeats every selected day, every week, until you remove it.'
+                  : 'Repeats every selected day this term, then stops automatically.'}
+              </p>
+            )}
+          </Field>
+        )}
+
+        {/* Pickup - adults only; a child can't collect a child. */}
+        <Field label="Pickup">
+          <select value={pickup} onChange={(e) => setPickup(e.target.value)} style={mInput}>
+            <option value="">Choose who collects {kid.name}</option>
+            {members.filter((m) => m.member_type !== 'dependent').map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </Field>
+
+        {/* Show on the family calendar - kids always see theirs in Child
+            Mode; this switch additionally surfaces it on the adult calendar. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: M_INK }}>Show on the family calendar</div>
+            <div style={{ fontSize: 12, color: M_INK3, marginTop: 2 }}>Everyone sees it, colour-coded to {kid.name}.</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={onCalendar}
+            onClick={() => setOnCalendar((v) => !v)}
+            style={{ width: 40, height: 22, borderRadius: 99, border: 0, cursor: 'pointer', background: onCalendar ? M_BRAND : M_LINE_STRONG, position: 'relative', transition: 'background .15s', padding: 0, flexShrink: 0 }}
+          >
+            <span style={{ position: 'absolute', top: 2, left: onCalendar ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+          </button>
+        </div>
+
+        {/* Upcoming per-date exceptions from the calendar or the AI:
+            skipped dates and one-off changed dates. Removing a chip
+            restores that occurrence to the usual schedule. */}
+        {editing && (skips.length > 0 || overrideDates.length > 0) && (
+          <Field label="One-off changes">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {skips.map((d) => (
+                <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 99, background: '#fff', border: `1px solid ${M_LINE_STRONG}`, padding: '5px 10px', fontSize: 12, color: M_INK }}>
+                  {fmtSkipDate(d)} · skipped
+                  <button type="button" onClick={() => handleUnskip(d)} aria-label={`Restore ${fmtSkipDate(d)}`} style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', color: M_INK3, fontSize: 14, lineHeight: 1 }}>×</button>
+                </span>
+              ))}
+              {overrideDates.map((d) => {
+                const o = activity.overrides?.[d] || {};
+                const t = o.time_start ? ` ${String(o.time_start).slice(0, 5)}` : '';
+                return (
+                  <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 99, background: '#fff', border: `1px solid ${M_LINE_STRONG}`, padding: '5px 10px', fontSize: 12, color: M_INK }}>
+                    {fmtSkipDate(d)} · changed{t}
+                    <button type="button" onClick={() => handleUnskip(d)} aria-label={`Restore ${fmtSkipDate(d)}`} style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', color: M_INK3, fontSize: 14, lineHeight: 1 }}>×</button>
+                  </span>
+                );
+              })}
+            </div>
+          </Field>
+        )}
+
+        {error && <p style={{ fontSize: 12, color: '#D25454', margin: '0 0 12px' }}>{error}</p>}
+
+        {/* Footer - same button treatment as the task modal. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
           {editing && (
             <button
+              type="button"
               onClick={handleDelete}
               disabled={saving}
-              className="text-xs font-medium text-coral hover:text-coral/80 mr-auto disabled:opacity-50"
+              style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#E8724A', marginRight: 'auto', opacity: saving ? 0.5 : 1 }}
             >
               Delete
             </button>
           )}
-          <button onClick={onClose} className="text-sm font-medium text-cocoa hover:text-bark px-4 py-2">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !name.trim()} className="text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-lg px-4 py-2">
+          <div style={{ flex: editing ? 'none' : 1 }} />
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ ...mInput, width: 'auto', padding: '10px 18px', cursor: 'pointer', fontWeight: 600, background: '#fff' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={disabled}
+            style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: 'inherit', background: M_BRAND, color: '#fff', opacity: disabled ? 0.5 : 1 }}
+          >
             {saving ? 'Saving…' : (editing ? 'Save' : 'Add')}
           </button>
         </div>
