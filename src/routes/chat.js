@@ -106,7 +106,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-  const [members, notes, shopping, tasks, events, household, schools, recipes, rawPreferences] = await Promise.all([
+  const [members, notes, shopping, tasks, events, household, schools, recipes, rawPreferences, activities] = await Promise.all([
     db.getHouseholdMembers(householdId),
     db.getHouseholdNotes(householdId),
     db.getShoppingList(householdId),
@@ -116,6 +116,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     db.getHouseholdSchools(householdId),
     db.getRecipes(householdId).catch(() => []),
     db.getHouseholdPreferences(householdId).catch(() => []),
+    db.getHouseholdActivities(householdId).catch(() => []),
   ]);
 
   // Fetch term dates for the household's schools so the AI can answer
@@ -219,6 +220,30 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
       }).join('\n')
     : '(empty)';
 
+  // Weekly extracurriculars with ids so the model can target skip_activity /
+  // update_activity / delete_activity precisely (same ID-grounding pattern
+  // as the recipe box). Upcoming skips are shown so "is swimming on this
+  // week?" answers correctly and unskip requests can name a real date.
+  const DAY_NAMES = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'];
+  const activitiesStr = activities.length > 0
+    ? activities.map((a) => {
+        const child = members.find((m) => m.id === a.child_id);
+        const time = a.time_start
+          ? ` ${String(a.time_start).slice(0, 5)}${a.time_end ? `-${String(a.time_end).slice(0, 5)}` : ''}`
+          : '';
+        const pickup = a.pickup_member_id
+          ? `, pickup: ${members.find((m) => m.id === a.pickup_member_id)?.name || 'unknown'}`
+          : '';
+        const term = a.start_date || a.end_date
+          ? `, runs ${a.start_date || '…'} to ${a.end_date || '…'}${a.term_label ? ` (${a.term_label})` : ''}`
+          : '';
+        const hidden = a.show_on_calendar === false ? ', hidden from adult calendar' : '';
+        const upcomingSkips = (a.skips || []).filter((d) => d >= today);
+        const skips = upcomingSkips.length > 0 ? `, skipped: ${upcomingSkips.join(', ')}` : '';
+        return `- ${child?.name || 'Unknown child'} - ${a.activity}: ${DAY_NAMES[a.day_of_week] || '?'}${time}${pickup}${term}${hidden}${skips} (id: ${a.id})`;
+      }).join('\n')
+    : '(none)';
+
   // Learned family preferences - the same block the WhatsApp classifier sees,
   // so the web/app assistant honours allergies, dietary rules, dislikes and
   // schedule anchors instead of only the legacy household.allergies field.
@@ -243,7 +268,8 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     .replace(/{{SCHOOLS}}/g, schoolsStr)
     .replace(/{{NOTES}}/g, notesStr)
     .replace(/{{PREFERENCES}}/g, preferencesStr)
-    .replace(/{{RECIPES}}/g, recipesStr);
+    .replace(/{{RECIPES}}/g, recipesStr)
+    .replace(/{{ACTIVITIES}}/g, activitiesStr);
 
   if (allergiesStr) {
     prompt += `\n\nHOUSEHOLD ALLERGIES & DIETARY REQUIREMENTS: ${allergiesStr}\nALWAYS avoid these allergens/restrictions when suggesting recipes, meals, or food-related advice.`;
@@ -467,7 +493,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // that lead with the bare past-tense verb ("Removed Padel on Sunday…",
     // "Done, both entries deleted") - the last one slipped through and let
     // a no-op deletion read as success.
-    const claimsAction = /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted)\b|\bI (?:added|created|scheduled|saved|removed|deleted)\b|(?:^|\n)\s*(?:Removed|Deleted|Added|Created|Updated|Rescheduled|Cancelled)\b|(?:^|\n)\s*(?:Done|All set|Sorted)[,.!]/im;
+    const claimsAction = /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted|skipped)\b|\bI (?:added|created|scheduled|saved|removed|deleted|skipped)\b|(?:^|\n)\s*(?:Removed|Deleted|Added|Created|Updated|Rescheduled|Cancelled|Skipped)\b|(?:^|\n)\s*(?:Done|All set|Sorted)[,.!]/im;
     if (actions.length === 0 && claimsAction.test(cleanContent)) {
       console.warn('[chat] reply claimed an action but no action block parsed - correcting. Raw length:', aiText.length);
       cleanContent += '\n\n⚠️ Actually - I wasn\'t able to save that just now. Please ask me again.';
@@ -568,6 +594,52 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             });
           } else {
             cleanContent += `\n\n⚠️ I found ${candidates.length} events matching "${act.title}" - tell me which date to remove, or say "remove all of them".`;
+          }
+
+        } else if (['skip_activity', 'update_activity', 'delete_activity'].includes(act.action)) {
+          // Weekly extracurriculars (child_weekly_schedule) - the prompt
+          // lists them with ids, so the model targets by id. Household
+          // scoping mirrors the /schools routes: the activity's child must
+          // be a member of THIS household.
+          const activity = act.activity_id ? await db.getChildActivityById(act.activity_id).catch(() => null) : null;
+          const owned = activity && members.some((m) => m.id === activity.child_id);
+          if (!owned) {
+            cleanContent += `\n\n⚠️ I couldn't find that activity in your family's weekly schedule, so nothing was changed.`;
+          } else if (act.action === 'skip_activity') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(act.date || '')) {
+              cleanContent += `\n\n⚠️ I couldn't work out which date to ${act.unskip ? 'restore' : 'skip'} - tell me the exact day.`;
+            } else if (act.unskip) {
+              await db.removeActivitySkip(act.activity_id, act.date);
+              executedActions.push({ type: 'activity_unskipped', activity: activity.activity, date: act.date });
+            } else {
+              await db.addActivitySkip(act.activity_id, req.householdId, act.date, req.user.id);
+              executedActions.push({ type: 'activity_skipped', activity: activity.activity, date: act.date });
+            }
+          } else if (act.action === 'update_activity') {
+            const fields = {};
+            if (act.day_of_week !== null && act.day_of_week !== undefined) fields.day_of_week = act.day_of_week;
+            if (act.activity) fields.activity = act.activity;
+            if (act.time_start !== null && act.time_start !== undefined) fields.time_start = act.time_start;
+            if (act.time_end !== null && act.time_end !== undefined) fields.time_end = act.time_end;
+            if (act.show_on_calendar !== null && act.show_on_calendar !== undefined) fields.show_on_calendar = act.show_on_calendar;
+            if (act.pickup_name !== null && act.pickup_name !== undefined) {
+              // Resolve the pickup person by name; unknown names clear it
+              // rather than guessing (empty string clears, per the query).
+              const pick = members.find((m) => m.name.toLowerCase() === String(act.pickup_name).toLowerCase());
+              fields.pickup_member_id = pick ? pick.id : null;
+            }
+            if (Object.keys(fields).length === 0) {
+              cleanContent += `\n\n⚠️ I couldn't tell what to change about "${activity.activity}" - nothing was updated.`;
+            } else {
+              await db.updateChildActivity(act.activity_id, fields);
+              executedActions.push({ type: 'activity_updated', activity: activity.activity });
+            }
+          } else {
+            await db.deleteChildActivity(act.activity_id);
+            executedActions.push({ type: 'activity_deleted', activity: activity.activity });
+          }
+          if (executedActions.some((e) => e.type?.startsWith('activity_'))) {
+            cache.invalidate(`schools:${req.householdId}`);
           }
 
         } else if (act.action === 'add_shopping' && act.items?.length) {
