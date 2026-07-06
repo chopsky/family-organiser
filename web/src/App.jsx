@@ -45,7 +45,6 @@ const Rewards         = lazy(() => import('./pages/Rewards'));
 const Lists           = lazy(() => import('./pages/Lists'));
 const Calendar        = lazy(() => import('./pages/Calendar'));
 const Meals           = lazy(() => import('./pages/Meals'));
-const Receipt         = lazy(() => import('./pages/Receipt'));
 const FamilySetup     = lazy(() => import('./pages/FamilySetup'));
 const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
@@ -274,7 +273,10 @@ function AppRoutes() {
             the Dashboard (where the notes card lives). */}
         <Route path="/note" element={<RequireAuth><ChildGate><Navigate to="/dashboard" replace /></ChildGate></RequireAuth>} />
         <Route path="/meals" element={<RequireAuth><ChildGate><Layout><Meals /></Layout></ChildGate></RequireAuth>} />
-        <Route path="/receipt" element={<RequireAuth><ChildGate><Layout><Receipt /></Layout></ChildGate></RequireAuth>} />
+        {/* Receipts page retired (2026-07-06): receipt scanning lives in the
+            AI chat / WhatsApp / email channels, which tick off the shopping
+            list directly. Old links land on Lists, where the result shows. */}
+        <Route path="/receipt" element={<Navigate to="/lists" replace />} />
         <Route path="/documents" element={<RequireAuth><ChildGate><Layout><Documents /></Layout></ChildGate></RequireAuth>} />
         {/* Kids' notes archive - adult-only; in Child Mode the ChildGate
             redirects /notes to the kids' home (it's not a CHILD_OPEN route). */}
