@@ -138,6 +138,46 @@ describe('POST /api/chat activity actions', () => {
     expect(res.body.message).toMatch(/couldn't find that activity/i);
   });
 
+  test('assistant history is saved RAW (action block included) so replay does not teach block-less confirmations', async () => {
+    // Real failure 2026-07-06: cleanContent (blocks stripped) was persisted
+    // and replayed as history, so in long conversations the model mimicked
+    // its own stripped confirmations and stopped emitting blocks - every
+    // first attempt tripped the truth guard until the user said try again.
+    const raw = `Done!\n\n\`\`\`json\n${JSON.stringify({ action: 'delete_activity', activity_id: 'act-1' })}\n\`\`\``;
+    callWithFailover.mockResolvedValue({ text: raw, provider: 'claude' });
+
+    const res = await request(app()).post('/api/chat').send({ message: 'remove wraparound care' });
+    expect(res.status).toBe(200);
+    const assistantSave = db.saveChatMessage.mock.calls.find((c) => c[2] === 'assistant');
+    expect(assistantSave[3]).toContain('"action":"delete_activity"'); // block persisted
+    // The response the user sees is still stripped.
+    expect(res.body.message).not.toContain('delete_activity');
+  });
+
+  test('truth-guard appendix is persisted to history alongside the raw reply', async () => {
+    // Prose claims an action but no block: the guard bounces it, and the
+    // correction must survive into history so the model sees its failure.
+    callWithFailover.mockResolvedValue({ text: "I've added **Babysitter** for tomorrow.", provider: 'claude' });
+
+    const res = await request(app()).post('/api/chat').send({ message: 'babysitter tomorrow 17:30' });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/wasn't able to save/i);
+    const assistantSave = db.saveChatMessage.mock.calls.find((c) => c[2] === 'assistant');
+    expect(assistantSave[3]).toMatch(/wasn't able to save/i);
+  });
+
+  test('GET /history strips action blocks from assistant messages for display', async () => {
+    db.getChatHistory.mockResolvedValue([
+      { role: 'user', content: 'add it' },
+      { role: 'assistant', content: 'Done!\n\n```json\n{"action": "create_task", "title": "X"}\n```' },
+    ]);
+    const res = await request(app()).get('/api/chat/history?conversation_id=c1');
+    expect(res.status).toBe(200);
+    expect(res.body.messages[0].content).toBe('add it');
+    expect(res.body.messages[1].content).toBe('Done!');
+    expect(JSON.stringify(res.body.messages)).not.toContain('create_task');
+  });
+
   test('the prompt ground truth lists activities with ids and skips', async () => {
     db.getHouseholdActivities.mockResolvedValue([
       { ...ACTIVITY, skips: ['2099-01-04'], pickup_member_id: 'u1' },

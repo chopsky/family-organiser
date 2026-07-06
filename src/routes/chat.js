@@ -356,10 +356,14 @@ function extractActions(content) {
 router.get('/conversations', requireAuth, requireHousehold, async (req, res) => {
   try {
     const conversations = await db.getConversations(req.user.id);
-    // Get last message preview for each conversation
+    // Get last message preview for each conversation. Assistant messages
+    // are stored RAW (action blocks included) so the model can see its own
+    // past blocks; strip them for the human-facing preview.
     const withPreviews = await Promise.all(conversations.map(async (conv) => {
       const msgs = await db.getChatHistory(conv.id, 1, req.householdId);
-      return { ...conv, lastMessage: msgs[0]?.content?.substring(0, 80) || null };
+      const raw = msgs[0]?.content || null;
+      const preview = raw ? extractActions(raw).cleanContent.trim() : null;
+      return { ...conv, lastMessage: preview ? preview.substring(0, 80) : null };
     }));
     return res.json({ conversations: withPreviews });
   } catch (err) {
@@ -400,7 +404,15 @@ router.get('/history', requireAuth, requireHousehold, async (req, res) => {
     const { conversation_id } = req.query;
     if (conversation_id) {
       const messages = await db.getChatHistory(conversation_id, 50, req.householdId);
-      return res.json({ messages });
+      // Assistant rows are stored RAW (with their action blocks) so the
+      // LLM's replayed history matches what it actually wrote. Strip the
+      // blocks here - clients only ever render clean prose.
+      const display = messages.map((m) => (
+        m.role === 'assistant'
+          ? { ...m, content: extractActions(m.content || '').cleanContent.trim() }
+          : m
+      ));
+      return res.json({ messages: display });
     }
     return res.json({ messages: [] });
   } catch (err) {
@@ -484,6 +496,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     // Extract and process all actions
     let { cleanContent, actions } = extractActions(aiText);
+    // Everything appended to cleanContent from here on (truth-guard notice,
+    // executor warnings, weather reports) is an "appendix" the user must
+    // see AND the model must remember. Snapshot the stripped base so the
+    // save below can reconstruct raw-reply + appendices for history.
+    const strippedBase = cleanContent;
 
     // Truth guard (real failure: "Okay, I've added Mason's tennis lesson…"
     // with NO action block, so nothing was saved and the user only found out
@@ -781,7 +798,15 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 
     // Save both messages to DB
     await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);
-    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', cleanContent, conversationId);
+    // Persist the RAW reply (action blocks included) plus any appendices,
+    // NOT the stripped cleanContent. History is replayed to the model on
+    // every turn - storing stripped confirmations taught it that "I've
+    // added X" needs no action block (it mimicked its own history), so the
+    // first attempt in a long conversation claimed success without saving
+    // and the truth guard had to bounce it. The /history and /conversations
+    // read endpoints strip blocks for display instead.
+    const historyAppendix = cleanContent.slice(strippedBase.length);
+    await db.saveChatMessage(req.householdId, req.user.id, 'assistant', aiText + historyAppendix, conversationId);
     await db.touchConversation(conversationId);
 
     // Chat actions mutate digest data (events, tasks, shopping, meals) -
