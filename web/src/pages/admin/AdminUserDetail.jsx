@@ -332,48 +332,89 @@ export default function AdminUserDetail() {
           </div>
           {usageLoading ? (
             <div className="flex justify-center py-4"><Spinner /></div>
-          ) : !usage?.ai?.totalCalls ? (
+          ) : !usage?.ai?.totalCalls && !usage?.ai?.recentCalls?.length ? (
             <p className="text-sm text-warm-grey">No AI calls recorded</p>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div>
-                  <p className="text-lg font-bold text-charcoal">{usage.ai.totalCalls}</p>
-                  <p className="text-[11px] text-warm-grey">Total Calls</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-charcoal">{usage.ai.avgLatencyMs}ms</p>
-                  <p className="text-[11px] text-warm-grey">Avg Latency</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-charcoal">{usage.ai.failoverCalls}</p>
-                  <p className="text-[11px] text-warm-grey">Failovers</p>
-                </div>
-              </div>
+              {usage.ai.totalCalls > 0 ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div>
+                      <p className="text-lg font-bold text-charcoal">{usage.ai.totalCalls}</p>
+                      <p className="text-[11px] text-warm-grey">Total Calls</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-charcoal">{usage.ai.avgLatencyMs}ms</p>
+                      <p className="text-[11px] text-warm-grey">Avg Latency</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-charcoal">{usage.ai.failoverCalls}</p>
+                      <p className="text-[11px] text-warm-grey">Failovers</p>
+                    </div>
+                  </div>
 
-              {usage.ai.daily?.length > 0 && (
-                <div className="mb-4 pb-4 border-b border-light-grey">
-                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Last 10 Days</p>
-                  <DailyChart data={usage.ai.daily} />
+                  {usage.ai.daily?.length > 0 && (
+                    <div className="mb-4 pb-4 border-b border-light-grey">
+                      <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Last 10 Days</p>
+                      <DailyChart data={usage.ai.daily} />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    {Object.entries(usage.ai.byProvider || {}).map(([provider, count]) => (
+                      <div key={provider} className="flex items-center justify-between text-sm">
+                        <span className="text-warm-grey capitalize">{provider}</span>
+                        <span className="font-medium text-charcoal">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {Object.keys(usage.ai.byFeature || {}).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-light-grey space-y-1.5">
+                      {Object.entries(usage.ai.byFeature).sort((a, b) => b[1] - a[1]).map(([feature, count]) => (
+                        <div key={feature} className="flex items-center justify-between text-sm">
+                          <span className="text-warm-grey capitalize">{feature}</span>
+                          <span className="font-medium text-charcoal">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-warm-grey mb-3">No calls in the selected range — showing their most recent activity below.</p>
+              )}
+
+              {/* Recent calls - NOT window-bound, so old activity stays visible */}
+              {usage.ai.recentCalls?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-light-grey">
+                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Recent Calls</p>
+                  <div className="space-y-1.5">
+                    {usage.ai.recentCalls.map((c, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-charcoal capitalize truncate">
+                          {(c.feature || 'unknown').replace(/_/g, ' ')}
+                          {c.error && <span className="text-coral ml-1" title={c.error}>⚠</span>}
+                        </span>
+                        <span className="text-warm-grey whitespace-nowrap" title={c.created_at ? new Date(c.created_at).toLocaleString() : ''}>
+                          {c.provider} · {formatRelativeTime(c.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                {Object.entries(usage.ai.byProvider || {}).map(([provider, count]) => (
-                  <div key={provider} className="flex items-center justify-between text-sm">
-                    <span className="text-warm-grey capitalize">{provider}</span>
-                    <span className="font-medium text-charcoal">{count}</span>
+              {/* What they actually asked in web chat */}
+              {usage.ai.recentChatMessages?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-light-grey">
+                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Recent Chat Messages</p>
+                  <div className="space-y-2">
+                    {usage.ai.recentChatMessages.map((m, i) => (
+                      <div key={i} className="text-xs">
+                        <p className="text-charcoal">"{m.content}"</p>
+                        <p className="text-[10px] text-warm-grey mt-0.5">{formatRelativeTime(m.created_at)}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {Object.keys(usage.ai.byFeature || {}).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-light-grey space-y-1.5">
-                  {Object.entries(usage.ai.byFeature).sort((a, b) => b[1] - a[1]).map(([feature, count]) => (
-                    <div key={feature} className="flex items-center justify-between text-sm">
-                      <span className="text-warm-grey capitalize">{feature}</span>
-                      <span className="font-medium text-charcoal">{count}</span>
-                    </div>
-                  ))}
                 </div>
               )}
             </>
@@ -388,42 +429,71 @@ export default function AdminUserDetail() {
           </div>
           {usageLoading ? (
             <div className="flex justify-center py-4"><Spinner /></div>
-          ) : !usage?.whatsapp?.totalMessages ? (
+          ) : !usage?.whatsapp?.totalMessages && !usage?.whatsapp?.recentMessages?.length ? (
             <p className="text-sm text-warm-grey">No WhatsApp messages recorded</p>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div>
-                  <p className="text-lg font-bold text-charcoal">{usage.whatsapp.totalMessages}</p>
-                  <p className="text-[11px] text-warm-grey">Total</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-charcoal">{usage.whatsapp.inbound}</p>
-                  <p className="text-[11px] text-warm-grey">Inbound</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-charcoal">{usage.whatsapp.errors}</p>
-                  <p className="text-[11px] text-warm-grey">Errors</p>
-                </div>
-              </div>
-              {Object.keys(usage.whatsapp.byType || {}).length > 0 && (
-                <div className="space-y-1.5">
-                  {Object.entries(usage.whatsapp.byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-                    <div key={type} className="flex items-center justify-between text-sm">
-                      <span className="text-warm-grey capitalize">{type}</span>
-                      <span className="font-medium text-charcoal">{count}</span>
+              {usage.whatsapp.totalMessages > 0 ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div>
+                      <p className="text-lg font-bold text-charcoal">{usage.whatsapp.totalMessages}</p>
+                      <p className="text-[11px] text-warm-grey">Total</p>
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <p className="text-lg font-bold text-charcoal">{usage.whatsapp.inbound}</p>
+                      <p className="text-[11px] text-warm-grey">Inbound</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-charcoal">{usage.whatsapp.errors}</p>
+                      <p className="text-[11px] text-warm-grey">Errors</p>
+                    </div>
+                  </div>
+                  {Object.keys(usage.whatsapp.byType || {}).length > 0 && (
+                    <div className="space-y-1.5">
+                      {Object.entries(usage.whatsapp.byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                        <div key={type} className="flex items-center justify-between text-sm">
+                          <span className="text-warm-grey capitalize">{type}</span>
+                          <span className="font-medium text-charcoal">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {Object.keys(usage.whatsapp.byIntent || {}).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-light-grey space-y-1.5">
+                      {Object.entries(usage.whatsapp.byIntent).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
+                        <div key={intent} className="flex items-center justify-between text-sm">
+                          <span className="text-warm-grey capitalize">{intent.replace(/_/g, ' ')}</span>
+                          <span className="font-medium text-charcoal">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-warm-grey mb-3">No messages in the selected range — showing their most recent activity below.</p>
               )}
-              {Object.keys(usage.whatsapp.byIntent || {}).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-light-grey space-y-1.5">
-                  {Object.entries(usage.whatsapp.byIntent).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                    <div key={intent} className="flex items-center justify-between text-sm">
-                      <span className="text-warm-grey capitalize">{intent.replace(/_/g, ' ')}</span>
-                      <span className="font-medium text-charcoal">{count}</span>
-                    </div>
-                  ))}
+
+              {/* Recent messages with actual content - NOT window-bound */}
+              {usage.whatsapp.recentMessages?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-light-grey">
+                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Recent Messages</p>
+                  <div className="space-y-2">
+                    {usage.whatsapp.recentMessages.map((m, i) => (
+                      <div key={i} className="text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-semibold uppercase ${m.direction === 'inbound' ? 'text-plum' : 'text-warm-grey'}`}>
+                            {m.direction === 'inbound' ? '→ In' : '← Out'}
+                          </span>
+                          <span className="text-[10px] text-warm-grey">
+                            {m.message_type}{m.intent ? ` · ${m.intent.replace(/_/g, ' ')}` : ''} · {formatRelativeTime(m.created_at)}
+                          </span>
+                          {m.error && <span className="text-coral text-[10px]" title={m.error}>⚠ failed</span>}
+                        </div>
+                        {m.body && <p className="text-charcoal mt-0.5">"{m.body}"</p>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>
