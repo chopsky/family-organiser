@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
-import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash } from '../components/Icons';
+import { IconCalendar, IconPlus, IconUser, IconCheck, IconSearch, IconSettings, IconTrash, IconStar } from '../components/Icons';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import PillBtn from '../components/ui/PillBtn';
@@ -372,6 +372,22 @@ export default function Calendar() {
   const [formRecurrence, setFormRecurrence] = useState('');
   const [formEndDate, setFormEndDate] = useState(toDateStr(today));
   const [formAssignees, setFormAssignees] = useState([]);
+  // Create-sheet type: one modal morphs between a household event and a
+  // kid's weekly activity (design_handoff_event_activity). Create-only -
+  // editing an event never shows the toggle, and activity edits go through
+  // the activity sheet → ActivityModal.
+  const [createKind, setCreateKind] = useState('event'); // 'event' | 'activity'
+  const [actKid, setActKid] = useState('');
+  const [actDays, setActDays] = useState([]); // 0=Mon..6=Sun, multi-select
+  const [actStart, setActStart] = useState('');
+  const [actEnd, setActEnd] = useState('');
+  const [actTerms, setActTerms] = useState([]);
+  const [actTermsLoading, setActTermsLoading] = useState(false);
+  const [actTermKey, setActTermKey] = useState('ongoing'); // term start_date | 'ongoing' | 'custom'
+  const [actCustomStart, setActCustomStart] = useState('');
+  const [actCustomEnd, setActCustomEnd] = useState('');
+  const [actPickup, setActPickup] = useState('');
+  const [actOnCal, setActOnCal] = useState(true);
   // Default to no reminder. The "+ Add notification" button lets users
   // opt in explicitly. Pre-checking a 5-min default surprised users who
   // never asked for one (and silently saved an actual reminder row if
@@ -877,6 +893,17 @@ export default function Calendar() {
     setFormReminders([]);
     setShowMoreOptions(false);
     setEventAttachments([]);
+    // Activity-mode fields (the Event / Kids' activity toggle).
+    setCreateKind('event');
+    const base = selectedDate || today;
+    setActDays([(new Date(base).getDay() + 6) % 7]);
+    setActStart('');
+    setActEnd('');
+    setActTermKey('ongoing');
+    setActCustomStart('');
+    setActCustomEnd('');
+    setActPickup('');
+    setActOnCal(true);
   }
 
   async function loadAttachments(eventId) {
@@ -922,11 +949,22 @@ export default function Calendar() {
     if (date) {
       setFormDate(toDateStr(date));
       setFormEndDate(toDateStr(date));
+      // Activity mode defaults its "Repeats on" day to the tapped cell.
+      setActDays([(new Date(date).getDay() + 6) % 7]);
     }
     if (hour !== undefined) {
       setFormStart(`${String(hour).padStart(2, '0')}:00`);
       setFormEnd(`${String(Math.min(hour + 1, 23)).padStart(2, '0')}:00`);
     }
+    // Default the activity's child: the single filtered member when the
+    // filter is one kid, otherwise the household's first dependent.
+    const kids = members.filter((m) => m.member_type === 'dependent');
+    let defaultKid = kids[0]?.id || '';
+    if (activeMemberFilters && activeMemberFilters.size === 1) {
+      const only = [...activeMemberFilters][0];
+      if (kids.some((k) => k.id === only)) defaultKid = only;
+    }
+    setActKid(defaultKid);
     setShowForm(true);
   }
 
@@ -989,6 +1027,65 @@ export default function Calendar() {
     setFormReminders(ev.reminders && Array.isArray(ev.reminders) ? ev.reminders : []);
     setShowMoreOptions(false);
     setShowForm(true);
+  }
+
+  // Activity mode's term selector: load the chosen child's real school
+  // terms (same source as the Family page's form) and default to the term
+  // covering today. Falls back to "Ongoing" when the child has no terms.
+  useEffect(() => {
+    if (!showForm || createKind !== 'activity' || !actKid) return undefined;
+    let cancelled = false;
+    setActTermsLoading(true);
+    api.get(`/schools/terms/${actKid}`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const t = data.terms || [];
+        setActTerms(t);
+        const todayStr = toDateStr(new Date());
+        const cur = t.find((x) => todayStr >= x.start_date && todayStr <= x.end_date);
+        setActTermKey(cur ? cur.start_date : 'ongoing');
+      })
+      .catch(() => { if (!cancelled) { setActTerms([]); setActTermKey('ongoing'); } })
+      .finally(() => { if (!cancelled) setActTermsLoading(false); });
+    return () => { cancelled = true; };
+  }, [showForm, createKind, actKid]);
+
+  // Submit for the create sheet's Kids' activity mode: one
+  // child_weekly_schedule row per selected weekday (how multi-day
+  // activities are modelled everywhere else), sharing the chosen term
+  // window, pickup person and show-on-calendar flag.
+  async function handleActivityCreate(e) {
+    e.preventDefault();
+    if (!formTitle.trim() || !actKid || actDays.length === 0) return;
+    setSaving(true);
+    try {
+      const base = {
+        child_id: actKid,
+        activity: formTitle.trim(),
+        time_start: actStart || null,
+        time_end: actEnd || null,
+        pickup_member_id: actPickup || null,
+        show_on_calendar: actOnCal,
+      };
+      const termObj = actTerms.find((t) => t.start_date === actTermKey) || null;
+      if (actTermKey === 'custom') {
+        Object.assign(base, { start_date: actCustomStart || null, end_date: actCustomEnd || null, term_label: null });
+      } else if (termObj) {
+        Object.assign(base, { start_date: termObj.start_date, end_date: termObj.end_date, term_label: termObj.label });
+      } else {
+        Object.assign(base, { start_date: null, end_date: null, term_label: null });
+      }
+      for (const day of [...actDays].sort((a, b) => a - b)) {
+        await api.post('/schools/activities', { ...base, day_of_week: day });
+      }
+      setShowForm(false);
+      resetForm();
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not save the activity.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ── Activity sheet actions (skip one date / delete the series) ─────
@@ -2363,48 +2460,92 @@ export default function Calendar() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-2 pb-2">
               <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>
-                {editingEvent ? 'Edit Event' : 'New Event'}
+                {editingEvent ? 'Edit Event' : createKind === 'activity' ? 'New activity' : 'New Event'}
               </h2>
               <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="text-warm-grey hover:text-charcoal p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-6 pb-5">
-              {/* Creating something for a child's week? Route to the real
-                  activity form (pickup person, term windows, Kids Mode)
-                  instead of a plain recurring event - a weekly event can't
-                  carry any of that. Create-mode only; households without
-                  dependents never see it. */}
+            <form onSubmit={(!editingEvent && createKind === 'activity') ? handleActivityCreate : handleSubmit} className="px-6 pb-5">
+              {/* ── 0. Event / Kids' activity toggle (create only) ──
+                  One modal that morphs in place (design_handoff_event_
+                  activity): an activity is a specialised term-bounded
+                  recurring event with a child, pickup person and weekly
+                  days, so it gets its own field set rather than a banner
+                  to a second dialog. Households without kids never see
+                  the toggle. The typed title survives switching type. */}
               {!editingEvent && members.some((m) => m.member_type === 'dependent') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const wd = formDate ? (new Date(`${formDate}T12:00:00`).getDay() + 6) % 7 : 0;
-                    setShowForm(false);
-                    resetForm();
-                    setActivityEdit({
-                      child: null,
-                      activity: null,
-                      presetDay: wd,
-                      childOptions: members.filter((m) => m.member_type === 'dependent'),
-                    });
-                  }}
-                  className="w-full text-left text-xs font-medium text-plum bg-plum-light rounded-xl px-3 py-2.5 mb-1"
-                >
-                  🏫 A kid's weekly club or class? <span className="underline">Add it as an extracurricular activity</span> - with pickup person and term dates.
-                </button>
+                <div className="mb-3">
+                  <Segmented
+                    fluid
+                    value={createKind}
+                    onChange={setCreateKind}
+                    ariaLabel="What are you creating?"
+                    options={[
+                      { value: 'event', label: <><IconCalendar className="h-4 w-4" /> Event</> },
+                      { value: 'activity', label: <><IconStar className="h-4 w-4" /> Kids&rsquo; activity</> },
+                    ]}
+                  />
+                  <p className="text-xs text-warm-grey mt-2 px-0.5">
+                    {createKind === 'activity'
+                      ? 'A recurring weekly club or class, with a pickup person and term dates.'
+                      : 'A one-off or repeating event for anyone in the household.'}
+                  </p>
+                </div>
               )}
-              {/* ── 1. Title ── */}
+
+              {/* ── Who's it for (activity mode) - shown above the name,
+                     single-select child pills, same pill language as the
+                     event mode's member selector. ── */}
+              {!editingEvent && createKind === 'activity' && (
+                <div className="mb-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Who&rsquo;s it for</p>
+                  <div className="flex flex-wrap gap-2">
+                    {members.filter((m) => m.member_type === 'dependent').map((m) => {
+                      const on = actKid === m.id;
+                      const hex = m.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setActKid(m.id)}
+                          className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-all"
+                          style={{
+                            border: `1.5px solid ${hex}`,
+                            background: on ? hex : 'transparent',
+                            color: on ? '#fff' : hex,
+                          }}
+                        >
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                            style={{ background: on ? 'rgba(255,255,255,0.3)' : hex, color: '#fff' }}
+                          >
+                            {on ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            ) : (
+                              m.name?.[0]?.toUpperCase() || '?'
+                            )}
+                          </span>
+                          {m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── 1. Title / activity name ── */}
               <input
                 type="text"
                 value={formTitle}
                 onChange={e => setFormTitle(e.target.value)}
                 required
                 className="w-full text-lg font-medium text-charcoal placeholder-warm-grey/60 border-0 border-b-2 border-light-grey bg-transparent py-3 focus:border-plum focus:outline-none transition-colors"
-                placeholder="Add title"
+                placeholder={(!editingEvent && createKind === 'activity') ? 'Activity name · e.g. Swimming' : 'Add title'}
               />
 
+              {(editingEvent || createKind === 'event') && (
               <div className="mt-5 space-y-4">
                 {/* ── 2. Date / Time ── */}
                 <div className="flex gap-3">
@@ -2713,10 +2854,135 @@ export default function Calendar() {
                   </div>
                 )}
               </div>
+              )}
+
+              {/* ── Kids' activity mode body (create only) ── */}
+              {!editingEvent && createKind === 'activity' && (
+              <div className="mt-5 space-y-4">
+                {/* Repeats on - Mon-Sun multi-select day pills (upgrades the
+                    old single-day dropdown; one schedule row per day). */}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Repeats on</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => {
+                      const on = actDays.includes(i);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          aria-pressed={on}
+                          aria-label={d}
+                          onClick={() => setActDays((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]))}
+                          className={`w-10 h-10 rounded-xl text-[13px] font-bold transition-colors ${on ? 'bg-plum border-plum text-white' : 'bg-white text-warm-grey'}`}
+                          style={{ border: on ? '1.5px solid var(--color-plum)' : '1.5px solid var(--color-light-grey)' }}
+                        >
+                          {d[0]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Time */}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Time</p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <label className="flex items-center gap-2 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus-within:border-plum">
+                      <span className="text-warm-grey text-xs font-medium">Starts</span>
+                      <input
+                        type="time"
+                        value={actStart}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setActStart(v);
+                          if (v && actEnd && actEnd <= v) setActEnd('');
+                        }}
+                        className="flex-1 min-w-0 bg-transparent focus:outline-none text-sm"
+                        style={{ WebkitAppearance: 'none', appearance: 'none' }}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus-within:border-plum">
+                      <span className="text-warm-grey text-xs font-medium">Ends</span>
+                      <input
+                        type="time"
+                        value={actEnd}
+                        onChange={(e) => setActEnd(e.target.value)}
+                        className="flex-1 min-w-0 bg-transparent focus:outline-none text-sm"
+                        style={{ WebkitAppearance: 'none', appearance: 'none' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Term - the child's real school terms + Ongoing/Custom.
+                    New activities inherit the window so they stop with the
+                    term automatically. */}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">
+                    Term{actTermsLoading && <span className="ml-2 normal-case font-medium tracking-normal">loading…</span>}
+                  </p>
+                  <select
+                    value={actTermKey}
+                    onChange={(e) => setActTermKey(e.target.value)}
+                    className="w-full h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                  >
+                    {actTerms.map((t) => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
+                    <option value="ongoing">Ongoing (every term)</option>
+                    <option value="custom">Custom dates…</option>
+                  </select>
+                  {actTermKey === 'custom' ? (
+                    <div className="flex items-center gap-2 mt-2">
+                      <input type="date" value={actCustomStart} onChange={(e) => setActCustomStart(e.target.value)} className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none" />
+                      <span className="text-xs text-warm-grey">to</span>
+                      <input type="date" value={actCustomEnd} onChange={(e) => setActCustomEnd(e.target.value)} min={actCustomStart || undefined} className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none" />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-warm-grey mt-2">
+                      {actTermKey === 'ongoing'
+                        ? 'Repeats every selected day, every week, until you remove it.'
+                        : 'Repeats every selected day this term, then stops automatically.'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Pickup */}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Pickup</p>
+                  <select
+                    value={actPickup}
+                    onChange={(e) => setActPickup(e.target.value)}
+                    className="w-full h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                  >
+                    <option value="">Choose who collects {members.find((m) => m.id === actKid)?.name || 'them'}</option>
+                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Show on the family calendar */}
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <div>
+                    <p className="text-sm font-semibold text-charcoal">Show on the family calendar</p>
+                    <p className="text-xs text-warm-grey mt-0.5">
+                      Everyone sees it, colour-coded to {members.find((m) => m.id === actKid)?.name || 'the child'}.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={actOnCal}
+                    onClick={() => setActOnCal((v) => !v)}
+                    className={`relative w-10 h-[22px] rounded-full transition-colors flex-shrink-0 ${actOnCal ? 'bg-plum' : 'bg-light-grey'}`}
+                  >
+                    <span className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform ${actOnCal ? 'translate-x-[20px]' : 'translate-x-[2px]'}`} />
+                  </button>
+                </div>
+              </div>
+              )}
 
               {/* ── 7. Bottom bar ── */}
               <div className="flex items-center justify-between mt-5 pt-4 border-t border-light-grey">
                 <div className="flex items-center gap-2">
+                  {(editingEvent || createKind === 'event') && (
                   <button
                     type="button"
                     onClick={() => setShowMoreOptions(!showMoreOptions)}
@@ -2724,6 +2990,7 @@ export default function Calendar() {
                   >
                     {showMoreOptions ? 'Less options \u2227' : 'More options \u2228'}
                   </button>
+                  )}
                   {editingEvent && (
                     <button
                       type="button"
@@ -2746,10 +3013,10 @@ export default function Calendar() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving || !formTitle.trim()}
+                    disabled={saving || !formTitle.trim() || (!editingEvent && createKind === 'activity' && (!actKid || actDays.length === 0))}
                     className="h-9 px-5 rounded-xl bg-plum hover:bg-plum-dark disabled:opacity-50 text-white text-sm font-semibold transition-colors"
                   >
-                    {saving ? 'Saving...' : editingEvent ? 'Update' : 'Save'}
+                    {saving ? 'Saving...' : editingEvent ? 'Update' : createKind === 'activity' ? 'Add activity' : 'Save'}
                   </button>
                 </div>
               </div>
