@@ -5,6 +5,8 @@
  */
 jest.mock('../db/queries');
 jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
+jest.mock('../services/r2');
+jest.mock('../services/push');
 jest.mock('../middleware/auth', () => ({
   requireAuth: (req, _res, next) => { req.user = { id: 'me' }; next(); },
   requireHousehold: (req, _res, next) => { req.householdId = 'h1'; next(); },
@@ -13,6 +15,8 @@ jest.mock('../middleware/auth', () => ({
 const express = require('express');
 const request = require('supertest');
 const db = require('../db/queries');
+const r2 = require('../services/r2');
+const push = require('../services/push');
 
 function app() {
   const a = express();
@@ -35,6 +39,10 @@ beforeEach(() => {
   db.getHouseholdSchools.mockResolvedValue([]);
   db.getTermDatesBySchoolIds.mockResolvedValue([]);
   db.getKidsCountdownEvents.mockResolvedValue([]);
+  db.getKidNotesForHousehold.mockResolvedValue([]);
+  r2.uploadFile.mockResolvedValue();
+  r2.getSignedDownloadUrl.mockResolvedValue('https://signed.example/note.png');
+  push.sendToHousehold.mockResolvedValue({ sent: 1, failed: 0 });
 });
 
 describe('GET /api/kids/big-days', () => {
@@ -81,5 +89,85 @@ describe('GET /api/kids/big-days', () => {
     const res = await request(app()).get('/api/kids/big-days');
     expect(res.status).toBe(200);
     expect(res.body.bigDays).toEqual([]);
+  });
+});
+
+// Kids' daily notes: draw/write once a day; parents react; the reaction
+// goes back to the kid. These pin the route contract: PNG-only uploads,
+// dependent-only authors, signed URLs on reads, reaction allowlist.
+describe('kids notes', () => {
+  // Smallest possible valid-magic PNG payload for upload tests.
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('x')]);
+  const kid = { id: 'k1', name: 'Olivia', member_type: 'dependent' };
+  const parent = { id: 'me', name: 'Sarah', member_type: 'account' };
+
+  beforeEach(() => {
+    db.getHouseholdMembers.mockResolvedValue([parent, kid]);
+    db.upsertKidNote.mockImplementation(async (hh, childId, date, fields) => ({
+      id: 'n1', household_id: hh, child_id: childId, note_date: date, reactions: {}, ...fields,
+    }));
+  });
+
+  test('GET /notes returns signed image URLs and hides the storage key', async () => {
+    db.getKidNotesForHousehold.mockResolvedValue([
+      { id: 'n1', child_id: 'k1', note_date: '2026-07-06', image_path: 'h1/kid-notes/k1/a.png', text_note: null, reactions: { me: '❤️' } },
+      { id: 'n2', child_id: 'k1', note_date: '2026-07-05', image_path: null, text_note: 'hi mum', reactions: {} },
+    ]);
+    const res = await request(app()).get('/api/kids/notes?limit=5');
+    expect(res.status).toBe(200);
+    expect(db.getKidNotesForHousehold).toHaveBeenCalledWith('h1', { childId: null, limit: 5 });
+    expect(res.body.notes[0].image_url).toBe('https://signed.example/note.png');
+    expect(res.body.notes[0].image_path).toBeUndefined();
+    expect(res.body.notes[1].image_url).toBeNull();
+  });
+
+  test('POST /notes uploads the drawing to R2 and pushes to the whole household', async () => {
+    const res = await request(app())
+      .post('/api/kids/notes')
+      .field('child_id', 'k1')
+      .field('text', 'love you')
+      .attach('image', png, 'note.png');
+    expect(res.status).toBe(201);
+    const [key, buf, mime] = r2.uploadFile.mock.calls[0];
+    expect(key).toMatch(/^h1\/kid-notes\/k1\/[0-9a-f-]+\.png$/);
+    expect(buf.equals(png)).toBe(true);
+    expect(mime).toBe('image/png');
+    expect(db.upsertKidNote).toHaveBeenCalledWith('h1', 'k1', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), {
+      image_path: key,
+      text_note: 'love you',
+    });
+    // excludeUserId null: the kid's device runs on a parent account and
+    // that parent should still get the note on their own phone.
+    expect(push.sendToHousehold).toHaveBeenCalledWith('h1', null, expect.objectContaining({
+      title: '💌 A note from Olivia',
+      category: 'family_activity',
+    }));
+    expect(res.body.note.image_url).toBe('https://signed.example/note.png');
+  });
+
+  test('POST /notes accepts a text-only note without touching R2', async () => {
+    const res = await request(app()).post('/api/kids/notes').field('child_id', 'k1').field('text', 'hi dad');
+    expect(res.status).toBe(201);
+    expect(r2.uploadFile).not.toHaveBeenCalled();
+    expect(db.upsertKidNote).toHaveBeenCalledWith('h1', 'k1', expect.any(String), { image_path: null, text_note: 'hi dad' });
+  });
+
+  test('POST /notes rejects empty notes, non-PNG files and non-dependent authors', async () => {
+    expect((await request(app()).post('/api/kids/notes').field('child_id', 'k1')).status).toBe(400);
+    expect((await request(app()).post('/api/kids/notes').field('child_id', 'k1').attach('image', Buffer.from('GIF89a'), 'x.png')).status).toBe(415);
+    expect((await request(app()).post('/api/kids/notes').field('child_id', 'me').field('text', 'hi')).status).toBe(404);
+    expect(db.upsertKidNote).not.toHaveBeenCalled();
+  });
+
+  test('POST /notes/:id/reactions stores the reacting user and rejects unknown emoji', async () => {
+    db.setKidNoteReaction.mockResolvedValue({ id: 'n1', child_id: 'k1', image_path: null, reactions: { me: '🌟' } });
+    const res = await request(app()).post('/api/kids/notes/n1/reactions').send({ emoji: '🌟' });
+    expect(res.status).toBe(200);
+    expect(db.setKidNoteReaction).toHaveBeenCalledWith('n1', 'h1', 'me', '🌟');
+    expect(res.body.note.reactions).toEqual({ me: '🌟' });
+
+    expect((await request(app()).post('/api/kids/notes/n1/reactions').send({ emoji: '💩' })).status).toBe(400);
+    db.setKidNoteReaction.mockResolvedValue(null);
+    expect((await request(app()).post('/api/kids/notes/n1/reactions').send({ emoji: '🌟' })).status).toBe(404);
   });
 });

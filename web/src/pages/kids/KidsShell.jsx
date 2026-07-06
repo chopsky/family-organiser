@@ -14,10 +14,11 @@ import { KidsLogo } from './ui';
 import QuestsScreen from './QuestsScreen';
 import ShopScreen from './ShopScreen';
 import DaysScreen from './DaysScreen';
+import NoteScreen from './NoteScreen';
 import MeScreen from './MeScreen';
 
-const PATH_TAB = { '/tasks': 'quests', '/rewards': 'shop', '/calendar': 'days', '/settings': 'me' };
-const TAB_PATH = { quests: '/tasks', shop: '/rewards', days: '/calendar', me: '/settings' };
+const PATH_TAB = { '/tasks': 'quests', '/rewards': 'shop', '/calendar': 'days', '/note': 'note', '/settings': 'me' };
+const TAB_PATH = { quests: '/tasks', shop: '/rewards', days: '/calendar', note: '/note', me: '/settings' };
 
 function safeGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function safeSet(key, value) { try { localStorage.setItem(key, value); } catch { /* private browsing */ } }
@@ -91,6 +92,7 @@ export default function KidsShell() {
     tab === 'quests' ? <QuestsScreen kid={kid} theme={theme} day={day} setDay={setDay} kids={kids} pickKid={pickKid} />
     : tab === 'shop' ? <ShopScreen kid={kid} theme={theme} balance={balance} onBalance={(kidId, bal) => setDay((d) => (d ? { ...d, balances: { ...d.balances, [kidId]: bal } } : d))} />
     : tab === 'days' ? <DaysScreen kid={kid} theme={theme} members={members} />
+    : tab === 'note' ? <NoteScreen kid={kid} theme={theme} members={members} />
     : <MeScreen kid={kid} theme={theme} onSaved={patchMember} />
   );
 
@@ -160,6 +162,7 @@ const NAV_ITEMS = [
   ['quests', 'Quests', '⭐'],
   ['shop', 'Shop', '🎁'],
   ['days', 'My Days', '📅'],
+  ['note', 'Note', '💌'],
 ];
 
 function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {

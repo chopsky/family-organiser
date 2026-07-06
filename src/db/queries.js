@@ -1273,6 +1273,78 @@ async function getActivitySkipsForHousehold(householdId, db = supabase) {
   return data || [];
 }
 
+// ============ Kids' daily notes ============
+// Once a day a child draws/writes a note for their parents from Kids Mode
+// (kid_notes: one row per child per date, UNIQUE(child_id, note_date)).
+// Parents react with an emoji - reactions = { userId: emoji } - and the
+// reaction is shown back to the kid, which is the point of the feature.
+// Table lives in migration-kid-notes.sql; until the user runs it, reads
+// degrade to empty (42P01/PGRST205) and writes surface a clear error.
+
+function isMissingKidNotesTable(error) {
+  return error && (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST200');
+}
+
+// Create or replace today's note. Re-sending on the same day overwrites
+// the drawing/text and clears reactions (it's a new note).
+async function upsertKidNote(householdId, childId, noteDate, { image_path = null, text_note = null } = {}, db = supabase) {
+  const { data, error } = await db
+    .from('kid_notes')
+    .upsert(
+      { household_id: householdId, child_id: childId, note_date: noteDate, image_path, text_note, reactions: {} },
+      { onConflict: 'child_id,note_date', ignoreDuplicates: false }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getKidNoteById(noteId, householdId, db = supabase) {
+  const { data, error } = await db
+    .from('kid_notes')
+    .select('*')
+    .eq('id', noteId)
+    .eq('household_id', householdId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// Newest-first archive for the household (dashboard card + kid's own
+// "sent" state both read from this).
+async function getKidNotesForHousehold(householdId, { childId = null, limit = 20 } = {}, db = supabase) {
+  let query = db
+    .from('kid_notes')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('note_date', { ascending: false })
+    .limit(limit);
+  if (childId) query = query.eq('child_id', childId);
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingKidNotesTable(error)) return [];
+    throw error;
+  }
+  return data || [];
+}
+
+// One reaction per reacting user; reacting again replaces their emoji.
+async function setKidNoteReaction(noteId, householdId, userId, emoji, db = supabase) {
+  const note = await getKidNoteById(noteId, householdId, db);
+  if (!note) return null;
+  const reactions = { ...(note.reactions || {}), [userId]: emoji };
+  const { data, error } = await db
+    .from('kid_notes')
+    .update({ reactions })
+    .eq('id', noteId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function addChildSchoolEvent(data, db = supabase) {
   const { data: event, error } = await db
     .from('child_school_events')
@@ -8417,6 +8489,10 @@ module.exports = {
   addActivitySkip,
   removeActivitySkip,
   getActivitySkipsForHousehold,
+  upsertKidNote,
+  getKidNoteById,
+  getKidNotesForHousehold,
+  setKidNoteReaction,
   addChildSchoolEvent,
   getChildSchoolEvents,
   // Meals

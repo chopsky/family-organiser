@@ -268,6 +268,10 @@ function AppRoutes() {
         <Route path="/chores" element={<Navigate to="/tasks" replace />} />
         <Route path="/shopping" element={<Navigate to="/lists" replace />} />
         <Route path="/calendar" element={<RequireAuth><ChildGate><Layout><Calendar /></Layout></ChildGate></RequireAuth>} />
+        {/* Kids-only: in Child Mode the ChildGate renders the KidsShell Note
+            screen here; the adult app has no /note page, so it bounces to
+            the Dashboard (where the notes card lives). */}
+        <Route path="/note" element={<RequireAuth><ChildGate><Navigate to="/dashboard" replace /></ChildGate></RequireAuth>} />
         <Route path="/meals" element={<RequireAuth><ChildGate><Layout><Meals /></Layout></ChildGate></RequireAuth>} />
         <Route path="/receipt" element={<RequireAuth><ChildGate><Layout><Receipt /></Layout></ChildGate></RequireAuth>} />
         <Route path="/documents" element={<RequireAuth><ChildGate><Layout><Documents /></Layout></ChildGate></RequireAuth>} />
