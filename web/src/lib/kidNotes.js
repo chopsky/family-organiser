@@ -26,7 +26,12 @@ export function printNote(note) {
       .sheet { text-align: center; break-inside: avoid; page-break-inside: avoid; }
       h1 { font-size: 22px; margin: 0 0 4px; }
       .date { color: #8A8493; font-size: 13px; margin: 0 0 14px; }
-      img { display: block; margin: 0 auto; max-width: 100%; max-height: 165mm; border: 1px solid #ddd; border-radius: 12px; }
+      /* Cap the drawing's height so the heading above and the message below
+         always share the page. The printable HEIGHT is much smaller on a
+         landscape sheet (~186mm on A4) than portrait (~273mm), so the cap
+         drops accordingly - otherwise the message spills to a second page. */
+      img { display: block; margin: 0 auto; max-width: 100%; max-height: 170mm; border: 1px solid #ddd; border-radius: 12px; }
+      @media print and (orientation: landscape) { img { max-height: 120mm; } }
       .msg { font-size: 18px; font-style: italic; margin-top: 14px; }
       @media print { body { padding: 0; } }
     </style></head><body>
