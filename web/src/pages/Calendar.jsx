@@ -58,6 +58,52 @@ const COLOR_HEX = {
   lavender: '#6558C7', orange: '#E8A040', blue: '#4A9FCC', green: '#7DAE82', gray: '#7A8694',
 };
 
+// ── Modal styling shared with the Tasks/Rewards modals ──────────────────
+// The New Event / New activity sheet must read as the same family as
+// Chores.jsx's TaskModal and Rewards.jsx's reward modal: serif 22px
+// heading, 12px/600 field labels, white rounded-10 inputs, avatar-ring
+// member pickers and right-aligned rounded-10 footer buttons. Constants
+// mirror Chores.jsx exactly.
+const M_INK = '#1A1620', M_INK2 = '#4A4453', M_INK3 = '#8A8493';
+const M_LINE_STRONG = 'rgba(26,22,32,0.12)';
+const M_BRAND = '#6C3DD9', M_BRAND_SOFT = '#EFE9FB';
+const M_BG_SOFT = '#F3EEE5';
+const M_SERIF = 'var(--font-serif-display)';
+const mInput = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${M_LINE_STRONG}`, fontSize: 14, color: M_INK, outline: 'none', background: '#fff', fontFamily: 'inherit' };
+
+// Field wrapper: label row (12/600, optional right-aligned control such as
+// the All-day toggle) above the control - identical to Chores' Field.
+function MField({ label, right, children, style }) {
+  return (
+    <div style={{ marginBottom: 16, ...style }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: M_INK2 }}>{label}</div>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Avatar-ring member picker button (the task modal's "Who" control).
+function MAvatarPick({ member, on, onClick, hex }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={member.name}
+      style={{ position: 'relative', border: on ? `2px solid ${hex}` : '2px solid transparent', borderRadius: '50%', padding: 1, background: 'transparent', cursor: 'pointer' }}
+    >
+      <Avatar member={member} size={50} bg="#fff" />
+      {on && (
+        <span style={{ position: 'absolute', right: -2, bottom: -2, width: 18, height: 18, borderRadius: '50%', background: hex, border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+      )}
+    </button>
+  );
+}
+
 const RECURRENCES = ['', 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const NOTIFICATION_OPTIONS = [
   { value: '', label: 'None' },
@@ -2457,13 +2503,19 @@ export default function Calendar() {
       {showForm && (
         <BottomSheet open={showForm} onDismiss={() => { setShowForm(false); resetForm(); }} desktopWidthClass="sm:w-[480px]">
           <div ref={formRef} className="overflow-y-auto min-h-0">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-2 pb-2">
-              <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>
-                {editingEvent ? 'Edit Event' : createKind === 'activity' ? 'New activity' : 'New Event'}
+            {/* Header - serif 22 + soft square close button, matching the
+                Tasks/Rewards modals. */}
+            <div className="flex items-center justify-between px-6 pt-2" style={{ marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontFamily: M_SERIF, fontSize: 22, fontWeight: 400, color: M_INK }}>
+                {editingEvent ? 'Edit event' : createKind === 'activity' ? 'New activity' : 'New event'}
               </h2>
-              <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="text-warm-grey hover:text-charcoal p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                aria-label="Close"
+                style={{ width: 34, height: 34, borderRadius: 10, border: 0, background: M_BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={M_INK2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
@@ -2495,88 +2547,59 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* ── Who's it for (activity mode) - shown above the name,
-                     single-select child pills, same pill language as the
-                     event mode's member selector. ── */}
+              {/* ── Who's it for (activity mode) - avatar-ring single-select,
+                     the same "Who" control as the task modal. ── */}
               {!editingEvent && createKind === 'activity' && (
-                <div className="mb-1">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Who&rsquo;s it for</p>
-                  <div className="flex flex-wrap gap-2">
-                    {members.filter((m) => m.member_type === 'dependent').map((m) => {
-                      const on = actKid === m.id;
-                      const hex = m.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setActKid(m.id)}
-                          className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-all"
-                          style={{
-                            border: `1.5px solid ${hex}`,
-                            background: on ? hex : 'transparent',
-                            color: on ? '#fff' : hex,
-                          }}
-                        >
-                          <span
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                            style={{ background: on ? 'rgba(255,255,255,0.3)' : hex, color: '#fff' }}
-                          >
-                            {on ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            ) : (
-                              m.name?.[0]?.toUpperCase() || '?'
-                            )}
-                          </span>
-                          {m.name}
-                        </button>
-                      );
-                    })}
+                <MField label="Who's it for">
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {members.filter((m) => m.member_type === 'dependent').map((m) => (
+                      <MAvatarPick
+                        key={m.id}
+                        member={m}
+                        on={actKid === m.id}
+                        onClick={() => setActKid(m.id)}
+                        hex={m.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage}
+                      />
+                    ))}
                   </div>
-                </div>
+                </MField>
               )}
 
               {/* ── 1. Title / activity name ── */}
-              <input
-                type="text"
-                value={formTitle}
-                onChange={e => setFormTitle(e.target.value)}
-                required
-                className="w-full text-lg font-medium text-charcoal placeholder-warm-grey/60 border-0 border-b-2 border-light-grey bg-transparent py-3 focus:border-plum focus:outline-none transition-colors"
-                placeholder={(!editingEvent && createKind === 'activity') ? 'Activity name · e.g. Swimming' : 'Add title'}
-              />
+              <MField label={(!editingEvent && createKind === 'activity') ? 'Activity name' : 'Title'}>
+                <input
+                  type="text"
+                  value={formTitle}
+                  onChange={e => setFormTitle(e.target.value)}
+                  required
+                  style={mInput}
+                  placeholder={(!editingEvent && createKind === 'activity') ? 'e.g. Swimming' : 'e.g. Dentist appointment'}
+                />
+              </MField>
 
               {(editingEvent || createKind === 'event') && (
-              <div className="mt-5 space-y-4">
-                {/* ── 2. Date / Time ── */}
-                <div className="flex gap-3">
-                  {/* Clock icon */}
-                  <div className="flex-shrink-0 pt-2.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  </div>
-                  {/* min-w-0 on the flex-1 wrapper prevents the inner row from
-                      growing past the modal width on narrow phones - flex
-                      items default to min-width:auto, and native iOS date
-                      inputs have a wide intrinsic min-width that would
-                      otherwise force the row to overflow. */}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {/* All-day toggle - own row, right-aligned. Was inline
-                        with the start row, but on narrow phones it ate
-                        enough horizontal space that the native iOS date
-                        picker had no room to render "DD Mmm YYYY" and the
-                        date string wrapped/truncated. Promoting it to
-                        its own row frees the entire row width for the
-                        date+time pair on both lines. */}
-                    <div className="flex justify-end">
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-warm-grey cursor-pointer whitespace-nowrap select-none">
-                        <div
-                          className={`relative w-8 h-[18px] rounded-full transition-colors cursor-pointer ${formAllDay ? 'bg-plum' : 'bg-light-grey'}`}
-                          onClick={() => setFormAllDay(!formAllDay)}
-                        >
-                          <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${formAllDay ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
-                        </div>
-                        All day
-                      </label>
-                    </div>
+              <div>
+                {/* ── 2. When - date/time rows with the All-day switch in the
+                       label row. min-w-0 on the date inputs stops native iOS
+                       pickers forcing the row past the modal width. ── */}
+                <MField
+                  label="When"
+                  right={(
+                    <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer whitespace-nowrap select-none" style={{ color: M_INK2 }}>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={formAllDay}
+                        onClick={() => setFormAllDay(!formAllDay)}
+                        style={{ width: 34, height: 20, borderRadius: 99, border: 0, cursor: 'pointer', background: formAllDay ? M_BRAND : M_LINE_STRONG, position: 'relative', transition: 'background .15s', padding: 0 }}
+                      >
+                        <span style={{ position: 'absolute', top: 2, left: formAllDay ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+                      </button>
+                      All day
+                    </label>
+                  )}
+                >
+                  <div className="space-y-2">
                     {/* Start row */}
                     <div className="flex items-center gap-2">
                       <input
@@ -2586,8 +2609,7 @@ export default function Calendar() {
                           setFormDate(e.target.value);
                           if (formEndDate < e.target.value) setFormEndDate(e.target.value);
                         }}
-                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
-                        className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        style={{ ...mInput, minWidth: 0, flex: 1, WebkitAppearance: 'none', appearance: 'none' }}
                       />
                       {!formAllDay && (
                         <input
@@ -2607,8 +2629,7 @@ export default function Calendar() {
                                 : `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
                             }
                           }}
-                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
-                          className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                          style={{ ...mInput, width: 96, flexShrink: 0, WebkitAppearance: 'none', appearance: 'none' }}
                         />
                       )}
                     </div>
@@ -2619,109 +2640,77 @@ export default function Calendar() {
                         value={formEndDate}
                         onChange={e => setFormEndDate(e.target.value)}
                         min={formDate}
-                        style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
-                        className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        style={{ ...mInput, minWidth: 0, flex: 1, WebkitAppearance: 'none', appearance: 'none' }}
                       />
                       {!formAllDay && (
                         <input
                           type="time"
                           value={formEnd}
                           onChange={e => setFormEnd(e.target.value)}
-                          style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none', lineHeight: '40px' }}
-                          className="w-[88px] flex-shrink-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                          style={{ ...mInput, width: 96, flexShrink: 0, WebkitAppearance: 'none', appearance: 'none' }}
                         />
                       )}
                     </div>
                   </div>
-                </div>
+                </MField>
 
-                {/* ── 3. Members multi-select ── */}
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 pt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-warm-grey mb-2">Select members:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {members.map(m => {
-                        const isSelected = formAssignees.includes(m.name);
-                        const hex = m.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage;
-                        return (
-                          <button
-                            key={m.name}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                const next = formAssignees.filter(n => n !== m.name);
-                                setFormAssignees(next);
-                                if (next.length > 0) {
-                                  const firstMember = members.find(mem => mem.name === next[0]);
-                                  setFormColor(firstMember?.color_theme || 'lavender');
-                                  setFormAssignee(next[0]);
-                                } else {
-                                  setFormColor('lavender');
-                                  setFormAssignee('');
-                                }
+                {/* ── 3. Who - avatar-ring multi-select (the task modal's
+                       Who control). Selection logic unchanged: names drive
+                       assignees, first pick sets the event colour. ── */}
+                <MField label="Who">
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {members.map(m => {
+                      const isSelected = formAssignees.includes(m.name);
+                      const hex = m.color_theme ? (COLOR_HEX[m.color_theme] || COLOR_HEX.sage) : COLOR_HEX.sage;
+                      return (
+                        <MAvatarPick
+                          key={m.name}
+                          member={m}
+                          on={isSelected}
+                          hex={hex}
+                          onClick={() => {
+                            if (isSelected) {
+                              const next = formAssignees.filter(n => n !== m.name);
+                              setFormAssignees(next);
+                              if (next.length > 0) {
+                                const firstMember = members.find(mem => mem.name === next[0]);
+                                setFormColor(firstMember?.color_theme || 'lavender');
+                                setFormAssignee(next[0]);
                               } else {
-                                const next = [...formAssignees, m.name];
-                                setFormAssignees(next);
-                                if (next.length === 1) {
-                                  setFormColor(m.color_theme || 'lavender');
-                                  setFormAssignee(m.name);
-                                }
+                                setFormColor('lavender');
+                                setFormAssignee('');
                               }
-                            }}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-all"
-                            style={{
-                              border: `1.5px solid ${hex}`,
-                              background: isSelected ? hex : 'transparent',
-                              color: isSelected ? '#fff' : hex,
-                            }}
-                          >
-                            {/* Avatar circle */}
-                            <span
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                              style={{
-                                background: isSelected ? 'rgba(255,255,255,0.3)' : hex,
-                                color: isSelected ? '#fff' : '#fff',
-                              }}
-                            >
-                              {isSelected ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                              ) : (
-                                m.name?.[0]?.toUpperCase() || '?'
-                              )}
-                            </span>
-                            {m.name}
-                          </button>
-                        );
-                      })}
-                    </div>
+                            } else {
+                              const next = [...formAssignees, m.name];
+                              setFormAssignees(next);
+                              if (next.length === 1) {
+                                setFormColor(m.color_theme || 'lavender');
+                                setFormAssignee(m.name);
+                              }
+                            }
+                          }}
+                        />
+                      );
+                    })}
                   </div>
-                </div>
+                </MField>
 
                 {/* ── 4. Repeat ── */}
-                <div className="flex gap-3 items-center">
-                  <div className="flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  </div>
+                <MField label="Repeat">
                   <select
                     value={formRecurrence}
                     onChange={e => setFormRecurrence(e.target.value)}
-                    className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                    style={mInput}
                   >
                     {RECURRENCES.map(r => (
                       <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>
                     ))}
                   </select>
-                </div>
+                </MField>
 
                 {/* ── 5. Reminders ── */}
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 pt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                  </div>
-                  <div className="flex-1 space-y-2">
+                <MField label="Reminders">
+                  <div className="space-y-2">
                     {formReminders.map((reminder, idx) => {
                       // The bot can create reminders with arbitrary offsets
                       // (e.g. "remind me 20 minutes before") that aren't in
@@ -2747,7 +2736,7 @@ export default function Calendar() {
                                 next[idx] = { time, unit };
                                 setFormReminders(next);
                               }}
-                              className="flex-1 h-9 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                              style={{ ...mInput, flex: 1, width: 'auto' }}
                             >
                               {!isPreset && <option value="">Pick a preset…</option>}
                               {REMINDER_OPTIONS.map(opt => (
@@ -2782,48 +2771,36 @@ export default function Calendar() {
                     <button
                       type="button"
                       onClick={() => setFormReminders([...formReminders, { time: '10', unit: 'minutes' }])}
-                      className="pt-2 text-xs font-semibold text-plum hover:text-plum-dark transition-colors"
+                      style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: M_BRAND }}
                     >
                       + Add reminder
                     </button>
                   </div>
-                </div>
+                </MField>
 
                 {/* ── 6. More options / Less options ── */}
                 {showMoreOptions && (
-                  <div className="space-y-4 pt-1">
-                    {/* Description */}
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 pt-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
-                      </div>
+                  <div>
+                    <MField label="Description">
                       <textarea
                         value={formDesc}
                         onChange={e => setFormDesc(e.target.value)}
                         rows={2}
-                        className="flex-1 border-[1.5px] border-light-grey rounded-lg px-2.5 py-2 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        style={{ ...mInput, resize: 'vertical' }}
                         placeholder="Add description"
                       />
-                    </div>
-                    {/* Location */}
-                    <div className="flex gap-3 items-center">
-                      <div className="flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      </div>
+                    </MField>
+                    <MField label="Location">
                       <input
                         type="text"
                         value={formLocation}
                         onChange={e => setFormLocation(e.target.value)}
-                        className="flex-1 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                        style={mInput}
                         placeholder="Add location"
                       />
-                    </div>
-                    {/* Attachments */}
-                    <div className="flex gap-3 items-start">
-                      <div className="flex-shrink-0 pt-0.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-warm-grey"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
+                    </MField>
+                    <MField label="Attachments">
+                      <div className="min-w-0">
                         {editingEvent ? (
                           <>
                             {eventAttachments.length > 0 && (
@@ -2850,7 +2827,7 @@ export default function Calendar() {
                           <span className="text-sm text-warm-grey">Save the event first, then you can attach files.</span>
                         )}
                       </div>
-                    </div>
+                    </MField>
                   </div>
                 )}
               </div>
@@ -2858,12 +2835,11 @@ export default function Calendar() {
 
               {/* ── Kids' activity mode body (create only) ── */}
               {!editingEvent && createKind === 'activity' && (
-              <div className="mt-5 space-y-4">
-                {/* Repeats on - Mon-Sun multi-select day pills (upgrades the
-                    old single-day dropdown; one schedule row per day). */}
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Repeats on</p>
-                  <div className="flex flex-wrap gap-2">
+              <div>
+                {/* Repeats on - Mon-Sun multi-select chips (the task
+                    modal's weekly-day pills; one schedule row per day). */}
+                <MField label="Repeats on">
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => {
                       const on = actDays.includes(i);
                       return (
@@ -2873,58 +2849,47 @@ export default function Calendar() {
                           aria-pressed={on}
                           aria-label={d}
                           onClick={() => setActDays((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]))}
-                          className={`w-10 h-10 rounded-xl text-[13px] font-bold transition-colors ${on ? 'bg-plum border-plum text-white' : 'bg-white text-warm-grey'}`}
-                          style={{ border: on ? '1.5px solid var(--color-plum)' : '1.5px solid var(--color-light-grey)' }}
+                          style={{ padding: '6px 10px', borderRadius: 99, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', border: on ? `1.5px solid ${M_BRAND}` : `1px solid ${M_LINE_STRONG}`, background: on ? M_BRAND_SOFT : '#fff', color: on ? M_BRAND : M_INK2 }}
                         >
-                          {d[0]}
+                          {d.slice(0, 2)}
                         </button>
                       );
                     })}
                   </div>
-                </div>
+                </MField>
 
                 {/* Time */}
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Time</p>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <label className="flex items-center gap-2 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus-within:border-plum">
-                      <span className="text-warm-grey text-xs font-medium">Starts</span>
-                      <input
-                        type="time"
-                        value={actStart}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setActStart(v);
-                          if (v && actEnd && actEnd <= v) setActEnd('');
-                        }}
-                        className="flex-1 min-w-0 bg-transparent focus:outline-none text-sm"
-                        style={{ WebkitAppearance: 'none', appearance: 'none' }}
-                      />
-                    </label>
-                    <label className="flex items-center gap-2 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus-within:border-plum">
-                      <span className="text-warm-grey text-xs font-medium">Ends</span>
-                      <input
-                        type="time"
-                        value={actEnd}
-                        onChange={(e) => setActEnd(e.target.value)}
-                        className="flex-1 min-w-0 bg-transparent focus:outline-none text-sm"
-                        style={{ WebkitAppearance: 'none', appearance: 'none' }}
-                      />
-                    </label>
-                  </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <MField label="Starts" style={{ flex: 1 }}>
+                    <input
+                      type="time"
+                      value={actStart}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setActStart(v);
+                        if (v && actEnd && actEnd <= v) setActEnd('');
+                      }}
+                      style={{ ...mInput, WebkitAppearance: 'none', appearance: 'none' }}
+                    />
+                  </MField>
+                  <MField label="Ends" style={{ flex: 1 }}>
+                    <input
+                      type="time"
+                      value={actEnd}
+                      onChange={(e) => setActEnd(e.target.value)}
+                      style={{ ...mInput, WebkitAppearance: 'none', appearance: 'none' }}
+                    />
+                  </MField>
                 </div>
 
                 {/* Term - the child's real school terms + Ongoing/Custom.
                     New activities inherit the window so they stop with the
                     term automatically. */}
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">
-                    Term{actTermsLoading && <span className="ml-2 normal-case font-medium tracking-normal">loading…</span>}
-                  </p>
+                <MField label={actTermsLoading ? 'Term (loading…)' : 'Term'}>
                   <select
                     value={actTermKey}
                     onChange={(e) => setActTermKey(e.target.value)}
-                    className="w-full h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                    style={mInput}
                   >
                     {actTerms.map((t) => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
                     <option value="ongoing">Ongoing (every term)</option>
@@ -2932,42 +2897,42 @@ export default function Calendar() {
                   </select>
                   {actTermKey === 'custom' ? (
                     <div className="flex items-center gap-2 mt-2">
-                      <input type="date" value={actCustomStart} onChange={(e) => setActCustomStart(e.target.value)} className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none" />
-                      <span className="text-xs text-warm-grey">to</span>
-                      <input type="date" value={actCustomEnd} onChange={(e) => setActCustomEnd(e.target.value)} min={actCustomStart || undefined} className="flex-1 min-w-0 h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none" />
+                      <input type="date" value={actCustomStart} onChange={(e) => setActCustomStart(e.target.value)} style={{ ...mInput, minWidth: 0, flex: 1 }} />
+                      <span style={{ fontSize: 12, color: M_INK3 }}>to</span>
+                      <input type="date" value={actCustomEnd} onChange={(e) => setActCustomEnd(e.target.value)} min={actCustomStart || undefined} style={{ ...mInput, minWidth: 0, flex: 1 }} />
                     </div>
                   ) : (
-                    <p className="text-xs text-warm-grey mt-2">
+                    <p style={{ fontSize: 12, color: M_INK3, margin: '8px 0 0' }}>
                       {actTermKey === 'ongoing'
                         ? 'Repeats every selected day, every week, until you remove it.'
                         : 'Repeats every selected day this term, then stops automatically.'}
                     </p>
                   )}
-                </div>
+                </MField>
 
                 {/* Pickup - adults only; a child can't collect a child. */}
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Pickup</p>
+                <MField label="Pickup">
                   <select
                     value={actPickup}
                     onChange={(e) => setActPickup(e.target.value)}
-                    className="w-full h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
+                    style={mInput}
                   >
                     <option value="">Choose who collects {members.find((m) => m.id === actKid)?.name || 'them'}</option>
                     {members.filter((m) => m.member_type !== 'dependent').map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
-                </div>
+                </MField>
               </div>
               )}
 
-              {/* ── 7. Bottom bar ── */}
-              <div className="flex items-center justify-between mt-5 pt-4 border-t border-light-grey">
+              {/* ── 7. Bottom bar - same button treatment as the task
+                     modal: right-aligned white Cancel + solid primary. ── */}
+              <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-2">
                   {(editingEvent || createKind === 'event') && (
                   <button
                     type="button"
                     onClick={() => setShowMoreOptions(!showMoreOptions)}
-                    className="text-xs font-semibold text-plum hover:text-plum-dark transition-colors"
+                    style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: M_BRAND }}
                   >
                     {showMoreOptions ? 'Less options \u2227' : 'More options \u2228'}
                   </button>
@@ -2984,20 +2949,20 @@ export default function Calendar() {
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     type="button"
                     onClick={() => { setShowForm(false); resetForm(); }}
-                    className="h-9 px-4 rounded-xl border-[1.5px] border-light-grey text-warm-grey hover:bg-cream text-sm font-semibold transition-colors"
+                    style={{ ...mInput, width: 'auto', padding: '10px 18px', cursor: 'pointer', fontWeight: 600, background: '#fff' }}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving || !formTitle.trim() || (!editingEvent && createKind === 'activity' && (!actKid || actDays.length === 0))}
-                    className="h-9 px-5 rounded-xl bg-plum hover:bg-plum-dark disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                    style={{ padding: '10px 22px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: 'inherit', background: M_BRAND, color: '#fff', opacity: (saving || !formTitle.trim() || (!editingEvent && createKind === 'activity' && (!actKid || actDays.length === 0))) ? 0.5 : 1 }}
                   >
-                    {saving ? 'Saving...' : editingEvent ? 'Update' : createKind === 'activity' ? 'Add activity' : 'Save'}
+                    {saving ? 'Saving…' : editingEvent ? 'Save' : createKind === 'activity' ? 'Add activity' : 'Save'}
                   </button>
                 </div>
               </div>
