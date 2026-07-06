@@ -240,7 +240,13 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
         const hidden = a.show_on_calendar === false ? ', hidden from adult calendar' : '';
         const upcomingSkips = (a.skips || []).filter((d) => d >= today);
         const skips = upcomingSkips.length > 0 ? `, skipped: ${upcomingSkips.join(', ')}` : '';
-        return `- ${child?.name || 'Unknown child'} - ${a.activity}: ${DAY_NAMES[a.day_of_week] || '?'}${time}${pickup}${term}${hidden}${skips} (id: ${a.id})`;
+        // Upcoming one-off changes so "is swimming still at 3 on Thursday?"
+        // answers correctly and "back to normal" can name a real date.
+        const upcomingOverrides = Object.entries(a.overrides || {}).filter(([d]) => d >= today);
+        const changed = upcomingOverrides.length > 0
+          ? `, changed: ${upcomingOverrides.map(([d, o]) => `${d}${o.time_start ? ` at ${String(o.time_start).slice(0, 5)}` : ''}`).join(', ')}`
+          : '';
+        return `- ${child?.name || 'Unknown child'} - ${a.activity}: ${DAY_NAMES[a.day_of_week] || '?'}${time}${pickup}${term}${hidden}${skips}${changed} (id: ${a.id})`;
       }).join('\n')
     : '(none)';
 
@@ -510,7 +516,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // that lead with the bare past-tense verb ("Removed Padel on Sunday…",
     // "Done, both entries deleted") - the last one slipped through and let
     // a no-op deletion read as success.
-    const claimsAction = /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted|skipped)\b|\bI (?:added|created|scheduled|saved|removed|deleted|skipped)\b|(?:^|\n)\s*(?:Removed|Deleted|Added|Created|Updated|Rescheduled|Cancelled|Skipped)\b|(?:^|\n)\s*(?:Done|All set|Sorted)[,.!]/im;
+    const claimsAction = /\bI(?:'|’)?ve (?:added|created|scheduled|saved|set up|updated|removed|deleted|skipped|changed|moved)\b|\bI (?:added|created|scheduled|saved|removed|deleted|skipped|changed|moved)\b|(?:^|\n)\s*(?:Removed|Deleted|Added|Created|Updated|Rescheduled|Cancelled|Skipped|Changed|Moved)\b|(?:^|\n)\s*(?:Done|All set|Sorted)[,.!]/im;
     if (actions.length === 0 && claimsAction.test(cleanContent)) {
       console.warn('[chat] reply claimed an action but no action block parsed - correcting. Raw length:', aiText.length);
       cleanContent += '\n\n⚠️ Actually - I wasn\'t able to save that just now. Please ask me again.';
@@ -613,7 +619,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             cleanContent += `\n\n⚠️ I found ${candidates.length} events matching "${act.title}" - tell me which date to remove, or say "remove all of them".`;
           }
 
-        } else if (['skip_activity', 'update_activity', 'delete_activity'].includes(act.action)) {
+        } else if (['skip_activity', 'override_activity', 'update_activity', 'delete_activity'].includes(act.action)) {
           // Weekly extracurriculars (child_weekly_schedule) - the prompt
           // lists them with ids, so the model targets by id. Household
           // scoping mirrors the /schools routes: the activity's child must
@@ -631,6 +637,44 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             } else {
               await db.addActivitySkip(act.activity_id, req.householdId, act.date, req.user.id);
               executedActions.push({ type: 'activity_skipped', activity: activity.activity, date: act.date });
+            }
+          } else if (act.action === 'override_activity') {
+            // One-off change ("piano is at 4pm today"): the model only sets
+            // the fields the user changed, so default the rest from the
+            // series - an override row REPLACES all three fields for that
+            // date (same contract as the calendar sheet's prefilled form).
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(act.date || '')) {
+              cleanContent += `\n\n⚠️ I couldn't work out which date to change - tell me the exact day.`;
+            } else {
+              const timeOk = (t) => !t || /^\d{2}:\d{2}$/.test(t);
+              if (!timeOk(act.time_start) || !timeOk(act.time_end)) {
+                cleanContent += `\n\n⚠️ I couldn't parse that time - use HH:MM (e.g. 16:00).`;
+              } else {
+                let start = act.time_start || (activity.time_start ? String(activity.time_start).slice(0, 5) : null);
+                let end = act.time_end || null;
+                // Start moved but no end given: keep the series duration
+                // rather than pinning the old end (17:30-18:00 moved to
+                // 16:00 should become 16:00-16:30, not 16:00-18:00).
+                if (act.time_start && !act.time_end && activity.time_start && activity.time_end) {
+                  const mins = (t) => Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5));
+                  const dur = mins(activity.time_end) - mins(activity.time_start);
+                  const endM = Math.min(23 * 60 + 59, mins(act.time_start) + Math.max(0, dur));
+                  end = `${String(Math.floor(endM / 60)).padStart(2, '0')}:${String(endM % 60).padStart(2, '0')}`;
+                } else if (!act.time_end && !act.time_start) {
+                  end = activity.time_end ? String(activity.time_end).slice(0, 5) : null;
+                }
+                let pickupId = activity.pickup_member_id || null;
+                if (act.pickup_name) {
+                  const pick = members.find((m) => m.name.toLowerCase() === String(act.pickup_name).toLowerCase());
+                  if (pick) pickupId = pick.id;
+                }
+                await db.addActivitySkip(act.activity_id, req.householdId, act.date, req.user.id, {
+                  time_start: start,
+                  time_end: end,
+                  pickup_member_id: pickupId,
+                });
+                executedActions.push({ type: 'activity_overridden', activity: activity.activity, date: act.date });
+              }
             }
           } else if (act.action === 'update_activity') {
             const fields = {};

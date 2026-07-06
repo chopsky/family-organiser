@@ -398,6 +398,22 @@ module.exports = [
     },
   },
   {
+    name: 'activity change: "piano is at 4pm today" is a one-date CHANGE, not a series update or skip',
+    message: "Mason's piano is at 4pm today",
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Mason'] },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action !== 'change') return `expected action "change", got "${sa.action}" (one-date time move must not skip or edit the series)`;
+      const today = new Date().toISOString().split('T')[0];
+      if (sa.skip_date !== today) return `expected skip_date ${today}, got ${sa.skip_date}`;
+      if (sa.time_start !== '16:00') return `expected time_start 16:00, got ${sa.time_start}`;
+      if (!/piano/i.test(sa.activity || '')) return `wrong activity: "${sa.activity}"`;
+      return null;
+    },
+  },
+  {
     name: 'activity remove: "Logan has quit football club" deletes the series (no skip_date)',
     message: 'Logan has quit football club, take it off his schedule',
     ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Logan'] },

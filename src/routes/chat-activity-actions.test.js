@@ -105,6 +105,43 @@ describe('POST /api/chat activity actions', () => {
     expect(res.body.message).toMatch(/couldn't work out which date/i);
   });
 
+  test('override_activity writes a one-off change, keeping the session length when only the start moves', async () => {
+    // Series is 15:30-16:30 (below); "piano at 4pm today" moves the start
+    // to 16:00 and the end must follow to 17:00, not stay pinned.
+    db.getChildActivityById.mockResolvedValue({ ...ACTIVITY, time_start: '15:30:00', time_end: '16:30:00', pickup_member_id: 'u1' });
+    callWithFailover.mockResolvedValue(reply({
+      action: 'override_activity', activity_id: 'act-1', date: '2026-07-06',
+      time_start: '16:00', time_end: null, pickup_name: null,
+    }));
+
+    const res = await request(app()).post('/api/chat').send({ message: 'wraparound care is at 4pm today' });
+    expect(res.status).toBe(200);
+    expect(db.addActivitySkip).toHaveBeenCalledWith('act-1', 'h1', '2026-07-06', 'u1', {
+      time_start: '16:00',
+      time_end: '17:00', // 60-minute series duration preserved
+      pickup_member_id: 'u1', // series pickup carried over, not cleared
+    });
+    expect(res.body.actions).toEqual([
+      { type: 'activity_overridden', activity: 'Wraparound Care', date: '2026-07-06' },
+    ]);
+  });
+
+  test('override_activity pickup-only change keeps the series times', async () => {
+    db.getChildActivityById.mockResolvedValue({ ...ACTIVITY, time_start: '15:30:00', time_end: '16:30:00', pickup_member_id: null });
+    callWithFailover.mockResolvedValue(reply({
+      action: 'override_activity', activity_id: 'act-1', date: '2026-07-06',
+      time_start: null, time_end: null, pickup_name: 'Grant',
+    }));
+
+    const res = await request(app()).post('/api/chat').send({ message: 'Grant collects from wraparound care today' });
+    expect(res.status).toBe(200);
+    expect(db.addActivitySkip).toHaveBeenCalledWith('act-1', 'h1', '2026-07-06', 'u1', {
+      time_start: '15:30',
+      time_end: '16:30',
+      pickup_member_id: 'u1',
+    });
+  });
+
   test('update_activity patches only the provided fields and resolves pickup by name', async () => {
     callWithFailover.mockResolvedValue(reply({
       action: 'update_activity', activity_id: 'act-1', time_start: '16:00', time_end: null,

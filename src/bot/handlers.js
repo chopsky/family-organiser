@@ -2009,23 +2009,51 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       if (!child) {
         return { response: `I couldn't find a child called "${sa.child_name}" in your family. Check the name and try again!`, actions };
       }
-      if (sa.action === 'skip') {
-        // "No swimming today" - hide ONE date, keep the series weekly.
-        // Same fuzzy match as remove; day narrowing comes from the skip
-        // date's weekday when the classifier didn't set day_of_week.
+      if (sa.action === 'skip' || sa.action === 'change') {
+        // "No swimming today" (skip) / "piano is at 4pm today" (change) -
+        // ONE date only, the series stays weekly. Same fuzzy match as
+        // remove; day narrowing comes from the exception date's weekday
+        // when the classifier didn't set day_of_week.
         const activities = await db.getChildActivities(child.id);
         const match = activities.find(a =>
           a.activity.toLowerCase() === sa.activity.toLowerCase() &&
           (sa.day_of_week === undefined || sa.day_of_week === null || a.day_of_week === sa.day_of_week)
         );
         if (!match) {
-          return { response: `I couldn't find "${sa.activity}" in ${child.name}'s weekly activities, so nothing was skipped.`, actions };
+          return { response: `I couldn't find "${sa.activity}" in ${child.name}'s weekly activities, so nothing was changed.`, actions };
         }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(sa.skip_date || '')) {
-          return { response: `Which date should I skip ${child.name}'s ${match.activity}? Tell me the day (e.g. "today" or "Thursday").`, actions };
+          return { response: `Which date do you mean for ${child.name}'s ${match.activity}? Tell me the day (e.g. "today" or "Thursday").`, actions };
         }
-        await db.addActivitySkip(match.id, household.id, sa.skip_date, null);
-        return { response: result.response_message || `🏫 Skipped ${child.name}'s ${match.activity} on ${sa.skip_date} - back to normal the week after. ✅`, actions };
+        if (sa.action === 'skip') {
+          await db.addActivitySkip(match.id, household.id, sa.skip_date, null);
+          return { response: result.response_message || `🏫 Skipped ${child.name}'s ${match.activity} on ${sa.skip_date} - back to normal the week after. ✅`, actions };
+        }
+        // change: an override row replaces all three fields for that date,
+        // so default anything the user didn't mention from the series
+        // (and keep the session length when only the start moved).
+        let start = sa.time_start || (match.time_start ? String(match.time_start).slice(0, 5) : null);
+        let end = sa.time_end || null;
+        if (sa.time_start && !sa.time_end && match.time_start && match.time_end) {
+          const mins = (t) => Number(String(t).slice(0, 2)) * 60 + Number(String(t).slice(3, 5));
+          const dur = mins(match.time_end) - mins(match.time_start);
+          const endM = Math.min(23 * 60 + 59, mins(sa.time_start) + Math.max(0, dur));
+          end = `${String(Math.floor(endM / 60)).padStart(2, '0')}:${String(endM % 60).padStart(2, '0')}`;
+        } else if (!sa.time_end && !sa.time_start) {
+          end = match.time_end ? String(match.time_end).slice(0, 5) : null;
+        }
+        let pickupId = match.pickup_member_id || null;
+        if (sa.pickup_name) {
+          const pick = household.members.find(m => m.name.toLowerCase() === String(sa.pickup_name).toLowerCase());
+          if (pick) pickupId = pick.id;
+        }
+        await db.addActivitySkip(match.id, household.id, sa.skip_date, null, {
+          time_start: start, time_end: end, pickup_member_id: pickupId,
+        });
+        const bits = [];
+        if (start) bits.push(`at ${start}`);
+        if (sa.pickup_name) bits.push(`${sa.pickup_name} collects`);
+        return { response: result.response_message || `🏫 Changed ${child.name}'s ${match.activity} on ${sa.skip_date}${bits.length ? ` (${bits.join(', ')})` : ''} - just that day. ✅`, actions };
       } else if (sa.action === 'remove') {
         // Find and remove the activity
         const activities = await db.getChildActivities(child.id);
