@@ -108,7 +108,7 @@ describe('kids notes', () => {
     }));
   });
 
-  test('GET /notes returns signed image URLs and hides the storage key', async () => {
+  test('GET /notes returns signed image URLs, the child name, and hides the storage key', async () => {
     db.getKidNotesForHousehold.mockResolvedValue([
       { id: 'n1', child_id: 'k1', note_date: '2026-07-06', image_path: 'h1/kid-notes/k1/a.png', text_note: null, reactions: { me: '❤️' } },
       { id: 'n2', child_id: 'k1', note_date: '2026-07-05', image_path: null, text_note: 'hi mum', reactions: {} },
@@ -118,6 +118,7 @@ describe('kids notes', () => {
     expect(db.getKidNotesForHousehold).toHaveBeenCalledWith('h1', { childId: null, limit: 5 });
     expect(res.body.notes[0].image_url).toBe('https://signed.example/note.png');
     expect(res.body.notes[0].image_path).toBeUndefined();
+    expect(res.body.notes[0].child_name).toBe('Olivia');
     expect(res.body.notes[1].image_url).toBeNull();
   });
 

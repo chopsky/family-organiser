@@ -7,6 +7,7 @@ import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconHelp, IconList, IconGift, IconStar, IconSparkles } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
+import KidNoteAlert from './KidNoteAlert';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
 import { tap as hapticTap } from '../lib/haptics';
@@ -429,6 +430,12 @@ export default function Layout({ children }) {
           never appears on the Subscribe / Login / Signup routes (which
           don't use Layout). */}
       <TrialEndedOverlay />
+
+      {/* Kids' notes banner + popup - "Olivia has sent you a note." with a
+          View button on whatever adult page is open. Not in Child Mode:
+          the kid shouldn't react to their own note (and Layout only shows
+          there via the PIN-unlocked Settings escape hatch anyway). */}
+      {!childMode && <KidNoteAlert />}
     </div>
   );
 }

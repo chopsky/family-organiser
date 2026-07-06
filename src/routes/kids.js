@@ -134,13 +134,20 @@ async function noteWithUrl(note) {
 }
 
 // GET /api/kids/notes?child_id=&limit= — newest first for the household
-// (dashboard card), or one child's archive (Kids Mode sent state).
+// (adult note alert/popup), or one child's archive (Kids Mode sent state).
+// Each note carries child_name so the alert can say who sent it without
+// a second members fetch.
 router.get('/notes', requireAuth, requireHousehold, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 60);
     const childId = req.query.child_id || null;
-    const notes = await db.getKidNotesForHousehold(req.householdId, { childId, limit });
-    return res.json({ notes: await Promise.all(notes.map(noteWithUrl)) });
+    const [notes, members] = await Promise.all([
+      db.getKidNotesForHousehold(req.householdId, { childId, limit }),
+      db.getHouseholdMembers(req.householdId).catch(() => []),
+    ]);
+    const nameOf = (id) => members.find((m) => m.id === id)?.name || null;
+    const out = await Promise.all(notes.map(async (n) => ({ ...(await noteWithUrl(n)), child_name: nameOf(n.child_id) })));
+    return res.json({ notes: out });
   } catch (err) {
     console.error('GET /api/kids/notes error:', err);
     return res.status(500).json({ error: 'Internal server error' });

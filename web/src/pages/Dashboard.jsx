@@ -18,7 +18,6 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { setBadgeCount } from '../lib/badge';
 import WeatherStrip from '../components/WeatherStrip';
 import AfterSchoolCard from '../components/AfterSchoolCard';
-import KidNotesCard from '../components/KidNotesCard';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 
@@ -806,11 +805,6 @@ export default function Dashboard() {
             null on desktop and when the household has no activities, so it won't
             occupy a grid cell in those cases. */}
         <AfterSchoolCard members={members} />
-
-        {/* Notes from the kids - drawings/messages sent from Kids Mode, with
-            one-tap emoji reactions that show back up on the kid's screen.
-            Hides itself when nothing was sent this week. */}
-        <KidNotesCard members={members} currentUserId={user?.id} />
 
         {/* Card 2a - Today's tasks scorecard: per-member chores/routines
             progress (done/total + a progress bar in the member's colour). */}
