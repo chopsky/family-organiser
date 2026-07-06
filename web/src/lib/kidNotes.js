@@ -15,17 +15,27 @@ export function printNote(note) {
   const who = escapeHtml(note.child_name || 'the kids');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>A note from ${who}</title>
     <style>
-      body { font-family: -apple-system, system-ui, sans-serif; color: #1A1620; text-align: center; padding: 32px; }
-      h1 { font-size: 24px; margin: 0 0 4px; }
-      .date { color: #8A8493; font-size: 13px; margin-bottom: 20px; }
-      img { max-width: 100%; border: 1px solid #ddd; border-radius: 12px; }
-      .msg { font-size: 20px; font-style: italic; margin-top: 20px; }
+      /* Predictable page box so the whole note fits on ONE sheet. */
+      @page { margin: 12mm; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body { font-family: -apple-system, system-ui, sans-serif; color: #1A1620; padding: 24px; }
+      /* Keep heading + drawing + message together - never split across
+         pages. The image is capped in height so there's always room for
+         the heading above and the message below on the same page. */
+      .sheet { text-align: center; break-inside: avoid; page-break-inside: avoid; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .date { color: #8A8493; font-size: 13px; margin: 0 0 14px; }
+      img { display: block; margin: 0 auto; max-width: 100%; max-height: 165mm; border: 1px solid #ddd; border-radius: 12px; }
+      .msg { font-size: 18px; font-style: italic; margin-top: 14px; }
       @media print { body { padding: 0; } }
     </style></head><body>
-    <h1>A note from ${who} &#128156;</h1>
-    <div class="date">${escapeHtml(note.note_date || '')}</div>
-    ${note.image_url ? `<img alt="Drawing" src="${escapeHtml(note.image_url)}">` : ''}
-    ${note.text_note ? `<div class="msg">&ldquo;${escapeHtml(note.text_note)}&rdquo;</div>` : ''}
+    <div class="sheet">
+      <h1>A note from ${who} &#128156;</h1>
+      <div class="date">${escapeHtml(note.note_date || '')}</div>
+      ${note.image_url ? `<img alt="Drawing" src="${escapeHtml(note.image_url)}">` : ''}
+      ${note.text_note ? `<div class="msg">&ldquo;${escapeHtml(note.text_note)}&rdquo;</div>` : ''}
+    </div>
     <script>
       window.addEventListener('load', function () {
         var img = document.querySelector('img');
