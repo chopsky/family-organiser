@@ -126,7 +126,7 @@ export default function KidNotesArchive() {
   };
 
   return (
-    <div className="max-w-[1160px] mx-auto pb-24">
+    <div className="max-w-[720px] mx-auto pb-24">
       <PageHeader title="Notes from the kids" />
 
       {kidsWithNotes.length > 1 && (
