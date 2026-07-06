@@ -353,7 +353,7 @@ function ProfileCard({ me, members }) {
       <div className="flex items-center gap-[18px] p-[22px]">
         <Avatar member={me || user} size={60} />
         <div className="flex-1 min-w-0">
-          <div className="text-lg font-bold text-bark truncate">{user?.name}</div>
+          <div className="text-lg font-semibold text-bark truncate">{user?.name}</div>
           <div className="text-[13px] text-warm-grey mt-0.5 truncate">
             {[user?.email, me?.family_role || (isOwner ? 'Owner' : 'Member')].filter(Boolean).join(' · ')}
           </div>
@@ -1409,7 +1409,7 @@ export default function Settings() {
       <div className="flex items-center gap-[18px] p-[22px] flex-wrap sm:flex-nowrap">
         <div className="w-[54px] h-[54px] rounded-2xl bg-white flex items-center justify-center text-[28px] shrink-0">🧸</div>
         <div className="flex-1 min-w-0 basis-48">
-          <div className="text-base font-bold text-bark">Hand the device to your kids</div>
+          <div className="text-base font-semibold text-bark">Hand the device to your kids</div>
           <div className="text-[13px] text-cocoa mt-[3px] leading-[1.45] max-w-[440px]">
             A simpler, playful space with only their quests, star shop and calendar. You&apos;ll need your PIN to switch back.
           </div>
