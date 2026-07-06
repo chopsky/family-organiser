@@ -5992,7 +5992,13 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
   // The recent-activity lists are deliberately NOT window-bound: when an
   // admin asks "what were this user's 3 AI calls?", the answer shouldn't
   // vanish because the calls happened 31 days ago and the toggle is on 30d.
-  const [aiRes, waRes, recentAiRes, recentWaRes, recentChatRes] = await Promise.all([
+  //
+  // PRIVACY: metadata only, never message content. body/response/chat text
+  // are personal data under GDPR - the admin's operational question ("are
+  // they sending/receiving? what kind of activity?") is answered by
+  // direction/type/intent/feature/timestamps. Content stays out of the
+  // admin payload by design (data minimisation); don't add it back.
+  const [aiRes, waRes, recentAiRes, recentWaRes] = await Promise.all([
     db.from('ai_usage_log').select('provider, feature, latency_ms, is_failover, created_at').eq('user_id', userId).gte('created_at', since),
     db.from('whatsapp_message_log').select('direction, message_type, intent, processing_ms, error, created_at').eq('user_id', userId).gte('created_at', since),
     db.from('ai_usage_log')
@@ -6001,24 +6007,18 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
       .order('created_at', { ascending: false })
       .limit(15),
     db.from('whatsapp_message_log')
-      .select('direction, message_type, intent, body, response, error, created_at')
+      .select('direction, message_type, intent, error, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(10),
-    db.from('chat_messages')
-      .select('content, created_at')
-      .eq('user_id', userId)
-      .eq('role', 'user')
-      .order('created_at', { ascending: false })
-      .limit(8),
   ]);
 
   const aiRows = aiRes.data || [];
   const waRows = waRes.data || [];
 
-  // Truncate message bodies - the admin needs the gist, not the full
-  // transcript, and long recipe JSON blobs would bloat the payload.
-  const clip = (s, n = 180) => {
+  // Clip error strings - they're technical (Twilio codes, timeouts) but can
+  // be long; the admin needs the gist.
+  const clip = (s, n = 120) => {
     if (!s || typeof s !== 'string') return null;
     return s.length > n ? `${s.slice(0, n)}…` : s;
   };
@@ -6029,7 +6029,7 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
     model: r.model,
     latency_ms: r.latency_ms,
     is_failover: r.is_failover,
-    error: clip(r.error, 120),
+    error: clip(r.error),
     created_at: r.created_at,
   }));
 
@@ -6037,14 +6037,7 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
     direction: r.direction,
     message_type: r.message_type,
     intent: r.intent,
-    body: clip(r.body),
-    response: clip(r.response),
-    error: clip(r.error, 120),
-    created_at: r.created_at,
-  }));
-
-  const recentChatMessages = (recentChatRes.data || []).map((r) => ({
-    content: clip(r.content),
+    error: clip(r.error),
     created_at: r.created_at,
   }));
 
@@ -6098,7 +6091,6 @@ async function getUserUsageStats(userId, { days = 30 } = {}, db = supabase) {
       byFeature: aiByFeature,
       daily: dailyAi,
       recentCalls: recentAiCalls,
-      recentChatMessages,
     },
     whatsapp: {
       totalMessages: waRows.length,

@@ -403,20 +403,6 @@ export default function AdminUserDetail() {
                 </div>
               )}
 
-              {/* What they actually asked in web chat */}
-              {usage.ai.recentChatMessages?.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-light-grey">
-                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Recent Chat Messages</p>
-                  <div className="space-y-2">
-                    {usage.ai.recentChatMessages.map((m, i) => (
-                      <div key={i} className="text-xs">
-                        <p className="text-charcoal">"{m.content}"</p>
-                        <p className="text-[10px] text-warm-grey mt-0.5">{formatRelativeTime(m.created_at)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
@@ -474,23 +460,26 @@ export default function AdminUserDetail() {
                 <p className="text-xs text-warm-grey mb-3">No messages in the selected range — showing their most recent activity below.</p>
               )}
 
-              {/* Recent messages with actual content - NOT window-bound */}
+              {/* Recent message activity - metadata only (direction / type /
+                  intent / time), never message content. GDPR data
+                  minimisation: the admin question is "are they active?",
+                  which doesn't need what they said. */}
               {usage.whatsapp.recentMessages?.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-light-grey">
-                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Recent Messages</p>
-                  <div className="space-y-2">
+                  <p className="text-[11px] text-warm-grey font-semibold uppercase tracking-wider mb-2">Recent Activity</p>
+                  <div className="space-y-1.5">
                     {usage.whatsapp.recentMessages.map((m, i) => (
-                      <div key={i} className="text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-semibold uppercase ${m.direction === 'inbound' ? 'text-plum' : 'text-warm-grey'}`}>
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-charcoal truncate">
+                          <span className={`font-semibold ${m.direction === 'inbound' ? 'text-plum' : 'text-warm-grey'}`}>
                             {m.direction === 'inbound' ? '→ In' : '← Out'}
                           </span>
-                          <span className="text-[10px] text-warm-grey">
-                            {m.message_type}{m.intent ? ` · ${m.intent.replace(/_/g, ' ')}` : ''} · {formatRelativeTime(m.created_at)}
-                          </span>
-                          {m.error && <span className="text-coral text-[10px]" title={m.error}>⚠ failed</span>}
-                        </div>
-                        {m.body && <p className="text-charcoal mt-0.5">"{m.body}"</p>}
+                          {' '}{m.message_type}{m.intent ? ` · ${m.intent.replace(/_/g, ' ')}` : ''}
+                          {m.error && <span className="text-coral ml-1" title={m.error}>⚠</span>}
+                        </span>
+                        <span className="text-warm-grey whitespace-nowrap" title={m.created_at ? new Date(m.created_at).toLocaleString() : ''}>
+                          {formatRelativeTime(m.created_at)}
+                        </span>
                       </div>
                     ))}
                   </div>
