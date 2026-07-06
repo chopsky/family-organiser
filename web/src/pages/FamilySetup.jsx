@@ -15,6 +15,7 @@ import { loadCached } from '../lib/offlineCache';
 import { pickPhoto } from '../lib/photo-picker';
 import resizeImage from '../lib/resizeImage';
 import PageHeader from '../components/ui/PageHeader';
+import ActivityModal from '../components/ActivityModal';
 import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Avatar from '../components/ui/Avatar';
@@ -133,7 +134,6 @@ function AddTile({ label, onClick }) {
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // ── Term-aware weekly activities helpers ──
-const todayYmd = () => new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
 const isOngoingActivity = (a) => !a.start_date && !a.end_date;
 // Does an activity's window overlap a term's window? (ongoing always does)
 function activityInTerm(a, term) {
@@ -404,29 +404,10 @@ export default function FamilySetup() {
   // step before that link is persisted.
   const [profileSaSchoolName, setProfileSaSchoolName] = useState('');
   const [profileSaSchoolExistingId, setProfileSaSchoolExistingId] = useState(null);
-  const [addActivityDay, setAddActivityDay] = useState(0);
-  const [addActivityName, setAddActivityName] = useState('');
-  const [addActivityStart, setAddActivityStart] = useState('');
-  const [addActivityEnd, setAddActivityEnd] = useState('');
-  const [addActivityPickup, setAddActivityPickup] = useState(''); // member id or ''
-  // Also surface the activity on the main adult calendar (kids always see
-  // theirs in Child Mode). Checked by default for new activities.
-  const [addActivityOnCalendar, setAddActivityOnCalendar] = useState(true);
-  // Term-aware activities: the child's school terms, which term the grid is
-  // showing (a term label | 'ongoing' | 'custom'), and custom-window inputs.
-  const [activityTerms, setActivityTerms] = useState([]);
-  const [selectedTermKey, setSelectedTermKey] = useState('ongoing');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
-  const [editingActivity, setEditingActivity] = useState(null); // activity being edited, or null = add mode
-  // Standalone activity editor (driven by the Activities card). activityChild
-  // is the child whose activity is being added/edited - decoupled from the
-  // Edit-Profile modal's editingMember so activities can be managed in one
-  // place for the whole household.
-  const [activityChild, setActivityChild] = useState(null);
-  const [activityModalOpen, setActivityModalOpen] = useState(false);
-  const [activityTermsLoading, setActivityTermsLoading] = useState(false);
-  const [savingActivity, setSavingActivity] = useState(false);
+  // Standalone activity editor (driven by the Activities card). The form
+  // itself is the shared <ActivityModal> (also used by the Calendar's
+  // activity sheet); this holds { child, activity|null } while it's open.
+  const [activityModal, setActivityModal] = useState(null);
   const [editTermDates, setEditTermDates] = useState([]);
   const [showAddTermDate, setShowAddTermDate] = useState(false);
   const [termDateType, setTermDateType] = useState('inset_day');
@@ -732,103 +713,15 @@ export default function FamilySetup() {
     // there's nothing school-related to pre-load here.
   }
 
-  // Open the form to ADD a new activity (clears any edit state).
-  // Load a child's school terms so the activity modal's term selector can
-  // default to the current term and offer real terms (with auto-filled date
-  // windows). Falls back to 'ongoing' when the child has no resolvable
-  // school / terms.
-  function loadActivityTerms(childId) {
-    setActivityTermsLoading(true);
-    api.get(`/schools/terms/${childId}`)
-      .then(({ data }) => {
-        const terms = data.terms || [];
-        setActivityTerms(terms);
-        const today = todayYmd();
-        const cur = terms.find(t => today >= t.start_date && today <= t.end_date);
-        setSelectedTermKey(cur ? cur.start_date : 'ongoing');
-      })
-      .catch(() => { setActivityTerms([]); setSelectedTermKey('ongoing'); })
-      .finally(() => setActivityTermsLoading(false));
-  }
-
-  // Open the activity modal in ADD mode for a specific child.
+  // Open the shared ActivityModal in ADD / EDIT mode for a child. The
+  // modal owns the form, term selector and API calls (it's the same
+  // component the Calendar's activity sheet uses).
   function openAddActivity(child) {
-    const c = child || activityChild;
-    if (!c) return;
-    setActivityChild(c);
-    setEditingActivity(null);
-    setAddActivityDay(0);
-    setAddActivityName('');
-    setAddActivityStart('');
-    setAddActivityEnd('');
-    setAddActivityPickup('');
-    setAddActivityOnCalendar(true);
-    setCustomStart('');
-    setCustomEnd('');
-    loadActivityTerms(c.id);
-    setActivityModalOpen(true);
+    if (child) setActivityModal({ child, activity: null });
   }
 
-  // Open the activity modal in EDIT mode (pre-filled) for a child's activity.
   function openEditActivity(child, a) {
-    const c = child || activityChild;
-    if (!c) return;
-    setActivityChild(c);
-    setEditingActivity(a);
-    setAddActivityDay(a.day_of_week ?? 0);
-    setAddActivityName(a.activity || '');
-    setAddActivityStart(a.time_start ? a.time_start.substring(0, 5) : '');
-    setAddActivityEnd(a.time_end ? a.time_end.substring(0, 5) : '');
-    setAddActivityPickup(a.pickup_member_id || '');
-    setAddActivityOnCalendar(a.show_on_calendar !== false);
-    loadActivityTerms(c.id);
-    setActivityModalOpen(true);
-  }
-
-  function closeActivityForm() {
-    setActivityModalOpen(false);
-    setEditingActivity(null);
-  }
-
-  // Handles both add (POST) and edit (PATCH) depending on editingActivity.
-  async function handleAddActivity() {
-    if (!addActivityName.trim() || !activityChild) return;
-    setSavingActivity(true);
-    try {
-      const body = {
-        day_of_week: addActivityDay,
-        activity: addActivityName.trim(),
-        time_start: addActivityStart || null,
-        time_end: addActivityEnd || null,
-        pickup_member_id: addActivityPickup || null,
-        show_on_calendar: addActivityOnCalendar,
-      };
-      // New activities inherit the selected term's window so they only show
-      // that term (and next term can be prepared without touching this one).
-      // Edits preserve the activity's existing window (the grid selector is a
-      // view control, not a per-activity move).
-      if (!editingActivity) {
-        const termObj = activityTerms.find(t => t.start_date === selectedTermKey) || null;
-        if (selectedTermKey === 'custom') {
-          Object.assign(body, { start_date: customStart || null, end_date: customEnd || null, term_label: null });
-        } else if (termObj) {
-          Object.assign(body, { start_date: termObj.start_date, end_date: termObj.end_date, term_label: termObj.label });
-        } else {
-          Object.assign(body, { start_date: null, end_date: null, term_label: null });
-        }
-      }
-      if (editingActivity) {
-        await api.patch(`/schools/activities/${editingActivity.id}`, body);
-      } else {
-        await api.post('/schools/activities', { ...body, child_id: activityChild.id });
-      }
-      closeActivityForm();
-      await loadActivities(); // refresh childActivities (the card + pills read from it)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not save activity.');
-    } finally {
-      setSavingActivity(false);
-    }
+    if (child) setActivityModal({ child, activity: a });
   }
 
   async function handleAddTermDate() {
@@ -1435,15 +1328,6 @@ export default function FamilySetup() {
       setError(err.response?.data?.error || 'Sync failed. Check the iCal URL.');
     } finally {
       setSyncingIcal(false);
-    }
-  }
-
-  async function handleDeleteActivity(activityId) {
-    try {
-      await api.delete(`/schools/activities/${activityId}`);
-      await loadActivities();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not remove activity.');
     }
   }
 
@@ -2447,103 +2331,17 @@ export default function FamilySetup() {
         );
       })()}
 
-      {/* Activity add/edit modal - child-scoped via activityChild, opened from
-          the Activities card. Reuses the shared activity form state. */}
-      {activityModalOpen && activityChild && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => closeActivityForm()}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-5 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base md:text-medium font-semibold text-bark">{editingActivity ? 'Edit activity' : 'Add activity'}</h2>
-              <button onClick={() => closeActivityForm()} className="text-cocoa hover:text-bark p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-xs text-cocoa mb-4">For {activityChild.name}</p>
-
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <select value={addActivityDay} onChange={(e) => setAddActivityDay(Number(e.target.value))} className="border border-cream-border rounded-lg px-2 py-2 text-sm bg-white">
-                  {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                </select>
-                <input type="text" value={addActivityName} onChange={(e) => setAddActivityName(e.target.value)} placeholder="e.g. Swimming" className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent" autoFocus />
-              </div>
-              <div className="flex gap-2 items-center flex-wrap">
-                <label className="text-xs text-cocoa">Starts at:</label>
-                <input type="time" value={addActivityStart} onChange={(e) => setAddActivityStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                <label className="text-xs text-cocoa">Ends at:</label>
-                <input type="time" value={addActivityEnd} onChange={(e) => setAddActivityEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-              </div>
-
-              {/* Term window applies only to NEW activities. Edits keep their
-                  existing window (the term concept is per-activity, not a move). */}
-              {!editingActivity && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-cocoa font-medium">Term:</label>
-                    <select value={selectedTermKey} onChange={(e) => setSelectedTermKey(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
-                      {activityTerms.map(t => <option key={t.start_date} value={t.start_date}>{t.label}</option>)}
-                      <option value="ongoing">Ongoing (every term)</option>
-                      <option value="custom">Custom dates…</option>
-                    </select>
-                    {activityTermsLoading && <span className="text-[11px] text-cocoa">Loading…</span>}
-                  </div>
-                  {selectedTermKey === 'custom' ? (
-                    <div className="flex gap-2 items-center flex-wrap">
-                      <label className="text-xs text-cocoa">Runs:</label>
-                      <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                      <span className="text-xs text-cocoa">to</span>
-                      <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white" />
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-cocoa">
-                      {selectedTermKey === 'ongoing'
-                        ? 'Will show every term, until you remove it.'
-                        : `Will be set for ${(activityTerms.find(t => t.start_date === selectedTermKey)?.label) || 'this term'} only.`}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 items-center">
-                <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
-                <select value={addActivityPickup} onChange={(e) => setAddActivityPickup(e.target.value)} className="flex-1 border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
-                  <option value="">No pickup set</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-              </div>
-
-              {/* Kids always see their activities in Child Mode; this toggle
-                  additionally surfaces them on the main adult calendar. */}
-              <label className="flex gap-2 items-center text-xs text-cocoa cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={addActivityOnCalendar}
-                  onChange={(e) => setAddActivityOnCalendar(e.target.checked)}
-                  className="h-4 w-4 rounded border-cream-border accent-[var(--color-plum)]"
-                />
-                Show on the family calendar
-              </label>
-            </div>
-
-            <div className="flex items-center gap-2 mt-5">
-              {editingActivity && (
-                <button
-                  onClick={() => { const id = editingActivity.id; closeActivityForm(); handleDeleteActivity(id); }}
-                  className="text-xs font-medium text-coral hover:text-coral/80 mr-auto"
-                >
-                  Delete
-                </button>
-              )}
-              <button onClick={() => closeActivityForm()} className="text-sm font-medium text-cocoa hover:text-bark px-4 py-2">Cancel</button>
-              <button onClick={handleAddActivity} disabled={savingActivity || !addActivityName.trim()} className="text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-lg px-4 py-2">
-                {savingActivity ? 'Saving…' : (editingActivity ? 'Save' : 'Add')}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Activity add/edit modal - the shared form (also used by the
+          Calendar's activity sheet). Owns its own state + API calls;
+          onChanged refreshes the Activities card. */}
+      {activityModal && (
+        <ActivityModal
+          child={activityModal.child}
+          activity={activityModal.activity}
+          members={members}
+          onClose={() => setActivityModal(null)}
+          onChanged={loadActivities}
+        />
       )}
 
       {/* Allergies & Dietary Requirements - a single white card. The chips are

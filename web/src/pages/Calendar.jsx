@@ -15,6 +15,7 @@ import { readCache, writeCache, loadCached } from '../lib/offlineCache';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
+import ActivityModal from '../components/ActivityModal';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -344,6 +345,12 @@ export default function Calendar() {
   // 'yours' vs 'pulled from someone else's calendar'.
   const [externalFeeds, setExternalFeeds] = useState([]);
   const [syncedEvent, setSyncedEvent] = useState(null); // read-only detail sheet for synced events
+  // Tap on a weekly-activity occurrence → its own sheet (skip this day /
+  // edit series / delete series), NOT the event modal: activities live in
+  // child_weekly_schedule, so the event editor's PATCH would 404.
+  const [activitySheet, setActivitySheet] = useState(null); // { activity, child, date }
+  const [activityBusy, setActivityBusy] = useState(false);
+  const [activityEdit, setActivityEdit] = useState(null); // { child, activity } → shared ActivityModal
   const [loading, setLoading] = useState(!seedMonth);
   const [error, setError] = useState('');
   // Form state
@@ -464,7 +471,7 @@ export default function Calendar() {
 
   // ── Data loading ────────────────────────────────────────
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts = {}) => {
     try {
       let monthsToFetch;
       if (viewMode === 'week') {
@@ -480,7 +487,10 @@ export default function Calendar() {
 
       const monthResults = await Promise.all(monthsToFetch.map(fetchMonth));
       const schoolFetch = schoolData ? Promise.resolve(null) : api.get('/schools').catch(() => null);
-      const activitiesFetch = activitiesData ? Promise.resolve(null) : api.get('/schools/activities').catch(() => null);
+      // Activities are cached for the page's lifetime, EXCEPT on explicit
+      // refreshes (pull-to-refresh, AI data-changed broadcast, the activity
+      // sheet's skip/edit/delete) - those must see fresh skips/edits.
+      const activitiesFetch = (activitiesData && !opts.force) ? Promise.resolve(null) : api.get('/schools/activities').catch(() => null);
       const [freshSchoolData, freshActivities] = await Promise.all([schoolFetch, activitiesFetch]);
 
       const allEvents = monthResults.flatMap(r => r.events);
@@ -618,7 +628,7 @@ export default function Calendar() {
   // Dashboard. Both clear the 5-min in-memory month cache so they pull fresh.
   const refresh = useCallback(async () => {
     monthCacheRef.current = {};
-    await load();
+    await load({ force: true });
   }, [load]);
   const ptr = usePullToRefresh(refresh);
   useAppForegroundRefresh(refresh);
@@ -928,6 +938,20 @@ export default function Calendar() {
       setSyncedEvent(ev);
       return;
     }
+    // Weekly-activity occurrences get their own sheet: the series lives in
+    // child_weekly_schedule (not calendar_events), so the event editor
+    // can't touch it. The sheet offers skip-this-day / edit / delete.
+    if (ev._activity) {
+      const act = (activitiesData || []).find((a) => a.id === ev._activityId);
+      if (act) {
+        setActivitySheet({
+          activity: act,
+          child: members.find((m) => m.id === act.child_id) || null,
+          date: ev._activityDate,
+        });
+      }
+      return;
+    }
     // Synced copies (device sync / URL feeds) are READ-ONLY: an edit here
     // would silently revert on the next sync and a delete would resurrect -
     // the most confusing possible outcome. Show a detail sheet with
@@ -965,6 +989,40 @@ export default function Calendar() {
     setFormReminders(ev.reminders && Array.isArray(ev.reminders) ? ev.reminders : []);
     setShowMoreOptions(false);
     setShowForm(true);
+  }
+
+  // ── Activity sheet actions (skip one date / delete the series) ─────
+  async function handleSkipActivityDay() {
+    if (!activitySheet) return;
+    setActivityBusy(true);
+    try {
+      await api.post(`/schools/activities/${activitySheet.activity.id}/skips`, { date: activitySheet.date });
+      setActivitySheet(null);
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not skip this day.');
+    } finally {
+      setActivityBusy(false);
+    }
+  }
+
+  async function handleDeleteActivitySeries() {
+    if (!activitySheet) return;
+    const ok = await confirmDestructive({
+      title: 'Delete activity?',
+      message: `This removes "${activitySheet.activity.activity}" every week, not just this day.`,
+    });
+    if (!ok) return;
+    setActivityBusy(true);
+    try {
+      await api.delete(`/schools/activities/${activitySheet.activity.id}`);
+      setActivitySheet(null);
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not delete the activity.');
+    } finally {
+      setActivityBusy(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -2313,6 +2371,30 @@ export default function Calendar() {
             </div>
 
             <form onSubmit={handleSubmit} className="px-6 pb-5">
+              {/* Creating something for a child's week? Route to the real
+                  activity form (pickup person, term windows, Kids Mode)
+                  instead of a plain recurring event - a weekly event can't
+                  carry any of that. Create-mode only; households without
+                  dependents never see it. */}
+              {!editingEvent && members.some((m) => m.member_type === 'dependent') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const wd = formDate ? (new Date(`${formDate}T12:00:00`).getDay() + 6) % 7 : 0;
+                    setShowForm(false);
+                    resetForm();
+                    setActivityEdit({
+                      child: null,
+                      activity: null,
+                      presetDay: wd,
+                      childOptions: members.filter((m) => m.member_type === 'dependent'),
+                    });
+                  }}
+                  className="w-full text-left text-xs font-medium text-plum bg-plum-light rounded-xl px-3 py-2.5 mb-1"
+                >
+                  🏫 A kid's weekly club or class? <span className="underline">Add it as an extracurricular activity</span> - with pickup person and term dates.
+                </button>
+              )}
               {/* ── 1. Title ── */}
               <input
                 type="text"
@@ -2867,6 +2949,88 @@ export default function Calendar() {
           </div>
         );
       })()}
+
+      {/* Activity occurrence sheet - tap on a weekly extracurricular. The
+          series is editable via the shared ActivityModal; "Skip this day"
+          hides just this date everywhere (calendar, Kids Mode, digest,
+          subscribed feeds). */}
+      {activitySheet && (() => {
+        const { activity, child, date } = activitySheet;
+        const [y, m, d] = date.split('-').map(Number);
+        const dateLabel = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+        const timeLabel = activity.time_start
+          ? `${String(activity.time_start).slice(0, 5)}${activity.time_end ? ` – ${String(activity.time_end).slice(0, 5)}` : ''}`
+          : 'All day';
+        const pickupName = activity.pickup_member_id
+          ? members.find((mem) => mem.id === activity.pickup_member_id)?.name
+          : null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setActivitySheet(null)}>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative bg-white rounded-2xl shadow-lg border border-light-grey p-5 sm:p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <h2 className="text-base md:text-lg font-medium text-charcoal">
+                  {child ? `${child.name} - ` : ''}{activity.activity}
+                </h2>
+                <button onClick={() => setActivitySheet(null)} className="text-warm-grey hover:text-charcoal p-1 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-warm-grey">{dateLabel} · {timeLabel}</p>
+              {pickupName && <p className="text-sm text-warm-grey mt-1">🚗 Pickup: {pickupName}</p>}
+              {activity.term_label && <p className="text-xs text-warm-grey mt-1">{activity.term_label}</p>}
+              <div className="mt-4 bg-plum-light rounded-xl px-3 py-2.5">
+                <p className="text-[11px] text-plum/80">
+                  Repeats weekly{child ? ` for ${child.name}` : ''} - skipping only hides this date.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 mt-4">
+                <button
+                  type="button"
+                  disabled={activityBusy}
+                  onClick={handleSkipActivityDay}
+                  className="w-full text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-xl px-4 py-2.5"
+                >
+                  {activityBusy ? 'Working…' : 'Skip this day'}
+                </button>
+                <button
+                  type="button"
+                  disabled={activityBusy}
+                  onClick={() => { setActivityEdit({ child, activity }); setActivitySheet(null); }}
+                  className="w-full text-sm font-semibold text-plum bg-white border border-plum/40 hover:bg-plum-light disabled:opacity-50 rounded-xl px-4 py-2.5"
+                >
+                  Edit activity
+                </button>
+                <button
+                  type="button"
+                  disabled={activityBusy}
+                  onClick={handleDeleteActivitySeries}
+                  className="w-full text-sm font-semibold text-coral hover:text-coral/80 disabled:opacity-50 px-4 py-1.5"
+                >
+                  Delete activity
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Shared activity form (same component the Family page uses) - opened
+          from the sheet's "Edit activity" or the New Event form's
+          "extracurricular" shortcut (create mode with a child picker). */}
+      {activityEdit && (
+        <ActivityModal
+          child={activityEdit.child}
+          childOptions={activityEdit.childOptions || []}
+          activity={activityEdit.activity}
+          presetDay={activityEdit.presetDay ?? 0}
+          members={members}
+          onClose={() => setActivityEdit(null)}
+          onChanged={refresh}
+        />
+      )}
     </div>
   );
 }
