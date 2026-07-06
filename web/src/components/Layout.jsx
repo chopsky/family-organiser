@@ -5,7 +5,7 @@ import { useChildMode } from '../context/ChildModeContext';
 import { CHILD_VISIBLE_ROUTES } from '../lib/childMode';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconHelp, IconList, IconGift, IconStar, IconSparkles } from './Icons';
+import { IconHome, IconCheck, IconCalendar, IconCamera, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconHelp, IconList, IconGift, IconStar, IconSparkles, IconMail } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import KidNoteAlert from './KidNoteAlert';
 import TrialEndedOverlay from './TrialEndedOverlay';
@@ -31,9 +31,10 @@ const navGroups = [
     { to: '/meals',    label: 'Meal Plan', Icon: IconUtensils },
   ] },
   { label: 'Household', items: [
-    { to: '/receipt',   label: 'Receipts',  Icon: IconCamera   },
-    { to: '/documents', label: 'Documents', Icon: IconFileText },
-    { to: '/family',    label: 'Family',    Icon: IconUsers    },
+    { to: '/receipt',   label: 'Receipts',   Icon: IconCamera   },
+    { to: '/documents', label: 'Documents',  Icon: IconFileText },
+    { to: '/notes',     label: "Kids' Notes", Icon: IconMail    },
+    { to: '/family',    label: 'Family',     Icon: IconUsers    },
   ] },
   { label: 'Account', items: [
     { to: '/help',     label: 'Help',     Icon: IconHelp     },
@@ -60,6 +61,7 @@ const moreNav = [
   { to: '/rewards' },
   { to: '/family' },
   { to: '/documents' },
+  { to: '/notes' },
   { to: '/receipt' },
   { to: '/settings' },
   { to: '/help' },
@@ -94,6 +96,14 @@ const moreTiles = [
     Icon: IconFileText,
     bg: '#E2ECFA',
     fg: '#5B8DE0',
+  },
+  {
+    to: '/notes',
+    label: "Kids' Notes",
+    sub: 'Notes from the kids',
+    Icon: IconMail,
+    bg: '#FDF0EB',
+    fg: '#E8724A',
   },
   {
     to: '/family',

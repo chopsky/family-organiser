@@ -11,60 +11,21 @@
  * instead). Polls GET /api/kids/notes every 60s, so a note lands within a
  * minute even if the parent ignores the push notification.
  *
- * "Seen" is per-device (localStorage): a note stops bannering once this
- * user has reacted to it (server state, follows them across devices) or
- * has opened/dismissed it here. Only the last 2 days can banner - an old
- * note surfacing days later would be noise, not delight.
+ * A note is retired ONLY when this user reacts to it (server state, so it
+ * follows them across devices). Opening the popup does not hide it, and
+ * the banner's ✕ is a session-only snooze - so an un-reacted note is never
+ * lost. Notes ≤7 days old can banner. The full archive (incl. reacted and
+ * text-only notes) lives on the Notes page (KidNotesArchive).
  */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import { REACTIONS, printNote } from '../lib/kidNotes';
 
 const INK2 = '#4A4453';
 const INK3 = '#8A8493';
 const SOFT = '#F3EEE5';
-
-// Must match REACTION_EMOJI in src/routes/kids.js - the backend rejects
-// anything outside this set.
-const REACTIONS = ['❤️', '😍', '🌟', '😂', '🥰', '👏'];
-
-const escapeHtml = (s) => String(s || '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-
-// Print a note on its own page so a parent can pop a keepsake on the
-// fridge. Builds a minimal document (the drawing + message + who/when) as
-// a Blob and opens it in a new window; the inline script waits for the
-// image to paint, then fires the browser print dialog.
-function printNote(note) {
-  const who = escapeHtml(note.child_name || 'the kids');
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>A note from ${who}</title>
-    <style>
-      body { font-family: -apple-system, system-ui, sans-serif; color: #1A1620; text-align: center; padding: 32px; }
-      h1 { font-size: 24px; margin: 0 0 4px; }
-      .date { color: #8A8493; font-size: 13px; margin-bottom: 20px; }
-      img { max-width: 100%; border: 1px solid #ddd; border-radius: 12px; }
-      .msg { font-size: 20px; font-style: italic; margin-top: 20px; }
-      @media print { body { padding: 0; } }
-    </style></head><body>
-    <h1>A note from ${who} &#128156;</h1>
-    <div class="date">${escapeHtml(note.note_date || '')}</div>
-    ${note.image_url ? `<img alt="Drawing" src="${escapeHtml(note.image_url)}">` : ''}
-    ${note.text_note ? `<div class="msg">&ldquo;${escapeHtml(note.text_note)}&rdquo;</div>` : ''}
-    <script>
-      window.addEventListener('load', function () {
-        var img = document.querySelector('img');
-        if (img && !img.complete) {
-          img.addEventListener('load', function () { window.print(); });
-          img.addEventListener('error', function () { window.print(); });
-        } else { window.print(); }
-      });
-    </script>
-    </body></html>`;
-  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-  const w = window.open(url, '_blank');
-  if (!w) { URL.revokeObjectURL(url); return; }
-  setTimeout(() => URL.revokeObjectURL(url), 60000); // after the window has loaded it
-}
 
 export default function KidNoteAlert() {
   const { user } = useAuth();
