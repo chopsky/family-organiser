@@ -143,7 +143,7 @@ export default function DaysScreen({ kid, theme }) {
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '16px 0 14px' : '0 0 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '0 0 14px' : '0 0 16px' }}>
         <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6 }}>My Days <span className="kids-wobble">📅</span></div>
         <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 14, border: '2px solid rgba(49,43,75,0.06)' }}>
           {[['list', 'List'], ['month', 'Month']].map(([k, l]) => (

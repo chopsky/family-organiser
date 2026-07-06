@@ -53,7 +53,7 @@ export default function NoteScreen({ kid, theme, members }) {
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0, maxWidth: isMobile ? undefined : 680 }}>
-      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, margin: isMobile ? '16px 0' : '0 0 8px' }}>
+      <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, margin: isMobile ? '0 0 16px' : '0 0 8px' }}>
         My Note <span className="kids-wobble">💌</span>
       </div>
       <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, marginBottom: 18 }}>
