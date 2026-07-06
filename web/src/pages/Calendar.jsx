@@ -387,7 +387,6 @@ export default function Calendar() {
   const [actCustomStart, setActCustomStart] = useState('');
   const [actCustomEnd, setActCustomEnd] = useState('');
   const [actPickup, setActPickup] = useState('');
-  const [actOnCal, setActOnCal] = useState(true);
   // Default to no reminder. The "+ Add notification" button lets users
   // opt in explicitly. Pre-checking a 5-min default surprised users who
   // never asked for one (and silently saved an actual reminder row if
@@ -903,7 +902,6 @@ export default function Calendar() {
     setActCustomStart('');
     setActCustomEnd('');
     setActPickup('');
-    setActOnCal(true);
   }
 
   async function loadAttachments(eventId) {
@@ -1065,7 +1063,9 @@ export default function Calendar() {
         time_start: actStart || null,
         time_end: actEnd || null,
         pickup_member_id: actPickup || null,
-        show_on_calendar: actOnCal,
+        // Created FROM the calendar, so it obviously belongs on it - the
+        // visibility toggle lives in Family Setup / the edit modal.
+        show_on_calendar: true,
       };
       const termObj = actTerms.find((t) => t.start_date === actTermKey) || null;
       if (actTermKey === 'custom') {
@@ -2945,7 +2945,7 @@ export default function Calendar() {
                   )}
                 </div>
 
-                {/* Pickup */}
+                {/* Pickup - adults only; a child can't collect a child. */}
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-warm-grey mb-2">Pickup</p>
                   <select
@@ -2954,27 +2954,8 @@ export default function Calendar() {
                     className="w-full h-10 border-[1.5px] border-light-grey rounded-lg px-2.5 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
                   >
                     <option value="">Choose who collects {members.find((m) => m.id === actKid)?.name || 'them'}</option>
-                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {members.filter((m) => m.member_type !== 'dependent').map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
-                </div>
-
-                {/* Show on the family calendar */}
-                <div className="flex items-center justify-between gap-3 pt-1">
-                  <div>
-                    <p className="text-sm font-semibold text-charcoal">Show on the family calendar</p>
-                    <p className="text-xs text-warm-grey mt-0.5">
-                      Everyone sees it, colour-coded to {members.find((m) => m.id === actKid)?.name || 'the child'}.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={actOnCal}
-                    onClick={() => setActOnCal((v) => !v)}
-                    className={`relative w-10 h-[22px] rounded-full transition-colors flex-shrink-0 ${actOnCal ? 'bg-plum' : 'bg-light-grey'}`}
-                  >
-                    <span className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform ${actOnCal ? 'translate-x-[20px]' : 'translate-x-[2px]'}`} />
-                  </button>
                 </div>
               </div>
               )}

@@ -218,9 +218,10 @@ export default function ActivityModal({ child = null, childOptions = [], members
 
           <div className="flex gap-2 items-center">
             <label className="text-xs text-cocoa whitespace-nowrap">Pickup:</label>
+            {/* Adults only - a child can't collect a child. */}
             <select value={pickup} onChange={(e) => setPickup(e.target.value)} className="flex-1 border border-cream-border rounded-lg px-2 py-1.5 text-sm bg-white">
               <option value="">No pickup set</option>
-              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              {members.filter((m) => m.member_type !== 'dependent').map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
 
