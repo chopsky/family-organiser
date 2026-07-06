@@ -51,10 +51,13 @@ export default function ActivityModal({ child = null, childOptions = [], members
   const [onCalendar, setOnCalendar] = useState(editing ? activity.show_on_calendar !== false : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  // Upcoming skipped dates (edit mode) - removable chips. Past skips are
+  // Upcoming per-date exceptions (edit mode) - removable chips. Skips hide
+  // a date; overrides give it a one-off time/pickup. Past dates are
   // history, not something to manage, so they stay hidden.
   const [skips, setSkips] = useState(() =>
     editing ? (activity.skips || []).filter((d) => d >= todayYmd()) : []);
+  const [overrideDates, setOverrideDates] = useState(() =>
+    editing ? Object.keys(activity.overrides || {}).filter((d) => d >= todayYmd()).sort() : []);
 
   // Term selector (add mode only): the child's real school terms, with
   // "Ongoing" and "Custom dates" fallbacks. Edits keep their window.
@@ -141,6 +144,7 @@ export default function ActivityModal({ child = null, childOptions = [], members
     try {
       await api.delete(`/schools/activities/${activity.id}/skips/${dateStr}`);
       setSkips((prev) => prev.filter((d) => d !== dateStr));
+      setOverrideDates((prev) => prev.filter((d) => d !== dateStr));
       onChanged?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not restore that date.');
@@ -237,15 +241,16 @@ export default function ActivityModal({ child = null, childOptions = [], members
             Show on the family calendar
           </label>
 
-          {/* Upcoming skipped dates ("skip just this day" from the calendar
-              or the AI). Removing a chip restores that occurrence. */}
-          {editing && skips.length > 0 && (
+          {/* Upcoming per-date exceptions from the calendar or the AI:
+              skipped dates and one-off changed dates. Removing a chip
+              restores that occurrence to the usual schedule. */}
+          {editing && (skips.length > 0 || overrideDates.length > 0) && (
             <div className="space-y-1.5">
-              <div className="text-xs text-cocoa font-medium">Skipped dates:</div>
+              <div className="text-xs text-cocoa font-medium">One-off changes:</div>
               <div className="flex flex-wrap gap-1.5">
                 {skips.map((d) => (
                   <span key={d} className="inline-flex items-center gap-1 rounded-full bg-white border border-cream-border px-2.5 py-1 text-xs text-bark">
-                    {fmtSkipDate(d)}
+                    {fmtSkipDate(d)} · skipped
                     <button
                       type="button"
                       onClick={() => handleUnskip(d)}
@@ -256,6 +261,23 @@ export default function ActivityModal({ child = null, childOptions = [], members
                     </button>
                   </span>
                 ))}
+                {overrideDates.map((d) => {
+                  const o = activity.overrides?.[d] || {};
+                  const t = o.time_start ? ` ${String(o.time_start).slice(0, 5)}` : '';
+                  return (
+                    <span key={d} className="inline-flex items-center gap-1 rounded-full bg-white border border-cream-border px-2.5 py-1 text-xs text-bark">
+                      {fmtSkipDate(d)} · changed{t}
+                      <button
+                        type="button"
+                        onClick={() => handleUnskip(d)}
+                        aria-label={`Restore ${fmtSkipDate(d)}`}
+                        className="text-cocoa hover:text-coral leading-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}

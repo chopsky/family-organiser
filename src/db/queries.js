@@ -1170,33 +1170,75 @@ function isMissingSkipsTable(error) {
   return error && (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST200');
 }
 
-// Attach `skips: ['YYYY-MM-DD', …]` to each activity row (single query for
-// the whole batch). Pre-migration the column is just an empty array.
+// Attach per-date exceptions to each activity row (single query for the
+// whole batch): `skips: ['YYYY-MM-DD', …]` (kind='skip' - the date is
+// hidden) and `overrides: { 'YYYY-MM-DD': { time_start, time_end,
+// pickup_member_id } }` (kind='override' - the date happens, but with a
+// different time and/or pickup person). Before
+// migration-activity-overrides.sql the kind columns don't exist (42703 /
+// PGRST204), so retry with the original column set and treat every row
+// as a plain skip; before the skips table itself both degrade to empty.
 async function attachActivitySkips(activities, db = supabase) {
   if (!activities.length) return activities;
-  const { data, error } = await db
+  const ids = activities.map((a) => a.id);
+  let { data, error } = await db
     .from('activity_skips')
-    .select('activity_id, date')
-    .in('activity_id', activities.map((a) => a.id));
+    .select('activity_id, date, kind, time_start, time_end, pickup_member_id')
+    .in('activity_id', ids);
+  if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+    ({ data, error } = await db
+      .from('activity_skips')
+      .select('activity_id, date')
+      .in('activity_id', ids));
+  }
   if (error) {
-    if (isMissingSkipsTable(error)) return activities.map((a) => ({ ...a, skips: [] }));
+    if (isMissingSkipsTable(error)) return activities.map((a) => ({ ...a, skips: [], overrides: {} }));
     throw error;
   }
-  const byActivity = new Map();
+  const skipsBy = new Map();
+  const overridesBy = new Map();
   for (const row of data || []) {
-    if (!byActivity.has(row.activity_id)) byActivity.set(row.activity_id, []);
-    byActivity.get(row.activity_id).push(row.date);
+    if (row.kind === 'override') {
+      if (!overridesBy.has(row.activity_id)) overridesBy.set(row.activity_id, {});
+      overridesBy.get(row.activity_id)[row.date] = {
+        time_start: row.time_start || null,
+        time_end: row.time_end || null,
+        pickup_member_id: row.pickup_member_id || null,
+      };
+    } else {
+      if (!skipsBy.has(row.activity_id)) skipsBy.set(row.activity_id, []);
+      skipsBy.get(row.activity_id).push(row.date);
+    }
   }
-  return activities.map((a) => ({ ...a, skips: (byActivity.get(a.id) || []).sort() }));
+  return activities.map((a) => ({
+    ...a,
+    skips: (skipsBy.get(a.id) || []).sort(),
+    overrides: overridesBy.get(a.id) || {},
+  }));
 }
 
-async function addActivitySkip(activityId, householdId, dateStr, createdBy = null, db = supabase) {
-  const { error } = await db
+// Write one exception row. Plain skips send ONLY the original column set
+// (works before migration-activity-overrides.sql); an `override` object
+// ({ time_start, time_end, pickup_member_id }) upgrades the row to
+// kind='override' and upserts over any existing exception on that date.
+async function addActivitySkip(activityId, householdId, dateStr, createdBy = null, override = null, db = supabase) {
+  const base = { activity_id: activityId, household_id: householdId, date: dateStr, created_by: createdBy };
+  // Plain skips also send explicit kind/nulls so skipping a date that
+  // currently holds an OVERRIDE row converts it back to a skip (upsert
+  // merge only touches provided columns).
+  const full = override
+    ? { ...base, kind: 'override', time_start: override.time_start || null, time_end: override.time_end || null, pickup_member_id: override.pickup_member_id || null }
+    : { ...base, kind: 'skip', time_start: null, time_end: null, pickup_member_id: null };
+  let { error } = await db
     .from('activity_skips')
-    .upsert(
-      { activity_id: activityId, household_id: householdId, date: dateStr, created_by: createdBy },
-      { onConflict: 'activity_id,date', ignoreDuplicates: true }
-    );
+    .upsert(full, { onConflict: 'activity_id,date', ignoreDuplicates: false });
+  // Pre-overrides-migration tolerance (kind columns missing): plain skips
+  // retry with the original column set; overrides can't degrade - surface.
+  if (error && !override && (error.code === 'PGRST204' || error.code === '42703')) {
+    ({ error } = await db
+      .from('activity_skips')
+      .upsert(base, { onConflict: 'activity_id,date', ignoreDuplicates: true }));
+  }
   if (error) throw error;
 }
 
@@ -1209,14 +1251,21 @@ async function removeActivitySkip(activityId, dateStr, db = supabase) {
   if (error) throw error;
 }
 
-// All skips for a household (small table; callers build a lookup set). Used
-// by the ICS feed and the reminders job, which work server-side without the
-// embedded `skips` arrays.
+// All exception rows for a household (small table; callers build lookup
+// structures). Used by the ICS feed and the reminders job, which work
+// server-side without the embedded arrays. Same pre-migration fallbacks
+// as attachActivitySkips.
 async function getActivitySkipsForHousehold(householdId, db = supabase) {
-  const { data, error } = await db
+  let { data, error } = await db
     .from('activity_skips')
-    .select('activity_id, date')
+    .select('activity_id, date, kind, time_start, time_end, pickup_member_id')
     .eq('household_id', householdId);
+  if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+    ({ data, error } = await db
+      .from('activity_skips')
+      .select('activity_id, date')
+      .eq('household_id', householdId));
+  }
   if (error) {
     if (isMissingSkipsTable(error)) return [];
     throw error;

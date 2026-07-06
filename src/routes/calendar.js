@@ -450,12 +450,17 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
             // Per-date skip: the occurrence stops being emitted, so
             // subscribers drop it on their next refresh.
             if (act.skips && act.skips.includes(dateStr)) continue;
+            // Per-date override: emit the one-off time under the SAME
+            // stable UID, so subscribers update the occurrence in place.
+            const ov = act.overrides ? act.overrides[dateStr] : null;
+            const effStart = ov ? ov.time_start : act.time_start;
+            const effEnd = ov ? ov.time_end : act.time_end;
             const childName = nameById.get(act.child_id);
             const summary = childName ? `${childName} - ${act.activity}` : act.activity;
-            if (act.time_start) {
-              const startIso = localToUTC(dateStr, String(act.time_start).slice(0, 5), tz);
-              const endIso = act.time_end
-                ? localToUTC(dateStr, String(act.time_end).slice(0, 5), tz)
+            if (effStart) {
+              const startIso = localToUTC(dateStr, String(effStart).slice(0, 5), tz);
+              const endIso = effEnd
+                ? localToUTC(dateStr, String(effEnd).slice(0, 5), tz)
                 : new Date(new Date(startIso).getTime() + 3600000).toISOString();
               calendar.createEvent({
                 id: `housemait-act-${act.id}-${dateStr}@housemait.com`,

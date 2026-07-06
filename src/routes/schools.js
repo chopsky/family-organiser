@@ -432,27 +432,44 @@ router.delete('/activities/:activityId', requireAuth, requireHousehold, requireA
 // Matches the DATE column format; anything else is a client bug.
 const SKIP_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// One override field is enough to make a row an override; HH:MM[:SS] times.
+const SKIP_TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
+
 /**
  * POST /api/schools/activities/:activityId/skips
- * "Skip just this day": hide one occurrence of a weekly activity on one
- * date (body: { date: 'YYYY-MM-DD' }). The series is untouched; every
- * expansion surface (calendar, Kids Mode, After-School card, digest, ICS
- * feed) filters skipped dates out. Idempotent - re-skipping is a no-op.
+ * Per-date exception for a weekly activity (body: { date: 'YYYY-MM-DD',
+ * time_start?, time_end?, pickup_member_id? }).
+ * - No override fields → "skip just this day": the occurrence is hidden
+ *   everywhere (calendar, Kids Mode, After-School card, digest, ICS feed).
+ * - Any override field → "change just this day": the occurrence happens,
+ *   with that time and/or pickup person replacing the series values.
+ * One row per (activity, date): posting again replaces the exception, so
+ * a skip can become an override and vice versa.
  */
 router.post('/activities/:activityId/skips', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { date } = req.body;
+  const { date, time_start, time_end, pickup_member_id } = req.body;
   if (!date || !SKIP_DATE_RE.test(date)) {
     return res.status(400).json({ error: 'date (YYYY-MM-DD) is required.' });
+  }
+  const isOverride = time_start !== undefined || time_end !== undefined || pickup_member_id !== undefined;
+  if ((time_start && !SKIP_TIME_RE.test(time_start)) || (time_end && !SKIP_TIME_RE.test(time_end))) {
+    return res.status(400).json({ error: 'times must be HH:MM.' });
   }
   try {
     const existing = await db.getChildActivityById(req.params.activityId);
     if (!existing || !(await childInHousehold(existing.child_id, req.householdId))) {
       return res.status(404).json({ error: 'Activity not found.' });
     }
-    await db.addActivitySkip(req.params.activityId, req.householdId, date, req.user?.id || null);
+    await db.addActivitySkip(
+      req.params.activityId,
+      req.householdId,
+      date,
+      req.user?.id || null,
+      isOverride ? { time_start: time_start || null, time_end: time_end || null, pickup_member_id: pickup_member_id || null } : null,
+    );
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
-    return res.status(201).json({ message: 'Skipped.', activity_id: req.params.activityId, date });
+    return res.status(201).json({ message: isOverride ? 'Changed for this day.' : 'Skipped.', activity_id: req.params.activityId, date });
   } catch (err) {
     console.error('POST /api/schools/activities/:activityId/skips error:', err);
     return res.status(500).json({ error: 'Internal server error' });

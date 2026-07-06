@@ -396,6 +396,12 @@ export default function Calendar() {
   // child_weekly_schedule, so the event editor's PATCH would 404.
   const [activitySheet, setActivitySheet] = useState(null); // { activity, child, date }
   const [activityBusy, setActivityBusy] = useState(false);
+  // "Change just this day" mini-form inside the sheet (per-date override:
+  // different time/pickup for one occurrence, series untouched).
+  const [actChangeOpen, setActChangeOpen] = useState(false);
+  const [ovStart, setOvStart] = useState('');
+  const [ovEnd, setOvEnd] = useState('');
+  const [ovPickup, setOvPickup] = useState('');
   const [activityEdit, setActivityEdit] = useState(null); // { child, activity } → shared ActivityModal
   const [loading, setLoading] = useState(!seedMonth);
   const [error, setError] = useState('');
@@ -647,12 +653,17 @@ export default function Calendar() {
             if (act.start_date && dateStr < act.start_date) continue;
             if (act.end_date && dateStr > act.end_date) continue;
             if (act.skips?.includes(dateStr)) continue;
+            // Per-date override ("piano is at 16:00 today"): replace the
+            // series time for this one occurrence.
+            const ov = act.overrides?.[dateStr] || null;
+            const effStart = ov?.time_start || act.time_start;
+            const effEnd = ov ? (ov.time_end || null) : act.time_end;
             schoolEvents.push({
               id: `act-${act.id}-${dateStr}`,
               title: `${child.name} - ${act.activity}`,
-              start_time: act.time_start ? `${dateStr}T${act.time_start}` : `${dateStr}T00:00:00Z`,
-              end_time: act.time_end ? `${dateStr}T${act.time_end}` : null,
-              all_day: !act.time_start,
+              start_time: effStart ? `${dateStr}T${effStart}` : `${dateStr}T00:00:00Z`,
+              end_time: effEnd ? `${dateStr}T${effEnd}` : null,
+              all_day: !effStart,
               category: 'school',
               assigned_to_names: [child.name],
               color: child.color_theme || 'sky',
@@ -1031,6 +1042,13 @@ export default function Calendar() {
           child: members.find((m) => m.id === act.child_id) || null,
           date: ev._activityDate,
         });
+        // Prefill the change-just-this-day form with the occurrence's
+        // EFFECTIVE values (existing override wins over the series).
+        const ov = act.overrides?.[ev._activityDate] || null;
+        setOvStart(String(ov?.time_start || act.time_start || '').slice(0, 5));
+        setOvEnd(String(ov?.time_end || act.time_end || '').slice(0, 5));
+        setOvPickup((ov ? ov.pickup_member_id : act.pickup_member_id) || '');
+        setActChangeOpen(false);
       }
       return;
     }
@@ -1144,6 +1162,42 @@ export default function Calendar() {
       refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not skip this day.');
+    } finally {
+      setActivityBusy(false);
+    }
+  }
+
+  // "Change just this day": write a per-date override (same exceptions
+  // table as skips, kind='override') carrying the one-off time/pickup.
+  async function handleOverrideActivityDay() {
+    if (!activitySheet) return;
+    setActivityBusy(true);
+    try {
+      await api.post(`/schools/activities/${activitySheet.activity.id}/skips`, {
+        date: activitySheet.date,
+        time_start: ovStart || null,
+        time_end: ovEnd || null,
+        pickup_member_id: ovPickup || null,
+      });
+      setActivitySheet(null);
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not change this day.');
+    } finally {
+      setActivityBusy(false);
+    }
+  }
+
+  // Remove an existing per-date override (back to the usual time/pickup).
+  async function handleResetActivityDay() {
+    if (!activitySheet) return;
+    setActivityBusy(true);
+    try {
+      await api.delete(`/schools/activities/${activitySheet.activity.id}/skips/${activitySheet.date}`);
+      setActivitySheet(null);
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not reset this day.');
     } finally {
       setActivityBusy(false);
     }
@@ -3171,11 +3225,17 @@ export default function Calendar() {
         const { activity, child, date } = activitySheet;
         const [y, m, d] = date.split('-').map(Number);
         const dateLabel = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-        const timeLabel = activity.time_start
-          ? `${String(activity.time_start).slice(0, 5)}${activity.time_end ? ` – ${String(activity.time_end).slice(0, 5)}` : ''}`
+        // The tapped OCCURRENCE's effective values: an existing per-date
+        // override wins over the series.
+        const ov = activity.overrides?.[date] || null;
+        const effTimeStart = ov ? ov.time_start : activity.time_start;
+        const effTimeEnd = ov ? ov.time_end : activity.time_end;
+        const effPickupId = ov ? ov.pickup_member_id : activity.pickup_member_id;
+        const timeLabel = effTimeStart
+          ? `${String(effTimeStart).slice(0, 5)}${effTimeEnd ? ` – ${String(effTimeEnd).slice(0, 5)}` : ''}`
           : 'All day';
-        const pickupName = activity.pickup_member_id
-          ? members.find((mem) => mem.id === activity.pickup_member_id)?.name
+        const pickupName = effPickupId
+          ? members.find((mem) => mem.id === effPickupId)?.name
           : null;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setActivitySheet(null)}>
@@ -3196,34 +3256,93 @@ export default function Calendar() {
               {activity.term_label && <p className="text-xs text-warm-grey mt-1">{activity.term_label}</p>}
               <div className="mt-4 bg-plum-light rounded-xl px-3 py-2.5">
                 <p className="text-[11px] text-plum/80">
-                  Repeats weekly{child ? ` for ${child.name}` : ''} - skipping only hides this date.
+                  {ov
+                    ? 'This day has been changed - the rest of the week runs as usual.'
+                    : `Repeats weekly${child ? ` for ${child.name}` : ''} - skipping or changing only affects this date.`}
                 </p>
               </div>
+
+              {/* "Change just this day" mini-form: one-off time/pickup for
+                  this occurrence, stored as a per-date override. */}
+              {actChangeOpen && (
+                <div className="mt-4">
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <MField label="Starts" style={{ flex: 1, marginBottom: 10 }}>
+                      <input type="time" value={ovStart} onChange={(e) => setOvStart(e.target.value)} style={{ ...mInput, WebkitAppearance: 'none', appearance: 'none' }} />
+                    </MField>
+                    <MField label="Ends" style={{ flex: 1, marginBottom: 10 }}>
+                      <input type="time" value={ovEnd} onChange={(e) => setOvEnd(e.target.value)} style={{ ...mInput, WebkitAppearance: 'none', appearance: 'none' }} />
+                    </MField>
+                  </div>
+                  <MField label="Pickup (this day only)" style={{ marginBottom: 10 }}>
+                    <select value={ovPickup} onChange={(e) => setOvPickup(e.target.value)} style={mInput}>
+                      <option value="">No pickup set</option>
+                      {members.filter((mem) => mem.member_type !== 'dependent').map((mem) => (
+                        <option key={mem.id} value={mem.id}>{mem.name}</option>
+                      ))}
+                    </select>
+                  </MField>
+                </div>
+              )}
+
               <div className="flex flex-col gap-2 mt-4">
+                {actChangeOpen ? (
+                  <button
+                    type="button"
+                    disabled={activityBusy}
+                    onClick={handleOverrideActivityDay}
+                    className="w-full text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-xl px-4 py-2.5"
+                  >
+                    {activityBusy ? 'Working…' : 'Save for this day'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={activityBusy}
+                    onClick={handleSkipActivityDay}
+                    className="w-full text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-xl px-4 py-2.5"
+                  >
+                    {activityBusy ? 'Working…' : 'Skip this day'}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={activityBusy}
-                  onClick={handleSkipActivityDay}
-                  className="w-full text-sm font-semibold text-white bg-primary hover:bg-primary-pressed disabled:opacity-50 rounded-xl px-4 py-2.5"
-                >
-                  {activityBusy ? 'Working…' : 'Skip this day'}
-                </button>
-                <button
-                  type="button"
-                  disabled={activityBusy}
-                  onClick={() => { setActivityEdit({ child, activity }); setActivitySheet(null); }}
+                  onClick={() => setActChangeOpen((v) => !v)}
                   className="w-full text-sm font-semibold text-plum bg-white border border-plum/40 hover:bg-plum-light disabled:opacity-50 rounded-xl px-4 py-2.5"
                 >
-                  Edit activity
+                  {actChangeOpen ? 'Cancel change' : 'Change just this day'}
                 </button>
-                <button
-                  type="button"
-                  disabled={activityBusy}
-                  onClick={handleDeleteActivitySeries}
-                  className="w-full text-sm font-semibold text-coral hover:text-coral/80 disabled:opacity-50 px-4 py-1.5"
-                >
-                  Delete activity
-                </button>
+                {ov && !actChangeOpen && (
+                  <button
+                    type="button"
+                    disabled={activityBusy}
+                    onClick={handleResetActivityDay}
+                    className="w-full text-sm font-semibold text-plum bg-white border border-plum/40 hover:bg-plum-light disabled:opacity-50 rounded-xl px-4 py-2.5"
+                  >
+                    Back to the usual time
+                  </button>
+                )}
+                {!actChangeOpen && (
+                  <button
+                    type="button"
+                    disabled={activityBusy}
+                    onClick={() => { setActivityEdit({ child, activity }); setActivitySheet(null); }}
+                    className="w-full text-sm font-semibold text-plum bg-white border border-plum/40 hover:bg-plum-light disabled:opacity-50 rounded-xl px-4 py-2.5"
+                  >
+                    Edit activity
+                  </button>
+                )}
+                {!actChangeOpen && (
+                  <button
+                    type="button"
+                    disabled={activityBusy}
+                    onClick={handleDeleteActivitySeries}
+                    className="w-full text-sm font-semibold text-coral hover:text-coral/80 disabled:opacity-50 px-4 py-1.5"
+                  >
+                    Delete activity
+                  </button>
+                )}
               </div>
             </div>
           </div>

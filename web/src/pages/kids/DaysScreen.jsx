@@ -57,13 +57,19 @@ function actsOn(dateStr, acts) {
       && (!a.start_date || dateStr >= a.start_date)
       && (!a.end_date || dateStr <= a.end_date)
       && !a.skips?.includes(dateStr))
-    .map((a) => ({
-      id: `act:${a.id}:${dateStr}`,
-      date: dateStr,
-      emoji: kidsEventEmoji({ title: a.activity }),
-      title: a.activity,
-      sub: [fmtClock(a.time_start), fmtClock(a.time_end)].filter(Boolean).join(' – '),
-    }));
+    .map((a) => {
+      // Per-date override ("swimming is at 4 today"): show the one-off time.
+      const ov = a.overrides?.[dateStr] || null;
+      const start = ov ? ov.time_start : a.time_start;
+      const end = ov ? ov.time_end : a.time_end;
+      return {
+        id: `act:${a.id}:${dateStr}`,
+        date: dateStr,
+        emoji: kidsEventEmoji({ title: a.activity }),
+        title: a.activity,
+        sub: [fmtClock(start), fmtClock(end)].filter(Boolean).join(' – '),
+      };
+    });
 }
 
 export default function DaysScreen({ kid, theme }) {

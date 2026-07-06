@@ -52,8 +52,8 @@ describe('getHouseholdActivities', () => {
     const rows = await queries.getHouseholdActivities('hh-1');
     expect(mockEqCalls).toContainEqual(['users.household_id', 'hh-1']);
     expect(rows).toEqual([
-      { id: 'a1', child_id: 'c-1', activity: 'Swimming', day_of_week: 1, skips: [] },
-      { id: 'a2', child_id: 'c-2', activity: 'Football', day_of_week: 3, skips: ['2026-07-08'] },
+      { id: 'a1', child_id: 'c-1', activity: 'Swimming', day_of_week: 1, skips: [], overrides: {} },
+      { id: 'a2', child_id: 'c-2', activity: 'Football', day_of_week: 3, skips: ['2026-07-08'], overrides: {} },
     ]);
     // The join object must not leak through.
     expect(rows.every((r) => !('users' in r))).toBe(true);
@@ -71,7 +71,7 @@ describe('getHouseholdActivities', () => {
       { data: null, error: { code: '42P01', message: 'relation "activity_skips" does not exist' } },
     ];
     const rows = await queries.getHouseholdActivities('hh-1');
-    expect(rows).toEqual([{ id: 'a1', child_id: 'c-1', activity: 'Swimming', day_of_week: 1, skips: [] }]);
+    expect(rows).toEqual([{ id: 'a1', child_id: 'c-1', activity: 'Swimming', day_of_week: 1, skips: [], overrides: {} }]);
   });
 
   test('throws when the query errors', async () => {

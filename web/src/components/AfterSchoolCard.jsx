@@ -106,6 +106,14 @@ export default function AfterSchoolCard({ members = [] }) {
       && (!a.start_date || selectedDate >= a.start_date)
       && (!a.end_date || selectedDate <= a.end_date)
       && !a.skips?.includes(selectedDate))
+    // Per-date override: this week's occurrence may have a one-off
+    // time/pickup that replaces the series values.
+    .map((a) => {
+      const ov = a.overrides?.[selectedDate];
+      return ov
+        ? { ...a, time_start: ov.time_start, time_end: ov.time_end, pickup_member_id: ov.pickup_member_id }
+        : a;
+    })
     .sort((a, b) => timeOf(a).localeCompare(timeOf(b)));
 
   return (

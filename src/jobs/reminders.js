@@ -541,7 +541,12 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
             a.day_of_week === dayOfWeek && a.term_only !== false && activityActiveOn(a, todayStr)
             && !(a.skips || []).includes(todayStr));
           for (const act of todayActivities) {
-            schoolActivities.push({ ...act, child_name: child.name });
+            // Per-date override: the brief must show today's one-off
+            // time/pickup, not the series values.
+            const ov = act.overrides?.[todayStr];
+            schoolActivities.push(ov
+              ? { ...act, time_start: ov.time_start, time_end: ov.time_end, pickup_member_id: ov.pickup_member_id, child_name: child.name }
+              : { ...act, child_name: child.name });
           }
         }
       }

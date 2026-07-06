@@ -1191,7 +1191,7 @@ describe('activity skips', () => {
       .set(AUTH)
       .send({ date: '2026-07-06' });
     expect(res.status).toBe(201);
-    expect(db.addActivitySkip).toHaveBeenCalledWith('act-1', 'hh-1', '2026-07-06', 'u-1');
+    expect(db.addActivitySkip).toHaveBeenCalledWith('act-1', 'hh-1', '2026-07-06', 'u-1', null);
   });
 
   test('POST rejects a malformed date', async () => {
@@ -1220,6 +1220,29 @@ describe('activity skips', () => {
       .set(AUTH);
     expect(res.status).toBe(200);
     expect(db.removeActivitySkip).toHaveBeenCalledWith('act-1', '2026-07-06');
+  });
+
+  test('POST with override fields writes a per-date override, not a skip', async () => {
+    // "Piano is at 16:00 today and James collects" - the occurrence
+    // happens with one-off values; the series is untouched.
+    const res = await request(app)
+      .post('/api/schools/activities/act-1/skips')
+      .set(AUTH)
+      .send({ date: '2026-07-06', time_start: '16:00', time_end: '17:00', pickup_member_id: 'u-2' });
+    expect(res.status).toBe(201);
+    expect(db.addActivitySkip).toHaveBeenCalledWith(
+      'act-1', 'hh-1', '2026-07-06', 'u-1',
+      { time_start: '16:00', time_end: '17:00', pickup_member_id: 'u-2' },
+    );
+  });
+
+  test('POST override rejects malformed times', async () => {
+    const res = await request(app)
+      .post('/api/schools/activities/act-1/skips')
+      .set(AUTH)
+      .send({ date: '2026-07-06', time_start: '4pm' });
+    expect(res.status).toBe(400);
+    expect(db.addActivitySkip).not.toHaveBeenCalled();
   });
 });
 
@@ -1555,5 +1578,36 @@ describe('outbound calendar feed emits stable UIDs', () => {
     expect(uidsAfter).not.toContain(`UID:housemait-act-a1-${iso(0)}@housemait.com`);
     // Every remaining occurrence is byte-identical to the pre-skip render.
     expect(uidsAfter).toEqual(uidsBefore.filter((u) => u !== `UID:housemait-act-a1-${iso(0)}@housemait.com`));
+  });
+
+  // Per-date overrides: the occurrence keeps its stable UID but is emitted
+  // at the one-off time, so subscribers update it in place on refresh.
+  test('an overridden activity date keeps its UID but moves to the one-off time', async () => {
+    armFeed();
+    const todayDow = (new Date().getDay() + 6) % 7; // 0=Monday
+    const iso = (daysAhead) => {
+      const d = new Date();
+      d.setDate(d.getDate() + daysAhead);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    db.getHouseholdActivities.mockResolvedValue([{
+      id: 'a1', child_id: 'kid1', activity: 'Dance', day_of_week: todayDow,
+      time_start: '17:30:00', time_end: '18:00:00', show_on_calendar: true,
+      skips: [],
+      overrides: { [iso(0)]: { time_start: '16:00:00', time_end: '16:45:00', pickup_member_id: null } },
+    }]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Olivia', member_type: 'dependent' }]);
+
+    const res = await request(app).get('/api/calendar/feed/tok123.ics');
+    expect(res.status).toBe(200);
+    const uids = uidsOf(res.text);
+    // All 14 occurrences still present - overriding never drops the date.
+    expect(uids.filter((u) => u.startsWith('UID:housemait-act-a1-'))).toHaveLength(14);
+    // The overridden occurrence's VEVENT carries the one-off 16:00 start.
+    const overriddenBlock = res.text
+      .split('BEGIN:VEVENT')
+      .find((b) => b.includes(`housemait-act-a1-${iso(0)}`));
+    expect(overriddenBlock).toMatch(/DTSTART:\d{8}T1[56]\d{4}/); // 16:00 local → 15:00Z (BST) or 16:00Z
+    expect(overriddenBlock).not.toMatch(/DTSTART:\d{8}T1[67]3000/); // not the series 17:30
   });
 });
