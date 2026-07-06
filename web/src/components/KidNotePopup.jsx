@@ -6,6 +6,8 @@
  *
  * Presentational: the parent owns the note state and passes onReact so
  * optimistic updates land wherever the note lives (banner list / archive).
+ * onDelete is optional - when provided (adult surfaces), a Delete button
+ * renders; the caller owns confirmation and state removal.
  */
 import { REACTIONS, printNote, prettyNoteDate } from '../lib/kidNotes';
 
@@ -13,7 +15,7 @@ const INK2 = '#4A4453';
 const INK3 = '#8A8493';
 const SOFT = '#F3EEE5';
 
-export default function KidNotePopup({ note, currentUserId, onReact, onClose }) {
+export default function KidNotePopup({ note, currentUserId, onReact, onClose, onDelete }) {
   if (!note) return null;
   const mine = note.reactions?.[currentUserId];
 
@@ -96,6 +98,18 @@ export default function KidNotePopup({ note, currentUserId, onReact, onClose }) 
         {mine && (
           <div style={{ marginTop: 10, fontSize: 13, fontWeight: 500, color: INK2 }}>
             {note.child_name || 'They'} will see your {mine} on their screen. ✨
+          </div>
+        )}
+
+        {onDelete && (
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(26,22,32,0.06)', textAlign: 'right' }}>
+            <button
+              type="button"
+              onClick={onDelete}
+              style={{ border: 0, background: 'transparent', color: 'var(--color-coral, #E8724A)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '6px 8px' }}
+            >
+              Delete note
+            </button>
           </div>
         )}
       </div>

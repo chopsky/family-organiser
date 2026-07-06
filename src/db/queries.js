@@ -1353,6 +1353,20 @@ async function getKidNotesForHousehold(householdId, { childId = null, limit = 20
   return data || [];
 }
 
+// Delete a note (household-scoped). Returns the deleted row - the route
+// needs image_path to clean up the drawing in R2 - or null if not found.
+async function deleteKidNote(noteId, householdId, db = supabase) {
+  const { data, error } = await db
+    .from('kid_notes')
+    .delete()
+    .eq('id', noteId)
+    .eq('household_id', householdId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 // One reaction per reacting user; reacting again replaces their emoji.
 async function setKidNoteReaction(noteId, householdId, userId, emoji, db = supabase) {
   const note = await getKidNoteById(noteId, householdId, db);
@@ -8518,6 +8532,7 @@ module.exports = {
   getKidNoteById,
   getKidNotesForHousehold,
   setKidNoteReaction,
+  deleteKidNote,
   addChildSchoolEvent,
   getChildSchoolEvents,
   // Meals

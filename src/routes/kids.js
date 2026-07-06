@@ -217,6 +217,23 @@ router.post('/notes', requireAuth, requireHousehold, noteUpload.single('image'),
   }
 });
 
+// DELETE /api/kids/notes/:id — remove a note (adult surfaces only expose
+// this; Child Mode never renders the popup that carries the button). The
+// drawing is cleaned out of R2 best-effort. Deleting today's note also
+// frees the child to send a fresh one (the one-per-day check no longer
+// finds a row) - deliberate, so a mishap can be redone.
+router.delete('/notes/:id', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const note = await db.deleteKidNote(req.params.id, req.householdId);
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+    if (note.image_path) r2.deleteFile(note.image_path).catch(() => {});
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/kids/notes/:id error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/kids/notes/:id/reactions {emoji} — one per reacting user;
 // reacting again swaps the emoji.
 router.post('/notes/:id/reactions', requireAuth, requireHousehold, async (req, res) => {

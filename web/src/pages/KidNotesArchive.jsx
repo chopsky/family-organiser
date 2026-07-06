@@ -18,9 +18,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { confirmDestructive } from '../lib/action-sheet';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import KidNotePopup from '../components/KidNotePopup';
+import { prettyNoteDate } from '../lib/kidNotes';
 
 const INK2 = '#4A4453';
 const INK3 = '#8A8493';
@@ -109,6 +111,20 @@ export default function KidNotesArchive() {
     } catch { /* keep optimistic; re-syncs on next load */ }
   };
 
+  const removeNote = async (note) => {
+    const ok = await confirmDestructive({
+      title: 'Delete this note?',
+      message: `${note.child_name || 'This'} note from ${prettyNoteDate(note.note_date)} will be gone for good.`,
+      confirmLabel: 'Delete note',
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/kids/notes/${note.id}`);
+      setNotes((ns) => ns.filter((n) => n.id !== note.id));
+      setViewingId(null);
+    } catch { /* leave the note in place; nothing was deleted */ }
+  };
+
   return (
     <div className="max-w-[720px] mx-auto">
       <PageHeader
@@ -154,6 +170,7 @@ export default function KidNotesArchive() {
           currentUserId={user?.id}
           onReact={(emoji) => react(viewing, emoji)}
           onClose={() => setViewingId(null)}
+          onDelete={() => removeNote(viewing)}
         />
       )}
     </div>

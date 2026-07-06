@@ -41,6 +41,7 @@ beforeEach(() => {
   db.getKidsCountdownEvents.mockResolvedValue([]);
   db.getKidNotesForHousehold.mockResolvedValue([]);
   r2.uploadFile.mockResolvedValue();
+  r2.deleteFile.mockResolvedValue();
   r2.getSignedDownloadUrl.mockResolvedValue('https://signed.example/note.png');
   push.sendToHousehold.mockResolvedValue({ sent: 1, failed: 0 });
 });
@@ -176,6 +177,23 @@ describe('kids notes', () => {
     expect((await request(app()).post('/api/kids/notes').field('child_id', 'k1').attach('image', Buffer.from('GIF89a'), 'x.png')).status).toBe(415);
     expect((await request(app()).post('/api/kids/notes').field('child_id', 'me').field('text', 'hi')).status).toBe(404);
     expect(db.createKidNote).not.toHaveBeenCalled();
+  });
+
+  test('DELETE /notes/:id removes the note and cleans the drawing out of R2', async () => {
+    db.deleteKidNote.mockResolvedValue({ id: 'n1', child_id: 'k1', image_path: 'h1/kid-notes/k1/a.png' });
+    const res = await request(app()).delete('/api/kids/notes/n1');
+    expect(res.status).toBe(200);
+    expect(db.deleteKidNote).toHaveBeenCalledWith('n1', 'h1');
+    expect(r2.deleteFile).toHaveBeenCalledWith('h1/kid-notes/k1/a.png');
+  });
+
+  test('DELETE /notes/:id: text-only notes skip R2; unknown ids 404', async () => {
+    db.deleteKidNote.mockResolvedValue({ id: 'n2', child_id: 'k1', image_path: null });
+    expect((await request(app()).delete('/api/kids/notes/n2')).status).toBe(200);
+    expect(r2.deleteFile).not.toHaveBeenCalled();
+
+    db.deleteKidNote.mockResolvedValue(null);
+    expect((await request(app()).delete('/api/kids/notes/nope')).status).toBe(404);
   });
 
   test('POST /notes/:id/reactions stores the reacting user and rejects unknown emoji', async () => {

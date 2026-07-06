@@ -21,6 +21,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import { confirmDestructive } from '../lib/action-sheet';
+import { prettyNoteDate } from '../lib/kidNotes';
 import KidNotePopup from './KidNotePopup';
 
 const INK3 = '#8A8493';
@@ -78,6 +80,21 @@ export default function KidNoteAlert() {
     } catch { /* keep the optimistic state; it re-syncs on the next poll */ }
   };
 
+  const removeNote = async () => {
+    const note = viewing;
+    const ok = await confirmDestructive({
+      title: 'Delete this note?',
+      message: `${note.child_name || 'This'} note from ${prettyNoteDate(note.note_date)} will be gone for good.`,
+      confirmLabel: 'Delete note',
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/kids/notes/${note.id}`);
+      setNotes((ns) => ns.filter((n) => n.id !== note.id));
+      setViewing(null);
+    } catch { /* leave the note in place; nothing was deleted */ }
+  };
+
   return (
     <>
       {/* ── Banner ── */}
@@ -127,6 +144,7 @@ export default function KidNoteAlert() {
           currentUserId={user?.id}
           onReact={react}
           onClose={() => setViewing(null)}
+          onDelete={removeNote}
         />
       )}
     </>
