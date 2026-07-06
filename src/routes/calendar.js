@@ -447,6 +447,9 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
             if (act.day_of_week !== wd) continue;
             if (act.start_date && dateStr < act.start_date) continue;
             if (act.end_date && dateStr > act.end_date) continue;
+            // Per-date skip: the occurrence stops being emitted, so
+            // subscribers drop it on their next refresh.
+            if (act.skips && act.skips.includes(dateStr)) continue;
             const childName = nameById.get(act.child_id);
             const summary = childName ? `${childName} - ${act.activity}` : act.activity;
             if (act.time_start) {

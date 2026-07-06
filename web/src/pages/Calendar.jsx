@@ -570,6 +570,12 @@ export default function Calendar() {
             // so toISOString().split('T')[0] would return Sunday's date and
             // the activity would render on the wrong day.
             const dateStr = toDateStr(d);
+            // Term window (same rule as Kids Mode + the ICS feed - this
+            // view previously rendered activities year-round) and per-date
+            // skips ("skip just this day" from the activity sheet / AI).
+            if (act.start_date && dateStr < act.start_date) continue;
+            if (act.end_date && dateStr > act.end_date) continue;
+            if (act.skips?.includes(dateStr)) continue;
             schoolEvents.push({
               id: `act-${act.id}-${dateStr}`,
               title: `${child.name} - ${act.activity}`,
@@ -581,6 +587,10 @@ export default function Calendar() {
               color: child.color_theme || 'sky',
               _school: true,
               _activity: true,
+              // The activity sheet (tap → skip/edit/delete) needs the series
+              // id + the concrete occurrence date.
+              _activityId: act.id,
+              _activityDate: dateStr,
             });
           }
         }

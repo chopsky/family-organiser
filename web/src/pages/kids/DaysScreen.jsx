@@ -47,14 +47,16 @@ const bigEmoji = (b) => b.emoji || kidsEventEmoji({ title: b.title });
 // Weekly extracurriculars (child_weekly_schedule) expanded onto real dates.
 // day_of_week uses the app-wide 0=Monday convention; an activity with a term
 // window (start_date/end_date) only occurs inside it, one without a window
-// occurs every week.
+// occurs every week. Per-date skips ("no swimming today") hide just that
+// occurrence.
 const fmtClock = (t) => (t ? String(t).slice(0, 5) : '');
 function actsOn(dateStr, acts) {
   const wd = (toLocalDate(dateStr).getDay() + 6) % 7;
   return acts
     .filter((a) => a.day_of_week === wd
       && (!a.start_date || dateStr >= a.start_date)
-      && (!a.end_date || dateStr <= a.end_date))
+      && (!a.end_date || dateStr <= a.end_date)
+      && !a.skips?.includes(dateStr))
     .map((a) => ({
       id: `act:${a.id}:${dateStr}`,
       date: dateStr,

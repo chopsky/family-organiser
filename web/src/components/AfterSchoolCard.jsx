@@ -90,8 +90,22 @@ export default function AfterSchoolCard({ members = [] }) {
   if (!isMobile) return null;
   if (!activities || activities.length === 0) return null; // hide when no clubs at all
 
+  // The Mon-Sun selector reads as THIS week, so resolve the selected
+  // weekday to its concrete date - that's what term windows and per-date
+  // skips ("no swimming today") are checked against.
+  const selectedDate = (() => {
+    const now = new Date();
+    const ourToday = (now.getDay() + 6) % 7;
+    const d = new Date(now);
+    d.setDate(now.getDate() + (dayIdx - ourToday));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+
   const items = activities
-    .filter(a => a.day_of_week === dayIdx)
+    .filter(a => a.day_of_week === dayIdx
+      && (!a.start_date || selectedDate >= a.start_date)
+      && (!a.end_date || selectedDate <= a.end_date)
+      && !a.skips?.includes(selectedDate))
     .sort((a, b) => timeOf(a).localeCompare(timeOf(b)));
 
   return (

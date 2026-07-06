@@ -534,10 +534,12 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           if (termSchoolId && !(await isSchoolInSession(termSchoolId, todayStr))) continue; // school holiday/inset/half-term
 
           const activities = await db.getChildActivities(child.id);
-          // Honour the activity's term window: an activity only shows when
-          // today falls inside [start_date, end_date] (NULL dates = ongoing).
+          // Honour the activity's term window (today inside [start_date,
+          // end_date], NULL dates = ongoing) and per-date skips ("no
+          // swimming today" must keep it out of the morning brief too).
           const todayActivities = activities.filter(a =>
-            a.day_of_week === dayOfWeek && a.term_only !== false && activityActiveOn(a, todayStr));
+            a.day_of_week === dayOfWeek && a.term_only !== false && activityActiveOn(a, todayStr)
+            && !(a.skips || []).includes(todayStr));
           for (const act of todayActivities) {
             schoolActivities.push({ ...act, child_name: child.name });
           }

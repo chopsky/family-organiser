@@ -1527,4 +1527,33 @@ describe('outbound calendar feed emits stable UIDs', () => {
     expect(uidsOf(again.text).filter((u) => u.startsWith('UID:housemait-act-a1-')))
       .toEqual(uids.filter((u) => u.startsWith('UID:housemait-act-a1-')));
   });
+
+  // Per-date skips: a skipped occurrence stops being emitted (subscribers
+  // drop it on refresh) while every other occurrence keeps its stable UID.
+  test('a skipped activity date drops out of the feed, neighbours unchanged', async () => {
+    armFeed();
+    const todayDow = (new Date().getDay() + 6) % 7; // 0=Monday
+    const iso = (daysAhead) => {
+      const d = new Date();
+      d.setDate(d.getDate() + daysAhead);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const base = { id: 'a1', child_id: 'kid1', activity: 'Dance', day_of_week: todayDow, time_start: '17:30:00', show_on_calendar: true };
+    db.getHouseholdActivities.mockResolvedValue([{ ...base, skips: [] }]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Olivia', member_type: 'dependent' }]);
+    const before = await request(app).get('/api/calendar/feed/tok123.ics');
+    const uidsBefore = uidsOf(before.text).filter((u) => u.startsWith('UID:housemait-act-a1-'));
+    expect(uidsBefore).toHaveLength(14);
+
+    // Skip today's occurrence and re-render.
+    armFeed();
+    db.getHouseholdActivities.mockResolvedValue([{ ...base, skips: [iso(0)] }]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Olivia', member_type: 'dependent' }]);
+    const after = await request(app).get('/api/calendar/feed/tok123.ics');
+    const uidsAfter = uidsOf(after.text).filter((u) => u.startsWith('UID:housemait-act-a1-'));
+    expect(uidsAfter).toHaveLength(13);
+    expect(uidsAfter).not.toContain(`UID:housemait-act-a1-${iso(0)}@housemait.com`);
+    // Every remaining occurrence is byte-identical to the pre-skip render.
+    expect(uidsAfter).toEqual(uidsBefore.filter((u) => u !== `UID:housemait-act-a1-${iso(0)}@housemait.com`));
+  });
 });
