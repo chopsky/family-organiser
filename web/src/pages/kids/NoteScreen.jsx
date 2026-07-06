@@ -18,7 +18,6 @@ export default function NoteScreen({ kid, theme, members }) {
   const isMobile = useIsMobile();
   const [todayNote, setTodayNote] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const [composing, setComposing] = useState(false);
 
   // Switching the active kid resets the screen (render-time prop-change
   // reset, per the React docs pattern - the shell keeps us mounted).
@@ -26,7 +25,6 @@ export default function NoteScreen({ kid, theme, members }) {
   if (lastKidId !== kid.id) {
     setLastKidId(kid.id);
     setLoaded(false);
-    setComposing(false);
     setTodayNote(null);
   }
 
@@ -49,7 +47,9 @@ export default function NoteScreen({ kid, theme, members }) {
   }, [kid.id]);
 
   if (!loaded) return null;
-  const showCompose = composing || !todayNote;
+  // One note per day: once today's is sent, there's no "make another" -
+  // the kid sees their note and their grown-ups' reactions until tomorrow.
+  const showCompose = !todayNote;
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0, maxWidth: isMobile ? undefined : 680 }}>
@@ -61,8 +61,8 @@ export default function NoteScreen({ kid, theme, members }) {
       </div>
 
       {showCompose
-        ? <Compose kid={kid} theme={theme} onSent={(note) => { setTodayNote(note); setComposing(false); }} />
-        : <SentState note={todayNote} members={members} onAgain={() => setComposing(true)} />}
+        ? <Compose kid={kid} theme={theme} onSent={setTodayNote} />
+        : <SentState note={todayNote} members={members} />}
     </div>
   );
 }
@@ -153,8 +153,19 @@ function Compose({ kid, theme, onSent }) {
       }
       const { data } = await api.post('/kids/notes', form);
       onSent(data.note);
-    } catch {
-      setError("Oh no, it didn't send. Try again!");
+    } catch (err) {
+      // 409 = today's note is already sent (e.g. from another device).
+      // Refetch so the screen flips to the sent state instead of nagging.
+      if (err?.response?.status === 409) {
+        try {
+          const { data } = await api.get('/kids/notes', { params: { child_id: kid.id, limit: 3 } });
+          const mine = (data.notes || []).find((n) => n.note_date === todayStr());
+          if (mine) { onSent(mine); return; }
+        } catch { /* fall through to the message */ }
+        setError("You've already sent today's note! Come back tomorrow. 💌");
+      } else {
+        setError("Oh no, it didn't send. Try again!");
+      }
       setBusy(false);
     }
   };
@@ -208,7 +219,7 @@ function Compose({ kid, theme, onSent }) {
   );
 }
 
-function SentState({ note, members, onAgain }) {
+function SentState({ note, members }) {
   const reactions = Object.entries(note.reactions || {});
   const nameOf = (userId) => members.find((m) => m.id === userId)?.name || 'Someone';
 
@@ -240,9 +251,11 @@ function SentState({ note, members, onAgain }) {
         )}
       </div>
 
-      <button onClick={onAgain} style={{ width: '100%', marginTop: 16, marginBottom: 20, border: '2px solid rgba(49,43,75,0.10)', borderRadius: 20, padding: '14px 0', fontFamily: 'inherit', fontSize: 16, fontWeight: 600, color: KIDS_INK.ink2, cursor: 'pointer', background: 'rgba(255,255,255,0.8)' }}>
-        Make a new one for today
-      </button>
+      {/* One note a day - so no "make another"; just a warm nudge to come
+          back tomorrow. */}
+      <div style={{ marginTop: 16, marginBottom: 20, textAlign: 'center', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2 }}>
+        Come back tomorrow to send another! 🌙
+      </div>
     </div>
   );
 }

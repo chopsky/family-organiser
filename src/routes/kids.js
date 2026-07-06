@@ -100,11 +100,13 @@ router.get('/big-days', requireAuth, requireHousehold, async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // Kids' daily notes — once a day a child draws/writes a note for their
-// parents. One note per (child, day); re-sending replaces it and clears
-// reactions. Parents react with an emoji (POST /notes/:id/reactions) and
-// the kid sees the reactions on their "sent" screen - closing that loop
-// is the feature. Child Mode devices run on a parent's auth token, so
-// requireAuth+requireHousehold cover both directions.
+// parents. Strictly ONE note per (child, day): a second send is refused
+// (409), not allowed to replace the first. Parents react with an emoji
+// (POST /notes/:id/reactions) and the kid sees the reactions on their
+// "sent" screen - closing that loop is the feature. A copy of each
+// drawing is also filed into the parents' Documents. Child Mode devices
+// run on a parent's auth token, so requireAuth+requireHousehold cover
+// both directions.
 // ---------------------------------------------------------------------------
 
 // Canvas PNGs from a phone-sized drawing area are well under 1 MB;
@@ -123,6 +125,41 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 async function householdChild(householdId, childId) {
   const members = await db.getHouseholdMembers(householdId);
   return members.find((m) => m.id === childId && m.member_type === 'dependent') || null;
+}
+
+// Save a keepsake copy of a note's drawing into the parents' Documents,
+// in a (reused) folder named after the child, filed under a timestamped
+// name. Best-effort: a child's note must still send even if Documents is
+// unavailable (e.g. the older documents tables aren't present), so every
+// failure here is swallowed after logging.
+async function saveNoteToDocuments(householdId, child, buffer, uploadedBy, tz) {
+  try {
+    let folder = await db.findDocumentFolderByName(householdId, child.name);
+    if (!folder) {
+      folder = await db.createDocumentFolder(householdId, {
+        name: child.name, visibility: 'shared', created_by: uploadedBy, icon: 'image', color: '#6C3DD9',
+      });
+    }
+    // Human-readable timestamp in the household's timezone, e.g.
+    // "Note - 6 Jul 2026, 15:24.png". Each day's note lands as its own
+    // dated file so the folder reads as a diary.
+    const stamp = new Date().toLocaleString('en-GB', {
+      timeZone: tz, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    const displayName = `Note - ${stamp}.png`;
+    const storageKey = `${householdId}/${folder.id}/${crypto.randomUUID()}-note.png`;
+    await r2.uploadFile(storageKey, buffer, 'image/png');
+    await db.createDocument(householdId, {
+      name: displayName,
+      file_path: storageKey,
+      file_size: buffer.length,
+      mime_type: 'image/png',
+      uploaded_by: uploadedBy,
+      folder_id: folder.id,
+    });
+  } catch (err) {
+    console.error('[kid-notes] Documents copy failed (non-fatal):', err.message);
+  }
 }
 
 async function noteWithUrl(note) {
@@ -173,16 +210,35 @@ router.post('/notes', requireAuth, requireHousehold, noteUpload.single('image'),
     try { tz = (await db.getHouseholdById(req.householdId))?.timezone || tz; } catch { /* default */ }
     const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz });
 
+    // One note per child per day. Refuse a second send rather than
+    // replacing the first (checked up front for a friendly answer; the
+    // insert below is the race-safe backstop via the UNIQUE constraint).
+    const existing = await db.getKidNoteForChildDate(req.householdId, child_id, todayStr);
+    if (existing) {
+      return res.status(409).json({ error: "You've already sent your note today. Come back tomorrow!" });
+    }
+
     let imagePath = null;
     if (req.file) {
       imagePath = `${req.householdId}/kid-notes/${child_id}/${crypto.randomUUID()}.png`;
       await r2.uploadFile(imagePath, req.file.buffer, 'image/png');
     }
 
-    const note = await db.upsertKidNote(req.householdId, child_id, todayStr, {
-      image_path: imagePath,
-      text_note: text,
-    });
+    let note;
+    try {
+      note = await db.createKidNote(req.householdId, child_id, todayStr, { image_path: imagePath, text_note: text });
+    } catch (err) {
+      if (err.code === 'KID_NOTE_DUPLICATE') {
+        return res.status(409).json({ error: "You've already sent your note today. Come back tomorrow!" });
+      }
+      throw err;
+    }
+
+    // Keepsake copy into the parents' Documents (folder per child,
+    // timestamped). Fire-and-forget - never blocks or fails the send.
+    if (req.file) {
+      saveNoteToDocuments(req.householdId, child, req.file.buffer, req.user.id, tz);
+    }
 
     // Everyone's devices, sender included - the "sender" here is whichever
     // parent account the kid's device is signed into, and that parent

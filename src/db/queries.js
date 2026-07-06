@@ -1285,18 +1285,42 @@ function isMissingKidNotesTable(error) {
   return error && (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST200');
 }
 
-// Create or replace today's note. Re-sending on the same day overwrites
-// the drawing/text and clears reactions (it's a new note).
-async function upsertKidNote(householdId, childId, noteDate, { image_path = null, text_note = null } = {}, db = supabase) {
+// Postgres unique_violation - a note already exists for this (child, day).
+// Surfaced so the route can answer with a friendly "already sent today".
+const KID_NOTE_DUPLICATE = 'KID_NOTE_DUPLICATE';
+
+// Today's note for one child, or null. The one-per-day rule reads this
+// before writing so a second send is refused rather than silently
+// replacing the first.
+async function getKidNoteForChildDate(householdId, childId, noteDate, db = supabase) {
   const { data, error } = await db
     .from('kid_notes')
-    .upsert(
-      { household_id: householdId, child_id: childId, note_date: noteDate, image_path, text_note, reactions: {} },
-      { onConflict: 'child_id,note_date', ignoreDuplicates: false }
-    )
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('child_id', childId)
+    .eq('note_date', noteDate)
+    .maybeSingle();
+  if (error) {
+    if (isMissingKidNotesTable(error)) return null;
+    throw error;
+  }
+  return data;
+}
+
+// Insert today's note. Deliberately NOT an upsert: a child gets ONE note
+// per day, so a duplicate (the UNIQUE(child_id, note_date) constraint
+// firing, code 23505) is rethrown as KID_NOTE_DUPLICATE for the route to
+// turn into a 409 rather than overwriting the earlier note.
+async function createKidNote(householdId, childId, noteDate, { image_path = null, text_note = null } = {}, db = supabase) {
+  const { data, error } = await db
+    .from('kid_notes')
+    .insert({ household_id: householdId, child_id: childId, note_date: noteDate, image_path, text_note, reactions: {} })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') { const e = new Error('Note already sent today'); e.code = KID_NOTE_DUPLICATE; throw e; }
+    throw error;
+  }
   return data;
 }
 
@@ -6780,6 +6804,22 @@ async function getDocumentFolders(householdId, userId, parentFolderId = null) {
     .map(f => ({ ...f, file_count: f.documents?.length || 0, documents: undefined }));
 }
 
+// Find a top-level (root) folder by exact name, or null. Used by the
+// kids'-notes feature to drop each child's note copies into a folder
+// named after them, reusing it across days instead of creating dupes.
+async function findDocumentFolderByName(householdId, name) {
+  const { data, error } = await supabase
+    .from('document_folders')
+    .select()
+    .eq('household_id', householdId)
+    .eq('name', name)
+    .is('parent_folder_id', null)
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
 async function getDocumentFolderById(folderId, householdId) {
   const { data, error } = await supabase
     .from('document_folders')
@@ -8489,7 +8529,8 @@ module.exports = {
   addActivitySkip,
   removeActivitySkip,
   getActivitySkipsForHousehold,
-  upsertKidNote,
+  getKidNoteForChildDate,
+  createKidNote,
   getKidNoteById,
   getKidNotesForHousehold,
   setKidNoteReaction,
@@ -8580,6 +8621,7 @@ module.exports = {
   // Documents
   createDocumentFolder,
   getDocumentFolders,
+  findDocumentFolderByName,
   getDocumentFolderById,
   updateDocumentFolder,
   deleteDocumentFolder,

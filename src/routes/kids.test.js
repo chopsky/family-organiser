@@ -103,9 +103,14 @@ describe('kids notes', () => {
 
   beforeEach(() => {
     db.getHouseholdMembers.mockResolvedValue([parent, kid]);
-    db.upsertKidNote.mockImplementation(async (hh, childId, date, fields) => ({
+    db.getKidNoteForChildDate.mockResolvedValue(null); // no note yet today
+    db.createKidNote.mockImplementation(async (hh, childId, date, fields) => ({
       id: 'n1', household_id: hh, child_id: childId, note_date: date, reactions: {}, ...fields,
     }));
+    // Documents keepsake copy (best-effort) - default happy path.
+    db.findDocumentFolderByName.mockResolvedValue(null);
+    db.createDocumentFolder.mockResolvedValue({ id: 'f1', name: 'Olivia' });
+    db.createDocument.mockResolvedValue({ id: 'd1' });
   });
 
   test('GET /notes returns signed image URLs, the child name, and hides the storage key', async () => {
@@ -122,7 +127,7 @@ describe('kids notes', () => {
     expect(res.body.notes[1].image_url).toBeNull();
   });
 
-  test('POST /notes uploads the drawing to R2 and pushes to the whole household', async () => {
+  test('POST /notes uploads the drawing to R2, pushes, and files a Documents copy', async () => {
     const res = await request(app())
       .post('/api/kids/notes')
       .field('child_id', 'k1')
@@ -133,7 +138,7 @@ describe('kids notes', () => {
     expect(key).toMatch(/^h1\/kid-notes\/k1\/[0-9a-f-]+\.png$/);
     expect(buf.equals(png)).toBe(true);
     expect(mime).toBe('image/png');
-    expect(db.upsertKidNote).toHaveBeenCalledWith('h1', 'k1', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), {
+    expect(db.createKidNote).toHaveBeenCalledWith('h1', 'k1', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), {
       image_path: key,
       text_note: 'love you',
     });
@@ -144,20 +149,44 @@ describe('kids notes', () => {
       category: 'family_activity',
     }));
     expect(res.body.note.image_url).toBe('https://signed.example/note.png');
+
+    // Keepsake copy: a folder named after the child + a timestamped doc.
+    // (Fire-and-forget in the route, so let the microtasks flush first.)
+    await new Promise((r) => setImmediate(r));
+    expect(db.createDocumentFolder).toHaveBeenCalledWith('h1', expect.objectContaining({ name: 'Olivia', visibility: 'shared' }));
+    const docCall = db.createDocument.mock.calls[0][1];
+    expect(docCall.folder_id).toBe('f1');
+    expect(docCall.mime_type).toBe('image/png');
+    expect(docCall.name).toMatch(/^Note - .+\.png$/);
+    expect(r2.uploadFile.mock.calls.some(([k]) => k.startsWith('h1/f1/'))).toBe(true);
   });
 
-  test('POST /notes accepts a text-only note without touching R2', async () => {
+  test('POST /notes accepts a text-only note without touching R2 or Documents', async () => {
     const res = await request(app()).post('/api/kids/notes').field('child_id', 'k1').field('text', 'hi dad');
     expect(res.status).toBe(201);
     expect(r2.uploadFile).not.toHaveBeenCalled();
-    expect(db.upsertKidNote).toHaveBeenCalledWith('h1', 'k1', expect.any(String), { image_path: null, text_note: 'hi dad' });
+    expect(db.createDocument).not.toHaveBeenCalled();
+    expect(db.createKidNote).toHaveBeenCalledWith('h1', 'k1', expect.any(String), { image_path: null, text_note: 'hi dad' });
+  });
+
+  test('POST /notes allows only one note per child per day (409 on the second)', async () => {
+    db.getKidNoteForChildDate.mockResolvedValue({ id: 'n1', child_id: 'k1' }); // already sent today
+    const res = await request(app()).post('/api/kids/notes').field('child_id', 'k1').field('text', 'again');
+    expect(res.status).toBe(409);
+    expect(db.createKidNote).not.toHaveBeenCalled();
+  });
+
+  test('POST /notes races: a duplicate insert surfaces as 409, not a 500', async () => {
+    db.createKidNote.mockRejectedValue(Object.assign(new Error('dupe'), { code: 'KID_NOTE_DUPLICATE' }));
+    const res = await request(app()).post('/api/kids/notes').field('child_id', 'k1').field('text', 'racy');
+    expect(res.status).toBe(409);
   });
 
   test('POST /notes rejects empty notes, non-PNG files and non-dependent authors', async () => {
     expect((await request(app()).post('/api/kids/notes').field('child_id', 'k1')).status).toBe(400);
     expect((await request(app()).post('/api/kids/notes').field('child_id', 'k1').attach('image', Buffer.from('GIF89a'), 'x.png')).status).toBe(415);
     expect((await request(app()).post('/api/kids/notes').field('child_id', 'me').field('text', 'hi')).status).toBe(404);
-    expect(db.upsertKidNote).not.toHaveBeenCalled();
+    expect(db.createKidNote).not.toHaveBeenCalled();
   });
 
   test('POST /notes/:id/reactions stores the reacting user and rejects unknown emoji', async () => {

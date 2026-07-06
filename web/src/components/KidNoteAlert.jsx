@@ -29,6 +29,43 @@ const SOFT = '#F3EEE5';
 // anything outside this set.
 const REACTIONS = ['❤️', '😍', '🌟', '😂', '🥰', '👏'];
 
+const escapeHtml = (s) => String(s || '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+// Print a note on its own page so a parent can pop a keepsake on the
+// fridge. Builds a minimal document (the drawing + message + who/when) as
+// a Blob and opens it in a new window; the inline script waits for the
+// image to paint, then fires the browser print dialog.
+function printNote(note) {
+  const who = escapeHtml(note.child_name || 'the kids');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>A note from ${who}</title>
+    <style>
+      body { font-family: -apple-system, system-ui, sans-serif; color: #1A1620; text-align: center; padding: 32px; }
+      h1 { font-size: 24px; margin: 0 0 4px; }
+      .date { color: #8A8493; font-size: 13px; margin-bottom: 20px; }
+      img { max-width: 100%; border: 1px solid #ddd; border-radius: 12px; }
+      .msg { font-size: 20px; font-style: italic; margin-top: 20px; }
+      @media print { body { padding: 0; } }
+    </style></head><body>
+    <h1>A note from ${who} &#128156;</h1>
+    <div class="date">${escapeHtml(note.note_date || '')}</div>
+    ${note.image_url ? `<img alt="Drawing" src="${escapeHtml(note.image_url)}">` : ''}
+    ${note.text_note ? `<div class="msg">&ldquo;${escapeHtml(note.text_note)}&rdquo;</div>` : ''}
+    <script>
+      window.addEventListener('load', function () {
+        var img = document.querySelector('img');
+        if (img && !img.complete) {
+          img.addEventListener('load', function () { window.print(); });
+          img.addEventListener('error', function () { window.print(); });
+        } else { window.print(); }
+      });
+    </script>
+    </body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const w = window.open(url, '_blank');
+  if (!w) { URL.revokeObjectURL(url); return; }
+  setTimeout(() => URL.revokeObjectURL(url), 60000); // after the window has loaded it
+}
+
 const SEEN_KEY = 'kidNotesSeen';
 function readSeen() {
   try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch { return {}; }
@@ -146,18 +183,27 @@ export default function KidNoteAlert() {
             style={{ maxWidth: 400, background: '#fff', borderRadius: 22, padding: 20, boxShadow: '0 18px 50px rgba(26,22,32,0.25)', maxHeight: '85vh', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
-              <h2 style={{ fontFamily: 'var(--font-serif-display)', fontSize: 22, color: '#1A1620', margin: 0 }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: 12, gap: 8 }}>
+              <h2 style={{ fontFamily: 'var(--font-serif-display)', fontSize: 22, color: '#1A1620', margin: 0, minWidth: 0 }}>
                 A note from {viewing.child_name || 'the kids'} 💌
               </h2>
-              <button
-                type="button"
-                onClick={() => setViewing(null)}
-                aria-label="Close"
-                style={{ width: 34, height: 34, borderRadius: 10, border: 0, background: SOFT, color: INK2, fontSize: 16, cursor: 'pointer', flexShrink: 0 }}
-              >
-                ✕
-              </button>
+              <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => printNote(viewing)}
+                  style={{ height: 34, padding: '0 12px', borderRadius: 10, border: 0, background: SOFT, color: INK2, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  🖨 Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewing(null)}
+                  aria-label="Close"
+                  style={{ width: 34, height: 34, borderRadius: 10, border: 0, background: SOFT, color: INK2, fontSize: 16, cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {viewing.image_url && (
