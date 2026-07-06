@@ -6804,22 +6804,6 @@ async function getDocumentFolders(householdId, userId, parentFolderId = null) {
     .map(f => ({ ...f, file_count: f.documents?.length || 0, documents: undefined }));
 }
 
-// Find a top-level (root) folder by exact name, or null. Used by the
-// kids'-notes feature to drop each child's note copies into a folder
-// named after them, reusing it across days instead of creating dupes.
-async function findDocumentFolderByName(householdId, name) {
-  const { data, error } = await supabase
-    .from('document_folders')
-    .select()
-    .eq('household_id', householdId)
-    .eq('name', name)
-    .is('parent_folder_id', null)
-    .limit(1)
-    .maybeSingle();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
-}
-
 async function getDocumentFolderById(folderId, householdId) {
   const { data, error } = await supabase
     .from('document_folders')
@@ -8621,7 +8605,6 @@ module.exports = {
   // Documents
   createDocumentFolder,
   getDocumentFolders,
-  findDocumentFolderByName,
   getDocumentFolderById,
   updateDocumentFolder,
   deleteDocumentFolder,

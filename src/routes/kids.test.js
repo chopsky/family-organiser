@@ -107,10 +107,6 @@ describe('kids notes', () => {
     db.createKidNote.mockImplementation(async (hh, childId, date, fields) => ({
       id: 'n1', household_id: hh, child_id: childId, note_date: date, reactions: {}, ...fields,
     }));
-    // Documents keepsake copy (best-effort) - default happy path.
-    db.findDocumentFolderByName.mockResolvedValue(null);
-    db.createDocumentFolder.mockResolvedValue({ id: 'f1', name: 'Olivia' });
-    db.createDocument.mockResolvedValue({ id: 'd1' });
   });
 
   test('GET /notes returns signed image URLs, the child name, and hides the storage key', async () => {
@@ -127,7 +123,7 @@ describe('kids notes', () => {
     expect(res.body.notes[1].image_url).toBeNull();
   });
 
-  test('POST /notes uploads the drawing to R2, pushes, and files a Documents copy', async () => {
+  test('POST /notes uploads the drawing to R2 and pushes to the whole household', async () => {
     const res = await request(app())
       .post('/api/kids/notes')
       .field('child_id', 'k1')
@@ -149,23 +145,16 @@ describe('kids notes', () => {
       category: 'family_activity',
     }));
     expect(res.body.note.image_url).toBe('https://signed.example/note.png');
-
-    // Keepsake copy: a folder named after the child + a timestamped doc.
-    // (Fire-and-forget in the route, so let the microtasks flush first.)
-    await new Promise((r) => setImmediate(r));
-    expect(db.createDocumentFolder).toHaveBeenCalledWith('h1', expect.objectContaining({ name: 'Olivia - Notes', visibility: 'shared' }));
-    const docCall = db.createDocument.mock.calls[0][1];
-    expect(docCall.folder_id).toBe('f1');
-    expect(docCall.mime_type).toBe('image/png');
-    expect(docCall.name).toMatch(/^Note - .+\.png$/);
-    expect(r2.uploadFile.mock.calls.some(([k]) => k.startsWith('h1/f1/'))).toBe(true);
+    // Notes live in the Kids' Notes archive, not Documents.
+    expect(db.createDocument).not.toHaveBeenCalled();
+    // Only the note image is uploaded - no second Documents copy.
+    expect(r2.uploadFile).toHaveBeenCalledTimes(1);
   });
 
-  test('POST /notes accepts a text-only note without touching R2 or Documents', async () => {
+  test('POST /notes accepts a text-only note without touching R2', async () => {
     const res = await request(app()).post('/api/kids/notes').field('child_id', 'k1').field('text', 'hi dad');
     expect(res.status).toBe(201);
     expect(r2.uploadFile).not.toHaveBeenCalled();
-    expect(db.createDocument).not.toHaveBeenCalled();
     expect(db.createKidNote).toHaveBeenCalledWith('h1', 'k1', expect.any(String), { image_path: null, text_note: 'hi dad' });
   });
 
