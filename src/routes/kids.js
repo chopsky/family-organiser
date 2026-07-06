@@ -140,7 +140,9 @@ async function noteWithUrl(note) {
 // a second members fetch.
 router.get('/notes', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 60);
+    // Cap high enough for the archive's gallery (200 ≈ several months of
+    // daily notes across a couple of kids); the alert only asks for 6.
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 200);
     const childId = req.query.child_id || null;
     const [notes, members] = await Promise.all([
       db.getKidNotesForHousehold(req.householdId, { childId, limit }),

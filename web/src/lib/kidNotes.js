@@ -7,6 +7,14 @@ export const REACTIONS = ['❤️', '😍', '🌟', '😂', '🥰', '👏'];
 
 const escapeHtml = (s) => String(s || '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
+// "Monday 6 July" from a YYYY-MM-DD string (noon avoids TZ edge cases).
+export const prettyNoteDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  } catch { return dateStr; }
+};
+
 // Print a note on its own page so a parent can pop a keepsake on the
 // fridge. Builds a minimal document (the drawing + message + who/when) as
 // a Blob and opens it in a new window; the inline script waits for the

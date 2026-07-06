@@ -21,11 +21,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
-import { REACTIONS, printNote } from '../lib/kidNotes';
+import KidNotePopup from './KidNotePopup';
 
-const INK2 = '#4A4453';
 const INK3 = '#8A8493';
-const SOFT = '#F3EEE5';
 
 export default function KidNoteAlert() {
   const { user } = useAuth();
@@ -122,89 +120,14 @@ export default function KidNoteAlert() {
         </div>
       )}
 
-      {/* ── Note popup ── */}
+      {/* ── Note popup (shared with the Kids' Notes archive) ── */}
       {viewing && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(26,22,32,0.45)', padding: 20 }}
-          onClick={() => setViewing(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Note from ${viewing.child_name || 'a child'}`}
-        >
-          <div
-            className="w-full"
-            style={{ maxWidth: 400, background: '#fff', borderRadius: 22, padding: 20, boxShadow: '0 18px 50px rgba(26,22,32,0.25)', maxHeight: '85vh', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between" style={{ marginBottom: 12, gap: 8 }}>
-              <h2 style={{ fontFamily: 'var(--font-serif-display)', fontSize: 22, color: '#1A1620', margin: 0, minWidth: 0 }}>
-                A note from {viewing.child_name || 'the kids'} 💌
-              </h2>
-              <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => printNote(viewing)}
-                  style={{ height: 34, padding: '0 12px', borderRadius: 10, border: 0, background: SOFT, color: INK2, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  🖨 Print
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewing(null)}
-                  aria-label="Close"
-                  style={{ width: 34, height: 34, borderRadius: 10, border: 0, background: SOFT, color: INK2, fontSize: 16, cursor: 'pointer' }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {viewing.image_url && (
-              <img
-                src={viewing.image_url}
-                alt={`Drawing from ${viewing.child_name || 'a child'}`}
-                style={{ display: 'block', width: '100%', borderRadius: 14, border: '1px solid rgba(26,22,32,0.08)' }}
-              />
-            )}
-            {viewing.text_note && (
-              <div style={{ marginTop: viewing.image_url ? 10 : 0, fontSize: 15, fontWeight: 500, color: INK2 }}>
-                “{viewing.text_note}”
-              </div>
-            )}
-
-            <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: INK3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Send something back
-            </div>
-            <div className="flex items-center" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              {REACTIONS.map((emoji) => {
-                const on = viewing.reactions?.[user?.id] === emoji;
-                return (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => react(emoji)}
-                    aria-label={`React ${emoji}`}
-                    aria-pressed={on}
-                    style={{
-                      border: 0, cursor: 'pointer', fontSize: 20, lineHeight: 1,
-                      padding: '9px 12px', borderRadius: 99,
-                      background: on ? 'var(--color-plum)' : SOFT,
-                      transform: on ? 'scale(1.1)' : 'none', transition: 'transform .15s, background .15s',
-                    }}
-                  >
-                    {emoji}
-                  </button>
-                );
-              })}
-            </div>
-            {viewing.reactions?.[user?.id] && (
-              <div style={{ marginTop: 10, fontSize: 13, fontWeight: 500, color: INK2 }}>
-                {viewing.child_name || 'They'} will see your {viewing.reactions[user.id]} on their screen. ✨
-              </div>
-            )}
-          </div>
-        </div>
+        <KidNotePopup
+          note={viewing}
+          currentUserId={user?.id}
+          onReact={react}
+          onClose={() => setViewing(null)}
+        />
       )}
     </>
   );
