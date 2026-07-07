@@ -27,6 +27,11 @@ function dayName(dateStr) {
   return toLocalDate(dateStr).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 }
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+// Minutes-from-midnight for ordering a day's items chronologically. Local
+// time, to match fmtTime's display. All-day / untimed items get -1 so they
+// sit at the top of the day.
+const minsIso = (iso) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
+const minsClock = (t) => { if (!t) return -1; const [h, m] = String(t).split(':'); return (Number(h) || 0) * 60 + (Number(m) || 0); };
 
 // Only events that relate to THIS child. Assignment lives in two places
 // depending on which surface created the event: event_assignees rows
@@ -68,6 +73,7 @@ function actsOn(dateStr, acts) {
         emoji: kidsEventEmoji({ title: a.activity }),
         title: a.activity,
         sub: [fmtClock(start), fmtClock(end)].filter(Boolean).join(' – '),
+        sort: minsClock(start),
       };
     });
 }
@@ -124,11 +130,11 @@ export default function DaysScreen({ kid, theme }) {
     const date = String(e.start_time).slice(0, 10);
     if (date < todayStr()) continue;
     const sub = [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · ');
-    items.push({ id: `${e.id}:${date}`, date, emoji: kidsEventEmoji(e), title: e.title, sub, family: (e.assignees || []).length === 0 });
+    items.push({ id: `${e.id}:${date}`, date, emoji: kidsEventEmoji(e), title: e.title, sub, family: (e.assignees || []).length === 0, sort: e.all_day ? -1 : minsIso(e.start_time) });
   }
   for (const b of myBigs) {
     if (b.date.slice(0, 7) !== listMp) continue;
-    items.push({ id: `big:${b.date}:${b.title}`, date: b.date, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
+    items.push({ id: `big:${b.date}:${b.title}`, date: b.date, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true, sort: -1 });
   }
   // Weekly extracurriculars, expanded across the selected month's remaining days.
   const listEnd = new Date(listFirst.getFullYear(), listFirst.getMonth() + 1, 0);
@@ -139,6 +145,11 @@ export default function DaysScreen({ kid, theme }) {
   const deduped = items.filter((it) => { if (seen.has(it.id)) return false; seen.add(it.id); return true; });
   const groups = {};
   for (const it of deduped) (groups[it.date] = groups[it.date] || []).push(it);
+  // Order each day chronologically (all-day/big days first, then by start
+  // time); stable tie-break on title keeps same-time items steady.
+  for (const k of Object.keys(groups)) {
+    groups[k].sort((a, b) => (a.sort ?? -1) - (b.sort ?? -1) || String(a.title).localeCompare(String(b.title)));
+  }
   const days = Object.keys(groups).sort();
 
   return (
@@ -289,11 +300,12 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, is
   const evOn = (dateStr) => {
     const out = evs
       .filter((e) => String(e.start_time).slice(0, 10) === dateStr)
-      .map((e) => ({ id: e.id, emoji: kidsEventEmoji(e), title: e.title, sub: [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · '), family: (e.assignees || []).length === 0 }));
+      .map((e) => ({ id: e.id, emoji: kidsEventEmoji(e), title: e.title, sub: [e.all_day ? '' : fmtTime(e.start_time), e.location].filter(Boolean).join(' · '), family: (e.assignees || []).length === 0, sort: e.all_day ? -1 : minsIso(e.start_time) }));
     for (const b of bigDays) {
-      if (b.date === dateStr) out.push({ id: `big:${b.title}`, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true });
+      if (b.date === dateStr) out.push({ id: `big:${b.title}`, emoji: bigEmoji(b), title: b.title, sub: '', family: true, big: true, sort: -1 });
     }
     out.push(...actsOn(dateStr, activities));
+    out.sort((a, b) => (a.sort ?? -1) - (b.sort ?? -1) || String(a.title).localeCompare(String(b.title)));
     return out;
   };
 
