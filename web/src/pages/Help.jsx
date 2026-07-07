@@ -51,17 +51,15 @@ export default function Help() {
           We're here for you
         </div>
         <h1
-          className="text-charcoal"
+          className="text-charcoal text-[34px] md:text-[32px]"
           style={{
             fontFamily: 'var(--font-serif-display)',
             fontWeight: 400,
-            fontSize: 'clamp(36px, 6vw, 44px)',
             lineHeight: 1.05,
             letterSpacing: '-0.015em',
           }}
         >
-          How can we{' '}
-          <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>help?</em>
+          How can we help?
         </h1>
         <p className="text-warm-grey mt-3 text-[15px] leading-relaxed">
           Quick answers to common questions below - and a way to reach us if
