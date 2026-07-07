@@ -2146,7 +2146,7 @@ function advancePeriod(date, recurrence) {
  * the row's real `id` (edit/delete act on the series) and get a unique
  * `occurrence_key` for rendering. Pure; bounded by maxPerEvent.
  */
-function expandRecurringEvents(events, startDate, endDate, maxPerEvent = 500) {
+function expandRecurringEvents(events, startDate, endDate, maxPerEvent = 500, skipSet = null) {
   const winStart = new Date(startDate).getTime();
   const winEnd = new Date(endDate).getTime();
   const out = [];
@@ -2165,22 +2165,72 @@ function expandRecurringEvents(events, startDate, endDate, maxPerEvent = 500) {
       occ = next; n++;
     }
     if (!occ) continue;
-    // Emit occurrences that start on/before the window end.
+    // Emit occurrences that start on/before the window end. A skipSet
+    // entry of `${event_id}|${occurrence UTC date}` ("delete just this
+    // day" - event_skips) suppresses that single occurrence; the series
+    // marches on either side of it.
     while (occ.getTime() <= winEnd && n < maxPerEvent) {
-      const occEnd = new Date(occ.getTime() + durationMs);
-      out.push({
-        ...ev,
-        start_time: occ.toISOString(),
-        end_time: occEnd.toISOString(),
-        occurrence_key: `${ev.id}|${occ.toISOString()}`,
-        recurrence_instance: occ.getTime() !== baseStart.getTime(),
-      });
+      if (!skipSet || !skipSet.has(`${ev.id}|${occ.toISOString().slice(0, 10)}`)) {
+        const occEnd = new Date(occ.getTime() + durationMs);
+        out.push({
+          ...ev,
+          start_time: occ.toISOString(),
+          end_time: occEnd.toISOString(),
+          occurrence_key: `${ev.id}|${occ.toISOString()}`,
+          recurrence_instance: occ.getTime() !== baseStart.getTime(),
+        });
+      }
       const next = advancePeriod(occ, ev.recurrence);
       if (!next) break;
       occ = next; n++;
     }
   }
   return out;
+}
+
+// ============ Per-occurrence skips for recurring events ============
+// event_skips mirrors activity_skips: one row per (event, date) hides
+// that single occurrence of a RECURRING event everywhere expansion
+// happens, without touching the series. `date` = the occurrence's ISO
+// start sliced to YYYY-MM-DD (UTC) - the writer and the expansion both
+// derive it from the same server-produced timestamp, so they can never
+// disagree. Table lives in migration-event-skips.sql; until the user
+// runs it, reads degrade to "no skips" and writes surface a clear error.
+
+function isMissingEventSkipsTable(error) {
+  return error && (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST200');
+}
+
+async function getEventSkipsForEvents(eventIds, db = supabase) {
+  if (!eventIds.length) return [];
+  const { data, error } = await db
+    .from('event_skips')
+    .select('event_id, date')
+    .in('event_id', eventIds);
+  if (error) {
+    if (isMissingEventSkipsTable(error)) return [];
+    throw error;
+  }
+  return data || [];
+}
+
+async function addEventSkip(eventId, householdId, dateStr, createdBy = null, db = supabase) {
+  const { error } = await db
+    .from('event_skips')
+    .upsert(
+      { event_id: eventId, household_id: householdId, date: dateStr, created_by: createdBy },
+      { onConflict: 'event_id,date', ignoreDuplicates: true }
+    );
+  if (error) throw error;
+}
+
+async function removeEventSkip(eventId, dateStr, db = supabase) {
+  const { error } = await db
+    .from('event_skips')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('date', dateStr);
+  if (error) throw error;
 }
 
 /**
@@ -3009,7 +3059,28 @@ async function getCalendarEvents(householdId, startDate, endDate, { userId, cate
   // Non-recurring overlapping events pass through; recurring events come from
   // expansion (so the base occurrence isn't double-counted).
   const nonRecurring = overlapRows.filter((e) => !e.recurrence);
-  const expanded = expandRecurringEvents(recurringRows, startDate, endDate);
+
+  // "Delete just this day" exceptions: suppress skipped occurrences during
+  // expansion, and embed each series' skipped dates on its occurrences so
+  // the edit modal can list them as removable chips. Every consumer of
+  // this function (web calendar, digest, reminders, ICS feed, AI ground
+  // truth) inherits the filter.
+  let skipSet = null;
+  let skipsByEvent = null;
+  if (recurringRows.length) {
+    const skipRows = await getEventSkipsForEvents(recurringRows.map((r) => r.id), db);
+    if (skipRows.length) {
+      skipSet = new Set(skipRows.map((r) => `${r.event_id}|${r.date}`));
+      skipsByEvent = new Map();
+      for (const r of skipRows) {
+        if (!skipsByEvent.has(r.event_id)) skipsByEvent.set(r.event_id, []);
+        skipsByEvent.get(r.event_id).push(r.date);
+      }
+      for (const dates of skipsByEvent.values()) dates.sort();
+    }
+  }
+  const expanded = expandRecurringEvents(recurringRows, startDate, endDate, 500, skipSet)
+    .map((o) => (skipsByEvent && skipsByEvent.has(o.id) ? { ...o, skips: skipsByEvent.get(o.id) } : o));
   let merged = [...nonRecurring, ...expanded];
 
   // MEMBER birthdays are derived live from members' birthday field (single
@@ -8419,6 +8490,9 @@ module.exports = {
   getBirthdayEvents,
   isBirthdayTitle,
   expandRecurringEvents,
+  addEventSkip,
+  removeEventSkip,
+  getEventSkipsForEvents,
   getCalendarEventById,
   createEventAttachment,
   getEventAttachments,

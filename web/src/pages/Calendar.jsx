@@ -446,6 +446,9 @@ export default function Calendar() {
   const [formReminders, setFormReminders] = useState([]);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Delete choice for a RECURRING event's occurrence: just this day
+  // (event_skips row) vs the whole series (soft delete).
+  const [recurDeleteOpen, setRecurDeleteOpen] = useState(false);
 
   const [toggling, setToggling] = useState(new Set());
   const [deletingTask, setDeletingTask] = useState(new Set());
@@ -1368,8 +1371,20 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id) {
+    // A recurring event's occurrence gets the choice sheet instead of the
+    // straight confirm - "delete today's" must not silently kill the
+    // series (real user incident: a weekly event deleted for good when
+    // only one day was meant).
+    if (editingEvent?.recurrence && editingEvent?.start_time) {
+      setRecurDeleteOpen(true);
+      return;
+    }
     const ok = await confirmDestructive({ title: 'Delete this event?', message: 'This cannot be undone.' });
     if (!ok) return;
+    await performEventDelete(id);
+  }
+
+  async function performEventDelete(id) {
     // Optimistic: yank from local state + close the modal immediately so the
     // user sees instant feedback. The reconciling load() runs in the
     // background and is mostly a safety net (a parallel update from another
@@ -1389,6 +1404,43 @@ export default function Calendar() {
       // Rollback: re-fetch so the optimistic removal is undone if the
       // server still has the event.
       await load();
+    }
+  }
+
+  // "Delete just this day": one event_skips row hides this occurrence
+  // everywhere (calendar, digest, reminders, AI) - the series marches on.
+  // The date key is the occurrence's ISO start sliced to YYYY-MM-DD,
+  // exactly how the server's expansion derives it.
+  async function skipEventOccurrence() {
+    const ev = editingEvent;
+    if (!ev) return;
+    const date = String(ev.start_time).slice(0, 10);
+    const occKey = ev.occurrence_key || ev.id;
+    setRecurDeleteOpen(false);
+    setShowForm(false);
+    resetForm();
+    setEvents(prev => prev.filter(e => (e.occurrence_key || e.id) !== occKey));
+    invalidateMonthCache();
+    try {
+      await api.post(`/calendar/events/${ev.id}/skips`, { date });
+      load().catch(() => {});
+    } catch {
+      setError('Could not remove this day.');
+      await load();
+    }
+  }
+
+  // Un-skip from the edit modal's "Removed days" chips.
+  async function unskipEventDay(dateStr) {
+    const ev = editingEvent;
+    if (!ev) return;
+    try {
+      await api.delete(`/calendar/events/${ev.id}/skips/${dateStr}`);
+      setEditingEvent(prev => (prev ? { ...prev, skips: (prev.skips || []).filter(d => d !== dateStr) } : prev));
+      invalidateMonthCache();
+      load().catch(() => {});
+    } catch {
+      setError('Could not restore that day.');
     }
   }
 
@@ -2760,6 +2812,25 @@ export default function Calendar() {
                       <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>
                     ))}
                   </select>
+                  {/* Days removed with "Delete just this day" - tap ✕ to
+                      bring one back. Only shows when the series has skips. */}
+                  {editingEvent?.recurrence && editingEvent?.skips?.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {editingEvent.skips.map((d) => (
+                        <span key={d} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px 5px 10px', borderRadius: 8, background: M_BG_SOFT, fontSize: 12, fontWeight: 600, color: M_INK2 }}>
+                          {new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} removed
+                          <button
+                            type="button"
+                            onClick={() => unskipEventDay(d)}
+                            aria-label={`Restore ${d}`}
+                            style={{ border: 0, background: 'transparent', color: M_INK3, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </MField>
 
                 {/* ── 5. Reminders ── */}
@@ -3221,6 +3292,56 @@ export default function Calendar() {
           series is editable via the shared ActivityModal; "Skip this day"
           hides just this date everywhere (calendar, Kids Mode, digest,
           subscribed feeds). */}
+      {/* ── Recurring-event delete choice: just this day vs the series ── */}
+      {recurDeleteOpen && editingEvent && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center"
+          style={{ background: 'rgba(26,22,32,0.45)', padding: 20 }}
+          onClick={() => setRecurDeleteOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Delete repeating event"
+        >
+          <div
+            className="w-full"
+            style={{ maxWidth: 380, background: '#fff', borderRadius: 20, padding: 20, boxShadow: '0 18px 50px rgba(26,22,32,0.25)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{ margin: 0, fontFamily: M_SERIF, fontSize: 20, fontWeight: 400, color: M_INK }}>
+              This event repeats
+            </h2>
+            <div style={{ fontSize: 14, color: M_INK2, marginTop: 6 }}>
+              “{editingEvent.title}” happens {(RECURRENCE_LABELS[editingEvent.recurrence] || 'regularly').toLowerCase()}.
+              Delete just this day, or the whole series?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={skipEventOccurrence}
+                style={{ ...mInput, cursor: 'pointer', fontWeight: 600, color: M_INK, textAlign: 'center' }}
+              >
+                Delete just this day
+                {' '}({new Date(editingEvent.start_time).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })})
+              </button>
+              <button
+                type="button"
+                onClick={() => { const id = editingEvent.id; setRecurDeleteOpen(false); performEventDelete(id); }}
+                style={{ padding: '10px 12px', borderRadius: 10, border: 0, background: 'var(--color-coral, #E8724A)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Delete the whole series
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecurDeleteOpen(false)}
+                style={{ padding: '9px 12px', borderRadius: 10, border: 0, background: 'transparent', color: M_INK3, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activitySheet && (() => {
         const { activity, child, date } = activitySheet;
         const [y, m, d] = date.split('-').map(Number);

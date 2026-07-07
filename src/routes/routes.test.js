@@ -1246,6 +1246,52 @@ describe('activity skips', () => {
   });
 });
 
+// ─── Event skips: "delete just this day" for recurring events ────────────────
+describe('event skips', () => {
+  const RECURRING = { id: 'e1', title: 'Flicky', recurrence: 'weekly', start_time: '2026-06-23T11:00:00Z', end_time: '2026-06-23T12:00:00Z' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.getCalendarEventById.mockResolvedValue(RECURRING);
+  });
+
+  test('POST creates a skip for one occurrence date', async () => {
+    const res = await request(app)
+      .post('/api/calendar/events/e1/skips')
+      .set(AUTH)
+      .send({ date: '2026-07-07' });
+    expect(res.status).toBe(201);
+    expect(db.addEventSkip).toHaveBeenCalledWith('e1', 'hh-1', '2026-07-07', 'u-1');
+  });
+
+  test('POST rejects a non-recurring event and malformed dates', async () => {
+    db.getCalendarEventById.mockResolvedValue({ ...RECURRING, recurrence: null });
+    expect((await request(app).post('/api/calendar/events/e1/skips').set(AUTH).send({ date: '2026-07-07' })).status).toBe(400);
+
+    db.getCalendarEventById.mockResolvedValue(RECURRING);
+    expect((await request(app).post('/api/calendar/events/e1/skips').set(AUTH).send({ date: 'today' })).status).toBe(400);
+    expect(db.addEventSkip).not.toHaveBeenCalled();
+  });
+
+  test('POST 404s for an event outside the household', async () => {
+    db.getCalendarEventById.mockResolvedValue(null); // household-scoped lookup missed
+    const res = await request(app)
+      .post('/api/calendar/events/e1/skips')
+      .set(AUTH)
+      .send({ date: '2026-07-07' });
+    expect(res.status).toBe(404);
+    expect(db.addEventSkip).not.toHaveBeenCalled();
+  });
+
+  test('DELETE removes a skip (restore the day)', async () => {
+    const res = await request(app)
+      .delete('/api/calendar/events/e1/skips/2026-07-07')
+      .set(AUTH);
+    expect(res.status).toBe(200);
+    expect(db.removeEventSkip).toHaveBeenCalledWith('e1', '2026-07-07');
+  });
+});
+
 // ─── GET /api/schools must not delete brand-new schools ─────────────────────────
 // A school just added via "Add a school" has no children, no term dates and no
 // iCal feed yet. GET is a pure read - it must return it (so the add-then-import

@@ -947,6 +947,48 @@ router.delete('/events/:id', async (req, res) => {
   }
 });
 
+// "Delete just this day" for RECURRING events: one event_skips row hides a
+// single occurrence everywhere expansion happens (calendar, digest,
+// reminders, ICS feed, AI ground truth) without touching the series.
+// `date` = the occurrence's start ISO sliced to YYYY-MM-DD, exactly as the
+// expansion derives it. Only meaningful on recurring events - a plain
+// event's delete is the ordinary soft-delete above.
+const SKIP_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+router.post('/events/:id/skips', async (req, res) => {
+  try {
+    const { date } = req.body || {};
+    if (!date || !SKIP_DATE_RE.test(date)) return res.status(400).json({ error: 'A date (YYYY-MM-DD) is required' });
+    const event = await db.getCalendarEventById(req.params.id, req.householdId);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (!event.recurrence) return res.status(400).json({ error: 'Only repeating events can skip a day' });
+    await db.addEventSkip(req.params.id, req.householdId, date, req.user.id);
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
+    cache.invalidatePattern(`cal-events:${req.householdId}:`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/calendar/events/:id/skips error:', err?.message || err);
+    return res.status(500).json({ error: 'Could not skip this day.' });
+  }
+});
+
+router.delete('/events/:id/skips/:date', async (req, res) => {
+  try {
+    if (!SKIP_DATE_RE.test(req.params.date)) return res.status(400).json({ error: 'Invalid date' });
+    const event = await db.getCalendarEventById(req.params.id, req.householdId);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    await db.removeEventSkip(req.params.id, req.params.date);
+    cache.invalidatePattern(`cal-month:${req.householdId}:`);
+    cache.invalidatePattern(`cal-events:${req.householdId}:`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/calendar/events/:id/skips/:date error:', err?.message || err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * GET /api/calendar/deleted
  * List soft-deleted calendar events for the household.
