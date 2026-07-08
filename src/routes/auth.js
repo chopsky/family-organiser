@@ -1161,7 +1161,13 @@ router.post('/google', async (req, res) => {
     });
     const payload = ticket.getPayload();
     const googleEmail = payload.email.toLowerCase();
-    const googleName = payload.name || payload.given_name || googleEmail.split('@')[0];
+    // First name only. SSO hands us the full legal name, but the surname is
+    // usually already in the household name ("The Shapiros"), so "Grant Shapiro"
+    // reads awkwardly as a member name / greeting. Prefer Google's given_name;
+    // else the first token of the full name; else the email local part.
+    const googleName = (payload.given_name || '').trim()
+      || (payload.name || '').trim().split(/\s+/)[0]
+      || googleEmail.split('@')[0];
 
     let user = await db.getUserByEmail(googleEmail);
 
@@ -1282,7 +1288,9 @@ router.post('/apple', async (req, res) => {
     let user = await db.getUserByEmail(appleEmail);
 
     if (!user) {
-      const userName = appleName || appleEmail.split('@')[0];
+      // First name only (see the Google handler). appleName arrives as
+      // "Given Family" (joined client-side); take the first token.
+      const userName = (appleName || '').trim().split(/\s+/)[0] || appleEmail.split('@')[0];
       // Hold the invite reference so we can copy its pre-fill fields onto the
       // new user. Mirrors the email/password and Google blocks above.
       let householdId = null;
