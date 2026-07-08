@@ -24,6 +24,34 @@ const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
 const TODOS_ID = '__todos__';
 
+// ── To-do time buckets: Today / This week / Someday ──────────────────────
+// A long flat to-do list is unworkable - the fix is a small working set
+// (Today, This week) with everything else in a collapsed Someday backlog.
+// Buckets derive from the task's existing due_date (no new fields):
+//   due <= today (recent)   → Today   (overdue shows a "since …" chip)
+//   due <= this Sunday      → This week
+//   later date / no date    → Someday (dated items keep a date chip)
+// Overdue more than a week sinks into Someday without a chip: the backend has
+// always stamped due_date = today on undated adds, so old due dates are
+// creation stamps, not real commitments - without the sink the whole legacy
+// backlog would squat in Today as "overdue".
+// Buckets are computed at FETCH time (not render) so the render stays pure.
+const ymdLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const endOfWeekLocal = (d) => { const e = new Date(d); e.setDate(e.getDate() + (6 - ((e.getDay() + 6) % 7))); return e; };
+const daysAgoLocal = (d, n) => { const e = new Date(d); e.setDate(e.getDate() - n); return e; };
+const fmtDayMon = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const fmtWeekday = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' });
+function decorateTodo(due, today, eow, stale) {
+  if (!due) return { due: null, bucket: 'someday', dueLabel: null, dueTone: null };
+  if (due < stale) return { due, bucket: 'someday', dueLabel: null, dueTone: null };
+  if (due < today) return { due, bucket: 'today', dueLabel: `since ${fmtDayMon(due)}`, dueTone: 'late' };
+  if (due === today) return { due, bucket: 'today', dueLabel: null, dueTone: null };
+  if (due <= eow) return { due, bucket: 'week', dueLabel: fmtWeekday(due), dueTone: null };
+  return { due, bucket: 'someday', dueLabel: fmtDayMon(due), dueTone: null };
+}
+// due asc (undated last), title tie-break - stable order inside each bucket.
+const byDueThenText = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || String(a.text).localeCompare(String(b.text));
+
 const Svg = (p) => <svg width={p.s || 16} height={p.s || 16} viewBox="0 0 24 24" fill="none" stroke={p.c || 'currentColor'} strokeWidth={p.w || 2} strokeLinecap="round" strokeLinejoin="round">{p.children}</svg>;
 const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
 const IcClose = (p) => <Svg {...p}><path d="M18 6L6 18M6 6l12 12" /></Svg>;
@@ -55,6 +83,10 @@ export default function Lists() {
   const [draft, setDraft] = useState('');
   const [toFilter, setToFilter] = useState(null); // member id for To-dos filter
   const [doneOpen, setDoneOpen] = useState(false);
+  // Someday backlog starts collapsed - the working set (Today / This week)
+  // leads. Auto-opens when a new undated to-do is added so it never looks
+  // like the add silently failed.
+  const [somedayOpen, setSomedayOpen] = useState(false);
   const [newList, setNewList] = useState(false);
   const [editList, setEditList] = useState(null); // list descriptor being renamed
   const [editItem, setEditItem] = useState(null); // grocery item being edited
@@ -72,7 +104,7 @@ export default function Lists() {
   const isTodos = active?.id === TODOS_ID;
 
   // Switching lists clears the filter + transient mobile UI.
-  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); setDoneOpen(false); }, [activeId]);
+  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); setDoneOpen(false); setSomedayOpen(false); }, [activeId]);
   // Mirror the active list into ?list=<id> so a refresh lands back on it.
   // To-dos is the default, so it drops the param to keep the URL clean.
   // replace:true keeps each list switch out of the back-button history, and
@@ -126,7 +158,15 @@ export default function Lists() {
           api.get('/tasks', { params: { all: true } }),
           api.get('/tasks/recent'),
         ]);
-        const map = (t, isDone) => ({ id: t.id, text: t.title, done: isDone, section: null, whoIds: t.assigned_to_ids || [] });
+        // Time buckets are stamped here at fetch time (see decorateTodo).
+        const now = new Date();
+        const today = ymdLocal(now);
+        const eow = ymdLocal(endOfWeekLocal(now));
+        const stale = ymdLocal(daysAgoLocal(now, 7)); // overdue past a week sinks to Someday
+        const map = (t, isDone) => ({
+          id: t.id, text: t.title, done: isDone, section: null, whoIds: t.assigned_to_ids || [],
+          ...decorateTodo(t.due_date ? String(t.due_date).slice(0, 10) : null, today, eow, stale),
+        });
         apply([...(open.tasks || []).map((t) => map(t, false)), ...(done.tasks || []).map((t) => map(t, true))]);
       } else {
         const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
@@ -192,7 +232,12 @@ export default function Lists() {
     try {
       if (isTodos) {
         const names = draftWho ? [members.find((x) => x.id === draftWho)?.name].filter(Boolean) : [];
-        await api.post('/tasks', { title: text, ...(names.length ? { assigned_to_names: names } : {}) });
+        // due_date 'none' = create genuinely undated (server sentinel) - a bare
+        // add would otherwise be stamped due=today and land in the Today bucket.
+        await api.post('/tasks', { title: text, due_date: 'none', ...(names.length ? { assigned_to_names: names } : {}) });
+        // New quick-adds are undated → they land in Someday; open it so the
+        // add is visibly there rather than swallowed by a collapsed section.
+        setSomedayOpen(true);
       } else {
         await api.post('/shopping', { item: text, list_id: active.id });
       }
@@ -223,8 +268,18 @@ export default function Lists() {
   const saveTodoEdit = useCallback(async (fields) => {
     if (!editTodo || !fields.title?.trim()) return;
     const names = (fields.whoIds || []).map((id) => members.find((m) => m.id === id)?.name).filter(Boolean);
+    const payload = { title: fields.title.trim(), assigned_to_names: names };
+    // "When" chip → due_date, only if the user actually touched the chips
+    // (fields.when is null when untouched, so an existing precise date -
+    // e.g. one the AI set - survives an unrelated edit).
+    if (fields.when) {
+      const now = new Date();
+      payload.due_date = fields.when === 'today' ? ymdLocal(now)
+        : fields.when === 'week' ? ymdLocal(endOfWeekLocal(now))
+          : null;
+    }
     try {
-      await api.patch(`/tasks/${editTodo.id}`, { title: fields.title.trim(), assigned_to_names: names });
+      await api.patch(`/tasks/${editTodo.id}`, payload);
     } catch { /* fall through to reload */ }
     setEditTodo(null);
     if (active) loadItems(active);
@@ -293,8 +348,19 @@ export default function Lists() {
     .filter((i) => doneAtLoad.has(i.id))
     .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
   const openCount = filtered.filter((i) => !i.done).length;
-  const sections = isTodos ? [{ name: null, items: openItems }]
+  // To-dos: the working set (Today / This week) renders as ordinary
+  // sections; the Someday backlog gets its own collapsed accordion below
+  // (same pattern as Done). Groceries keep their aisle grouping.
+  const sections = isTodos
+    ? [
+      { name: 'Today', items: openItems.filter((i) => i.bucket === 'today').sort(byDueThenText) },
+      { name: 'This week', items: openItems.filter((i) => i.bucket === 'week').sort(byDueThenText) },
+    ].filter((s) => s.items.length)
     : Object.entries(openItems.reduce((acc, i) => { (acc[i.section] ||= []).push(i); return acc; }, {})).map(([name, its]) => ({ name, items: its }));
+  const somedayItems = isTodos ? openItems.filter((i) => i.bucket === 'someday').sort(byDueThenText) : [];
+  // Keep Someday visible when it's all there is - a page that's only a
+  // collapsed header reads as empty/broken.
+  const somedayShown = somedayItems.length > 0 && (somedayOpen || sections.length === 0);
   const memberOf = (id) => members.find((m) => m.id === id);
 
   // Shared To-do controls (mobile + desktop): the quick-add bar with the
@@ -409,6 +475,24 @@ export default function Lists() {
                     </div>
                   </div>
                 ))}
+                {somedayItems.length > 0 && (
+                  <div>
+                    {/* Someday backlog - collapsed by default, same accordion
+                        pattern as Done, so the working set above stays short. */}
+                    <button onClick={() => setSomedayOpen((o) => !o)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '4px 4px 6px', border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK3 }}>Someday · {somedayItems.length}</span>
+                      <span style={{ transform: somedayShown ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', display: 'flex' }}><IcChevDown s={14} c={INK3} /></span>
+                    </button>
+                    {somedayShown && (
+                      <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+                        {somedayItems.map((it, i, arr) => (
+                          <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {doneItems.length > 0 && (
                   <div>
                     {/* Collapsible Done section — matches the desktop accordion. */}
@@ -496,6 +580,16 @@ export default function Lists() {
                             </div>
                           </div>
                         ))}
+                        {somedayItems.length > 0 && (
+                          <div style={{ marginBottom: 14 }}>
+                            {/* Someday backlog - collapsed by default (Done-style accordion). */}
+                            <button onClick={() => setSomedayOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: INK3, padding: '0 4px 8px' }}>
+                              <span style={{ transform: somedayShown ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', display: 'flex' }}><IcChevDown s={14} c={INK3} /></span>
+                              Someday · {somedayItems.length}
+                            </button>
+                            {somedayShown && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{somedayItems.map((it) => <Row key={it.id} it={it} isTodos={isTodos} color={active?.color || BRAND} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} onToggle={toggle} onDelete={removeItem} onEdit={isTodos ? setEditTodo : setEditItem} />)}</div>}
+                          </div>
+                        )}
                         {doneItems.length > 0 && (
                           <div style={{ marginTop: 6 }}>
                             <button onClick={() => setDoneOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: INTER, fontSize: 12, fontWeight: 700, color: INK3, padding: '4px' }}>
@@ -543,6 +637,9 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit })
         {!isTodos && <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT }}>{it.emoji}</span>}
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
       </div>
+      {isTodos && !it.done && it.dueLabel && (
+        <span style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 600, padding: '3px 9px', borderRadius: 999, color: it.dueTone === 'late' ? '#C24A5E' : INK3, background: it.dueTone === 'late' ? 'rgba(215,85,106,0.09)' : BG_SOFT }}>{it.dueLabel}</span>
+      )}
       {isTodos && assignees.length > 0 && (
         <div style={{ display: 'flex', flexShrink: 0 }}>
           {assignees.slice(0, 3).map((m, i) => (
@@ -609,6 +706,9 @@ function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, on
       </button>
       {!isTodos && it.emoji && <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, fontSize: 18, background: color + '1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.emoji}</span>}
       <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      {isTodos && !it.done && it.dueLabel && (
+        <span style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 600, padding: '3px 9px', borderRadius: 999, color: it.dueTone === 'late' ? '#C24A5E' : INK3, background: it.dueTone === 'late' ? 'rgba(215,85,106,0.09)' : BG_SOFT }}>{it.dueLabel}</span>
+      )}
       {isTodos && assignees.length > 0 && (
         <div style={{ display: 'flex', flexShrink: 0 }}>
           {assignees.slice(0, 3).map((m, i) => <div key={m.id} style={{ marginLeft: i ? -8 : 0, borderRadius: '50%', border: '2px solid #fff', display: 'flex' }}><Avatar member={m} size={26} /></div>)}
@@ -689,13 +789,19 @@ function EditItemModal({ item, onClose, onSave }) {
 // Edit a to-do — title + assignees. To-dos live in the tasks table, so this
 // PATCHes /tasks/:id (title + assigned_to_names, which replaces the assignee
 // list; [] unassigns). Mirrors the grocery Edit-item form for parity.
+const WHEN_OPTIONS = [['today', 'Today'], ['week', 'This week'], ['someday', 'Someday']];
+
 function EditTodoModal({ item, members, onClose, onSave }) {
   const [title, setTitle] = useState(item.text || '');
   const [whoIds, setWhoIds] = useState(item.whoIds || []);
+  // null = untouched: saving without tapping a chip leaves the stored
+  // due_date exactly as it was (incl. precise AI-set dates).
+  const [when, setWhen] = useState(null);
+  const activeWhen = when ?? item.bucket ?? 'someday';
   const toggleWho = (id) => setWhoIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const field = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, outline: 'none', background: '#fff', color: INK };
   const label = { fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 };
-  const save = () => { if (title.trim()) onSave({ title, whoIds }); };
+  const save = () => { if (title.trim()) onSave({ title, whoIds, when }); };
   return (
     <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[440px]">
       <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
@@ -706,6 +812,20 @@ function EditTodoModal({ item, members, onClose, onSave }) {
         <div style={{ marginBottom: 16 }}>
           <div style={label}>To-do</div>
           <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} style={field} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={label}>When</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {WHEN_OPTIONS.map(([key, text]) => {
+              const on = activeWhen === key;
+              return (
+                <button key={key} onClick={() => setWhen(key)}
+                  style={{ flex: 1, padding: '9px 0', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, border: 0, color: on ? BRAND : INK2, background: on ? BRAND + '1C' : '#fff', boxShadow: on ? `inset 0 0 0 1.5px ${BRAND}` : `inset 0 0 0 1px ${LINE}` }}>
+                  {text}
+                </button>
+              );
+            })}
+          </div>
         </div>
         {members.length > 0 && (
           <div style={{ marginBottom: 18 }}>

@@ -1990,7 +1990,13 @@ async function addTasks(householdId, tasks, addedByUserId, members = [], db = su
       title: t.title,
       assigned_to_ids: ids,
       assigned_to_names: names,
-      due_date: t.due_date || new Date().toISOString().split('T')[0],
+      // Undated adds default to "today" so they surface in the digest/badge/
+      // bot views. The web Lists page opts out with the sentinel 'none' (its
+      // quick-adds belong in the Someday bucket). The sentinel exists because
+      // an explicit null can't be the opt-out: the LLM channels (chat,
+      // classifier, email) routinely emit `due_date: null` for dateless tasks
+      // and those must keep defaulting to today.
+      due_date: t.due_date === 'none' ? null : (t.due_date || new Date().toISOString().split('T')[0]),
       due_time: t.due_time || null,
       recurrence: t.recurrence || null,
       priority: t.priority || 'medium',
@@ -2000,7 +2006,14 @@ async function addTasks(householdId, tasks, addedByUserId, members = [], db = su
     };
   });
 
-  const { data, error } = await db.from('tasks').insert(rows).select();
+  let { data, error } = await db.from('tasks').insert(rows).select();
+  // Pre-migration tolerance: until migration-todo-someday.sql drops the NOT
+  // NULL constraint on tasks.due_date, undated rows are rejected (23502).
+  // Fall back to the historical today-default so quick-adds keep working.
+  if (error && error.code === '23502' && rows.some((r) => r.due_date === null)) {
+    const today = new Date().toISOString().split('T')[0];
+    ({ data, error } = await db.from('tasks').insert(rows.map((r) => ({ ...r, due_date: r.due_date || today }))).select());
+  }
   if (error) throw error;
   return data;
 }

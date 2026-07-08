@@ -244,6 +244,11 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
     cache.invalidate(`digest:${req.householdId}`);
     return res.json({ task: updated, nextTask });
   } catch (err) {
+    // Pre-migration tolerance: clearing a due date (the Someday bucket) needs
+    // migration-todo-someday.sql to drop the NOT NULL on tasks.due_date.
+    if (err?.code === '23502' && due_date === null) {
+      return res.status(400).json({ error: 'Could not clear the date on this to-do.' });
+    }
     console.error('PATCH /api/tasks/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }

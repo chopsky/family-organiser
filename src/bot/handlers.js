@@ -598,8 +598,9 @@ function formatTaskList(tasks, heading = 'Tasks') {
       : names.length === 1 ? ` - ${names[0]}`
       : ` - ${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
     const rec = t.recurrence ? ` _(${t.recurrence})_` : '';
-    const dateLabel = overdue
-      ? ` _(overdue: ${t.due_date})_`
+    // Undated to-dos (the Lists page's Someday bucket) get no date bracket.
+    const dateLabel = !t.due_date ? ''
+      : overdue ? ` _(overdue: ${t.due_date})_`
       : dueToday ? ' _(today)_' : ` _(${t.due_date})_`;
     lines.push(`${statusIcon} ${t.title}${who}${rec}${dateLabel}`);
   }
