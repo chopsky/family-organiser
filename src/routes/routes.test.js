@@ -887,9 +887,28 @@ describe('DELETE /api/auth/account', () => {
     bcrypt.compare.mockResolvedValue(true); // most tests want the password to pass
   });
 
-  test('returns 400 when password is missing', async () => {
-    const res = await request(app).delete('/api/auth/account').set(AUTH).send({});
+  test('password account: 400 when the password is missing', async () => {
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: '$2b$12$stored' });
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ confirmation: 'DELETE' });
     expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/[Pp]assword/);
+    expect(db.deleteHouseholdCascade).not.toHaveBeenCalled();
+    expect(db.deleteUserAdmin).not.toHaveBeenCalled();
+  });
+
+  test('SSO account (no password_hash) deletes WITHOUT a password', async () => {
+    // Google/Apple users have no password. Requiring one would make their
+    // account permanently undeletable (and fail Apple's deletion rule).
+    db.getUserById.mockResolvedValue({ ...USER, password_hash: null, auth_provider: 'google' });
+    db.getHouseholdById.mockResolvedValue(HOUSEHOLD);
+    db.getHouseholdMembers.mockResolvedValue([USER]);
+    db.deleteHouseholdCascade.mockResolvedValue();
+
+    const res = await request(app).delete('/api/auth/account').set(AUTH).send({ confirmation: 'DELETE' });
+    expect(res.status).toBe(200);
+    expect(res.body.mode).toBe('household_deleted');
+    expect(bcrypt.compare).not.toHaveBeenCalled(); // no password check for SSO
+    expect(db.deleteHouseholdCascade).toHaveBeenCalledWith(HOUSEHOLD.id);
   });
 
   test('returns 400 when typed-DELETE confirmation is missing', async () => {

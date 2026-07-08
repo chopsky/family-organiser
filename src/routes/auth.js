@@ -86,6 +86,9 @@ async function authResponse(user, req = null) {
       // the strict member-only redaction we apply there.
       email: user.email || null,
       auth_provider: user.auth_provider || null,
+      // Whether this account has a password at all. Google/Apple SSO users
+      // don't, so the delete-account flow must not demand one from them.
+      has_password: !!user.password_hash,
       color_theme: user.color_theme || 'sage',
       avatar_url: user.avatar_url || null,
       avatar_id: user.avatar_id || null,
@@ -585,6 +588,9 @@ router.get('/me', requireAuth, async (req, res) => {
       role: fresh.role,
       email: fresh.email || null,
       auth_provider: fresh.auth_provider || null,
+      // SSO-only accounts have no password → the delete flow drops the
+      // password field for them (see Settings delete modal).
+      has_password: !!fresh.password_hash,
       signup_promo_code: fresh.signup_promo_code || null,
       // Always include onboarded_at (null or timestamp) so the web client can
       // refresh it on boot. Completing onboarding on one device used to leave
@@ -806,9 +812,6 @@ router.get('/export', requireAuth, async (req, res) => {
 //   - Wrong password returns 401 without revealing which half failed.
 router.delete('/account', requireAuth, async (req, res) => {
   const { password, confirmation } = req.body;
-  if (!password) {
-    return res.status(400).json({ error: 'Password is required to delete your account.' });
-  }
   // Phase 8 / spec §9: belt-and-braces typed-word confirmation on top of
   // the password re-entry. The frontend can still show its own modal
   // affordance, but the backend also insists on the literal word
@@ -830,10 +833,18 @@ router.delete('/account', requireAuth, async (req, res) => {
       });
     }
 
-    // Verify the password before proceeding. Constant-time compare is
-    // handled by bcrypt internally; we don't leak whether the user exists.
-    const valid = await bcrypt.compare(password, user.password_hash || '');
-    if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+    // Password re-auth applies only to accounts that HAVE a password. Google/
+    // Apple SSO users have no password_hash — demanding one would make their
+    // account permanently undeletable (and fail Apple's account-deletion rule).
+    // Their live authenticated session + the typed-DELETE confirmation are the
+    // safeguard. Constant-time compare is handled by bcrypt internally.
+    if (user.password_hash) {
+      if (!password) {
+        return res.status(400).json({ error: 'Password is required to delete your account.' });
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+    }
 
     // Load the household row once so we can both (a) decide the deletion
     // mode and (b) snapshot Stripe state for the audit log before the

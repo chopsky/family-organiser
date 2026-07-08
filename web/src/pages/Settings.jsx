@@ -786,7 +786,7 @@ export default function Settings() {
   // on mount so it reflects the latest stamp from the user's most
   // recent sign-in (including users whose AuthContext cache pre-dates
   // the auth_provider column existing).
-  const [accountInfo, setAccountInfo] = useState({ email: user?.email || null, auth_provider: user?.auth_provider || null });
+  const [accountInfo, setAccountInfo] = useState({ email: user?.email || null, auth_provider: user?.auth_provider || null, has_password: user?.has_password });
   // Alias editor state
   const [aliasEditing, setAliasEditing] = useState(false);
   const [aliasInput, setAliasInput] = useState('');
@@ -1032,7 +1032,11 @@ export default function Settings() {
   // corresponds to a valid user row.
   async function handleDeleteAccount() {
     setDeleteError('');
-    if (!deletePassword) {
+    // SSO-only accounts (Google/Apple) have no password to re-enter; the typed
+    // "DELETE" + live session is their confirmation. has_password === false is
+    // the only case we skip the password; unknown/true still asks for one.
+    const needsPassword = accountInfo.has_password !== false;
+    if (needsPassword && !deletePassword) {
       setDeleteError('Enter your password to confirm.');
       return;
     }
@@ -1046,9 +1050,9 @@ export default function Settings() {
     }
     setDeleting(true);
     try {
-      // Backend requires BOTH the password and the literal string
-      // "DELETE" - matches the two-factor feel of a destructive action.
-      await api.delete('/auth/account', { data: { password: deletePassword, confirmation: 'DELETE' } });
+      // Backend requires the literal string "DELETE" plus, for password
+      // accounts, the password (re-auth). SSO users send no password.
+      await api.delete('/auth/account', { data: { ...(deletePassword ? { password: deletePassword } : {}), confirmation: 'DELETE' } });
       // Clear the auth context without calling the server's /auth/logout
       // endpoint - the refresh token we'd post there was just deleted with
       // the rest of our data, so attempting it would 404.
@@ -1270,7 +1274,7 @@ export default function Settings() {
   // returns the latest DB state.
   useEffect(() => {
     api.get('/auth/me')
-      .then(({ data }) => setAccountInfo({ email: data.email || null, auth_provider: data.auth_provider || null }))
+      .then(({ data }) => setAccountInfo({ email: data.email || null, auth_provider: data.auth_provider || null, has_password: data.has_password }))
       .catch(() => {});
   }, []);
 
@@ -2630,20 +2634,29 @@ export default function Settings() {
               }}
               className="space-y-3"
             >
-              <div>
-                <label className="block text-xs font-semibold text-bark mb-1.5">
-                  Your password
-                </label>
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  autoComplete="current-password"
-                  autoFocus
-                  disabled={deleting}
-                  className="w-full border border-cream-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-error/30 focus:border-error transition-all text-bark"
-                />
-              </div>
+              {/* Password re-auth only for accounts that have a password.
+                  Google/Apple SSO users have none, so we drop the field for
+                  them (otherwise their account is impossible to delete). */}
+              {accountInfo.has_password === false ? (
+                <p className="text-sm text-cocoa">
+                  You signed in with {accountInfo.auth_provider === 'apple' ? 'Apple' : 'Google'}, so there's no password to enter.
+                </p>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-bark mb-1.5">
+                    Your password
+                  </label>
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    autoComplete="current-password"
+                    autoFocus
+                    disabled={deleting}
+                    className="w-full border border-cream-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-error/30 focus:border-error transition-all text-bark"
+                  />
+                </div>
+              )}
 
               {/* Typed-DELETE confirmation - matches the spec's two-step
                   destructive-action pattern (Phase 8 / GDPR). Input is
@@ -2690,7 +2703,7 @@ export default function Settings() {
                   type="submit"
                   disabled={
                     deleting ||
-                    !deletePassword ||
+                    (accountInfo.has_password !== false && !deletePassword) ||
                     deleteTypedConfirm !== 'DELETE' ||
                     !deleteConfirmed
                   }
