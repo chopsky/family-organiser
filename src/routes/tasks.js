@@ -12,6 +12,18 @@ const VALID_RECURRENCES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
 const VALID_PRIORITIES   = ['low', 'medium', 'high'];
 const VALID_NOTIFICATIONS = ['at_time', '5_min', '15_min', '30_min', '1_hour', '2_hours', '1_day', '2_days'];
 
+// Tasks (to-dos) render on the calendar, so any task write must bust the
+// calendar caches too — not only the digest. Otherwise a re-fetch right after
+// an edit (e.g. the calendar's optimistic re-date reconcile) serves the stale,
+// pre-change task and the UI snaps back to the old value. Mirrors what
+// calendar.js invalidates on an event write.
+function invalidateTaskCaches(householdId) {
+  cache.invalidatePattern(`cal-month:${householdId}:`);
+  cache.invalidatePattern(`cal-events:${householdId}:`);
+  cache.invalidatePattern(`cal-tasks:${householdId}:`);
+  cache.invalidate(`digest:${householdId}`);
+}
+
 /**
  * GET /api/tasks/recent
  * Returns tasks completed in the last 7 days - kept visible under "Done"
@@ -133,7 +145,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       broadcast.toHousehold(req.user.id, members, `📋 ${req.user.name} added task: ${titles}`);
     }
 
-    cache.invalidate(`digest:${req.householdId}`);
+    invalidateTaskCaches(req.householdId);
     return res.status(201).json({ tasks: saved });
   } catch (err) {
     console.error('POST /api/tasks error:', err);
@@ -241,7 +253,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       }
     }
 
-    cache.invalidate(`digest:${req.householdId}`);
+    invalidateTaskCaches(req.householdId);
     return res.json({ task: updated, nextTask });
   } catch (err) {
     // Pre-migration tolerance: clearing a due date (the Someday bucket) needs
@@ -261,7 +273,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
 router.delete('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
     await db.deleteTask(req.params.id, req.householdId);
-    cache.invalidate(`digest:${req.householdId}`);
+    invalidateTaskCaches(req.householdId);
     return res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/tasks/:id error:', err);
