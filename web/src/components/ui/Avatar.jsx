@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { hexFor } from '../../lib/memberColors';
+import { hexFor, tintFor } from '../../lib/memberColors';
 import { avatarSrc } from '../../lib/avatarSet';
 
 /**
@@ -79,11 +79,11 @@ export default function Avatar({ member, size = 40, className = '', style = {}, 
     return (
       <div
         className={className}
-        // Opaque pale tint by default (the member colour at ~13% composited
-        // over white via a solid-colour gradient layer) so overlapping avatars
-        // occlude each other cleanly. `bg` overrides it - e.g. white on the
-        // Tasks/Rewards columns where a tint would clash with the surface.
-        style={{ ...base, background: bg || `linear-gradient(${hexFor(member)}22, ${hexFor(member)}22), #fff`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        // Flat, opaque pastel tint of the member's colour (see tintFor) so the
+        // circle is clearly visible and overlapping avatars occlude cleanly.
+        // `bg` overrides it - e.g. white on the Tasks/Rewards columns where a
+        // tint would clash with the surface.
+        style={{ ...base, background: bg || tintFor(member), overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <img
           src={avatarSrc(member.avatar_id)}
