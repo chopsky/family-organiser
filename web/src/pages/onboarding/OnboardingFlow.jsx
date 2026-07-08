@@ -134,7 +134,17 @@ export default function OnboardingFlow() {
   }
 
   const key = STEPS[Math.max(0, idx)];
-  const isFirst = idx <= 0;
+  // Account + household creation are committed, one-time actions. Once done,
+  // "Back" must not return to those steps: re-submitting create-household with
+  // the same name fails / dupes, stranding the user (the only escapes being a
+  // differently-named household or a manual refresh — the reported dead-end).
+  // So clamp the back floor to the first step that's still safe to revisit:
+  // once a household exists → the invite step; once signed up → the household
+  // step; otherwise the account step.
+  const backFloor = auth.household
+    ? STEPS.indexOf('invite')
+    : (auth.token ? STEPS.indexOf('household') : 0);
+  const isFirst = idx <= backFloor;
 
   // Advance/retreat one step, hopping over 'get-app' when it isn't shown for
   // this visitor (so non-iPhone-web users go calendar <-> finish directly).
@@ -144,8 +154,8 @@ export default function OnboardingFlow() {
     return n;
   });
   const back = () => setIdx((i) => {
-    let n = Math.max(i - 1, 0);
-    if (STEPS[n] === 'get-app' && !SHOW_GET_APP) n = Math.max(n - 1, 0);
+    let n = Math.max(i - 1, backFloor);
+    if (STEPS[n] === 'get-app' && !SHOW_GET_APP) n = Math.max(n - 1, backFloor);
     return n;
   });
 
