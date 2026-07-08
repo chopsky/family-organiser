@@ -20,7 +20,7 @@ export const hexFor = (m) => MEMBER_HEX[m?.color_theme] || '#7DAE82';
 // soft circle behind an illustrated avatar. Opaque (a solid hex, not an alpha)
 // so overlapping avatars occlude each other cleanly; `amount` is how much of the
 // member colour shows through (0 = white, 1 = the full accent).
-export const tintFor = (m, amount = 0.28) => {
+export const tintFor = (m, amount = 0.21) => {
   const hex = hexFor(m).replace('#', '');
   const chan = (i) => parseInt(hex.slice(i, i + 2), 16);
   const mix = (c) => Math.round(255 + (c - 255) * amount);
