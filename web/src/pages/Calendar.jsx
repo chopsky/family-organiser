@@ -464,7 +464,6 @@ export default function Calendar() {
   const [taskRecurrence, setTaskRecurrence] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskNotification, setTaskNotification] = useState('');
-  const [savingTask, setSavingTask] = useState(false);
   const taskFormRef = useRef(null);
 
   // Search state
@@ -1500,24 +1499,31 @@ export default function Calendar() {
   async function handleTaskSubmit(e) {
     e.preventDefault();
     if (!taskTitle.trim()) return;
-    setSavingTask(true);
+    const id = editingTask.id;
+    const patch = {
+      title: taskTitle.trim(),
+      due_date: taskDueDate,
+      due_time: taskDueTime || null,
+      assigned_to_names: taskAssignees,
+      recurrence: taskRecurrence || null,
+      description: taskDescription || null,
+      notification: taskNotification || null,
+    };
+    // Optimistic: move + relabel the to-do in local state and close the form at
+    // once, so it jumps to its new day instantly instead of waiting on the PATCH
+    // AND a full month re-fetch (the old flow awaited both, hence the lag). A
+    // background reconcile then picks up server-resolved fields (e.g. the
+    // assignee id/name arrays); a failure rolls the optimistic change back.
+    const prevTasks = tasks;
+    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    closeTaskForm();
     try {
-      await api.patch(`/tasks/${editingTask.id}`, {
-        title: taskTitle.trim(),
-        due_date: taskDueDate,
-        due_time: taskDueTime || null,
-        assigned_to_names: taskAssignees,
-        recurrence: taskRecurrence || null,
-        description: taskDescription || null,
-        notification: taskNotification || null,
-      });
-      closeTaskForm();
+      await api.patch(`/tasks/${id}`, patch);
       invalidateMonthCache();
-      await load();
+      load(); // background reconcile — not awaited, the UI has already moved
     } catch {
-      setError('Could not update task.');
-    } finally {
-      setSavingTask(false);
+      setTasks(prevTasks); // roll the move back
+      setError('Could not update the to-do.');
     }
   }
 
@@ -1697,7 +1703,7 @@ export default function Calendar() {
   // Type badge styling
   function getTypeBadge(item) {
     const cat = item.category || 'general';
-    if (item._type === 'task') return { label: 'Task', bg: '#FDF0EB', color: '#993C1D' };
+    if (item._type === 'task') return { label: 'To-do', bg: '#FDF0EB', color: '#993C1D' };
     if (cat === 'school') return { label: 'School', bg: '#EDF5EE', color: '#3B6D11' };
     if (cat === 'birthday') return { label: 'Birthday', bg: '#F3EDFC', color: '#6B3FA0' };
     if (cat === 'public_holiday') return { label: 'Holiday', bg: '#EDF5EE', color: '#3B6D11' };
@@ -1715,7 +1721,7 @@ export default function Calendar() {
       const dateLabel = result.date
         ? new Date(result.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
         : 'No date';
-      const typeLabel = result.type === 'event' ? 'Event' : result.type === 'task' ? 'Task' : 'School';
+      const typeLabel = result.type === 'event' ? 'Event' : result.type === 'task' ? 'To-do' : 'School';
       // Dot colour: events get their own colour; tasks and school-term-dates
       // each get a category tint.
       const dotColor = result.type === 'event'
@@ -1787,7 +1793,7 @@ export default function Calendar() {
           <div className="flex flex-wrap gap-1.5">
             {[
               { key: 'events', label: 'Events', dot: '#6B3FA0' },
-              { key: 'tasks', label: 'Tasks', dot: '#E8724A' },
+              { key: 'tasks', label: 'To-dos', dot: '#E8724A' },
               { key: 'birthdays', label: 'Birthdays', dot: '#D4537E' },
               { key: 'holidays', label: 'Holidays', dot: '#7DAE82' },
               { key: 'school', label: 'School', dot: '#E8A040' },
@@ -1877,7 +1883,7 @@ export default function Calendar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search events, tasks..."
+                  placeholder="Search events, to-dos..."
                   className="w-full h-[42px] rounded-xl px-3.5 text-sm outline-none text-charcoal"
                   style={{ border: '2px solid #E8724A', background: 'white' }}
                   autoFocus
@@ -3102,7 +3108,7 @@ export default function Calendar() {
           <div className="absolute inset-0 bg-black/40" />
           <div ref={taskFormRef} onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-2xl border border-light-grey p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>Edit Task</h2>
+              <h2 className="text-lg font-medium text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>Edit To-do</h2>
               <button type="button" onClick={closeTaskForm} className="text-warm-grey hover:text-charcoal p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -3118,7 +3124,7 @@ export default function Calendar() {
                   onChange={e => setTaskTitle(e.target.value)}
                   required
                   className="w-full h-12 border-[1.5px] border-light-grey rounded-[10px] px-3 text-sm bg-cream focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/20"
-                  placeholder="Task title"
+                  placeholder="To-do title"
                 />
               </div>
               <div>
@@ -3224,10 +3230,10 @@ export default function Calendar() {
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="submit"
-                  disabled={savingTask || !taskTitle.trim()}
+                  disabled={!taskTitle.trim()}
                   className="h-10 px-5 rounded-xl bg-plum hover:bg-plum-dark disabled:opacity-50 text-white text-sm font-semibold transition-colors"
                 >
-                  {savingTask ? 'Saving...' : 'Save changes'}
+                  Save changes
                 </button>
                 <button
                   type="button"
