@@ -5,6 +5,7 @@ const multer = require('multer');
 const db = require('../db/queries');
 const { supabaseAdmin } = require('../db/client');
 const { callWithFailover } = require('../services/ai-client');
+const { parseJSON } = require('../services/ai');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 const push = require('../services/push');
@@ -217,8 +218,7 @@ Return ONLY valid JSON:
 
     let parsed;
     try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-      parsed = JSON.parse(cleaned);
+      parsed = parseJSON(text, 'meal AI response');
     } catch {
       console.error('Could not parse AI suggestions:', text?.substring(0, 200));
       return res.status(500).json({ error: 'Could not parse AI suggestions' });
@@ -366,8 +366,7 @@ Return ONLY valid JSON:
 
     let result;
     try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-      result = JSON.parse(cleaned);
+      result = parseJSON(text, 'meal AI response');
     } catch {
       return res.status(500).json({ error: 'Could not parse AI response' });
     }
@@ -565,8 +564,7 @@ ${pageText}` }],
 
     let parsed;
     try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-      parsed = JSON.parse(cleaned);
+      parsed = parseJSON(text, 'meal AI response');
     } catch {
       return res.status(500).json({ error: 'Could not parse recipe from AI response' });
     }
@@ -654,8 +652,7 @@ Rules:
 
     let parsed;
     try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-      parsed = JSON.parse(cleaned);
+      parsed = parseJSON(text, 'meal AI response');
     } catch {
       return res.status(500).json({ error: 'Could not parse recipe from AI response' });
     }
@@ -727,8 +724,7 @@ Return ONLY valid JSON:
 
     let parsed;
     try {
-      const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-      parsed = JSON.parse(cleaned);
+      parsed = parseJSON(text, 'meal AI response');
     } catch {
       return res.status(500).json({ error: 'Could not parse generated recipe' });
     }

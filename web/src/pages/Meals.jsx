@@ -602,7 +602,9 @@ function MealPlanView({ setError }) {
           <div className="flex flex-wrap items-center justify-between gap-3 no-print">
             <div className="flex flex-wrap gap-2.5">
               <PillBtn onClick={addWeekToShoppingList} icon={<IconCart className="h-3.5 w-3.5" />}>Add to shopping list</PillBtn>
-              <PillBtn primary onClick={suggestMeals} icon={<Sparkle />}>Plan with AI</PillBtn>
+              <PillBtn primary onClick={suggestMeals} disabled={suggesting} icon={<Sparkle />}>
+                {suggesting ? 'Planning…' : 'Plan with AI'}
+              </PillBtn>
             </div>
             <PillBtn onClick={() => window.print()} title="Opens the browser's print dialog in landscape orientation">Print</PillBtn>
           </div>
