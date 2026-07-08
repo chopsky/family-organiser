@@ -5416,6 +5416,27 @@ async function updateHouseholdSubscriptionAdmin(householdId, updates, db = supab
     throw err;
   }
 
+  // Extending the trial to a FUTURE date must also REVIVE it. The access gate
+  // (middleware/subscriptionStatus.js) keys off subscription_status, so a
+  // household left at 'expired' stays locked out no matter how far out
+  // trial_ends_at is — which is why "Extend Trial" on an expired household
+  // looked like it did nothing. Flip the status back to 'trialing' and clear
+  // the retention clock (inactive_since, stamped on expiry). Never downgrade a
+  // paying ('active') household. Trials carry no Stripe subscription, so this
+  // can't desync with Stripe (the reason status is otherwise webhook-only).
+  if (typeof allowed.trial_ends_at === 'string' && new Date(allowed.trial_ends_at).getTime() > Date.now()) {
+    const { data: current, error: readErr } = await db
+      .from('households')
+      .select('subscription_status')
+      .eq('id', householdId)
+      .single();
+    if (readErr) throw readErr;
+    if (current && current.subscription_status !== 'active') {
+      allowed.subscription_status = 'trialing';
+      allowed.inactive_since = null;
+    }
+  }
+
   const { data, error } = await db
     .from('households')
     .update(allowed)
