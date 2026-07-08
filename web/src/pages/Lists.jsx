@@ -73,11 +73,6 @@ export default function Lists() {
   // the URL to avoid a TDZ on searchParams, which is declared below.
   const [activeId, setActiveId] = useState(() => new URLSearchParams(window.location.search).get('list') || TODOS_ID);
   const [items, setItems] = useState([]);
-  // Which item ids were already done when the list was loaded. Section
-  // placement (open vs Done) is frozen to this, so checking an item off just
-  // strikes it through in place — it only moves to Done on the next load
-  // (refresh / leave + return / switch list).
-  const [doneAtLoad, setDoneAtLoad] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [draft, setDraft] = useState('');
@@ -150,8 +145,7 @@ export default function Lists() {
   const loadItems = useCallback(async (list) => {
     if (!list) return;
     setLoadingItems(true);
-    // Snapshot the open/Done partition for this load; toggles won't re-segment.
-    const apply = (arr) => { setItems(arr); setDoneAtLoad(new Set(arr.filter((i) => i.done).map((i) => i.id))); };
+    const apply = (arr) => setItems(arr);
     try {
       if (list.kind === 'todos') {
         const [{ data: open }, { data: done }] = await Promise.all([
@@ -287,9 +281,14 @@ export default function Lists() {
 
   const toggle = useCallback(async (it) => {
     const next = !it.done;
-    setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, done: next } : x)));
+    // Checking an item moves it straight to Done (and vice-versa) - see the
+    // openItems/doneItems partition, which reads the live `done` flag. Stamp
+    // completed_at on check so the item lands at the TOP of Done (recent-first)
+    // rather than the bottom; clear it on uncheck.
+    const stampedAt = next ? new Date().toISOString() : null;
+    setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, done: next, completed_at: stampedAt } : x)));
     try { await api.patch(`${isTodos ? '/tasks' : '/shopping'}/${it.id}`, { completed: next }); }
-    catch { setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, done: !next } : x))); }
+    catch { setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, done: !next, completed_at: it.completed_at } : x))); }
   }, [isTodos]);
 
   const removeItem = useCallback(async (it) => {
@@ -336,16 +335,14 @@ export default function Lists() {
 
   // visible items (To-dos filter by assignee) + grouping
   const filtered = isTodos && toFilter ? items.filter((i) => (i.whoIds || []).includes(toFilter)) : items;
-  // Section placement is frozen to the load-time snapshot: checking an item off
-  // strikes it through but keeps it in Open until the next load; un-checking
-  // keeps it in Done. openCount is the live not-done total for the badges, so
-  // those still update immediately when you tick something.
-  const openItems = filtered.filter((i) => !doneAtLoad.has(i.id));
-  // Done items most-recently-checked-off first. Shopping items carry
-  // completed_at; To-dos don't (they keep their /tasks/recent order, which is
-  // already recent-first), and the empty-string fallback leaves them stable.
+  // Open vs Done reads the LIVE done flag, so ticking an item moves it straight
+  // into Done and un-ticking a Done item moves it straight back to its bucket.
+  const openItems = filtered.filter((i) => !i.done);
+  // Done items most-recently-checked-off first: toggle stamps completed_at on
+  // check, so a freshly-ticked item lands at the top; the empty-string fallback
+  // keeps anything without a stamp stable at the bottom.
   const doneItems = filtered
-    .filter((i) => doneAtLoad.has(i.id))
+    .filter((i) => i.done)
     .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
   const openCount = filtered.filter((i) => !i.done).length;
   // To-dos: the working set (Today / This week) renders as ordinary
