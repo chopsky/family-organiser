@@ -22,77 +22,76 @@ export const KID_COLOR_PRESETS = [
   // special. `premium: true` keeps them out of the free-default pool and gates
   // them in the Me picker. Keys mirror src/services/kids-cosmetics.js (the
   // authoritative price/season source); colours live here for kidTheme().
-  { key: 'galaxy',  premium: true, name: 'Galaxy',  c1: '#6D5BF0', c2: '#241A5E', accent: '#8B7BFF', soft: '#E9E5FF' },
-  { key: 'dino',    premium: true, name: 'Dino',    c1: '#5FCF7F', c2: '#1C6E3C', accent: '#34AC59', soft: '#E1F6E7' },
-  { key: 'unicorn', premium: true, name: 'Unicorn', c1: '#FF9DE6', c2: '#9B3FD6', accent: '#D96FE0', soft: '#FBE7FB' },
-  { key: 'ocean',   premium: true, name: 'Ocean',   c1: '#41C7E6', c2: '#124F8E', accent: '#1F9FD6', soft: '#DDF1FB' },
+  { key: 'galaxy',  premium: true, dark: true, name: 'Galaxy',  c1: '#8B7BFF', c2: '#3B2E7E', accent: '#A78BFA', soft: '#E9E5FF' },
+  { key: 'dino',    premium: true, dark: true, name: 'Dino',    c1: '#4FBE72', c2: '#155230', accent: '#5FCF7F', soft: '#E1F6E7' },
+  { key: 'unicorn', premium: true, dark: true, name: 'Unicorn', c1: '#FF9DE6', c2: '#7C3AC4', accent: '#F58FD6', soft: '#FBE7FB' },
+  { key: 'ocean',   premium: true, dark: true, name: 'Ocean',   c1: '#3AC0E6', c2: '#0E3E6E', accent: '#5AD4E0', soft: '#DDF1FB' },
 ];
 
 // The free pool a kid without a chosen colour falls back to, so a premium
 // theme is never assigned (or shown active) without being bought.
 export const FREE_PRESETS = KID_COLOR_PRESETS.filter((p) => !p.premium);
 
-// Decorated backdrops for the premium themes — the "world" that appears when a
-// kid wears one (free themes keep the plain soft fade). Each is a light,
-// text-readable base with a themed motif layered on top: galaxy sparkles,
-// jungle canopy, unicorn pastels, ocean bubbles. Pure CSS (no images), static
-// (reduced-motion safe). Keyed by theme key; applied as the shell background.
+// Immersive DARK backdrops for the premium themes — the "world" that appears
+// when a kid wears one (free themes keep the plain light fade). Deep base with
+// bright decoration: a galaxy starfield, a night jungle with fireflies, a
+// magical unicorn night, a deep sea with bubbles. Pure CSS (no images), static
+// (reduced-motion safe). Kids screens go light-on-dark when the theme is dark
+// (see kidTheme's onInk tokens). Keyed by theme key; applied as the shell bg.
 export const PREMIUM_SCENES = {
-  // Galaxy — a dense sparkle field (gold / violet / magenta / coral) over
-  // purple nebula blooms.
+  // Galaxy — a bright starfield (white / gold / lilac) over a deep-space nebula.
   galaxy: `
-    radial-gradient(3px 3px at 8% 13%, #F0A81E, transparent),
-    radial-gradient(2px 2px at 16% 26%, #8B7BFF, transparent),
-    radial-gradient(3.5px 3.5px at 24% 8%, #D66FE0, transparent),
-    radial-gradient(2px 2px at 33% 21%, #FB6F92, transparent),
-    radial-gradient(2.5px 2.5px at 42% 11%, #F0A81E, transparent),
-    radial-gradient(2px 2px at 51% 24%, #8B7BFF, transparent),
-    radial-gradient(3.5px 3.5px at 60% 9%, #D66FE0, transparent),
-    radial-gradient(2px 2px at 69% 22%, #F0A81E, transparent),
-    radial-gradient(3px 3px at 78% 12%, #8B7BFF, transparent),
-    radial-gradient(2.5px 2.5px at 87% 24%, #D66FE0, transparent),
-    radial-gradient(3px 3px at 94% 9%, #FB6F92, transparent),
-    radial-gradient(58% 42% at 18% 3%, rgba(139,123,255,0.42), transparent 70%),
-    radial-gradient(54% 40% at 84% 1%, rgba(214,111,224,0.34), transparent 70%),
-    linear-gradient(180deg, #E7E0FE, #FFFDF8 50%)`,
-  // Dino — green leaf specks, a two-corner canopy and a rolling-hills band.
+    radial-gradient(1.5px 1.5px at 6% 14%, #fff, transparent),
+    radial-gradient(2px 2px at 13% 30%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1.5px 1.5px at 21% 9%, #FFE08A, transparent),
+    radial-gradient(2.5px 2.5px at 29% 24%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 37% 13%, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px 2px at 45% 28%, #C9BEFF, transparent),
+    radial-gradient(1.5px 1.5px at 53% 10%, #fff, transparent),
+    radial-gradient(2.5px 2.5px at 61% 22%, #FFE08A, transparent),
+    radial-gradient(1.5px 1.5px at 69% 13%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(2px 2px at 77% 27%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 85% 10%, #C9BEFF, transparent),
+    radial-gradient(2.5px 2.5px at 92% 24%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 97% 14%, #FFE08A, transparent),
+    radial-gradient(72% 55% at 20% 0%, rgba(139,123,255,0.45), transparent 70%),
+    radial-gradient(62% 50% at 85% 4%, rgba(214,111,224,0.35), transparent 70%),
+    linear-gradient(180deg, #221A52, #120C2C)`,
+  // Dino — golden fireflies + light leaves over a night canopy and dark hills.
   dino: `
-    radial-gradient(4px 4px at 12% 16%, rgba(31,110,60,0.85), transparent),
-    radial-gradient(2.5px 2.5px at 26% 9%, rgba(52,172,89,0.85), transparent),
-    radial-gradient(3.5px 3.5px at 38% 20%, rgba(31,110,60,0.8), transparent),
-    radial-gradient(2.5px 2.5px at 52% 11%, rgba(52,172,89,0.85), transparent),
-    radial-gradient(4px 4px at 66% 18%, rgba(31,110,60,0.85), transparent),
-    radial-gradient(2.5px 2.5px at 80% 9%, rgba(52,172,89,0.85), transparent),
-    radial-gradient(3.5px 3.5px at 90% 20%, rgba(31,110,60,0.8), transparent),
-    radial-gradient(85% 55% at 10% 0%, rgba(52,172,89,0.36), transparent 68%),
-    radial-gradient(72% 48% at 92% 2%, rgba(31,110,60,0.28), transparent 68%),
-    radial-gradient(150% 42% at 50% 113%, rgba(31,110,60,0.36), transparent 60%),
-    linear-gradient(180deg, #DDF3E2, #FFFDF8 52%)`,
-  // Unicorn — a soft rainbow spread (pink / purple / mint) dusted with sparkles.
+    radial-gradient(2px 2px at 10% 12%, #FFDD6B, transparent),
+    radial-gradient(2.5px 2.5px at 24% 24%, #FFDD6B, transparent),
+    radial-gradient(2px 2px at 40% 10%, #A8F0B8, transparent),
+    radial-gradient(2.5px 2.5px at 58% 22%, #FFDD6B, transparent),
+    radial-gradient(2px 2px at 74% 12%, #A8F0B8, transparent),
+    radial-gradient(2.5px 2.5px at 88% 24%, #FFDD6B, transparent),
+    radial-gradient(90% 55% at 8% 0%, rgba(46,140,74,0.5), transparent 68%),
+    radial-gradient(75% 48% at 94% 2%, rgba(20,90,48,0.42), transparent 68%),
+    radial-gradient(150% 46% at 50% 114%, rgba(9,60,32,0.6), transparent 60%),
+    linear-gradient(180deg, #15532F, #0A2E1B)`,
+  // Unicorn — a magical night: white/gold sparkles + a pink/purple/teal glow.
   unicorn: `
-    radial-gradient(3px 3px at 14% 16%, #F0A81E, transparent),
-    radial-gradient(2.5px 2.5px at 30% 9%, #D66FE0, transparent),
-    radial-gradient(4px 4px at 46% 18%, #FF9DE6, transparent),
-    radial-gradient(2.5px 2.5px at 62% 10%, #5EE0AB, transparent),
-    radial-gradient(3px 3px at 78% 17%, #F0A81E, transparent),
-    radial-gradient(2.5px 2.5px at 90% 9%, #D66FE0, transparent),
-    radial-gradient(50% 44% at 8% 2%, rgba(255,157,230,0.46), transparent 70%),
-    radial-gradient(46% 40% at 34% 0%, rgba(155,63,214,0.26), transparent 70%),
-    radial-gradient(46% 40% at 62% 0%, rgba(94,224,171,0.26), transparent 70%),
-    radial-gradient(50% 44% at 92% 2%, rgba(255,157,230,0.40), transparent 70%),
-    linear-gradient(180deg, #FBE3FA, #FFFDF8 52%)`,
-  // Ocean — rising bubbles of varied sizes over a deep-water band.
+    radial-gradient(2px 2px at 10% 14%, #fff, transparent),
+    radial-gradient(2.5px 2.5px at 26% 26%, #FFE08A, transparent),
+    radial-gradient(2px 2px at 44% 10%, #fff, transparent),
+    radial-gradient(2.5px 2.5px at 62% 22%, #FFB3EC, transparent),
+    radial-gradient(2px 2px at 80% 12%, #fff, transparent),
+    radial-gradient(2.5px 2.5px at 92% 24%, #FFE08A, transparent),
+    radial-gradient(55% 48% at 10% 0%, rgba(255,120,210,0.42), transparent 70%),
+    radial-gradient(50% 44% at 40% 2%, rgba(150,90,240,0.36), transparent 70%),
+    radial-gradient(50% 44% at 68% 2%, rgba(90,210,220,0.30), transparent 70%),
+    radial-gradient(55% 48% at 94% 0%, rgba(255,120,210,0.36), transparent 70%),
+    linear-gradient(180deg, #3A1D5E, #201038)`,
+  // Ocean — rising bubbles + a sunlit surface glow over deep navy water.
   ocean: `
-    radial-gradient(15px 15px at 18% 27%, rgba(31,159,214,0.22), transparent),
-    radial-gradient(9px 9px at 30% 13%, rgba(31,159,214,0.26), transparent),
-    radial-gradient(6px 6px at 44% 22%, rgba(31,159,214,0.24), transparent),
-    radial-gradient(12px 12px at 60% 11%, rgba(31,159,214,0.22), transparent),
-    radial-gradient(7px 7px at 74% 24%, rgba(31,159,214,0.26), transparent),
-    radial-gradient(5px 5px at 86% 13%, rgba(31,159,214,0.28), transparent),
-    radial-gradient(70% 46% at 12% 0%, rgba(31,159,214,0.32), transparent 70%),
-    radial-gradient(60% 42% at 90% 2%, rgba(18,79,142,0.24), transparent 70%),
-    radial-gradient(160% 46% at 50% 115%, rgba(18,79,142,0.34), transparent 62%),
-    linear-gradient(180deg, #D3EDFA, #FFFDF8 52%)`,
+    radial-gradient(14px 14px at 16% 30%, rgba(160,225,245,0.16), transparent),
+    radial-gradient(9px 9px at 30% 16%, rgba(160,225,245,0.20), transparent),
+    radial-gradient(6px 6px at 46% 26%, rgba(160,225,245,0.18), transparent),
+    radial-gradient(12px 12px at 62% 13%, rgba(160,225,245,0.16), transparent),
+    radial-gradient(7px 7px at 78% 26%, rgba(160,225,245,0.20), transparent),
+    radial-gradient(5px 5px at 90% 15%, rgba(160,225,245,0.24), transparent),
+    radial-gradient(130% 55% at 50% -12%, rgba(90,205,235,0.40), transparent 62%),
+    linear-gradient(180deg, #114E86, #08243F)`,
 };
 
 export const KID_AVATARS = ['🦖', '🦄', '🐱', '🐶', '🦊', '🐼', '🐯', '🦁', '🐵', '🐸', '🦉', '🐙', '🦕', '🐢', '🐝', '🦋', '🚀', '⚽', '🎨', '🦸', '🧚', '🤖'];
@@ -115,12 +114,23 @@ export function kidTheme(member, index = 0) {
   // an unset colour falls back to a FREE preset so premium is never free.
   const preset = presetByKey[member?.kid_color] || FREE_PRESETS[index % FREE_PRESETS.length];
   const emoji = member?.kid_avatar || KID_AVATARS[index % 2]; // 🦖 / 🦄 defaults per the spec
+  const dark = !!preset.dark;
   return {
     key: preset.key,
     accent: preset.accent,
     soft: preset.soft,
     c1: preset.c1,
     c2: preset.c2,
+    dark,
+    // Text/chrome that sits directly ON the themed background goes light on a
+    // dark theme, standard ink on a light one. Text INSIDE the white cards keeps
+    // the fixed dark KIDS_INK (the white card provides its own contrast).
+    onInk: dark ? '#FCFAFF' : KIDS_INK.ink,
+    onInk2: dark ? 'rgba(255,255,255,0.76)' : KIDS_INK.ink2,
+    onInk3: dark ? 'rgba(255,255,255,0.54)' : KIDS_INK.ink3,
+    // Translucent surface for the rail/nav chrome, so it reads on either base.
+    chrome: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.6)',
+    chromeBorder: dark ? 'rgba(255,255,255,0.16)' : 'rgba(49,43,75,0.06)',
     grad: `linear-gradient(160deg, ${preset.c1}, ${preset.c2})`,
     // Premium themes get a decorated scene; free themes keep the soft fade.
     bg: PREMIUM_SCENES[preset.key] || `radial-gradient(130% 60% at 50% 0%, ${preset.soft}, ${KIDS_INK.paper} 60%)`,

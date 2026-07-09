@@ -110,7 +110,7 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
       <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, marginBottom: 2 }}>
         Hi, {kid.name}! <span className="kids-wobble">👋</span>
       </div>
-      <div style={{ fontSize: isMobile ? 16 : 17, color: KIDS_INK.ink2, fontWeight: 500, marginBottom: isMobile ? 16 : 18 }}>
+      <div style={{ fontSize: isMobile ? 16 : 17, color: theme.onInk2, fontWeight: 500, marginBottom: isMobile ? 16 : 18 }}>
         {streak?.paused ? 'Routines are paused — have fun! 🏖️' : total === 0 ? 'No quests today - enjoy it!' : doneCount === total ? 'You finished everything! 🎉' : "Here are today's quests."}
       </div>
 
@@ -119,7 +119,7 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
       {streak?.paused ? (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '36px 22px', background: '#fff', borderRadius: 26, border: '2px solid rgba(49,43,75,0.06)', boxShadow: '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)' }}>
           <div style={{ fontSize: 64 }}>🏖️</div>
-          <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8 }}>Routines are paused</div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8, color: KIDS_INK.ink }}>Routines are paused</div>
           <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, marginTop: 6, maxWidth: 320, margin: '6px auto 0' }}>Enjoy your break — your streak is safe. A grown-up can switch quests back on any time.</div>
         </div>
       ) : (
@@ -149,7 +149,7 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
           {total === 0 && (
             <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
               <div style={{ fontSize: 64 }}>🏖️</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>A quest-free day!</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: theme.onInk2, marginTop: 10 }}>A quest-free day!</div>
             </div>
           )}
         </>

@@ -68,7 +68,7 @@ export function KidsLogo({ c1, c2 }) {
         <path fill={`url(#${gid})`} d="M68.91,88.98c-12.99-3.42-15.25-21.12-3.81-27.97,10.83-6.74,25.17,2.44,23.15,15.15-1.08,8.84-10.55,15.28-19.15,12.86l-.19-.05Z" />
         <path fill={`url(#${gid})`} d="M125.88,89c-12.51-2.66-16.19-19.3-6.07-27.06,9.59-7.72,24.58-1.08,25.02,11.28.67,9.77-9.22,18.12-18.75,15.82l-.19-.04Z" />
       </svg>
-      <span style={{ fontSize: 21, fontWeight: 600, letterSpacing: -0.5, color: KIDS_INK.ink }}>Housemait</span>
+      <span style={{ fontSize: 21, fontWeight: 600, letterSpacing: -0.5 }}>Housemait</span>
       <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: '#fff', background: KIDS_INK.sun, padding: '3px 8px', borderRadius: 999, boxShadow: '0 3px 0 rgba(233,154,18,0.35)' }}>KIDS</span>
     </div>
   );
@@ -81,7 +81,7 @@ export function Section({ title, emoji, count, accent, hint, style, children }) 
         <span style={{ fontSize: 20 }}>{emoji}</span>
         <span style={{ fontSize: 19, fontWeight: 600 }}>{title}</span>
         {count != null && <span style={{ fontSize: 14, fontWeight: 600, color: '#fff', background: accent, padding: '2px 10px', borderRadius: 999 }}>{count}</span>}
-        {hint && <span style={{ fontSize: 12, color: KIDS_INK.ink3, fontWeight: 500, marginLeft: 'auto' }}>{hint}</span>}
+        {hint && <span style={{ fontSize: 12, color: 'inherit', opacity: 0.55, fontWeight: 500, marginLeft: 'auto' }}>{hint}</span>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
     </div>

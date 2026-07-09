@@ -56,13 +56,13 @@ export default function NoteScreen({ kid, theme, members }) {
       <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, margin: isMobile ? '0 0 16px' : '0 0 8px' }}>
         My Note <span className="kids-wobble">💌</span>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, marginBottom: 18 }}>
+      <div style={{ fontSize: 15, fontWeight: 500, color: theme.onInk2, marginBottom: 18 }}>
         {showCompose ? 'Draw or write something for your grown-ups!' : 'Your note is on its way!'}
       </div>
 
       {showCompose
         ? <Compose kid={kid} theme={theme} onSent={setTodayNote} />
-        : <SentState note={todayNote} members={members} />}
+        : <SentState note={todayNote} members={members} theme={theme} />}
     </div>
   );
 }
@@ -219,7 +219,7 @@ function Compose({ kid, theme, onSent }) {
   );
 }
 
-function SentState({ note, members }) {
+function SentState({ note, members, theme }) {
   const reactions = Object.entries(note.reactions || {});
   const nameOf = (userId) => members.find((m) => m.id === userId)?.name || 'Someone';
 
@@ -244,7 +244,7 @@ function SentState({ note, members }) {
             {reactions.map(([userId, emoji]) => (
               <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span className="kids-wobble" style={{ fontSize: 30 }}>{emoji}</span>
-                <span style={{ fontSize: 16, fontWeight: 600 }}>{nameOf(userId)} loved your note!</span>
+                <span style={{ fontSize: 16, fontWeight: 600, color: KIDS_INK.ink }}>{nameOf(userId)} loved your note!</span>
               </div>
             ))}
           </div>
@@ -253,7 +253,7 @@ function SentState({ note, members }) {
 
       {/* One note a day - so no "make another"; just a warm nudge to come
           back tomorrow. */}
-      <div style={{ marginTop: 16, marginBottom: 20, textAlign: 'center', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2 }}>
+      <div style={{ marginTop: 16, marginBottom: 20, textAlign: 'center', fontSize: 15, fontWeight: 600, color: theme.onInk2 }}>
         Come back tomorrow to send another! 🌙
       </div>
     </div>

@@ -99,7 +99,7 @@ export default function KidsShell() {
   return (
     <div
       className="flex flex-col md:flex-row"
-      style={{ height: '100dvh', overflow: 'hidden', fontFamily: "'Fredoka', system-ui, sans-serif", color: KIDS_INK.ink, background: theme.bg, WebkitTapHighlightColor: 'transparent' }}
+      style={{ height: '100dvh', overflow: 'hidden', fontFamily: "'Fredoka', system-ui, sans-serif", color: theme.onInk, background: theme.bg, WebkitTapHighlightColor: 'transparent' }}
     >
       {/* tablet / desktop left rail */}
       <Rail tab={tab} navigate={navigate} theme={theme} kids={kids} kid={kid} pickKid={pickKid} balance={balance} />
@@ -168,7 +168,7 @@ const NAV_ITEMS = [
 function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {
   const items = [...NAV_ITEMS, ['me', 'Me', theme.emoji]];
   return (
-    <div className="hidden md:flex" style={{ width: 236, flexShrink: 0, background: 'rgba(255,255,255,0.6)', borderRight: '2px solid rgba(49,43,75,0.06)', flexDirection: 'column', padding: '26px 18px' }}>
+    <div className="hidden md:flex" style={{ width: 236, flexShrink: 0, background: theme.chrome, borderRight: `2px solid ${theme.chromeBorder}`, backdropFilter: theme.dark ? 'blur(8px)' : 'none', flexDirection: 'column', padding: '26px 18px' }}>
       <div style={{ padding: '2px 2px 18px' }}><KidsLogo c1={theme.c1} c2={theme.c2} /></div>
 
       <div style={{ marginBottom: 22 }}>
@@ -180,7 +180,7 @@ function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {
           const on = k === tab;
           return (
             <button key={k} onClick={() => navigate(TAB_PATH[k])} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', borderRadius: 18, border: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-              background: on ? theme.grad : 'transparent', color: on ? '#fff' : KIDS_INK.ink2, boxShadow: on ? '0 6px 16px rgba(49,43,75,0.16)' : 'none' }}>
+              background: on ? theme.grad : 'transparent', color: on ? '#fff' : theme.onInk2, boxShadow: on ? '0 6px 16px rgba(49,43,75,0.16)' : 'none' }}>
               <span style={{ fontSize: 24, filter: on ? 'none' : 'grayscale(.3)' }}>{em}</span>
               <b style={{ fontWeight: 600, fontSize: 17 }}>{label}</b>
             </button>
@@ -203,14 +203,14 @@ function BottomNav({ tab, navigate, theme }) {
   const items = [...NAV_ITEMS, ['me', 'Me', theme.emoji]];
   return (
     <div className="md:hidden" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, padding: '12px 16px', paddingBottom: 'calc(14px + env(safe-area-inset-bottom))', pointerEvents: 'none', zIndex: 40 }}>
-      <div style={{ display: 'flex', gap: 8, background: '#fff', borderRadius: 26, padding: 8, boxShadow: '0 8px 26px rgba(49,43,75,0.16)', border: '2px solid rgba(49,43,75,0.05)', pointerEvents: 'auto' }}>
+      <div style={{ display: 'flex', gap: 8, background: theme.dark ? 'rgba(22,18,42,0.82)' : '#fff', backdropFilter: theme.dark ? 'blur(14px)' : 'none', borderRadius: 26, padding: 8, boxShadow: '0 8px 26px rgba(20,15,40,0.28)', border: `2px solid ${theme.dark ? 'rgba(255,255,255,0.14)' : 'rgba(49,43,75,0.05)'}`, pointerEvents: 'auto' }}>
         {items.map(([k, label, em]) => {
           const on = k === tab;
           return (
             <button key={k} onClick={() => navigate(TAB_PATH[k])} style={{ flex: 1, padding: '10px 0', borderRadius: 19, border: 0, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               background: on ? theme.grad : 'transparent' }}>
               <span style={{ fontSize: 22, filter: on ? 'none' : 'grayscale(.3)', transform: on ? 'scale(1.05)' : 'none' }}>{em}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: on ? '#fff' : KIDS_INK.ink3 }}>{label}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: on ? '#fff' : theme.onInk3 }}>{label}</span>
             </button>
           );
         })}

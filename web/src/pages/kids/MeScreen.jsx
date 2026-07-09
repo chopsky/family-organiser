@@ -97,7 +97,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
           <div style={{ width: 120, height: 120, borderRadius: '50%', background: theme.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 66, boxShadow: '0 12px 28px rgba(49,43,75,0.22)', flexShrink: 0 }}>{theme.emoji}</div>
           <div>
             <div style={{ fontSize: 26, fontWeight: 600 }}>{kid.name}</div>
-            <div style={{ fontSize: 15, color: KIDS_INK.ink2, fontWeight: 500 }}>Pick your colour and avatar!</div>
+            <div style={{ fontSize: 15, color: theme.onInk2, fontWeight: 500 }}>Pick your colour and avatar!</div>
           </div>
         </div>
       )}
@@ -143,7 +143,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
           Shop (bought with stars there - never handed out free). */}
       {premiumThemes.length > 0 && (
         <>
-          <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, color: KIDS_INK.ink2, padding: isMobile ? '0 4px 10px' : '0 2px 12px' }}>Premium themes 🌟</div>
+          <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, color: theme.onInk2, padding: isMobile ? '0 4px 10px' : '0 2px 12px' }}>Premium themes 🌟</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 14 : 16, marginBottom: isMobile ? 28 : 30, padding: '0 2px' }}>
             {premiumThemes.map((c) => {
               const owned = ownedCos.has(c.key);
@@ -185,11 +185,11 @@ export default function MeScreen({ kid, theme, onSaved }) {
           ))}
         </div>
       ) : (
-        <div style={{ fontSize: 13.5, fontWeight: 500, color: KIDS_INK.ink3, padding: '0 4px' }}>Buy stickers in the Star Shop! 🛍️</div>
+        <div style={{ fontSize: 13.5, fontWeight: 500, color: theme.onInk3, padding: '0 4px' }}>Buy stickers in the Star Shop! 🛍️</div>
       )}
 
       {/* ── Grown-ups (PIN-gated) ─────────────────────────────────────────── */}
-      <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, color: KIDS_INK.ink2, padding: isMobile ? '30px 4px 12px' : '34px 2px 14px' }}>Grown-ups 🔒</div>
+      <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, color: theme.onInk2, padding: isMobile ? '30px 4px 12px' : '34px 2px 14px' }}>Grown-ups 🔒</div>
 
       {/* Routine pause: freeze the streak while away or unwell (grown-up only). */}
       {pause?.available && (
@@ -212,7 +212,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
         )
       )}
       {pause?.available && !pause.paused && (
-        <div style={{ fontSize: 12.5, fontWeight: 500, color: KIDS_INK.ink3, padding: '0 4px 4px', maxWidth: 440 }}>Away or unwell? Pause so the streak doesn't break — resume when you're back.</div>
+        <div style={{ fontSize: 12.5, fontWeight: 500, color: theme.onInk3, padding: '0 4px 4px', maxWidth: 440 }}>Away or unwell? Pause so the streak doesn't break — resume when you're back.</div>
       )}
 
       {/* Exit: leaving Child Mode already gives a grown-up the full adult app. */}

@@ -185,7 +185,7 @@ export default function DaysScreen({ kid, theme }) {
           <div style={{ display: 'flex', gap: 16, marginBottom: 20, alignItems: 'stretch' }}>
             {hero && <Countdown hero={hero} theme={theme} />}
             <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', color: KIDS_INK.ink3 }}>Also coming up</div>
+              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', color: theme.onInk3 }}>Also coming up</div>
               {myBigs.filter((b) => b !== hero).slice(0, 3).map((b) => (
                 <div key={`${b.date}:${b.title}`} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 18, padding: '10px 14px' }}>
                   <span style={{ fontSize: 26 }}>{bigEmoji(b)}</span>
@@ -213,7 +213,7 @@ export default function DaysScreen({ kid, theme }) {
       {view === 'list' && days.length === 0 && (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
           <div style={{ fontSize: 64 }}>🎈</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: theme.onInk2, marginTop: 10 }}>
             {listOffset === 0 ? 'Nothing else this month' : `Nothing in ${listFirst.toLocaleDateString('en-GB', { month: 'long' })} yet`}
           </div>
         </div>
@@ -226,16 +226,16 @@ export default function DaysScreen({ kid, theme }) {
         return (
           <div key={k}>
             <button onClick={() => { if (!today) setOpen((o) => ({ ...o, [k]: !o[k] })); }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'transparent', border: 0, cursor: today ? 'default' : 'pointer', fontFamily: 'inherit', padding: '14px 4px 8px', textAlign: 'left' }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: today ? theme.accent : KIDS_INK.ink }}>{dayName(k)}</span>
-              {sleepsTo(k) > 1 && <span style={{ fontSize: 12.5, fontWeight: 600, color: KIDS_INK.ink3 }}>· in {sleepText(sleepsTo(k))}</span>}
+              <span style={{ fontSize: 15, fontWeight: 600, color: today ? theme.accent : theme.onInk }}>{dayName(k)}</span>
+              {sleepsTo(k) > 1 && <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.onInk3 }}>· in {sleepText(sleepsTo(k))}</span>}
               <span style={{ flex: 1 }} />
               {!isOpen && (
                 <span style={{ display: 'flex', gap: 3, marginRight: 4 }}>
                   {g.slice(0, 4).map((it, i) => <span key={i} style={{ fontSize: 17 }}>{it.emoji}</span>)}
-                  {g.length > 4 && <span style={{ fontSize: 12, fontWeight: 600, color: KIDS_INK.ink3, alignSelf: 'center' }}>+{g.length - 4}</span>}
+                  {g.length > 4 && <span style={{ fontSize: 12, fontWeight: 600, color: theme.onInk3, alignSelf: 'center' }}>+{g.length - 4}</span>}
                 </span>
               )}
-              {!today && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={KIDS_INK.ink3} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" /></svg>}
+              {!today && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.onInk3} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" /></svg>}
             </button>
             {isOpen && (
               <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 12 } : { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -327,7 +327,7 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, is
         <button onClick={() => setOffset((m) => Math.min(6, m + 1))} disabled={offset >= 6} style={{ ...(isMobile ? mvNav : mvNavT), opacity: offset >= 6 ? 0.35 : 1 }}>›</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8 }}>
-        {(isMobile ? MONTH_WD : MONTH_WD_FULL).map((w, i) => <div key={i} style={{ textAlign: 'center', fontSize: isMobile ? 12 : 13, fontWeight: 600, color: KIDS_INK.ink3 }}>{w}</div>)}
+        {(isMobile ? MONTH_WD : MONTH_WD_FULL).map((w, i) => <div key={i} style={{ textAlign: 'center', fontSize: isMobile ? 12 : 13, fontWeight: 600, color: theme.onInk3 }}>{w}</div>)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? 6 : 8 }}>
         {cells.map((d, i) => {
@@ -339,7 +339,7 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, is
             <button key={i} onClick={() => setSel(dateStr)} style={{ position: 'relative', aspectRatio: '1', borderRadius: isMobile ? 14 : 16, cursor: 'pointer', fontFamily: 'inherit',
               border: (today || on) ? `2.5px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', background: (today || on) ? theme.soft : '#fff',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 1 : 3, opacity: past ? 0.5 : 1, overflow: 'hidden' }}>
-              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 600, color: today ? theme.accent : KIDS_INK.ink }}>{d}</span>
+              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 600, color: today ? theme.accent : theme.onInk }}>{d}</span>
               {dayEvs.length > 0 && !past && <span style={{ display: 'flex', gap: isMobile ? 1 : 2 }}>{dayEvs.slice(0, 3).map((e, j) => <span key={j} style={{ fontSize: isMobile ? 9 : 12 }}>{e.emoji}</span>)}</span>}
               {past && <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 40 40" preserveAspectRatio="none"><line x1="7" y1="33" x2="33" y2="7" stroke={theme.accent} strokeWidth="3" strokeLinecap="round" opacity="0.5" /></svg>}
               {today && <span style={{ position: 'absolute', bottom: isMobile ? 3 : 4, fontSize: isMobile ? 7 : 8, fontWeight: 800, letterSpacing: .5, color: theme.accent }}>TODAY</span>}
@@ -352,13 +352,13 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, is
 
   const dayPanel = (
     <div style={isMobile ? { marginTop: 16 } : { width: 340, flexShrink: 0 }}>
-      <div style={{ fontSize: isMobile ? 15 : 18, fontWeight: 600, padding: isMobile ? '0 2px 8px' : '0 2px 12px', color: n === 0 ? theme.accent : KIDS_INK.ink }}>
+      <div style={{ fontSize: isMobile ? 15 : 18, fontWeight: 600, padding: isMobile ? '0 2px 8px' : '0 2px 12px', color: n === 0 ? theme.accent : theme.onInk }}>
         {dayName(sel)}
-        {n > 1 && <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 600, color: KIDS_INK.ink3 }}> · in {sleepText(n)}</span>}
-        {n < 0 && <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 600, color: KIDS_INK.ink3 }}> · all crossed off ✓</span>}
+        {n > 1 && <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 600, color: theme.onInk3 }}> · in {sleepText(n)}</span>}
+        {n < 0 && <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 600, color: theme.onInk3 }}> · all crossed off ✓</span>}
       </div>
       {selEv.length === 0
-        ? <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: KIDS_INK.ink3, padding: isMobile ? '6px 2px' : '8px 2px' }}>Nothing on this day 🎈</div>
+        ? <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: theme.onInk3, padding: isMobile ? '6px 2px' : '8px 2px' }}>Nothing on this day 🎈</div>
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{selEv.map((it) => <EventCard key={it.id} it={it} theme={theme} />)}</div>}
     </div>
   );
