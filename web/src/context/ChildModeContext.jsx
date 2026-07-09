@@ -78,20 +78,32 @@ export function ChildModeProvider({ children }) {
   const unlockSettings = useCallback(() => setSettingsUnlocked(true), []);
   const lockSettings = useCallback(() => setSettingsUnlocked(false), []);
 
-  const verifyPin = useCallback(async (pin) => {
+  // Pure PIN check against the backend - returns a boolean, NO side effects.
+  // Use this to gate a one-off grown-up action (e.g. the Kids Me screen's
+  // pause/resume) that must NOT drop out of Child Mode.
+  const checkPin = useCallback(async (pin) => {
     try {
       const { data } = await api.post('/household/child-mode/verify-pin', { pin });
-      if (data?.ok) { setSettingsUnlocked(true); return true; }
-      return false;
+      return !!data?.ok;
     } catch {
       return false;
     }
   }, []);
 
+  // Verify AND unlock Settings - trips the ChildGate escape hatch so the adult
+  // Settings page (or whatever ChildGate swaps in) renders. Only the
+  // ChildModePinScreen should use this; grown-up actions that stay inside Child
+  // Mode use checkPin instead.
+  const verifyPin = useCallback(async (pin) => {
+    const ok = await checkPin(pin);
+    if (ok) setSettingsUnlocked(true);
+    return ok;
+  }, [checkPin]);
+
   return (
     <ChildModeContext.Provider value={{
       enabled, settingsUnlocked, pinIsSet,
-      enable, disable, unlockSettings, lockSettings, verifyPin,
+      enable, disable, unlockSettings, lockSettings, verifyPin, checkPin,
     }}>
       {children}
     </ChildModeContext.Provider>

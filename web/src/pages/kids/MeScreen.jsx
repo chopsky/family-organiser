@@ -15,7 +15,10 @@ import { STICKER_VISUALS } from '../../lib/kidsCosmetics';
 
 export default function MeScreen({ kid, theme, onSaved }) {
   const isMobile = useIsMobile();
-  const { verifyPin, disable, pinIsSet } = useChildMode();
+  // checkPin (not verifyPin) so gating a grown-up action here — pause/resume,
+  // exit — verifies the PIN WITHOUT tripping the Settings escape hatch that
+  // would drop us out of Child Mode. See ChildModeContext.
+  const { checkPin, disable, pinIsSet } = useChildMode();
   const navigate = useNavigate();
   const [gate, setGate] = useState(null); // { onSuccess } while the grown-up PIN sheet is open
   const [stats, setStats] = useState(null); // streak + earned badges
@@ -223,7 +226,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
       </button>
       <div style={{ height: 20 }} />
 
-      {gate && <PinSheet theme={theme} verifyPin={verifyPin} onSuccess={() => { const fn = gate.onSuccess; setGate(null); fn(); }} onClose={() => setGate(null)} />}
+      {gate && <PinSheet theme={theme} verifyPin={checkPin} onSuccess={() => { const fn = gate.onSuccess; setGate(null); fn(); }} onClose={() => setGate(null)} />}
     </div>
   );
 }
