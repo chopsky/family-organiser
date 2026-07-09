@@ -581,19 +581,27 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
         },
         { householdId, userId: member.id },
       );
+      let pushSent = 0;
       try {
         const result = await push.sendPushNotification(
           deviceTokens.map((t) => t.token),
           { title, body, data: { type: 'morning_brief' } },
         );
+        pushSent = result.sent;
         console.log(`[reminders] Morning brief push → ${member.name}: sent=${result.sent} failed=${result.failed}`);
       } catch (err) {
         console.error(`Failed to send morning brief push to ${member.name}:`, err.message);
       }
-      continue;
+      // Push is the chosen channel, but it can go silently dead (stale tokens,
+      // an APNs env/config problem, a pruned token). If NOTHING was delivered,
+      // fall back to the WhatsApp digest so the brief still lands - a dead-push
+      // spell must never quietly kill it. Delivered to ≥1 device, or no WhatsApp
+      // to fall back to → done; otherwise drop through to the WhatsApp send.
+      if (pushSent > 0 || !whatsappLinked) continue;
+      console.warn(`[reminders] Morning brief push delivered 0 for ${member.name}; falling back to WhatsApp`);
     }
 
-    // ── WhatsApp channel (no app installed): the legacy digest ──
+    // ── WhatsApp channel (no app installed, or push fell back): the legacy digest ──
     const message = buildDailyReminderMessage(member, buildOpts);
 
     // Send via WhatsApp. Prefer the approved Content Template path when
