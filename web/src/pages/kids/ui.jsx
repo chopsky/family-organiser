@@ -74,6 +74,41 @@ export function KidsLogo({ c1, c2 }) {
   );
 }
 
+// Deterministic twinkle positions (top-weighted): [left%, top%, sizePx].
+const TWINKLES = [
+  [6, 12, 2], [13, 28, 2.5], [21, 8, 1.5], [29, 22, 3], [37, 13, 2], [45, 27, 2.5],
+  [53, 9, 1.5], [61, 21, 3], [69, 13, 2], [77, 26, 2.5], [85, 9, 1.5], [92, 22, 3],
+  [97, 14, 2], [3, 44, 2], [17, 52, 2.5], [33, 46, 1.5], [50, 55, 2.5], [66, 47, 2],
+  [82, 53, 2.5], [95, 45, 2], [10, 66, 2], [40, 70, 1.5], [74, 66, 2], [58, 34, 2.5],
+  [26, 38, 2], [88, 38, 1.5], [46, 40, 2],
+];
+// Big drifting emoji per decoration kind: [emoji, left%, top%, sizePx, opacity].
+const DECO_EMOJI = {
+  stars:     [['🌙', 76, 6, 40, 0.9], ['🪐', 8, 12, 34, 0.8], ['✨', 52, 3, 22, 0.85], ['🛰️', 30, 52, 24, 0.7]],
+  sparkles:  [['🦄', 78, 7, 38, 0.9], ['✨', 12, 14, 26, 0.9], ['🌈', 46, 3, 34, 0.75], ['⭐', 30, 54, 24, 0.8]],
+  fireflies: [['🌿', 5, 9, 38, 0.5], ['🍃', 86, 6, 30, 0.5], ['🌴', 4, 68, 42, 0.45], ['🦕', 80, 58, 36, 0.5], ['🌙', 60, 6, 30, 0.7]],
+  bubbles:   [['🫧', 72, 7, 42, 0.85], ['🐠', 11, 62, 32, 0.75], ['🐚', 82, 78, 28, 0.6], ['🌊', 44, 4, 28, 0.55]],
+};
+
+// The immersive scene layer for a DARK premium theme: pulsing stars/fireflies +
+// gently drifting themed emoji, behind all content. Nothing on light themes.
+export function KidsDeco({ theme }) {
+  if (!theme?.dark || !theme.deco) return null;
+  const showTwinkles = theme.deco !== 'bubbles';
+  const starColor = (i) => (theme.deco === 'fireflies' ? '#FFDD6B' : ['#fff', '#FFE08A', '#C9BEFF'][i % 3]);
+  const emoji = DECO_EMOJI[theme.deco] || [];
+  return (
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+      {showTwinkles && TWINKLES.map((p, i) => (
+        <span key={i} className="kids-twinkle" style={{ left: `${p[0]}%`, top: `${p[1]}%`, width: p[2], height: p[2], background: starColor(i), animationDelay: `${(i % 13) * 0.2}s` }} />
+      ))}
+      {emoji.map((e, i) => (
+        <span key={`e${i}`} className="kids-drift" style={{ left: `${e[1]}%`, top: `${e[2]}%`, fontSize: e[3], opacity: e[4], animationDelay: `${i * 0.8}s` }}>{e[0]}</span>
+      ))}
+    </div>
+  );
+}
+
 export function Section({ title, emoji, count, accent, hint, style, children }) {
   return (
     <div className="kids-card-in" style={{ marginBottom: 20, ...style }}>

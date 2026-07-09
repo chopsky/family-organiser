@@ -10,7 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { kidTheme, isKidMember, KIDS_INK } from '../../lib/kidsTheme';
-import { KidsLogo } from './ui';
+import { KidsLogo, KidsDeco } from './ui';
 import QuestsScreen from './QuestsScreen';
 import ShopScreen from './ShopScreen';
 import DaysScreen from './DaysScreen';
@@ -99,12 +99,15 @@ export default function KidsShell() {
   return (
     <div
       className="flex flex-col md:flex-row"
-      style={{ height: '100dvh', overflow: 'hidden', fontFamily: "'Fredoka', system-ui, sans-serif", color: theme.onInk, background: theme.bg, WebkitTapHighlightColor: 'transparent' }}
+      style={{ position: 'relative', height: '100dvh', overflow: 'hidden', fontFamily: "'Fredoka', system-ui, sans-serif", color: theme.onInk, background: theme.bg, WebkitTapHighlightColor: 'transparent' }}
     >
+      {/* Immersive scene decoration (dark premium themes only), behind content. */}
+      <KidsDeco theme={theme} />
+
       {/* tablet / desktop left rail */}
       <Rail tab={tab} navigate={navigate} theme={theme} kids={kids} kid={kid} pickKid={pickKid} balance={balance} />
 
-      <div className="flex-1 min-h-0 overflow-y-auto safe-top" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto safe-top" style={{ position: 'relative', zIndex: 1, scrollbarWidth: 'none' }}>
         {/* Tablet content padding comes from the scroll area (34px 38px, per
             the tablet spec); phone screens pad themselves and get clearance
             for the floating bottom nav. */}
@@ -168,7 +171,7 @@ const NAV_ITEMS = [
 function Rail({ tab, navigate, theme, kids, kid, pickKid, balance }) {
   const items = [...NAV_ITEMS, ['me', 'Me', theme.emoji]];
   return (
-    <div className="hidden md:flex" style={{ width: 236, flexShrink: 0, background: theme.chrome, borderRight: `2px solid ${theme.chromeBorder}`, backdropFilter: theme.dark ? 'blur(8px)' : 'none', flexDirection: 'column', padding: '26px 18px' }}>
+    <div className="hidden md:flex" style={{ position: 'relative', zIndex: 1, width: 236, flexShrink: 0, background: theme.chrome, borderRight: `2px solid ${theme.chromeBorder}`, backdropFilter: theme.dark ? 'blur(8px)' : 'none', flexDirection: 'column', padding: '26px 18px' }}>
       <div style={{ padding: '2px 2px 18px' }}><KidsLogo c1={theme.c1} c2={theme.c2} /></div>
 
       <div style={{ marginBottom: 22 }}>

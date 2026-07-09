@@ -197,7 +197,7 @@ function Compose({ kid, theme, onSent }) {
           border: colour === ERASER ? '3px solid rgba(49,43,75,0.35)' : '2px solid rgba(49,43,75,0.10)',
           transform: colour === ERASER ? 'scale(1.12)' : 'none', transition: 'transform .15s' }}>🧽</button>
         <div style={{ flex: 1 }} />
-        <button onClick={clear} style={{ border: 0, background: 'rgba(255,255,255,0.8)', borderRadius: 99, padding: '8px 14px', fontFamily: 'inherit', fontWeight: 600, fontSize: 13, color: KIDS_INK.ink2, cursor: 'pointer' }}>
+        <button onClick={clear} style={{ border: theme.dark ? `1.5px solid ${theme.cardBorder}` : 0, background: theme.dark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.8)', backdropFilter: theme.cardBlur, borderRadius: 99, padding: '8px 14px', fontFamily: 'inherit', fontWeight: 600, fontSize: 13, color: theme.onInk2, cursor: 'pointer' }}>
           Start over
         </button>
       </div>
@@ -234,9 +234,9 @@ function SentState({ note, members, theme }) {
         )}
       </div>
 
-      <div style={{ marginTop: 16, background: 'rgba(255,255,255,0.75)', borderRadius: 20, padding: '16px 18px' }}>
+      <div style={{ marginTop: 16, background: theme.card, backdropFilter: theme.cardBlur, border: `1px solid ${theme.cardBorder}`, borderRadius: 20, padding: '16px 18px' }}>
         {reactions.length === 0 ? (
-          <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: theme.cardText2, textAlign: 'center' }}>
             Sent! 💌 Now we wait for your grown-ups to see it…
           </div>
         ) : (
@@ -244,7 +244,7 @@ function SentState({ note, members, theme }) {
             {reactions.map(([userId, emoji]) => (
               <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span className="kids-wobble" style={{ fontSize: 30 }}>{emoji}</span>
-                <span style={{ fontSize: 16, fontWeight: 600, color: KIDS_INK.ink }}>{nameOf(userId)} loved your note!</span>
+                <span style={{ fontSize: 16, fontWeight: 600, color: theme.cardText }}>{nameOf(userId)} loved your note!</span>
               </div>
             ))}
           </div>

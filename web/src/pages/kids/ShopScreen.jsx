@@ -6,7 +6,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { KIDS_INK } from '../../lib/kidsTheme';
 import { shopItems } from '../../lib/kidsCosmetics';
 import { StarPill, Celebrate } from './ui';
 
@@ -119,11 +118,11 @@ export default function ShopScreen({ kid, theme, balance, onBalance, onSaved }) 
           const can = balance >= r.cost;
           const pct = Math.min(1, r.cost ? balance / r.cost : 1);
           return (
-            <div key={r.id} className="kids-card-in" style={{ background: '#fff', borderRadius: 24, padding: '16px 14px 14px', textAlign: 'center',
-              border: can ? `2px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)',
-              boxShadow: '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)' }}>
+            <div key={r.id} className="kids-card-in" style={{ background: theme.card, backdropFilter: theme.cardBlur, borderRadius: 24, padding: '16px 14px 14px', textAlign: 'center',
+              border: can ? `2px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`,
+              boxShadow: theme.cardShadow }}>
               <div style={{ fontSize: 46, marginBottom: 6, filter: can ? 'none' : 'grayscale(.4)', opacity: can ? 1 : .7 }}>{r.emoji || '🎁'}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.2, minHeight: 36, color: KIDS_INK.ink }}>{r.title}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.2, minHeight: 36, color: theme.cardText }}>{r.title}</div>
               <div style={{ margin: '8px 0 12px', display: 'flex', justifyContent: 'center' }}><StarPill n={r.cost} /></div>
               {can ? (
                 <button onClick={() => redeem(r)} disabled={redeemingId === r.id} style={{ width: '100%', padding: '11px', borderRadius: 16, border: 0, cursor: 'pointer', fontFamily: 'inherit',
@@ -132,10 +131,10 @@ export default function ShopScreen({ kid, theme, balance, onBalance, onSaved }) 
                 </button>
               ) : (
                 <div>
-                  <div style={{ height: 10, borderRadius: 999, background: '#EDEBF4', overflow: 'hidden' }}>
+                  <div style={{ height: 10, borderRadius: 999, background: theme.dark ? 'rgba(255,255,255,0.14)' : '#EDEBF4', overflow: 'hidden' }}>
                     <div style={{ width: `${pct * 100}%`, height: '100%', background: theme.accent, borderRadius: 999 }} />
                   </div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: KIDS_INK.ink3, marginTop: 6 }}>{r.cost - balance} more ⭐</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: theme.cardText3, marginTop: 6 }}>{r.cost - balance} more ⭐</div>
                 </div>
               )}
             </div>
@@ -189,7 +188,7 @@ function CosmeticAction({ it, theme, balance, worn, busy, onBuy, onWear }) {
     if (it.kind === 'theme') {
       return worn
         ? <div style={{ fontSize: 13, fontWeight: 600, color: theme.accent, padding: '9px 0' }}>Wearing ✓</div>
-        : <button onClick={onWear} style={{ width: '100%', padding: '10px', borderRadius: 14, border: `2px solid ${theme.accent}`, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', color: theme.accent, fontSize: 14, fontWeight: 600 }}>Wear it</button>;
+        : <button onClick={onWear} style={{ width: '100%', padding: '10px', borderRadius: 14, border: `2px solid ${theme.accent}`, background: theme.card, backdropFilter: theme.cardBlur, cursor: 'pointer', fontFamily: 'inherit', color: theme.accent, fontSize: 14, fontWeight: 600 }}>Wear it</button>;
     }
     return <div style={{ fontSize: 13, fontWeight: 600, color: theme.accent, padding: '9px 0' }}>Owned ✓</div>;
   }
@@ -201,18 +200,18 @@ function CosmeticAction({ it, theme, balance, worn, busy, onBuy, onWear }) {
       </button>
     );
   }
-  return <div style={{ fontSize: 12.5, fontWeight: 600, color: KIDS_INK.ink3, padding: '9px 0' }}>{it.cost - balance} more ⭐</div>;
+  return <div style={{ fontSize: 12.5, fontWeight: 600, color: theme.cardText3, padding: '9px 0' }}>{it.cost - balance} more ⭐</div>;
 }
 
 function ThemeCard({ it, theme, balance, worn, busy, onBuy, onWear }) {
   return (
-    <div className="kids-card-in" style={{ background: '#fff', borderRadius: 22, padding: '12px', textAlign: 'center',
-      border: worn ? `2px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', boxShadow: '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)' }}>
+    <div className="kids-card-in" style={{ background: theme.card, backdropFilter: theme.cardBlur, borderRadius: 22, padding: '12px', textAlign: 'center',
+      border: worn ? `2px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow }}>
       <div style={{ height: 64, borderRadius: 16, marginBottom: 8, background: `linear-gradient(160deg, ${it.theme.c1}, ${it.theme.c2})`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', filter: it.owned ? 'none' : 'saturate(.9)' }}>
         {!it.owned && <span style={{ fontSize: 22 }}>🔒</span>}
       </div>
-      <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 8, color: KIDS_INK.ink }}>{it.name}</div>
+      <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 8, color: theme.cardText }}>{it.name}</div>
       <CosmeticAction it={it} theme={theme} balance={balance} worn={worn} busy={busy} onBuy={onBuy} onWear={onWear} />
     </div>
   );
@@ -220,10 +219,10 @@ function ThemeCard({ it, theme, balance, worn, busy, onBuy, onWear }) {
 
 function StickerCard({ it, theme, balance, busy, onBuy }) {
   return (
-    <div className="kids-card-in" style={{ background: '#fff', borderRadius: 22, padding: '14px 12px 12px', textAlign: 'center',
-      border: it.owned ? `2px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', boxShadow: '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)' }}>
+    <div className="kids-card-in" style={{ background: theme.card, backdropFilter: theme.cardBlur, borderRadius: 22, padding: '14px 12px 12px', textAlign: 'center',
+      border: it.owned ? `2px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow }}>
       <div style={{ fontSize: 46, marginBottom: 6, filter: it.owned ? 'none' : 'grayscale(.5) opacity(.75)' }}>{it.emoji}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: KIDS_INK.ink }}>{it.name}{it.seasonal ? ' ⏳' : ''}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: theme.cardText }}>{it.name}{it.seasonal ? ' ⏳' : ''}</div>
       <CosmeticAction it={it} theme={theme} balance={balance} busy={busy} onBuy={onBuy} />
     </div>
   );

@@ -117,10 +117,10 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
       <StreakCard streak={streak} theme={theme} isMobile={isMobile} />
 
       {streak?.paused ? (
-        <div className="kids-card-in" style={{ textAlign: 'center', padding: '36px 22px', background: '#fff', borderRadius: 26, border: '2px solid rgba(49,43,75,0.06)', boxShadow: '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)' }}>
+        <div className="kids-card-in" style={{ textAlign: 'center', padding: '36px 22px', background: theme.card, backdropFilter: theme.cardBlur, borderRadius: 26, border: `2px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow }}>
           <div style={{ fontSize: 64 }}>🏖️</div>
-          <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8, color: KIDS_INK.ink }}>Routines are paused</div>
-          <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, marginTop: 6, maxWidth: 320, margin: '6px auto 0' }}>Enjoy your break — your streak is safe. A grown-up can switch quests back on any time.</div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8, color: theme.cardText }}>Routines are paused</div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: theme.cardText2, marginTop: 6, maxWidth: 320, margin: '6px auto 0' }}>Enjoy your break — your streak is safe. A grown-up can switch quests back on any time.</div>
         </div>
       ) : (
         <>
@@ -172,20 +172,20 @@ function StreakCard({ streak, theme, isMobile }) {
   const has = streak.current > 0;
   const paused = !!streak.paused;
   return (
-    <div className="kids-card-in" style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff',
-      border: '2px solid rgba(49,43,75,0.06)', borderRadius: isMobile ? 26 : 24, padding: isMobile ? '13px 15px' : '15px 18px',
-      marginBottom: isMobile ? 18 : 20, boxShadow: '0 6px 0 rgba(49,43,75,0.04), 0 10px 22px rgba(49,43,75,0.06)' }}>
+    <div className="kids-card-in" style={{ display: 'flex', alignItems: 'center', gap: 14, background: theme.card, backdropFilter: theme.cardBlur,
+      border: `2px solid ${theme.cardBorder}`, borderRadius: isMobile ? 26 : 24, padding: isMobile ? '13px 15px' : '15px 18px',
+      marginBottom: isMobile ? 18 : 20, boxShadow: theme.cardShadow }}>
       <span style={{ width: 54, height: 54, borderRadius: 17, flexShrink: 0, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: (has || paused) ? theme.soft : '#F1EFF7', filter: (has || paused) ? 'none' : 'grayscale(.5) opacity(.7)' }}>{paused ? '⏸️' : '🔥'}</span>
+        background: theme.dark ? 'rgba(255,255,255,0.12)' : ((has || paused) ? theme.soft : '#F1EFF7'), filter: (has || paused) ? 'none' : 'grayscale(.5) opacity(.7)' }}>{paused ? '⏸️' : '🔥'}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-          <span style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, lineHeight: 1, color: KIDS_INK.ink }}>{streak.current}</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2 }}>day{streak.current === 1 ? '' : 's'} in a row</span>
+          <span style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, lineHeight: 1, color: theme.cardText }}>{streak.current}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: theme.cardText2 }}>day{streak.current === 1 ? '' : 's'} in a row</span>
           {streak.longest > streak.current && streak.longest > 0 && (
-            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: KIDS_INK.ink3, whiteSpace: 'nowrap' }}>Best {streak.longest}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: theme.cardText3, whiteSpace: 'nowrap' }}>Best {streak.longest}</span>
           )}
         </div>
-        <div style={{ fontSize: 13.5, fontWeight: 500, color: streak.atRisk ? '#C2410C' : KIDS_INK.ink2, marginTop: 3 }}>{streakLine(streak)}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 500, color: streak.atRisk ? (theme.dark ? '#FFB27A' : '#C2410C') : theme.cardText2, marginTop: 3 }}>{streakLine(streak)}</div>
       </div>
     </div>
   );
@@ -217,19 +217,19 @@ function Quest({ t, theme, done, lockedBy, onTap }) {
   };
   return (
     <button onClick={tap} disabled={lockedBy} className="kids-anim" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', cursor: lockedBy ? 'default' : 'pointer',
-      background: '#fff', border: done ? `2px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', borderRadius: 22, padding: '14px 16px', fontFamily: 'inherit',
-      boxShadow: done ? 'none' : '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)', opacity: (done || lockedBy) ? 0.66 : 1,
+      background: theme.card, backdropFilter: theme.cardBlur, border: done ? `2px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`, borderRadius: 22, padding: '14px 16px', fontFamily: 'inherit',
+      boxShadow: done ? 'none' : theme.cardShadow, opacity: (done || lockedBy) ? 0.66 : 1,
       animation: anim ? 'kids-pop .26s ease' : 'none', transition: 'border-color .2s' }}>
       <span style={{ width: 52, height: 52, borderRadius: 16, flexShrink: 0, fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: done ? '#EFEDF6' : theme.soft, filter: done ? 'grayscale(.5)' : 'none' }}>{t.emoji || '⭐'}</span>
+        background: theme.dark ? (done ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.14)') : (done ? '#EFEDF6' : theme.soft), filter: done ? 'grayscale(.5)' : 'none' }}>{t.emoji || '⭐'}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 17, fontWeight: 600, textDecoration: done ? 'line-through' : 'none', color: done ? KIDS_INK.ink3 : KIDS_INK.ink }}>{t.title}</span>
+        <span style={{ display: 'block', fontSize: 17, fontWeight: 600, textDecoration: done ? 'line-through' : 'none', color: done ? theme.cardText3 : theme.cardText }}>{t.title}</span>
         {lockedBy
-          ? <span style={{ fontSize: 13, fontWeight: 600, color: KIDS_INK.ink3 }}>✓ A family member did this</span>
+          ? <span style={{ fontSize: 13, fontWeight: 600, color: theme.cardText3 }}>✓ A family member did this</span>
           : (t.reward && t.stars > 0) ? <span style={{ display: 'inline-flex', marginTop: 4 }}><StarPill n={`+${t.stars}`} /></span> : null}
       </span>
       <span style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: done ? theme.accent : '#fff', border: done ? `2px solid ${theme.accent}` : '3px solid #E4E1EE' }}>
+        background: done ? theme.accent : (theme.dark ? 'rgba(255,255,255,0.12)' : '#fff'), border: done ? `2px solid ${theme.accent}` : `3px solid ${theme.dark ? 'rgba(255,255,255,0.32)' : '#E4E1EE'}` }}>
         {done && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12l5 5L20 6" /></svg>}
       </span>
       {flash && <span className="kids-anim" style={{ position: 'absolute', right: 44, top: 6, fontSize: 16, fontWeight: 600, color: '#B77B10', animation: 'kids-float-up .9s ease forwards', pointerEvents: 'none' }}>+{t.stars}⭐</span>}

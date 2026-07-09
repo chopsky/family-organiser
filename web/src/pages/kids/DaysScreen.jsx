@@ -10,7 +10,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { KIDS_INK } from '../../lib/kidsTheme';
 import { kidsEventEmoji } from '../../lib/kidsEventEmoji';
 
 const dayMs = 86400000;
@@ -156,9 +155,9 @@ export default function DaysScreen({ kid, theme }) {
     <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '0 0 14px' : '0 0 16px' }}>
         <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6 }}>My Days <span className="kids-wobble">📅</span></div>
-        <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 14, border: '2px solid rgba(49,43,75,0.06)' }}>
+        <div style={{ display: 'flex', gap: 4, background: theme.card, backdropFilter: theme.cardBlur, padding: 4, borderRadius: 14, border: `2px solid ${theme.cardBorder}` }}>
           {[['list', 'List'], ['month', 'Month']].map(([k, l]) => (
-            <button key={k} onClick={() => setView(k)} style={{ padding: '6px 13px', borderRadius: 10, border: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: view === k ? theme.grad : 'transparent', color: view === k ? '#fff' : KIDS_INK.ink3 }}>{l}</button>
+            <button key={k} onClick={() => setView(k)} style={{ padding: '6px 13px', borderRadius: 10, border: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, background: view === k ? theme.grad : 'transparent', color: view === k ? '#fff' : theme.cardText2 }}>{l}</button>
           ))}
         </div>
       </div>
@@ -169,7 +168,7 @@ export default function DaysScreen({ kid, theme }) {
           {view === 'list' && myBigs.filter((b) => b !== hero).length > 0 && (
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, margin: '4px 0 8px' }}>
               {myBigs.filter((b) => b !== hero).slice(0, 6).map((b) => (
-                <div key={`${b.date}:${b.title}`} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 999, padding: '7px 14px 7px 9px' }}>
+                <div key={`${b.date}:${b.title}`} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: theme.card, backdropFilter: theme.cardBlur, border: `2px solid ${theme.cardBorder}`, borderRadius: 999, padding: '7px 14px 7px 9px' }}>
                   <span style={{ fontSize: 20 }}>{bigEmoji(b)}</span>
                   <span>
                     <b style={{ fontWeight: 600, fontSize: 13, display: 'block', lineHeight: 1.1 }}>{b.title}</b>
@@ -187,7 +186,7 @@ export default function DaysScreen({ kid, theme }) {
             <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', color: theme.onInk3 }}>Also coming up</div>
               {myBigs.filter((b) => b !== hero).slice(0, 3).map((b) => (
-                <div key={`${b.date}:${b.title}`} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2px solid rgba(49,43,75,0.06)', borderRadius: 18, padding: '10px 14px' }}>
+                <div key={`${b.date}:${b.title}`} style={{ display: 'flex', alignItems: 'center', gap: 11, background: theme.card, backdropFilter: theme.cardBlur, border: `2px solid ${theme.cardBorder}`, borderRadius: 18, padding: '10px 14px' }}>
                   <span style={{ fontSize: 26 }}>{bigEmoji(b)}</span>
                   <span style={{ minWidth: 0 }}>
                     <b style={{ fontWeight: 600, fontSize: 14, display: 'block', lineHeight: 1.15 }}>{b.title}</b>
@@ -204,9 +203,9 @@ export default function DaysScreen({ kid, theme }) {
 
       {view === 'list' && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '4px 2px 2px' : '2px 2px 4px' }}>
-          <button onClick={() => setListOffset((m) => Math.max(0, m - 1))} disabled={listOffset <= 0} style={{ ...(isMobile ? mvNav : mvNavT), opacity: listOffset <= 0 ? 0.35 : 1 }}>‹</button>
+          <button onClick={() => setListOffset((m) => Math.max(0, m - 1))} disabled={listOffset <= 0} style={{ ...(isMobile ? mvNav(theme) : mvNavT(theme)), opacity: listOffset <= 0 ? 0.35 : 1 }}>‹</button>
           <b style={{ fontWeight: 600, fontSize: isMobile ? 18 : 22 }}>{listOffset === 0 ? 'This month' : listFirst.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</b>
-          <button onClick={() => setListOffset((m) => Math.min(6, m + 1))} disabled={listOffset >= 6} style={{ ...(isMobile ? mvNav : mvNavT), opacity: listOffset >= 6 ? 0.35 : 1 }}>›</button>
+          <button onClick={() => setListOffset((m) => Math.min(6, m + 1))} disabled={listOffset >= 6} style={{ ...(isMobile ? mvNav(theme) : mvNavT(theme)), opacity: listOffset >= 6 ? 0.35 : 1 }}>›</button>
         </div>
       )}
 
@@ -252,11 +251,11 @@ export default function DaysScreen({ kid, theme }) {
 
 function EventCard({ it, theme }) {
   return (
-    <div className="kids-card-in" style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', borderRadius: 22, padding: '14px 16px', border: `2px solid ${it.big ? theme.accent : 'rgba(49,43,75,0.06)'}`, boxShadow: '0 5px 0 rgba(49,43,75,0.04), 0 10px 18px rgba(49,43,75,0.05)' }}>
-      <span style={{ width: 52, height: 52, borderRadius: 16, flexShrink: 0, fontSize: 27, display: 'flex', alignItems: 'center', justifyContent: 'center', background: it.big ? theme.soft : '#F1EFF8' }}>{it.emoji}</span>
+    <div className="kids-card-in" style={{ display: 'flex', alignItems: 'center', gap: 14, background: theme.card, backdropFilter: theme.cardBlur, borderRadius: 22, padding: '14px 16px', border: `2px solid ${it.big ? theme.accent : theme.cardBorder}`, boxShadow: theme.cardShadow }}>
+      <span style={{ width: 52, height: 52, borderRadius: 16, flexShrink: 0, fontSize: 27, display: 'flex', alignItems: 'center', justifyContent: 'center', background: it.big ? theme.cardSel : theme.cardIcon }}>{it.emoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>{it.title}</div>
-        {it.sub && <div style={{ fontSize: 13.5, color: KIDS_INK.ink3, fontWeight: 500, marginTop: 1 }}>{it.sub}</div>}
+        <div style={{ fontSize: 16, fontWeight: 600, color: theme.cardText }}>{it.title}</div>
+        {it.sub && <div style={{ fontSize: 13.5, color: theme.cardText3, fontWeight: 500, marginTop: 1 }}>{it.sub}</div>}
       </div>
     </div>
   );
@@ -283,8 +282,8 @@ function Countdown({ hero, theme, isMobile }) {
 // ── Month grid: cross off past days, count sleeps to events ──
 const MONTH_WD = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const MONTH_WD_FULL = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const mvNav = { width: 38, height: 38, borderRadius: 12, border: 0, background: '#fff', cursor: 'pointer', fontSize: 22, fontWeight: 600, color: KIDS_INK.ink2, boxShadow: '0 2px 0 rgba(49,43,75,0.06)', fontFamily: 'inherit' };
-const mvNavT = { width: 42, height: 42, borderRadius: 14, border: 0, background: '#fff', cursor: 'pointer', fontSize: 24, fontWeight: 600, color: KIDS_INK.ink2, boxShadow: '0 2px 0 rgba(49,43,75,0.06)', fontFamily: 'inherit' };
+const mvNav = (theme) => ({ width: 38, height: 38, borderRadius: 12, border: theme.dark ? `2px solid ${theme.cardBorder}` : 0, background: theme.card, backdropFilter: theme.cardBlur, cursor: 'pointer', fontSize: 22, fontWeight: 600, color: theme.cardText2, boxShadow: theme.cardShadow, fontFamily: 'inherit' });
+const mvNavT = (theme) => ({ width: 42, height: 42, borderRadius: 14, border: theme.dark ? `2px solid ${theme.cardBorder}` : 0, background: theme.card, backdropFilter: theme.cardBlur, cursor: 'pointer', fontSize: 24, fontWeight: 600, color: theme.cardText2, boxShadow: theme.cardShadow, fontFamily: 'inherit' });
 
 function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, isMobile }) {
   const now = new Date();
@@ -322,9 +321,9 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, is
   const grid = (
     <div style={isMobile ? undefined : { flex: 1, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: isMobile ? '4px 2px 12px' : '2px 2px 14px' }}>
-        <button onClick={() => setOffset((m) => Math.max(0, m - 1))} disabled={offset <= 0} style={{ ...(isMobile ? mvNav : mvNavT), opacity: offset <= 0 ? 0.35 : 1 }}>‹</button>
+        <button onClick={() => setOffset((m) => Math.max(0, m - 1))} disabled={offset <= 0} style={{ ...(isMobile ? mvNav(theme) : mvNavT(theme)), opacity: offset <= 0 ? 0.35 : 1 }}>‹</button>
         <b style={{ fontWeight: 600, fontSize: isMobile ? 18 : 22 }}>{first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</b>
-        <button onClick={() => setOffset((m) => Math.min(6, m + 1))} disabled={offset >= 6} style={{ ...(isMobile ? mvNav : mvNavT), opacity: offset >= 6 ? 0.35 : 1 }}>›</button>
+        <button onClick={() => setOffset((m) => Math.min(6, m + 1))} disabled={offset >= 6} style={{ ...(isMobile ? mvNav(theme) : mvNavT(theme)), opacity: offset >= 6 ? 0.35 : 1 }}>›</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8 }}>
         {(isMobile ? MONTH_WD : MONTH_WD_FULL).map((w, i) => <div key={i} style={{ textAlign: 'center', fontSize: isMobile ? 12 : 13, fontWeight: 600, color: theme.onInk3 }}>{w}</div>)}
@@ -337,7 +336,7 @@ function MonthView({ theme, kid, monthEvents, loadMonth, bigDays, activities, is
           const dayEvs = evOn(dateStr);
           return (
             <button key={i} onClick={() => setSel(dateStr)} style={{ position: 'relative', aspectRatio: '1', borderRadius: isMobile ? 14 : 16, cursor: 'pointer', fontFamily: 'inherit',
-              border: (today || on) ? `2.5px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', background: (today || on) ? theme.soft : '#fff',
+              border: (today || on) ? `2.5px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`, background: (today || on) ? theme.cardSel : theme.card, backdropFilter: theme.cardBlur,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 1 : 3, opacity: past ? 0.5 : 1, overflow: 'hidden' }}>
               <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 600, color: today ? theme.accent : theme.onInk }}>{d}</span>
               {dayEvs.length > 0 && !past && <span style={{ display: 'flex', gap: isMobile ? 1 : 2 }}>{dayEvs.slice(0, 3).map((e, j) => <span key={j} style={{ fontSize: isMobile ? 9 : 12 }}>{e.emoji}</span>)}</span>}

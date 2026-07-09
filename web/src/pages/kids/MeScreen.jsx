@@ -115,11 +115,11 @@ export default function MeScreen({ kid, theme, onSaved }) {
           const on = earned.has(key);
           return (
             <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderRadius: 18,
-              background: on ? theme.soft : '#fff', border: on ? `2px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)' }}>
+              background: on ? theme.cardSel : theme.card, backdropFilter: theme.cardBlur, border: on ? `2px solid ${theme.accent}` : `2px solid ${theme.cardBorder}` }}>
               <span style={{ fontSize: 26, flexShrink: 0, filter: on ? 'none' : 'grayscale(1) opacity(.5)' }}>{meta.emoji}</span>
               <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: on ? KIDS_INK.ink : KIDS_INK.ink3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.label}</span>
-                <span style={{ display: 'block', fontSize: 12, fontWeight: 500, color: on ? theme.accent : KIDS_INK.ink3 }}>{on ? 'Earned!' : meta.blurb}</span>
+                <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: on ? theme.cardText : theme.cardText3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.label}</span>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 500, color: on ? theme.accent : theme.cardText3 }}>{on ? 'Earned!' : meta.blurb}</span>
               </span>
             </div>
           );
@@ -169,7 +169,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
           const on = theme.emoji === a;
           return (
             <button key={a} onClick={() => save({ kid_avatar: a })} style={{ aspectRatio: '1', borderRadius: 18, fontSize: isMobile ? 30 : 32, cursor: 'pointer', fontFamily: 'inherit',
-              background: on ? theme.soft : '#fff', border: on ? `3px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{a}</button>
+              background: on ? theme.cardSel : theme.card, backdropFilter: theme.cardBlur, border: on ? `3px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{a}</button>
           );
         })}
       </div>
@@ -179,7 +179,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
       {ownedStickers.length > 0 ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 12 : 14, padding: '0 2px' }}>
           {ownedStickers.map((k) => (
-            <div key={k} title={STICKER_VISUALS[k]?.name || ''} style={{ width: isMobile ? 56 : 62, height: isMobile ? 56 : 62, borderRadius: 18, background: theme.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+            <div key={k} title={STICKER_VISUALS[k]?.name || ''} style={{ width: isMobile ? 56 : 62, height: isMobile ? 56 : 62, borderRadius: 18, background: theme.cardSel, backdropFilter: theme.cardBlur, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
               {STICKER_VISUALS[k]?.emoji || '✨'}
             </div>
           ))}
@@ -194,19 +194,19 @@ export default function MeScreen({ kid, theme, onSaved }) {
       {/* Routine pause: freeze the streak while away or unwell (grown-up only). */}
       {pause?.available && (
         pause.paused ? (
-          <div style={{ background: theme.soft, borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div style={{ background: theme.cardSel, backdropFilter: theme.cardBlur, border: `1px solid ${theme.cardBorder}`, borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <span style={{ fontSize: 26 }}>⏸️</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14.5, fontWeight: 600, color: KIDS_INK.ink }}>Routines paused</div>
-              <div style={{ fontSize: 12.5, fontWeight: 500, color: KIDS_INK.ink2 }}>The streak is safe{pause.since ? ` since ${fmtDay(pause.since)}` : ''}.</div>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: theme.cardText }}>Routines paused</div>
+              <div style={{ fontSize: 12.5, fontWeight: 500, color: theme.cardText2 }}>The streak is safe{pause.since ? ` since ${fmtDay(pause.since)}` : ''}.</div>
             </div>
             <button onClick={() => runGrownup(togglePause)} disabled={pauseBusy} style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: 'inherit', background: theme.grad, color: '#fff', fontSize: 13.5, fontWeight: 600, opacity: pauseBusy ? .6 : 1 }}>
               {pauseBusy ? '…' : 'Resume'}
             </button>
           </div>
         ) : (
-          <button onClick={() => runGrownup(togglePause)} disabled={pauseBusy} style={{ width: isMobile ? '100%' : undefined, padding: isMobile ? 14 : '13px 22px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
-            fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 12 }}>
+          <button onClick={() => runGrownup(togglePause)} disabled={pauseBusy} style={{ width: isMobile ? '100%' : undefined, padding: isMobile ? 14 : '13px 22px', borderRadius: 18, border: `2px solid ${theme.dark ? theme.cardBorder : 'rgba(49,43,75,0.12)'}`, background: theme.card, backdropFilter: theme.cardBlur, cursor: 'pointer',
+            fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: theme.cardText2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 12 }}>
             ⏸️ Pause routines
           </button>
         )
@@ -216,8 +216,8 @@ export default function MeScreen({ kid, theme, onSaved }) {
       )}
 
       {/* Exit: leaving Child Mode already gives a grown-up the full adult app. */}
-      <button onClick={() => runGrownup(exit)} style={{ width: isMobile ? '100%' : undefined, marginTop: 14, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
-        fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+      <button onClick={() => runGrownup(exit)} style={{ width: isMobile ? '100%' : undefined, marginTop: 14, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: `2px solid ${theme.dark ? theme.cardBorder : 'rgba(49,43,75,0.12)'}`, background: theme.card, backdropFilter: theme.cardBlur, cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: theme.cardText2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <LockIcon />
         Exit Child Mode
       </button>

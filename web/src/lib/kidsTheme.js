@@ -22,10 +22,10 @@ export const KID_COLOR_PRESETS = [
   // special. `premium: true` keeps them out of the free-default pool and gates
   // them in the Me picker. Keys mirror src/services/kids-cosmetics.js (the
   // authoritative price/season source); colours live here for kidTheme().
-  { key: 'galaxy',  premium: true, dark: true, name: 'Galaxy',  c1: '#8B7BFF', c2: '#3B2E7E', accent: '#A78BFA', soft: '#E9E5FF' },
-  { key: 'dino',    premium: true, dark: true, name: 'Dino',    c1: '#4FBE72', c2: '#155230', accent: '#5FCF7F', soft: '#E1F6E7' },
-  { key: 'unicorn', premium: true, dark: true, name: 'Unicorn', c1: '#FF9DE6', c2: '#7C3AC4', accent: '#F58FD6', soft: '#FBE7FB' },
-  { key: 'ocean',   premium: true, dark: true, name: 'Ocean',   c1: '#3AC0E6', c2: '#0E3E6E', accent: '#5AD4E0', soft: '#DDF1FB' },
+  { key: 'galaxy',  premium: true, dark: true, deco: 'stars',    name: 'Galaxy',  c1: '#8B7BFF', c2: '#3B2E7E', accent: '#A78BFA', soft: '#E9E5FF' },
+  { key: 'dino',    premium: true, dark: true, deco: 'fireflies', name: 'Dino',    c1: '#4FBE72', c2: '#155230', accent: '#5FCF7F', soft: '#E1F6E7' },
+  { key: 'unicorn', premium: true, dark: true, deco: 'sparkles',  name: 'Unicorn', c1: '#FF9DE6', c2: '#7C3AC4', accent: '#F58FD6', soft: '#FBE7FB' },
+  { key: 'ocean',   premium: true, dark: true, deco: 'bubbles',   name: 'Ocean',   c1: '#3AC0E6', c2: '#0E3E6E', accent: '#5AD4E0', soft: '#DDF1FB' },
 ];
 
 // The free pool a kid without a chosen colour falls back to, so a premium
@@ -131,6 +131,25 @@ export function kidTheme(member, index = 0) {
     // Translucent surface for the rail/nav chrome, so it reads on either base.
     chrome: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.6)',
     chromeBorder: dark ? 'rgba(255,255,255,0.16)' : 'rgba(49,43,75,0.06)',
+    // Card surface + in-card text. On a dark theme cards are FROSTED GLASS
+    // (translucent, light text, glowing border) so they melt into the scene
+    // instead of floating as bright white rectangles; on a light theme they are
+    // the usual solid-white card with dark ink. Replace hard-coded card '#fff'
+    // + KIDS_INK.* with these so cards adapt per theme.
+    card: dark ? 'rgba(255,255,255,0.09)' : '#fff',
+    cardBorder: dark ? 'rgba(255,255,255,0.18)' : 'rgba(49,43,75,0.06)',
+    cardShadow: dark ? '0 10px 30px rgba(8,4,24,0.35)' : '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)',
+    cardText: dark ? '#F4F0FF' : KIDS_INK.ink,
+    cardText2: dark ? 'rgba(244,240,255,0.74)' : KIDS_INK.ink2,
+    cardText3: dark ? 'rgba(244,240,255,0.52)' : KIDS_INK.ink3,
+    cardBlur: dark ? 'blur(10px)' : 'none',
+    // Selected/active surface (a picked badge, an "on" toggle, today's calendar
+    // cell): a brighter frosted highlight on dark, the soft pastel on light.
+    cardSel: dark ? 'rgba(255,255,255,0.17)' : preset.soft,
+    // In-card icon tile (emoji chips, avatar swatches): a faint glass square on
+    // dark, a soft tint on light.
+    cardIcon: dark ? 'rgba(255,255,255,0.10)' : '#F3F0FB',
+    deco: preset.deco || null,
     grad: `linear-gradient(160deg, ${preset.c1}, ${preset.c2})`,
     // Premium themes get a decorated scene; free themes keep the soft fade.
     bg: PREMIUM_SCENES[preset.key] || `radial-gradient(130% 60% at 50% 0%, ${preset.soft}, ${KIDS_INK.paper} 60%)`,
