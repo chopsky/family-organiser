@@ -9,8 +9,9 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChildMode } from '../../context/ChildModeContext';
-import { KID_COLOR_PRESETS, KID_AVATARS, KIDS_INK } from '../../lib/kidsTheme';
+import { FREE_PRESETS, KID_COLOR_PRESETS, KID_AVATARS, KIDS_INK } from '../../lib/kidsTheme';
 import { BADGE_META, BADGE_ORDER } from '../../lib/kidsBadges';
+import { STICKER_VISUALS } from '../../lib/kidsCosmetics';
 
 export default function MeScreen({ kid, theme, onSaved }) {
   const isMobile = useIsMobile();
@@ -26,6 +27,18 @@ export default function MeScreen({ kid, theme, onSaved }) {
     return () => { alive = false; };
   }, [kid.id]);
   const earned = new Set((stats?.badges || []).map((b) => b.badge_key));
+
+  // Owned cosmetics (premium themes + stickers) for gating the theme picker
+  // and the sticker shelf. Refetched on kid switch.
+  const [cosmetics, setCosmetics] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api.get(`/kids/cosmetics?member_id=${kid.id}`).then(({ data }) => { if (alive) setCosmetics(data); }).catch(() => {});
+    return () => { alive = false; };
+  }, [kid.id]);
+  const ownedCos = new Set(cosmetics?.owned || []);
+  const premiumThemes = KID_COLOR_PRESETS.filter((p) => p.premium);
+  const ownedStickers = (cosmetics?.owned || []).filter((k) => k.startsWith('sticker_'));
 
   const save = (patch) => {
     // Optimistic: the shell re-themes instantly; the PATCH persists to the
@@ -94,8 +107,8 @@ export default function MeScreen({ kid, theme, onSaved }) {
       </div>
 
       <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My colour 🎨</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 14 : 16, marginBottom: isMobile ? 28 : 30, padding: '0 2px' }}>
-        {KID_COLOR_PRESETS.map((c) => {
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 14 : 16, marginBottom: premiumThemes.length ? 18 : (isMobile ? 28 : 30), padding: '0 2px' }}>
+        {FREE_PRESETS.map((c) => {
           const on = theme.key === c.key;
           const size = isMobile ? 52 : 58;
           return (
@@ -105,6 +118,30 @@ export default function MeScreen({ kid, theme, onSaved }) {
           );
         })}
       </div>
+
+      {/* Premium themes: owned ones are selectable; locked ones bounce to the
+          Shop (bought with stars there - never handed out free). */}
+      {premiumThemes.length > 0 && (
+        <>
+          <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, color: KIDS_INK.ink2, padding: isMobile ? '0 4px 10px' : '0 2px 12px' }}>Premium themes 🌟</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 14 : 16, marginBottom: isMobile ? 28 : 30, padding: '0 2px' }}>
+            {premiumThemes.map((c) => {
+              const owned = ownedCos.has(c.key);
+              const on = theme.key === c.key;
+              const size = isMobile ? 52 : 58;
+              return (
+                <button key={c.key} aria-label={c.name} title={owned ? c.name : `${c.name} — get it in the Shop`}
+                  onClick={() => (owned ? save({ kid_color: c.key }) : navigate('/rewards'))}
+                  style={{ position: 'relative', width: size, height: size, borderRadius: '50%', border: on ? '4px solid #fff' : '4px solid transparent', cursor: 'pointer',
+                    boxShadow: on ? `0 0 0 3px ${c.accent}, 0 6px 14px rgba(49,43,75,0.2)` : '0 4px 10px rgba(49,43,75,0.12)',
+                    background: `linear-gradient(160deg, ${c.c1}, ${c.c2})`, filter: owned ? 'none' : 'saturate(.85)' }}>
+                  {!owned && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>🔒</span>}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My avatar 😀</div>
       <div className="grid grid-cols-5 md:grid-cols-8" style={{ gap: isMobile ? 10 : 12 }}>
@@ -116,6 +153,20 @@ export default function MeScreen({ kid, theme, onSaved }) {
           );
         })}
       </div>
+
+      {/* Sticker collection: what the kid has bought in the Shop. */}
+      <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600, padding: isMobile ? '28px 4px 12px' : '30px 2px 14px' }}>My stickers ✨</div>
+      {ownedStickers.length > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 12 : 14, padding: '0 2px' }}>
+          {ownedStickers.map((k) => (
+            <div key={k} title={STICKER_VISUALS[k]?.name || ''} style={{ width: isMobile ? 56 : 62, height: isMobile ? 56 : 62, borderRadius: 18, background: theme.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+              {STICKER_VISUALS[k]?.emoji || '✨'}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13.5, fontWeight: 500, color: KIDS_INK.ink3, padding: '0 4px' }}>Buy stickers in the Star Shop! 🛍️</div>
+      )}
 
       {/* PIN-gated exit. One button only: leaving Child Mode already gives a
           grown-up the full adult app, Settings included. */}

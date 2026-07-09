@@ -8338,6 +8338,39 @@ async function addKidBadge(householdId, memberId, badgeKey, earnedOn, db = supab
   return { inserted: Array.isArray(data) && data.length > 0 };
 }
 
+// ─── Kids-mode cosmetics (Phase 2: star-shop) ────────────────────────────────
+// A kid's owned cosmetics (premium themes + stickers). Returns null (NOT [])
+// when the table doesn't exist yet, so the route can tell "no cosmetics" apart
+// from "feature not migrated" and keep the shop's cosmetics section dark until
+// migration-kids-cosmetics.sql runs.
+async function getKidCosmetics(householdId, memberId, db = supabase) {
+  const { data, error } = await db
+    .from('kid_cosmetics_owned')
+    .select('cosmetic_key, kind, acquired_on')
+    .eq('household_id', householdId)
+    .eq('member_id', memberId);
+  if (error) {
+    if (/kid_cosmetics_owned/i.test(error.message || '')) return null; // pre-migration
+    throw error;
+  }
+  return data || [];
+}
+
+// Idempotent grant (unique member_id+cosmetic_key). Returns { inserted } so the
+// caller charges stars exactly once. `unavailable` flags a missing table.
+async function addKidCosmetic(householdId, memberId, key, kind, source = 'star', db = supabase) {
+  const { data, error } = await db
+    .from('kid_cosmetics_owned')
+    .upsert({ household_id: householdId, member_id: memberId, cosmetic_key: key, kind, source },
+      { onConflict: 'member_id,cosmetic_key', ignoreDuplicates: true })
+    .select('id');
+  if (error) {
+    if (/kid_cosmetics_owned/i.test(error.message || '')) return { inserted: false, unavailable: true };
+    throw error;
+  }
+  return { inserted: Array.isArray(data) && data.length > 0 };
+}
+
 async function getRewards(householdId, db = supabase) {
   const run = (cols) => db
     .from('rewards')
@@ -8454,6 +8487,8 @@ module.exports = {
   getKidStreak,
   getKidBadges,
   addKidBadge,
+  getKidCosmetics,
+  addKidCosmetic,
   getRewards,
   addReward,
   updateReward,

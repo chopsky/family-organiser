@@ -90,7 +90,7 @@ export default function KidsShell() {
 
   const screen = kid && (
     tab === 'quests' ? <QuestsScreen kid={kid} theme={theme} day={day} setDay={setDay} kids={kids} pickKid={pickKid} />
-    : tab === 'shop' ? <ShopScreen kid={kid} theme={theme} balance={balance} onBalance={(kidId, bal) => setDay((d) => (d ? { ...d, balances: { ...d.balances, [kidId]: bal } } : d))} />
+    : tab === 'shop' ? <ShopScreen kid={kid} theme={theme} balance={balance} onSaved={patchMember} onBalance={(kidId, bal) => setDay((d) => (d ? { ...d, balances: { ...d.balances, [kidId]: bal } } : d))} />
     : tab === 'days' ? <DaysScreen kid={kid} theme={theme} members={members} />
     : tab === 'note' ? <NoteScreen kid={kid} theme={theme} members={members} />
     : <MeScreen kid={kid} theme={theme} onSaved={patchMember} />

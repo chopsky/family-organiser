@@ -18,9 +18,17 @@ const multer = require('multer');
 const db = require('../db/queries');
 const r2 = require('../services/r2');
 const push = require('../services/push');
+const kidsCosmetics = require('../services/kids-cosmetics');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
+
+// Today as 'MM-DD' in the household's timezone, for the seasonal-cosmetic gate.
+async function householdMMDD(householdId) {
+  let tz = 'Europe/London';
+  try { tz = (await db.getHouseholdById(householdId))?.timezone || tz; } catch { /* default */ }
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz }).slice(5); // 'YYYY-MM-DD' -> 'MM-DD'
+}
 
 const WINDOW_DAYS = 180;
 const ymd = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
@@ -245,6 +253,74 @@ router.post('/notes/:id/reactions', requireAuth, requireHousehold, async (req, r
     return res.json({ note: await noteWithUrl(note) });
   } catch (err) {
     console.error('POST /api/kids/notes/:id/reactions error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/kids/cosmetics?member_id= — the star-shop cosmetics for a kid:
+ * their star balance, which cosmetics they own, and the catalogue (cost +
+ * in-season flag). `available:false` means the migration hasn't run yet, so the
+ * shop keeps its cosmetics section dark. Visual data lives on the client;
+ * this is the authoritative cost/season source.
+ */
+router.get('/cosmetics', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const memberId = req.query.member_id;
+    if (!memberId) return res.status(400).json({ error: 'member_id is required' });
+    const [owned, balances, mmdd] = await Promise.all([
+      db.getKidCosmetics(req.householdId, memberId),
+      db.getStarBalances(req.householdId),
+      householdMMDD(req.householdId),
+    ]);
+    return res.json({
+      available: owned !== null,
+      balance: balances[memberId] || 0,
+      owned: (owned || []).map((o) => o.cosmetic_key),
+      catalogue: kidsCosmetics.getCatalogue(mmdd),
+    });
+  } catch (err) {
+    console.error('GET /api/kids/cosmetics error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/kids/cosmetics/:key/buy — body { member_id }. Spends stars to own a
+ * cosmetic. Grants first (idempotent) then charges (idempotent per member+key),
+ * so a rare failure leaves a free cosmetic rather than charging for nothing.
+ * The server owns the price + the season gate - never trust a client cost.
+ */
+router.post('/cosmetics/:key/buy', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const memberId = req.body?.member_id;
+    if (!memberId) return res.status(400).json({ error: 'member_id is required' });
+    const item = kidsCosmetics.getCosmetic(req.params.key);
+    if (!item) return res.status(404).json({ error: 'Unknown cosmetic' });
+
+    const members = await db.getHouseholdMembers(req.householdId);
+    if (!members.some((m) => m.id === memberId)) return res.status(400).json({ error: 'Unknown member' });
+
+    const owned = await db.getKidCosmetics(req.householdId, memberId);
+    if (owned === null) return res.status(503).json({ error: 'Cosmetics are coming soon' }); // pre-migration
+    const balances = await db.getStarBalances(req.householdId);
+    const balance = balances[memberId] || 0;
+
+    if (owned.some((o) => o.cosmetic_key === item.key)) {
+      return res.json({ ok: true, alreadyOwned: true, balance, owned: owned.map((o) => o.cosmetic_key) });
+    }
+    const mmdd = await householdMMDD(req.householdId);
+    if (!kidsCosmetics.inSeason(item, mmdd)) return res.status(400).json({ error: 'Not available right now' });
+    if (balance < item.cost) return res.status(400).json({ error: 'Not enough stars', balance, cost: item.cost });
+
+    const { inserted } = await db.addKidCosmetic(req.householdId, memberId, item.key, item.kind, 'star');
+    if (inserted) {
+      await db.addStarTransaction({ householdId: req.householdId, memberId, delta: -item.cost, reason: 'spend', refType: 'cosmetic', refId: `${memberId}:${item.key}` });
+    }
+    const after = await db.getStarBalances(req.householdId);
+    return res.status(201).json({ ok: true, key: item.key, kind: item.kind, balance: after[memberId] || 0, owned: [...owned.map((o) => o.cosmetic_key), item.key] });
+  } catch (err) {
+    console.error('POST /api/kids/cosmetics/:key/buy error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

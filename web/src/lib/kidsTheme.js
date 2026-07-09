@@ -9,6 +9,7 @@
 // stable default derived from their position in the kids list.
 
 export const KID_COLOR_PRESETS = [
+  // Free presets (8) - always selectable in the Me picker.
   { key: 'sky',    c1: '#5CC6FF', c2: '#2E8FE0', accent: '#3BB4F5', soft: '#E3F4FE' },
   { key: 'coral',  c1: '#FF9DBB', c2: '#F2578A', accent: '#FB6F92', soft: '#FFE7EE' },
   { key: 'grape',  c1: '#A78BFA', c2: '#7C4DE0', accent: '#8B5CF6', soft: '#EFE9FE' },
@@ -17,7 +18,19 @@ export const KID_COLOR_PRESETS = [
   { key: 'teal',   c1: '#5AD4E0', c2: '#1AA6B8', accent: '#22B4C4', soft: '#DCF5F8' },
   { key: 'orange', c1: '#FFB27A', c2: '#F2743A', accent: '#FB8C4E', soft: '#FFEBDD' },
   { key: 'berry',  c1: '#F58FD6', c2: '#D14EA8', accent: '#E86FC4', soft: '#FCE6F5' },
+  // Premium themes (Phase 2 star-shop): richer, darker gradients that read as
+  // special. `premium: true` keeps them out of the free-default pool and gates
+  // them in the Me picker. Keys mirror src/services/kids-cosmetics.js (the
+  // authoritative price/season source); colours live here for kidTheme().
+  { key: 'galaxy',  premium: true, name: 'Galaxy',  c1: '#6D5BF0', c2: '#241A5E', accent: '#8B7BFF', soft: '#E9E5FF' },
+  { key: 'dino',    premium: true, name: 'Dino',    c1: '#5FCF7F', c2: '#1C6E3C', accent: '#34AC59', soft: '#E1F6E7' },
+  { key: 'unicorn', premium: true, name: 'Unicorn', c1: '#FF9DE6', c2: '#9B3FD6', accent: '#D96FE0', soft: '#FBE7FB' },
+  { key: 'ocean',   premium: true, name: 'Ocean',   c1: '#41C7E6', c2: '#124F8E', accent: '#1F9FD6', soft: '#DDF1FB' },
 ];
+
+// The free pool a kid without a chosen colour falls back to, so a premium
+// theme is never assigned (or shown active) without being bought.
+export const FREE_PRESETS = KID_COLOR_PRESETS.filter((p) => !p.premium);
 
 export const KID_AVATARS = ['🦖', '🦄', '🐱', '🐶', '🦊', '🐼', '🐯', '🦁', '🐵', '🐸', '🦉', '🐙', '🦕', '🐢', '🐝', '🦋', '🚀', '⚽', '🎨', '🦸', '🧚', '🤖'];
 
@@ -35,7 +48,9 @@ const presetByKey = Object.fromEntries(KID_COLOR_PRESETS.map((p) => [p.key, p]))
  * one yet, so siblings start on different colours.
  */
 export function kidTheme(member, index = 0) {
-  const preset = presetByKey[member?.kid_color] || KID_COLOR_PRESETS[index % KID_COLOR_PRESETS.length];
+  // A saved kid_color resolves to any preset (incl. an owned premium theme);
+  // an unset colour falls back to a FREE preset so premium is never free.
+  const preset = presetByKey[member?.kid_color] || FREE_PRESETS[index % FREE_PRESETS.length];
   const emoji = member?.kid_avatar || KID_AVATARS[index % 2]; // 🦖 / 🦄 defaults per the spec
   return {
     key: preset.key,
