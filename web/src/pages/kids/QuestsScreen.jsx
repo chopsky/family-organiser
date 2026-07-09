@@ -10,7 +10,7 @@ import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
 import { BADGE_META, streakLine } from '../../lib/kidsBadges';
-import { StarPill, Section, Celebrate, KidsLogo } from './ui';
+import { StarPill, Section, Celebrate } from './ui';
 import { KidSwitch } from './KidsShell';
 
 const SLOTS = [['morning', 'Morning', '☀️'], ['afternoon', 'Afternoon', '🌤️'], ['evening', 'Evening', '🌙']];
@@ -91,20 +91,15 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
 
   return (
     <div style={{ padding: isMobile ? '20px 18px 0' : 0 }}>
-      {/* Phone-only brand row + kid switcher + star pill. The tablet rail
-          already carries all three, so the tablet content starts directly
-          with the greeting (conditional render - a md:hidden class would
-          lose to these rows' inline display:flex). */}
+      {/* Phone-only kid switcher + star pill. The tablet rail already carries
+          these (plus the brand logo), so the tablet content starts directly
+          with the greeting (conditional render - a md:hidden class would lose
+          to this row's inline display:flex). */}
       {isMobile && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 16px' }}>
-            <KidsLogo c1={theme.c1} c2={theme.c2} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <KidSwitch kids={kids || []} kid={kid} pickKid={pickKid} />
-            <StarPill n={(day?.balances && day.balances[kid.id]) || 0} />
-          </div>
-        </>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <KidSwitch kids={kids || []} kid={kid} pickKid={pickKid} />
+          <StarPill n={(day?.balances && day.balances[kid.id]) || 0} />
+        </div>
       )}
 
       <div style={{ fontSize: isMobile ? 30 : 34, fontWeight: 600, letterSpacing: -0.6, marginBottom: 2 }}>
