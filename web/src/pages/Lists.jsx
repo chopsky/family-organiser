@@ -406,7 +406,7 @@ export default function Lists() {
         return (
           <button key={m.id} onClick={() => setToFilter(on ? null : m.id)} title={m.name}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 5px 5px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, border: 0, background: on ? mc + '22' : '#fff', boxShadow: on ? `inset 0 0 0 1.5px ${mc}` : `inset 0 0 0 1px ${LINE}` }}>
-            <Avatar member={m} size={26} /><span style={{ fontSize: 12, fontWeight: 700, color: on ? mc : INK3 }}>{n}</span>
+            <Avatar member={m} size={35} /><span style={{ fontSize: 12, fontWeight: 700, color: on ? mc : INK3 }}>{n}</span>
           </button>
         );
       })}
@@ -641,7 +641,7 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit })
         <div style={{ display: 'flex', flexShrink: 0 }}>
           {assignees.slice(0, 3).map((m, i) => (
             <div key={m.id} style={{ marginLeft: i ? -8 : 0, borderRadius: '50%', border: '2px solid #fff', display: 'flex' }}>
-              <Avatar member={m} size={35} />
+              <Avatar member={m} size={26} />
             </div>
           ))}
         </div>
