@@ -108,7 +108,7 @@ const PROMPT_ICON = {
   check: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12l3 3 5-6" /></svg>,
 };
 const QUICK_PROMPTS = [
-  { title: 'Add an event', ex: 'Mason has tennis Saturday at 3pm', color: 'var(--color-plum)', icon: PROMPT_ICON.cal },
+  { title: 'Add an event', ex: 'Swimming lesson Saturday at 3pm', color: 'var(--color-plum)', icon: PROMPT_ICON.cal },
   { title: 'Add to the grocery list', ex: 'We need carrots and milk', color: '#4F9D69', icon: PROMPT_ICON.cart },
   { title: 'Plan a meal', ex: 'Something easy for Wednesday', color: '#D8873B', icon: PROMPT_ICON.fork },
   { title: 'Create a task', ex: "Remind me to renew Lily's passport", color: '#D8788A', icon: PROMPT_ICON.check },
