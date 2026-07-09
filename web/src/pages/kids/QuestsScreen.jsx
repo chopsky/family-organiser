@@ -111,38 +111,48 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
         Hi, {kid.name}! <span className="kids-wobble">👋</span>
       </div>
       <div style={{ fontSize: isMobile ? 16 : 17, color: KIDS_INK.ink2, fontWeight: 500, marginBottom: isMobile ? 16 : 18 }}>
-        {total === 0 ? 'No quests today - enjoy it!' : doneCount === total ? 'You finished everything! 🎉' : "Here are today's quests."}
+        {streak?.paused ? 'Routines are paused — have fun! 🏖️' : total === 0 ? 'No quests today - enjoy it!' : doneCount === total ? 'You finished everything! 🎉' : "Here are today's quests."}
       </div>
 
       <StreakCard streak={streak} theme={theme} isMobile={isMobile} />
 
-      {total > 0 && (
-        <div style={{ background: theme.grad, borderRadius: isMobile ? 30 : 28, padding: isMobile ? '20px 22px' : '22px 26px', display: 'flex', alignItems: 'center', gap: isMobile ? 18 : 22, marginBottom: isMobile ? 22 : 24, boxShadow: isMobile ? '0 10px 26px rgba(49,43,75,0.2)' : '0 12px 30px rgba(49,43,75,0.2)' }}>
-          <ProgressRing pct={pct} mascot={mascot} size={isMobile ? 84 : 98} />
-          <div style={{ color: '#fff' }}>
-            <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, opacity: .92 }}>Quest progress</div>
-            <div style={{ fontSize: isMobile ? 30 : 38, fontWeight: 600, lineHeight: 1.1 }}>{doneCount} <span style={{ fontSize: isMobile ? 18 : 22, opacity: .85 }}>of {total} done</span></div>
-            <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, opacity: .92, marginTop: 2 }}>{pct === 1 ? 'Legend! ⭐' : pct >= .5 ? (isMobile ? 'Over halfway!' : 'Over halfway, keep going!') : 'You can do it!'}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Tablet: sections flow into 2 columns (each section unbreakable);
-          mobile: the same sections stack. */}
-      <div style={isMobile ? undefined : { columns: 2, columnGap: 22 }}>
-        {sections.map((g) => (
-          <Section key={g.k} title={g.label} emoji={g.em} count={`${g.tasks.filter(isDone).length}/${g.tasks.length}`} accent={theme.accent} hint={g.hint}
-            style={isMobile ? undefined : { breakInside: 'avoid', marginBottom: 22 }}>
-            {g.tasks.map((t) => <Quest key={t.occurrence_key} t={t} theme={theme} done={isDone(t)} lockedBy={doneByOther(t)} onTap={() => toggle(t)} />)}
-          </Section>
-        ))}
-      </div>
-
-      {total === 0 && (
-        <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
+      {streak?.paused ? (
+        <div className="kids-card-in" style={{ textAlign: 'center', padding: '36px 22px', background: '#fff', borderRadius: 26, border: '2px solid rgba(49,43,75,0.06)', boxShadow: '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)' }}>
           <div style={{ fontSize: 64 }}>🏖️</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>A quest-free day!</div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8 }}>Routines are paused</div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: KIDS_INK.ink2, marginTop: 6, maxWidth: 320, margin: '6px auto 0' }}>Enjoy your break — your streak is safe. A grown-up can switch quests back on any time.</div>
         </div>
+      ) : (
+        <>
+          {total > 0 && (
+            <div style={{ background: theme.grad, borderRadius: isMobile ? 30 : 28, padding: isMobile ? '20px 22px' : '22px 26px', display: 'flex', alignItems: 'center', gap: isMobile ? 18 : 22, marginBottom: isMobile ? 22 : 24, boxShadow: isMobile ? '0 10px 26px rgba(49,43,75,0.2)' : '0 12px 30px rgba(49,43,75,0.2)' }}>
+              <ProgressRing pct={pct} mascot={mascot} size={isMobile ? 84 : 98} />
+              <div style={{ color: '#fff' }}>
+                <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, opacity: .92 }}>Quest progress</div>
+                <div style={{ fontSize: isMobile ? 30 : 38, fontWeight: 600, lineHeight: 1.1 }}>{doneCount} <span style={{ fontSize: isMobile ? 18 : 22, opacity: .85 }}>of {total} done</span></div>
+                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, opacity: .92, marginTop: 2 }}>{pct === 1 ? 'Legend! ⭐' : pct >= .5 ? (isMobile ? 'Over halfway!' : 'Over halfway, keep going!') : 'You can do it!'}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Tablet: sections flow into 2 columns (each section unbreakable);
+              mobile: the same sections stack. */}
+          <div style={isMobile ? undefined : { columns: 2, columnGap: 22 }}>
+            {sections.map((g) => (
+              <Section key={g.k} title={g.label} emoji={g.em} count={`${g.tasks.filter(isDone).length}/${g.tasks.length}`} accent={theme.accent} hint={g.hint}
+                style={isMobile ? undefined : { breakInside: 'avoid', marginBottom: 22 }}>
+                {g.tasks.map((t) => <Quest key={t.occurrence_key} t={t} theme={theme} done={isDone(t)} lockedBy={doneByOther(t)} onTap={() => toggle(t)} />)}
+              </Section>
+            ))}
+          </div>
+
+          {total === 0 && (
+            <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ fontSize: 64 }}>🏖️</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: KIDS_INK.ink2, marginTop: 10 }}>A quest-free day!</div>
+            </div>
+          )}
+        </>
       )}
 
       {/* No review prompt here: this celebration fires in Child Mode where a
@@ -160,12 +170,13 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
 function StreakCard({ streak, theme, isMobile }) {
   if (!streak) return null;
   const has = streak.current > 0;
+  const paused = !!streak.paused;
   return (
     <div className="kids-card-in" style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff',
       border: '2px solid rgba(49,43,75,0.06)', borderRadius: isMobile ? 26 : 24, padding: isMobile ? '13px 15px' : '15px 18px',
       marginBottom: isMobile ? 18 : 20, boxShadow: '0 6px 0 rgba(49,43,75,0.04), 0 10px 22px rgba(49,43,75,0.06)' }}>
       <span style={{ width: 54, height: 54, borderRadius: 17, flexShrink: 0, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: has ? theme.soft : '#F1EFF7', filter: has ? 'none' : 'grayscale(.5) opacity(.7)' }}>🔥</span>
+        background: (has || paused) ? theme.soft : '#F1EFF7', filter: (has || paused) ? 'none' : 'grayscale(.5) opacity(.7)' }}>{paused ? '⏸️' : '🔥'}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
           <span style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, lineHeight: 1, color: KIDS_INK.ink }}>{streak.current}</span>

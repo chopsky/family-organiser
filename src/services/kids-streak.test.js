@@ -98,6 +98,41 @@ describe('computeStreak', () => {
     expect(s.atRisk).toBe(false);
   });
 
+  test('an ongoing pause protects the streak (missed days do not break it)', () => {
+    const today = '2026-07-15';
+    const defs = [dailyDef()];
+    const done = daysBack(today, 8, 4); // 5 done days, then nothing for 4 days
+    const pauses = [{ start_date: addDaysStr(today, -3), end_date: null }]; // paused since 3 days ago
+    const s = computeStreak({ defs, completions: mk('d1', K, done), skips: [], pauses, memberId: K, today });
+    expect(s.current).toBe(5);         // held at the pre-pause value
+    expect(s.todayStatus).toBe('NONE'); // today is frozen
+    expect(s.atRisk).toBe(false);
+    // Without the pause the same gap would break it (2+ misses in a week):
+    const noPause = computeStreak({ defs, completions: mk('d1', K, done), skips: [], memberId: K, today });
+    expect(noPause.current).toBeLessThan(5);
+  });
+
+  test('a day the kid still completes during a pause keeps counting', () => {
+    const today = '2026-07-15';
+    const defs = [dailyDef()];
+    const completions = mk('d1', K, [addDaysStr(today, -1), addDaysStr(today, 0)]); // did yesterday + today
+    const pauses = [{ start_date: addDaysStr(today, -1), end_date: null }];         // paused, but did them anyway
+    const s = computeStreak({ defs, completions, skips: [], pauses, memberId: K, today });
+    expect(s.current).toBe(2);
+    expect(s.satisfiedToday).toBe(true);
+  });
+
+  test('a closed pause window keeps those days frozen after resuming', () => {
+    const today = '2026-07-15';
+    const defs = [dailyDef()];
+    const done = daysBack(today, 10, 6); // done through 6 days ago
+    const pauses = [{ start_date: addDaysStr(today, -5), end_date: addDaysStr(today, -2) }]; // was paused, now resumed
+    // Since resuming (today-2..today) nothing done -> those are real misses again.
+    const s = computeStreak({ defs, completions: mk('d1', K, done), skips: [], pauses, memberId: K, today });
+    expect(s.todayStatus).toBe('MISS'); // back off pause; today is live again
+    expect(s.atRisk).toBe(true);
+  });
+
   test('longest reflects a past run even after it is broken', () => {
     const today = findSunday('2026-07-13');
     const defs = [dailyDef()];

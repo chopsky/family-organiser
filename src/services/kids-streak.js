@@ -90,13 +90,16 @@ function dayStatus(mine, doneSet, skipSet, dateStr) {
  * @param {Array}  completions chore_completions rows over the lookback window
  *                             (each: { definition_id, member_id, date, slot })
  * @param {Array}  skips       chore_skips rows over the window ({ definition_id, date })
+ * @param {Array}  pauses      kid_routine_pauses rows ({ start_date, end_date|null })
+ *                             - a paused day protects the streak (a would-be
+ *                             miss becomes neutral); a completed day still counts.
  * @param {string} memberId    the kid
  * @param {string} today       'YYYY-MM-DD' (household-local today)
  * @param {number} [lookbackDays]
  * @returns {{current:number, longest:number, satisfiedToday:boolean,
  *            atRisk:boolean, nextMilestone:number|null, todayStatus:string}}
  */
-function computeStreak({ defs, completions, skips, memberId, today, lookbackDays = DEFAULT_LOOKBACK_DAYS }) {
+function computeStreak({ defs, completions, skips, pauses = [], memberId, today, lookbackDays = DEFAULT_LOOKBACK_DAYS }) {
   const doneSet = new Set();
   for (const c of completions || []) {
     if (c.member_id !== memberId) continue;
@@ -105,6 +108,15 @@ function computeStreak({ defs, completions, skips, memberId, today, lookbackDays
   const skipSet = new Set((skips || []).map((s) => `${s.definition_id}|${s.date}`));
   const mine = (defs || []).filter((d) => !d.anyone && (d.assignee_ids || []).includes(memberId));
 
+  // A date is frozen if it falls in any pause window (an open pause extends to
+  // today). Freezing only downgrades a would-be MISS to neutral - a DONE day
+  // still counts, so a kid who does their quests on holiday keeps building.
+  const frozen = (date) => (pauses || []).some((p) => date >= p.start_date && date <= (p.end_date || today));
+  const statusOf = (date) => {
+    const st = dayStatus(mine, doneSet, skipSet, date);
+    return st === 'MISS' && frozen(date) ? 'NONE' : st;
+  };
+
   // Walk ascending from (today - lookback) THROUGH YESTERDAY, maintaining the
   // run with one graced miss per ISO week. `best` tracks the longest run seen.
   let run = 0;
@@ -112,7 +124,7 @@ function computeStreak({ defs, completions, skips, memberId, today, lookbackDays
   const graceUsed = new Set(); // ISO-week key -> that week's one grace is spent
   for (let i = lookbackDays; i >= 1; i--) {
     const date = addDaysStr(today, -i);
-    const st = dayStatus(mine, doneSet, skipSet, date);
+    const st = statusOf(date);
     if (st === 'DONE') {
       run += 1;
     } else if (st === 'MISS') {
@@ -126,7 +138,7 @@ function computeStreak({ defs, completions, skips, memberId, today, lookbackDays
 
   // Today is special: if it's an in-progress MISS the day isn't over, so it
   // doesn't break the streak - it's "at risk". Only a completed today extends.
-  const todayStatus = dayStatus(mine, doneSet, skipSet, today);
+  const todayStatus = statusOf(today);
   const current = todayStatus === 'DONE' ? runThroughYesterday + 1 : runThroughYesterday;
   const longest = Math.max(best, current);
   const satisfiedToday = todayStatus === 'DONE';

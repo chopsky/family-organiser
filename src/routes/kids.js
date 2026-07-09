@@ -23,11 +23,15 @@ const { requireAuth, requireHousehold } = require('../middleware/auth');
 
 const router = Router();
 
-// Today as 'MM-DD' in the household's timezone, for the seasonal-cosmetic gate.
-async function householdMMDD(householdId) {
+// Today as 'YYYY-MM-DD' in the household's timezone.
+async function householdToday(householdId) {
   let tz = 'Europe/London';
   try { tz = (await db.getHouseholdById(householdId))?.timezone || tz; } catch { /* default */ }
-  return new Date().toLocaleDateString('en-CA', { timeZone: tz }).slice(5); // 'YYYY-MM-DD' -> 'MM-DD'
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+}
+// Just the 'MM-DD' part, for the seasonal-cosmetic gate.
+async function householdMMDD(householdId) {
+  return (await householdToday(householdId)).slice(5);
 }
 
 const WINDOW_DAYS = 180;
@@ -321,6 +325,57 @@ router.post('/cosmetics/:key/buy', requireAuth, requireHousehold, async (req, re
     return res.status(201).json({ ok: true, key: item.key, kind: item.kind, balance: after[memberId] || 0, owned: [...owned.map((o) => o.cosmetic_key), item.key] });
   } catch (err) {
     console.error('POST /api/kids/cosmetics/:key/buy error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Routine PAUSE (holiday / off-sick). Grown-up-gated in the UI by the Child
+ * Mode PIN; the endpoint itself uses the normal household auth (the PIN is a
+ * client-side guardrail, consistent with the rest of Child Mode).
+ *
+ * GET  /api/kids/pause?member_id=  -> { available, paused, since }
+ * POST /api/kids/pause             -> start (idempotent)
+ * POST /api/kids/pause/resume      -> end the open pause
+ */
+router.get('/pause', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const memberId = req.query.member_id;
+    if (!memberId) return res.status(400).json({ error: 'member_id is required' });
+    const pauses = await db.getKidPauses(req.householdId, memberId);
+    if (pauses === null) return res.json({ available: false, paused: false, since: null });
+    const active = pauses.find((p) => !p.end_date);
+    return res.json({ available: true, paused: !!active, since: active ? active.start_date : null });
+  } catch (err) {
+    console.error('GET /api/kids/pause error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/pause', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const memberId = req.body?.member_id;
+    if (!memberId) return res.status(400).json({ error: 'member_id is required' });
+    const today = await householdToday(req.householdId);
+    const r = await db.startKidPause(req.householdId, memberId, today);
+    if (r.unavailable) return res.status(503).json({ error: 'Pause is coming soon' });
+    return res.json({ paused: true, since: r.since });
+  } catch (err) {
+    console.error('POST /api/kids/pause error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/pause/resume', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const memberId = req.body?.member_id;
+    if (!memberId) return res.status(400).json({ error: 'member_id is required' });
+    const today = await householdToday(req.householdId);
+    const r = await db.endKidPause(req.householdId, memberId, today);
+    if (r.unavailable) return res.status(503).json({ error: 'Pause is coming soon' });
+    return res.json({ paused: false });
+  } catch (err) {
+    console.error('POST /api/kids/pause/resume error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

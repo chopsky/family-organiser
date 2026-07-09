@@ -20,6 +20,7 @@ export const BADGE_ORDER = ['streak_7', 'streak_30', 'streak_100', 'streak_365']
  * ({ current, longest, satisfiedToday, atRisk, nextMilestone }).
  */
 export function streakLine(s) {
+  if (s?.paused) return s.current > 0 ? `Paused — your ${s.current}-day streak is safe ⏸️` : 'Paused — routines are on hold ⏸️';
   if (!s || s.current <= 0) return 'Do your quests to start a streak!';
   if (s.atRisk) return `Finish today to keep your ${s.current}-day streak! 🔥`;
   if (s.satisfiedToday) return `${s.current} days in a row — amazing! 🎉`;

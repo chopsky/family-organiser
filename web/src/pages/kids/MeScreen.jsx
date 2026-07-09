@@ -4,7 +4,7 @@
 // The two grown-up actions at the bottom are PIN-gated: Exit Child Mode
 // (turns Child Mode off on this device) and Grown-up settings (unlocks the
 // adult Settings page behind the existing ChildGate escape hatch).
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -17,7 +17,7 @@ export default function MeScreen({ kid, theme, onSaved }) {
   const isMobile = useIsMobile();
   const { verifyPin, disable, pinIsSet } = useChildMode();
   const navigate = useNavigate();
-  const [gate, setGate] = useState(false); // PIN sheet open for Exit Child Mode
+  const [gate, setGate] = useState(null); // { onSuccess } while the grown-up PIN sheet is open
   const [stats, setStats] = useState(null); // streak + earned badges
 
   // Load this kid's streak + earned badges for the badge shelf.
@@ -40,6 +40,26 @@ export default function MeScreen({ kid, theme, onSaved }) {
   const premiumThemes = KID_COLOR_PRESETS.filter((p) => p.premium);
   const ownedStickers = (cosmetics?.owned || []).filter((k) => k.startsWith('sticker_'));
 
+  // Routine pause (holiday / off-sick): { available, paused, since }. Toggling
+  // it is a grown-up action, so it's PIN-gated in the UI below.
+  const [pause, setPause] = useState(null);
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const loadPause = useCallback(async () => {
+    try { const { data } = await api.get(`/kids/pause?member_id=${kid.id}`); setPause(data); }
+    catch { setPause({ available: false, paused: false }); }
+  }, [kid.id]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch; state lands after the await
+  useEffect(() => { loadPause(); }, [loadPause]);
+  const togglePause = async () => {
+    if (pauseBusy) return;
+    setPauseBusy(true);
+    try {
+      await api.post(pause?.paused ? '/kids/pause/resume' : '/kids/pause', { member_id: kid.id });
+      await loadPause();
+    } catch { /* leave state; a refetch on next visit reconciles */ }
+    setPauseBusy(false);
+  };
+
   const save = (patch) => {
     // Optimistic: the shell re-themes instantly; the PATCH persists to the
     // member record in the background (the device is a household login, so
@@ -48,11 +68,11 @@ export default function MeScreen({ kid, theme, onSaved }) {
     api.patch('/household/profile', { user_id: kid.id, ...patch }).catch(() => {});
   };
 
-  const openGate = () => {
-    // No PIN configured (edge: enabled before the PIN was cleared) - don't
-    // dead-bolt the device; exiting just works.
-    if (!pinIsSet) { exit(); return; }
-    setGate(true);
+  // Run a grown-up-only action behind the PIN. No PIN configured (edge: enabled
+  // before the PIN was cleared) -> don't dead-bolt the device; run it directly.
+  const runGrownup = (onSuccess) => {
+    if (!pinIsSet) { onSuccess(); return; }
+    setGate({ onSuccess });
   };
   const exit = () => {
     disable();
@@ -168,18 +188,51 @@ export default function MeScreen({ kid, theme, onSaved }) {
         <div style={{ fontSize: 13.5, fontWeight: 500, color: KIDS_INK.ink3, padding: '0 4px' }}>Buy stickers in the Star Shop! 🛍️</div>
       )}
 
-      {/* PIN-gated exit. One button only: leaving Child Mode already gives a
-          grown-up the full adult app, Settings included. */}
-      <button onClick={openGate} style={{ width: isMobile ? '100%' : undefined, marginTop: isMobile ? 28 : 32, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
-        fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2, display: isMobile ? 'inline-flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+      {/* ── Grown-ups (PIN-gated) ─────────────────────────────────────────── */}
+      <div style={{ fontSize: isMobile ? 15 : 16, fontWeight: 600, color: KIDS_INK.ink2, padding: isMobile ? '30px 4px 12px' : '34px 2px 14px' }}>Grown-ups 🔒</div>
+
+      {/* Routine pause: freeze the streak while away or unwell (grown-up only). */}
+      {pause?.available && (
+        pause.paused ? (
+          <div style={{ background: theme.soft, borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <span style={{ fontSize: 26 }}>⏸️</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: KIDS_INK.ink }}>Routines paused</div>
+              <div style={{ fontSize: 12.5, fontWeight: 500, color: KIDS_INK.ink2 }}>The streak is safe{pause.since ? ` since ${fmtDay(pause.since)}` : ''}.</div>
+            </div>
+            <button onClick={() => runGrownup(togglePause)} disabled={pauseBusy} style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: 'inherit', background: theme.grad, color: '#fff', fontSize: 13.5, fontWeight: 600, opacity: pauseBusy ? .6 : 1 }}>
+              {pauseBusy ? '…' : 'Resume'}
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => runGrownup(togglePause)} disabled={pauseBusy} style={{ width: isMobile ? '100%' : undefined, padding: isMobile ? 14 : '13px 22px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
+            fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 12 }}>
+            ⏸️ Pause routines
+          </button>
+        )
+      )}
+      {pause?.available && !pause.paused && (
+        <div style={{ fontSize: 12.5, fontWeight: 500, color: KIDS_INK.ink3, padding: '0 4px 4px', maxWidth: 440 }}>Away or unwell? Pause so the streak doesn't break — resume when you're back.</div>
+      )}
+
+      {/* Exit: leaving Child Mode already gives a grown-up the full adult app. */}
+      <button onClick={() => runGrownup(exit)} style={{ width: isMobile ? '100%' : undefined, marginTop: 14, padding: isMobile ? 15 : '14px 26px', borderRadius: 18, border: '2px solid rgba(49,43,75,0.12)', background: '#fff', cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <LockIcon />
         Exit Child Mode
       </button>
       <div style={{ height: 20 }} />
 
-      {gate && <PinSheet theme={theme} verifyPin={verifyPin} onSuccess={() => { setGate(false); exit(); }} onClose={() => setGate(false)} />}
+      {gate && <PinSheet theme={theme} verifyPin={verifyPin} onSuccess={() => { const fn = gate.onSuccess; setGate(null); fn(); }} onClose={() => setGate(null)} />}
     </div>
   );
+}
+
+// 'YYYY-MM-DD' -> '8 Jul' (parsed as a local date so it never drifts a day).
+function fmtDay(ymd) {
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 function LockIcon() {

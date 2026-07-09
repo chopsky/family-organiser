@@ -8297,13 +8297,17 @@ async function removeStarTransactionByRef(refType, refId, db = supabase) {
 // nextMilestone, todayStatus }.
 async function getKidStreak(householdId, memberId, today, db = supabase) {
   const from = addDaysStr(today, -DEFAULT_LOOKBACK_DAYS);
-  const [defs, completions, skips] = await Promise.all([
+  const [defs, completions, skips, pauses] = await Promise.all([
     getChoreDefinitions(householdId, db),
     getChoreCompletionsForRange(householdId, from, today, db),
     // Skips are best-effort: if migration-chore-skips.sql hasn't run, treat as none.
     getChoreSkipsForRange(householdId, from, today, db).catch(() => []),
+    // Pauses best-effort too (migration-kids-pause.sql): null -> no freezing.
+    getKidPauses(householdId, memberId, db).catch(() => null),
   ]);
-  return computeStreak({ defs, completions, skips, memberId, today, lookbackDays: DEFAULT_LOOKBACK_DAYS });
+  const streak = computeStreak({ defs, completions, skips, pauses: pauses || [], memberId, today, lookbackDays: DEFAULT_LOOKBACK_DAYS });
+  const active = (pauses || []).find((p) => !p.end_date);
+  return { ...streak, paused: !!active, pausedSince: active ? active.start_date : null };
 }
 
 // Milestone badges a kid has earned. Tolerant of the table not existing yet
@@ -8369,6 +8373,55 @@ async function addKidCosmetic(householdId, memberId, key, kind, source = 'star',
     throw error;
   }
   return { inserted: Array.isArray(data) && data.length > 0 };
+}
+
+// ─── Kids-mode routine PAUSE (holiday / off-sick) ────────────────────────────
+// Pause periods for a kid. `end_date` NULL = ongoing. Returns null when the
+// table doesn't exist yet (pre-migration) so callers freeze nothing + hide the
+// control instead of erroring.
+async function getKidPauses(householdId, memberId, db = supabase) {
+  const { data, error } = await db
+    .from('kid_routine_pauses')
+    .select('start_date, end_date')
+    .eq('household_id', householdId)
+    .eq('member_id', memberId);
+  if (error) {
+    if (/kid_routine_pauses/i.test(error.message || '')) return null; // pre-migration
+    throw error;
+  }
+  return data || [];
+}
+
+// Start a pause today (household-local). Idempotent: an existing open pause is
+// returned unchanged. `unavailable` flags a missing table.
+async function startKidPause(householdId, memberId, today, db = supabase) {
+  const { data: open, error: selErr } = await db
+    .from('kid_routine_pauses')
+    .select('start_date')
+    .eq('household_id', householdId).eq('member_id', memberId).is('end_date', null)
+    .limit(1);
+  if (selErr) {
+    if (/kid_routine_pauses/i.test(selErr.message || '')) return { unavailable: true };
+    throw selErr;
+  }
+  if (Array.isArray(open) && open.length) return { paused: true, since: open[0].start_date };
+  const { error } = await db.from('kid_routine_pauses').insert({ household_id: householdId, member_id: memberId, start_date: today });
+  if (error) throw error;
+  return { paused: true, since: today };
+}
+
+// Resume: close the open pause window (its days stay frozen forever, so the
+// streak can't retroactively break). No-op if not paused.
+async function endKidPause(householdId, memberId, today, db = supabase) {
+  const { error } = await db
+    .from('kid_routine_pauses')
+    .update({ end_date: today })
+    .eq('household_id', householdId).eq('member_id', memberId).is('end_date', null);
+  if (error) {
+    if (/kid_routine_pauses/i.test(error.message || '')) return { unavailable: true };
+    throw error;
+  }
+  return { paused: false };
 }
 
 async function getRewards(householdId, db = supabase) {
@@ -8489,6 +8542,9 @@ module.exports = {
   addKidBadge,
   getKidCosmetics,
   addKidCosmetic,
+  getKidPauses,
+  startKidPause,
+  endKidPause,
   getRewards,
   addReward,
   updateReward,
