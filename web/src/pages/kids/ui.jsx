@@ -104,9 +104,10 @@ function buildDeco(kind) {
   if (kind === 'bubbles') {
     const dots = Array.from({ length: 16 }, () => {
       const bs = rnd(8, 34);
-      return { cls: '', style: { position: 'absolute', borderRadius: '50%', background: 'rgba(255,255,255,0.28)', width: bs, height: bs, left: `${rnd(2, 94)}%`, top: `${rnd(2, 96)}%` } };
+      // Each bubble drifts along its own slow vector (mostly up, gentle sideways).
+      return { cls: 'kids-bubble', style: { position: 'absolute', borderRadius: '50%', background: 'rgba(255,255,255,0.28)', width: bs, height: bs, left: `${rnd(2, 94)}%`, top: `${rnd(2, 96)}%`, '--bx': `${rnd(-16, 16)}px`, '--by': `${rnd(-26, -8)}px`, animationDuration: `${rnd(8, 16)}s`, animationDelay: `${rnd(0, 6)}s` } };
     });
-    return { dots, emoji: [{ ch: '🫧', style: { fontSize: 40, left: '72%', top: '8%', opacity: 0.7 } }] };
+    return { dots, emoji: [] };
   }
   if (kind === 'sprinkles') {
     const cols = ['#FB7DC0', '#A855F7', '#FDE047', '#34D399', '#38BDF8'];

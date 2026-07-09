@@ -279,10 +279,14 @@
   @keyframes kids-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
   .kids-twinkle { position: absolute; border-radius: 50%; background: #fff; animation: kids-twinkle 2.4s ease-in-out infinite; }
   .kids-demoji { position: absolute; }
+  /* Ocean's flat bubbles drift slowly — each carries its own --bx/--by vector
+     + duration/delay (set inline) so they wander independently. */
+  @keyframes kids-bubble { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(var(--bx, 8px), var(--by, -16px)); } }
+  .kids-bubble { animation: kids-bubble 10s ease-in-out infinite; }
   .kids-wobble { display: inline-block; animation: kids-wobble 1.5s ease infinite; }
   .kids-card-in { animation: kids-card-in .4s ease both; }
   @media (prefers-reduced-motion: reduce) {
-    .kids-wobble, .kids-card-in { animation: none; }
+    .kids-wobble, .kids-card-in, .kids-twinkle, .kids-bubble { animation: none; }
     .kids-anim { animation: none !important; }
   }
 
