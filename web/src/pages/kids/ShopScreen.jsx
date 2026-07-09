@@ -111,31 +111,10 @@ export default function ShopScreen({ kid, theme, balance, onBalance, onSaved }) 
         </div>
       )}
 
-      {/* Cosmetics: themes + stickers the kid buys with their own stars. */}
-      {themeItems.length > 0 && (
-        <>
-          <SectionTitle isMobile={isMobile}>Themes 🎨</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: isMobile ? 14 : 16, marginBottom: isMobile ? 22 : 26 }}>
-            {themeItems.map((it) => (
-              <ThemeCard key={it.key} it={it} theme={theme} balance={balance} worn={theme.key === it.key} busy={buyingKey === it.key}
-                onBuy={() => buy(it)} onWear={() => applyTheme(it.key)} />
-            ))}
-          </div>
-        </>
-      )}
-      {stickerItems.length > 0 && (
-        <>
-          <SectionTitle isMobile={isMobile}>Stickers ✨</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: isMobile ? 14 : 16, marginBottom: isMobile ? 22 : 26 }}>
-            {stickerItems.map((it) => (
-              <StickerCard key={it.key} it={it} theme={theme} balance={balance} busy={buyingKey === it.key} onBuy={() => buy(it)} />
-            ))}
-          </div>
-        </>
-      )}
-
+      {/* Parent-set rewards first - the real-world treats are the headline of
+          the shop; cosmetics (themes + stickers) sit below. */}
       {myRewards.length > 0 && <SectionTitle isMobile={isMobile}>Pick a treat 🎁</SectionTitle>}
-      <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: isMobile ? 14 : 16 }}>
+      <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: isMobile ? 14 : 16, marginBottom: (themeItems.length || stickerItems.length) ? (isMobile ? 26 : 30) : 0 }}>
         {myRewards.map((r) => {
           const can = balance >= r.cost;
           const pct = Math.min(1, r.cost ? balance / r.cost : 1);
@@ -163,6 +142,29 @@ export default function ShopScreen({ kid, theme, balance, onBalance, onSaved }) 
           );
         })}
       </div>
+
+      {/* Cosmetics: themes + stickers the kid buys with their own stars. */}
+      {themeItems.length > 0 && (
+        <>
+          <SectionTitle isMobile={isMobile}>Themes 🎨</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: isMobile ? 14 : 16, marginBottom: isMobile ? 22 : 26 }}>
+            {themeItems.map((it) => (
+              <ThemeCard key={it.key} it={it} theme={theme} balance={balance} worn={theme.key === it.key} busy={buyingKey === it.key}
+                onBuy={() => buy(it)} onWear={() => applyTheme(it.key)} />
+            ))}
+          </div>
+        </>
+      )}
+      {stickerItems.length > 0 && (
+        <>
+          <SectionTitle isMobile={isMobile}>Stickers ✨</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: isMobile ? 14 : 16, marginBottom: isMobile ? 22 : 26 }}>
+            {stickerItems.map((it) => (
+              <StickerCard key={it.key} it={it} theme={theme} balance={balance} busy={buyingKey === it.key} onBuy={() => buy(it)} />
+            ))}
+          </div>
+        </>
+      )}
 
       {rewards && myRewards.length === 0 && cosmetics.length === 0 && (
         <div className="kids-card-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
