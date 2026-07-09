@@ -183,6 +183,21 @@ describe('validateTermDates', () => {
     expect(rows[0].warnings.some(w => /Same label and academic year/i.test(w))).toBe(false);
   });
 
+  it('does not flag recurring half-terms (same label + AY, months apart)', () => {
+    // "Half term" legitimately occurs in October, February and May of one
+    // academic year. Those are distinct events, not a hallucinated duplicate.
+    const rows = validateTermDates(
+      [
+        { event_type: 'half_term_start', date: '2025-10-27', label: 'Half Term', academic_year: '2025-2026' },
+        { event_type: 'half_term_start', date: '2026-02-16', label: 'Half Term', academic_year: '2025-2026' },
+        { event_type: 'half_term_start', date: '2026-05-25', label: 'Half Term', academic_year: '2025-2026' },
+      ],
+      '',
+      NOW
+    );
+    expect(rows.every(r => r.warnings.every(w => !/Same label/i.test(w)))).toBe(true);
+  });
+
   it('does not flag same-label rows in different academic years', () => {
     const rows = validateTermDates(
       [

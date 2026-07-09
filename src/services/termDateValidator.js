@@ -247,11 +247,15 @@ function checkDuplicates(rows) {
     }
   }
 
-  // Same event_type + same academic year + same normalised label, but
-  // different dates: almost certainly the same real-world event with one
-  // row hallucinated or off by a day. The AI sometimes emits both a
-  // "last day of attendance" and the term-end date when the PDF only
-  // gives one. Flag the second row and point at the other date.
+  // Same event_type + same academic year + same normalised label, on a
+  // *nearly identical* date: almost certainly the same real-world event with
+  // one row hallucinated or off by a day. The AI sometimes emits both a
+  // "last day of attendance" and the term-end date when the PDF only gives
+  // one. We only flag rows whose dates sit close together — generic labels
+  // like "Half term" legitimately recur several times an academic year
+  // (October, February, May half-terms), and those are months apart, so a
+  // large gap means two genuinely distinct events, not a duplicate.
+  const NEAR_DUP_DAYS = 14;
   const byLabel = new Map();
   for (const r of rows) {
     const label = normaliseWhitespace(r.label);
@@ -262,12 +266,23 @@ function checkDuplicates(rows) {
   }
   for (const group of byLabel.values()) {
     if (group.length < 2) continue;
-    const dates = group.map(r => r.date).filter(Boolean);
     for (let i = 1; i < group.length; i++) {
-      const others = dates.filter((_, idx) => idx !== i).join(', ');
-      group[i].warnings.push(
-        `Same label and academic year as another row (${others}) but a different date — one of them is probably wrong.`
-      );
+      const di = parseISODate(group[i].date);
+      if (!di) continue;
+      // Only earlier rows in the group are considered "the original", so each
+      // real-world duplicate is flagged once (on the later-listed row).
+      const near = [];
+      for (let j = 0; j < i; j++) {
+        const dj = parseISODate(group[j].date);
+        if (!dj) continue;
+        const gapDays = Math.abs(di - dj) / 86400000;
+        if (gapDays > 0 && gapDays <= NEAR_DUP_DAYS) near.push(group[j].date);
+      }
+      if (near.length) {
+        group[i].warnings.push(
+          `Same label and academic year as another row (${near.join(', ')}) but a nearby different date — one of them is probably wrong.`
+        );
+      }
     }
   }
 }
