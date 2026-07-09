@@ -43,11 +43,13 @@ export const KID_COLOR_PRESETS = [
     card: '#fff', cardBorder: 'rgba(46,61,28,0.08)', cardShadow: '0 5px 14px -4px rgba(46,61,28,0.16)', cardBlur: 'none',
     cardText: '#2E3D1C', cardText2: '#6E8258', cardText3: '#9AAE84' },
   { key: 'ocean', premium: true, dark: false, deco: 'bubbles', name: 'Ocean',
-    c1: '#38BDF8', c2: '#0E7490', accent: '#0E9BC4', soft: '#CFEFFB',
-    bg: 'radial-gradient(120% 90% at 50% 0%, #7DD3F0 0%, #43A6D6 45%, #1E7BB0 100%)',
-    ink: '#062B3D', ink2: '#2C6A8A', ink3: '#5A8CA6',
+    c1: '#38BDF8', c2: '#0E7490', accent: '#0B7EA0', soft: '#CFEFFB',
+    // Lighter gradient (never drops below a pale sky blue) so dark-ink text
+    // stays legible top-to-bottom; on-bg ink darkened to match.
+    bg: 'radial-gradient(120% 90% at 50% 0%, #7DD3F0 0%, #ABDEF7 45%, #98C5DF 100%)',
+    ink: '#06293B', ink2: '#204F6B', ink3: '#2C6480',
     chrome: 'rgba(255,255,255,0.55)', chromeBorder: 'rgba(6,43,61,0.08)', chip: '#CFEFFB', sel: '#CFEFFB',
-    card: 'rgba(255,255,255,0.94)', cardBorder: 'rgba(6,43,61,0.06)', cardShadow: '0 6px 16px -4px rgba(6,43,61,0.22)', cardBlur: 'none',
+    card: 'rgba(255,255,255,0.96)', cardBorder: 'rgba(6,43,61,0.06)', cardShadow: '0 6px 16px -4px rgba(6,43,61,0.22)', cardBlur: 'none',
     cardText: '#062B3D', cardText2: '#2C6A8A', cardText3: '#5A8CA6' },
   { key: 'unicorn', premium: true, dark: false, deco: 'sprinkles', name: 'Candy',
     c1: '#FB7DC0', c2: '#A855F7', accent: '#D651A8', soft: '#FCDCF0',
