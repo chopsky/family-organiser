@@ -29,16 +29,23 @@ import KidNotePopup from './KidNotePopup';
 
 const INK3 = '#8A8493';
 
+// Dismissed-note ids for THIS page session. Module-level (not component state)
+// on purpose: every route wraps its page in its own <Layout>, so navigating
+// remounts KidNoteAlert — a component-state snooze would reset on every page
+// change and the banner would keep popping back. This Set survives navigation
+// and is cleared only on a full reload / new tab, so an un-reacted note still
+// returns next session (and always lives in the Notes archive) — never lost.
+const sessionDismissed = new Set();
+
 export default function KidNoteAlert() {
   const { user } = useAuth();
   // No children → no notes can ever exist; skip the 60s polling entirely.
   const hasChildren = useHasChildren();
   const [notes, setNotes] = useState([]);
-  // Snoozed-for-this-session note ids (the banner's ✕). Deliberately NOT
-  // persisted: a note the parent hasn't reacted to must never be lost - it
-  // returns on the next load until they react. REACTION is the only thing
-  // that permanently retires a note.
-  const [snoozed, setSnoozed] = useState(() => new Set());
+  // Dismissed note ids (the banner's ✕, and opening a note). Seeded from the
+  // module-level Set so a dismissal survives the Layout remount on navigation;
+  // REACTION is still the only thing that permanently retires a note server-side.
+  const [snoozed, setSnoozed] = useState(() => new Set(sessionDismissed));
   const [viewing, setViewing] = useState(null); // the note open in the popup
 
   useEffect(() => {
@@ -61,7 +68,10 @@ export default function KidNoteAlert() {
     return () => { cancelled = true; clearInterval(t); };
   }, [hasChildren]);
 
-  const snooze = (noteId) => setSnoozed((s) => new Set(s).add(noteId));
+  const snooze = (noteId) => {
+    sessionDismissed.add(noteId); // survives navigation (see the module Set above)
+    setSnoozed((s) => new Set(s).add(noteId));
+  };
 
   // Newest note this user hasn't reacted to and hasn't snoozed this session.
   const fresh = notes.find((n) => !n.reactions?.[user?.id] && !snoozed.has(n.id));
