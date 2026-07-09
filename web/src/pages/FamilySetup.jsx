@@ -133,7 +133,7 @@ function AddTile({ label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-[18px] border-[1.5px] border-dashed border-light-grey bg-transparent flex flex-col items-center justify-center gap-3 min-h-[184px] text-warm-grey hover:border-plum/40 hover:text-plum transition-colors"
+      className="rounded-[18px] border-[1.5px] border-dashed border-light-grey bg-transparent flex flex-col items-center justify-center gap-3 min-h-[178px] text-warm-grey hover:border-plum/40 hover:text-plum transition-colors"
     >
       <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: SOFT }}>
         <IconPlus className="h-6 w-6" />
