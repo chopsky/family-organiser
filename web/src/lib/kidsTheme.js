@@ -18,81 +18,49 @@ export const KID_COLOR_PRESETS = [
   { key: 'teal',   c1: '#5AD4E0', c2: '#1AA6B8', accent: '#22B4C4', soft: '#DCF5F8' },
   { key: 'orange', c1: '#FFB27A', c2: '#F2743A', accent: '#FB8C4E', soft: '#FFEBDD' },
   { key: 'berry',  c1: '#F58FD6', c2: '#D14EA8', accent: '#E86FC4', soft: '#FCE6F5' },
-  // Premium themes (Phase 2 star-shop): richer, darker gradients that read as
-  // special. `premium: true` keeps them out of the free-default pool and gates
-  // them in the Me picker. Keys mirror src/services/kids-cosmetics.js (the
-  // authoritative price/season source); colours live here for kidTheme().
-  { key: 'galaxy',  premium: true, dark: true, deco: 'stars',    name: 'Galaxy',  c1: '#8B7BFF', c2: '#3B2E7E', accent: '#A78BFA', soft: '#E9E5FF' },
-  { key: 'dino',    premium: true, dark: true, deco: 'fireflies', name: 'Dino',    c1: '#4FBE72', c2: '#155230', accent: '#5FCF7F', soft: '#E1F6E7' },
-  { key: 'unicorn', premium: true, dark: true, deco: 'sparkles',  name: 'Unicorn', c1: '#FF9DE6', c2: '#7C3AC4', accent: '#F58FD6', soft: '#FBE7FB' },
-  { key: 'ocean',   premium: true, dark: true, deco: 'bubbles',   name: 'Ocean',   c1: '#3AC0E6', c2: '#0E3E6E', accent: '#5AD4E0', soft: '#DDF1FB' },
+  // Premium themes (Phase 2 star-shop). Each carries its FULL token bundle
+  // (background + ink + card + chrome) so it can be a distinct "world", matching
+  // the design preview (design_handoff_kids / kids-themes-preview.html).
+  // `premium: true` keeps them out of the free-default pool and gates them in
+  // the Me picker. `dark`/`deco` drive the shell: only GALAXY is a dark,
+  // frosted-glass world; Dino / Ocean / Candy are bright & LIGHT (dark ink on a
+  // vivid gradient, solid-white cards). Keys mirror src/services/kids-cosmetics.js
+  // (the authoritative price/season source) — NOTE the pink theme's key is
+  // 'unicorn' but it DISPLAYS as "Candy" (key kept for back-compat with
+  // already-purchased cosmetics; only the look + name changed).
+  { key: 'galaxy', premium: true, dark: true, deco: 'stars', name: 'Galaxy',
+    c1: '#A78BFA', c2: '#EC4899', accent: '#8B5CF6', soft: '#EDE7FF',
+    bg: 'radial-gradient(120% 80% at 50% 0%, #3A2A6E 0%, #1E1640 55%, #130E2B 100%)',
+    ink: '#F1EBFF', ink2: '#B7ABE2', ink3: 'rgba(241,235,255,0.55)',
+    chrome: 'rgba(255,255,255,0.10)', chromeBorder: 'rgba(167,139,250,0.28)', chip: 'rgba(167,139,250,0.22)', sel: 'rgba(255,255,255,0.17)',
+    card: 'rgba(255,255,255,0.08)', cardBorder: 'rgba(167,139,250,0.30)', cardShadow: '0 10px 30px rgba(8,4,24,0.35)', cardBlur: 'blur(10px)',
+    cardText: '#F1EBFF', cardText2: 'rgba(241,235,255,0.74)', cardText3: 'rgba(241,235,255,0.52)' },
+  { key: 'dino', premium: true, dark: false, deco: 'jungle', name: 'Dino',
+    c1: '#6FCB6A', c2: '#2FA98B', accent: '#3FA97C', soft: '#E1F2D6',
+    bg: 'radial-gradient(120% 80% at 50% 0%, #DBF1CC 0%, #EDF7E2 55%, #F1F8E9 100%)',
+    ink: '#2E3D1C', ink2: '#6E8258', ink3: '#9AAE84',
+    chrome: 'rgba(255,255,255,0.7)', chromeBorder: 'rgba(46,61,28,0.08)', chip: '#E1F2D6', sel: '#E1F2D6',
+    card: '#fff', cardBorder: 'rgba(46,61,28,0.08)', cardShadow: '0 5px 14px -4px rgba(46,61,28,0.16)', cardBlur: 'none',
+    cardText: '#2E3D1C', cardText2: '#6E8258', cardText3: '#9AAE84' },
+  { key: 'ocean', premium: true, dark: false, deco: 'bubbles', name: 'Ocean',
+    c1: '#38BDF8', c2: '#0E7490', accent: '#0E9BC4', soft: '#CFEFFB',
+    bg: 'radial-gradient(120% 90% at 50% 0%, #7DD3F0 0%, #43A6D6 45%, #1E7BB0 100%)',
+    ink: '#062B3D', ink2: '#2C6A8A', ink3: '#5A8CA6',
+    chrome: 'rgba(255,255,255,0.55)', chromeBorder: 'rgba(6,43,61,0.08)', chip: '#CFEFFB', sel: '#CFEFFB',
+    card: 'rgba(255,255,255,0.94)', cardBorder: 'rgba(6,43,61,0.06)', cardShadow: '0 6px 16px -4px rgba(6,43,61,0.22)', cardBlur: 'none',
+    cardText: '#062B3D', cardText2: '#2C6A8A', cardText3: '#5A8CA6' },
+  { key: 'unicorn', premium: true, dark: false, deco: 'sprinkles', name: 'Candy',
+    c1: '#FB7DC0', c2: '#A855F7', accent: '#D651A8', soft: '#FCDCF0',
+    bg: 'radial-gradient(120% 90% at 50% 0%, #FFE0F0 0%, #FCE7F8 55%, #FBEFFB 100%)',
+    ink: '#5A1E52', ink2: '#A76399', ink3: '#C48CB8',
+    chrome: 'rgba(255,255,255,0.7)', chromeBorder: 'rgba(90,30,82,0.08)', chip: '#FCDCF0', sel: '#FCDCF0',
+    card: '#fff', cardBorder: 'rgba(90,30,82,0.08)', cardShadow: '0 5px 14px -4px rgba(90,30,82,0.16)', cardBlur: 'none',
+    cardText: '#5A1E52', cardText2: '#A76399', cardText3: '#C48CB8' },
 ];
 
 // The free pool a kid without a chosen colour falls back to, so a premium
 // theme is never assigned (or shown active) without being bought.
 export const FREE_PRESETS = KID_COLOR_PRESETS.filter((p) => !p.premium);
-
-// Immersive DARK backdrops for the premium themes — the "world" that appears
-// when a kid wears one (free themes keep the plain light fade). Deep base with
-// bright decoration: a galaxy starfield, a night jungle with fireflies, a
-// magical unicorn night, a deep sea with bubbles. Pure CSS (no images), static
-// (reduced-motion safe). Kids screens go light-on-dark when the theme is dark
-// (see kidTheme's onInk tokens). Keyed by theme key; applied as the shell bg.
-export const PREMIUM_SCENES = {
-  // Galaxy — a bright starfield (white / gold / lilac) over a deep-space nebula.
-  galaxy: `
-    radial-gradient(1.5px 1.5px at 6% 14%, #fff, transparent),
-    radial-gradient(2px 2px at 13% 30%, rgba(255,255,255,0.9), transparent),
-    radial-gradient(1.5px 1.5px at 21% 9%, #FFE08A, transparent),
-    radial-gradient(2.5px 2.5px at 29% 24%, #fff, transparent),
-    radial-gradient(1.5px 1.5px at 37% 13%, rgba(255,255,255,0.85), transparent),
-    radial-gradient(2px 2px at 45% 28%, #C9BEFF, transparent),
-    radial-gradient(1.5px 1.5px at 53% 10%, #fff, transparent),
-    radial-gradient(2.5px 2.5px at 61% 22%, #FFE08A, transparent),
-    radial-gradient(1.5px 1.5px at 69% 13%, rgba(255,255,255,0.9), transparent),
-    radial-gradient(2px 2px at 77% 27%, #fff, transparent),
-    radial-gradient(1.5px 1.5px at 85% 10%, #C9BEFF, transparent),
-    radial-gradient(2.5px 2.5px at 92% 24%, #fff, transparent),
-    radial-gradient(1.5px 1.5px at 97% 14%, #FFE08A, transparent),
-    radial-gradient(72% 55% at 20% 0%, rgba(139,123,255,0.45), transparent 70%),
-    radial-gradient(62% 50% at 85% 4%, rgba(214,111,224,0.35), transparent 70%),
-    linear-gradient(180deg, #221A52, #120C2C)`,
-  // Dino — golden fireflies + light leaves over a night canopy and dark hills.
-  dino: `
-    radial-gradient(2px 2px at 10% 12%, #FFDD6B, transparent),
-    radial-gradient(2.5px 2.5px at 24% 24%, #FFDD6B, transparent),
-    radial-gradient(2px 2px at 40% 10%, #A8F0B8, transparent),
-    radial-gradient(2.5px 2.5px at 58% 22%, #FFDD6B, transparent),
-    radial-gradient(2px 2px at 74% 12%, #A8F0B8, transparent),
-    radial-gradient(2.5px 2.5px at 88% 24%, #FFDD6B, transparent),
-    radial-gradient(90% 55% at 8% 0%, rgba(46,140,74,0.5), transparent 68%),
-    radial-gradient(75% 48% at 94% 2%, rgba(20,90,48,0.42), transparent 68%),
-    radial-gradient(150% 46% at 50% 114%, rgba(9,60,32,0.6), transparent 60%),
-    linear-gradient(180deg, #15532F, #0A2E1B)`,
-  // Unicorn — a magical night: white/gold sparkles + a pink/purple/teal glow.
-  unicorn: `
-    radial-gradient(2px 2px at 10% 14%, #fff, transparent),
-    radial-gradient(2.5px 2.5px at 26% 26%, #FFE08A, transparent),
-    radial-gradient(2px 2px at 44% 10%, #fff, transparent),
-    radial-gradient(2.5px 2.5px at 62% 22%, #FFB3EC, transparent),
-    radial-gradient(2px 2px at 80% 12%, #fff, transparent),
-    radial-gradient(2.5px 2.5px at 92% 24%, #FFE08A, transparent),
-    radial-gradient(55% 48% at 10% 0%, rgba(255,120,210,0.42), transparent 70%),
-    radial-gradient(50% 44% at 40% 2%, rgba(150,90,240,0.36), transparent 70%),
-    radial-gradient(50% 44% at 68% 2%, rgba(90,210,220,0.30), transparent 70%),
-    radial-gradient(55% 48% at 94% 0%, rgba(255,120,210,0.36), transparent 70%),
-    linear-gradient(180deg, #3A1D5E, #201038)`,
-  // Ocean — rising bubbles + a sunlit surface glow over deep navy water.
-  ocean: `
-    radial-gradient(14px 14px at 16% 30%, rgba(160,225,245,0.16), transparent),
-    radial-gradient(9px 9px at 30% 16%, rgba(160,225,245,0.20), transparent),
-    radial-gradient(6px 6px at 46% 26%, rgba(160,225,245,0.18), transparent),
-    radial-gradient(12px 12px at 62% 13%, rgba(160,225,245,0.16), transparent),
-    radial-gradient(7px 7px at 78% 26%, rgba(160,225,245,0.20), transparent),
-    radial-gradient(5px 5px at 90% 15%, rgba(160,225,245,0.24), transparent),
-    radial-gradient(130% 55% at 50% -12%, rgba(90,205,235,0.40), transparent 62%),
-    linear-gradient(180deg, #114E86, #08243F)`,
-};
 
 export const KID_AVATARS = ['🦖', '🦄', '🐱', '🐶', '🦊', '🐼', '🐯', '🦁', '🐵', '🐸', '🦉', '🐙', '🦕', '🐢', '🐝', '🦋', '🚀', '⚽', '🎨', '🦸', '🧚', '🤖'];
 
@@ -115,6 +83,10 @@ export function kidTheme(member, index = 0) {
   const preset = presetByKey[member?.kid_color] || FREE_PRESETS[index % FREE_PRESETS.length];
   const emoji = member?.kid_avatar || KID_AVATARS[index % 2]; // 🦖 / 🦄 defaults per the spec
   const dark = !!preset.dark;
+  // Premium themes carry their own full token bundle; free themes (and any
+  // token a preset omits) fall back to the standard light Kids skin. Only a
+  // `dark` theme (Galaxy) uses frosted-glass cards + light-on-dark text; the
+  // bright themes (Dino / Ocean / Candy) are dark-ink-on-vivid with solid cards.
   return {
     key: preset.key,
     accent: preset.accent,
@@ -122,37 +94,30 @@ export function kidTheme(member, index = 0) {
     c1: preset.c1,
     c2: preset.c2,
     dark,
-    // Text/chrome that sits directly ON the themed background goes light on a
-    // dark theme, standard ink on a light one. Text INSIDE the white cards keeps
-    // the fixed dark KIDS_INK (the white card provides its own contrast).
-    onInk: dark ? '#FCFAFF' : KIDS_INK.ink,
-    onInk2: dark ? 'rgba(255,255,255,0.76)' : KIDS_INK.ink2,
-    onInk3: dark ? 'rgba(255,255,255,0.54)' : KIDS_INK.ink3,
-    // Translucent surface for the rail/nav chrome, so it reads on either base.
-    chrome: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.6)',
-    chromeBorder: dark ? 'rgba(255,255,255,0.16)' : 'rgba(49,43,75,0.06)',
-    // Card surface + in-card text. On a dark theme cards are FROSTED GLASS
-    // (translucent, light text, glowing border) so they melt into the scene
-    // instead of floating as bright white rectangles; on a light theme they are
-    // the usual solid-white card with dark ink. Replace hard-coded card '#fff'
-    // + KIDS_INK.* with these so cards adapt per theme.
-    card: dark ? 'rgba(255,255,255,0.09)' : '#fff',
-    cardBorder: dark ? 'rgba(255,255,255,0.18)' : 'rgba(49,43,75,0.06)',
-    cardShadow: dark ? '0 10px 30px rgba(8,4,24,0.35)' : '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)',
-    cardText: dark ? '#F4F0FF' : KIDS_INK.ink,
-    cardText2: dark ? 'rgba(244,240,255,0.74)' : KIDS_INK.ink2,
-    cardText3: dark ? 'rgba(244,240,255,0.52)' : KIDS_INK.ink3,
-    cardBlur: dark ? 'blur(10px)' : 'none',
-    // Selected/active surface (a picked badge, an "on" toggle, today's calendar
-    // cell): a brighter frosted highlight on dark, the soft pastel on light.
-    cardSel: dark ? 'rgba(255,255,255,0.17)' : preset.soft,
-    // In-card icon tile (emoji chips, avatar swatches): a faint glass square on
-    // dark, a soft tint on light.
-    cardIcon: dark ? 'rgba(255,255,255,0.10)' : '#F3F0FB',
+    // Text that sits directly ON the themed background.
+    onInk: preset.ink || KIDS_INK.ink,
+    onInk2: preset.ink2 || KIDS_INK.ink2,
+    onInk3: preset.ink3 || KIDS_INK.ink3,
+    // Rail / nav chrome (translucent surface over the scene).
+    chrome: preset.chrome || 'rgba(255,255,255,0.6)',
+    chromeBorder: preset.chromeBorder || 'rgba(49,43,75,0.06)',
+    // Card surface + in-card text. Galaxy is frosted glass (translucent + blur +
+    // glowing border + light text); every other theme is a solid card, dark ink.
+    card: preset.card || '#fff',
+    cardBorder: preset.cardBorder || 'rgba(49,43,75,0.06)',
+    cardShadow: preset.cardShadow || '0 6px 0 rgba(49,43,75,0.05), 0 10px 20px rgba(49,43,75,0.06)',
+    cardText: preset.cardText || KIDS_INK.ink,
+    cardText2: preset.cardText2 || KIDS_INK.ink2,
+    cardText3: preset.cardText3 || KIDS_INK.ink3,
+    cardBlur: preset.cardBlur || 'none',
+    // Selected/active surface (a picked badge, an "on" toggle, today's cell) and
+    // the in-card icon tile (emoji chips, avatar swatches).
+    cardSel: preset.sel || preset.soft,
+    cardIcon: preset.chip || '#F3F0FB',
     deco: preset.deco || null,
     grad: `linear-gradient(160deg, ${preset.c1}, ${preset.c2})`,
-    // Premium themes get a decorated scene; free themes keep the soft fade.
-    bg: PREMIUM_SCENES[preset.key] || `radial-gradient(130% 60% at 50% 0%, ${preset.soft}, ${KIDS_INK.paper} 60%)`,
+    // Premium themes carry a full scene; free themes keep the soft fade.
+    bg: preset.bg || `radial-gradient(130% 60% at 50% 0%, ${preset.soft}, ${KIDS_INK.paper} 60%)`,
     emoji,
   };
 }

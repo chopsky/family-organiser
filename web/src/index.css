@@ -274,11 +274,11 @@
     55%  { transform: scale(1.12); opacity: 1; }
     100% { transform: scale(1); opacity: 1; }
   }
-  /* Premium-theme scene decoration: twinkling stars + gently drifting emoji. */
-  @keyframes kids-twinkle { 0%, 100% { opacity: .2; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
-  .kids-twinkle { position: absolute; border-radius: 50%; background: #fff; animation: kids-twinkle 2.6s ease-in-out infinite; }
-  @keyframes kids-drift { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(3deg); } }
-  .kids-drift { position: absolute; animation: kids-drift 6s ease-in-out infinite; }
+  /* Premium-theme scene decoration: Galaxy's stars flicker (opacity only, like
+     the design preview); the themed emoji sit still. */
+  @keyframes kids-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  .kids-twinkle { position: absolute; border-radius: 50%; background: #fff; animation: kids-twinkle 2.4s ease-in-out infinite; }
+  .kids-demoji { position: absolute; }
   .kids-wobble { display: inline-block; animation: kids-wobble 1.5s ease infinite; }
   .kids-card-in { animation: kids-card-in .4s ease both; }
   @media (prefers-reduced-motion: reduce) {

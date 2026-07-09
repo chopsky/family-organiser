@@ -1,7 +1,7 @@
 // Shared Kids-mode primitives: star pill, confetti + celebration overlay,
 // the gradient-filled Housemait KIDS logo, and the section header. Pure
 // presentational components; the theme comes in via props (see kidsTheme.js).
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { KIDS_INK } from '../../lib/kidsTheme';
 
 export function Star({ s = 16 }) {
@@ -74,37 +74,59 @@ export function KidsLogo({ c1, c2 }) {
   );
 }
 
-// Deterministic twinkle positions (top-weighted): [left%, top%, sizePx].
-const TWINKLES = [
-  [6, 12, 2], [13, 28, 2.5], [21, 8, 1.5], [29, 22, 3], [37, 13, 2], [45, 27, 2.5],
-  [53, 9, 1.5], [61, 21, 3], [69, 13, 2], [77, 26, 2.5], [85, 9, 1.5], [92, 22, 3],
-  [97, 14, 2], [3, 44, 2], [17, 52, 2.5], [33, 46, 1.5], [50, 55, 2.5], [66, 47, 2],
-  [82, 53, 2.5], [95, 45, 2], [10, 66, 2], [40, 70, 1.5], [74, 66, 2], [58, 34, 2.5],
-  [26, 38, 2], [88, 38, 1.5], [46, 40, 2],
-];
-// Big drifting emoji per decoration kind: [emoji, left%, top%, sizePx, opacity].
-const DECO_EMOJI = {
-  stars:     [['🌙', 76, 6, 40, 0.9], ['🪐', 8, 12, 34, 0.8], ['✨', 52, 3, 22, 0.85], ['🛰️', 30, 52, 24, 0.7]],
-  sparkles:  [['🦄', 78, 7, 38, 0.9], ['✨', 12, 14, 26, 0.9], ['🌈', 46, 3, 34, 0.75], ['⭐', 30, 54, 24, 0.8]],
-  fireflies: [['🌿', 5, 9, 38, 0.5], ['🍃', 86, 6, 30, 0.5], ['🌴', 4, 68, 42, 0.45], ['🦕', 80, 58, 36, 0.5], ['🌙', 60, 6, 30, 0.7]],
-  bubbles:   [['🫧', 72, 7, 42, 0.85], ['🐠', 11, 62, 32, 0.75], ['🐚', 82, 78, 28, 0.6], ['🌊', 44, 4, 28, 0.55]],
-};
+const rnd = (a, b) => a + Math.random() * (b - a);
 
-// The immersive scene layer for a DARK premium theme: pulsing stars/fireflies +
-// gently drifting themed emoji, behind all content. Nothing on light themes.
+// Build one theme's decoration — matches design_handoff_kids/kids-themes-preview.html.
+// Returns { dots:[{cls,style}], emoji:[{ch,style}] }. Positions are randomised
+// once per theme (see useMemo in KidsDeco) so the scatter looks natural but
+// stays put across re-renders.
+//   stars     (Galaxy) — 46 flickering white/gold/lilac dots + 🌙🪐✨🛰️
+//   jungle    (Dino)   — leaves & dinos, static
+//   bubbles   (Ocean)  — translucent circles + one 🫧 (NO wave/fish emoji)
+//   sprinkles (Candy)  — little coloured confetti sticks
+function buildDeco(kind) {
+  if (kind === 'stars') {
+    const cols = ['#fff', '#FFE08A', '#C9BEFF'];
+    const dots = Array.from({ length: 46 }, () => {
+      const sz = rnd(1.5, 3.5);
+      return { cls: 'kids-twinkle', style: { width: sz, height: sz, left: `${rnd(2, 98)}%`, top: `${rnd(1, 60)}%`, background: cols[Math.floor(rnd(0, 3))], animationDelay: `${rnd(0, 2.4)}s` } };
+    });
+    const emoji = [['🌙', 34, 76, 6], ['🪐', 30, 10, 12], ['✨', 20, 52, 3], ['🛰️', 22, 30, 52]]
+      .map(([ch, fs, l, t]) => ({ ch, style: { fontSize: fs, left: `${l}%`, top: `${t}%`, opacity: 0.85 } }));
+    return { dots, emoji };
+  }
+  if (kind === 'jungle') {
+    const em = ['🌿', '🍃', '🌴', '🦕', '🦴', '🌿', '🍃'];
+    const pos = [[4, 8], [86, 5], [3, 72], [80, 60], [46, 84], [70, 90], [14, 40]];
+    const emoji = em.map((ch, i) => ({ ch, style: { fontSize: rnd(22, 40), left: `${pos[i][0]}%`, top: `${pos[i][1]}%`, opacity: 0.4 } }));
+    return { dots: [], emoji };
+  }
+  if (kind === 'bubbles') {
+    const dots = Array.from({ length: 16 }, () => {
+      const bs = rnd(8, 34);
+      return { cls: '', style: { position: 'absolute', borderRadius: '50%', background: 'rgba(255,255,255,0.28)', width: bs, height: bs, left: `${rnd(2, 94)}%`, top: `${rnd(2, 96)}%` } };
+    });
+    return { dots, emoji: [{ ch: '🫧', style: { fontSize: 40, left: '72%', top: '8%', opacity: 0.7 } }] };
+  }
+  if (kind === 'sprinkles') {
+    const cols = ['#FB7DC0', '#A855F7', '#FDE047', '#34D399', '#38BDF8'];
+    const dots = Array.from({ length: 40 }, (_, k) => ({ cls: '', style: { position: 'absolute', width: rnd(4, 9), height: 3, borderRadius: 2, background: cols[k % 5], left: `${rnd(2, 96)}%`, top: `${rnd(2, 60)}%`, transform: `rotate(${rnd(0, 180)}deg)`, opacity: 0.7 } }));
+    return { dots, emoji: [] };
+  }
+  return null;
+}
+
+// The scene layer behind all content: a themed decoration for each premium
+// theme (Galaxy stars flicker; the bright themes are static). Nothing for free
+// themes (deco is null). Reduced-motion is respected via the CSS keyframes.
 export function KidsDeco({ theme }) {
-  if (!theme?.dark || !theme.deco) return null;
-  const showTwinkles = theme.deco !== 'bubbles';
-  const starColor = (i) => (theme.deco === 'fireflies' ? '#FFDD6B' : ['#fff', '#FFE08A', '#C9BEFF'][i % 3]);
-  const emoji = DECO_EMOJI[theme.deco] || [];
+  const kind = theme?.deco || null;
+  const spec = useMemo(() => buildDeco(kind), [kind]);
+  if (!spec) return null;
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
-      {showTwinkles && TWINKLES.map((p, i) => (
-        <span key={i} className="kids-twinkle" style={{ left: `${p[0]}%`, top: `${p[1]}%`, width: p[2], height: p[2], background: starColor(i), animationDelay: `${(i % 13) * 0.2}s` }} />
-      ))}
-      {emoji.map((e, i) => (
-        <span key={`e${i}`} className="kids-drift" style={{ left: `${e[1]}%`, top: `${e[2]}%`, fontSize: e[3], opacity: e[4], animationDelay: `${i * 0.8}s` }}>{e[0]}</span>
-      ))}
+      {spec.dots.map((d, i) => <span key={`d${i}`} className={d.cls} style={d.style} />)}
+      {spec.emoji.map((e, i) => <span key={`e${i}`} className="kids-demoji" style={e.style}>{e.ch}</span>)}
     </div>
   );
 }
