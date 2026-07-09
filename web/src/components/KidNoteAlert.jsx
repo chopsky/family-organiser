@@ -12,10 +12,11 @@
  * minute even if the parent ignores the push notification.
  *
  * A note is retired ONLY when this user reacts to it (server state, so it
- * follows them across devices). Opening the popup does not hide it, and
- * the banner's ✕ is a session-only snooze - so an un-reacted note is never
- * lost. Notes ≤7 days old can banner. The full archive (incl. reacted and
- * text-only notes) lives on the Notes page (KidNotesArchive).
+ * follows them across devices). Opening the popup — like the banner's ✕ —
+ * snoozes the banner for this session (so a read note doesn't linger), but an
+ * un-reacted note is never lost: it returns on the next load and always lives
+ * in the Notes archive. Notes ≤7 days old can banner. The full archive (incl.
+ * reacted and text-only notes) lives on the Notes page (KidNotesArchive).
  */
 
 import { useState, useEffect } from 'react';
@@ -65,9 +66,12 @@ export default function KidNoteAlert() {
   // Newest note this user hasn't reacted to and hasn't snoozed this session.
   const fresh = notes.find((n) => !n.reactions?.[user?.id] && !snoozed.has(n.id));
 
-  // Opening does NOT retire the note - only reacting does. So if the parent
-  // reads it and closes without reacting, the banner comes back.
-  const openNote = (note) => setViewing(note);
+  // Opening snoozes the banner for THIS session so it doesn't linger after the
+  // parent has read + closed the note (that felt like a stuck notification).
+  // Reacting is still the only thing that permanently retires a note server-
+  // side; an un-reacted note returns on the next load (and always lives in the
+  // Notes archive), so it's dismissed, not lost.
+  const openNote = (note) => { snooze(note.id); setViewing(note); };
 
   const react = async (emoji) => {
     const note = viewing;
