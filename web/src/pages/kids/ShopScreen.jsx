@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { shopItems } from '../../lib/kidsCosmetics';
+import { KID_THEME_ART } from '../../lib/kidsThemeArt';
 import { StarPill, Celebrate } from './ui';
 
 export default function ShopScreen({ kid, theme, balance, onBalance, onSaved }) {
@@ -204,12 +205,20 @@ function CosmeticAction({ it, theme, balance, worn, busy, onBuy, onWear }) {
 }
 
 function ThemeCard({ it, theme, balance, worn, busy, onBuy, onWear }) {
+  const art = KID_THEME_ART[it.key];
   return (
     <div className="kids-card-in" style={{ background: theme.card, backdropFilter: theme.cardBlur, borderRadius: 22, padding: '12px', textAlign: 'center',
       border: worn ? `2px solid ${theme.accent}` : `2px solid ${theme.cardBorder}`, boxShadow: theme.cardShadow }}>
-      <div style={{ height: 64, borderRadius: 16, marginBottom: 8, background: `linear-gradient(160deg, ${it.theme.c1}, ${it.theme.c2})`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', filter: it.owned ? 'none' : 'saturate(.9)' }}>
-        {!it.owned && <span style={{ fontSize: 22 }}>🔒</span>}
+      {/* Banner art on a gradient backdrop — the gradient shows through if the
+          image is missing/fails, so this is safe before the files are added. */}
+      <div style={{ position: 'relative', height: 76, borderRadius: 16, marginBottom: 8, overflow: 'hidden',
+        background: `linear-gradient(160deg, ${it.theme.c1}, ${it.theme.c2})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {art && (
+          <img src={art} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: it.owned ? 'none' : 'brightness(0.72)' }} />
+        )}
+        {!it.owned && <span style={{ position: 'relative', fontSize: 24, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.45))' }}>🔒</span>}
       </div>
       <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 8, color: theme.cardText }}>{it.name}</div>
       <CosmeticAction it={it} theme={theme} balance={balance} worn={worn} busy={busy} onBuy={onBuy} onWear={onWear} />
