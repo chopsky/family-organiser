@@ -39,6 +39,10 @@ beforeEach(() => {
   db.removeChoreCompletion.mockResolvedValue();
   db.addStarTransaction.mockResolvedValue({ applied: true });
   db.removeStarTransactionByRef.mockResolvedValue();
+  // Kids-mode streak plumbing: harmless defaults (streak 0 -> no milestone) so
+  // the completion path exercises the award block without awarding anything.
+  db.getKidStreak.mockResolvedValue({ current: 0, longest: 0, satisfiedToday: true, atRisk: false, nextMilestone: 7 });
+  db.addKidBadge.mockResolvedValue({ inserted: false });
 });
 
 describe('POST /api/chores/:id/complete', () => {
@@ -129,6 +133,44 @@ describe('POST /api/chores/:id/complete', () => {
       await request(chores()).post('/api/chores/a1/complete').send({ member_id: 'g', date: DATE, done: false });
       expect(db.removeChoreCompletion).toHaveBeenCalledWith('a1', 'g', DATE, 'h1', '');
       expect(db.removeStarTransactionByRef).toHaveBeenCalledWith('chore_earn', 'a1:g:2026-04-18');
+    });
+  });
+
+  describe('streak milestones', () => {
+    test('reaching a milestone awards the badge + bonus stars, once', async () => {
+      db.getKidStreak.mockResolvedValue({ current: 7, longest: 7 });
+      db.addKidBadge.mockResolvedValue({ inserted: true });
+      const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: true });
+      expect(res.status).toBe(200);
+      expect(db.getKidStreak).toHaveBeenCalledWith('h1', 'm', DATE);
+      expect(db.addKidBadge).toHaveBeenCalledWith('h1', 'm', 'streak_7', DATE);
+      expect(db.addStarTransaction).toHaveBeenCalledWith(expect.objectContaining({
+        memberId: 'm', delta: 5, reason: 'earn', refType: 'streak_milestone', refId: 'm:streak_7',
+      }));
+      expect(res.body.newBadges).toEqual([{ key: 'streak_7', tier: 7, bonus: 5 }]);
+    });
+
+    test('an adult completion never computes a kids streak', async () => {
+      db.getKidStreak.mockResolvedValue({ current: 7 });
+      await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'g', date: DATE, done: true });
+      expect(db.getKidStreak).not.toHaveBeenCalled();
+      expect(db.addKidBadge).not.toHaveBeenCalled();
+    });
+
+    test('an already-earned milestone is not re-credited', async () => {
+      db.getKidStreak.mockResolvedValue({ current: 30, longest: 30 });
+      db.addKidBadge.mockResolvedValue({ inserted: false }); // already have both tiers
+      const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: true });
+      const reasons = db.addStarTransaction.mock.calls.map((c) => c[0].refType);
+      expect(reasons).not.toContain('streak_milestone');
+      expect(res.body.newBadges).toEqual([]);
+    });
+
+    test('un-completing never awards or revokes a streak badge', async () => {
+      db.getKidStreak.mockResolvedValue({ current: 7 });
+      await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: false });
+      expect(db.getKidStreak).not.toHaveBeenCalled();
+      expect(db.addKidBadge).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,5 +1,6 @@
 const { supabaseAdmin: supabase } = require('./client');
 const crypto = require('crypto');
+const { computeStreak, DEFAULT_LOOKBACK_DAYS, addDaysStr } = require('../services/kids-streak');
 
 // Sanitise a free-text value before embedding it in a PostgREST `.or()` filter
 // STRING. PostgREST parses that whole string, so commas / parentheses (its
@@ -8284,6 +8285,59 @@ async function removeStarTransactionByRef(refType, refId, db = supabase) {
   if (error) throw error;
 }
 
+// ─── Kids-mode streaks + milestone badges ────────────────────────────────────
+// The streak count is NOT stored - it's derived on read from chore_completions
+// (the same history the Quests screen reads), so it can't drift. Only the
+// once-ever milestone badges are persisted (kid_badges). See
+// src/services/kids-streak.js for the pure recurrence/grace logic.
+
+// A kid's live streak, computed as-of `today` ('YYYY-MM-DD', household-local).
+// Reads a bounded window of completion + skip history and runs the pure
+// computeStreak. Returns { current, longest, satisfiedToday, atRisk,
+// nextMilestone, todayStatus }.
+async function getKidStreak(householdId, memberId, today, db = supabase) {
+  const from = addDaysStr(today, -DEFAULT_LOOKBACK_DAYS);
+  const [defs, completions, skips] = await Promise.all([
+    getChoreDefinitions(householdId, db),
+    getChoreCompletionsForRange(householdId, from, today, db),
+    // Skips are best-effort: if migration-chore-skips.sql hasn't run, treat as none.
+    getChoreSkipsForRange(householdId, from, today, db).catch(() => []),
+  ]);
+  return computeStreak({ defs, completions, skips, memberId, today, lookbackDays: DEFAULT_LOOKBACK_DAYS });
+}
+
+// Milestone badges a kid has earned. Tolerant of the table not existing yet
+// (pre-migration deploy window) - returns [] so the Kids UI never 500s.
+async function getKidBadges(householdId, memberId, db = supabase) {
+  const { data, error } = await db
+    .from('kid_badges')
+    .select('badge_key, earned_on')
+    .eq('household_id', householdId)
+    .eq('member_id', memberId)
+    .order('earned_on', { ascending: true });
+  if (error) {
+    if (/kid_badges/i.test(error.message || '')) return []; // migration-kids-streak.sql not run yet
+    throw error;
+  }
+  return data || [];
+}
+
+// Idempotent badge unlock (unique member_id+badge_key). Returns { inserted } so
+// the caller credits the matching star bonus exactly once. Missing table (pre-
+// migration) is swallowed as a non-insert.
+async function addKidBadge(householdId, memberId, badgeKey, earnedOn, db = supabase) {
+  const { data, error } = await db
+    .from('kid_badges')
+    .upsert({ household_id: householdId, member_id: memberId, badge_key: badgeKey, earned_on: earnedOn },
+      { onConflict: 'member_id,badge_key', ignoreDuplicates: true })
+    .select('id');
+  if (error) {
+    if (/kid_badges/i.test(error.message || '')) return { inserted: false };
+    throw error;
+  }
+  return { inserted: Array.isArray(data) && data.length > 0 };
+}
+
 async function getRewards(householdId, db = supabase) {
   const run = (cols) => db
     .from('rewards')
@@ -8397,6 +8451,9 @@ module.exports = {
   getStarBalances,
   addStarTransaction,
   removeStarTransactionByRef,
+  getKidStreak,
+  getKidBadges,
+  addKidBadge,
   getRewards,
   addReward,
   updateReward,

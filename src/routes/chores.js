@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 const { buildDayView } = require('../services/chores');
+const { STREAK_MILESTONES } = require('../services/kids-streak');
 
 const router = Router();
 
@@ -120,6 +121,27 @@ router.get('/week', requireAuth, requireHousehold, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/chores/streak?member_id= — a kid's daily-quest streak + earned
+ * milestone badges. Computed on read from completion history (see
+ * src/services/kids-streak.js), so it never drifts from what the kid did.
+ */
+router.get('/streak', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const memberId = req.query.member_id;
+    if (!memberId) return res.status(400).json({ error: 'member_id is required' });
+    const today = await householdToday(req.householdId);
+    const [streak, badges] = await Promise.all([
+      db.getKidStreak(req.householdId, memberId, today),
+      db.getKidBadges(req.householdId, memberId),
+    ]);
+    return res.json({ ...streak, badges });
+  } catch (err) {
+    console.error('GET /api/chores/streak error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /** POST /api/chores — create a recurring definition. */
 router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
@@ -227,6 +249,7 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
     // The completion write is the source of truth for the toggle. The star
     // ledger + balance steps below are best-effort: a ledger hiccup must not
     // 500 the request, or the client would revert a toggle that actually saved.
+    let didInsert = false;
     if (done) {
       // An "Anyone" chore is claimed once per day: if someone already completed
       // it, ignore further claims so a second member can't double-credit stars.
@@ -237,6 +260,7 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
       }
       if (!alreadyClaimed) {
         const { inserted } = await db.addChoreCompletion(def.id, memberId, req.householdId, date, slot);
+        didInsert = inserted;
         // Credit stars only on a NEW completion (insert) so repeat taps can't double-credit.
         if (inserted && def.reward && def.stars > 0) {
           try {
@@ -252,11 +276,33 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
       }
     }
 
+    // Kids-mode streak: a NEW quest completion by a kid may push their streak to
+    // a milestone (7/30/100/365 days) - award the once-ever badge + its star
+    // bonus (idempotent via kid_badges + the ledger's ref). Uncompleting never
+    // revokes a badge; "Anyone" chores don't feed a personal streak. All
+    // best-effort so a streak hiccup never 500s a saved toggle.
+    let streak = null;
+    const newBadges = [];
+    if (done && didInsert && !def.anyone && member.member_type === 'dependent') {
+      try {
+        streak = await db.getKidStreak(req.householdId, memberId, date);
+        for (const m of STREAK_MILESTONES) {
+          if (streak.current < m.tier) continue;
+          const { inserted } = await db.addKidBadge(req.householdId, memberId, m.badge, date);
+          if (!inserted) continue; // already earned on a previous day
+          try {
+            await db.addStarTransaction({ householdId: req.householdId, memberId, delta: m.bonus, reason: 'earn', refType: 'streak_milestone', refId: `${memberId}:${m.badge}` });
+          } catch (e) { console.warn('streak bonus credit failed (non-fatal):', e.message); }
+          newBadges.push({ key: m.badge, tier: m.tier, bonus: m.bonus });
+        }
+      } catch (e) { console.warn('streak award failed (non-fatal):', e.message); }
+    }
+
     cache.invalidate(`digest:${req.householdId}`);
     let balances = {};
     try { balances = await db.getStarBalances(req.householdId); }
     catch (e) { console.warn('chore complete: balance fetch failed (non-fatal):', e.message); }
-    return res.json({ ok: true, balances });
+    return res.json({ ok: true, balances, streak, newBadges });
   } catch (err) {
     console.error('POST /api/chores/:id/complete error:', err);
     return res.status(500).json({ error: 'Internal server error' });

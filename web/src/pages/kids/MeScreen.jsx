@@ -4,18 +4,28 @@
 // The two grown-up actions at the bottom are PIN-gated: Exit Child Mode
 // (turns Child Mode off on this device) and Grown-up settings (unlocks the
 // adult Settings page behind the existing ChildGate escape hatch).
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChildMode } from '../../context/ChildModeContext';
 import { KID_COLOR_PRESETS, KID_AVATARS, KIDS_INK } from '../../lib/kidsTheme';
+import { BADGE_META, BADGE_ORDER } from '../../lib/kidsBadges';
 
 export default function MeScreen({ kid, theme, onSaved }) {
   const isMobile = useIsMobile();
   const { verifyPin, disable, pinIsSet } = useChildMode();
   const navigate = useNavigate();
   const [gate, setGate] = useState(false); // PIN sheet open for Exit Child Mode
+  const [stats, setStats] = useState(null); // streak + earned badges
+
+  // Load this kid's streak + earned badges for the badge shelf.
+  useEffect(() => {
+    let alive = true;
+    api.get(`/chores/streak?member_id=${kid.id}`).then(({ data }) => { if (alive) setStats(data); }).catch(() => {});
+    return () => { alive = false; };
+  }, [kid.id]);
+  const earned = new Set((stats?.badges || []).map((b) => b.badge_key));
 
   const save = (patch) => {
     // Optimistic: the shell re-themes instantly; the PATCH persists to the
@@ -58,6 +68,30 @@ export default function MeScreen({ kid, theme, onSaved }) {
           </div>
         </div>
       )}
+
+      {/* Badge shelf: the four streak milestones, earned or locked (a locked
+          one shows what to aim for). Streaks are earned by daily quests - never
+          bought - so these live here, next to identity, not in the Star Shop. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>
+        <span style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600 }}>My badges 🏅</span>
+        {stats?.current > 0 && <span style={{ fontSize: 14, fontWeight: 600, color: theme.accent }}>🔥 {stats.current}-day streak</span>}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 12, marginBottom: isMobile ? 28 : 32, padding: '0 2px' }}>
+        {BADGE_ORDER.map((key) => {
+          const meta = BADGE_META[key];
+          const on = earned.has(key);
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderRadius: 18,
+              background: on ? theme.soft : '#fff', border: on ? `2px solid ${theme.accent}` : '2px solid rgba(49,43,75,0.06)' }}>
+              <span style={{ fontSize: 26, flexShrink: 0, filter: on ? 'none' : 'grayscale(1) opacity(.5)' }}>{meta.emoji}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: on ? KIDS_INK.ink : KIDS_INK.ink3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.label}</span>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 500, color: on ? theme.accent : KIDS_INK.ink3 }}>{on ? 'Earned!' : meta.blurb}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
       <div style={{ fontSize: isMobile ? 19 : 20, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 2px 14px' }}>My colour 🎨</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 14 : 16, marginBottom: isMobile ? 28 : 30, padding: '0 2px' }}>

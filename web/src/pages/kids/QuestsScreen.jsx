@@ -5,10 +5,11 @@
 // under "My jobs", and "Anyone" chores as the shared "Help the family" pool
 // where the first kid to finish claims the stars. Completing a rewarded quest
 // flashes "+N⭐"; finishing every rewarded quest earns the trophy celebration.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { KIDS_INK } from '../../lib/kidsTheme';
+import { BADGE_META, streakLine } from '../../lib/kidsBadges';
 import { StarPill, Section, Celebrate, KidsLogo } from './ui';
 import { KidSwitch } from './KidsShell';
 
@@ -18,7 +19,16 @@ const MASCOTS = ['😴', '🙂', '😃', '🤩', '🥳'];
 export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid }) {
   const isMobile = useIsMobile();
   const [celebrate, setCelebrate] = useState(null);
+  const [streak, setStreak] = useState(null);
   const tasks = (day?.tasks || []).filter((t) => t.anyone || (t.assignee_ids || []).includes(kid.id));
+
+  // Load this kid's streak on mount / kid switch. Completing a quest returns a
+  // fresh streak in the toggle response, so we only fetch here (not per-toggle).
+  useEffect(() => {
+    let alive = true;
+    api.get(`/chores/streak?member_id=${kid.id}`).then(({ data }) => { if (alive) setStreak(data); }).catch(() => {});
+    return () => { alive = false; };
+  }, [kid.id]);
 
   const isDone = (t) => (t.anyone ? !!t.completed : !!(t.done && t.done[kid.id]));
   const doneByOther = (t) => t.anyone && t.completed && t.completed_by !== kid.id;
@@ -53,6 +63,14 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
     try {
       const { data } = await api.post(`/chores/${t.id}/complete`, { member_id: kid.id, date: day.date, done: next, slot: t.slot || '' });
       if (data?.balances) setDay((d) => (d ? { ...d, balances: data.balances } : d));
+      if (data?.streak) setStreak(data.streak);
+      // A milestone just unlocked - celebrate the highest tier reached, over the
+      // top of any all-done trophy (a badge is the bigger moment).
+      if (data?.newBadges?.length) {
+        const top = data.newBadges[data.newBadges.length - 1];
+        const meta = BADGE_META[top.key];
+        setTimeout(() => setCelebrate({ emoji: meta?.emoji || '🔥', title: `${top.tier}-day streak!`, sub: `${meta?.label || 'Streak badge'} · +${top.bonus}⭐` }), 500);
+      }
     } catch {
       // Revert by reloading the day so we never show a tick that didn't save.
       try {
@@ -96,6 +114,8 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
         {total === 0 ? 'No quests today - enjoy it!' : doneCount === total ? 'You finished everything! 🎉' : "Here are today's quests."}
       </div>
 
+      <StreakCard streak={streak} theme={theme} isMobile={isMobile} />
+
       {total > 0 && (
         <div style={{ background: theme.grad, borderRadius: isMobile ? 30 : 28, padding: isMobile ? '20px 22px' : '22px 26px', display: 'flex', alignItems: 'center', gap: isMobile ? 18 : 22, marginBottom: isMobile ? 22 : 24, boxShadow: isMobile ? '0 10px 26px rgba(49,43,75,0.2)' : '0 12px 30px rgba(49,43,75,0.2)' }}>
           <ProgressRing pct={pct} mascot={mascot} size={isMobile ? 84 : 98} />
@@ -130,6 +150,32 @@ export default function QuestsScreen({ kid, theme, day, setDay, kids, pickKid })
           in front of a child. The prompt lives on the ADULT Tasks page's
           celebration instead (Chores.jsx). */}
       {celebrate && <Celebrate data={celebrate} onDone={() => setCelebrate(null)} />}
+    </div>
+  );
+}
+
+// The daily-quest streak: a flame + day count that shows even on a quest-free
+// day (so a rest day still shows the streak the kid is protecting). Distinct
+// from the gradient "Quest progress" card - white, calm, always at the top.
+function StreakCard({ streak, theme, isMobile }) {
+  if (!streak) return null;
+  const has = streak.current > 0;
+  return (
+    <div className="kids-card-in" style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff',
+      border: '2px solid rgba(49,43,75,0.06)', borderRadius: isMobile ? 26 : 24, padding: isMobile ? '13px 15px' : '15px 18px',
+      marginBottom: isMobile ? 18 : 20, boxShadow: '0 6px 0 rgba(49,43,75,0.04), 0 10px 22px rgba(49,43,75,0.06)' }}>
+      <span style={{ width: 54, height: 54, borderRadius: 17, flexShrink: 0, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: has ? theme.soft : '#F1EFF7', filter: has ? 'none' : 'grayscale(.5) opacity(.7)' }}>🔥</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, lineHeight: 1, color: KIDS_INK.ink }}>{streak.current}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: KIDS_INK.ink2 }}>day{streak.current === 1 ? '' : 's'} in a row</span>
+          {streak.longest > streak.current && streak.longest > 0 && (
+            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: KIDS_INK.ink3, whiteSpace: 'nowrap' }}>Best {streak.longest}</span>
+          )}
+        </div>
+        <div style={{ fontSize: 13.5, fontWeight: 500, color: streak.atRisk ? '#C2410C' : KIDS_INK.ink2, marginTop: 3 }}>{streakLine(streak)}</div>
+      </div>
     </div>
   );
 }
