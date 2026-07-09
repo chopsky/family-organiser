@@ -183,7 +183,10 @@ function SectionTitle({ children, isMobile }) {
   return <div style={{ fontSize: isMobile ? 19 : 21, fontWeight: 600, padding: isMobile ? '0 4px 12px' : '0 4px 14px' }}>{children}</div>;
 }
 
-// Shared price/lock footer for a cosmetic card: worn / wear / buy / save-up.
+// Shared price/lock footer for a cosmetic card. Owned → worn / wear / owned.
+// Otherwise the price is ALWAYS shown (StarPill) with either a buy button (can
+// afford) or a progress bar + "X more ⭐" (saving up) — the same treatment as
+// the "Pick a treat" reward tiles, so cost + goal are visible at every stage.
 function CosmeticAction({ it, theme, balance, worn, busy, onBuy, onWear }) {
   if (it.owned) {
     if (it.kind === 'theme') {
@@ -193,15 +196,25 @@ function CosmeticAction({ it, theme, balance, worn, busy, onBuy, onWear }) {
     }
     return <div style={{ fontSize: 13, fontWeight: 600, color: theme.accent, padding: '9px 0' }}>Owned ✓</div>;
   }
-  if (it.affordable) {
-    return (
-      <button onClick={onBuy} disabled={busy} style={{ width: '100%', padding: '10px', borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: 'inherit',
-        background: theme.grad, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 5px 0 rgba(49,43,75,0.12)', opacity: busy ? .7 : 1 }}>
-        {busy ? '…' : `Get it! ${it.cost}⭐`}
-      </button>
-    );
-  }
-  return <div style={{ fontSize: 12.5, fontWeight: 600, color: theme.cardText3, padding: '9px 0' }}>{it.cost - balance} more ⭐</div>;
+  const pct = Math.min(1, it.cost ? balance / it.cost : 1);
+  return (
+    <>
+      <div style={{ margin: '0 0 10px', display: 'flex', justifyContent: 'center' }}><StarPill n={it.cost} /></div>
+      {it.affordable ? (
+        <button onClick={onBuy} disabled={busy} style={{ width: '100%', padding: '10px', borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: 'inherit',
+          background: theme.grad, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 5px 0 rgba(49,43,75,0.12)', opacity: busy ? .7 : 1 }}>
+          {busy ? '…' : 'Get it!'}
+        </button>
+      ) : (
+        <div>
+          <div style={{ height: 10, borderRadius: 999, background: theme.dark ? 'rgba(255,255,255,0.14)' : '#EDEBF4', overflow: 'hidden' }}>
+            <div style={{ width: `${pct * 100}%`, height: '100%', background: theme.accent, borderRadius: 999 }} />
+          </div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: theme.cardText3, marginTop: 6 }}>{it.cost - balance} more ⭐</div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function ThemeCard({ it, theme, balance, worn, busy, onBuy, onWear }) {
