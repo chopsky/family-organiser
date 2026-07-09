@@ -430,9 +430,12 @@ export default function Layout({ children }) {
           desktop sidebar already exposes everything in this menu. */}
       {!childMode && moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
 
-      {/* Floating AI chat button + panel. Hidden on the dashboard, which has
-          its own AI composer, so the FAB isn't redundant there. */}
-      {!childMode && !isDashboard && <Suspense fallback={null}><ChatWidget /></Suspense>}
+      {/* Floating AI chat button + panel. Mounted on the dashboard too so its
+          inline composer / weather / notes (which dispatch openChatWidget)
+          actually open the chat. On the dashboard the desktop already has an
+          inline composer, so ChatWidget shows the floating orb only on mobile
+          there (isDashboard) — every other page shows it on both. */}
+      {!childMode && <Suspense fallback={null}><ChatWidget isDashboard={isDashboard} /></Suspense>}
 
       {/* Trial-ended overlay - only renders for expired households who
           haven't dismissed it this session. Scoped to Layout so it

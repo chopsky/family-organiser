@@ -278,7 +278,7 @@ function ActionCards({ actions, members }) {
   );
 }
 
-export default function ChatWidget() {
+export default function ChatWidget({ isDashboard = false }) {
   const { user } = useAuth();
   const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
   const [micOn, setMicOn] = useState(false);
@@ -361,6 +361,19 @@ I'm always here if you need me!`;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     mobileEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // On open (and when returning from history), jump straight to the latest
+  // message. The [messages] effect above only fires on message changes, so an
+  // already-loaded conversation would otherwise open scrolled to the top.
+  // Instant (no smooth) so it's already at the bottom when the panel appears.
+  useEffect(() => {
+    if (!isOpen || showHistory) return undefined;
+    const id = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ block: 'end' });
+      mobileEndRef.current?.scrollIntoView({ block: 'end' });
+    }, 80);
+    return () => clearTimeout(id);
+  }, [isOpen, showHistory]);
 
   // Focus input when opened (and not showing history)
   useEffect(() => {
@@ -626,8 +639,10 @@ I'm always here if you need me!`;
 
   return (
     <>
-      {/* Welcome speech bubble for first-time users */}
-      {!isOpen && showWelcomeBubble && (
+      {/* Welcome speech bubble for first-time users. Not on the dashboard,
+          where the orb is mobile-only (desktop uses the inline composer) and
+          the bubble's tail would point at nothing. */}
+      {!isOpen && showWelcomeBubble && !isDashboard && (
         <div className="hidden md:block fixed bottom-40 md:bottom-[88px] right-4 md:right-6 z-50 max-w-[300px] animate-fade-in">
           <div className="relative bg-white rounded-2xl shadow-lg border border-light-grey p-4">
             <button
@@ -657,7 +672,7 @@ I'm always here if you need me!`;
             }
             setIsOpen(true);
           }}
-          className="flex fixed ai-orb-bottom right-4 md:right-6 z-50 w-14 h-14 rounded-full text-white items-center justify-center transition-all hover:scale-105"
+          className={`${isDashboard ? 'flex md:hidden' : 'flex'} fixed ai-orb-bottom right-4 md:right-6 z-50 w-14 h-14 rounded-full text-white items-center justify-center transition-all hover:scale-105`}
           style={{
             // Gradient AI orb from the floating-nav handoff. bottom-24
             // lands it just above the floating pill's right edge.
