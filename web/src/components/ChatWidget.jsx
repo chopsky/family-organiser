@@ -949,7 +949,7 @@ I'm always here if you need me!`;
                         <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: 'rgba(45,42,51,0.05)', color: p.color }}>{p.icon}</div>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-charcoal">{p.title}</div>
-                          <div className="text-xs text-warm-grey italic mt-0.5 truncate">&ldquo;{p.ex}&rdquo;</div>
+                          <div className="text-xs text-warm-grey mt-0.5 truncate">&ldquo;{p.ex}&rdquo;</div>
                         </div>
                       </button>
                     ))}
