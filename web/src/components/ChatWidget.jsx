@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../lib/api';
 import { getDeviceLocation } from '../lib/location';
+import { useAuth } from '../context/AuthContext';
+import Sheet from './ui/Sheet';
+import AIComposer from './ui/AIComposer';
 
 /**
  * Format markdown-style text into React elements.
@@ -94,6 +97,22 @@ const MicIcon = ({ className }) => (
     <path d="M5 11a7 7 0 0014 0M12 18v3" />
   </svg>
 );
+
+// Empty-state quick prompts (mobile bottom sheet). Tapping one FILLS the
+// composer with the example (it does not send) so the user can edit first.
+// Colours per the design handoff; the icon tile is a soft neutral tint.
+const PROMPT_ICON = {
+  cal: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="16" rx="3" /><rect x="3" y="5" width="18" height="5" rx="3" opacity=".55" /></svg>,
+  cart: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h2l2 11h9l2-8H7" /><circle cx="9" cy="20" r="1.6" /><circle cx="17" cy="20" r="1.6" /></svg>,
+  fork: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a2 2 0 0 0 4 0V3M8 12v9M16 3c-1.5 0-2.5 2-2.5 5S15 13 16 13s2.5-1 2.5-5S17.5 3 16 3zM16 13v8" /></svg>,
+  check: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12l3 3 5-6" /></svg>,
+};
+const QUICK_PROMPTS = [
+  { title: 'Add an event', ex: 'Mason has tennis Saturday at 3pm', color: 'var(--color-plum)', icon: PROMPT_ICON.cal },
+  { title: 'Add to the grocery list', ex: 'We need carrots and milk', color: '#4F9D69', icon: PROMPT_ICON.cart },
+  { title: 'Plan a meal', ex: 'Something easy for Wednesday', color: '#D8873B', icon: PROMPT_ICON.fork },
+  { title: 'Create a task', ex: "Remind me to renew Lily's passport", color: '#D8788A', icon: PROMPT_ICON.check },
+];
 
 function safeGetItem(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -260,6 +279,12 @@ function ActionCards({ actions, members }) {
 }
 
 export default function ChatWidget() {
+  const { user } = useAuth();
+  const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
+  const [micOn, setMicOn] = useState(false);
+  const recognitionRef = useRef(null);
+  const mobileFileRef = useRef(null);
+  const mobileEndRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -274,7 +299,6 @@ export default function ChatWidget() {
   const [members, setMembers] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const pendingMessageRef = useRef(null);
   const initializedRef = useRef(false);
 
   const WELCOME_MESSAGE = `Hey there! Welcome to Housemait - I'm your AI assistant, here to help your household stay organised.
@@ -332,7 +356,10 @@ I'm always here if you need me!`;
 
   // Auto-scroll to bottom
   useEffect(() => {
+    // Both end-markers exist (desktop panel + mobile sheet); only the visible
+    // one scrolls — scrollIntoView on the display:none one is a harmless no-op.
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    mobileEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
   // Focus input when opened (and not showing history)
@@ -532,6 +559,30 @@ I'm always here if you need me!`;
     uploadAttachment(file);
   }
 
+  // Voice input via the Web Speech API — transcribes into the composer. Works
+  // in browsers and Android WebView; iOS WKWebView (the Capacitor app) doesn't
+  // implement SpeechRecognition, so this silently no-ops there (a native STT
+  // plugin would be the follow-up). Tap again to stop.
+  function toggleMic() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    if (micOn && recognitionRef.current) { recognitionRef.current.stop(); return; }
+    const rec = new SR();
+    rec.lang = 'en-GB';
+    rec.interimResults = true;
+    rec.continuous = false;
+    const base = input ? `${input.trimEnd()} ` : '';
+    rec.onresult = (ev) => {
+      const txt = Array.from(ev.results).map((r) => r[0].transcript).join('');
+      setInput(base + txt);
+    };
+    rec.onend = () => { setMicOn(false); recognitionRef.current = null; };
+    rec.onerror = () => { setMicOn(false); recognitionRef.current = null; };
+    recognitionRef.current = rec;
+    setMicOn(true);
+    try { rec.start(); } catch { setMicOn(false); recognitionRef.current = null; }
+  }
+
   // Listen for external "open chat with message" events (from dashboard AI input)
   useEffect(() => {
     function handleOpenChat(e) {
@@ -545,8 +596,13 @@ I'm always here if you need me!`;
         setTimeout(() => sendMessage(msg), 100);
       }
       if (attach) {
-        // Open the native file picker once the composer has mounted.
-        setTimeout(() => document.querySelector('[data-chat-file-input]')?.click(), 200);
+        // Open the native file picker once the composer has mounted — target
+        // whichever composer is visible (desktop docked panel vs mobile sheet).
+        setTimeout(() => {
+          const sel = window.matchMedia('(min-width: 768px)').matches
+            ? '[data-chat-file-input-desktop]' : '[data-chat-file-input]';
+          document.querySelector(sel)?.click();
+        }, 200);
       }
     }
     window.addEventListener('openChatWidget', handleOpenChat);
@@ -617,10 +673,8 @@ I'm always here if you need me!`;
       {/* Chat panel */}
       {isOpen && (
         <>
-          {/* Mobile backdrop */}
-          <div className="md:hidden fixed inset-0 bg-black/30 z-50" onClick={() => setIsOpen(false)} />
-
-          <div className="fixed inset-0 md:left-auto w-full md:w-[380px] bg-white z-50 flex flex-col shadow-xl border-l border-light-grey safe-top safe-bottom">
+          {/* ── Desktop: docked right-side panel (unchanged) ── */}
+          <div className="hidden md:flex fixed inset-y-0 right-0 w-[380px] bg-white z-50 flex-col shadow-xl border-l border-light-grey safe-top safe-bottom">
 
             {/* Header */}
             <div className="px-4 py-3 border-b border-light-grey flex items-center gap-2 shrink-0">
@@ -800,7 +854,7 @@ I'm always here if you need me!`;
                           onChange={handleImageUpload}
                           disabled={loading}
                           className="hidden"
-                          data-chat-file-input
+                          data-chat-file-input-desktop
                         />
                       </label>
                       <div className="flex items-center gap-1">
@@ -830,6 +884,125 @@ I'm always here if you need me!`;
                 </form>
               </>
             )}
+          </div>
+
+          {/* ── Mobile: bottom sheet (design_handoff_ai_chat) ── */}
+          <div className="md:hidden">
+            <Sheet open={isOpen} onClose={() => setIsOpen(false)}>
+              {/* Header */}
+              <div className="px-5 pb-3 pt-1 flex items-center gap-2.5 shrink-0">
+                {showHistory ? (
+                  <>
+                    <button onClick={() => setShowHistory(false)} aria-label="Back" className="p-1 -ml-1 text-warm-grey"><ArrowLeftIcon className="h-5 w-5" /></button>
+                    <h2 className="flex-1 text-[15px] font-semibold text-charcoal">Chat history</h2>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-9 h-9 rounded-[11px] flex items-center justify-center text-white shrink-0"
+                      style={{ background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)', boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}>
+                      <SparklesIcon className="h-[18px] w-[18px]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] font-bold text-charcoal leading-tight">Housemait AI</div>
+                      <div className="text-[11px] text-warm-grey leading-tight">Knows your family · always on</div>
+                    </div>
+                    <button onClick={openHistory} aria-label="Chat history" className="w-8 h-8 rounded-full flex items-center justify-center text-warm-grey hover:text-plum"><HistoryIcon className="h-[18px] w-[18px]" /></button>
+                    <button onClick={startNewConversation} aria-label="New chat" className="w-8 h-8 rounded-full flex items-center justify-center text-warm-grey hover:text-plum"><PlusIcon className="h-[18px] w-[18px]" /></button>
+                  </>
+                )}
+                <button onClick={() => setIsOpen(false)} aria-label="Close" className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-warm-grey shrink-0" style={{ background: 'rgba(45,42,51,0.05)' }}><CloseIcon className="h-4 w-4" /></button>
+              </div>
+
+              {showHistory ? (
+                /* History list */
+                <div className="flex-1 overflow-y-auto px-3 pb-2">
+                  {loadingHistory ? (
+                    <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-plum/30 border-t-plum rounded-full animate-spin" /></div>
+                  ) : conversations.length === 0 ? (
+                    <div className="text-center text-warm-grey text-sm py-12 px-4"><HistoryIcon className="h-8 w-8 mx-auto mb-2 text-light-grey" /><p>No previous conversations</p></div>
+                  ) : (
+                    <div className="divide-y divide-light-grey">
+                      {conversations.map((conv) => (
+                        <div key={conv.id} onClick={() => loadConversation(conv.id)} className={`px-3 py-3 cursor-pointer active:bg-cream rounded-xl group ${conv.id === activeConversationId ? 'bg-plum-light/30' : ''}`}>
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-charcoal truncate">{conv.title}</p>
+                              {conv.lastMessage && <p className="text-xs text-warm-grey truncate mt-0.5">{conv.lastMessage}</p>}
+                              <p className="text-[10px] text-warm-grey/60 mt-1">{timeAgo(conv.updated_at)}</p>
+                            </div>
+                            <button onClick={(e) => deleteConversation(conv.id, e)} aria-label="Delete conversation" className="p-1 text-warm-grey/60 hover:text-red-500 shrink-0"><TrashIcon className="h-4 w-4" /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : messages.length === 0 && !loading ? (
+                /* Empty state: Recoleta greeting + quick-prompt cards (fill the composer, don't send) */
+                <div className="flex-1 overflow-y-auto px-5">
+                  <div className="text-charcoal mt-2" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 26, lineHeight: 1.1, letterSpacing: '-0.4px' }}>
+                    How can I help, {firstName}?
+                  </div>
+                  <div className="flex flex-col gap-2.5 mt-4 pb-2">
+                    {QUICK_PROMPTS.map((p) => (
+                      <button key={p.title} onClick={() => setInput(p.ex)} className="bg-white rounded-2xl px-3.5 py-3 text-left flex gap-3 items-center active:scale-[0.99] transition-transform" style={{ border: '1px solid rgba(45,42,51,0.08)' }}>
+                        <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: 'rgba(45,42,51,0.05)', color: p.color }}>{p.icon}</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-charcoal">{p.title}</div>
+                          <div className="text-xs text-warm-grey italic mt-0.5 truncate">&ldquo;{p.ex}&rdquo;</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Thread: user plum-filled right, AI white left; action cards inline */
+                <div className="flex-1 overflow-y-auto px-5 py-1">
+                  <div className="flex flex-col gap-3 py-1">
+                    {messages.map((msg, i) => (
+                      <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        {msg.role === 'assistant' && Array.isArray(msg.actions) && msg.actions.length > 0 && (
+                          <div className="max-w-[85%] w-full mb-1.5"><ActionCards actions={msg.actions} members={members} /></div>
+                        )}
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{
+                          maxWidth: '80%', padding: '10px 14px', borderRadius: 18,
+                          background: msg.role === 'user' ? 'var(--color-plum)' : '#fff',
+                          color: msg.role === 'user' ? '#fff' : '#2D2A33',
+                          border: msg.role === 'user' ? '0' : '1px solid rgba(45,42,51,0.08)',
+                          borderBottomRightRadius: msg.role === 'user' ? 6 : 18,
+                          borderBottomLeftRadius: msg.role === 'user' ? 18 : 6,
+                        }}>
+                          {msg.role === 'assistant' ? formatMessage(msg.content) : msg.content}
+                        </div>
+                      </div>
+                    ))}
+                    {loading && (
+                      <div className="flex justify-start"><div className="bg-white rounded-2xl rounded-bl-md" style={{ border: '1px solid rgba(45,42,51,0.08)' }}><TypingIndicator /></div></div>
+                    )}
+                    <div ref={mobileEndRef} />
+                  </div>
+                </div>
+              )}
+
+              {/* Composer pinned at the bottom */}
+              {!showHistory && (
+                <div className="px-4 pt-2 shrink-0">
+                  <AIComposer
+                    value={input}
+                    onChange={setInput}
+                    onSubmit={() => handleSend()}
+                    onMic={toggleMic}
+                    onAttach={() => mobileFileRef.current?.click()}
+                    attach
+                    micOn={micOn}
+                    disabled={loading}
+                    autoFocus
+                    placeholder="Ask me anything…"
+                  />
+                  <input ref={mobileFileRef} type="file" accept="image/*,application/pdf" onChange={handleImageUpload} disabled={loading} className="hidden" data-chat-file-input />
+                </div>
+              )}
+            </Sheet>
           </div>
         </>
       )}
