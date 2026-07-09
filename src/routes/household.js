@@ -9,6 +9,7 @@ const { supabaseAdmin } = require('../db/client');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const email = require('../services/email');
 const cache = require('../services/cache');
+const kidsCosmetics = require('../services/kids-cosmetics');
 const { validateEmailAlias } = require('../utils/email-alias');
 const { publicHousehold } = require('../utils/publicHousehold');
 
@@ -224,10 +225,22 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   // color_theme, which drives the parent-facing palette.
   const VALID_KID_COLORS = ['sky', 'coral', 'grape', 'sun', 'mint', 'teal', 'orange', 'berry'];
   if (req.body.kid_color !== undefined) {
-    if (req.body.kid_color !== null && !VALID_KID_COLORS.includes(req.body.kid_color)) {
-      return res.status(400).json({ error: 'Invalid kid colour.' });
+    const kc = req.body.kid_color;
+    if (kc !== null && !VALID_KID_COLORS.includes(kc)) {
+      // Beyond the 8 free presets, the only valid kid colours are PREMIUM
+      // themes (galaxy/dino/…) - and only if this kid actually OWNS the theme,
+      // so the star economy can't be bypassed by PATCHing kid_color directly.
+      const cosmetic = kidsCosmetics.getCosmetic(kc);
+      if (!cosmetic || cosmetic.kind !== 'theme') {
+        return res.status(400).json({ error: 'Invalid kid colour.' });
+      }
+      let owned = null;
+      try { owned = await db.getKidCosmetics(req.householdId, targetUserId); } catch { owned = null; }
+      if (!owned || !owned.some((o) => o.cosmetic_key === kc)) {
+        return res.status(400).json({ error: 'Theme not owned.' });
+      }
     }
-    updates.kid_color = req.body.kid_color;
+    updates.kid_color = kc;
   }
   if (req.body.kid_avatar !== undefined) {
     const av = req.body.kid_avatar;

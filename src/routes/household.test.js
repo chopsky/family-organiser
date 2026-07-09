@@ -46,6 +46,40 @@ beforeEach(() => {
   mockStorage.remove.mockResolvedValue({ error: null });
 });
 
+describe('PATCH /api/household/profile — kid_color premium-theme gating', () => {
+  beforeEach(() => {
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'olivia', member_type: 'dependent' }]);
+    db.updateUser.mockResolvedValue({ id: 'olivia' });
+    db.getKidCosmetics.mockResolvedValue([]); // owns nothing unless a test overrides
+  });
+
+  test('a free preset colour is allowed without ownership', async () => {
+    const res = await request(makeApp()).patch('/api/household/profile').send({ user_id: 'olivia', kid_color: 'sky' });
+    expect(res.status).toBe(200);
+    expect(db.updateUser).toHaveBeenCalledWith('olivia', expect.objectContaining({ kid_color: 'sky' }));
+  });
+
+  test('a premium theme is allowed when the kid owns it', async () => {
+    db.getKidCosmetics.mockResolvedValue([{ cosmetic_key: 'galaxy', kind: 'theme' }]);
+    const res = await request(makeApp()).patch('/api/household/profile').send({ user_id: 'olivia', kid_color: 'galaxy' });
+    expect(res.status).toBe(200);
+    expect(db.updateUser).toHaveBeenCalledWith('olivia', expect.objectContaining({ kid_color: 'galaxy' }));
+  });
+
+  test('a premium theme the kid does NOT own is rejected (star economy not bypassable)', async () => {
+    db.getKidCosmetics.mockResolvedValue([]); // not owned
+    const res = await request(makeApp()).patch('/api/household/profile').send({ user_id: 'olivia', kid_color: 'galaxy' });
+    expect(res.status).toBe(400);
+    expect(db.updateUser).not.toHaveBeenCalled();
+  });
+
+  test('an unknown kid colour is rejected', async () => {
+    const res = await request(makeApp()).patch('/api/household/profile').send({ user_id: 'olivia', kid_color: 'nope' });
+    expect(res.status).toBe(400);
+    expect(db.updateUser).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/household/profile/avatar', () => {
   it('updates the targeted member (not the caller) when userId is in the household', async () => {
     db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason' }]);
