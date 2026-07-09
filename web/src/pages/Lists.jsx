@@ -641,7 +641,7 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit })
         <div style={{ display: 'flex', flexShrink: 0 }}>
           {assignees.slice(0, 3).map((m, i) => (
             <div key={m.id} style={{ marginLeft: i ? -8 : 0, borderRadius: '50%', border: '2px solid #fff', display: 'flex' }}>
-              <Avatar member={m} size={26} />
+              <Avatar member={m} size={35} />
             </div>
           ))}
         </div>

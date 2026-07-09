@@ -2591,7 +2591,7 @@ export default function Calendar() {
                   >
                     {badge.label}
                   </span>
-                  {renderMemberStack(eventMembers, { size: 28, ringColor: '#FFFFFF' })}
+                  {renderMemberStack(eventMembers, { size: 35, ringColor: '#FFFFFF' })}
                 </div>
               );
             })}

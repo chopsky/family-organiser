@@ -88,8 +88,8 @@ export default function Avatar({ member, size = 40, className = '', style = {}, 
         <img
           src={avatarSrc(member.avatar_id)}
           alt={member.name || ''}
-          // 85% width + vertically centred: a little breathing room in the circle.
-          style={{ width: '85%', height: '100%', objectFit: 'contain', display: 'block' }}
+          // 80% width + vertically centred: a little breathing room in the circle.
+          style={{ width: '80%', height: '100%', objectFit: 'contain', display: 'block' }}
         />
       </div>
     );
