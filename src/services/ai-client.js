@@ -79,7 +79,7 @@ function finalizeResult(text, provider) {
  * Call Gemini 3.1 Pro. Returns { text, provider }.
  * Converts Claude-style messages to Gemini format.
  */
-async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, responseFormat, useThinking = true }) {
+async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, responseFormat, responseSchema, useThinking = true }) {
   const client = getGeminiClient();
   const timeout = timeoutMs || DEFAULT_TIMEOUT_MS;
 
@@ -124,6 +124,13 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
     if (responseFormat === 'json') {
       config.responseMimeType = 'application/json';
     }
+    // Strict structured outputs: a standard JSON Schema the API enforces —
+    // the model cannot return JSON that doesn't validate. responseJsonSchema
+    // takes precedence over responseMimeType alone (@google/genai 1.46+).
+    if (responseSchema) {
+      config.responseMimeType = 'application/json';
+      config.responseJsonSchema = responseSchema;
+    }
     // Gemini 2.5 Flash has thinking ON by default and the thinking
     // budget eats into maxOutputTokens. For mechanical tasks like
     // structured extraction or classification, callers should pass
@@ -161,7 +168,7 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
  * enabled the model can invoke them server-side; the response still
  * contains a final text block which is what we extract here.
  */
-async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false, tools, model }) {
+async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useThinking = false, tools, model, responseSchema }) {
   const client = getAnthropicClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
@@ -182,10 +189,38 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
       params.tools = tools;
     }
 
+    // Structured output via FORCED TOOL USE: tool_use.input arrives as
+    // parsed JSON by API contract, so empty/prose/malformed output is
+    // protocol-impossible. (output_config structured outputs could not fit
+    // this schema — its grammar compiler caps unions at 16 and optionals at
+    // 24 and bans open objects; see classify-schema.js for the live
+    // rejections.) Only engaged when the caller passed no other tools —
+    // forced tool_choice would block e.g. web_search from running.
+    const forcedTool = responseSchema && !(Array.isArray(tools) && tools.length > 0);
+    if (forcedTool) {
+      params.tools = [{
+        name: 'classification',
+        description: 'Report the structured classification of the message: the intent, any extracted actions, and the user-facing response_message.',
+        input_schema: responseSchema,
+      }];
+      params.tool_choice = { type: 'tool', name: 'classification' };
+    }
+
     const stream = client.messages.stream(params, { signal: controller.signal });
 
     const response = await stream.finalMessage();
     clearTimeout(timer);
+
+    if (forcedTool) {
+      const toolUse = response.content.find((b) => b.type === 'tool_use');
+      if (toolUse && toolUse.input && typeof toolUse.input === 'object') {
+        // Serialise back to text so the caller's parse path stays the single
+        // funnel (parseJSON is now a plain parse of known-good JSON).
+        return finalizeResult(JSON.stringify(toolUse.input), 'claude');
+      }
+      // Defensive: forced tool_choice should make this unreachable, but fall
+      // through to text extraction rather than assume.
+    }
 
     // Concatenate ALL text blocks. With tools enabled the model can
     // produce multiple text blocks interleaved with server_tool_use
@@ -206,7 +241,7 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
  * Call GPT-4o as fallback. Returns { text, provider }.
  * Converts Claude-style messages to OpenAI format.
  */
-async function callGPT({ system, messages, maxTokens = 2048, timeoutMs }) {
+async function callGPT({ system, messages, maxTokens = 2048, timeoutMs, responseSchema }) {
   const client = getOpenAIClient();
   // Same abort pattern as callClaude/callGemini. Without it a stalled OpenAI
   // connection hung this call forever — the only provider with no timeout.
@@ -233,11 +268,22 @@ async function callGPT({ system, messages, maxTokens = 2048, timeoutMs }) {
   }
 
   try {
-    const response = await client.chat.completions.create({
+    const gptParams = {
       model: GPT_MODEL,
       max_tokens: maxTokens,
       messages: gptMessages,
-    }, { signal: controller.signal });
+    };
+    // json_schema guidance with strict:false — OpenAI's strict mode demands
+    // the all-required/nullable dialect that Anthropic's union cap forbids
+    // (see classify-schema.js header). GPT is the rare double-failover, and
+    // parseJSON stays as the belt-and-braces on this path.
+    if (responseSchema) {
+      gptParams.response_format = {
+        type: 'json_schema',
+        json_schema: { name: 'classification', schema: responseSchema, strict: false },
+      };
+    }
+    const response = await client.chat.completions.create(gptParams, { signal: controller.signal });
 
     const text = response.choices?.[0]?.message?.content;
     if (!text) throw new Error('No text in GPT response');

@@ -77,3 +77,9 @@ and weather.
 |---|---|---|---|
 | 2026-07-02 | 21 | 21/21 (Sonnet 5) | v1 mega-prompt |
 | 2026-07-10 | 37 | 37/37 (Sonnet 5) | v1 mega-prompt |
+| 2026-07-10 | 37 | 36/37 v2 = 36/37 v1 same-hour (Sonnet 5) | v2 forced-tool schema |
+
+Known-flaky: `weak target: "cancel Ella's dentist"` wobbles on BOTH pipelines
+(model alternates between errand-creation and a clarifying reply; it never
+takes the dangerous path of deleting an unrelated item). Treat a failure here
+as suspect-flake — re-run it before blaming a change.

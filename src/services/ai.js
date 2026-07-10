@@ -3,6 +3,7 @@ const { callWithFailover, callClaude, CLAUDE_MODEL, CLAUDE_HAIKU_MODEL, REASONIN
 const { getCityFromTimezone } = require('./weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { formatPreferenceLines } = require('./preferences-format');
+const { CLASSIFY_SCHEMA } = require('./classify-schema');
 const {
   CLASSIFICATION_SYSTEM,
   RECEIPT_EXTRACTION_SYSTEM,
@@ -163,6 +164,14 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       timeoutMs: 30000,
       feature: 'classify',
       responseFormat: 'json', // force Gemini into structured-output mode
+      // BOT_PIPELINE=v2: enforce the classify schema at the API layer —
+      // empty/prose/malformed output becomes impossible. Claude (primary)
+      // gets it as a FORCED TOOL (tool_use.input is parsed JSON by API
+      // contract); Gemini enforces it via responseJsonSchema; GPT gets
+      // non-strict json_schema guidance. Read at CALL time so flipping the
+      // Railway var + restart is the kill switch. Unset/v1 = byte-identical
+      // legacy behaviour.
+      responseSchema: process.env.BOT_PIPELINE === 'v2' ? CLASSIFY_SCHEMA : undefined,
       householdId,
       userId,
     });
