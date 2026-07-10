@@ -958,7 +958,7 @@ export default function LandingPage() {
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <div className="eyebrow-sec">The AI that gets the brief</div>
             <h2 className="sec" style={{ margin: '0 auto 16px' }}>
-              Just tell it what's happening. <em>It&nbsp;does&nbsp;the&nbsp;rest.</em>
+              Just say it. <em>It's&nbsp;sorted.</em>
             </h2>
             <p className="sec-lede" style={{ margin: '0 auto' }}>
               Type it, snap it, or forward the email, and Housemait files real life into the right calendar entry, shopping line, task or meal.
