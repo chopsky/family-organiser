@@ -134,7 +134,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     { role: 'user', content: message },
   ];
 
-  return withRetry(async () => {
+  return withRetry(async (attempt = 0) => {
     const { text } = await callWithFailover({
       system: systemPrompt,
       messages,
@@ -144,8 +144,11 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       // wrong items. Sonnet 5 runs adaptive thinking by default, so hard
       // messages (ambiguous voice notes) get actual deliberation before
       // the JSON is emitted; trivial ones barely think at all. Gemini
-      // stays as the failover.
-      preferClaude: true,
+      // stays as the failover. On the RETRY attempt the preference flips
+      // (Gemini-first): if the first full chain failed, the likeliest
+      // cause is a correlated Claude wobble, so retrying into the same
+      // provider first just burns the retry.
+      preferClaude: attempt === 0,
       useThinking: false,
       // Adaptive thinking counts against max_tokens on Sonnet 5, and the
       // JSON schema overhead alone is ~400 tokens - 8192 leaves room for
@@ -329,7 +332,11 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], 
 async function withRetry(fn, { maxRetries = 1, delayMs = 2000 } = {}) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      // The attempt number is passed so callers can vary strategy on retry
+      // (classify flips provider preference — a correlated Claude wobble
+      // shouldn't retry into the same sick provider). Existing callers
+      // that take no args are unaffected.
+      return await fn(attempt);
     } catch (err) {
       if (attempt < maxRetries) {
         const wait = delayMs * (attempt + 1);

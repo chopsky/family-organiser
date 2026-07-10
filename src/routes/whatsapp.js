@@ -407,7 +407,6 @@ router.post('/webhook', async (req, res) => {
         // .details + .hint / full stack). This block emits a structured
         // object that Railway preserves as-is, so any future 'Sorry I
         // had trouble processing that' is instantly diagnosable.
-        const elapsed = ((Date.now() - start) / 1000).toFixed(1);
         console.error('[whatsapp-text-handler-error]', {
           userId: user.id,
           householdId: user.household_id,
@@ -423,19 +422,19 @@ router.post('/webhook', async (req, res) => {
         });
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', processingMs: Date.now() - start, body: text, error: err.message });
 
-        // A slightly more diagnostic user-facing message - picks a
-        // rough category from the error shape so the user knows whether
-        // to retry now or later.
+        // Category still drives WHICH message (retry-now vs retry-later),
+        // but the copy is warm and non-technical — no elapsed seconds, no
+        // "AI/JSON/format" internals (those live in the log block above).
         let userMsg;
         if (err.name === 'AbortError' || /timeout/i.test(err.message || '')) {
-          userMsg = `Sorry, the AI took too long (${elapsed}s). Please try again in a moment.`;
+          userMsg = 'Sorry — that took me longer than it should. Give me another try in a moment 🙏';
         } else if (err.code && typeof err.code === 'string' && err.code.startsWith('2')) {
           // Postgres SQLSTATE 2xxxx = data exception / constraint violation
-          userMsg = `Sorry, I couldn't save that (database error). Please try again or rephrase.`;
+          userMsg = "I couldn't save that just now. Mind trying again in a minute?";
         } else if (/parse|JSON|unexpected token/i.test(err.message || '')) {
-          userMsg = `Sorry, the AI replied in a format I couldn't read (${elapsed}s). Please try again.`;
+          userMsg = 'I scrambled that one — sorry! Please send it again.';
         } else {
-          userMsg = `Sorry, I had trouble processing that (${elapsed}s). Please try again.`;
+          userMsg = 'Something went wrong on my end — try that again for me?';
         }
         await whatsapp.sendMessage(phone, userMsg);
       }

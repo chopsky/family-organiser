@@ -206,8 +206,12 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
  * Call GPT-4o as fallback. Returns { text, provider }.
  * Converts Claude-style messages to OpenAI format.
  */
-async function callGPT({ system, messages, maxTokens = 2048 }) {
+async function callGPT({ system, messages, maxTokens = 2048, timeoutMs }) {
   const client = getOpenAIClient();
+  // Same abort pattern as callClaude/callGemini. Without it a stalled OpenAI
+  // connection hung this call forever — the only provider with no timeout.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
 
   const gptMessages = [{ role: 'system', content: system }];
 
@@ -228,16 +232,20 @@ async function callGPT({ system, messages, maxTokens = 2048 }) {
     }
   }
 
-  const response = await client.chat.completions.create({
-    model: GPT_MODEL,
-    max_tokens: maxTokens,
-    messages: gptMessages,
-  });
+  try {
+    const response = await client.chat.completions.create({
+      model: GPT_MODEL,
+      max_tokens: maxTokens,
+      messages: gptMessages,
+    }, { signal: controller.signal });
 
-  const text = response.choices?.[0]?.message?.content;
-  if (!text) throw new Error('No text in GPT response');
+    const text = response.choices?.[0]?.message?.content;
+    if (!text) throw new Error('No text in GPT response');
 
-  return finalizeResult(text, 'gpt-4o');
+    return finalizeResult(text, 'gpt-4o');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
