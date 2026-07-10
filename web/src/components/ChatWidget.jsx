@@ -1,9 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
 import api from '../lib/api';
 import { getDeviceLocation } from '../lib/location';
 import { useAuth } from '../context/AuthContext';
 import Sheet from './ui/Sheet';
 import AIComposer from './ui/AIComposer';
+
+// TEMPORARY (App Store screenshots, 2026-07-10): hide the floating AI orb in
+// the native app until this timestamp so screenshots don't include it. It
+// self-expires — the orb returns automatically after this time, no code change
+// or second rebuild needed. Native-only, so mobile/desktop web are untouched.
+// Safe to delete this constant and its use once past the expiry.
+const HIDE_AI_ORB_IN_APP_UNTIL = 1783664677000; // Fri 10 Jul 2026 07:24 BST
 
 /**
  * Format markdown-style text into React elements.
@@ -281,6 +289,10 @@ function ActionCards({ actions, members }) {
 export default function ChatWidget({ isDashboard = false }) {
   const { user } = useAuth();
   const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
+  // Temporary App Store screenshot hide (see HIDE_AI_ORB_IN_APP_UNTIL). Only
+  // suppresses the floating launcher in the native app during the window; the
+  // chat itself still works if opened via the dashboard composer.
+  const hideOrbForScreenshots = Capacitor.isNativePlatform() && Date.now() < HIDE_AI_ORB_IN_APP_UNTIL;
   const [micOn, setMicOn] = useState(false);
   const recognitionRef = useRef(null);
   const mobileFileRef = useRef(null);
@@ -661,7 +673,7 @@ I'm always here if you need me!`;
       )}
 
       {/* Floating button */}
-      {!isOpen && (
+      {!isOpen && !hideOrbForScreenshots && (
         <button
           onClick={() => {
             if (showWelcomeBubble) {
