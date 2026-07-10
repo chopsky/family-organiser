@@ -117,6 +117,11 @@ const NOTIFICATION_OPTIONS = [
   { value: '2_days', label: '2 days before' },
 ];
 const RECURRENCE_LABELS = { '': 'Does not repeat', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', yearly: 'Yearly' };
+const CAL_VIEWS = [
+  { value: 'month', label: 'Month' },
+  { value: 'week', label: 'Week' },
+  { value: 'day', label: 'Day' },
+];
 
 const REMINDER_OPTIONS = [
   { value: '5', unit: 'minutes', label: '5 minutes before' },
@@ -344,6 +349,14 @@ function ChevronRight({ className = 'w-3.5 h-3.5' }) {
   );
 }
 
+function ChevronDown({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 function SettingsIcon({ className = 'w-4 h-4' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -477,6 +490,9 @@ export default function Calendar() {
   const settingsRef = useRef(null);
   // Mobile filter sheet (the desktop cog is hidden on phones)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Mobile month/week/day dropdown (sits in the header next to +)
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const viewMenuRef = useRef(null);
 
   // Filters
   const [activeFilters, setActiveFilters] = useState(new Set(['events', 'tasks', 'birthdays', 'holidays', 'school']));
@@ -775,6 +791,18 @@ export default function Calendar() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showSearch]);
+
+  // Close the mobile view dropdown on click outside
+  useEffect(() => {
+    if (!viewMenuOpen) return undefined;
+    function handleClick(e) {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target)) {
+        setViewMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [viewMenuOpen]);
 
   // Init member filters when members load
   useEffect(() => {
@@ -1846,15 +1874,51 @@ export default function Calendar() {
           className={`md:hidden h-11 w-11 justify-center px-0! rounded-full! ${mobileSearchOpen ? 'border-plum! bg-plum-light! text-plum!' : ''}`}
           icon={<IconSearch className="h-[18px] w-[18px]" />}
         />
-        {!childMode && (
-          <PillBtn
-            aria-label="Filters"
-            aria-expanded={mobileFiltersOpen}
-            onClick={() => setMobileFiltersOpen(o => !o)}
-            className={`md:hidden h-11 w-11 justify-center px-0! rounded-full! ${mobileFiltersOpen ? 'border-plum! bg-plum-light! text-plum!' : ''}`}
-            icon={<SettingsIcon className="h-[18px] w-[18px]" />}
-          />
-        )}
+        {/* Mobile month/week/day dropdown - sits inline in the header next to
+            the + button (replaces the old full-width switcher below and the
+            filters cog). */}
+        <div ref={viewMenuRef} className="md:hidden relative">
+          <button
+            type="button"
+            aria-label="Calendar view"
+            aria-haspopup="listbox"
+            aria-expanded={viewMenuOpen}
+            onClick={() => setViewMenuOpen(o => !o)}
+            className={`inline-flex items-center gap-1.5 h-11 pl-4 pr-3 rounded-full border-[1.5px] bg-white text-[15px] font-semibold transition-colors active:scale-[0.98] ${
+              viewMenuOpen ? 'border-plum text-plum' : 'border-light-grey text-charcoal'
+            }`}
+          >
+            {CAL_VIEWS.find(v => v.value === viewMode)?.label || 'Month'}
+            <ChevronDown className={`h-4 w-4 transition-transform ${viewMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {viewMenuOpen && (
+            <div
+              role="listbox"
+              className="absolute right-0 top-[52px] w-44 bg-white rounded-2xl border border-light-grey z-30 p-1.5"
+              style={{ boxShadow: 'var(--shadow-lg)' }}
+            >
+              {CAL_VIEWS.map(({ value, label }) => {
+                const active = viewMode === value;
+                return (
+                  <button
+                    key={value}
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => { setViewMode(value); setViewMenuOpen(false); }}
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-[15px] font-semibold transition-colors ${
+                      active ? 'bg-plum-light text-plum' : 'text-charcoal active:bg-cream'
+                    }`}
+                  >
+                    {label}
+                    {active && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
         {canWrite && !childMode && (
           <PillBtn
             primary
@@ -2010,20 +2074,7 @@ export default function Calendar() {
           </div>
         )}
 
-        {/* View switcher - full width */}
-        <Segmented
-          fluid
-          ariaLabel="Calendar view"
-          value={viewMode}
-          onChange={setViewMode}
-          options={[
-            { value: 'month', label: 'Month' },
-            { value: 'week', label: 'Week' },
-            { value: 'day', label: 'Day' },
-          ]}
-        />
-
-        {/* Month navigation */}
+        {/* Month navigation (view switcher moved to the header dropdown) */}
         <div className="flex items-center justify-between">
           <button onClick={navigatePrev} aria-label="Previous" className="w-9 h-9 rounded-full border border-light-grey bg-white flex items-center justify-center text-charcoal active:bg-plum-light">
             <ChevronLeft />
