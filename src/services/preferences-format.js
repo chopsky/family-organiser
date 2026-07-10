@@ -88,8 +88,71 @@ function formatRecipeConstraints(preferences) {
   return `The family has these standing food preferences - honour them, and treat ALLERGIES and DIETARY RULES as hard safety constraints that override the request if they conflict:\n${lines.join('\n')}`;
 }
 
+// The Family page's "Allergies & dietary requirements" chips are stored on
+// households.allergies as an array of keys (see web/src/pages/FamilySetup.jsx).
+// That's a SEPARATE, explicit source from the classifier-learned
+// household_preferences, so every AI surface must merge BOTH — otherwise a
+// ticked allergen is honoured on one channel (the web chat reads the chips) but
+// silently ignored on another (the WhatsApp bot only read the learned rows).
+// Map each chip key to a human label and its constraint type.
+const HOUSEHOLD_ALLERGEN_CHIPS = {
+  celery: { label: 'Celery', key: 'allergy' },
+  gluten: { label: 'Gluten', key: 'allergy' },
+  crustaceans: { label: 'Crustaceans', key: 'allergy' },
+  eggs: { label: 'Eggs', key: 'allergy' },
+  fish: { label: 'Fish', key: 'allergy' },
+  lupin: { label: 'Lupin', key: 'allergy' },
+  milk: { label: 'Milk / dairy', key: 'allergy' },
+  molluscs: { label: 'Molluscs', key: 'allergy' },
+  mustard: { label: 'Mustard', key: 'allergy' },
+  nuts: { label: 'Tree nuts', key: 'allergy' },
+  peanuts: { label: 'Peanuts', key: 'allergy' },
+  sesame: { label: 'Sesame', key: 'allergy' },
+  soya: { label: 'Soya', key: 'allergy' },
+  sulphites: { label: 'Sulphites', key: 'allergy' },
+  vegetarian: { label: 'Vegetarian', key: 'dietary' },
+  vegan: { label: 'Vegan', key: 'dietary' },
+  halal: { label: 'Halal', key: 'dietary' },
+  kosher: { label: 'Kosher', key: 'dietary' },
+};
+
+// Normalise households.allergies (a JSON string or array of chip keys) into
+// preference-shaped rows { key: 'allergy'|'dietary', value: label }. Unknown
+// keys are dropped. Household-wide, so member_name is null ("Everyone").
+function householdAllergiesToPreferences(allergies) {
+  let list = allergies;
+  if (typeof list === 'string') {
+    try { list = JSON.parse(list); } catch { list = []; }
+  }
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const raw of list) {
+    const chip = HOUSEHOLD_ALLERGEN_CHIPS[String(raw).trim().toLowerCase()];
+    if (chip) out.push({ key: chip.key, value: chip.label, member_id: null, member_name: null, source: 'household' });
+  }
+  return out;
+}
+
+// Merge the Family-page allergen/dietary chips into the learned preferences,
+// de-duping so a chip that duplicates a learned row (same key + value, case-
+// insensitive) isn't listed twice. Use this wherever an AI surface builds an
+// allergy/dietary context so both sources are always honoured.
+function mergeHouseholdAllergies(preferences, allergies) {
+  const base = Array.isArray(preferences) ? preferences.slice() : [];
+  const seen = new Set(base.map((p) => `${p.key}::${String(p.value || '').trim().toLowerCase()}`));
+  for (const row of householdAllergiesToPreferences(allergies)) {
+    const k = `${row.key}::${row.value.trim().toLowerCase()}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    base.push(row);
+  }
+  return base;
+}
+
 module.exports = {
   KEY_PRIORITY,
   formatPreferenceLines,
   formatRecipeConstraints,
+  householdAllergiesToPreferences,
+  mergeHouseholdAllergies,
 };

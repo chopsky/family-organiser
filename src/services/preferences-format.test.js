@@ -1,6 +1,8 @@
 const {
   formatPreferenceLines,
   formatRecipeConstraints,
+  householdAllergiesToPreferences,
+  mergeHouseholdAllergies,
 } = require('./preferences-format');
 
 describe('formatPreferenceLines (classifier + chat block)', () => {
@@ -72,5 +74,51 @@ describe('formatRecipeConstraints', () => {
     expect(out).not.toMatch(/- DIETARY RULES/);
     expect(out).not.toMatch(/- DISLIKES/);
     expect(out).not.toMatch(/- LIKES/);
+  });
+});
+
+describe('householdAllergiesToPreferences (Family-page chips)', () => {
+  test('maps allergen keys to allergy rows and diet keys to dietary rows', () => {
+    const out = householdAllergiesToPreferences(['gluten', 'peanuts', 'vegan']);
+    expect(out).toEqual([
+      { key: 'allergy', value: 'Gluten', member_id: null, member_name: null, source: 'household' },
+      { key: 'allergy', value: 'Peanuts', member_id: null, member_name: null, source: 'household' },
+      { key: 'dietary', value: 'Vegan', member_id: null, member_name: null, source: 'household' },
+    ]);
+  });
+
+  test('accepts a JSON string, ignores unknown keys, tolerates junk', () => {
+    expect(householdAllergiesToPreferences('["nuts","bogus"]')).toEqual([
+      { key: 'allergy', value: 'Tree nuts', member_id: null, member_name: null, source: 'household' },
+    ]);
+    expect(householdAllergiesToPreferences(null)).toEqual([]);
+    expect(householdAllergiesToPreferences('not json')).toEqual([]);
+    expect(householdAllergiesToPreferences(undefined)).toEqual([]);
+  });
+});
+
+describe('mergeHouseholdAllergies', () => {
+  test('appends chips to learned preferences', () => {
+    const merged = mergeHouseholdAllergies(
+      [{ key: 'dislike', value: 'mushrooms', member_name: 'Mason' }],
+      ['gluten'],
+    );
+    expect(merged).toHaveLength(2);
+    expect(merged.find((p) => p.value === 'Gluten')).toMatchObject({ key: 'allergy' });
+  });
+
+  test('de-dupes a chip that a learned row already covers (case-insensitive)', () => {
+    const merged = mergeHouseholdAllergies(
+      [{ key: 'allergy', value: 'gluten', member_name: 'Lynn' }],
+      ['gluten'],
+    );
+    const glutens = merged.filter((p) => p.key === 'allergy' && p.value.toLowerCase() === 'gluten');
+    expect(glutens).toHaveLength(1);
+  });
+
+  test('formatRecipeConstraints surfaces a chip-only allergen', () => {
+    const out = formatRecipeConstraints(mergeHouseholdAllergies([], ['gluten', 'vegan']));
+    expect(out).toMatch(/- ALLERGIES[^\n]*Gluten/);
+    expect(out).toMatch(/- DIETARY RULES[^\n]*Vegan/);
   });
 });

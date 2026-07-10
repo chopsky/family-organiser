@@ -20,7 +20,7 @@ const { detectCalendarFeedUrl, subscribeCalendarFeed } = require('./calendar-url
 const { looksLikeBulkPaste, looksLikeSchoolTermDates, extractAndApply } = require('./bulk-extract');
 const { extractTextFromDocument } = require('../services/document-extract');
 const { extractTermDatesPreview, academicYearsForCountry } = require('../services/term-date-extract');
-const { formatRecipeConstraints } = require('../services/preferences-format');
+const { formatRecipeConstraints, mergeHouseholdAllergies } = require('../services/preferences-format');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -1684,7 +1684,13 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // Member name is resolved here so the prompt can show "Lynn:
   // allergic to nuts" rather than a raw uuid.
   const notes = await db.getHouseholdNotes(household.id);
-  const rawPreferences = await db.getHouseholdPreferences(household.id).catch(() => []);
+  // Merge the Family-page allergen/dietary chips (households.allergies) in with
+  // the classifier-learned rows so a ticked allergen is honoured here too — not
+  // only in learned preferences. `household` was loaded with all columns.
+  const rawPreferences = mergeHouseholdAllergies(
+    await db.getHouseholdPreferences(household.id).catch(() => []),
+    household.allergies,
+  );
   const preferences = rawPreferences.map((p) => {
     const member = p.member_id ? household.members.find((m) => m.id === p.member_id) : null;
     return { ...p, member_name: member?.name || null };
@@ -2966,7 +2972,12 @@ async function handleMyTasks(user, household) {
 }
 
 async function handlePreferencesList(user, household) {
-  const prefs = await db.getHouseholdPreferences(household.id).catch(() => []);
+  // Include the Family-page allergen/dietary chips so /preferences reflects what
+  // was ticked there, not only what was learned in chat.
+  const prefs = mergeHouseholdAllergies(
+    await db.getHouseholdPreferences(household.id).catch(() => []),
+    household.allergies,
+  );
   if (!prefs.length) {
     return "I haven't learned any family preferences yet. Just mention them in chat - _\"Lynn is allergic to nuts\"_, _\"we don't eat pork\"_, _\"Mason hates mushrooms\"_ - and I'll remember.";
   }
@@ -3051,8 +3062,14 @@ async function generateAndSaveRecipe(householdId, description, dietary, servings
   // a separate LLM request that would otherwise be blind to it. Allergies are
   // the safety-critical case. Soft-fail: a lookup error must not block the
   // recipe (it just generates without the standing constraints).
-  const prefs = await db.getHouseholdPreferences(householdId).catch(() => []);
-  const constraints = formatRecipeConstraints(prefs);
+  // Merge the household's learned preferences with the Family-page allergen
+  // chips (households.allergies) so a generated recipe honours BOTH. Only the
+  // id is in scope here, so fetch the chips directly. Both soft-fail to [].
+  const [prefs, chipAllergies] = await Promise.all([
+    db.getHouseholdPreferences(householdId).catch(() => []),
+    db.getHouseholdAllergies(householdId).catch(() => []),
+  ]);
+  const constraints = formatRecipeConstraints(mergeHouseholdAllergies(prefs, chipAllergies));
 
   const prompt = `Create a simple, family-friendly recipe based on: ${description}
 ${dietary ? `Dietary requirements: ${dietary}` : ''}

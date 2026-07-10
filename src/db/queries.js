@@ -76,6 +76,22 @@ async function getHouseholdById(id, db = supabase) {
   return data;
 }
 
+// The household's "Allergies & dietary requirements" chips (households.allergies,
+// a JSON array of keys). Safety-critical, so this soft-fails to [] rather than
+// throwing — a missing constraint must never crash a recipe/answer, but callers
+// merge it with the learned preferences via mergeHouseholdAllergies().
+async function getHouseholdAllergies(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .select('allergies')
+    .eq('id', householdId)
+    .single();
+  if (error) return [];
+  let list = data?.allergies;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
+  return Array.isArray(list) ? list : [];
+}
+
 async function updateHouseholdSettings(id, settings, db = supabase) {
   const { data, error } = await db
     .from('households')
@@ -8561,6 +8577,7 @@ module.exports = {
   createHousehold,
   getHouseholdByCode,
   getHouseholdById,
+  getHouseholdAllergies,
   updateHouseholdSettings,
   setChildModePinHash,
   clearChildModePinHash,

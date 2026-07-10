@@ -11,6 +11,7 @@ jest.mock('../db/queries', () => ({
   deleteTermDatesBySchoolAndAcademicYear: jest.fn(() => Promise.resolve()),
   updateHouseholdSchoolMeta: jest.fn(() => Promise.resolve()),
   getHouseholdPreferences: jest.fn(() => Promise.resolve([])),
+  getHouseholdAllergies: jest.fn(() => Promise.resolve([])),
   createRecipe: jest.fn((hid, r) => Promise.resolve({ id: 'r-1', ...r })),
   resolveAssignees: jest.fn(() => ({ ids: [], names: [] })),
   findSimilarEvent: jest.fn(() => Promise.resolve(null)),
@@ -313,8 +314,25 @@ describe('generateAndSaveRecipe - learned preferences', () => {
     expect(call.system).toMatch(/allergic/i);
   });
 
+  test('merges the Family-page allergen chips into the recipe constraints', async () => {
+    // Regression: the Family "Allergies & dietary requirements" chips
+    // (households.allergies) were ignored by the bot's recipe path — only the
+    // classifier-learned rows were honoured. Both must feed the constraints.
+    db.getHouseholdPreferences.mockResolvedValue([]); // nothing learned in chat
+    db.getHouseholdAllergies.mockResolvedValue(['gluten', 'vegan']);
+    aiClient.callWithFailover.mockResolvedValue({
+      text: JSON.stringify({ name: 'Rice bowl', category: 'dinner', ingredients: [], method: ['Cook rice'], servings: 4, dietary_tags: [] }),
+    });
+    await handlers.generateAndSaveRecipe('hh-1', 'quick dinner', null, 4);
+
+    const content = aiClient.callWithFailover.mock.calls[0][0].messages[0].content;
+    expect(content).toMatch(/ALLERGIES[^\n]*Gluten/);
+    expect(content).toMatch(/DIETARY RULES[^\n]*Vegan/);
+  });
+
   test('a preferences lookup failure does not block recipe generation', async () => {
     db.getHouseholdPreferences.mockRejectedValue(new Error('db down'));
+    db.getHouseholdAllergies.mockResolvedValue([]); // no chips either → no constraints
     aiClient.callWithFailover.mockResolvedValue({
       text: JSON.stringify({ name: 'Toast', category: 'breakfast', ingredients: [], method: ['Toast bread'], servings: 2, dietary_tags: [] }),
     });
