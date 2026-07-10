@@ -9,10 +9,11 @@
  * jest/CI - run it on demand before/after touching the classifier prompt or
  * the action-matching code.
  *
- * Provider: uses the same failover chain as production (Gemini → Claude →
- * GPT). To eval against the prod model, set GEMINI_API_KEY locally; otherwise
- * it falls over to whatever key is present (Claude/GPT) - still a useful
- * signal on prompt behaviour, but mind the model difference.
+ * Provider: uses the same chain as production — classify is CLAUDE-primary
+ * (preferClaude, Sonnet 5) with Gemini then GPT as failover. To eval against
+ * the prod model, set ANTHROPIC_API_KEY locally; with only a Gemini/GPT key
+ * present it falls over to those - still a useful signal on prompt behaviour,
+ * but mind the model difference.
  */
 // override:true so the repo's .env keys win over any stale/placeholder
 // values already exported in the shell (dotenv does NOT override existing
@@ -36,6 +37,7 @@ async function runCase(c) {
       tasks: c.ctx.tasks || [],
       calendarEvents: c.ctx.calendarEvents || [],
       history: c.ctx.history || [],
+      preferences: c.ctx.preferences || [],
       timezone: c.ctx.timezone || 'Europe/London',
       householdId: null,
       userId: null,

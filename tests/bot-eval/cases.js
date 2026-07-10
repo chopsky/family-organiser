@@ -426,4 +426,149 @@ module.exports = [
       return null;
     },
   },
+
+  // ── Phase-0 coverage batch (2026-07-10): reads, grounded answers,
+  //    multi-action, notes, subscriptions — the intents users hit daily that
+  //    had no golden case. The to-do read is the verbatim message from the
+  //    2026-07-10 empty-response incident. ──
+  {
+    name: 'read: "Whats on my to do list?" is query_tasks with no side effects (real incident 2026-07-10)',
+    message: 'Whats on my to do list?',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn'],
+      tasks: [
+        { id: 't1', title: 'Book MOT' },
+        { id: 't2', title: 'Buy birthday card for Granny' },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'query_tasks') return `expected query_tasks, got ${r.intent}`;
+      if (completions(r).length || adds(r).length) return 'a read must not add or complete tasks';
+      return null;
+    },
+  },
+  {
+    name: 'read: "what\'s on the shopping list?" is query_list with no adds',
+    message: "what's on the shopping list?",
+    ctx: { sender: 'Lynn', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => {
+      if (r.intent !== 'query_list') return `expected query_list, got ${r.intent}`;
+      if (shoppingAdds(r).length) return 'a read must not add shopping items';
+      return null;
+    },
+  },
+  {
+    name: 'read: "what\'s on this week?" is query_calendar with a date range',
+    message: "what's on this week?",
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => {
+      if (r.intent !== 'query_calendar') return `expected query_calendar, got ${r.intent}`;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.query_start || '')) return `missing/invalid query_start: ${r.query_start}`;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.query_end || '')) return `missing/invalid query_end: ${r.query_end}`;
+      return null;
+    },
+  },
+  {
+    name: 'read: "what subscriptions do we have?" is subscription_list',
+    message: 'what subscriptions do we have?',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => (r.intent !== 'subscription_list' ? `expected subscription_list, got ${r.intent}` : null),
+  },
+  {
+    name: 'grounding: allergy question answers from FAMILY PREFERENCES (chips fix 2026-07-10)',
+    message: 'Do we have any family allergies in the house?',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn'],
+      preferences: [{ key: 'allergy', value: 'Gluten', member_name: null }],
+    },
+    check: (r) => {
+      // chat and note_recall are both answer-in-response_message intents for
+      // this — what matters is the GROUNDING: the saved allergy is surfaced.
+      if (!['chat', 'note_recall'].includes(r.intent)) return `expected chat/note_recall, got ${r.intent}`;
+      if (!/gluten/i.test(r.response_message || '')) return `answer doesn't mention the saved Gluten allergy: "${r.response_message}"`;
+      return null;
+    },
+  },
+  {
+    name: 'recipe: "easy dinner recipe for tonight" carries a recipe_request',
+    message: 'give me an easy dinner recipe for tonight',
+    ctx: { sender: 'Lynn', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => {
+      if (r.intent !== 'recipe') return `expected recipe, got ${r.intent}`;
+      if (!r.recipe_request?.description) return 'missing recipe_request.description';
+      return null;
+    },
+  },
+  {
+    name: 'multi-action: "add milk to the list and remind me to call the dentist" does BOTH',
+    message: 'add milk to the shopping list and remind me to call the dentist',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (shoppingAdds(r).length < 1) return 'expected a shopping add (milk)';
+      if (adds(r).length < 1) return 'expected a task add (call the dentist)';
+      return null;
+    },
+  },
+  {
+    name: 'note_save: "remember the wifi password is hunter2" saves a note',
+    message: 'remember the wifi password is hunter2',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => {
+      if (r.intent !== 'note_save') return `expected note_save, got ${r.intent}`;
+      if (!r.note?.key) return 'missing note.key';
+      if (!/hunter2/i.test(r.note?.value || '')) return `note value lost the password: "${r.note?.value}"`;
+      return null;
+    },
+  },
+  {
+    name: 'note_recall: "what\'s the wifi password?" answers from saved notes',
+    message: "what's the wifi password?",
+    ctx: {
+      sender: 'Lynn',
+      memberNames: ['Grant', 'Lynn'],
+      notes: [{ key: 'wifi password', value: 'hunter2' }],
+    },
+    check: (r) => {
+      if (r.intent !== 'note_recall') return `expected note_recall, got ${r.intent}`;
+      if (!/hunter2/i.test(r.response_message || '')) return `answer doesn't contain the saved value: "${r.response_message}"`;
+      return null;
+    },
+  },
+  {
+    name: 'subscription_add: "we pay £9.99 a month for Netflix" tracks the subscription',
+    message: 'we pay £9.99 a month for Netflix',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => {
+      if (r.intent !== 'subscription_add') return `expected subscription_add, got ${r.intent}`;
+      if (!/netflix/i.test(r.subscription?.name || '')) return `wrong subscription name: "${r.subscription?.name}"`;
+      return null;
+    },
+  },
+  {
+    name: 'update_event: "move my haircut to 4pm" grounds on the right event [N]',
+    message: 'move my haircut to 4pm',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant'],
+      tasks: [],
+      calendarEvents: [
+        { id: 'e1', title: 'Dentist', start_time: futureISO(2), all_day: false },
+        { id: 'e2', title: 'Haircut', start_time: futureISO(3), all_day: false },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'update_event') return `expected update_event, got ${r.intent}`;
+      if (Number(r.target?.target_id) !== 2) return `expected target.target_id 2 (haircut), got ${r.target?.target_id}`;
+      if (!r.updates) return 'missing updates payload';
+      return null;
+    },
+  },
+  {
+    name: 'weather: "will it rain tomorrow?" is a weather query',
+    message: 'will it rain tomorrow?',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },
+    check: (r) => (r.intent !== 'weather' ? `expected weather, got ${r.intent}` : null),
+  },
 ];
