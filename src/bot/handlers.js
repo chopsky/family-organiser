@@ -21,6 +21,7 @@ const { looksLikeBulkPaste, looksLikeSchoolTermDates, extractAndApply } = requir
 const { extractTextFromDocument } = require('../services/document-extract');
 const { extractTermDatesPreview, academicYearsForCountry } = require('../services/term-date-extract');
 const { formatRecipeConstraints, mergeHouseholdAllergies } = require('../services/preferences-format');
+const { routeReadIntent } = require('../services/intent-router');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -1677,6 +1678,47 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
   }
 
+  // ── READ fast-path (BOT_ROUTER=1) ──────────────────────────────────────
+  // A tiny Haiku router decides whether this is a PURE read; if so the
+  // existing deterministic handlers answer straight from the DB — no
+  // mega-prompt, no context fetches, ~1s instead of ~7s. Anything the
+  // router isn't certain about returns null and falls through to the full
+  // pipeline below unchanged. Same early-return pattern as the weather
+  // pre-classify above.
+  {
+    const routed = await routeReadIntent(text, {
+      timezone: user.timezone || household.timezone || 'Europe/London',
+      householdId: household.id,
+      userId: user.id,
+    });
+    if (routed) {
+      console.log('[handlers] READ fast-path:', routed.route, 'for:', text.slice(0, 50));
+      ctx.intent = routed.route;
+      const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+      const userTz = user.timezone || household.timezone || 'Europe/London';
+      if (routed.route === 'query_tasks') {
+        // Same "my" scoping as the full dispatch below.
+        const asksForMine = /\bmy\s+(tasks?|to[- ]?dos?|list)\b/i.test(text);
+        const taskResponse = asksForMine
+          ? await handleMyTasks(user, household)
+          : await handleTasks(user, household);
+        return { response: taskResponse, actions };
+      }
+      if (routed.route === 'query_list') {
+        return { response: await handleList(user, household), actions };
+      }
+      if (routed.route === 'query_calendar') {
+        return await handleCalendarQuery(
+          { query_start: routed.query_start, query_end: routed.query_end },
+          household, user, userTz, actions
+        );
+      }
+      if (routed.route === 'subscription_list') {
+        return await handleSubscriptionList(household, actions);
+      }
+    }
+  }
+
   // Fetch saved notes, household preferences, and upcoming calendar
   // events for context. Preferences auto-surface allergies/dietary/
   // likes/dislikes/schedule anchors into the classifier prompt so the
@@ -1940,28 +1982,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
 
   if (result.intent === 'subscription_list') {
-    const subs = await db.listSubscriptions(household.id).catch(() => []);
-    if (!subs.length) {
-      return { response: 'You don\'t have any tracked subscriptions yet. Tell me one like "Netflix renews 1st of the month, £15.99".', actions };
-    }
-    const { formatMoney } = require('../utils/currency');
-    const monthlyTotal = subs.reduce((sum, s) => {
-      if (s.amount == null) return sum;
-      return sum + (s.recurrence === 'yearly' ? s.amount / 12 : s.amount);
-    }, 0);
-    const lines = ['*Your tracked subscriptions:*', ''];
-    for (const s of subs) {
-      const price = s.amount != null ? formatMoney(s.amount, s.currency) : '?';
-      const cad = s.recurrence === 'yearly' ? '/yr' : '/mo';
-      const next = new Date(s.next_renewal_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      lines.push(`• *${s.name}* - ${price}${cad} · next ${next}`);
-    }
-    if (monthlyTotal > 0) {
-      // Display total in whichever currency the first subscription used (close enough - v1 doesn't FX-convert).
-      lines.push('');
-      lines.push(`_Approx. ${formatMoney(monthlyTotal, subs[0].currency)} / month total._`);
-    }
-    return { response: lines.join('\n'), actions };
+    return await handleSubscriptionList(household, actions);
   }
 
   // Handle calendar event creation (primary path - intent explicitly create_event)
@@ -2969,6 +2990,35 @@ async function handleMyTasks(user, household) {
   const tasks = await db.getTasks(household.id, { assignedToId: user.id });
   const heading = `${user.name}'s Tasks`;
   return formatTaskList(tasks, heading);
+}
+
+/**
+ * Format the household's tracked subscriptions. Shared by the classify
+ * dispatch (intent subscription_list) and the READ fast-path router.
+ */
+async function handleSubscriptionList(household, actions) {
+  const subs = await db.listSubscriptions(household.id).catch(() => []);
+  if (!subs.length) {
+    return { response: 'You don\'t have any tracked subscriptions yet. Tell me one like "Netflix renews 1st of the month, £15.99".', actions };
+  }
+  const { formatMoney } = require('../utils/currency');
+  const monthlyTotal = subs.reduce((sum, s) => {
+    if (s.amount == null) return sum;
+    return sum + (s.recurrence === 'yearly' ? s.amount / 12 : s.amount);
+  }, 0);
+  const lines = ['*Your tracked subscriptions:*', ''];
+  for (const s of subs) {
+    const price = s.amount != null ? formatMoney(s.amount, s.currency) : '?';
+    const cad = s.recurrence === 'yearly' ? '/yr' : '/mo';
+    const next = new Date(s.next_renewal_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    lines.push(`• *${s.name}* - ${price}${cad} · next ${next}`);
+  }
+  if (monthlyTotal > 0) {
+    // Display total in whichever currency the first subscription used (close enough - v1 doesn't FX-convert).
+    lines.push('');
+    lines.push(`_Approx. ${formatMoney(monthlyTotal, subs[0].currency)} / month total._`);
+  }
+  return { response: lines.join('\n'), actions };
 }
 
 async function handlePreferencesList(user, household) {

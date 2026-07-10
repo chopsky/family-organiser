@@ -13,7 +13,8 @@
     "test:watch": "jest --watch",
     "test:verbose": "jest --verbose",
     "eval:emails": "node tests/email-eval/run.js",
-    "eval:bot": "node tests/bot-eval/run.js"
+    "eval:bot": "node tests/bot-eval/run.js",
+    "eval:router": "node tests/bot-eval/run-router.js"
   },
   "keywords": [],
   "author": "",

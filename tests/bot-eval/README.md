@@ -8,8 +8,9 @@ prompt + model behaviour that plain unit tests can't cover.
 ## Run it
 
 ```bash
-npm run eval:bot                  # all cases
+npm run eval:bot                  # all classify cases
 node tests/bot-eval/run.js euss   # only cases whose name matches "euss"
+npm run eval:router               # READ fast-path router cases (BOT_ROUTER gate: 20/20)
 ```
 
 Each case = one LLM call. It uses the **same chain as production** — classify
