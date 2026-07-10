@@ -50,6 +50,7 @@ export default function AdminAiUsage() {
   const timeline = data?.timeline || [];
   const topHouseholds = data?.topHouseholds || [];
   const topUsers = data?.topUsers || [];
+  const botFailures = data?.botFailures || null;
 
   const statCards = [
     { label: `Total Calls (${rangeLabel(days)})`, value: stats.totalCalls ?? 0, color: 'text-plum bg-plum-light' },
@@ -70,6 +71,57 @@ export default function AdminAiUsage() {
         </div>
         <DateRangeToggle value={days} onChange={setDays} />
       </div>
+
+      {/* ── Bot health — the strip the founder checks after any bot change.
+            User-visible failures (whatsapp_message_log.error) is the headline:
+            every one is a family that got an apology. Provider error/failover
+            rates are the leading indicators (a rescued call never reaches
+            users). ── */}
+      {botFailures && (
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="font-display text-lg font-medium text-charcoal">Bot health</h2>
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${botFailures.failures > 0 ? 'bg-coral' : 'bg-sage'}`} />
+            <span className="text-xs text-warm-grey">({rangeLabel(days)})</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className={`text-2xl font-bold ${botFailures.failures > 0 ? 'text-coral' : 'text-sage'}`}>
+                {botFailures.failures}
+                <span className="text-sm font-medium text-warm-grey ml-1.5">({botFailures.failureRate}%)</span>
+              </p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">User-visible failures / {botFailures.totalInbound} messages</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{stats.errorRate ?? 0}%</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">Provider error rate ({stats.errorCalls ?? 0} calls)</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{stats.failoverRate ?? 0}%</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">Failover rate</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{stats.p95LatencyMs ?? 0}ms</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">p95 latency (recent sample)</p>
+            </div>
+          </div>
+          {botFailures.recent?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-light-grey">
+              <p className="text-xs font-semibold text-charcoal mb-2">Recent failures</p>
+              <div className="space-y-1.5">
+                {botFailures.recent.map((f, i) => (
+                  <div key={i} className="text-xs bg-cream rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <span className="text-warm-grey shrink-0">{formatRelativeTime(f.at)}</span>
+                    {f.intent && <span className="font-mono text-plum shrink-0">{f.intent}</span>}
+                    <span className="text-charcoal truncate">&ldquo;{f.bodyPreview}&rdquo;</span>
+                    <span className="text-coral basis-full truncate">{f.error}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

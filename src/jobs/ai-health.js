@@ -1,21 +1,30 @@
 /**
- * AI provider health monitoring.
+ * AI provider + bot health monitoring.
  *
- * Runs hourly. Looks at the last hour of ai_usage_log entries and alerts
- * the operator if either:
+ * Runs hourly. Looks at the last hour of ai_usage_log and whatsapp_message_log
+ * and alerts the operator on any of:
  *
- *   1. Gemini is being SKIPPED - most calls are landing on Claude as
- *      primary (is_failover=false), suggesting GEMINI_API_KEY is unset
- *      or misnamed in the environment. This is the failure mode that bit
- *      us in late April: Gemini went dark for ~6 days unnoticed because
- *      Claude silently absorbed the load.
+ *   1. PRIMARY FAILING - most calls are landing on a failover provider
+ *      (is_failover=true). Whatever the per-feature primary is (classify is
+ *      Claude-first since 2026-07-02; most other features are Gemini-first),
+ *      a high failover share means the primary is erroring/unreachable and
+ *      the chain is silently absorbing it — working, but slower, pricier,
+ *      and one provider closer to a full outage. (This replaces the old
+ *      "gemini-skipped" signal, which predated Claude-primary classify and
+ *      inverted into a false alarm: Claude with is_failover=false is now the
+ *      EXPECTED shape, not a missing-Gemini-key symptom.)
  *
- *   2. Gemini is FAILING - Gemini is being attempted but throwing on
- *      most calls (auth, quota, model-not-found, etc.). The classifier
- *      still works because callWithFailover catches and falls through to
- *      Claude, but it's slower and more expensive than it should be.
+ *   2. PROVIDER ERRORING - any single provider is throwing on most of its
+ *      attempted calls (auth, quota, model-not-found). Failover keeps the
+ *      product working, so this is invisible to users until the next
+ *      provider in the chain has a bad hour too.
  *
- * Either condition triggers a single email per day (debounced via
+ *   3. BOT USER-VISIBLE FAILURES - WhatsApp turns where the user actually
+ *      received an apology (whatsapp_message_log.error set on an inbound
+ *      row). This is the headline metric: every one of these is a family
+ *      that asked the bot something and got "sorry" back.
+ *
+ * Each condition triggers at most one email per day (debounced via
  * scheduler_locks) so a multi-day outage doesn't spam the inbox.
  *
  * Email recipient: ADMIN_ALERT_EMAIL, falling back to SUPPORT_EMAIL.
@@ -31,87 +40,114 @@ const email = require('../services/email');
 // firing on quiet hours. If hourly volume is below MIN_VOLUME we don't
 // have enough signal to draw any conclusions (e.g. dead-of-night).
 const MIN_VOLUME = 5;
-const SKIP_RATE_THRESHOLD = 0.5;
+const FAILOVER_RATE_THRESHOLD = 0.5;
 const FAILURE_RATE_THRESHOLD = 0.5;
+// User-visible bot failures are individually bad, so the bar is a count,
+// not a rate: three families apologised-to in an hour is an incident.
+const USER_FAILURE_THRESHOLD = 3;
 
 async function checkAiHealth() {
   try {
     const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const { data: rows, error } = await supabase
-      .from('ai_usage_log')
-      .select('provider, is_failover, error')
-      .gte('created_at', since);
+    const [{ data: rows, error }, { count: userFailures, error: waError }] = await Promise.all([
+      supabase
+        .from('ai_usage_log')
+        .select('provider, is_failover, error')
+        .gte('created_at', since),
+      supabase
+        .from('whatsapp_message_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('direction', 'inbound')
+        .not('error', 'is', null)
+        .gte('created_at', since),
+    ]);
 
     if (error) {
       console.error('[ai-health] Query failed:', error.message);
       return;
     }
+    if (waError) console.error('[ai-health] whatsapp_message_log query failed:', waError.message);
+
+    // ── Signal 3 first: user-visible failures don't need MIN_VOLUME — three
+    //    apologies at 2am is still an incident worth waking up to. ──
+    if (!waError && (userFailures || 0) >= USER_FAILURE_THRESHOLD) {
+      await sendOncePerDay(
+        'bot-user-failures',
+        `WhatsApp bot: ${userFailures} user-visible failures in the last hour`,
+        [
+          `${userFailures} WhatsApp turns in the last hour ended with the user receiving an error apology (whatsapp_message_log.error set).`,
+          ``,
+          `Triage: Admin → AI usage → Bot health strip shows the recent failures with intents and error messages. Railway logs have the full [whatsapp-text-handler-error] blocks.`,
+        ].join('<br>')
+      );
+    }
 
     const total = rows.length;
     if (total < MIN_VOLUME) {
-      // Not enough volume to draw conclusions - quiet hour, skip.
+      // Not enough provider volume to draw conclusions - quiet hour, skip.
       return;
     }
 
-    // Signal 1: Gemini being skipped entirely (Claude is primary, is_failover=false)
-    const claudePrimaryCount = rows.filter(
-      (r) => r.provider === 'claude' && r.is_failover === false
-    ).length;
-    const skipRate = claudePrimaryCount / total;
-
-    // Signal 2: Gemini being attempted but failing
-    const geminiAttempts = rows.filter((r) => r.provider === 'gemini').length;
-    const geminiErrors = rows.filter((r) => r.provider === 'gemini' && r.error).length;
-    const failureRate = geminiAttempts >= MIN_VOLUME ? geminiErrors / geminiAttempts : 0;
-
-    let condition = null;
-    let body = null;
-
-    if (skipRate >= SKIP_RATE_THRESHOLD) {
-      condition = 'gemini-skipped';
-      body = [
-        `Gemini is being skipped on most AI calls - over the last hour, ${claudePrimaryCount} of ${total} calls (${Math.round(skipRate * 100)}%) went to Claude as primary (is_failover=false).`,
-        ``,
-        `This usually means <code>GEMINI_API_KEY</code> is missing or misnamed in the Railway production environment. Check Railway → API service → Variables. Confirm a key exists and is non-empty.`,
-        ``,
-        `Until this is fixed: classifier and chat are still working (Claude is handling everything) but at higher cost and outside the documented "primary AI" claim in the Privacy Policy. Earlier this month this exact failure mode went unnoticed for 6 days.`,
-      ].join('<br>');
-    } else if (failureRate >= FAILURE_RATE_THRESHOLD) {
-      condition = 'gemini-failing';
-      // Surface a sample error so the recipient can triage without digging into logs.
-      const sampleError = rows.find((r) => r.provider === 'gemini' && r.error)?.error || 'unknown';
-      body = [
-        `Gemini is failing on most calls - over the last hour, ${geminiErrors} of ${geminiAttempts} Gemini calls (${Math.round(failureRate * 100)}%) errored.`,
-        ``,
-        `Sample error: <code>${escapeHtml(sampleError)}</code>`,
-        ``,
-        `Failover to Claude is working so the classifier still functions, but check the Gemini API key, quota, and model identifier (<code>gemini-2.5-flash</code>) in Railway env. If quota: <a href="https://console.cloud.google.com/billing">https://console.cloud.google.com/billing</a>.`,
-      ].join('<br>');
+    // ── Signal 1: primary struggling — failover share of all calls ──
+    const failoverCount = rows.filter((r) => r.is_failover === true).length;
+    const failoverRate = failoverCount / total;
+    if (failoverRate >= FAILOVER_RATE_THRESHOLD) {
+      const byProvider = {};
+      for (const r of rows.filter((x) => x.is_failover)) {
+        byProvider[r.provider] = (byProvider[r.provider] || 0) + 1;
+      }
+      const landed = Object.entries(byProvider).map(([p, n]) => `${p}: ${n}`).join(', ');
+      await sendOncePerDay(
+        'primary-failing',
+        'AI primary provider struggling - most calls are failing over',
+        [
+          `Over the last hour, ${failoverCount} of ${total} AI calls (${Math.round(failoverRate * 100)}%) were served by a FAILOVER provider (${landed}).`,
+          ``,
+          `The product is still working, but the primary for those features is erroring or unreachable — check the provider status pages and the API keys in Railway → Variables. classify's primary is Claude (<code>ANTHROPIC_API_KEY</code>); most other features are Gemini-first (<code>GEMINI_API_KEY</code>).`,
+        ].join('<br>')
+      );
+      return; // one alert per run is enough; provider detail is in the email
     }
 
-    if (!condition) return;
-
-    // Debounce: at most one email per condition per day.
-    const today = new Date().toISOString().split('T')[0];
-    const lockKey = `ai-health-alert:${condition}`;
-    const acquired = await db.acquireSchedulerLock(lockKey, today);
-    if (!acquired) {
-      console.log(`[ai-health] Condition "${condition}" detected but alert already sent today; skipping.`);
-      return;
+    // ── Signal 2: any provider erroring on most of its attempts ──
+    const providers = [...new Set(rows.map((r) => r.provider))];
+    for (const provider of providers) {
+      const attempts = rows.filter((r) => r.provider === provider);
+      if (attempts.length < MIN_VOLUME) continue;
+      const errors = attempts.filter((r) => r.error);
+      const failureRate = errors.length / attempts.length;
+      if (failureRate >= FAILURE_RATE_THRESHOLD) {
+        const sampleError = errors[0]?.error || 'unknown';
+        await sendOncePerDay(
+          `provider-failing:${provider}`,
+          `${provider} failing on most AI calls - check quota or API key`,
+          [
+            `${provider} errored on ${errors.length} of ${attempts.length} calls (${Math.round(failureRate * 100)}%) in the last hour.`,
+            ``,
+            `Sample error: <code>${escapeHtml(sampleError)}</code>`,
+            ``,
+            `Failover is absorbing it so users are unaffected for now, but check the ${provider} API key, quota, and model identifier in Railway env.`,
+          ].join('<br>')
+        );
+      }
     }
-
-    const subject =
-      condition === 'gemini-skipped'
-        ? 'Gemini API key may be unset - Claude is doing all AI calls'
-        : 'Gemini failing on most calls - check quota or API key';
-
-    await email.sendAdminAlert(subject, body);
-    console.log(`[ai-health] Sent admin alert: ${condition}`);
   } catch (err) {
     // Never crash the cron loop - log and move on.
     console.error('[ai-health] checkAiHealth failed:', err.message);
   }
+}
+
+// Debounce helper: at most one email per condition per day.
+async function sendOncePerDay(condition, subject, body) {
+  const today = new Date().toISOString().split('T')[0];
+  const acquired = await db.acquireSchedulerLock(`ai-health-alert:${condition}`, today);
+  if (!acquired) {
+    console.log(`[ai-health] Condition "${condition}" detected but alert already sent today; skipping.`);
+    return;
+  }
+  await email.sendAdminAlert(subject, body);
+  console.log(`[ai-health] Sent admin alert: ${condition}`);
 }
 
 function escapeHtml(s) {

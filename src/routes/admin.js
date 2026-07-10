@@ -350,13 +350,14 @@ router.post('/households/:id/trial-pause', async (req, res) => {
 router.get('/ai-usage', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
-    const [stats, timeline, topHouseholds, topUsers] = await Promise.all([
+    const [stats, timeline, topHouseholds, topUsers, botFailures] = await Promise.all([
       db.getAiUsageStats({ days }),
       db.getAiUsageTimeline({ days }),
       db.getAiUsageTopHouseholds({ days }),
       db.getAiUsageTopUsers({ days }),
+      db.getBotUserVisibleFailures({ days }),
     ]);
-    return res.json({ stats, timeline, topHouseholds, topUsers });
+    return res.json({ stats, timeline, topHouseholds, topUsers, botFailures });
   } catch (err) {
     console.error('GET /api/admin/ai-usage error:', err);
     return res.status(500).json({ error: 'Internal server error' });

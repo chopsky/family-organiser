@@ -5587,12 +5587,18 @@ async function setUserPlatformAdmin(userId, isPlatformAdmin, db = supabase) {
 async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  const [totalRes, byProviderRes, byFeatureRes, failoverRes, avgLatencyRes] = await Promise.all([
+  const [totalRes, byProviderRes, byFeatureRes, failoverRes, avgLatencyRes, errorRes] = await Promise.all([
     db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since),
     db.from('ai_usage_log').select('provider').gte('created_at', since),
     db.from('ai_usage_log').select('feature').gte('created_at', since),
     db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since).eq('is_failover', true),
-    db.from('ai_usage_log').select('latency_ms').gte('created_at', since).not('latency_ms', 'is', null),
+    // Latency sample: the most RECENT 1000 calls. An unpaginated select is
+    // silently capped at 1000 rows by PostgREST anyway; ordering makes the
+    // sample deterministic (recent) instead of arbitrary. avg + p95 below
+    // are therefore "recent sample" stats, which is what a health strip wants.
+    db.from('ai_usage_log').select('latency_ms').gte('created_at', since).not('latency_ms', 'is', null)
+      .order('created_at', { ascending: false }).limit(1000),
+    db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since).not('error', 'is', null),
   ]);
 
   // Count by provider
@@ -5607,17 +5613,55 @@ async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
     byFeature[row.feature] = (byFeature[row.feature] || 0) + 1;
   }
 
-  // Avg latency
-  const latencies = (avgLatencyRes.data || []).map((r) => r.latency_ms);
+  // Latency: average + p95 over the recent sample (see select above).
+  const latencies = (avgLatencyRes.data || []).map((r) => r.latency_ms).sort((a, b) => a - b);
   const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
+  const p95Latency = latencies.length > 0 ? latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * 0.95))] : 0;
 
   return {
     totalCalls: totalRes.count || 0,
     failoverCalls: failoverRes.count || 0,
     failoverRate: totalRes.count > 0 ? Math.round((failoverRes.count / totalRes.count) * 100) : 0,
+    // Provider-level errors (a call that errored, even if a fallback then
+    // rescued the turn) — the LEADING indicator. User-visible failures live
+    // in whatsapp_message_log (see getBotUserVisibleFailures).
+    errorCalls: errorRes.count || 0,
+    errorRate: totalRes.count > 0 ? Math.round((errorRes.count / totalRes.count) * 100) : 0,
     avgLatencyMs: avgLatency,
+    p95LatencyMs: p95Latency,
     byProvider,
     byFeature,
+  };
+}
+
+// User-visible bot failures: whatsapp_message_log rows where the user actually
+// received an apology (error set on an inbound turn). This is the HEADLINE bot
+// health metric — a provider error that failed over successfully never shows
+// up here. Returns count, rate vs total inbound turns, and recent samples.
+async function getBotUserVisibleFailures({ days = 7 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const [totalRes, failedRes, samplesRes] = await Promise.all([
+    db.from('whatsapp_message_log').select('id', { count: 'exact', head: true })
+      .eq('direction', 'inbound').gte('created_at', since),
+    db.from('whatsapp_message_log').select('id', { count: 'exact', head: true })
+      .eq('direction', 'inbound').not('error', 'is', null).gte('created_at', since),
+    db.from('whatsapp_message_log').select('created_at, intent, error, body')
+      .eq('direction', 'inbound').not('error', 'is', null).gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(5),
+  ]);
+  if (samplesRes.error) throw samplesRes.error;
+  const total = totalRes.count || 0;
+  const failures = failedRes.count || 0;
+  return {
+    totalInbound: total,
+    failures,
+    failureRate: total > 0 ? Math.round((failures / total) * 1000) / 10 : 0, // one decimal, %
+    recent: (samplesRes.data || []).map((r) => ({
+      at: r.created_at,
+      intent: r.intent || null,
+      error: r.error,
+      bodyPreview: (r.body || '').slice(0, 60),
+    })),
   };
 }
 
@@ -8842,6 +8886,7 @@ module.exports = {
   deleteHouseholdCascade,
   // Platform admin Phase 2
   getAiUsageStats,
+  getBotUserVisibleFailures,
   getAiUsageTimeline,
   logWhatsAppMessage,
   getRecentWhatsAppTurns,
