@@ -45,6 +45,7 @@ function getOpenAIClient() {
  */
 function isTransient(err) {
   return (
+    err.emptyResponse === true ||
     err.status === 429 ||
     err.status === 529 ||
     err.error?.type === 'overloaded_error' ||
@@ -57,6 +58,21 @@ function isTransient(err) {
     err.message?.includes('timeout') ||
     err.message?.includes('Timeout')
   );
+}
+
+// A 200 with empty text is not a usable completion — Claude occasionally does
+// this on an all-thinking turn or a soft refusal, and it surfaced as "the AI
+// replied in a format I couldn't read" (parseJSON('') throws). Throw instead of
+// returning "" so callWithFailover's existing try/catch moves to the next
+// provider (e.g. Gemini). Tagged emptyResponse so isTransient() routes the
+// Claude→GPT path too. Every provider funnels its return through here.
+function finalizeResult(text, provider) {
+  if (typeof text !== 'string' || text.trim() === '') {
+    const err = new Error(`${provider} returned an empty response`);
+    err.emptyResponse = true;
+    throw err;
+  }
+  return { text, provider };
 }
 
 /**
@@ -130,7 +146,7 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
     const text = response.text;
     if (!text) throw new Error('No text in Gemini response');
 
-    return { text, provider: 'gemini' };
+    return finalizeResult(text, 'gemini');
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -179,7 +195,7 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
     if (textBlocks.length === 0) throw new Error('No text in Claude response');
     const text = textBlocks.map(b => b.text).join('\n').trim();
 
-    return { text, provider: 'claude' };
+    return finalizeResult(text, 'claude');
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -221,7 +237,7 @@ async function callGPT({ system, messages, maxTokens = 2048 }) {
   const text = response.choices?.[0]?.message?.content;
   if (!text) throw new Error('No text in GPT response');
 
-  return { text, provider: 'gpt-4o' };
+  return finalizeResult(text, 'gpt-4o');
 }
 
 /**
@@ -351,6 +367,7 @@ module.exports = {
   callGPT,
   REASONING_TIMEOUT_MS,
   isTransient,
+  finalizeResult,
   GEMINI_MODEL,
   CLAUDE_MODEL,
   CLAUDE_HAIKU_MODEL,
