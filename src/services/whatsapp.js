@@ -65,7 +65,12 @@ function normalizeWhatsAppMarkdown(text) {
     // **bold** -> *bold*  (lazy match, single line so we don't span paragraphs)
     .replace(/\*\*([^\n*]+?)\*\*/g, '*$1*')
     // __bold__ -> *bold*  (rarer but Gemini does emit it occasionally)
-    .replace(/__([^\n_]+?)__/g, '*$1*');
+    .replace(/__([^\n_]+?)__/g, '*$1*')
+    // Any **span** STILL left contains a newline (the rule above skips those;
+    // seen live 2026-07-11: "**Settings\nConnect Calendars**" shipped literal
+    // asterisks). WhatsApp can't bold across lines anyway, so unwrap to plain
+    // text rather than leave the punctuation showing.
+    .replace(/\*\*([^*]+?)\*\*/g, '$1');
 }
 
 /**

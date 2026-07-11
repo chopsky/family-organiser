@@ -34,6 +34,11 @@ describe('normalizeWhatsAppMarkdown', () => {
       expect(normalizeWhatsAppMarkdown('**bold**')).toBe('*bold*');
     });
 
+    it('unwraps a **span with a newline** to plain text (WhatsApp cannot bold across lines; real leak 2026-07-11)', () => {
+      expect(normalizeWhatsAppMarkdown('under **Settings\nConnect Calendars**.'))
+        .toBe('under Settings\nConnect Calendars.');
+    });
+
     it('converts multi-word **place names** to *place names*', () => {
       expect(normalizeWhatsAppMarkdown('**Alexandra Palace Park**')).toBe('*Alexandra Palace Park*');
     });
@@ -55,13 +60,12 @@ describe('normalizeWhatsAppMarkdown', () => {
       expect(normalizeWhatsAppMarkdown('**Right now:** 21°C')).toBe('*Right now:* 21°C');
     });
 
-    it('does not match across newlines', () => {
-      // A bold span shouldn't span two paragraphs - if the model writes
-      // ** at the start of one line and ** at the end of a later line
-      // we leave it alone (probably a quoting accident or an actual
-      // unbalanced asterisk).
-      const input = '**line one\nline two**';
-      expect(normalizeWhatsAppMarkdown(input)).toBe(input);
+    it('does not BOLD across newlines - unwraps to plain text instead', () => {
+      // A bold span can't span lines on WhatsApp. The old behaviour left
+      // the asterisks untouched, which shipped literal ** to users (seen
+      // live 2026-07-11: "**Settings\nConnect Calendars**"). Now the pair
+      // is unwrapped: no bold, but no leaked punctuation either.
+      expect(normalizeWhatsAppMarkdown('**line one\nline two**')).toBe('line one\nline two');
     });
   });
 
