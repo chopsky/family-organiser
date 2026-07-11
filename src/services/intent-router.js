@@ -60,7 +60,7 @@ async function routeReadIntent(text, { timezone = 'Europe/London', householdId, 
   if (process.env.BOT_ROUTER !== '1') return null;
   try {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: timezone });
-    const { text: raw } = await callClaude({
+    const { text: raw, usage } = await callClaude({
       system: `${ROUTER_SYSTEM}\n\nToday's date: ${today} (timezone ${timezone}).`,
       messages: [{ role: 'user', content: text }],
       model: CLAUDE_HAIKU_MODEL,
@@ -71,7 +71,7 @@ async function routeReadIntent(text, { timezone = 'Europe/London', householdId, 
     const parsed = JSON.parse(raw);
     if (!ROUTES.includes(parsed.route) || parsed.route === 'other') return null;
     // Telemetry so the Bot-health strip covers router behaviour.
-    logRouterDecision({ householdId, userId, route: parsed.route });
+    logRouterDecision({ householdId, userId, route: parsed.route, usage });
     return parsed;
   } catch (err) {
     // Timeout / provider error / parse surprise — never block the message.
@@ -82,7 +82,7 @@ async function routeReadIntent(text, { timezone = 'Europe/London', householdId, 
 
 // Fire-and-forget usage log (feature 'router'), mirroring logAiUsage's
 // pattern without exporting it from ai-client.
-function logRouterDecision({ householdId, userId, route }) {
+function logRouterDecision({ householdId, userId, route, usage }) {
   try {
     const { supabaseAdmin: supabase } = require('../db/client');
     supabase
@@ -93,6 +93,8 @@ function logRouterDecision({ householdId, userId, route }) {
         provider: 'claude',
         model: CLAUDE_HAIKU_MODEL,
         feature: `router:${route}`,
+        input_tokens: usage ? usage.inputTokens : null,
+        output_tokens: usage ? usage.outputTokens : null,
         is_failover: false,
       })
       .then(() => {})

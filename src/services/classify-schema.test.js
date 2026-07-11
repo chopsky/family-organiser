@@ -75,6 +75,19 @@ describe('lockstep with the prose prompt', () => {
     const promptIntents = [...line.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).filter((v) => v !== 'intent');
     expect(new Set(INTENTS)).toEqual(new Set(promptIntents));
   });
+
+  test('CLASSIFICATION_SYSTEM stays placeholder-free (prompt-cache invariant)', () => {
+    // The static rules block is served from the provider prompt cache, which
+    // only hits when the block is byte-identical across calls and households.
+    // A {{PLACEHOLDER}} sneaking back in silently kills the cache (and the
+    // ~90% input-price discount) without breaking anything functionally —
+    // dynamic values belong in CLASSIFICATION_CONTEXT.
+    const { CLASSIFICATION_CONTEXT } = require('./prompts');
+    expect(CLASSIFICATION_SYSTEM).not.toMatch(/{{[A-Z_]+}}/);
+    for (const ph of ['{{DATE}}', '{{MEMBERS}}', '{{SENDER}}', '{{NOTES}}', '{{PREFERENCES}}', '{{CALENDAR_EVENTS}}', '{{TASKS}}', '{{SCHOOL_TERM_DATES}}', '{{EXTRA_CONTEXT}}']) {
+      expect(CLASSIFICATION_CONTEXT).toContain(ph);
+    }
+  });
 });
 
 describe('provider adapters', () => {

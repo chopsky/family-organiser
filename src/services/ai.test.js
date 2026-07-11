@@ -38,6 +38,14 @@ function mockStream(jsonPayload) {
   };
 }
 
+/**
+ * classify() now sends `system` as an array of blocks (static cached rules +
+ * dynamic household context) - flatten back to one string for assertions.
+ */
+function sysOf(call) {
+  return Array.isArray(call.system) ? call.system.map((b) => b.text).join('\n\n') : call.system;
+}
+
 /** Build a mock stream that returns text wrapped in a markdown fence. */
 function mockStreamMarkdown(jsonPayload) {
   const finalMessage = {
@@ -153,8 +161,8 @@ describe('classify()', () => {
     await classify("test message", ['Alice', 'Bob']);
 
     const call = mockMessagesStream.mock.calls[0][0];
-    expect(call.system).toContain('Alice, Bob');
-    expect(call.system).toContain(new Date().toISOString().split('T')[0]);
+    expect(sysOf(call)).toContain('Alice, Bob');
+    expect(sysOf(call)).toContain(new Date().toISOString().split('T')[0]);
   });
 
   test('includes the sender in the prompt so "me/I/my" can resolve', async () => {
@@ -167,11 +175,11 @@ describe('classify()', () => {
     const call = mockMessagesStream.mock.calls[0][0];
     // Both the "current user" line and the example inside the sender-resolution
     // block should reference the sender by name.
-    expect(call.system).toContain('The current user (sender of this message) is: Grant');
+    expect(sysOf(call)).toContain('The current user (sender of this message) is: Grant');
     // The sender-resolution example in the prompt was updated to the
     // new multi-assignee shape (array of names). Confirm both that the
     // example reflects the array form and that the sender's name is in it.
-    expect(call.system).toContain('assigned_to_names: ["Grant"]');
+    expect(sysOf(call)).toContain('assigned_to_names: ["Grant"]');
   });
 
   test('prompt requires an explicit date for calendar events (no silent "today")', async () => {
@@ -179,7 +187,7 @@ describe('classify()', () => {
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
     }));
     await classify('add dentist', ['Grant'], [], { sender: 'Grant' });
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     expect(sys).toContain('DATE-REQUIRED FOR CALENDAR EVENTS');
     expect(sys).toMatch(/do not silently default to today/i);
   });
@@ -189,7 +197,7 @@ describe('classify()', () => {
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
     }));
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // Intents are in the enum
     for (const intent of ['update_event', 'delete_event', 'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item']) {
       expect(sys).toContain(`"${intent}"`);
@@ -206,7 +214,7 @@ describe('classify()', () => {
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
     }));
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // Defends against the failure mode where Gemini/Claude emit plain prose
     // ('My apologies…', 'I've added…') instead of JSON on meta or apologetic
     // turns, tripping parseJSON with no recoverable block.
@@ -220,7 +228,7 @@ describe('classify()', () => {
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
     }));
     await classify('how do you work?', ['Grant'], [], { sender: 'Grant' });
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // Ensure the HOW YOU ACTUALLY WORK block is present with the key facts
     // the bot must be able to describe when asked.
     expect(sys).toContain('HOW YOU ACTUALLY WORK');
@@ -234,7 +242,7 @@ describe('classify()', () => {
       intent: 'chat', shopping_items: [], tasks: [], response_message: 'ok',
     }));
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // The "BE CONSERVATIVE" guidance and the trampoline worked example should
     // both be present - they were added to prevent the classifier from
     // hijacking new scheduling statements into updates of same-topic items.
@@ -252,10 +260,10 @@ describe('classify()', () => {
 
     const call = mockMessagesStream.mock.calls[0][0];
     // The AI must be told how to handle an affirmative reply to a dupe prompt.
-    expect(call.system).toContain('FORCE-ADD');
-    expect(call.system).toContain('force: true');
+    expect(sysOf(call)).toContain('FORCE-ADD');
+    expect(sysOf(call)).toContain('force: true');
     // And the schema must expose the field so the model can actually emit it.
-    expect(call.system).toContain('"force": boolean');
+    expect(sysOf(call)).toContain('"force": boolean');
   });
 
   test('prompt forbids weak update/delete target matches (shared person name is not a topic match)', async () => {
@@ -268,13 +276,13 @@ describe('classify()', () => {
     const call = mockMessagesStream.mock.calls[0][0];
     // Real failure this guards: "cancel Logan's swimming" moved the unrelated
     // task "Do Logan's citizenship" to today because both mentioned Logan.
-    expect(call.system).toContain('NO WEAK TARGET MATCHES');
-    expect(call.system).toMatch(/shared person'?s name is NEVER a match/i);
+    expect(sysOf(call)).toContain('NO WEAK TARGET MATCHES');
+    expect(sysOf(call)).toMatch(/shared person'?s name is NEVER a match/i);
     // "cancel X" with no matching item = create a to-do for the errand.
-    expect(call.system).toContain('CANCEL/CHASE/REBOOK ERRANDS');
-    expect(call.system).toContain("Cancel Logan's swimming");
+    expect(sysOf(call)).toContain('CANCEL/CHASE/REBOOK ERRANDS');
+    expect(sysOf(call)).toContain("Cancel Logan's swimming");
     // The update-over-add bias must not extend to unrelated tasks.
-    expect(call.system).toMatch(/NEVER justifies updating an unrelated task/i);
+    expect(sysOf(call)).toMatch(/NEVER justifies updating an unrelated task/i);
   });
 
   test('formats calendar event times in the user timezone, not the server timezone', async () => {
@@ -295,11 +303,11 @@ describe('classify()', () => {
 
     const call = mockMessagesStream.mock.calls[0][0];
     // Must see 14:00 (local BST), never 13:00 (server UTC).
-    expect(call.system).toContain('Haircut');
-    expect(call.system).toContain('14:00');
+    expect(sysOf(call)).toContain('Haircut');
+    expect(sysOf(call)).toContain('14:00');
     // The substring "13:00" must not appear as a time for the event - this
     // was the exact bug where the AI told users their 2PM event was at 1PM.
-    expect(call.system).not.toContain(' 13:00:');
+    expect(sysOf(call)).not.toContain(' 13:00:');
   });
 
   test('prompt includes OPEN TASKS section with formatted task list', async () => {
@@ -319,7 +327,7 @@ describe('classify()', () => {
       ],
     });
 
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     expect(sys).toContain('OPEN TASKS');
     expect(sys).toContain('Pay Elementor');
     expect(sys).toContain('Book car service');
@@ -337,7 +345,7 @@ describe('classify()', () => {
 
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
 
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     expect(sys).toContain('OPEN TASKS');
     expect(sys).toContain('(no open tasks)');
   });
@@ -349,7 +357,7 @@ describe('classify()', () => {
 
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
 
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // The rules block teaches the model to recognise past-tense / completion
     // phrasing ("Elementor paid") and match it against an existing open task
     // rather than creating a new task.
@@ -371,7 +379,7 @@ describe('classify()', () => {
 
     await classify('hi', ['Grant'], [], { sender: 'Grant' });
 
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // Regression anchor for the reported bug where "Booked my car in for a
     // service on Wednesday morning" completed the task but didn't create a
     // calendar event. The prompt must teach the model to emit BOTH in a
@@ -404,7 +412,7 @@ describe('classify()', () => {
 
     await classify('hi', ['Grant'], [], { sender: 'Grant', tasks: manyTasks });
 
-    const sys = mockMessagesStream.mock.calls[0][0].system;
+    const sys = sysOf(mockMessagesStream.mock.calls[0][0]);
     // First 50 should be rendered, 51+ should be truncated with a count.
     expect(sys).toContain('Task 1');
     expect(sys).toContain('Task 50');
@@ -420,7 +428,7 @@ describe('classify()', () => {
     await classify("test", ['Alice']);
 
     const call = mockMessagesStream.mock.calls[0][0];
-    expect(call.system).toContain('The current user (sender of this message) is: Unknown');
+    expect(sysOf(call)).toContain('The current user (sender of this message) is: Unknown');
   });
 
   test('strips markdown fences from response', async () => {

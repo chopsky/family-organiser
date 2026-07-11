@@ -6,6 +6,7 @@ const { formatPreferenceLines } = require('./preferences-format');
 const { CLASSIFY_SCHEMA } = require('./classify-schema');
 const {
   CLASSIFICATION_SYSTEM,
+  CLASSIFICATION_CONTEXT,
   RECEIPT_EXTRACTION_SYSTEM,
   RECEIPT_MATCHING_SYSTEM,
   IMAGE_SCAN_SYSTEM,
@@ -143,7 +144,12 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   }
   const extraContextStr = extraSections.length ? `\n${extraSections.join('\n\n')}` : '';
 
-  const systemPrompt = CLASSIFICATION_SYSTEM
+  // Two-block system prompt: CLASSIFICATION_SYSTEM is placeholder-free and
+  // byte-identical on every call, so the providers can serve it from their
+  // prompt cache (cache: true → Anthropic cache_control; Gemini/OpenAI prefix
+  // caches hit automatically because the static block comes first). Only the
+  // small household-context block varies per message.
+  const contextPrompt = CLASSIFICATION_CONTEXT
     .replace(/{{DATE}}/g, today)
     .replace(/{{MEMBERS}}/g, membersStr)
     .replace(/{{SENDER}}/g, senderStr)
@@ -154,6 +160,11 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{TASKS}}/g, tasksStr)
     .replace(/{{SCHOOL_TERM_DATES}}/g, schoolTermDates || '(none)')
     .replace(/{{EXTRA_CONTEXT}}/g, extraContextStr);
+
+  const systemPrompt = [
+    { text: CLASSIFICATION_SYSTEM, cache: true },
+    { text: contextPrompt },
+  ];
 
   // Build message array: prior turns (if any) + current user message.
   // History is expected to be [{ role, content }, ...] in chronological order.

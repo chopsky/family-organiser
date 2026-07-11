@@ -81,6 +81,7 @@ and weather.
 | 2026-07-10 | 37 | 36/37 v2 = 36/37 v1 same-hour (Sonnet 5) | v2 forced-tool schema |
 
 | 2026-07-11 | 40 | 37-38/40 per run, shuffling failures (see note) | v2 + Phase-3 (multi-event, wider context) |
+| 2026-07-11 | 41 | 39/41 full run; both failures re-run → graduation passed, Ella = documented flake. Effective 40/41 | v2 + prompt-cache restructure (static rules block first + cache_control; household context moved to the end). Cache verified live in the run log: in≈24.7k, cache_read≈23.9k → ~900 fresh tokens/msg |
 
 Known-flaky: `weak target: "cancel Ella's dentist"` wobbles on BOTH pipelines
 (model alternates between errand-creation and a clarifying reply; it never

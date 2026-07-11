@@ -66,13 +66,71 @@ function isTransient(err) {
 // returning "" so callWithFailover's existing try/catch moves to the next
 // provider (e.g. Gemini). Tagged emptyResponse so isTransient() routes the
 // Claude→GPT path too. Every provider funnels its return through here.
-function finalizeResult(text, provider) {
+function finalizeResult(text, provider, usage) {
   if (typeof text !== 'string' || text.trim() === '') {
     const err = new Error(`${provider} returned an empty response`);
     err.emptyResponse = true;
     throw err;
   }
-  return { text, provider };
+  return { text, provider, usage: usage || null };
+}
+
+/**
+ * Normalise per-provider usage metadata to { inputTokens, outputTokens,
+ * cacheReadTokens, cacheWriteTokens }. inputTokens is the TOTAL prompt size
+ * (uncached + cache reads + cache writes) so the ai_usage_log column reads as
+ * "how big was this request", independent of cache billing discounts.
+ */
+function normalizeClaudeUsage(u) {
+  if (!u) return null;
+  const cacheRead = u.cache_read_input_tokens || 0;
+  const cacheWrite = u.cache_creation_input_tokens || 0;
+  return {
+    inputTokens: (u.input_tokens || 0) + cacheRead + cacheWrite,
+    outputTokens: u.output_tokens || 0,
+    cacheReadTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
+  };
+}
+
+function normalizeGeminiUsage(u) {
+  if (!u) return null;
+  return {
+    inputTokens: u.promptTokenCount || 0,
+    // Gemini bills "thinking" as output; fold it in so output_tokens is spend-true.
+    outputTokens: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0),
+    cacheReadTokens: u.cachedContentTokenCount || 0,
+    cacheWriteTokens: 0,
+  };
+}
+
+function normalizeGptUsage(u) {
+  if (!u) return null;
+  return {
+    inputTokens: u.prompt_tokens || 0,
+    outputTokens: u.completion_tokens || 0,
+    cacheReadTokens: u.prompt_tokens_details?.cached_tokens || 0,
+    cacheWriteTokens: 0,
+  };
+}
+
+/**
+ * `system` may be a plain string or an array of { text, cache? } blocks —
+ * static-and-cacheable content first, per-call dynamic content after.
+ * Anthropic gets real cache_control breakpoints; Gemini and OpenAI cache
+ * matching prefixes automatically, so for them the blocks just join.
+ */
+function systemToText(system) {
+  return Array.isArray(system) ? system.map((b) => b.text).join('\n\n') : system;
+}
+
+function systemToAnthropic(system) {
+  if (!Array.isArray(system)) return system;
+  return system.map((b) => (
+    b.cache
+      ? { type: 'text', text: b.text, cache_control: { type: 'ephemeral' } }
+      : { type: 'text', text: b.text }
+  ));
 }
 
 /**
@@ -118,7 +176,7 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
     // instruction and tripping downstream parseJSON. With responseMimeType
     // set, Gemini guarantees valid JSON at the API level.
     const config = {
-      systemInstruction: system,
+      systemInstruction: systemToText(system),
       maxOutputTokens: maxTokens,
     };
     if (responseFormat === 'json') {
@@ -153,7 +211,7 @@ async function callGemini({ system, messages, maxTokens = 2048, timeoutMs, respo
     const text = response.text;
     if (!text) throw new Error('No text in Gemini response');
 
-    return finalizeResult(text, 'gemini');
+    return finalizeResult(text, 'gemini', normalizeGeminiUsage(response.usageMetadata));
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -177,7 +235,7 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
     const params = {
       model: model || CLAUDE_MODEL,
       max_tokens: maxTokens,
-      system,
+      system: systemToAnthropic(system),
       messages,
     };
 
@@ -211,12 +269,14 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
     const response = await stream.finalMessage();
     clearTimeout(timer);
 
+    const usage = normalizeClaudeUsage(response.usage);
+
     if (forcedTool) {
       const toolUse = response.content.find((b) => b.type === 'tool_use');
       if (toolUse && toolUse.input && typeof toolUse.input === 'object') {
         // Serialise back to text so the caller's parse path stays the single
         // funnel (parseJSON is now a plain parse of known-good JSON).
-        return finalizeResult(JSON.stringify(toolUse.input), 'claude');
+        return finalizeResult(JSON.stringify(toolUse.input), 'claude', usage);
       }
       // Defensive: forced tool_choice should make this unreachable, but fall
       // through to text extraction rather than assume.
@@ -230,7 +290,7 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
     if (textBlocks.length === 0) throw new Error('No text in Claude response');
     const text = textBlocks.map(b => b.text).join('\n').trim();
 
-    return finalizeResult(text, 'claude');
+    return finalizeResult(text, 'claude', usage);
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -248,7 +308,7 @@ async function callGPT({ system, messages, maxTokens = 2048, timeoutMs, response
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
 
-  const gptMessages = [{ role: 'system', content: system }];
+  const gptMessages = [{ role: 'system', content: systemToText(system) }];
 
   for (const msg of messages) {
     if (typeof msg.content === 'string') {
@@ -288,7 +348,7 @@ async function callGPT({ system, messages, maxTokens = 2048, timeoutMs, response
     const text = response.choices?.[0]?.message?.content;
     if (!text) throw new Error('No text in GPT response');
 
-    return finalizeResult(text, 'gpt-4o');
+    return finalizeResult(text, 'gpt-4o', normalizeGptUsage(response.usage));
   } finally {
     clearTimeout(timer);
   }
@@ -307,7 +367,12 @@ async function callGPT({ system, messages, maxTokens = 2048, timeoutMs, response
 /**
  * Fire-and-forget: log AI usage to the ai_usage_log table.
  */
-function logAiUsage({ householdId, userId, provider, model, feature, latencyMs, isFailover, error }) {
+function logAiUsage({ householdId, userId, provider, model, feature, latencyMs, isFailover, error, usage }) {
+  // Cache hit/miss detail has no table columns — surface it in the Railway
+  // logs so a prompt-caching change is verifiable in prod without a migration.
+  if (usage && (usage.cacheReadTokens || usage.cacheWriteTokens)) {
+    console.log(`[ai-usage] ${provider} ${feature}: in=${usage.inputTokens} out=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens}`);
+  }
   supabase
     .from('ai_usage_log')
     .insert({
@@ -316,6 +381,8 @@ function logAiUsage({ householdId, userId, provider, model, feature, latencyMs, 
       provider,
       model,
       feature: feature || 'unknown',
+      input_tokens: usage ? usage.inputTokens : null,
+      output_tokens: usage ? usage.outputTokens : null,
       latency_ms: latencyMs,
       is_failover: isFailover || false,
       error: error || null,
@@ -339,7 +406,7 @@ async function callWithFailover(opts) {
     const claudeStart = Date.now();
     try {
       const result = await callClaude(opts);
-      logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: false });
+      logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: false, usage: result.usage });
       return result;
     } catch (err) {
       console.warn(`[ai-failover] Claude (primary) failed (${err.message || err.code}), falling back to Gemini`);
@@ -354,7 +421,7 @@ async function callWithFailover(opts) {
         // even when the caller asked for thinking — that flag is for
         // Claude. Gemini is only here because Claude failed.
         const result = await callGemini({ ...opts, useThinking: false });
-        logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: true });
+        logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: true, usage: result.usage });
         return result;
       } catch (err) {
         console.warn(`[ai-failover] Gemini (fallback) failed (${err.message || err.code}), trying GPT-4o`);
@@ -365,7 +432,7 @@ async function callWithFailover(opts) {
       const gptStart = Date.now();
       try {
         const result = await callGPT(opts);
-        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true });
+        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true, usage: result.usage });
         return result;
       } catch (gptErr) {
         logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true, error: gptErr.message });
@@ -380,7 +447,7 @@ async function callWithFailover(opts) {
     const geminiStart = Date.now();
     try {
       const result = await callGemini(opts);
-      logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: false });
+      logAiUsage({ householdId, userId, provider: 'gemini', model: GEMINI_MODEL, feature, latencyMs: Date.now() - geminiStart, isFailover: false, usage: result.usage });
       return result;
     } catch (err) {
       console.warn(`[ai-failover] Gemini failed (${err.message || err.code}), falling back to Claude`);
@@ -393,7 +460,7 @@ async function callWithFailover(opts) {
   const claudeStart = Date.now();
   try {
     const result = await callClaude(opts);
-    logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: attempt > 0 });
+    logAiUsage({ householdId, userId, provider: 'claude', model: CLAUDE_MODEL, feature, latencyMs: Date.now() - claudeStart, isFailover: attempt > 0, usage: result.usage });
     return result;
   } catch (err) {
     if (isTransient(err) && process.env.OPENAI_API_KEY) {
@@ -401,7 +468,7 @@ async function callWithFailover(opts) {
       const gptStart = Date.now();
       try {
         const result = await callGPT(opts);
-        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true });
+        logAiUsage({ householdId, userId, provider: 'gpt-4o', model: GPT_MODEL, feature, latencyMs: Date.now() - gptStart, isFailover: true, usage: result.usage });
         return result;
       } catch (gptErr) {
         console.error('[ai-failover] GPT-4o also failed:', gptErr.message);
@@ -422,6 +489,11 @@ module.exports = {
   REASONING_TIMEOUT_MS,
   isTransient,
   finalizeResult,
+  systemToText,
+  systemToAnthropic,
+  normalizeClaudeUsage,
+  normalizeGeminiUsage,
+  normalizeGptUsage,
   GEMINI_MODEL,
   CLAUDE_MODEL,
   CLAUDE_HAIKU_MODEL,
