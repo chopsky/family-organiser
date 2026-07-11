@@ -22,6 +22,7 @@ const { extractTextFromDocument } = require('../services/document-extract');
 const { extractTermDatesPreview, academicYearsForCountry } = require('../services/term-date-extract');
 const { formatRecipeConstraints, mergeHouseholdAllergies } = require('../services/preferences-format');
 const { routeReadIntent } = require('../services/intent-router');
+const { messageMentionsMeals, messageMentionsShopping, messageMentionsStars } = require('../utils/context-relevance');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -1771,8 +1772,29 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
   const schoolTermDates = summariseSchoolTermDates(householdSchools, termDates);
 
+  // Conditional wider context (Phase 3): the meal plan, shopping list and
+  // kids' star balances are fetched ONLY when the message plausibly needs
+  // them (keyword gates in utils/context-relevance.js — same pattern as the
+  // location gate) so "what's for dinner Thursday?" and "how many stars does
+  // Olivia have?" get real answers without bloating every other prompt.
+  // Each fetch soft-fails to nothing.
+  const todayYmdCtx = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
+  const weekEndCtx = (() => { const d = new Date(`${todayYmdCtx}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 7); return d.toISOString().slice(0, 10); })();
+  const [mealPlan, shoppingContext, starBalancesRaw] = await Promise.all([
+    messageMentionsMeals(text) ? db.getMealPlanForWeek(household.id, todayYmdCtx, weekEndCtx).catch(() => []) : [],
+    messageMentionsShopping(text) ? db.getShoppingList(household.id).catch(() => []) : [],
+    messageMentionsStars(text) ? db.getStarBalances(household.id).catch(() => null) : null,
+  ]);
+  // Resolve star balances to names — the model should see "Olivia: 89".
+  const starBalances = starBalancesRaw
+    ? Object.entries(starBalancesRaw).map(([memberId, balance]) => ({
+        name: household.members.find((m) => m.id === memberId)?.name || null,
+        balance,
+      })).filter((b) => b.name)
+    : [];
+
   console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${openTasks.length} open tasks, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences });
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences, mealPlan, shoppingItems: shoppingContext, starBalances });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 
@@ -1986,8 +2008,40 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
 
   // Handle calendar event creation (primary path - intent explicitly create_event)
-  if (result.intent === 'create_event' && result.calendar_event) {
-    const outcome = await createCalendarEventFromResult(result.calendar_event, user, household, actions, text);
+  // Multi-event messages ("swimming Tue 4pm and dentist Thu 9am") arrive in
+  // result.calendar_events (Phase 3); a single event stays in
+  // result.calendar_event. Two or more → the batch path below; exactly one
+  // (whichever field it arrived in) → the original single-event flow with
+  // its dupe-confirm prompt and appointment graduation.
+  const multiEvents = Array.isArray(result.calendar_events) ? result.calendar_events.filter(Boolean) : [];
+  if (result.intent === 'create_event' && multiEvents.length > 1) {
+    const added = [];
+    const skipped = [];
+    for (const ev of multiEvents) {
+      const outcome = await createCalendarEventFromResult(ev, user, household, actions, text);
+      if (outcome.kind === 'duplicate') {
+        skipped.push(`"${ev.title}" (already on the calendar)`);
+      } else if (outcome.kind === 'error') {
+        skipped.push(`"${ev.title}" (${outcome.message})`);
+      } else {
+        const when = ev.date
+          ? new Date(`${ev.date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+          : '';
+        added.push(`• ${ev.title}${when ? ` — ${when}` : ''}${ev.start_time && !ev.all_day ? ` ${ev.start_time}` : ''}`);
+        // Appointment graduation per created event, soft-fail as ever.
+        await graduateAppointmentTodo(ev.title, household, actions).catch(() => null);
+      }
+    }
+    if (!added.length) {
+      return { response: `I couldn't add those: ${skipped.join('; ')}`, actions };
+    }
+    let reply = `📅 Added ${added.length} events:\n${added.join('\n')}`;
+    if (skipped.length) reply += `\n\nSkipped ${skipped.join('; ')}.`;
+    return { response: reply, actions };
+  }
+  const singleEvent = result.calendar_event || (multiEvents.length === 1 ? multiEvents[0] : null);
+  if (result.intent === 'create_event' && singleEvent) {
+    const outcome = await createCalendarEventFromResult(singleEvent, user, household, actions, text);
     if (outcome.kind === 'duplicate') {
       // Surface the dupe prompt so the user can confirm with a follow-up "yes"
       // (FORCE-ADD path) - this behaviour is specific to the create_event
@@ -2009,7 +2063,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     // Appointment graduation: if this event fulfils an open "Book X appointment"
     // to-do, tick it off and say so. Soft-fail so it never blocks the event.
     let eventReply = result.response_message || '📅 Event added! ✅';
-    const ticked = await graduateAppointmentTodo(result.calendar_event.title, household, actions).catch(() => null);
+    const ticked = await graduateAppointmentTodo(singleEvent.title, household, actions).catch(() => null);
     if (ticked) eventReply += `\n\n✓ Also ticked off "${ticked}" from your to-do list.`;
     return { response: eventReply, actions };
   }

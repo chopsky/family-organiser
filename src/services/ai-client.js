@@ -200,7 +200,7 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
     if (forcedTool) {
       params.tools = [{
         name: 'classification',
-        description: 'Report the structured classification of the message: the intent, any extracted actions, and the user-facing response_message.',
+        description: 'Report the structured classification of the message. ALWAYS include the intent field and the user-facing response_message, plus any extracted actions.',
         input_schema: responseSchema,
       }];
       params.tool_choice = { type: 'tool', name: 'classification' };

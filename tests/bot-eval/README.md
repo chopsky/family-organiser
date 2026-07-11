@@ -80,7 +80,18 @@ and weather.
 | 2026-07-10 | 37 | 37/37 (Sonnet 5) | v1 mega-prompt |
 | 2026-07-10 | 37 | 36/37 v2 = 36/37 v1 same-hour (Sonnet 5) | v2 forced-tool schema |
 
+| 2026-07-11 | 40 | 37-38/40 per run, shuffling failures (see note) | v2 + Phase-3 (multi-event, wider context) |
+
 Known-flaky: `weak target: "cancel Ella's dentist"` wobbles on BOTH pipelines
 (model alternates between errand-creation and a clarifying reply; it never
 takes the dangerous path of deleting an unrelated item). Treat a failure here
 as suspect-flake — re-run it before blaming a change.
+
+Variance protocol (learned 2026-07-11, an elevated-variance night): a full run
+dropping 1-3 marginal cases that each RE-PASS on immediate isolated re-run is
+provider noise, not a regression. A regression looks like the redirect-to-app
+case did that night: the SAME case failing every run on new code while passing
+on old — bisect those (git stash the change, re-run) and fix at the root
+(that one was the model omitting `intent` on advice turns under the non-strict
+forced tool; fixed with a deterministic missing-intent→chat salvage in
+classify, not a prompt tweak).

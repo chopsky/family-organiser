@@ -82,6 +82,21 @@ const CURRENCIES = ['GBP', 'USD', 'EUR', 'ZAR', 'CAD', 'AUD', 'NZD'];
 
 const reminders = arr(obj({ time: num, unit: en(['minutes', 'hours', 'days']) }));
 
+// One calendar event — used both as the single `calendar_event` and as the
+// items of `calendar_events` (multi-event messages, Phase 3).
+const calendarEventShape = () => obj({
+  title: str,
+  date: str,
+  all_day: bool,
+  start_time: opt(str),
+  end_time: opt(str),
+  assigned_to_names: opt(strArr),
+  location: opt(str),
+  description: opt(str),
+  reminders: opt(reminders),
+  force: opt(bool),
+});
+
 // ── the classify output schema ───────────────────────────────────────────────
 const CLASSIFY_SCHEMA = obj({
   intent: en(INTENTS),
@@ -103,18 +118,10 @@ const CLASSIFY_SCHEMA = obj({
     priority: opt(en(PRIORITIES)),
     notification: opt(en(NOTIFICATIONS)),
   })),
-  calendar_event: opt(obj({
-    title: str,
-    date: str,
-    all_day: bool,
-    start_time: opt(str),
-    end_time: opt(str),
-    assigned_to_names: opt(strArr),
-    location: opt(str),
-    description: opt(str),
-    reminders: opt(reminders),
-    force: opt(bool),
-  })),
+  calendar_event: opt(calendarEventShape()),
+  // Multi-event messages ("swimming Tue 4pm and dentist Thu 9am"): ALL the
+  // events go here; calendar_event stays for the single-event case.
+  calendar_events: opt(arr(calendarEventShape())),
   target: opt(obj({
     title: str,
     target_id: opt(int),

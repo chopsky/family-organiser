@@ -571,4 +571,52 @@ module.exports = [
     ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },
     check: (r) => (r.intent !== 'weather' ? `expected weather, got ${r.intent}` : null),
   },
+
+  // ── Phase-3 batch (2026-07-11): multi-event + conditional wider context ──
+  {
+    name: 'multi-event: "swimming Tuesday 4pm and dentist Thursday 9am" extracts BOTH events',
+    message: 'Add swimming Tuesday at 4pm and the dentist Thursday at 9am',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      const evts = [
+        ...(r.calendar_event ? [r.calendar_event] : []),
+        ...(Array.isArray(r.calendar_events) ? r.calendar_events : []),
+      ];
+      if (evts.length !== 2) return `expected 2 events, got ${evts.length} (${evts.map((e) => e.title).join(' | ')})`;
+      const titles = evts.map((e) => (e.title || '').toLowerCase()).join(' ');
+      if (!/swim/.test(titles) || !/dentist/.test(titles)) return `wrong titles: ${titles}`;
+      if (adds(r).length) return 'events must not also become to-dos';
+      return null;
+    },
+  },
+  {
+    name: 'meal grounding: "what\'s for dinner tomorrow?" answers from the MEAL PLAN context',
+    message: "what's for dinner tomorrow?",
+    ctx: {
+      sender: 'Lynn',
+      memberNames: ['Grant', 'Lynn'],
+      mealPlan: [{ date: futureISO(1).slice(0, 10), category: 'dinner', meal_name: 'Spaghetti bolognese' }],
+    },
+    check: (r) => {
+      if (!/spaghetti|bolognese/i.test(r.response_message || '')) {
+        return `answer doesn't mention the planned meal: "${r.response_message}"`;
+      }
+      return null;
+    },
+  },
+  {
+    name: 'star grounding: "how many stars does Olivia have?" answers from STAR BALANCES',
+    message: 'how many stars does Olivia have?',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Olivia'],
+      starBalances: [{ name: 'Olivia', balance: 89 }, { name: 'Henry', balance: 42 }],
+    },
+    check: (r) => {
+      if (!/89/.test(r.response_message || '')) {
+        return `answer doesn't contain Olivia's balance (89): "${r.response_message}"`;
+      }
+      return null;
+    },
+  },
 ];

@@ -40,6 +40,7 @@ OPEN TASKS (not yet completed):
 
 SCHOOL TERM DATES & CLOSURES (use this for any question about school term, break, or holiday timing - do NOT guess from general knowledge, even if the household sounds like a familiar pattern):
 {{SCHOOL_TERM_DATES}}
+{{EXTRA_CONTEXT}}
 
 You will be given a raw message from a family member. Parse it and return structured data.
 
@@ -434,6 +435,7 @@ Respond only with valid JSON matching this schema:
     "reminders": [{"time": number, "unit": "minutes" | "hours" | "days"}] | null,
     "force": boolean
   } | null,
+  "calendar_events": [ /* MULTI-EVENT messages ONLY. When ONE message contains TWO OR MORE distinct events ("swimming Tuesday 4pm and dentist Thursday 9am"), put ALL of them here (same shape as calendar_event, one entry per event) and leave calendar_event null. For a single event keep using calendar_event. This field does NOT change WHEN something is an event vs a to-do - the routing rules above still decide that ("book a dentist appointment" with no time is STILL a to-do, never an event); it only changes WHERE multiple events go. */ ] | null,
   "target": {
     "title": string,
     "target_id": number | null,

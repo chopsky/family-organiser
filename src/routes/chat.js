@@ -945,9 +945,14 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
           summaryLines.push(`📋 Added ${toAdd.length} task${toAdd.length === 1 ? '' : 's'}: ${toAdd.map(t => t.title).join(', ')}`);
         }
       }
-      if (result.calendar_event) {
+      // A PDF (school letter) often carries several events — classify v2 puts
+      // multiples in calendar_events; a single one stays in calendar_event.
+      const pdfEvents = [
+        ...(result.calendar_event ? [result.calendar_event] : []),
+        ...(Array.isArray(result.calendar_events) ? result.calendar_events.filter(Boolean) : []),
+      ];
+      for (const ev of pdfEvents) {
         try {
-          const ev = result.calendar_event;
           const rawNames = Array.isArray(ev.assigned_to_names) ? ev.assigned_to_names : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
           const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
           const firstAssignee = assigneeIds.length > 0 ? members.find(m => m.id === assigneeIds[0]) : null;

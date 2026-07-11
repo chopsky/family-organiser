@@ -15,7 +15,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [], mealPlan = [], shoppingItems = [], starBalances = [] } = {}) {
   // "Today" needs to be computed in the user's timezone, not UTC, or
   // we drift on either side of midnight (a 23:30 BST message gets
   // tagged "tomorrow" by a UTC-only Railway). Also include the weekday
@@ -111,6 +111,31 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     locationStr = `The family is based in ${userCity}. Give locally relevant suggestions when appropriate.`;
   }
 
+  // Conditional extra context (Phase 3): the caller only populates these when
+  // the message plausibly needs them (keyword gates in the handlers), so most
+  // turns pay zero extra tokens. Ground-truth data so "what's for dinner
+  // Thursday?" / "what do we need to buy?" / "how many stars does Olivia
+  // have?" get real answers instead of "I don't know".
+  const extraSections = [];
+  if (Array.isArray(mealPlan) && mealPlan.length > 0) {
+    const mealLines = mealPlan.slice(0, 25).map((m) => {
+      const day = m.date
+        ? new Date(`${m.date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+        : '';
+      const name = m.meal_name || m.recipes?.name || 'planned meal';
+      return `- ${day}${m.category ? ` (${m.category})` : ''}: ${name}`;
+    });
+    extraSections.push(`THIS WEEK'S MEAL PLAN (answer meal questions from this, don't guess):\n${mealLines.join('\n')}`);
+  }
+  if (Array.isArray(shoppingItems) && shoppingItems.length > 0) {
+    const names = shoppingItems.slice(0, 30).map((i) => i.item || i.name).filter(Boolean);
+    extraSections.push(`CURRENT SHOPPING LIST (${shoppingItems.length} item${shoppingItems.length === 1 ? '' : 's'}${shoppingItems.length > 30 ? ', first 30 shown' : ''}): ${names.join(', ')}`);
+  }
+  if (Array.isArray(starBalances) && starBalances.length > 0) {
+    extraSections.push(`KIDS' STAR BALANCES (chore reward stars): ${starBalances.map((b) => `${b.name}: ${b.balance}`).join(', ')}`);
+  }
+  const extraContextStr = extraSections.length ? `\n${extraSections.join('\n\n')}` : '';
+
   const systemPrompt = CLASSIFICATION_SYSTEM
     .replace(/{{DATE}}/g, today)
     .replace(/{{MEMBERS}}/g, membersStr)
@@ -120,7 +145,8 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{PREFERENCES}}/g, preferencesStr)
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr)
     .replace(/{{TASKS}}/g, tasksStr)
-    .replace(/{{SCHOOL_TERM_DATES}}/g, schoolTermDates || '(none)');
+    .replace(/{{SCHOOL_TERM_DATES}}/g, schoolTermDates || '(none)')
+    .replace(/{{EXTRA_CONTEXT}}/g, extraContextStr);
 
   // Build message array: prior turns (if any) + current user message.
   // History is expected to be [{ role, content }, ...] in chronological order.
@@ -176,7 +202,18 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
       userId,
     });
     try {
-      return parseJSON(text, 'classification');
+      const parsed = parseJSON(text, 'classification');
+      // Under-filled envelope salvage: non-strict tool schemas don't enforce
+      // `required`, and on meta/advice turns the model occasionally answers
+      // in response_message but omits `intent` (seen live 2026-07-11 on the
+      // school-calendars redirect case). An answer with no envelope IS a
+      // chat answer — same philosophy as the prose salvage below.
+      if (parsed && typeof parsed === 'object' && !parsed.intent
+          && typeof parsed.response_message === 'string' && parsed.response_message.trim()) {
+        console.warn('[ai] classify result missing intent but has response_message - defaulting to chat');
+        parsed.intent = 'chat';
+      }
+      return parsed;
     } catch (err) {
       // Prose salvage: despite the JSON-only instruction, the model
       // occasionally answers meta/chat questions ("which AI model are you?")
