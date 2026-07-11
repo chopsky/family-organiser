@@ -114,10 +114,13 @@ describe('handleCalendarQuery', () => {
       { query_start: '2026-12-01', query_end: '2026-12-31' }, household, user, TZ, {},
     );
     expect(res.response).toMatch(/and 5 more/);
-    expect(res.response).toMatch(/\/calendar/); // overflow always links (text is incomplete)
+    // Points at the app by NAME on overflow - never a URL (a housemait.com
+    // link dragged a marketing-site preview card into the WhatsApp reply).
+    expect(res.response).toMatch(/open Housemait/i);
+    expect(res.response).not.toMatch(/https?:\/\//);
   });
 
-  test('appends a calendar deep-link for a week-sized result', async () => {
+  test('no link or app plug for a week-sized result', async () => {
     const week = Array.from({ length: 5 }, (_, i) => ({
       title: `Event ${i}`, start_time: '2026-12-15T09:00:00Z', end_time: '2026-12-15T10:00:00Z', assigned_to_names: [],
     }));
@@ -125,8 +128,9 @@ describe('handleCalendarQuery', () => {
     const res = await handlers.handleCalendarQuery(
       { query_start: '2026-12-01', query_end: '2026-12-31' }, household, user, TZ, {},
     );
-    expect(res.response).toMatch(/see it on your calendar/i);
-    expect(res.response).toMatch(/\/calendar/);
+    expect(res.response).toMatch(/Event 4/);
+    expect(res.response).not.toMatch(/https?:\/\//);
+    expect(res.response).not.toMatch(/open Housemait/i);
   });
 
   test('no deep-link for a small (1-2 event) result', async () => {

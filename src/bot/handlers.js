@@ -1339,18 +1339,12 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
   const intro = result.response_message?.trim() || "Here's what's on:";
   let body = `${intro}\n${lines.join('\n')}`;
 
-  // Deep-link to the visual calendar (#4). This is a BROWSE intent - the user
-  // asked to SEE their schedule - and the app's month/week view genuinely beats
-  // a flat text list, so a tap-through is welcome rather than a nag. On overflow
-  // the text reply is actually INCOMPLETE, so the link solves a real limit.
-  // Skipped for small "what's on today" results (< LINK_THRESHOLD), where the
-  // text is already a complete, glanceable answer.
-  const LINK_THRESHOLD = 4;
-  const calendarUrl = `${(process.env.WEB_URL || 'https://housemait.com').replace(/\/+$/, '')}/calendar`;
+  // No web link here: a housemait.com/calendar URL dragged a marketing-site
+  // preview card into every 4+-event reply and sent app users to a browser
+  // login. Only on overflow (where the text reply is genuinely incomplete)
+  // do we point at the app - by name, never by URL.
   if (events.length > MAX) {
-    body += `\n…and ${events.length - MAX} more — see them all in Housemait → ${calendarUrl}`;
-  } else if (events.length >= LINK_THRESHOLD) {
-    body += `\n\n📅 See it on your calendar → ${calendarUrl}`;
+    body += `\n…and ${events.length - MAX} more — open Housemait to see the full calendar.`;
   }
   return { response: body, actions };
 }
