@@ -605,6 +605,24 @@ module.exports = [
     },
   },
   {
+    name: 'chore grounding: "has Henry done his chores today?" answers from TODAY\'S CHORES',
+    message: 'has Henry done his chores today?',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Henry'],
+      choresToday: [{ name: 'Henry', done: 1, total: 3, outstanding: ['Feed the dog', 'Tidy room'] }],
+    },
+    check: (r) => {
+      const msg = r.response_message || '';
+      // Grounding: the answer must reflect the real status (1 of 3 /
+      // outstanding items), not a generic "I don't know".
+      if (!/1 of 3|two (more|left)|feed the dog|tidy/i.test(msg)) {
+        return `answer isn't grounded in today's chore status: "${msg}"`;
+      }
+      return null;
+    },
+  },
+  {
     name: 'star grounding: "how many stars does Olivia have?" answers from STAR BALANCES',
     message: 'how many stars does Olivia have?',
     ctx: {

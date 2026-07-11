@@ -41,6 +41,7 @@ async function runCase(c) {
       mealPlan: c.ctx.mealPlan || [],
       shoppingItems: c.ctx.shoppingItems || [],
       starBalances: c.ctx.starBalances || [],
+      choresToday: c.ctx.choresToday || [],
       timezone: c.ctx.timezone || 'Europe/London',
       householdId: null,
       userId: null,

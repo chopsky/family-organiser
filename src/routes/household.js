@@ -166,6 +166,46 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
 });
 
 /**
+ * GET /api/household/preferences
+ * The assistant's auto-learned family preferences (allergies, dietary rules,
+ * likes/dislikes, schedule anchors — captured from chat/WhatsApp by the
+ * classifier). Surfaced so families can REVIEW what the bot has learned and
+ * delete wrong inferences. member_name is resolved server-side.
+ */
+router.get('/preferences', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const [prefs, members] = await Promise.all([
+      db.getHouseholdPreferences(req.householdId),
+      db.getHouseholdMembers(req.householdId),
+    ]);
+    const preferences = (prefs || []).map((p) => ({
+      ...p,
+      member_name: p.member_id ? (members.find((m) => m.id === p.member_id)?.name || null) : null,
+    }));
+    return res.json({ preferences });
+  } catch (err) {
+    console.error('GET /api/household/preferences error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/household/preferences/:id
+ * Remove a learned preference. Any adult member can correct a wrong
+ * inference (everyday correction, not admin config) — household-scoped so a
+ * member can only ever delete their own household's rows.
+ */
+router.delete('/preferences/:id', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    await db.deleteHouseholdPreference(req.params.id, req.householdId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/household/preferences error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * PATCH /api/household/profile
  * Update a user's profile. Admins can update any member via optional `user_id` field.
  * Regular members can only update their own profile.

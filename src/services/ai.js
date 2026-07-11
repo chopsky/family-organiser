@@ -15,7 +15,7 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [], mealPlan = [], shoppingItems = [], starBalances = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [], mealPlan = [], shoppingItems = [], starBalances = [], choresToday = [] } = {}) {
   // "Today" needs to be computed in the user's timezone, not UTC, or
   // we drift on either side of midnight (a 23:30 BST message gets
   // tagged "tomorrow" by a UTC-only Railway). Also include the weekday
@@ -133,6 +133,13 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
   }
   if (Array.isArray(starBalances) && starBalances.length > 0) {
     extraSections.push(`KIDS' STAR BALANCES (chore reward stars): ${starBalances.map((b) => `${b.name}: ${b.balance}`).join(', ')}`);
+  }
+  if (Array.isArray(choresToday) && choresToday.length > 0) {
+    const lines = choresToday.map((c) => {
+      const left = c.outstanding.length ? ` — still to do: ${c.outstanding.slice(0, 5).join(', ')}` : ' — all done! 🎉';
+      return `- ${c.name}: ${c.done} of ${c.total} done${left}`;
+    });
+    extraSections.push(`TODAY'S CHORES & ROUTINES (answer "has X done their chores?" from this):\n${lines.join('\n')}`);
   }
   const extraContextStr = extraSections.length ? `\n${extraSections.join('\n\n')}` : '';
 

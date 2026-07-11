@@ -23,6 +23,7 @@ const { extractTermDatesPreview, academicYearsForCountry } = require('../service
 const { formatRecipeConstraints, mergeHouseholdAllergies } = require('../services/preferences-format');
 const { routeReadIntent } = require('../services/intent-router');
 const { messageMentionsMeals, messageMentionsShopping, messageMentionsStars } = require('../utils/context-relevance');
+const { buildDayView } = require('../services/chores');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -1780,10 +1781,15 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // Each fetch soft-fails to nothing.
   const todayYmdCtx = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
   const weekEndCtx = (() => { const d = new Date(`${todayYmdCtx}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 7); return d.toISOString().slice(0, 10); })();
-  const [mealPlan, shoppingContext, starBalancesRaw] = await Promise.all([
+  const wantsStars = messageMentionsStars(text);
+  const [mealPlan, shoppingContext, starBalancesRaw, choreDefs, choreCompletions] = await Promise.all([
     messageMentionsMeals(text) ? db.getMealPlanForWeek(household.id, todayYmdCtx, weekEndCtx).catch(() => []) : [],
     messageMentionsShopping(text) ? db.getShoppingList(household.id).catch(() => []) : [],
-    messageMentionsStars(text) ? db.getStarBalances(household.id).catch(() => null) : null,
+    wantsStars ? db.getStarBalances(household.id).catch(() => null) : null,
+    // The same gate also answers "has Henry done his chores today?" — the
+    // stars/chores/rewards vocabulary overlaps, so one fetch pair serves both.
+    wantsStars ? db.getChoreDefinitions(household.id).catch(() => []) : [],
+    wantsStars ? db.getChoreCompletionsForDate(household.id, todayYmdCtx).catch(() => []) : [],
   ]);
   // Resolve star balances to names — the model should see "Olivia: 89".
   const starBalances = starBalancesRaw
@@ -1792,9 +1798,31 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         balance,
       })).filter((b) => b.name)
     : [];
+  // Today's chore status per member: done/total + what's still outstanding.
+  let choresToday = [];
+  if (wantsStars && Array.isArray(choreDefs) && choreDefs.length) {
+    try {
+      const instances = buildDayView(choreDefs, choreCompletions || [], todayYmdCtx);
+      const byMember = {};
+      for (const inst of instances) {
+        if (inst.anyone) continue; // shared chores have no per-member state
+        for (const mid of inst.assignee_ids || []) {
+          const name = household.members.find((m) => m.id === mid)?.name;
+          if (!name) continue;
+          if (!byMember[name]) byMember[name] = { name, done: 0, total: 0, outstanding: [] };
+          byMember[name].total++;
+          if (inst.done?.[mid]) byMember[name].done++;
+          else byMember[name].outstanding.push(inst.slot ? `${inst.title} (${inst.slot})` : inst.title);
+        }
+      }
+      choresToday = Object.values(byMember);
+    } catch (err) {
+      console.warn('[handlers] chores-today context failed:', err.message);
+    }
+  }
 
   console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${openTasks.length} open tasks, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences, mealPlan, shoppingItems: shoppingContext, starBalances });
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences, mealPlan, shoppingItems: shoppingContext, starBalances, choresToday });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 

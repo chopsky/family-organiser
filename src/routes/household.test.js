@@ -180,3 +180,28 @@ describe('DELETE /api/household/avatar (household photo)', () => {
     expect(removed).not.toContain('h1/mason.png');
   });
 });
+
+describe('learned assistant preferences (review + correct)', () => {
+  it('GET /preferences resolves member names and returns the list', async () => {
+    db.getHouseholdPreferences.mockResolvedValue([
+      { id: 'p1', key: 'allergy', value: 'nuts', member_id: 'lynn' },
+      { id: 'p2', key: 'schedule', value: 'Tuesdays are soccer', member_id: null },
+    ]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'lynn', name: 'Lynn' }]);
+
+    const res = await request(makeApp()).get('/api/household/preferences');
+    expect(res.status).toBe(200);
+    expect(res.body.preferences).toHaveLength(2);
+    expect(res.body.preferences[0].member_name).toBe('Lynn');
+    expect(res.body.preferences[1].member_name).toBeNull();
+  });
+
+  it('DELETE /preferences/:id scopes the delete to the caller household', async () => {
+    db.deleteHouseholdPreference.mockResolvedValue(true);
+    const res = await request(makeApp()).delete('/api/household/preferences/p1');
+    expect(res.status).toBe(200);
+    // householdId comes from the auth middleware (h1), never the client —
+    // a member can only ever delete their own household's rows.
+    expect(db.deleteHouseholdPreference).toHaveBeenCalledWith('p1', 'h1');
+  });
+});

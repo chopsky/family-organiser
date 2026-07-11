@@ -76,6 +76,71 @@ function roleMeta(m) {
 // on hover. The role pill carries a text label (not colour alone) for a11y.
 // WhatsApp brand glyph (green), shown next to a member's name when their
 // number is linked. Path from the supplied whatsapp-color SVG.
+// "What your assistant has learned" — the household_preferences rows the AI
+// captures from chat/WhatsApp ("Lynn is allergic to nuts", "Tuesdays are
+// soccer"). Families could never SEE these before, so a wrong inference was
+// invisible and uncorrectable. Self-contained: fetches on mount, deletes with
+// optimistic removal. Renders nothing while loading or when nothing has been
+// learned yet (no empty-state card cluttering Family for new households).
+const PREF_LABELS = {
+  allergy: { icon: '🚫', label: 'Allergy' },
+  dietary: { icon: '🥗', label: 'Dietary' },
+  dislike: { icon: '🙅', label: 'Dislike' },
+  like: { icon: '❤️', label: 'Like' },
+  schedule: { icon: '🗓', label: 'Schedule' },
+  preference: { icon: '💡', label: 'Note' },
+};
+function LearnedPreferencesCard({ cardShadow }) {
+  const [prefs, setPrefs] = useState(null); // null = loading
+  useEffect(() => {
+    api.get('/household/preferences')
+      .then((r) => setPrefs(Array.isArray(r.data?.preferences) ? r.data.preferences : []))
+      .catch(() => setPrefs([]));
+  }, []);
+
+  async function removePref(id) {
+    const prev = prefs;
+    setPrefs(prefs.filter((p) => p.id !== id));
+    try {
+      await api.delete(`/household/preferences/${id}`);
+    } catch {
+      setPrefs(prev); // restore on failure
+    }
+  }
+
+  if (!prefs || prefs.length === 0) return null;
+  return (
+    <div className="bg-white rounded-[18px] border border-light-grey p-6 md:p-7" style={{ boxShadow: cardShadow }}>
+      <h2 className="text-lg font-semibold text-charcoal">What your assistant has learned</h2>
+      <p className="text-sm text-[var(--ink-2)] mt-1.5 max-w-[620px] leading-relaxed">
+        Things the AI has picked up from your chats — it factors these into meals, reminders and suggestions. Remove anything it got wrong.
+      </p>
+      <ul className="mt-5 space-y-2">
+        {prefs.map((p) => {
+          const meta = PREF_LABELS[p.key] || PREF_LABELS.preference;
+          return (
+            <li key={p.id} className="flex items-center gap-3 rounded-xl bg-cream px-4 py-2.5">
+              <span aria-hidden="true">{meta.icon}</span>
+              <span className="text-sm text-charcoal min-w-0 flex-1">
+                <span className="font-semibold">{p.member_name || 'Everyone'}</span>
+                <span className="text-warm-grey"> · {meta.label} · </span>
+                {p.value}
+              </span>
+              <button
+                onClick={() => removePref(p.id)}
+                aria-label={`Remove learned ${meta.label.toLowerCase()}: ${p.value}`}
+                className="text-warm-grey hover:text-coral shrink-0 p-1 transition-colors"
+              >
+                <IconTrash className="h-4 w-4" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function WhatsAppIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WhatsApp connected">
@@ -2423,6 +2488,10 @@ export default function FamilySetup() {
           {savingAllergies ? 'Saving…' : 'Save'}
         </button>
       </div>
+
+      {/* What the assistant has learned from chat - review + correct. Hidden
+          until at least one preference exists. */}
+      <LearnedPreferencesCard cardShadow={CARD_SHADOW} />
 
       {/* Add Dependent Modal */}
       {/* Household edit modal - name + address (with Photon autocomplete)
