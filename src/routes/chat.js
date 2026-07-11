@@ -3,7 +3,7 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
-const { CHAT_ASSISTANT_SYSTEM } = require('../services/prompts');
+const { CHAT_ASSISTANT_SYSTEM, CHAT_ASSISTANT_CONTEXT } = require('../services/prompts');
 const { formatPreferenceLines } = require('../services/preferences-format');
 const { scanImage, scanReceipt, matchReceiptToList, classify } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
@@ -261,7 +261,10 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     })),
   );
 
-  let prompt = CHAT_ASSISTANT_SYSTEM
+  // Two-block system prompt (same shape as classify): CHAT_ASSISTANT_SYSTEM
+  // is placeholder-free static rules served from the provider prompt cache;
+  // only this FAMILY DATA block varies per household/message.
+  let context = CHAT_ASSISTANT_CONTEXT
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
     .replace(/{{DATE}}/g, today)
     .replace(/{{SENDER}}/g, currentUser?.name || 'the user')
@@ -278,10 +281,13 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     .replace(/{{ACTIVITIES}}/g, activitiesStr);
 
   if (allergiesStr) {
-    prompt += `\n\nHOUSEHOLD ALLERGIES & DIETARY REQUIREMENTS: ${allergiesStr}\nALWAYS avoid these allergens/restrictions when suggesting recipes, meals, or food-related advice.`;
+    context += `\n\nHOUSEHOLD ALLERGIES & DIETARY REQUIREMENTS: ${allergiesStr}\nALWAYS avoid these allergens/restrictions when suggesting recipes, meals, or food-related advice.`;
   }
 
-  return prompt;
+  return [
+    { text: CHAT_ASSISTANT_SYSTEM, cache: true },
+    { text: context },
+  ];
 }
 
 /**

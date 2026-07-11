@@ -88,6 +88,14 @@ describe('lockstep with the prose prompt', () => {
       expect(CLASSIFICATION_CONTEXT).toContain(ph);
     }
   });
+
+  test('CHAT_ASSISTANT_SYSTEM stays placeholder-free (same cache invariant)', () => {
+    const { CHAT_ASSISTANT_SYSTEM, CHAT_ASSISTANT_CONTEXT } = require('./prompts');
+    expect(CHAT_ASSISTANT_SYSTEM).not.toMatch(/{{[A-Z_]+}}/);
+    for (const ph of ['{{HOUSEHOLD_NAME}}', '{{DATE}}', '{{TIMEZONE}}', '{{SENDER}}', '{{MEMBERS}}', '{{SHOPPING_LIST}}', '{{TASKS}}', '{{EVENTS}}', '{{SCHOOLS}}', '{{ACTIVITIES}}', '{{NOTES}}', '{{PREFERENCES}}', '{{RECIPES}}']) {
+      expect(CHAT_ASSISTANT_CONTEXT).toContain(ph);
+    }
+  });
 });
 
 describe('provider adapters', () => {

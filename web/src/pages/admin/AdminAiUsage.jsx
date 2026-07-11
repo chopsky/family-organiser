@@ -133,6 +133,49 @@ export default function AdminAiUsage() {
         ))}
       </div>
 
+      {/* Token usage - recent-sample counts per provider. Deliberately no £
+          figure: input_tokens includes prompt-cache reads (billed at ~10% of
+          list price), so tokens × list price would overstate real spend ~7x.
+          Cache hit/miss detail lives in the Railway logs ([ai-usage] lines). */}
+      {stats.tokens?.sampleCalls > 0 && (
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="font-display text-lg font-medium text-charcoal">Token usage</h2>
+            <span className="text-xs text-warm-grey">(most recent {stats.tokens.sampleCalls} logged calls)</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{(stats.tokens.inputTotal ?? 0).toLocaleString()}</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">Input tokens (incl. cached reads)</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{(stats.tokens.outputTotal ?? 0).toLocaleString()}</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">Output tokens</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{(stats.tokens.avgInputPerCall ?? 0).toLocaleString()}</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">Avg input / call</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-charcoal">{(stats.tokens.avgOutputPerCall ?? 0).toLocaleString()}</p>
+              <p className="text-xs text-warm-grey font-medium mt-0.5">Avg output / call</p>
+            </div>
+          </div>
+          {Object.keys(stats.tokens.byProvider || {}).length > 0 && (
+            <div className="mt-4 pt-4 border-t border-light-grey space-y-1.5">
+              {Object.entries(stats.tokens.byProvider).sort((a, b) => b[1].calls - a[1].calls).map(([provider, t]) => (
+                <div key={provider} className="text-xs bg-cream rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span className="font-mono text-plum shrink-0">{provider}</span>
+                  <span className="text-warm-grey">{t.calls} calls</span>
+                  <span className="text-charcoal">{t.input.toLocaleString()} in</span>
+                  <span className="text-charcoal">{t.output.toLocaleString()} out</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* AI provider self-test - triage "Gemini is being skipped" alerts.
           ai-runtime reports whether the LIVE process sees GEMINI_API_KEY;
           ai-selftest makes a real call and reports which provider answered. */}

@@ -222,7 +222,10 @@ describe('POST /api/chat activity actions', () => {
     callWithFailover.mockResolvedValue({ text: 'Hello!', provider: 'claude' });
 
     await request(app()).post('/api/chat').send({ message: 'hi' });
-    const sys = callWithFailover.mock.calls[0][0].system;
+    const sysRaw = callWithFailover.mock.calls[0][0].system;
+    // system is now [{text, cache}] blocks (static rules + FAMILY DATA) —
+    // flatten for the content assertions.
+    const sys = Array.isArray(sysRaw) ? sysRaw.map((b) => b.text).join('\n\n') : sysRaw;
     expect(sys).toContain('Weekly Extracurricular Activities');
     expect(sys).toContain('Logan - Wraparound Care: Mondays 15:30');
     expect(sys).toContain('pickup: Grant');

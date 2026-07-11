@@ -5587,7 +5587,7 @@ async function setUserPlatformAdmin(userId, isPlatformAdmin, db = supabase) {
 async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  const [totalRes, byProviderRes, byFeatureRes, failoverRes, avgLatencyRes, errorRes] = await Promise.all([
+  const [totalRes, byProviderRes, byFeatureRes, failoverRes, avgLatencyRes, errorRes, tokensRes] = await Promise.all([
     db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since),
     db.from('ai_usage_log').select('provider').gte('created_at', since),
     db.from('ai_usage_log').select('feature').gte('created_at', since),
@@ -5599,6 +5599,13 @@ async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
     db.from('ai_usage_log').select('latency_ms').gte('created_at', since).not('latency_ms', 'is', null)
       .order('created_at', { ascending: false }).limit(1000),
     db.from('ai_usage_log').select('id', { count: 'exact', head: true }).gte('created_at', since).not('error', 'is', null),
+    // Token sample: same recent-1000 discipline as latency. input_tokens is
+    // the TOTAL prompt size incl. cache reads (which bill at ~10%), so no
+    // £-cost is derived here — a list-price × tokens figure would overstate
+    // spend ~7x now that the classify prompt is cached.
+    db.from('ai_usage_log').select('provider, input_tokens, output_tokens').gte('created_at', since)
+      .not('input_tokens', 'is', null)
+      .order('created_at', { ascending: false }).limit(1000),
   ]);
 
   // Count by provider
@@ -5618,6 +5625,30 @@ async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
   const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
   const p95Latency = latencies.length > 0 ? latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * 0.95))] : 0;
 
+  // Tokens over the recent sample: totals + per-call averages, split by
+  // provider so a Gemini-failover day is visible at a glance.
+  const tokenRows = tokensRes.data || [];
+  const tokens = {
+    sampleCalls: tokenRows.length,
+    inputTotal: 0,
+    outputTotal: 0,
+    avgInputPerCall: 0,
+    avgOutputPerCall: 0,
+    byProvider: {},
+  };
+  for (const r of tokenRows) {
+    tokens.inputTotal += r.input_tokens || 0;
+    tokens.outputTotal += r.output_tokens || 0;
+    const p = tokens.byProvider[r.provider] || (tokens.byProvider[r.provider] = { calls: 0, input: 0, output: 0 });
+    p.calls += 1;
+    p.input += r.input_tokens || 0;
+    p.output += r.output_tokens || 0;
+  }
+  if (tokenRows.length > 0) {
+    tokens.avgInputPerCall = Math.round(tokens.inputTotal / tokenRows.length);
+    tokens.avgOutputPerCall = Math.round(tokens.outputTotal / tokenRows.length);
+  }
+
   return {
     totalCalls: totalRes.count || 0,
     failoverCalls: failoverRes.count || 0,
@@ -5631,6 +5662,7 @@ async function getAiUsageStats({ days = 30 } = {}, db = supabase) {
     p95LatencyMs: p95Latency,
     byProvider,
     byFeature,
+    tokens,
   };
 }
 
