@@ -24,9 +24,13 @@ const cases = require('./router-cases');
   for (const c of cases) {
     const routed = await routeReadIntent(c.message, { timezone: 'Europe/London' });
     const got = routed ? routed.route : null;
-    if (got === c.expect) {
+    const checkErr = got === c.expect && c.check && routed ? c.check(routed) : null;
+    if (got === c.expect && !checkErr) {
       pass++;
       console.log(`  ✓ "${c.message}" → ${got === null ? 'fall-through' : got}`);
+    } else if (checkErr) {
+      failures.push(c);
+      console.log(`  ✗ "${c.message}" → ${got} but ${checkErr}`);
     } else {
       failures.push(c);
       console.log(`  ✗ "${c.message}" → expected ${c.expect === null ? 'fall-through' : c.expect}, got ${got === null ? 'fall-through' : got}`);

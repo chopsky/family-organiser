@@ -31,6 +31,10 @@ const ROUTER_SCHEMA = {
     // router can resolve confidently; the handler defaults to today+14d.
     query_start: { type: 'string' },
     query_end: { type: 'string' },
+    // Only for query_calendar: the specific event/activity the user asked
+    // about ("what time is Mason's tennis?" → "Mason's tennis"). Without
+    // this the fast-path dumped the whole day instead of answering.
+    query_topic: { type: 'string' },
   },
   required: ['route'],
   additionalProperties: false,
@@ -40,7 +44,7 @@ const ROUTER_SYSTEM = `You route messages for a family-organiser bot. Decide if 
 
 - "query_tasks": view the to-do/task list ("what's on my to do list?", "show tasks")
 - "query_list": view the shopping list ("what's on the shopping list?", "what do we need to buy?")
-- "query_calendar": view calendar/schedule ("what's on this week?", "when is the dentist?", "do I have anything tomorrow?"). If the message names a timeframe, also set query_start and query_end (YYYY-MM-DD, resolved against today's date given below).
+- "query_calendar": view calendar/schedule ("what's on this week?", "when is the dentist?", "do I have anything tomorrow?"). If the message names a timeframe, also set query_start and query_end (YYYY-MM-DD, resolved against today's date given below). If the message asks about ONE specific named event or activity ("when is the dentist?", "what time is Mason's tennis today?"), ALSO set query_topic to the thing asked about (e.g. "dentist", "Mason's tennis") - never leave query_topic empty on a question about a specific thing.
 - "subscription_list": view tracked subscriptions ("what subscriptions do we have?")
 - "other": EVERYTHING else.
 

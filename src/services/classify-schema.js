@@ -185,6 +185,9 @@ const CLASSIFY_SCHEMA = obj({
   web_search_query: opt(str),
   query_start: opt(str),
   query_end: opt(str),
+  // query_calendar only: the specific event/activity asked about ("tennis"),
+  // so the handler can filter to it and answer honestly on no match.
+  query_topic: opt(str),
 });
 
 // ── per-provider adapters ────────────────────────────────────────────────────

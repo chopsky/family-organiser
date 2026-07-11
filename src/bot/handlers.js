@@ -1298,8 +1298,31 @@ async function graduateAppointmentTodo(eventTitle, household, actions) {
  * QUERIES must not rely on it - they'd miss far-future events. The classifier
  * supplies query_start / query_end (YYYY-MM-DD); we default to the next 14 days.
  */
+/**
+ * Does an event/activity title answer a question about `topic`?
+ * Token-level so "masons tennis" matches "Mason - Tennis" (possessive/plural
+ * trailing-s stripped, word order and punctuation ignored). True when every
+ * topic word is found in the title, or every title word is found in the
+ * topic ("dentist appointment" still matches a bare "Dentist").
+ */
+function topicMatchesTitle(topic, title) {
+  const tokens = (s) => String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .map((w) => w.replace(/'?s$/, ''))
+    .filter((w) => w.length >= 2 && !['the', 'a', 'an', 'my', 'our', 'his', 'her', 'their', 'for', 'of', 'at', 'on', 'in', 'to'].includes(w));
+  const tTopic = tokens(topic);
+  const tTitle = tokens(title);
+  if (!tTopic.length || !tTitle.length) return false;
+  const hits = (as, bs) => as.every((a) => bs.some((b) =>
+    a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)))));
+  return hits(tTopic, tTitle) || hits(tTitle, tTopic);
+}
+
 async function handleCalendarQuery(result, household, user, userTz, actions) {
   const { formatEventWhen } = require('../utils/event-when');
+  const { expandActivityOccurrences } = require('../services/activity-occurrences');
   const isYmd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz }); // YYYY-MM-DD
@@ -1322,6 +1345,49 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
   } catch (err) {
     console.error('[handlers] calendar query failed:', err.message);
     return { response: "I couldn't pull up your calendar just now. Please try again in a moment.", actions };
+  }
+
+  // Weekly extracurricular activities ARE part of the family's schedule
+  // ("what time is Mason's tennis?") but live in child_weekly_schedule, not
+  // calendar_events - without this merge the bot can never see them. Best-
+  // effort: an activities hiccup must not break the calendar answer.
+  let activityRows = [];
+  try {
+    const [acts, members] = await Promise.all([
+      db.getHouseholdActivities(household.id),
+      db.getHouseholdMembers(household.id),
+    ]);
+    activityRows = expandActivityOccurrences(acts, members, start, end, userTz);
+  } catch (err) {
+    console.warn('[handlers] calendar query: activities merge skipped:', err.message);
+  }
+  // Browse lists respect "hidden from adult calendar"; a direct question
+  // about a named activity searches ALL of them (asking about it IS consent).
+  events = events
+    .concat(activityRows.filter((a) => a.show_on_calendar))
+    .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+
+  // Named-thing question ("what time is Mason's tennis today?"): the router/
+  // classifier passes the subject through as query_topic. Filter to it and be
+  // HONEST when nothing matches - a generic day-dump is a non-answer.
+  const topic = typeof result.query_topic === 'string' ? result.query_topic.trim().slice(0, 80) : '';
+  if (topic) {
+    const searchable = events.concat(activityRows.filter((a) => !a.show_on_calendar));
+    const matches = searchable.filter((ev) => topicMatchesTitle(topic, ev.title));
+    if (matches.length > 0) {
+      const lines = matches.slice(0, 10).map((ev) => {
+        const when = formatEventWhen(ev, userTz);
+        return `• ${when ? `${when} — ` : ''}${ev.title}`;
+      });
+      const intro = result.response_message?.trim() || `Here's what I found for "${topic}":`;
+      return { response: `${intro}\n${lines.join('\n')}`, actions };
+    }
+    let body = `I can't see anything matching "${topic}" on the calendar for that period.`;
+    if (events.length > 0) {
+      const lines = events.slice(0, 10).map((ev) => `• ${formatEventWhen(ev, userTz) || ''} — ${ev.title}`);
+      body += `\n\nHere's what is on:\n${lines.join('\n')}`;
+    }
+    return { response: body, actions };
   }
 
   if (!events.length) {
@@ -1705,7 +1771,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       }
       if (routed.route === 'query_calendar') {
         return await handleCalendarQuery(
-          { query_start: routed.query_start, query_end: routed.query_end },
+          { query_start: routed.query_start, query_end: routed.query_end, query_topic: routed.query_topic },
           household, user, userTz, actions
         );
       }

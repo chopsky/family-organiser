@@ -470,6 +470,20 @@ module.exports = [
     },
   },
   {
+    // Real failure 2026-07-11: "What time is masons tennis today" got a
+    // whole-day dump because the topic was discarded at routing. The
+    // classify path must carry the asked-about thing in query_topic so the
+    // handler can filter to it (and admit it honestly when nothing matches).
+    name: 'read: "What time is masons tennis today" carries query_topic',
+    message: 'What time is masons tennis today',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Mason'] },
+    check: (r) => {
+      if (r.intent !== 'query_calendar') return `expected query_calendar, got ${r.intent}`;
+      if (!/tennis/i.test(r.query_topic || '')) return `query_topic missing tennis: ${JSON.stringify({ query_topic: r.query_topic })}`;
+      return null;
+    },
+  },
+  {
     name: 'read: "what subscriptions do we have?" is subscription_list',
     message: 'what subscriptions do we have?',
     ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'] },

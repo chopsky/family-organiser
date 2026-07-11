@@ -6,6 +6,8 @@
  */
 jest.mock('../db/queries', () => ({
   getCalendarEvents: jest.fn(),
+  getHouseholdActivities: jest.fn(() => Promise.resolve([])),
+  getHouseholdMembers: jest.fn(() => Promise.resolve([])),
   getHouseholdSchools: jest.fn(() => Promise.resolve([])),
   addSchoolTermDates: jest.fn(() => Promise.resolve([])),
   deleteTermDatesBySchoolAndAcademicYear: jest.fn(() => Promise.resolve()),
@@ -118,6 +120,62 @@ describe('handleCalendarQuery', () => {
     // link dragged a marketing-site preview card into the WhatsApp reply).
     expect(res.response).toMatch(/open Housemait/i);
     expect(res.response).not.toMatch(/https?:\/\//);
+  });
+
+  test('query_topic filters to the asked-about event only', async () => {
+    db.getCalendarEvents.mockResolvedValue([
+      { title: 'See Jess dog', start_time: '2026-12-15T09:00:00Z', end_time: '2026-12-15T10:00:00Z', assigned_to_names: [] },
+      { title: 'Collect cupcakes for party', start_time: '2026-12-15T11:00:00Z', end_time: '2026-12-15T12:00:00Z', assigned_to_names: [] },
+      { title: 'Tennis lesson', start_time: '2026-12-15T16:00:00Z', end_time: '2026-12-15T17:00:00Z', assigned_to_names: [] },
+    ]);
+    const res = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-15', query_end: '2026-12-15', query_topic: 'tennis' }, household, user, TZ, {},
+    );
+    expect(res.response).toMatch(/Tennis lesson/);
+    expect(res.response).not.toMatch(/cupcakes|Jess dog/);
+  });
+
+  test('query_topic with no match admits it and shows what IS on', async () => {
+    db.getCalendarEvents.mockResolvedValue([
+      { title: 'See Jess dog', start_time: '2026-12-15T09:00:00Z', end_time: '2026-12-15T10:00:00Z', assigned_to_names: [] },
+    ]);
+    const res = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-15', query_end: '2026-12-15', query_topic: 'tennis' }, household, user, TZ, {},
+    );
+    expect(res.response).toMatch(/can't see anything matching "tennis"/i);
+    expect(res.response).toMatch(/Jess dog/); // still helpful: shows the day
+  });
+
+  test('weekly activities are merged into calendar answers and findable by topic', async () => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    // 2026-12-16 is a Wednesday → day_of_week 2 (Monday=0 convention)
+    db.getHouseholdActivities.mockResolvedValue([
+      { id: 'act-1', child_id: 'kid1', activity: 'Tennis', day_of_week: 2, time_start: '16:00', time_end: '17:00' },
+    ]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Mason' }]);
+    const res = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-14', query_end: '2026-12-20', query_topic: "masons tennis" }, household, user, TZ, {},
+    );
+    expect(res.response).toMatch(/Mason - Tennis/);
+    expect(res.response).toMatch(/16:00/);
+  });
+
+  test('activities hidden from the adult calendar stay out of browse lists but answer direct questions', async () => {
+    db.getCalendarEvents.mockResolvedValue([
+      { title: 'Dentist', start_time: '2026-12-16T09:00:00Z', end_time: '2026-12-16T09:30:00Z', assigned_to_names: [] },
+    ]);
+    db.getHouseholdActivities.mockResolvedValue([
+      { id: 'act-1', child_id: 'kid1', activity: 'Tennis', day_of_week: 2, time_start: '16:00', time_end: '17:00', show_on_calendar: false },
+    ]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'kid1', name: 'Mason' }]);
+    const browse = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-14', query_end: '2026-12-20' }, household, user, TZ, {},
+    );
+    expect(browse.response).not.toMatch(/Tennis/);
+    const direct = await handlers.handleCalendarQuery(
+      { query_start: '2026-12-14', query_end: '2026-12-20', query_topic: 'tennis' }, household, user, TZ, {},
+    );
+    expect(direct.response).toMatch(/Mason - Tennis/);
   });
 
   test('no link or app plug for a week-sized result', async () => {
