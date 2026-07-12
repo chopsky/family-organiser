@@ -105,20 +105,20 @@ const moreTiles = [
     fg: '#5F8F63',
   },
   {
-    to: '/settings',
-    label: 'Settings',
-    sub: 'Account & preferences',
-    Icon: IconSettings,
-    bg: '#F1EEE9',
-    fg: '#6B6774',
-  },
-  {
     to: '/help',
     label: 'Help & Support',
     sub: 'Guides & contact us',
     Icon: IconHelp,
     bg: '#FBE7E7',
     fg: '#D25454',
+  },
+  {
+    to: '/settings',
+    label: 'Settings',
+    sub: 'Account & preferences',
+    Icon: IconSettings,
+    bg: '#F1EEE9',
+    fg: '#6B6774',
   },
 ];
 
