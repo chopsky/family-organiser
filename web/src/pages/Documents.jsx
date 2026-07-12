@@ -75,7 +75,10 @@ export default function Documents() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState(null);
   const [renamingDoc, setRenamingDoc] = useState(null);
-  const [movingDoc, setMovingDoc] = useState(null);
+  const [movingDocs, setMovingDocs] = useState(null); // array of docs (1 = row menu, N = bulk)
+  // Multi-select: checkboxes on rows + a floating Move/Delete bar.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [previewDoc, setPreviewDoc] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [showNewNote, setShowNewNote] = useState(false);
@@ -187,6 +190,26 @@ export default function Documents() {
     }
   }, [fetchData, atRoot, rootTab, fetchAllFiles, search]);
 
+  // Leaving the current list (folder change, tab flip, search on/off) drops
+  // the selection - stale ids from an invisible list must never be acted on.
+  useEffect(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, [currentFolder, rootTab, searching]);
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
   // ─── Navigation ─────────────────────────────────────────────────────────
 
   function navigateToFolder(folder) {
@@ -280,15 +303,35 @@ export default function Documents() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  async function handleMoveDocument(docId, folderId) {
-    try {
-      await api.patch(`/documents/${docId}`, { folder_id: folderId });
-      setMovingDoc(null);
-      refresh();
-    } catch (err) {
-      setMovingDoc(null);
-      setError(err.response?.data?.error || 'Failed to move document');
+  async function handleMoveDocuments(docIds, folderId) {
+    const results = await Promise.allSettled(
+      docIds.map((id) => api.patch(`/documents/${id}`, { folder_id: folderId })),
+    );
+    const failed = results.filter((r) => r.status === 'rejected');
+    setMovingDocs(null);
+    exitSelectMode();
+    if (failed.length) {
+      setError(failed.length === docIds.length
+        ? (failed[0].reason?.response?.data?.error || 'Failed to move')
+        : `Moved ${docIds.length - failed.length}, but ${failed.length} failed`);
     }
+    refresh();
+  }
+
+  async function handleDeleteDocuments(docIds) {
+    const ok = await confirmDestructive({
+      title: `Delete ${docIds.length} item${docIds.length === 1 ? '' : 's'}?`,
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    const results = await Promise.allSettled(
+      docIds.map((id) => api.delete(`/documents/${id}`)),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    exitSelectMode();
+    if (failed) setError(`Deleted ${docIds.length - failed}, but ${failed} failed`);
+    refresh();
   }
 
   async function handleDownload(doc) {
@@ -456,10 +499,15 @@ export default function Documents() {
 
       {searching ? (
         <>
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey mb-3.5">
-            {searchResults.length === 0
-              ? 'No matches'
-              : `${searchTotal} match${searchTotal === 1 ? '' : 'es'}${searchTotal > searchResults.length ? ` · showing ${searchResults.length}` : ''}`}
+          <div className="flex items-center justify-between mb-3.5">
+            <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey">
+              {searchResults.length === 0
+                ? 'No matches'
+                : `${searchTotal} match${searchTotal === 1 ? '' : 'es'}${searchTotal > searchResults.length ? ` · showing ${searchResults.length}` : ''}`}
+            </div>
+            {searchResults.length > 0 && (
+              <SelectToggle active={selectMode} onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))} />
+            )}
           </div>
           {searchResults.length === 0 ? (
             <div className="text-center py-14">
@@ -475,10 +523,13 @@ export default function Documents() {
                   showFolder
                   isFirst={i === 0}
                   isLast={i === searchResults.length - 1}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(doc.id)}
+                  onToggleSelect={() => toggleSelected(doc.id)}
                   onPreview={() => handlePreview(doc)}
                   onDownload={() => handleDownload(doc)}
                   onRename={() => setRenamingDoc(doc)}
-                  onMove={() => setMovingDoc(doc)}
+                  onMove={() => setMovingDocs([doc])}
                   onDelete={() => handleDeleteDocument(doc.id)}
                   onOpenNote={() => setEditingNote(doc)}
                 />
@@ -549,6 +600,10 @@ export default function Documents() {
                 ) : (
                   <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey">Files</div>
                 )}
+                <div className="flex items-center gap-2">
+                {list.length > 0 && (
+                  <SelectToggle active={selectMode} onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))} />
+                )}
                 {showAll && (
                   <select
                     value={sort}
@@ -561,6 +616,7 @@ export default function Documents() {
                     <option value="largest">Largest first</option>
                   </select>
                 )}
+                </div>
               </div>
               {list.length === 0 ? (
                 <p className="text-sm text-warm-grey py-4">
@@ -578,10 +634,13 @@ export default function Documents() {
                     showFolder={atRoot}
                     isFirst={i === 0}
                     isLast={i === list.length - 1}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(doc.id)}
+                    onToggleSelect={() => toggleSelected(doc.id)}
                     onPreview={() => handlePreview(doc)}
                     onDownload={() => handleDownload(doc)}
                     onRename={() => setRenamingDoc(doc)}
-                    onMove={() => setMovingDoc(doc)}
+                    onMove={() => setMovingDocs([doc])}
                     onDelete={() => handleDeleteDocument(doc.id)}
                     onOpenNote={() => setEditingNote(doc)}
                   />
@@ -602,6 +661,33 @@ export default function Documents() {
         </>
       )}
 
+      {selectMode && (() => {
+        const visibleDocs = searching ? searchResults : (atRoot && rootTab === 'all' ? allFiles : files);
+        const selectedDocs = (visibleDocs || []).filter((d) => selectedIds.has(d.id));
+        return (
+          <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-charcoal text-white rounded-2xl px-4 py-2.5 flex items-center gap-1.5" style={{ boxShadow: '0 8px 24px rgba(26,22,32,0.25)' }}>
+            <span className="text-sm font-semibold px-1.5 whitespace-nowrap">{selectedDocs.length} selected</span>
+            <button
+              onClick={() => setMovingDocs(selectedDocs)}
+              disabled={selectedDocs.length === 0}
+              className="px-3 py-2 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors disabled:opacity-40"
+            >
+              Move
+            </button>
+            <button
+              onClick={() => handleDeleteDocuments(selectedDocs.map((d) => d.id))}
+              disabled={selectedDocs.length === 0}
+              className="px-3 py-2 rounded-xl text-sm font-semibold text-coral hover:bg-white/10 transition-colors disabled:opacity-40"
+            >
+              Delete
+            </button>
+            <button onClick={exitSelectMode} aria-label="Exit selection" className="p-2 rounded-xl hover:bg-white/10 transition-colors">
+              <IconX className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      })()}
+
       {showNewFolder && (
         <NewFolderModal onSave={handleCreateFolder} onClose={() => setShowNewFolder(false)} />
       )}
@@ -619,11 +705,11 @@ export default function Documents() {
           onClose={() => setRenamingDoc(null)}
         />
       )}
-      {movingDoc && (
+      {movingDocs && (
         <MoveModal
-          doc={movingDoc}
-          onSave={(folderId) => handleMoveDocument(movingDoc.id, folderId)}
-          onClose={() => setMovingDoc(null)}
+          docs={movingDocs}
+          onSave={(folderId) => handleMoveDocuments(movingDocs.map((d) => d.id), folderId)}
+          onClose={() => setMovingDocs(null)}
         />
       )}
       {previewDoc && (
@@ -652,6 +738,20 @@ export default function Documents() {
         />
       )}
     </div>
+  );
+}
+
+function SelectToggle({ active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold border-[1.5px] transition-colors ${
+        active ? 'border-plum bg-plum-light text-plum' : 'border-light-grey text-warm-grey hover:border-plum hover:text-plum'
+      }`}
+    >
+      {active ? 'Done' : 'Select'}
+    </button>
   );
 }
 
@@ -766,11 +866,11 @@ function FileGlyph({ doc }) {
 
 /* ─── Document Row ─────────────────────────────────────────────────────────── */
 
-function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, onRename, onMove, onDelete, onOpenNote }) {
+function DocumentRow({ doc, showFolder, isFirst, isLast, selectMode, selected, onToggleSelect, onPreview, onDownload, onRename, onMove, onDelete, onOpenNote }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isNote = doc.kind === 'note';
   const folderName = doc.folder?.name;
-  const open = isNote ? onOpenNote : onPreview;
+  const open = selectMode ? onToggleSelect : (isNote ? onOpenNote : onPreview);
 
   // Note sub-line: at root show its folder, otherwise a one-line body snippet.
   const snippet = (doc.body || '').replace(/\s+/g, ' ').trim();
@@ -785,7 +885,24 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
       onMouseOver={(e) => { e.currentTarget.style.background = SOFT; }}
       onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
     >
-      <button onClick={open} aria-label={`${isNote ? 'Open' : 'Preview'} ${doc.name}`} className="shrink-0">
+      {selectMode && (
+        <button
+          onClick={onToggleSelect}
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={`Select ${doc.name}`}
+          className={`w-5 h-5 rounded-md border-[1.5px] shrink-0 flex items-center justify-center transition-colors ${
+            selected ? 'bg-plum border-plum' : 'border-light-grey bg-white'
+          }`}
+        >
+          {selected && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          )}
+        </button>
+      )}
+      <button onClick={open} aria-label={selectMode ? `Select ${doc.name}` : `${isNote ? 'Open' : 'Preview'} ${doc.name}`} className="shrink-0">
         {isNote ? <NoteGlyph /> : <FileGlyph doc={doc} />}
       </button>
       <button onClick={open} className="flex-1 min-w-0 text-left">
@@ -794,7 +911,8 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
       </button>
       <div className="text-xs text-warm-grey shrink-0">{whenLabel(doc.created_at)}</div>
 
-      {/* Overflow menu */}
+      {/* Overflow menu (hidden while selecting - the bulk bar owns actions) */}
+      {!selectMode && (
       <div className="relative shrink-0">
         <button
           onClick={() => setMenuOpen(o => !o)}
@@ -839,6 +957,7 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -912,9 +1031,10 @@ function RenameModal({ doc, onSave, onClose }) {
 
 /* ─── Move Modal ───────────────────────────────────────────────────────────── */
 
-function MoveModal({ doc, onSave, onClose }) {
+function MoveModal({ docs, onSave, onClose }) {
   const [allFolders, setAllFolders] = useState(null); // null = loading
-  const [selected, setSelected] = useState(doc.folder_id || '');
+  const single = docs.length === 1 ? docs[0] : null;
+  const [selected, setSelected] = useState(single?.folder_id || '');
 
   useEffect(() => {
     let cancelled = false;
@@ -933,7 +1053,9 @@ function MoveModal({ doc, onSave, onClose }) {
             <IconX className="h-5 w-5" />
           </button>
         </div>
-        <p className="text-xs text-warm-grey mb-4 truncate">{doc.name}</p>
+        <p className="text-xs text-warm-grey mb-4 truncate">
+          {single ? single.name : `${docs.length} items`}
+        </p>
 
         {allFolders === null ? (
           <div className="h-24 rounded-xl animate-pulse" style={{ background: SOFT }} />
@@ -965,7 +1087,7 @@ function MoveModal({ doc, onSave, onClose }) {
           <button
             type="button"
             onClick={() => onSave(selected || null)}
-            disabled={allFolders === null || selected === (doc.folder_id || '')}
+            disabled={allFolders === null || (single ? selected === (single.folder_id || '') : false)}
             className="flex-1 px-4 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Move
