@@ -1400,6 +1400,30 @@ async function setKidNoteReaction(noteId, householdId, userId, emoji, db = supab
   return data;
 }
 
+// Opening a note marks it seen for THIS parent - that's what retires the
+// banner permanently (reacting is optional). Same jsonb-map shape as
+// reactions so it follows the user across devices.
+async function markKidNoteSeen(noteId, householdId, userId, db = supabase) {
+  const note = await getKidNoteById(noteId, householdId, db);
+  if (!note) return null;
+  const seenBy = { ...(note.seen_by || {}), [userId]: new Date().toISOString() };
+  const { data, error } = await db
+    .from('kid_notes')
+    .update({ seen_by: seenBy })
+    .eq('id', noteId)
+    .eq('household_id', householdId)
+    .select()
+    .single();
+  if (error) {
+    // PGRST204 = the seen_by column doesn't exist yet (migration-kid-notes-
+    // seen.sql pending). Degrade to the old session-snooze behaviour rather
+    // than failing the open.
+    if (error.code === 'PGRST204') return note;
+    throw error;
+  }
+  return data;
+}
+
 async function addChildSchoolEvent(data, db = supabase) {
   const { data: event, error } = await db
     .from('child_school_events')
@@ -8923,6 +8947,7 @@ module.exports = {
   getKidNoteById,
   getKidNotesForHousehold,
   setKidNoteReaction,
+  markKidNoteSeen,
   deleteKidNote,
   addChildSchoolEvent,
   getChildSchoolEvents,

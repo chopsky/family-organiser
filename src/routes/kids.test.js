@@ -207,4 +207,15 @@ describe('kids notes', () => {
     db.setKidNoteReaction.mockResolvedValue(null);
     expect((await request(app()).post('/api/kids/notes/n1/reactions').send({ emoji: '🌟' })).status).toBe(404);
   });
+
+  test('POST /notes/:id/seen marks the OPENING user (retires the banner without a reaction)', async () => {
+    db.markKidNoteSeen.mockResolvedValue({ id: 'n1', child_id: 'k1', seen_by: { me: '2026-07-12T09:00:00Z' } });
+    const res = await request(app()).post('/api/kids/notes/n1/seen');
+    expect(res.status).toBe(200);
+    expect(db.markKidNoteSeen).toHaveBeenCalledWith('n1', 'h1', 'me');
+    expect(res.body.seen_by).toEqual({ me: '2026-07-12T09:00:00Z' });
+
+    db.markKidNoteSeen.mockResolvedValue(null);
+    expect((await request(app()).post('/api/kids/notes/n1/seen')).status).toBe(404);
+  });
 });

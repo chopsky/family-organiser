@@ -246,6 +246,23 @@ router.delete('/notes/:id', requireAuth, requireHousehold, async (req, res) => {
   }
 });
 
+// POST /api/kids/notes/:id/seen — opening a note marks it seen for this
+// parent, which permanently retires its banner (server state, so it follows
+// them across devices). Reacting stays optional delight, not the dismissal
+// toll. Degrades gracefully while migration-kid-notes-seen.sql is pending
+// (markKidNoteSeen no-ops on the missing column; client keeps its session
+// snooze as the fallback).
+router.post('/notes/:id/seen', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const note = await db.markKidNoteSeen(req.params.id, req.householdId, req.user.id);
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+    return res.json({ ok: true, seen_by: note.seen_by || {} });
+  } catch (err) {
+    console.error('POST /api/kids/notes/:id/seen error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/kids/notes/:id/reactions {emoji} — one per reacting user;
 // reacting again swaps the emoji.
 router.post('/notes/:id/reactions', requireAuth, requireHousehold, async (req, res) => {

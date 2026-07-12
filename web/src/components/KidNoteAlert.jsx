@@ -11,12 +11,13 @@
  * instead). Polls GET /api/kids/notes every 60s, so a note lands within a
  * minute even if the parent ignores the push notification.
  *
- * A note is retired ONLY when this user reacts to it (server state, so it
- * follows them across devices). Opening the popup — like the banner's ✕ —
- * snoozes the banner for this session (so a read note doesn't linger), but an
- * un-reacted note is never lost: it returns on the next load and always lives
- * in the Notes archive. Notes ≤7 days old can banner. The full archive (incl.
- * reacted and text-only notes) lives on the Notes page (KidNotesArchive).
+ * A note's banner is retired permanently when this user OPENS it (seen_by,
+ * server state, so it follows them across devices) or reacts. Reacting is
+ * optional - it's the delight path, not the dismissal toll. The banner's ✕
+ * alone only snoozes for this session: an unopened note returns next launch
+ * (for up to 7 days), so a kid's note is never dismissed unseen. The full
+ * archive (incl. seen and text-only notes) lives on the Notes page
+ * (KidNotesArchive).
  */
 
 import { useState, useEffect } from 'react';
@@ -73,15 +74,23 @@ export default function KidNoteAlert() {
     setSnoozed((s) => new Set(s).add(noteId));
   };
 
-  // Newest note this user hasn't reacted to and hasn't snoozed this session.
-  const fresh = notes.find((n) => !n.reactions?.[user?.id] && !snoozed.has(n.id));
+  // Newest note this user hasn't SEEN (opened) or reacted to, and hasn't
+  // snoozed this session. Seen is server state, so a note opened on one
+  // device never re-banners on another.
+  const fresh = notes.find((n) => !n.seen_by?.[user?.id] && !n.reactions?.[user?.id] && !snoozed.has(n.id));
 
-  // Opening snoozes the banner for THIS session so it doesn't linger after the
-  // parent has read + closed the note (that felt like a stuck notification).
-  // Reacting is still the only thing that permanently retires a note server-
-  // side; an un-reacted note returns on the next load (and always lives in the
-  // Notes archive), so it's dismissed, not lost.
-  const openNote = (note) => { snooze(note.id); setViewing(note); };
+  // Opening a note is what retires its banner permanently: the parent has
+  // seen it, and demanding an emoji before the banner would die made
+  // reacting a toll instead of a delight. Reacting stays optional; the ✕
+  // (snooze) alone never marks seen - an unopened note still returns next
+  // session, and every note always lives in the Notes archive.
+  const openNote = (note) => {
+    snooze(note.id); // instant local retire + fallback while seen_by lands (or pre-migration)
+    setViewing(note);
+    const seenApplied = { ...(note.seen_by || {}), [user.id]: new Date().toISOString() };
+    setNotes((ns) => ns.map((n) => (n.id === note.id ? { ...n, seen_by: seenApplied } : n)));
+    api.post(`/kids/notes/${note.id}/seen`).catch(() => { /* session snooze covers this open */ });
+  };
 
   const react = async (emoji) => {
     const note = viewing;
