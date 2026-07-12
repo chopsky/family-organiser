@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useChildMode } from '../context/ChildModeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
+import { getItemEmoji } from '../lib/shopping-constants';
 import Spinner from '../components/Spinner';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { BottomSheet } from '../components/BottomSheet';
@@ -31,28 +32,6 @@ const dotColors = {
   coral: 'bg-coral', lavender: 'bg-indigo',
   orange: 'bg-amber', blue: 'bg-sky', green: 'bg-sage', gray: 'bg-slate',
 };
-
-// ── Shopping aisle category badges (matches new aisle system) ───
-const AISLE_BADGE = {
-  'Produce':              { bg: 'bg-sage-light', text: 'text-[#4A7D50]', label: 'VEG' },
-  'Meat & Seafood':       { bg: 'bg-coral-light', text: 'text-[#C4522A]', label: 'MEAT' },
-  'Dairy & Eggs':         { bg: 'bg-plum-light', text: 'text-primary', label: 'DAIRY' },
-  'Bakery':               { bg: 'bg-[#FFF4E6]', text: 'text-[#B8860B]', label: 'BAKERY' },
-  'Pantry & Grains':      { bg: 'bg-[#FAEEDA]', text: 'text-[#854F0B]', label: 'PANTRY' },
-  'Frozen Foods':         { bg: 'bg-[#E6F1FB]', text: 'text-[#185FA5]', label: 'FROZEN' },
-  'Beverages':            { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'DRINKS' },
-  'Household & Cleaning': { bg: 'bg-[#F3EDFC]', text: 'text-[#6B3FA0]', label: 'HOME' },
-  'Personal Care':        { bg: 'bg-[#FDF0EB]', text: 'text-[#993C1D]', label: 'CARE' },
-  'Other':                { bg: 'bg-oat',       text: 'text-cocoa',      label: 'OTHER' },
-  // Legacy fallbacks
-  'groceries':            { bg: 'bg-[#EDF5EE]', text: 'text-[#3A6B40]', label: 'GROCERY' },
-  'household':            { bg: 'bg-[#F3EDFC]', text: 'text-[#6B3FA0]', label: 'HOME' },
-};
-
-function getCatBadge(cat) {
-  if (!cat) return AISLE_BADGE.Other;
-  return AISLE_BADGE[cat] || AISLE_BADGE[cat.toLowerCase()] || { bg: 'bg-oat', text: 'text-cocoa', label: cat.toUpperCase().slice(0, 6) };
-}
 
 // ── Helpers ─────────────────────────────────────────────────────
 function getGreeting() {
@@ -907,23 +886,20 @@ export default function Dashboard() {
                   rows so the dashboard card stays compact - the 'N items'
                   line at the bottom tells the user how many more there are. */}
               <div className="flex flex-col divide-y divide-[#1b14240f]">
-                {shoppingItems.slice(0, 5).map((item) => {
-                  const badge = getCatBadge(item.aisle_category || item.category || 'Other');
-                  return (
-                    <div key={item.id} className="flex items-center gap-2.5 py-2.5 first:pt-0 last:pb-0">
-                      <span
-                        className={`shrink-0 uppercase tracking-wide ${badge.bg} ${badge.text}`}
-                        style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}
-                      >
-                        {badge.label}
-                      </span>
-                      <span className="flex-1 text-sm text-bark truncate capitalize">{item.item}</span>
-                      {item.quantity && (
-                        <span className="shrink-0 text-cocoa" style={{ fontSize: 12 }}>{item.quantity}</span>
-                      )}
-                    </div>
-                  );
-                })}
+                {shoppingItems.slice(0, 5).map((item) => (
+                  <div key={item.id} className="flex items-center gap-2.5 py-2.5 first:pt-0 last:pb-0">
+                    {/* Per-item emoji (same lookup as the Lists page) instead
+                        of an aisle badge - the aisle only matters in-store,
+                        where the full list is already grouped by it. */}
+                    <span className="shrink-0 w-6 text-center" style={{ fontSize: 16 }} aria-hidden="true">
+                      {getItemEmoji(item.item, item.aisle_category || item.category)}
+                    </span>
+                    <span className="flex-1 text-sm text-bark truncate capitalize">{item.item}</span>
+                    {item.quantity && (
+                      <span className="shrink-0 text-cocoa" style={{ fontSize: 12 }}>{item.quantity}</span>
+                    )}
+                  </div>
+                ))}
               </div>
             </>
           )}
