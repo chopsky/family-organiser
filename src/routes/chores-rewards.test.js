@@ -77,6 +77,20 @@ describe('POST /api/chores/:id/complete', () => {
     expect(db.removeStarTransactionByRef).toHaveBeenCalledWith('chore_earn', 'd1:m:2026-04-18');
   });
 
+  test("a kid's UNDO returns the recomputed streak (real bug: display kept the pre-undo count)", async () => {
+    db.getKidStreak.mockResolvedValue({ current: 3, longest: 9, satisfiedToday: false, atRisk: true, nextMilestone: 7 });
+    const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: false });
+    expect(res.status).toBe(200);
+    expect(res.body.streak).toEqual(expect.objectContaining({ current: 3, satisfiedToday: false }));
+    // ...but never re-runs the badge award machinery on the undo path.
+    expect(db.addKidBadge).not.toHaveBeenCalled();
+  });
+
+  test("an adult's undo does NOT trigger a streak recompute (streaks are kid-only)", async () => {
+    await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'g', date: DATE, done: false });
+    expect(db.getKidStreak).not.toHaveBeenCalled();
+  });
+
   test('a routine slot is completed independently (slot threaded into the write + ref)', async () => {
     db.getChoreDefinitions.mockResolvedValue([
       { id: 'r1', type: 'routine', whens: ['morning', 'evening'], assignee_ids: ['m'], reward: true, stars: 2 },
@@ -167,10 +181,14 @@ describe('POST /api/chores/:id/complete', () => {
     });
 
     test('un-completing never awards or revokes a streak badge', async () => {
+      // The undo path DOES re-read the streak now (so the Quests screen shows
+      // the corrected count) - but the badge/bonus machinery must stay off it.
       db.getKidStreak.mockResolvedValue({ current: 7 });
-      await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: false });
-      expect(db.getKidStreak).not.toHaveBeenCalled();
+      const res = await request(chores()).post('/api/chores/d1/complete').send({ member_id: 'm', date: DATE, done: false });
       expect(db.addKidBadge).not.toHaveBeenCalled();
+      expect(res.body.newBadges).toEqual([]);
+      const reasons = db.addStarTransaction.mock.calls.map((c) => c[0].refType);
+      expect(reasons).not.toContain('streak_milestone');
     });
   });
 });

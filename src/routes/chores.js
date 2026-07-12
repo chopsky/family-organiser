@@ -296,6 +296,15 @@ router.post('/:id/complete', requireAuth, requireHousehold, async (req, res) => 
           newBadges.push({ key: m.badge, tier: m.tier, bonus: m.bonus });
         }
       } catch (e) { console.warn('streak award failed (non-fatal):', e.message); }
+    } else if (!done && !def.anyone && member.member_type === 'dependent') {
+      // UNDO must return the recomputed (now lower) streak, or the Quests
+      // screen keeps showing the pre-undo count until a full reload - a kid
+      // could untick everything and still see today counted. The streak is
+      // derived from completions so this is just a re-read; badges + their
+      // star bonuses stay (once-ever by design, never revoked).
+      try {
+        streak = await db.getKidStreak(req.householdId, memberId, date);
+      } catch (e) { console.warn('streak recompute on undo failed (non-fatal):', e.message); }
     }
 
     cache.invalidate(`digest:${req.householdId}`);
