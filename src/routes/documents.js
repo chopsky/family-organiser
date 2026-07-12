@@ -30,10 +30,12 @@ const MAX_FILES = 500;
 /**
  * GET /api/documents/folders?parent_id=<uuid>
  * List folders at a given level (root if no parent_id).
+ * ?all=1 returns EVERY visible folder flat - for the Move-to-folder picker.
  */
 router.get('/folders', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const folders = await db.getDocumentFolders(req.householdId, req.user.id, req.query.parent_id || null);
+    const parent = req.query.all === '1' ? 'all' : (req.query.parent_id || null);
+    const folders = await db.getDocumentFolders(req.householdId, req.user.id, parent);
     return res.json(folders);
   } catch (err) {
     console.error('GET /api/documents/folders error:', err);
@@ -205,6 +207,40 @@ router.get('/recent', requireAuth, requireHousehold, async (req, res) => {
     return res.json(withPreviews);
   } catch (err) {
     console.error('GET /api/documents/recent error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/documents/search?q=&sort=&offset=&limit=
+ * Search (or, with no q, browse) every visible document across the
+ * household - file names AND note bodies. sort: newest | name | largest.
+ * Returns { items, total, hasMore } for the "All files" pager.
+ */
+router.get('/search', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const sort = ['newest', 'name', 'largest'].includes(req.query.sort) ? req.query.sort : 'newest';
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 30, 1), 100);
+    const result = await db.searchDocuments(req.householdId, req.user.id, {
+      q: (req.query.q || '').slice(0, 200), sort, offset, limit,
+    });
+
+    const items = await Promise.all(result.items.map(async (doc) => {
+      if (doc.mime_type?.startsWith('image/')) {
+        try {
+          const preview_url = await r2.getSignedDownloadUrl(doc.file_path);
+          return { ...doc, preview_url };
+        } catch {
+          return doc;
+        }
+      }
+      return doc;
+    }));
+
+    return res.json({ ...result, items });
+  } catch (err) {
+    console.error('GET /api/documents/search error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

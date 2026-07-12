@@ -7001,7 +7001,11 @@ async function getDocumentFolders(householdId, userId, parentFolderId = null) {
     .eq('household_id', householdId)
     .order('name');
 
-  if (parentFolderId) {
+  // 'all' = every folder the user may see, flat - powers the Move-to-folder
+  // picker, which needs the whole tree regardless of the current level.
+  if (parentFolderId === 'all') {
+    // no parent filter
+  } else if (parentFolderId) {
     query = query.eq('parent_folder_id', parentFolderId);
   } else {
     query = query.is('parent_folder_id', null);
@@ -7132,6 +7136,44 @@ async function getRecentDocuments(householdId, userId, limit = 8) {
     return doc.folder.visibility === 'shared' || doc.folder.created_by === userId;
   });
   return visible.slice(0, limit);
+}
+
+/**
+ * Search / browse every document the user may see across the household.
+ * With q: matches file names AND note bodies (case-insensitive). Without q:
+ * the full "All files" listing. Pagination happens AFTER the private-folder
+ * visibility filter (offsets into the raw table would drift past hidden
+ * rows), which is safe because households cap at MAX_FILES=500 documents —
+ * one select never hits the PostgREST 1000-row ceiling.
+ */
+async function searchDocuments(householdId, userId, { q = '', sort = 'newest', offset = 0, limit = 30 } = {}) {
+  let query = supabase
+    .from('documents')
+    .select('*, folder:document_folders(id, name, visibility, created_by)')
+    .eq('household_id', householdId);
+
+  const term = (q || '').trim();
+  if (term) {
+    const s = sanitizeOrFilterValue(term);
+    query = query.or(`name.ilike.%${s}%,body.ilike.%${s}%`);
+  }
+
+  if (sort === 'name') query = query.order('name', { ascending: true });
+  else if (sort === 'largest') query = query.order('file_size', { ascending: false, nullsFirst: false });
+  else query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const visible = (data || []).filter((doc) => {
+    if (!doc.folder) return true;
+    return doc.folder.visibility === 'shared' || doc.folder.created_by === userId;
+  });
+  return {
+    items: visible.slice(offset, offset + limit),
+    total: visible.length,
+    hasMore: visible.length > offset + limit,
+  };
 }
 
 async function getDocumentById(docId, householdId) {
@@ -8978,6 +9020,7 @@ module.exports = {
   seedStarterRecipes,
   getDocuments,
   getRecentDocuments,
+  searchDocuments,
   createReceiptWithItems,
   getReceipts,
   getReceiptById,

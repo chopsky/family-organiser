@@ -71,17 +71,31 @@ export default function Documents() {
   const [usage, setUsage] = useState(null); // file/folder counts for the header kicker
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // {done, total} while uploading
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState(null);
   const [renamingDoc, setRenamingDoc] = useState(null);
+  const [movingDoc, setMovingDoc] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [showNewNote, setShowNewNote] = useState(false);
   const [editingNote, setEditingNote] = useState(null); // note row being edited
+  // Search spans the WHOLE household (file names + note bodies) regardless of
+  // the folder being viewed. null = not searching; [] = no results.
+  const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchTotal, setSearchTotal] = useState(0);
+  // Root file list: "Recent" (default) or the paginated "All files" browser.
+  const [rootTab, setRootTab] = useState('recent');
+  const [sort, setSort] = useState('newest');
+  const [allFiles, setAllFiles] = useState([]);
+  const [allHasMore, setAllHasMore] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
   const atRoot = !currentFolder;
+  const uploading = uploadProgress !== null;
+  const searching = searchResults !== null;
 
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
@@ -124,6 +138,55 @@ export default function Documents() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Debounced global search - file names AND note bodies, every folder.
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) { setSearchResults(null); return undefined; }
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/documents/search', { params: { q, limit: 50 } });
+        setSearchResults(Array.isArray(data.items) ? data.items : []);
+        setSearchTotal(data.total || 0);
+      } catch {
+        setSearchResults([]);
+        setSearchTotal(0);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // "All files" browser at root: paginated, sortable, spans every folder.
+  const fetchAllFiles = useCallback(async (offset) => {
+    try {
+      const { data } = await api.get('/documents/search', { params: { sort, offset, limit: 30 } });
+      const items = Array.isArray(data.items) ? data.items : [];
+      setAllFiles(prev => (offset === 0 ? items : [...prev, ...items]));
+      setAllHasMore(!!data.hasMore);
+    } catch {
+      if (offset === 0) setAllFiles([]);
+      setAllHasMore(false);
+    }
+  }, [sort]);
+
+  useEffect(() => {
+    if (atRoot && rootTab === 'all') fetchAllFiles(0);
+  }, [atRoot, rootTab, fetchAllFiles]);
+
+  // One refresh for every mutation: the folder view always, plus whichever
+  // global views (search / All files) are currently showing.
+  const refresh = useCallback(() => {
+    fetchData();
+    if (atRoot && rootTab === 'all') fetchAllFiles(0);
+    if (search.trim()) {
+      api.get('/documents/search', { params: { q: search.trim(), limit: 50 } })
+        .then(({ data }) => {
+          setSearchResults(Array.isArray(data.items) ? data.items : []);
+          setSearchTotal(data.total || 0);
+        })
+        .catch(() => {});
+    }
+  }, [fetchData, atRoot, rootTab, fetchAllFiles, search]);
+
   // ─── Navigation ─────────────────────────────────────────────────────────
 
   function navigateToFolder(folder) {
@@ -148,7 +211,7 @@ export default function Documents() {
     try {
       await api.post('/documents/folders', { ...data, parent_folder_id: currentFolder?.id || null });
       setShowNewFolder(false);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create folder');
     }
@@ -158,7 +221,7 @@ export default function Documents() {
     try {
       await api.patch(`/documents/folders/${folderId}`, data);
       setEditingFolder(null);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update folder');
     }
@@ -173,7 +236,7 @@ export default function Documents() {
     if (!ok) return;
     try {
       await api.delete(`/documents/folders/${folderId}`);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete folder');
     }
@@ -181,30 +244,50 @@ export default function Documents() {
 
   // ─── File Actions ───────────────────────────────────────────────────────
 
-  async function handleUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
+  // One uploader for the picker AND drag-drop; takes a FileList, uploads
+  // sequentially (the server validates one file per request) and reports
+  // per-file failures without abandoning the rest of the batch.
+  async function uploadFiles(fileList) {
+    const filesArr = Array.from(fileList || []);
+    if (!filesArr.length) return;
+    setUploadProgress({ done: 0, total: filesArr.length });
     setError('');
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (currentFolder?.id) formData.append('folder_id', currentFolder.id);
+    const failed = [];
+    for (let i = 0; i < filesArr.length; i++) {
+      const file = filesArr[i];
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (currentFolder?.id) formData.append('folder_id', currentFolder.id);
+        await api.post('/documents/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } catch (err) {
+        const data = err.response?.data;
+        failed.push(`${file.name} (${data?.detail || data?.error || 'failed'})`);
+      }
+      setUploadProgress({ done: i + 1, total: filesArr.length });
+    }
+    if (failed.length) {
+      setError(`Couldn't upload ${failed.length === 1 ? '' : `${failed.length} files, e.g. `}${failed[0]}`);
+    }
+    setUploadProgress(null);
+    refresh();
+  }
 
-      await api.post('/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      fetchData();
+  function handleUpload(e) {
+    uploadFiles(e.target.files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleMoveDocument(docId, folderId) {
+    try {
+      await api.patch(`/documents/${docId}`, { folder_id: folderId });
+      setMovingDoc(null);
+      refresh();
     } catch (err) {
-      const data = err.response?.data;
-      const msg = data?.detail
-        ? `${data.error || 'Upload failed'}: ${data.detail}`
-        : (data?.error || 'Failed to upload file');
-      setError(msg);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setMovingDoc(null);
+      setError(err.response?.data?.error || 'Failed to move document');
     }
   }
 
@@ -231,7 +314,7 @@ export default function Documents() {
     try {
       await api.patch(`/documents/${docId}`, { name });
       setRenamingDoc(null);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to rename document');
     }
@@ -245,7 +328,7 @@ export default function Documents() {
     if (!ok) return;
     try {
       await api.delete(`/documents/${docId}`);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete document');
     }
@@ -257,7 +340,7 @@ export default function Documents() {
     try {
       await api.post('/documents/notes', { title, body, folder_id: folder_id || null });
       setShowNewNote(false);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save note');
     }
@@ -267,7 +350,7 @@ export default function Documents() {
     try {
       await api.patch(`/documents/${noteId}`, { name: title, body, folder_id: folder_id || null });
       setEditingNote(null);
-      fetchData();
+      refresh();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save note');
     }
@@ -280,7 +363,29 @@ export default function Documents() {
   const empty = !loading && folders.length === 0 && files.length === 0;
 
   return (
-    <div className="max-w-[1160px] mx-auto pb-24">
+    <div
+      className="max-w-[1160px] mx-auto pb-24 relative"
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true); }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget)) return;
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files);
+      }}
+    >
+      {dragOver && (
+        <div className="absolute inset-0 z-40 rounded-2xl border-2 border-dashed border-plum bg-plum-light/70 flex items-center justify-center pointer-events-none">
+          <div className="text-plum font-semibold text-sm flex items-center gap-2">
+            <IconUpload className="h-5 w-5" />
+            Drop files to upload{currentFolder ? ` to ${currentFolder.name}` : ''}
+          </div>
+        </div>
+      )}
       <PageHeader
         kicker={kicker}
         title="Documents"
@@ -297,7 +402,7 @@ export default function Documents() {
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            {uploading ? 'Uploading…' : 'Upload'}
+            {uploading ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…` : 'Upload'}
           </PillBtn>
         </>}
       />
@@ -308,12 +413,37 @@ export default function Documents() {
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         className="hidden"
         accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.heic,.docx,.xlsx,.pptx,.doc,.xls,.ppt"
         onChange={handleUpload}
       />
 
       <Breadcrumbs breadcrumbs={breadcrumbs} onNavigate={navigateUp} />
+
+      {/* Global search - spans every folder, matches file names + note bodies */}
+      <div className="relative mb-5">
+        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search all files and notes…"
+          aria-label="Search documents"
+          className="w-full pl-10 pr-9 py-2.5 border-[1.5px] border-light-grey bg-white rounded-xl text-sm text-charcoal placeholder:text-warm-grey focus:border-plum focus:ring-1 focus:ring-plum/20 outline-none transition-colors"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-warm-grey hover:text-charcoal transition-colors"
+          >
+            <IconX className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-coral-light text-coral rounded-xl text-sm font-medium flex items-center justify-between">
@@ -324,7 +454,39 @@ export default function Documents() {
         </div>
       )}
 
-      {loading ? (
+      {searching ? (
+        <>
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey mb-3.5">
+            {searchResults.length === 0
+              ? 'No matches'
+              : `${searchTotal} match${searchTotal === 1 ? '' : 'es'}${searchTotal > searchResults.length ? ` · showing ${searchResults.length}` : ''}`}
+          </div>
+          {searchResults.length === 0 ? (
+            <div className="text-center py-14">
+              <p className="text-bark font-medium">Nothing matches &ldquo;{search.trim()}&rdquo;</p>
+              <p className="text-warm-grey text-sm mt-1">Search covers every folder, file name and note.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-[18px] border border-light-grey" style={{ boxShadow: CARD_SHADOW }}>
+              {searchResults.map((doc, i) => (
+                <DocumentRow
+                  key={doc.id}
+                  doc={doc}
+                  showFolder
+                  isFirst={i === 0}
+                  isLast={i === searchResults.length - 1}
+                  onPreview={() => handlePreview(doc)}
+                  onDownload={() => handleDownload(doc)}
+                  onRename={() => setRenamingDoc(doc)}
+                  onMove={() => setMovingDoc(doc)}
+                  onDelete={() => handleDeleteDocument(doc.id)}
+                  onOpenNote={() => setEditingNote(doc)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : loading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-[104px] rounded-2xl animate-pulse" style={{ background: SOFT }} />
@@ -360,36 +522,83 @@ export default function Documents() {
             </div>
           )}
 
-          {/* Files list */}
-          {files.length > 0 && (
+          {/* Files list. At root: Recent (quick glance) or All files (the
+              full browser - paginated + sortable). Inside a folder: its files. */}
+          {(() => {
+            const showAll = atRoot && rootTab === 'all';
+            const list = showAll ? allFiles : files;
+            return (atRoot || list.length > 0) && (
             <>
-              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey mb-3.5">
-                {atRoot ? 'Recently added' : 'Files'}
+              <div className="flex items-center justify-between mb-3.5">
+                {atRoot ? (
+                  <div className="flex items-center gap-1.5" role="tablist" aria-label="File list mode">
+                    {[['recent', 'Recently added'], ['all', 'All files']].map(([key, label]) => (
+                      <button
+                        key={key}
+                        role="tab"
+                        aria-selected={rootTab === key}
+                        onClick={() => setRootTab(key)}
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] transition-colors ${
+                          rootTab === key ? 'bg-plum-light text-plum' : 'text-warm-grey hover:text-charcoal'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-warm-grey">Files</div>
+                )}
+                {showAll && (
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    aria-label="Sort files"
+                    className="px-2.5 py-1.5 border-[1.5px] border-light-grey bg-white rounded-[10px] text-xs font-semibold text-charcoal outline-none focus:border-plum"
+                  >
+                    <option value="newest">Newest first</option>
+                    <option value="name">Name A–Z</option>
+                    <option value="largest">Largest first</option>
+                  </select>
+                )}
               </div>
-              {/* No overflow-hidden here - it would clip a row's ⋯ menu when
-                  it drops below a short card. First/last rows round their own
-                  corners instead so the hover tint still matches the card. */}
+              {list.length === 0 ? (
+                <p className="text-sm text-warm-grey py-4">
+                  {showAll ? 'No files anywhere yet.' : 'Nothing here yet.'}
+                </p>
+              ) : (
               <div
                 className="bg-white rounded-[18px] border border-light-grey"
                 style={{ boxShadow: CARD_SHADOW }}
               >
-                {files.map((doc, i) => (
+                {list.map((doc, i) => (
                   <DocumentRow
                     key={doc.id}
                     doc={doc}
                     showFolder={atRoot}
                     isFirst={i === 0}
-                    isLast={i === files.length - 1}
+                    isLast={i === list.length - 1}
                     onPreview={() => handlePreview(doc)}
                     onDownload={() => handleDownload(doc)}
                     onRename={() => setRenamingDoc(doc)}
+                    onMove={() => setMovingDoc(doc)}
                     onDelete={() => handleDeleteDocument(doc.id)}
                     onOpenNote={() => setEditingNote(doc)}
                   />
                 ))}
               </div>
+              )}
+              {showAll && allHasMore && (
+                <button
+                  onClick={() => fetchAllFiles(allFiles.length)}
+                  className="mt-4 mx-auto block px-5 py-2.5 bg-white border-[1.5px] border-light-grey text-plum rounded-xl text-sm font-semibold hover:border-plum transition-colors"
+                >
+                  Load more
+                </button>
+              )}
             </>
-          )}
+            );
+          })()}
         </>
       )}
 
@@ -408,6 +617,13 @@ export default function Documents() {
           doc={renamingDoc}
           onSave={(name) => handleRenameDocument(renamingDoc.id, name)}
           onClose={() => setRenamingDoc(null)}
+        />
+      )}
+      {movingDoc && (
+        <MoveModal
+          doc={movingDoc}
+          onSave={(folderId) => handleMoveDocument(movingDoc.id, folderId)}
+          onClose={() => setMovingDoc(null)}
         />
       )}
       {previewDoc && (
@@ -550,7 +766,7 @@ function FileGlyph({ doc }) {
 
 /* ─── Document Row ─────────────────────────────────────────────────────────── */
 
-function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, onRename, onDelete, onOpenNote }) {
+function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, onRename, onMove, onDelete, onOpenNote }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isNote = doc.kind === 'note';
   const folderName = doc.folder?.name;
@@ -610,6 +826,11 @@ function DocumentRow({ doc, showFolder, isFirst, isLast, onPreview, onDownload, 
                     Rename
                   </MenuItem>
                 </>
+              )}
+              {onMove && (
+                <MenuItem icon={<IconFolder className="h-3.5 w-3.5" />} onClick={() => { setMenuOpen(false); onMove(); }}>
+                  Move to folder
+                </MenuItem>
               )}
               <MenuItem icon={<IconTrash className="h-3.5 w-3.5" />} danger onClick={() => { setMenuOpen(false); onDelete(); }}>
                 Delete
@@ -686,6 +907,88 @@ function RenameModal({ doc, onSave, onClose }) {
         </form>
       </div>
     </div>
+  );
+}
+
+/* ─── Move Modal ───────────────────────────────────────────────────────────── */
+
+function MoveModal({ doc, onSave, onClose }) {
+  const [allFolders, setAllFolders] = useState(null); // null = loading
+  const [selected, setSelected] = useState(doc.folder_id || '');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/documents/folders', { params: { all: '1' } })
+      .then(({ data }) => { if (!cancelled) setAllFolders(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setAllFolders([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-display text-lg font-medium text-charcoal">Move to folder</h2>
+          <button onClick={onClose} aria-label="Close" className="text-warm-grey hover:text-charcoal transition-colors">
+            <IconX className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="text-xs text-warm-grey mb-4 truncate">{doc.name}</p>
+
+        {allFolders === null ? (
+          <div className="h-24 rounded-xl animate-pulse" style={{ background: SOFT }} />
+        ) : (
+          <div className="max-h-[45vh] overflow-y-auto -mx-2 px-2 space-y-1">
+            <FolderChoice
+              label="No folder (top level)"
+              color="#7A8694"
+              selected={selected === ''}
+              onPick={() => setSelected('')}
+            />
+            {allFolders.map((f) => (
+              <FolderChoice
+                key={f.id}
+                label={f.name}
+                color={f.color || '#6B3FA0'}
+                isPrivate={f.visibility === 'private'}
+                selected={selected === f.id}
+                onPick={() => setSelected(f.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-4">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-white border-[1.5px] border-light-grey text-warm-grey rounded-xl text-sm font-semibold hover:bg-cream transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(selected || null)}
+            disabled={allFolders === null || selected === (doc.folder_id || '')}
+            className="flex-1 px-4 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Move
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FolderChoice({ label, color, isPrivate, selected, onPick }) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm transition-colors border-[1.5px] ${
+        selected ? 'border-plum bg-plum-light' : 'border-transparent hover:bg-cream'
+      }`}
+    >
+      <IconFolder className="h-4 w-4 shrink-0" style={{ color }} />
+      <span className={`truncate font-medium ${selected ? 'text-plum' : 'text-charcoal'}`}>{label}</span>
+      {isPrivate && <IconLock className="h-3 w-3 text-plum shrink-0" />}
+    </button>
   );
 }
 
