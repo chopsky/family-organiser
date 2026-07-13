@@ -33,7 +33,7 @@ export default function usePushNotifications(user) {
           try {
             await api.post('/notifications/register-device', {
               token: token.value,
-              platform: 'ios',
+              platform: Capacitor.getPlatform(), // 'ios' | 'android' - routes the token to APNs or FCM server-side
             });
             registered.current = true;
           } catch (err) {

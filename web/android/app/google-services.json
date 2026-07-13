@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "610487251443",
+    "project_id": "housemait-a3c1e",
+    "storage_bucket": "housemait-a3c1e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:610487251443:android:f39dfbd563350247b22286",
+        "android_client_info": {
+          "package_name": "com.housemait.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVjZ9ONRdvS-zZJfbOPEkx6PO4xVO5kMU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

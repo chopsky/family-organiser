@@ -1,10 +1,13 @@
 /**
- * Apple Push Notification service (APNs) - sends push notifications
- * to iOS devices using Node's built-in http2 module (no third-party deps).
+ * Push notifications - APNs for iOS, FCM (HTTP v1) for Android, both using
+ * Node built-ins only (no third-party deps): APNs over http2 with an ES256
+ * JWT, FCM over fetch with an RS256 service-account JWT exchanged for an
+ * OAuth access token. Each device_tokens row carries `platform`
+ * ('ios' | 'android') and is routed to its provider.
  *
  * Fire-and-forget: errors are logged but never block the caller.
- * If APNs is not configured (missing env vars), all send functions
- * become silent no-ops so the app works fine without push.
+ * An unconfigured provider (missing env vars) makes ITS sends silent
+ * no-ops - the other platform keeps working.
  */
 
 const http2 = require('http2');
@@ -55,7 +58,29 @@ if (APN_KEY_ID && APN_TEAM_ID && (APN_KEY || APN_KEY_PATH)) {
     console.warn('[push] Failed to load APNs key:', err.message);
   }
 } else {
-  console.warn('[push] APNs not configured - need APN_KEY_ID, APN_TEAM_ID, and APN_KEY (or APN_KEY_PATH). Push notifications disabled.');
+  console.warn('[push] APNs not configured - need APN_KEY_ID, APN_TEAM_ID, and APN_KEY (or APN_KEY_PATH). iOS push disabled.');
+}
+
+// FCM: the Firebase service-account JSON, pasted whole into one env var.
+let fcm = null;
+let fcmConfigured = false;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (sa.project_id && sa.client_email && sa.private_key) {
+      // Real JSON carries actual newlines in private_key; the replace also
+      // tolerates a doubly-escaped paste (same trick as APN_KEY above).
+      fcm = { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key.replace(/\\n/g, '\n') };
+      fcmConfigured = true;
+      console.log(`[push] FCM configured (project ${fcm.projectId})`);
+    } else {
+      console.warn('[push] FIREBASE_SERVICE_ACCOUNT lacks project_id/client_email/private_key - Android push disabled.');
+    }
+  } catch (err) {
+    console.warn('[push] FIREBASE_SERVICE_ACCOUNT is not valid JSON - Android push disabled:', err.message);
+  }
+} else {
+  console.warn('[push] FCM not configured (no FIREBASE_SERVICE_ACCOUNT) - Android push disabled.');
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +317,92 @@ async function deliverDiagnostic(deviceToken, payload) {
 }
 
 // ---------------------------------------------------------------------------
+// FCM (Android) - OAuth token + HTTP v1 delivery
+// ---------------------------------------------------------------------------
+
+// Google OAuth access token from the service account: sign an RS256 JWT and
+// exchange it. Cached ~50 min (Google issues 60-min tokens).
+let cachedFcmToken = null;
+let cachedFcmTokenTime = 0;
+const FCM_TOKEN_LIFETIME = 50 * 60 * 1000;
+
+async function getFcmAccessToken() {
+  const now = Date.now();
+  if (cachedFcmToken && (now - cachedFcmTokenTime) < FCM_TOKEN_LIFETIME) {
+    return cachedFcmToken;
+  }
+  const iat = Math.floor(now / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const claims = Buffer.from(JSON.stringify({
+    iss: fcm.clientEmail,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat,
+    exp: iat + 3600,
+  })).toString('base64url');
+  const signingInput = `${header}.${claims}`;
+  const signature = crypto.createSign('RSA-SHA256').update(signingInput).sign(fcm.privateKey).toString('base64url');
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${signingInput}.${signature}`,
+  });
+  if (!res.ok) throw new Error(`FCM OAuth failed: ${res.status} ${await res.text()}`);
+  const json = await res.json();
+  cachedFcmToken = json.access_token;
+  cachedFcmTokenTime = now;
+  return cachedFcmToken;
+}
+
+/**
+ * Deliver one notification to one Android token via FCM HTTP v1. Prunes
+ * tokens Google reports as UNREGISTERED (app uninstalled / token rotated),
+ * mirroring the APNs 410 handling. Never throws.
+ */
+async function deliverFcm(deviceToken, { title, body, data, badge } = {}) {
+  try {
+    const accessToken = await getFcmAccessToken();
+    const message = {
+      token: deviceToken,
+      notification: { title, body },
+      android: {
+        priority: 'HIGH',
+        notification: {
+          sound: 'default',
+          ...(badge !== undefined ? { notification_count: badge } : {}),
+        },
+      },
+    };
+    if (data) {
+      // FCM data values MUST be strings - numbers/objects are rejected.
+      message.data = Object.fromEntries(
+        Object.entries(data).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)]),
+      );
+    }
+    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${fcm.projectId}/messages:send`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (res.ok) return { success: true };
+    const text = await res.text();
+    if (res.status === 404 || /UNREGISTERED/.test(text)) {
+      try {
+        await db.unregisterDeviceToken(deviceToken);
+        console.log('[push] Pruned dead FCM token', `${deviceToken.slice(0, 8)}...`);
+      } catch { /* best-effort */ }
+    } else {
+      console.error('[push] FCM failed for token', `${deviceToken.slice(0, 8)}...`, '- status:', res.status, text.slice(0, 200));
+    }
+    return { success: false, status: res.status, reason: text.slice(0, 200) };
+  } catch (err) {
+    console.error('[push] deliverFcm error:', err.message);
+    return { success: false, reason: err.message };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -326,34 +437,41 @@ function isCategoryEnabled(preferences, category) {
  * @returns {Promise<{ sent: number, failed: number }>}
  */
 async function sendPushNotification(deviceTokens, { title, body, data, badge, sound } = {}) {
-  if (!configured) {
-    return { sent: 0, failed: 0 };
-  }
-
   if (!deviceTokens || deviceTokens.length === 0) {
     return { sent: 0, failed: 0 };
   }
 
-  const payload = {
-    aps: {
-      alert: { title, body },
-      sound: sound || 'default',
-    },
-  };
+  // Accept bare token strings (legacy callers - assumed iOS) or
+  // { token, platform } rows, and route each to its provider.
+  const entries = deviceTokens.map((t) => (
+    typeof t === 'string' ? { token: t, platform: 'ios' } : { token: t.token, platform: t.platform || 'ios' }
+  ));
+  const ios = entries.filter((e) => e.platform !== 'android');
+  const android = entries.filter((e) => e.platform === 'android');
+  const results = [];
 
-  if (badge !== undefined) {
-    payload.aps.badge = badge;
+  if (ios.length && configured) {
+    const payload = {
+      aps: {
+        alert: { title, body },
+        sound: sound || 'default',
+      },
+    };
+    if (badge !== undefined) payload.aps.badge = badge;
+    if (data) Object.assign(payload, data);
+    results.push(...await Promise.all(ios.map((e) => deliver(e.token, payload))));
+  } else if (ios.length) {
+    results.push(...ios.map(() => ({ success: false, reason: 'APNs not configured' })));
   }
 
-  if (data) {
-    Object.assign(payload, data);
+  if (android.length && fcmConfigured) {
+    results.push(...await Promise.all(android.map((e) => deliverFcm(e.token, { title, body, data, badge }))));
+  } else if (android.length) {
+    results.push(...android.map(() => ({ success: false, reason: 'FCM not configured' })));
   }
 
-  const results = await Promise.all(deviceTokens.map((t) => deliver(t, payload)));
   const sent = results.filter((r) => r.success).length;
-  const failed = results.length - sent;
-
-  return { sent, failed };
+  return { sent, failed: results.length - sent };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +482,7 @@ async function sendPushNotification(deviceTokens, { title, body, data, badge, so
  * Send a push notification to a specific user, respecting their preferences.
  */
 async function sendToUser(userId, { title, body, data, category } = {}) {
-  if (!configured) {
+  if (!configured && !fcmConfigured) {
     return { sent: 0, failed: 0 };
   }
 
@@ -382,7 +500,7 @@ async function sendToUser(userId, { title, body, data, category } = {}) {
       return { sent: 0, failed: 0 };
     }
 
-    const deviceTokens = tokens.map((t) => t.token);
+    const deviceTokens = tokens.map((t) => ({ token: t.token, platform: t.platform || 'ios' }));
     return sendPushNotification(deviceTokens, { title, body, data });
   } catch (err) {
     console.error('[push] sendToUser error:', err.message);
@@ -399,7 +517,7 @@ async function sendToUser(userId, { title, body, data, category } = {}) {
  * respecting each member's notification preferences.
  */
 async function sendToHousehold(householdId, excludeUserId, { title, body, data, category } = {}) {
-  if (!configured) {
+  if (!configured && !fcmConfigured) {
     return { sent: 0, failed: 0 };
   }
 
@@ -416,7 +534,7 @@ async function sendToHousehold(householdId, excludeUserId, { title, body, data, 
       if (!tokensByUser.has(t.user_id)) {
         tokensByUser.set(t.user_id, []);
       }
-      tokensByUser.get(t.user_id).push(t.token);
+      tokensByUser.get(t.user_id).push({ token: t.token, platform: t.platform || 'ios' });
     }
 
     // Filter out users who have disabled this category
@@ -464,6 +582,8 @@ function getConfigInfo() {
     bundleId: APN_BUNDLE_ID,
     primaryEnv: PRIMARY_ENV,
     apnProduction: APN_PRODUCTION,
+    fcmConfigured,
+    fcmProjectId: fcm?.projectId || null,
   };
 }
 

@@ -63,7 +63,7 @@ export default function Notifications({ next, setError }) {
         try {
           await api.post('/notifications/register-device', {
             token: token.value,
-            platform: 'ios',
+            platform: Capacitor.getPlatform(), // 'ios' | 'android' - routes the token to APNs or FCM server-side
           });
         } catch (err) {
           console.warn('[onboarding] register-device failed:', err);
