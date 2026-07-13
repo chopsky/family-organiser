@@ -4,12 +4,29 @@ import api from '../lib/api';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_IOS_CLIENT_ID = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
+// Android's native Google Sign-In (Credential Manager) authenticates the app
+// by its package name + SHA-1 (registered as an Android OAuth client) and
+// takes the WEB OAuth client ID as its serverClientId - so this value is the
+// web client ID, not a separate Android one. Falls back to GOOGLE_CLIENT_ID
+// when the app's build exposes that (same value), so a single env var can
+// serve both.
+const GOOGLE_ANDROID_CLIENT_ID = import.meta.env.VITE_GOOGLE_ANDROID_CLIENT_ID || GOOGLE_CLIENT_ID;
 const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID;
 
 const isNativeIos = () => {
   try { return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'; }
   catch { return false; }
 };
+
+const isNativeAndroid = () => {
+  try { return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'; }
+  catch { return false; }
+};
+
+// Both native platforms drive Google Sign-In through the Capgo plugin's
+// native SDK (Google blocks its web JS SDK inside a WebView). Shared so the
+// init / disabled / branch logic reads the same for iOS and Android.
+const isNativeSocial = () => isNativeIos() || isNativeAndroid();
 
 // Detect "user dismissed the native sign-in sheet" across providers and
 // error shapes. Treat as a silent no-op rather than an error toast.
@@ -101,6 +118,27 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
       return () => { cancelled = true; };
     }
 
+    if (isNativeAndroid()) {
+      if (!GOOGLE_ANDROID_CLIENT_ID) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const { SocialLogin } = await import('@capgo/capacitor-social-login');
+          // Android: Credential Manager takes the WEB client ID as its
+          // serverClientId; the app is authorised by its package + SHA-1
+          // registered as an Android OAuth client. No Apple provider on
+          // Android.
+          await SocialLogin.initialize({
+            google: { webClientId: GOOGLE_ANDROID_CLIENT_ID },
+          });
+          if (!cancelled) setNativeSocialLoginInitialised(true);
+        } catch (err) {
+          console.error('[social-login] Android plugin initialise failed:', err);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
     if (!GOOGLE_CLIENT_ID) return;
     if (window.google?.accounts?.id) { setGoogleLoaded(true); return; }
 
@@ -121,7 +159,7 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
   // on click via requestCode(), returning a one-time auth code to
   // handleGoogleCode for the backend to exchange.
   useEffect(() => {
-    if (isNativeIos()) return;
+    if (isNativeSocial()) return; // native platforms use the Capgo plugin, not the web SDK
     if (!googleLoaded || !GOOGLE_CLIENT_ID || !window.google?.accounts?.oauth2) return;
     codeClientRef.current = window.google.accounts.oauth2.initCodeClient({
       client_id: GOOGLE_CLIENT_ID,
@@ -137,23 +175,26 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
   //     in the same JWT format the server already verifies.
   //   • Web: trigger Google's One Tap popup via the JS SDK.
   async function handleGoogleClick() {
-    if (isNativeIos()) {
+    // iOS AND Android native both go through the Capgo plugin's native Google
+    // SDK, which returns an idToken (the same JWT the server verifies for the
+    // web code-exchange path). Google blocks its web JS SDK in a WebView, so
+    // this native path is the only one that works in the apps.
+    if (isNativeSocial()) {
       if (!nativeSocialLoginInitialised) {
         onError('Google sign-in is initialising. Please try again in a moment.');
         return;
       }
       try {
         const { SocialLogin } = await import('@capgo/capacitor-social-login');
-        // Force the account chooser. Google's iOS SDK caches the last-used
-        // account by default and silently signs you back in - fine for
-        // password-manager-like flows, wrong for an explicit
-        // 'Continue with Google' button where the user expects to pick
-        // which account. logout() clears the cached credential without
-        // affecting the user's logged-in state in our app.
+        // Force the account chooser. The native SDKs cache the last-used
+        // account and silently sign you back in - fine for password-manager-
+        // like flows, wrong for an explicit 'Continue with Google' button
+        // where the user expects to pick which account. logout() clears the
+        // cached credential without affecting the user's logged-in state.
         try { await SocialLogin.logout({ provider: 'google' }); }
         catch { /* nothing cached - first sign-in, ignore */ }
         const result = await SocialLogin.login({ provider: 'google', options: {} });
-        // Plugin returns { provider, result: { idToken, ...profile } } on iOS.
+        // Plugin returns { provider, result: { idToken, ...profile } }.
         // Defensive: also try a couple of other shapes Capgo has used across
         // versions, in case the documented one doesn't match what we get.
         const idToken =
@@ -173,7 +214,7 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
         onSuccess(data);
       } catch (err) {
         if (isCancelError(err)) return;
-        console.error('[social-login] iOS Google sign-in error:', err);
+        console.error('[social-login] native Google sign-in error:', err);
         onError(err?.response?.data?.error || err?.message || 'Google sign-in failed.');
       }
       return;
@@ -272,9 +313,10 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
     }
   }
 
-  // Apple button shows on iOS native always (the entitlement is the gate),
-  // OR on web if APPLE_CLIENT_ID (the Services ID) is configured.
-  const showGoogle = !!GOOGLE_CLIENT_ID || isNativeIos();
+  // Google shows on web (web client ID present), iOS native (uses its own
+  // iOS client ID via the plugin), or Android native (needs the server/web
+  // client ID for Credential Manager - GOOGLE_ANDROID_CLIENT_ID).
+  const showGoogle = !!GOOGLE_CLIENT_ID || isNativeIos() || (isNativeAndroid() && !!GOOGLE_ANDROID_CLIENT_ID);
   // Apple Sign-In on web requires a Services ID + verified domain + signing
   // key + 4-5 env vars working in concert. iOS native uses
   // ASAuthorizationController via the entitlement and needs none of that.
@@ -291,7 +333,7 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
         <button
           type="button"
           onClick={handleGoogleClick}
-          disabled={isNativeIos() ? !nativeSocialLoginInitialised : !googleLoaded}
+          disabled={isNativeSocial() ? !nativeSocialLoginInitialised : !googleLoaded}
           className="w-full flex items-center justify-center gap-2 border border-cream-border rounded-lg px-4 py-2.5 text-sm font-medium text-bark hover:bg-oat transition-colors disabled:opacity-60 disabled:cursor-wait"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
