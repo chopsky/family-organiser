@@ -419,8 +419,8 @@ export default function Login() {
            a narrow phone without horizontal scroll. Tagged by id since
            the card uses inline styles that need !important to beat. */
         @media (max-width: 480px) {
-          #login-concierge-card { padding: 28px 22px 22px !important; }
-          #login-concierge-card h1 { font-size: 34px !important; }
+          #login-concierge-card { padding: 32px 22px 22px !important; }
+          #login-concierge-card h1 { font-size: 32px !important; }
         }
       `}</style>
     </div>
