@@ -77,7 +77,7 @@ export default function Lists() {
   const [loadingItems, setLoadingItems] = useState(false);
   const [draft, setDraft] = useState('');
   const [toFilter, setToFilter] = useState(null); // member id for To-dos filter
-  const [doneOpen, setDoneOpen] = useState(false);
+  const [doneOpen, setDoneOpen] = useState(true); // Done is visible by default (founder call 2026-07-12)
   // Someday backlog starts collapsed - the working set (Today / This week)
   // leads. Auto-opens when a new undated to-do is added so it never looks
   // like the add silently failed.
@@ -99,7 +99,7 @@ export default function Lists() {
   const isTodos = active?.id === TODOS_ID;
 
   // Switching lists clears the filter + transient mobile UI.
-  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); setDoneOpen(false); setSomedayOpen(false); }, [activeId]);
+  useEffect(() => { setToFilter(null); setConfirmDel(false); setWhoPickerOpen(false); setDoneOpen(true); setSomedayOpen(false); }, [activeId]);
   // Mirror the active list into ?list=<id> so a refresh lands back on it.
   // To-dos is the default, so it drops the param to keep the URL clean.
   // replace:true keeps each list switch out of the back-button history, and
@@ -341,8 +341,15 @@ export default function Lists() {
   // Done items most-recently-checked-off first: toggle stamps completed_at on
   // check, so a freshly-ticked item lands at the top; the empty-string fallback
   // keeps anything without a stamp stable at the bottom.
+  // Groceries: a Done row with an ACTIVE twin (same item name) is hidden -
+  // the item is back on the list, so showing it ticked-off too reads as a
+  // duplicate. Write-time reactivation prevents new twins; this filter
+  // covers rows that already exist. To-dos keep their history (a repeated
+  // task is a legitimate re-occurrence, not a duplicate).
+  const openNames = isTodos ? null : new Set(openItems.map((i) => String(i.item || '').trim().toLowerCase()));
   const doneItems = filtered
     .filter((i) => i.done)
+    .filter((i) => isTodos || !openNames.has(String(i.item || '').trim().toLowerCase()))
     .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
   const openCount = filtered.filter((i) => !i.done).length;
   // To-dos: the working set (Today / This week) renders as ordinary
@@ -538,7 +545,7 @@ export default function Lists() {
             {lists.map((l) => {
               const on = l.id === activeId;
               return (
-                <button key={l.id} onClick={() => { setActiveId(l.id); setToFilter(null); setDoneOpen(false); }}
+                <button key={l.id} onClick={() => { setActiveId(l.id); setToFilter(null); setDoneOpen(true); }}
                   style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 11, padding: isMobile ? '8px 14px 8px 8px' : '11px 12px', borderRadius: 14, cursor: 'pointer', fontFamily: INTER, textAlign: 'left', flexShrink: isMobile ? 0 : undefined, whiteSpace: 'nowrap', border: on ? `1.5px solid ${l.color}` : '1px solid transparent', background: on ? '#fff' : (isMobile ? '#fff' : 'transparent'), boxShadow: on ? '0 2px 10px rgba(26,22,32,0.05)' : 'none' }}>
                   <span style={{ width: isMobile ? 28 : 34, height: isMobile ? 28 : 34, borderRadius: 10, flexShrink: 0, fontSize: isMobile ? 15 : 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: l.color + '1F' }}>{l.emoji}</span>
                   <span style={{ flex: isMobile ? 'none' : 1, fontSize: 14, fontWeight: 600, color: INK }}>{l.name}</span>

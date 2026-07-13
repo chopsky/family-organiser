@@ -1794,11 +1794,14 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
   // Load existing incomplete items for the target lists. If a row
   // has no list_id (legacy), we still check household-wide to be
   // safe against grandfathered rows that pre-date the list_id column.
+  // Fetch active AND completed rows: an active twin dedupes/bumps as before;
+  // a completed twin gets REACTIVATED (flipped back to the open list) instead
+  // of inserting a fresh row next to it - re-adding "beef sausages" while a
+  // ticked-off "Beef Sausages" sits in Done must not show the item twice.
   let existingQuery = db
     .from('shopping_items')
     .select()
-    .eq('household_id', householdId)
-    .eq('completed', false);
+    .eq('household_id', householdId);
   if (listIds.length) existingQuery = existingQuery.in('list_id', listIds);
   const { data: existing, error: existingErr } = await existingQuery;
   if (existingErr) throw existingErr;
@@ -1808,17 +1811,25 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
   // each other.
   const indexKey = (listId, normalized) => `${listId || 'none'}|${normalized}`;
   const existingByKey = new Map();
+  const completedByKey = new Map();
   for (const row of existing || []) {
     const k = indexKey(row.list_id, normalizeItemName(row.item));
-    // Keep the OLDEST one if there are already duplicates lurking - the
-    // newer ones we'll either delete via a separate cleanup or leave
-    // alone. Dedupe-on-write is forward-looking, not retroactive.
-    if (!existingByKey.has(k)) existingByKey.set(k, row);
+    if (row.completed) {
+      // Keep the most recently completed twin - that's the one to revive.
+      const prev = completedByKey.get(k);
+      if (!prev || String(row.completed_at || '') > String(prev.completed_at || '')) completedByKey.set(k, row);
+    } else if (!existingByKey.has(k)) {
+      // Keep the OLDEST one if there are already duplicates lurking - the
+      // newer ones we'll either delete via a separate cleanup or leave
+      // alone. Dedupe-on-write is forward-looking, not retroactive.
+      existingByKey.set(k, row);
+    }
   }
 
   const toInsert = [];
   const duplicates = [];
   const toBumpQuantity = []; // { id, quantity }
+  const toReactivate = [];   // { id, quantity|null } completed twins to revive
 
   for (const item of items) {
     const normalized = normalizeItemName(item.item);
@@ -1831,7 +1842,14 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
     const k = indexKey(item.list_id, normalized);
     const match = existingByKey.get(k);
     if (!match) {
-      toInsert.push(item);
+      const doneTwin = completedByKey.get(k);
+      if (doneTwin) {
+        const incomingQty = item.quantity ? String(item.quantity).trim() : '';
+        toReactivate.push({ id: doneTwin.id, quantity: incomingQty || null });
+        completedByKey.delete(k); // a second add in the same batch inserts normally
+      } else {
+        toInsert.push(item);
+      }
       continue;
     }
     // Match found. Decide: bump quantity, or skip.
@@ -1861,6 +1879,24 @@ async function addShoppingItemsWithDedupe(householdId, items, addedByUserId, opt
       .single();
     if (error) {
       console.warn('[addShoppingItemsWithDedupe] failed to bump quantity:', error.message);
+      continue;
+    }
+    if (data) updated.push(data);
+  }
+
+  // Revive completed twins. Returned via `updated` so every caller's
+  // "saved" list ([...created, ...updated]) reports them as added.
+  for (const r of toReactivate) {
+    const patch = { completed: false, completed_at: null };
+    if (r.quantity) patch.quantity = r.quantity;
+    const { data, error } = await db
+      .from('shopping_items')
+      .update(patch)
+      .eq('id', r.id)
+      .select()
+      .single();
+    if (error) {
+      console.warn('[addShoppingItemsWithDedupe] failed to reactivate completed twin:', error.message);
       continue;
     }
     if (data) updated.push(data);
