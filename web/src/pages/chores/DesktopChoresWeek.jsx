@@ -31,8 +31,11 @@ function tint(hex, a) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
-// One task × day cell. `mc` = member colour.
-function Cell({ row, day, memberId, mc, doneSet, skipped, onToggle }) {
+// One task × day cell. `mc` = member colour. `allowPast` (adults only) makes
+// past cells tickable so a parent can back-fill a forgotten tick - streaks
+// are derived from completion history, so the kid's streak heals itself the
+// moment the missed day is filled in.
+function Cell({ row, day, memberId, mc, doneSet, skipped, onToggle, allowPast }) {
   const applies = !skipped && appliesOnDate(row.def, day.str);
   if (!applies) {
     return <span style={{ width: 14, height: 2, borderRadius: 2, background: INK3, opacity: 0.3 }} aria-hidden="true" />;
@@ -55,7 +58,23 @@ function Cell({ row, day, memberId, mc, doneSet, skipped, onToggle }) {
     );
   }
   if (day.isPast) {
-    // Real history: completed → filled check; not completed → muted empty ring.
+    if (allowPast) {
+      // Adults can back-fill or correct history. Kept visually muted (no
+      // glow ring) so today's cell stays the loudest.
+      return (
+        <button
+          type="button"
+          onClick={() => onToggle(row.def, row.slot, day.str, memberId, !done)}
+          aria-pressed={done}
+          aria-label={done ? 'Done — tap to undo' : 'Missed — tap to mark done'}
+          title={done ? 'Tap to undo' : 'Tap to mark done'}
+          style={{ ...ring({ cursor: 'pointer', border: done ? 'none' : `1.5px solid ${LINE_STRONG}`, background: done ? mc : '#fff', opacity: done ? 1 : 0.6 }), padding: 0 }}
+        >
+          {done && Check}
+        </button>
+      );
+    }
+    // Kids see history read-only: completed → filled check; missed → muted ring.
     return done
       ? <span style={ring({ background: mc })}>{Check}</span>
       : <span style={ring({ border: `1.5px solid ${LINE_STRONG}`, opacity: 0.5 })} title="Not done" />;
@@ -90,7 +109,7 @@ function SummaryStat({ dot, label, value }) {
   );
 }
 
-export default function DesktopChoresWeek({ members, who, setWho, defs, completions, skips, weekDays, balances = {}, onToggle, onEdit }) {
+export default function DesktopChoresWeek({ members, who, setWho, defs, completions, skips, weekDays, balances = {}, onToggle, onEdit, allowPast = false }) {
   const selected = members.find((m) => m.id === who) || members[0];
   if (!selected) {
     return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>Add family members to start assigning tasks.</div>;
@@ -186,7 +205,7 @@ export default function DesktopChoresWeek({ members, who, setWho, defs, completi
                     {/* 7 day-cells */}
                     {weekDays.map((day) => (
                       <div key={day.str} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 2px', minHeight: 44, background: day.isToday ? tint(mc, 0.06) : 'transparent' }}>
-                        <Cell row={row} day={day} memberId={selected.id} mc={mc} doneSet={doneSet} skipped={skips_.has(`${row.def.id}|${day.str}`)} onToggle={onToggle} />
+                        <Cell row={row} day={day} memberId={selected.id} mc={mc} doneSet={doneSet} skipped={skips_.has(`${row.def.id}|${day.str}`)} onToggle={onToggle} allowPast={allowPast} />
                       </div>
                     ))}
                   </div>

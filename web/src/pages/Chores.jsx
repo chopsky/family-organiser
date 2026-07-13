@@ -639,7 +639,9 @@ export default function Chores() {
     const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() + deltaDays);
     setWeekRefStr(dateStrLocal(dt));
   };
-  // Toggle a Week cell (today only). Optimistic over weekData.completions; the
+  // Toggle a Week cell (today, or any past day for adults - parents can
+  // back-fill a forgotten tick and the derived streak heals itself).
+  // Optimistic over weekData.completions; the
   // write hits the same /complete endpoint with that cell's date.
   const weekToggle = useCallback(async (def, slot, dateStr, memberId, nextDone) => {
     const k = (c) => `${c.definition_id}|${c.slot || ''}|${c.member_id}|${c.date}`;
@@ -819,6 +821,7 @@ export default function Chores() {
           balances={weekData?.balances || balances}
           onToggle={weekToggle}
           onEdit={(def) => setModal({ mode: 'edit', task: def })}
+          allowPast={!childMode}
         />
       ) : (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
