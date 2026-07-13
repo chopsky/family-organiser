@@ -26,15 +26,20 @@ function mockReqRes(headers = {}, body = {}) {
 describe('requireTurnstile native bypass', () => {
   const OLD_ENV = process.env.NODE_ENV;
   const OLD_SECRET = process.env.TURNSTILE_SECRET_KEY;
+  const OLD_FETCH = global.fetch;
   beforeEach(() => {
     process.env.NODE_ENV = 'production';
     process.env.TURNSTILE_SECRET_KEY = 'test-secret';
     global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: async () => ({ success: true }) }));
   });
-  afterAll(() => {
+  // Restore per-test so nothing leaks into other suites sharing the worker
+  // (NODE_ENV back to 'test' matters: many middlewares no-op only under it).
+  afterEach(() => {
     process.env.NODE_ENV = OLD_ENV;
     if (OLD_SECRET === undefined) delete process.env.TURNSTILE_SECRET_KEY;
     else process.env.TURNSTILE_SECRET_KEY = OLD_SECRET;
+    if (OLD_FETCH === undefined) delete global.fetch;
+    else global.fetch = OLD_FETCH;
   });
 
   test('Android (X-Client-Platform) bypasses without a token or a Cloudflare call', async () => {

@@ -8,6 +8,8 @@
  * Allowed:
  * - The configured production WEB_URL (e.g. https://www.housmait.com)
  * - capacitor://localhost - Capacitor iOS wrapper
+ * - https://localhost - Capacitor ANDROID wrapper (Android uses an https
+ *   scheme WebView origin, unlike iOS's custom capacitor:// scheme)
  * - http://localhost - dev server
  * - Vercel preview URLs for this project (hash-based or git-branch form)
  *
@@ -44,8 +46,9 @@ function isAllowedOrigin(origin) {
       if (stripWww(reqUrl.hostname) === stripWww(webUrl.hostname)) return true;
     }
   } catch { /* malformed URL - fall through to remaining checks */ }
-  if (origin === 'capacitor://localhost') return true;
-  if (origin === 'http://localhost') return true;
+  if (origin === 'capacitor://localhost') return true; // Capacitor iOS
+  if (origin === 'https://localhost') return true;     // Capacitor Android
+  if (origin === 'http://localhost') return true;      // dev server
   return PREVIEW_PATTERNS.some((re) => re.test(origin));
 }
 
