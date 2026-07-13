@@ -22,20 +22,15 @@ import { Capacitor } from '@capacitor/core';
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__turnstileOnLoad';
 
-// Skip Turnstile entirely on iOS native. Reasoning:
-//   • The threat model for a signed App Store binary is fundamentally
-//     different from web - no bot signups via App Review's flow, no
-//     credential stuffing from a controlled native binary.
-//   • Loading the Cloudflare script in the WebView introduces race
-//     conditions where users (especially App Reviewers using iPad
-//     hardware keyboards) can submit before a token is ready, resulting
-//     in opaque "login failed" errors. Apple rejected 1.1.0(8) for
-//     exactly this - Guideline 2.1(a), iPad login error.
-//   • Server-side middleware fail-opens when the request lacks a token,
-//     so the iOS native flow is allowed. See src/middleware/turnstile.js.
-function isIosNative() {
+// Skip Turnstile in ALL native apps (iOS + Android), not just iOS. A signed
+// app-store binary is a different threat model from a public web form, and the
+// widget is domain-locked to housemait.com so it can't even validate against
+// the app's https://localhost origin. The server middleware bypasses native
+// requests to match. (Was iOS-only, which left Android enforcing Turnstile and
+// unable to log in - the widget errored on localhost.)
+function isNativeApp() {
   try {
-    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+    return Capacitor.isNativePlatform();
   } catch {
     return false;
   }
@@ -91,7 +86,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
 
   useEffect(() => {
     // iOS native bypass - see top-of-file comment.
-    if (isIosNative()) {
+    if (isNativeApp()) {
       onChange?.(null);
       return;
     }
@@ -109,7 +104,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
     // previously deferred this until first user interaction to avoid
     // blocking iOS WebView's tap-event delivery during the first paint
     // - but iOS native now bypasses Turnstile entirely (see
-    // isIosNative() above), so the widget only ever renders on web,
+    // isNativeApp() above), so the widget only ever renders on web,
     // where eager loading is fine and gives users immediate feedback
     // that bot protection is running.
     loadScript()
@@ -124,7 +119,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
           // visible and gives users a clear signal that bot protection is
           // running. We previously used 'invisible' to dodge an iOS WebView
           // tap-handling race; that's now moot because iOS native bypasses
-          // Turnstile entirely (see isIosNative() above), so the visible
+          // Turnstile entirely (see isNativeApp() above), so the visible
           // widget only renders on desktop / mobile-web where it's fine.
           size: 'normal',
           // 'refresh-expired: auto' tells Cloudflare to silently issue a new
@@ -169,7 +164,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 
-  if (!SITE_KEY || isIosNative()) return null;
+  if (!SITE_KEY || isNativeApp()) return null;
 
   return <div ref={containerRef} className="turnstile-container my-3" />;
 });

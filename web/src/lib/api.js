@@ -40,6 +40,13 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   if (cachedAppVersion) config.headers['X-App-Version'] = cachedAppVersion;
+  // Deterministic platform signal ('ios' | 'android' | 'web'), set
+  // synchronously on every request. The backend uses it to bypass Turnstile
+  // for native apps - more reliable than sniffing Origin/User-Agent (Android
+  // Capacitor uses an https://localhost origin with no 'Capacitor' UA marker,
+  // which the origin-based check missed).
+  try { config.headers['X-Client-Platform'] = Capacitor?.getPlatform?.() || 'web'; }
+  catch { config.headers['X-Client-Platform'] = 'web'; }
   return config;
 });
 

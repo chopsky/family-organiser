@@ -41,23 +41,30 @@ async function requireTurnstile(req, res, next) {
     return next();
   }
 
-  // iOS native clients skip Turnstile entirely. The threat model for a
-  // signed App Store binary is fundamentally different from web - no
-  // bot signups via App Review's flow, no credential stuffing from a
-  // controlled native binary. Apple rejected 1.1.0(8) under Guideline
-  // 2.1(a) when an iPad reviewer hit a Turnstile race during login, so
-  // we now bypass it for Capacitor requests entirely.
+  // Native app clients (iOS + Android) skip Turnstile entirely. The threat
+  // model for a signed app-store binary is fundamentally different from web -
+  // no bot signups, no credential stuffing from a controlled native binary.
+  // Apple rejected 1.1.0(8) under Guideline 2.1(a) when an iPad reviewer hit a
+  // Turnstile race during login, so we bypass it for the apps entirely.
   //
-  // Detection: Capacitor iOS apps send the Origin header
-  // "capacitor://localhost". The User-Agent also includes "Capacitor"
-  // but is more easily forged; we use both as a defence-in-depth check.
-  // Either match is sufficient - if both are missing we treat as web.
+  // Detection, in priority order:
+  //   1. X-Client-Platform: 'ios'|'android' - the app's api client stamps this
+  //      synchronously on every request. This is the reliable signal.
+  //   2. Origin "capacitor://..." - iOS Capacitor's origin (Android uses
+  //      https://localhost, which this would miss - hence signal 1).
+  //   3. User-Agent contains "Capacitor" - weakest, kept as defence-in-depth.
+  // Any match is sufficient. All three are forgeable, but Turnstile is a
+  // bot-friction layer, not the auth gate (password + rate-limiting are) - the
+  // same posture the origin-only check already accepted.
   const origin = req.get('Origin') || '';
   const userAgent = req.get('User-Agent') || '';
-  const isCapacitorRequest =
+  const clientPlatform = (req.get('X-Client-Platform') || '').toLowerCase();
+  const isNativeApp =
+    clientPlatform === 'ios' ||
+    clientPlatform === 'android' ||
     origin.startsWith('capacitor://') ||
     /Capacitor/i.test(userAgent);
-  if (isCapacitorRequest) {
+  if (isNativeApp) {
     return next();
   }
 
