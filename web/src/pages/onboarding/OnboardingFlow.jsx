@@ -213,15 +213,17 @@ export default function OnboardingFlow() {
 
       {/* Auth header (logo + "Log in") only on the entry/account card - the
           rest of the flow is post-signup, where a "Log in" link makes no
-          sense. The account card's top padding below is bumped to clear it. */}
-      {key === 'account' && <AuthHeader cta={{ label: 'Log in', to: '/login' }} />}
+          sense. The account card's top padding below is bumped to clear it.
+          Hidden in the native apps: the marketing-style header is redundant
+          chrome there (the card already carries its own "Log in" link). */}
+      {key === 'account' && !Capacitor.isNativePlatform() && <AuthHeader cta={{ label: 'Log in', to: '/login' }} />}
 
       {/* All steps vertically centred. A short card sits in the middle; a card
           taller than the screen grows the page and scrolls from the top (so its
           top never clips). The stage's env(safe-area-inset-top) already clears
           the iOS status bar, so the small pt just keeps a tight gap below it for
           the tall, top-aligned cards. */}
-      <main className={`relative z-10 flex-1 flex flex-col items-center justify-center px-4 pb-8 md:pb-10 ${key === 'account' ? 'pt-20 md:pt-20' : 'pt-3 md:pt-14'}`}>
+      <main className={`relative z-10 flex-1 flex flex-col items-center justify-center px-4 pb-8 md:pb-10 ${key === 'account' && !Capacitor.isNativePlatform() ? 'pt-20 md:pt-20' : 'pt-3 md:pt-14'}`}>
         <div
           key={reduced ? 'static' : key /* re-mount per step so the enter animation fires */}
           className={`ob-card ${reduced ? '' : 'ob-card-in'}`}
