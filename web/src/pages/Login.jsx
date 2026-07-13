@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -101,10 +102,15 @@ export default function Login() {
       className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
       style={{
         background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)',
+        // The +5rem clears the AuthHeader; drop it in the native apps where the
+        // header is hidden, so the card re-centres.
+        paddingTop: `calc(env(safe-area-inset-top, 0px) + ${Capacitor.isNativePlatform() ? '1rem' : '5rem'})`,
       }}
     >
-      <AuthHeader cta={{ label: 'Sign up free', to: '/signup' }} />
+      {/* Marketing header (logo + "Sign up free") is redundant chrome in the
+          native apps - there's no website to jump to, and the card carries its
+          own sign-up link. Web keeps it. */}
+      {!Capacitor.isNativePlatform() && <AuthHeader cta={{ label: 'Sign up free', to: '/signup' }} />}
       {/* Coral blob (bottom-left) - purely decorative ambient lighting. */}
       <div
         aria-hidden="true"
