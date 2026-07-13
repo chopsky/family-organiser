@@ -236,17 +236,22 @@ export default function OnboardingFlow() {
             textAlign: 'center',
           }}
         >
-          {/* Progress header: back chevron (hidden on the first step) + fill bar. */}
+          {/* Progress header: back chevron (only from step 2 on) + fill bar.
+              On the first step the button is NOT rendered at all - using
+              visibility:hidden reserved its 38px + gap and pushed the bar
+              right, so it read as off-centre on the landing card. */}
           <div className="flex items-center gap-3 mb-6">
-            <button
-              type="button"
-              onClick={back}
-              aria-label="Back"
-              className="shrink-0 flex items-center justify-center rounded-xl transition-colors"
-              style={{ width: 38, height: 38, border: 0, cursor: isFirst ? 'default' : 'pointer', background: '#F3EEE5', color: '#6B6774', visibility: isFirst ? 'hidden' : 'visible' }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
-            </button>
+            {!isFirst && (
+              <button
+                type="button"
+                onClick={back}
+                aria-label="Back"
+                className="shrink-0 flex items-center justify-center rounded-xl transition-colors"
+                style={{ width: 38, height: 38, border: 0, cursor: 'pointer', background: '#F3EEE5', color: '#6B6774' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+              </button>
+            )}
             <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: '#F3EEE5' }}>
               <div className="h-full rounded-full" style={{ width: `${PROGRESS[key]}%`, background: 'var(--color-plum)', transition: reduced ? 'none' : 'width .45s cubic-bezier(0.22,1,0.36,1)' }} />
             </div>
