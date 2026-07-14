@@ -197,17 +197,24 @@ async function seedHolidaysForNewHousehold(householdId, timezone, createdByUserI
 }
 
 /**
- * Yearly refresh: fetch next year's holidays for all households.
+ * Yearly refresh: fetch current + next year's holidays for all households.
  * Called by cron job in December.
+ *
+ * Current year is included as self-healing: if a December run is ever missed
+ * (server down, Nager outage), that year would otherwise be permanently
+ * skipped - the cron only looks forward and nothing retries. Re-inserting the
+ * current year is a no-op on the happy path because insertHolidaysForHousehold
+ * dedupes against existing all-day events before inserting.
  */
 async function refreshHolidaysForAllHouseholds() {
   const households = await db.getAllHouseholds();
-  const nextYear = new Date().getFullYear() + 1;
+  const currentYear = new Date().getFullYear();
 
   for (const household of households) {
     const countryCode = resolveCountryCode(household);
     if (!countryCode) continue;
-    await insertHolidaysForHousehold(household.id, countryCode, nextYear, null);
+    await insertHolidaysForHousehold(household.id, countryCode, currentYear, null);
+    await insertHolidaysForHousehold(household.id, countryCode, currentYear + 1, null);
   }
 }
 
