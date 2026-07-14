@@ -18,8 +18,9 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import api from '../lib/api';
-import { getDeviceLocation, openLocationSettings } from '../lib/location';
+import { getDeviceLocation, openLocationSettings, requestLocationPermission } from '../lib/location';
 import { isNative } from '../lib/platform';
 
 // ── Weather glyphs - minimalist line icons, 24px viewBox (from the brief) ──
@@ -69,6 +70,8 @@ const BRAND_DEEP = '#4A22A8';
 export default function WeatherStrip({ onOpenAI }) {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(false);
+  // Bumped to force a re-fetch after the user grants location permission.
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Mobile-only: the weather widget is intentionally not shown on the
   // desktop app (≥768px, the design's sidebar breakpoint). We gate on a
@@ -107,7 +110,27 @@ export default function WeatherStrip({ onOpenAI }) {
         .catch(() => { if (!cancelled) setData({ available: false }); });
     })();
     return () => { cancelled = true; };
-  }, [isMobile]);
+  }, [isMobile, reloadKey]);
+
+  // "Open Settings" / fix-location handler. On iOS we deep-link to the app's
+  // settings page. On Android there is no such deep link, and the usual reason
+  // the card shows is that permission was never granted (the dashboard only
+  // does silent, skip-if-denied reads) - so re-request it, which surfaces the
+  // OS prompt. On grant, force a re-fetch; if permanently denied, fall back to
+  // the app settings page so they can flip it manually.
+  async function handleFixLocation() {
+    if (Capacitor.getPlatform() === 'ios') {
+      openLocationSettings();
+      return;
+    }
+    const state = await requestLocationPermission();
+    if (state === 'granted') {
+      setData(null); // show the skeleton while we re-fetch
+      setReloadKey((k) => k + 1);
+    } else {
+      openLocationSettings();
+    }
+  }
 
   // Desktop never shows the widget.
   if (!isMobile) return null;
@@ -169,10 +192,10 @@ export default function WeatherStrip({ onOpenAI }) {
             {isNative() ? (
               <button
                 type="button"
-                onClick={openLocationSettings}
+                onClick={handleFixLocation}
                 style={{ border: 0, background: 'transparent', padding: 0, color: BRAND, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}
               >
-                Open Settings
+                {Capacitor.getPlatform() === 'android' ? 'Enable location' : 'Open Settings'}
               </button>
             ) : (
               <span style={{ color: INK2, fontWeight: 600 }}>Open Settings</span>
