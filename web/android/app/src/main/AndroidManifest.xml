@@ -18,6 +18,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- App Links: verified https links to our own paths open the app
+                 instead of the browser (mirrors the iOS Universal Links / AASA
+                 components: /verify?token=… and /verified). autoVerify makes
+                 Android check /.well-known/assetlinks.json on housemait.com.
+                 Scoped to these paths so marketing/other links still open the
+                 browser. Both apex and www are claimed. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="housemait.com" />
+                <data android:host="www.housemait.com" />
+                <data android:path="/verify" />
+                <data android:path="/verified" />
+            </intent-filter>
         </activity>
 
         <provider

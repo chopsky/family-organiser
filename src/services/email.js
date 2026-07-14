@@ -65,6 +65,12 @@ async function sendEmail(to, subject, html, options = {}) {
   }
   const payload = { From: FROM, To: to, Subject: subject, HtmlBody: html };
   if (options.replyTo) payload.ReplyTo = options.replyTo;
+  // Postmark link tracking rewrites href targets to a tracking domain. For
+  // deep-linking emails (email verification) that breaks iOS Universal Links
+  // and Android App Links - the tapped URL is no longer on housemait.com, so
+  // the OS opens the browser instead of the app. Callers pass trackLinks:'None'
+  // to opt out and keep the raw https://housemait.com link intact.
+  if (options.trackLinks) payload.TrackLinks = options.trackLinks;
   await client.sendEmail(payload);
 }
 
@@ -84,7 +90,9 @@ async function sendVerificationEmail(to, name, token) {
     <div style="text-align:center;">${button('Verify email', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;">This link expires in 24 hours.</p>
   `);
-  await sendEmail(to, 'Verify your email for Housemait', html);
+  // trackLinks:'None' keeps the raw housemait.com/verify link so iOS Universal
+  // Links / Android App Links open the app instead of the browser.
+  await sendEmail(to, 'Verify your email for Housemait', html, { trackLinks: 'None' });
 }
 
 /**

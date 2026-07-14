@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.housemait.app",
+      "sha256_cert_fingerprints": [
+        "D7:A3:53:26:29:C7:95:3B:95:48:10:47:0C:71:BA:FA:4C:6C:66:0A:EC:04:68:84:60:E4:90:1F:AB:B9:1D:00",
+        "7D:82:51:BD:5B:0E:5F:A6:C1:9E:94:C2:AB:E5:FE:3F:C6:6E:25:AD:D3:1B:06:89:54:7F:F8:F3:DC:DC:B0:3B"
+      ]
+    }
+  }
+]
