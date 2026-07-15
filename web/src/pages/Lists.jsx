@@ -474,7 +474,7 @@ export default function Lists() {
                     {sec.name && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: active?.color || BRAND, padding: '0 4px 6px' }}>{sec.name}</div>}
                     <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
                       {sec.items.map((it, i, arr) => (
-                        <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} />
+                        <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} onEdit={isTodos ? setEditTodo : setEditItem} />
                       ))}
                     </div>
                   </div>
@@ -491,7 +491,7 @@ export default function Lists() {
                     {somedayShown && (
                       <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
                         {somedayItems.map((it, i, arr) => (
-                          <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} />
+                          <MobileListRow key={it.id} it={it} color={active?.color || BRAND} isTodos={isTodos} assignees={(it.whoIds || []).map(memberOf).filter(Boolean)} iosNative={iosNative} last={i === arr.length - 1} onToggle={toggle} onDelete={removeItem} onEdit={isTodos ? setEditTodo : setEditItem} />
                         ))}
                       </div>
                     )}
@@ -661,13 +661,14 @@ function Row({ it, isTodos, color, assignees = [], onToggle, onDelete, onEdit })
 // One mobile list row. On native iOS it's a swipe-left-to-reveal Delete (the
 // platform convention); on desktop + mobile web a tap-to-delete trash button
 // (same affordance as desktop). Completed rows render bare (checkbox + text).
-function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, onToggle, onDelete, doneRow }) {
+function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, onToggle, onDelete, onEdit, doneRow }) {
   const REVEAL = 88; // px of Delete action revealed
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dxRef = useRef(0);
   const start = useRef(null); // { x, y, tx } while a pointer is down
   const axis = useRef(null);  // 'h' | 'v' | null (undecided)
+  const wasDrag = useRef(false); // suppress the click that follows a horizontal swipe
   const setTx = (v) => { dxRef.current = v; setDx(v); };
   // Toggling completion closes any open swipe.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -697,10 +698,20 @@ function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, on
   const onUp = () => {
     const s = start.current; start.current = null; setDragging(false);
     if (!s || axis.current !== 'h') { axis.current = null; return; } // vertical = scroll, do nothing
+    wasDrag.current = true;                                          // the click that follows must not open edit
     setTx(dxRef.current < -REVEAL / 2 ? -REVEAL : 0);                // snap
     axis.current = null;
   };
   const onCancel = () => { start.current = null; axis.current = null; setDragging(false); setTx(dxRef.current < -REVEAL / 2 ? -REVEAL : 0); };
+
+  // Tap on the row text opens the edit modal (same affordance as the desktop
+  // Row). Guards: the synthetic click after a horizontal swipe is swallowed,
+  // and while the Delete action is revealed a tap just closes the swipe.
+  const handleTap = () => {
+    if (wasDrag.current) { wasDrag.current = false; return; }
+    if (iosNative && dxRef.current !== 0) { setTx(0); return; }
+    onEdit?.(it);
+  };
 
   const inner = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
@@ -708,8 +719,11 @@ function MobileListRow({ it, color, isTodos, assignees = [], iosNative, last, on
         style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: it.done ? `2px solid ${color}` : `1.5px solid ${LINE_STRONG}`, background: it.done ? color : 'transparent' }}>
         {it.done && <Tick s={12} />}
       </button>
-      {!isTodos && it.emoji && <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, fontSize: 18, background: color + '1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.emoji}</span>}
-      <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      <div onClick={onEdit ? handleTap : undefined}
+        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, cursor: onEdit ? 'pointer' : 'default' }}>
+        {!isTodos && it.emoji && <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, fontSize: 18, background: color + '1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.emoji}</span>}
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, color: it.done ? INK3 : INK, textDecoration: it.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.text}</span>
+      </div>
       {isTodos && !it.done && it.dueLabel && (
         <span style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 600, padding: '3px 9px', borderRadius: 999, color: it.dueTone === 'late' ? '#C24A5E' : INK3, background: it.dueTone === 'late' ? 'rgba(215,85,106,0.09)' : BG_SOFT }}>{it.dueLabel}</span>
       )}
