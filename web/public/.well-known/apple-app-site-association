@@ -5,7 +5,8 @@
         "appIDs": ["G37VHKH43S.com.housemait.app"],
         "components": [
           { "/": "/verify", "?": { "token": "?*" } },
-          { "/": "/verified" }
+          { "/": "/verified" },
+          { "/": "/open" }
         ]
       }
     ]

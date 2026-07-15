@@ -396,7 +396,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 
       <!-- CTA -->
       <div style="text-align:center;margin-top:24px;">
-        ${button('Open Housemait', BASE_URL)}
+        ${button('Open Housemait', `${BASE_URL}/open`)}
       </div>
     </div>
 
@@ -408,7 +408,8 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 </body>
 </html>`;
 
-  await sendEmail(to, `Weekly Digest - ${householdName}`, html);
+  // trackLinks:'None' keeps /open intact so the button deep-links into the app.
+  await sendEmail(to, `Weekly Digest - ${householdName}`, html, { trackLinks: 'None' });
 }
 
 // ─── Subscription lifecycle emails (Phase 7) ────────────────────────────────
@@ -460,7 +461,7 @@ function formatTrialEndDate(when) {
  * @param {'transactional'|'broadcast'} args.stream
  * @param {string[]} [args.listUnsubscribeHeaders]  headers for broadcast emails
  */
-async function sendTemplate({ to, templateAlias, model, stream, listUnsubscribeHeaders }) {
+async function sendTemplate({ to, templateAlias, model, stream, listUnsubscribeHeaders, trackLinks }) {
   if (!client) {
     console.warn(`[email] Postmark not configured - skipping "${templateAlias}" to ${to}`);
     return;
@@ -472,6 +473,10 @@ async function sendTemplate({ to, templateAlias, model, stream, listUnsubscribeH
     TemplateModel: model,
     MessageStream: STREAM[stream] || STREAM.transactional,
   };
+  // Same rationale as sendEmail: Postmark link tracking rewrites hrefs to a
+  // tracking domain, which breaks Universal Links / App Links - emails whose
+  // buttons deep-link into the app must pass trackLinks:'None'.
+  if (trackLinks) payload.TrackLinks = trackLinks;
   if (listUnsubscribeHeaders?.length) {
     payload.Headers = listUnsubscribeHeaders;
   }
@@ -538,10 +543,16 @@ async function sendWelcomeEmail({ to, firstName, trialEndsAt }) {
     to,
     templateAlias: TEMPLATE_ALIASES.welcome,
     stream: 'transactional',
+    // /open is the Universal Link / App Link path - on a phone with the
+    // app installed, the "Open Housemait" button opens the app instead of
+    // the browser (the bare BASE_URL root is deliberately NOT a deep-link
+    // path). trackLinks:'None' so Postmark doesn't rewrite the href to a
+    // tracking domain, which would defeat the deep link.
+    trackLinks: 'None',
     model: {
       first_name: firstName || 'there',
       trial_end_date: formatTrialEndDate(trialEndsAt),
-      app_url: BASE_URL,
+      app_url: `${BASE_URL}/open`,
     },
   });
 }

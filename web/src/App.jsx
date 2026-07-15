@@ -243,6 +243,13 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />
         <Route path="/verify" element={<Verify />} />
+        {/* /open - deep-link target for "Open Housemait" email buttons. It's a
+            Universal Link / App Link path (AASA + Android intent-filter), so on
+            a phone with the app installed the OS opens the app instead of the
+            browser; in either client it just lands on the home route. The bare
+            domain can't be used for this - claiming "/" would hijack every
+            housemait.com marketing link into the app. */}
+        <Route path="/open" element={<Navigate to="/" replace />} />
         <Route path="/verified" element={<Verified />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
