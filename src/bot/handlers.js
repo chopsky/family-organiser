@@ -2264,7 +2264,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       const startTime = ev.all_day ? `${ev.date}T00:00:00Z` : localToUTC(ev.date, ev.start_time || '09:00', userTz);
       const endTime = ev.all_day ? `${ev.date}T23:59:59Z` : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
 
-      const created = await db.createCalendarEvent(household.id, {
+      const eventFields = {
         title: ev.title,
         start_time: startTime,
         end_time: endTime,
@@ -2275,7 +2275,19 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         location: ev.location || null,
         description: ev.description || null,
         category: 'school',
-      }, user.id);
+      };
+      let created;
+      try {
+        created = await db.createCalendarEvent(household.id, eventFields, user.id);
+      } catch (err) {
+        // Until migration-calendar-school-category.sql runs, the DB CHECK
+        // constraint doesn't allow 'school' - fall back to 'general' so the
+        // user gets their event instead of a raw constraint error. Harmless
+        // after the migration (the first insert simply succeeds).
+        if (!/calendar_events_category_check/.test(err?.message || '')) throw err;
+        console.warn('[handlers] school category rejected by DB constraint - retrying as general (run migration-calendar-school-category.sql)');
+        created = await db.createCalendarEvent(household.id, { ...eventFields, category: 'general' }, user.id);
+      }
 
       if (created && assigneeNames.length > 0) {
         await db.saveEventAssignees(created.id, household.id, assigneeNames, household.members);
