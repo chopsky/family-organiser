@@ -581,7 +581,13 @@ router.get('/me', requireAuth, async (req, res) => {
   // that happened on the user's latest sign-in.
   try {
     const fresh = await db.getUserById(req.user.id);
-    if (!fresh) return res.status(404).json({ error: 'User not found' });
+    // 401 (not 404): a valid JWT whose user row is gone means the account
+    // was deleted (e.g. via /admin) while a device still held tokens. Only
+    // 401 engages the client's refresh→force-logout chain - the refresh
+    // token is also gone, so the device cleanly lands on the login screen.
+    // A 404 here left deleted-mid-onboarding devices permanently stuck in
+    // the wizard, booting from stale localStorage state forever.
+    if (!fresh) return res.status(401).json({ error: 'Account no longer exists' });
     return res.json({
       id: fresh.id,
       name: fresh.name,
@@ -626,6 +632,13 @@ router.post('/mark-onboarded', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    // PGRST116 = the fallback fetch found no user row: the account was
+    // deleted while this device still held tokens. 401 (same as /me) so
+    // the client's refresh→force-logout chain lands them on login instead
+    // of looping the onboarding wizard off a 500.
+    if (err?.code === 'PGRST116') {
+      return res.status(401).json({ error: 'Account no longer exists' });
+    }
     console.error('POST /api/auth/mark-onboarded error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
