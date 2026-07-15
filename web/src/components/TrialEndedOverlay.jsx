@@ -24,7 +24,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
-import { isIos } from '../lib/platform';
+import { isIos, isAndroid } from '../lib/platform';
 
 const DISMISSED_KEY = 'trial-ended-overlay-dismissed';
 
@@ -69,6 +69,9 @@ export default function TrialEndedOverlay() {
   // iOS so this guard is defence-in-depth - explicitly block here in
   // case any future change to the context regresses that.
   if (isIos()) return null;
+  // Google Play payments policy: same posture on Android - no subscribe
+  // prompt, no external-purchase steering - until Play Billing ships.
+  if (isAndroid()) return null;
   if (!isExpired || dismissed) return null;
 
   function handleDismiss() {

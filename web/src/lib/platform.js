@@ -33,6 +33,25 @@ export function isIos() {
   }
 }
 
+/**
+ * True when the app is running as a Capacitor-wrapped native Android binary.
+ * False for web (even Chrome on an Android phone) and iOS.
+ *
+ * Used to gate purchase UI out of the Play build: Google Play's payments
+ * policy requires Play Billing for in-app digital subscriptions and, like
+ * Apple, prohibits steering users to an external payment flow. Until Play
+ * Billing ships (RevenueCat, mirroring iOS), Android offers NO purchase
+ * flow - CTAs hidden, /subscribe renders a neutral notice with no external
+ * link or instruction.
+ */
+export function isAndroid() {
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  } catch {
+    return false;
+  }
+}
+
 /** True when running as any Capacitor-wrapped native binary (iOS or Android). */
 export function isNative() {
   try {

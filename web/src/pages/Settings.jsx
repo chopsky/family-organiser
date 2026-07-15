@@ -10,7 +10,7 @@ import DeviceCalendarSync from '../components/DeviceCalendarSync';
 import GoogleCalendarConnect from '../components/GoogleCalendarConnect';
 import { isDeviceCalendarSupported } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
-import { isIos } from '../lib/platform';
+import { isIos, isAndroid } from '../lib/platform';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
@@ -329,10 +329,11 @@ function ProfileCard({ me, members }) {
     : isTrialing && daysRemaining != null ? `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left`
     : null;
 
+  const isAndroidPlatform = isAndroid();
   const billingSub = isInternal ? 'No billing applies to this household'
     : isTrialing ? (trialEndsAt ? `Trial ends ${fmtDate(trialEndsAt)}` : 'Subscribe any time to avoid interruption')
     : isActive ? (provider === 'apple' ? 'Billed through your Apple ID' : 'Billed by card via Stripe')
-    : isExpired ? "Your data's still here - subscribe to unlock everything"
+    : isExpired ? (isAndroidPlatform ? "Your data's still here and safe" : "Your data's still here - subscribe to unlock everything")
     : '';
   const billingControl = isInternal ? null
     : !isOwner
@@ -340,11 +341,13 @@ function ProfileCard({ me, members }) {
       : isActive
         ? <SelectBtn value={portalLoading ? 'Opening…' : 'Manage'} onClick={openCustomerPortal} disabled={portalLoading} />
         : (isTrialing || isExpired)
-          ? (
+          // Android: no purchase flow until Google Play Billing ships - no
+          // Subscribe CTA (Play payments policy, mirrors the iOS 3.1.1 posture).
+          ? (isAndroidPlatform ? null : (
             <Link to="/subscribe" className="inline-flex items-center px-4 py-2 rounded-[11px] bg-plum hover:bg-plum-pressed text-white text-[13px] font-semibold transition-colors whitespace-nowrap">
               Subscribe
             </Link>
-          )
+          ))
           : null;
 
   return (

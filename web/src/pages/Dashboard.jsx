@@ -5,6 +5,7 @@ import { useChildMode } from '../context/ChildModeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
 import { getItemEmoji } from '../lib/shopping-constants';
+import { isAndroid } from '../lib/platform';
 import Spinner from '../components/Spinner';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { BottomSheet } from '../components/BottomSheet';
@@ -181,6 +182,9 @@ function PromoClaimNudge() {
   });
 
   const promo = user?.signup_promo_code;
+  // Android has no in-app purchase flow yet (Google Play Billing pending),
+  // so a discount CTA pointing at /subscribe would dead-end - hide it.
+  if (isAndroid()) return null;
   if (!promo || isActive || dismissed) return null;
 
   function dismiss() {

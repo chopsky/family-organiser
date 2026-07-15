@@ -24,8 +24,9 @@ import api from '../lib/api';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
 import ErrorBanner from '../components/ErrorBanner';
-import { isIos } from '../lib/platform';
+import { isIos, isAndroid } from '../lib/platform';
 import IosSubscribe from './IosSubscribe';
+import AndroidSubscribe from './AndroidSubscribe';
 import { LOCALES, getLocaleByPath, getLocaleByCountry } from '../lib/locales';
 import { readLocaleCookie } from '../hooks/useLocale';
 
@@ -104,7 +105,12 @@ export default function Subscribe() {
   // Platform dispatch - iOS sees the Apple-IAP paywall, web sees the
   // Stripe Checkout paywall below. Both are App-Review-compliant under
   // Guideline 3.1.1: native IAP on iOS, no anti-steering on web.
+  // Android sees a neutral no-purchase notice: Google Play's payments
+  // policy requires Play Billing for in-app subscriptions, and until
+  // that ships the Play build must offer no purchase flow at all (and
+  // must not steer users to an external one).
   if (isIos()) return <IosSubscribe />;
+  if (isAndroid()) return <AndroidSubscribe />;
 
   // Locale-driven pricing. resolveLocale() reads the cookie set during
   // the marketing journey; getLocaleByPath() exists if we ever want to

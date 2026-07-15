@@ -18,7 +18,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
-import { isIos } from '../lib/platform';
+import { isIos, isNative } from '../lib/platform';
 
 // ── localStorage helpers (mirror AuthContext's Safari-safe wrappers) ──
 function safeGetItem(key) {
@@ -60,7 +60,7 @@ export function TrialIndicatorSubtle({ className = '' }) {
   // already short-circuits to isInternal=true on iOS so isTrialing
   // would naturally be false, but a defensive check here prevents
   // accidental regressions if the context behaviour ever changes.
-  if (isIos()) return null;
+  if (isNative()) return null; // iOS (3.1.1) and Android (Play Billing pending): no trial/plan UI
   if (!isTrialing || daysRemaining == null) return null;
 
   const label = daysRemaining === 1
@@ -106,7 +106,7 @@ export function TrialIndicatorCard() {
   // check below would already return null, but the explicit guard here
   // is defence-in-depth. Comes after the hook calls so we don't
   // violate rules-of-hooks.
-  if (isIos()) return null;
+  if (isNative()) return null; // iOS (3.1.1) and Android (Play Billing pending): no trial/plan UI
 
   // Only show for the last 10 days of the trial. Days 1–20 of the trial
   // (11+ remaining) use the subtle text in Settings only per the spec.

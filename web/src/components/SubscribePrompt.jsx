@@ -24,7 +24,7 @@
 
 import { Link } from 'react-router-dom';
 import { useCanWrite } from '../context/SubscriptionContext';
-import { isIos } from '../lib/platform';
+import { isNative } from '../lib/platform';
 
 /**
  * Inline prompt. Renders regardless of subscription state - the caller
@@ -48,7 +48,7 @@ export default function SubscribePrompt({
   // canWrite=true on iOS so callers' `{!canWrite && <SubscribePrompt/>}`
   // patterns won't render this, but any caller that renders us
   // unconditionally would still get blocked here.
-  if (isIos()) return null;
+  if (isNative()) return null; // iOS (3.1.1) and Android (Play Billing pending): no Subscribe CTA
 
   const { padding, text, button } = SIZES[size] || SIZES.md;
 
