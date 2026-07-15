@@ -179,6 +179,54 @@ describe('active-subscription handlers', () => {
   });
 });
 
+// --- Store -> provider mapping (Android / Google Play Billing) ------
+
+describe('provider from event.store', () => {
+  test('PLAY_STORE purchases mark the household provider=google', async () => {
+    const res = await postEvent(makeEvent('INITIAL_PURCHASE', { store: 'PLAY_STORE' }));
+    expect(res.status).toBe(200);
+    expect(db.updateHouseholdSubscription).toHaveBeenCalledWith(
+      HOUSEHOLD_ID,
+      expect.objectContaining({
+        subscription_status: 'active',
+        subscription_provider: 'google',
+      })
+    );
+  });
+
+  test('APP_STORE stays provider=apple', async () => {
+    await postEvent(makeEvent('RENEWAL', { store: 'APP_STORE' }));
+    expect(db.updateHouseholdSubscription).toHaveBeenCalledWith(
+      HOUSEHOLD_ID,
+      expect.objectContaining({ subscription_provider: 'apple' })
+    );
+  });
+
+  test('missing store defaults to apple (legacy payloads)', async () => {
+    await postEvent(makeEvent('RENEWAL'));
+    expect(db.updateHouseholdSubscription).toHaveBeenCalledWith(
+      HOUSEHOLD_ID,
+      expect.objectContaining({ subscription_provider: 'apple' })
+    );
+  });
+
+  test('SUBSCRIBER_ALIAS on PLAY_STORE keeps provider=google', async () => {
+    const res = await postEvent(makeEvent('SUBSCRIBER_ALIAS', {
+      store: 'PLAY_STORE',
+      original_app_user_id: 'anon-123',
+      app_user_id: APP_USER_ID,
+    }));
+    expect(res.status).toBe(200);
+    expect(db.updateHouseholdSubscription).toHaveBeenCalledWith(
+      HOUSEHOLD_ID,
+      expect.objectContaining({
+        revenuecat_app_user_id: APP_USER_ID,
+        subscription_provider: 'google',
+      })
+    );
+  });
+});
+
 // --- Expiration handler --------------------------------------------
 
 describe('EXPIRATION', () => {

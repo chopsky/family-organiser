@@ -90,6 +90,17 @@ function planFromProductId(productId) {
 }
 
 /**
+ * Map RevenueCat's event.store to our subscription_provider enum.
+ * APP_STORE / MAC_APP_STORE -> 'apple'; PLAY_STORE -> 'google'.
+ * Default 'apple' preserves the pre-Android behaviour for events that
+ * omit store (older payloads, TEST fires).
+ */
+function providerFromStore(store) {
+  if (store === 'PLAY_STORE') return 'google';
+  return 'apple';
+}
+
+/**
  * Resolve a RevenueCat event payload to one of our household rows.
  *
  * In the happy path (the iOS app called Purchases.logIn(household.id)
@@ -184,8 +195,9 @@ async function handleEvent(event) {
 
 /**
  * Active states (initial purchase, renewal, plan-change, un-cancel) all
- * write the same household state: status=active, provider=apple,
- * plan from product_id, current period end from expiration_at_ms.
+ * write the same household state: status=active, provider from the
+ * event's store (apple/google), plan from product_id, current period
+ * end from expiration_at_ms.
  */
 async function applyActiveSubscription(event) {
   const household = await resolveHousehold(event.app_user_id);
@@ -199,7 +211,7 @@ async function applyActiveSubscription(event) {
 
   const update = {
     subscription_status: 'active',
-    subscription_provider: 'apple',
+    subscription_provider: providerFromStore(event.store),
     revenuecat_app_user_id: event.app_user_id,
     inactive_since: null, // clear retention clock if it was ticking
   };
@@ -271,7 +283,7 @@ async function handleSubscriberAlias(event) {
 
   await db.updateHouseholdSubscription(household.id, {
     revenuecat_app_user_id: next,
-    subscription_provider: 'apple',
+    subscription_provider: providerFromStore(event.store),
   });
 }
 

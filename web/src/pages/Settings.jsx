@@ -11,6 +11,7 @@ import GoogleCalendarConnect from '../components/GoogleCalendarConnect';
 import { isDeviceCalendarSupported } from '../lib/deviceCalendar';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { isIos, isAndroid } from '../lib/platform';
+import { iapKeyPresent } from '../lib/revenuecat';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
@@ -289,6 +290,15 @@ function ProfileCard({ me, members }) {
       return;
     }
 
+    if (provider === 'google') {
+      // Play's subscription-management page for OUR subscription. On an
+      // Android device this opens the Play Store app; on web/iOS it opens
+      // Play's web account page - both let the user manage/cancel.
+      window.location.href =
+        'https://play.google.com/store/account/subscriptions?package=com.housemait.app';
+      return;
+    }
+
     setPortalLoading(true);
     setPortalError('');
     try {
@@ -330,10 +340,14 @@ function ProfileCard({ me, members }) {
     : null;
 
   const isAndroidPlatform = isAndroid();
+  // Android can only offer purchase once Play Billing is configured
+  // (RevenueCat Google key baked into the build). Without it, no
+  // Subscribe CTA and neutral expired copy (Play payments policy).
+  const androidCanPurchase = !isAndroidPlatform || iapKeyPresent();
   const billingSub = isInternal ? 'No billing applies to this household'
     : isTrialing ? (trialEndsAt ? `Trial ends ${fmtDate(trialEndsAt)}` : 'Subscribe any time to avoid interruption')
-    : isActive ? (provider === 'apple' ? 'Billed through your Apple ID' : 'Billed by card via Stripe')
-    : isExpired ? (isAndroidPlatform ? "Your data's still here and safe" : "Your data's still here - subscribe to unlock everything")
+    : isActive ? (provider === 'apple' ? 'Billed through your Apple ID' : provider === 'google' ? 'Billed through Google Play' : 'Billed by card via Stripe')
+    : isExpired ? (androidCanPurchase ? "Your data's still here - subscribe to unlock everything" : "Your data's still here and safe")
     : '';
   const billingControl = isInternal ? null
     : !isOwner
@@ -341,9 +355,9 @@ function ProfileCard({ me, members }) {
       : isActive
         ? <SelectBtn value={portalLoading ? 'Opening…' : 'Manage'} onClick={openCustomerPortal} disabled={portalLoading} />
         : (isTrialing || isExpired)
-          // Android: no purchase flow until Google Play Billing ships - no
-          // Subscribe CTA (Play payments policy, mirrors the iOS 3.1.1 posture).
-          ? (isAndroidPlatform ? null : (
+          // Android: Subscribe CTA only once Play Billing is live in this
+          // build (Play payments policy; /subscribe then shows the paywall).
+          ? (!androidCanPurchase ? null : (
             <Link to="/subscribe" className="inline-flex items-center px-4 py-2 rounded-[11px] bg-plum hover:bg-plum-pressed text-white text-[13px] font-semibold transition-colors whitespace-nowrap">
               Subscribe
             </Link>

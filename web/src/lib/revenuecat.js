@@ -3,10 +3,12 @@
  *
  * Thin layer over @revenuecat/purchases-capacitor that:
  *
- *   1. Centralises the iOS-only check so callers don't have to
+ *   1. Centralises the native-platform check so callers don't have to
  *      remember to gate every call. Every export is a no-op on web
- *      and Android (Capacitor.isNativePlatform() === false), which
- *      lets the rest of the app call into it unconditionally.
+ *      (and on a native platform whose RevenueCat key isn't set),
+ *      which lets the rest of the app call into it unconditionally.
+ *      iOS bills through Apple IAP, Android through Google Play
+ *      Billing - same SDK, per-platform API key (platformApiKey()).
  *
  *   2. Hides the SDK's verbose response shapes - callers want
  *      "did the purchase succeed" or "what's the active entitlement",
@@ -49,10 +51,42 @@ console.log('[revenuecat] module loaded; isNative=', Capacitor.isNativePlatform(
 /** Entitlement identifier matching the RevenueCat dashboard (Phase 0). */
 export const PREMIUM_ENTITLEMENT = 'premium';
 
+/**
+ * The RevenueCat PUBLIC API key for the platform we're running on.
+ * iOS and Android are separate "apps" in the RevenueCat project, each
+ * with its own key. A missing key means IAP is disabled on that
+ * platform (configure() no-ops and every caller sees null offerings) -
+ * that's the dormant state Android ships in until Play Billing is
+ * configured end-to-end (Play products + RevenueCat Google app + this
+ * env var), at which point setting VITE_REVENUECAT_GOOGLE_KEY in the
+ * build env switches the paywall on with no further code change.
+ */
+function platformApiKey() {
+  const platform = Capacitor.getPlatform();
+  if (platform === 'ios') return import.meta.env?.VITE_REVENUECAT_IOS_KEY || null;
+  if (platform === 'android') return import.meta.env?.VITE_REVENUECAT_GOOGLE_KEY || null;
+  return null;
+}
+
 /** True if we're running on a platform where IAP is even possible. */
 export function isIapPlatform() {
   try {
-    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+    if (!Capacitor.isNativePlatform()) return false;
+    const platform = Capacitor.getPlatform();
+    return platform === 'ios' || platform === 'android';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Synchronous "could IAP work here" check: native platform AND its
+ * RevenueCat key is present in the build. Used to gate Subscribe CTAs
+ * without waiting for configure()/getOfferings() round-trips.
+ */
+export function iapKeyPresent() {
+  try {
+    return isIapPlatform() && !!platformApiKey();
   } catch {
     return false;
   }
@@ -71,7 +105,7 @@ let _configured = false;
 export async function configure() {
   console.log('[revenuecat] configure() entered');
   if (!isIapPlatform()) {
-    console.log('[revenuecat] not iOS native, skipping');
+    console.log('[revenuecat] not a native IAP platform, skipping');
     return;
   }
   if (_configured) {
@@ -79,11 +113,11 @@ export async function configure() {
     return;
   }
 
-  const apiKey = import.meta.env?.VITE_REVENUECAT_IOS_KEY;
+  const apiKey = platformApiKey();
   if (!apiKey) {
     console.warn(
-      '[revenuecat] VITE_REVENUECAT_IOS_KEY not set - IAP disabled. ' +
-      'Add the iOS public API key in Vercel env vars.'
+      `[revenuecat] no RevenueCat key for platform "${Capacitor.getPlatform()}" - IAP disabled. ` +
+      'Set VITE_REVENUECAT_IOS_KEY (iOS) / VITE_REVENUECAT_GOOGLE_KEY (Android) in the build env.'
     );
     return;
   }
@@ -240,7 +274,8 @@ export async function restorePurchases() {
  * status afterwards since RevenueCat applies the offer asynchronously.
  */
 export async function presentCodeRedemptionSheet() {
-  if (!isIapPlatform()) {
+  // Apple StoreKit feature - iOS only (Android/Play has no equivalent sheet).
+  if (!isIapPlatform() || Capacitor.getPlatform() !== 'ios') {
     throw new Error('Code redemption not available on this platform');
   }
   return Purchases.presentCodeRedemptionSheet();

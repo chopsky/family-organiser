@@ -105,10 +105,10 @@ export default function Subscribe() {
   // Platform dispatch - iOS sees the Apple-IAP paywall, web sees the
   // Stripe Checkout paywall below. Both are App-Review-compliant under
   // Guideline 3.1.1: native IAP on iOS, no anti-steering on web.
-  // Android sees a neutral no-purchase notice: Google Play's payments
-  // policy requires Play Billing for in-app subscriptions, and until
-  // that ships the Play build must offer no purchase flow at all (and
-  // must not steer users to an external one).
+  // Android sees the Google Play Billing paywall when the build carries
+  // VITE_REVENUECAT_GOOGLE_KEY, and a neutral no-purchase notice
+  // otherwise (Play's payments policy requires Play Billing for in-app
+  // subscriptions and prohibits steering to an external payment flow).
   if (isIos()) return <IosSubscribe />;
   if (isAndroid()) return <AndroidSubscribe />;
 
