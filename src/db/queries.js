@@ -386,10 +386,20 @@ function isMissingColumnError(error) {
     || (msg.includes('column') && msg.includes('does not exist'));
 }
 
+/**
+ * Refresh tokens are stored as SHA-256 hashes, never plaintext - a database
+ * leak must not hand out live sessions. SHA-256 (not bcrypt) is deliberate:
+ * the tokens are 32 bytes of CSPRNG output, so brute-force isn't a threat
+ * and a deterministic hash keeps the indexed equality lookup.
+ */
+function hashRefreshToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 async function createRefreshToken(userId, token, expiresAt, meta = {}, db = supabase) {
   const baseRow = {
     user_id: userId,
-    token,
+    token: hashRefreshToken(token),
     expires_at: expiresAt,
     user_agent: meta.userAgent || null,
     ip_address: meta.ipAddress || null,
@@ -409,15 +419,37 @@ async function createRefreshToken(userId, token, expiresAt, meta = {}, db = supa
 }
 
 async function getValidRefreshToken(token, db = supabase) {
-  const { data, error } = await db
-    .from('refresh_tokens')
-    .select()
-    .eq('token', token)
-    .eq('revoked', false)
-    .gt('expires_at', new Date().toISOString())
-    .single();
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
+  const now = new Date().toISOString();
+  const lookup = async (value) => {
+    const { data, error } = await db
+      .from('refresh_tokens')
+      .select()
+      .eq('token', value)
+      .eq('revoked', false)
+      .gt('expires_at', now)
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || null;
+  };
+
+  // Hash-first: all tokens issued since the hashing change are stored as
+  // SHA-256 digests.
+  const hashed = await lookup(hashRefreshToken(token));
+  if (hashed) return hashed;
+
+  // Legacy fallback: rows issued before the change hold the raw token.
+  // Upgrade the row in place on first use so live sessions survive the
+  // rollout with no migration and the table converges to hashed-only
+  // (stragglers age out at expires_at).
+  const legacy = await lookup(token);
+  if (legacy) {
+    const { error: upgradeErr } = await db
+      .from('refresh_tokens')
+      .update({ token: hashRefreshToken(token) })
+      .eq('id', legacy.id);
+    if (upgradeErr) console.warn('[db] legacy refresh-token hash upgrade failed:', upgradeErr.message);
+  }
+  return legacy;
 }
 
 async function revokeRefreshToken(tokenId, db = supabase) {
