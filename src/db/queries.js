@@ -6416,8 +6416,19 @@ async function getHouseholdActivity(householdId, { days = 30 } = {}, db = supaba
  * same reason as getHouseholdActivity (those weren't created by the user).
  */
 async function getUserFeatureSpread(userId, db = supabase) {
-  const [calendar, shopping, tasks, chat, documents, meals] = await Promise.all([
+  // Calendar usage is wider than "created a manual event":
+  //   - creating events (excluding feed-pulled rows, which the cron writes)
+  //   - subscribing an external calendar feed (owning the household's
+  //     Google/Apple feed IS using the calendar)
+  //   - generating an outbound share token
+  // Caveat that can't be fixed retroactively: calendar_events.created_by is
+  // ON DELETE SET NULL, so events created by a since-deleted account are
+  // orphaned and count for nobody. (Same applies to added_by on the other
+  // tables - a recreated account starts its counts from zero.)
+  const [calendar, feeds, feedToken, shopping, tasks, chat, documents, meals] = await Promise.all([
     db.from('calendar_events').select('id', { count: 'exact', head: true }).eq('created_by', userId).is('external_feed_id', null),
+    db.from('external_calendar_feeds').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    db.from('calendar_feed_tokens').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     db.from('shopping_items').select('id', { count: 'exact', head: true }).eq('added_by', userId),
     db.from('tasks').select('id', { count: 'exact', head: true }).eq('added_by', userId),
     db.from('chat_messages').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('role', 'user'),
@@ -6425,8 +6436,13 @@ async function getUserFeatureSpread(userId, db = supabase) {
     db.from('meal_plan').select('id', { count: 'exact', head: true }).eq('added_by', userId),
   ]);
 
+  const calendarEvents = calendar.count || 0;
+  const calendarUsed = calendarEvents > 0 || (feeds.count || 0) > 0 || (feedToken.count || 0) > 0;
+
   return {
-    calendar: { used: (calendar.count || 0) > 0, count: calendar.count || 0 },
+    // count stays "events created" (the meaningful volume number);
+    // used is the wider any-calendar-touch signal.
+    calendar: { used: calendarUsed, count: calendarEvents, feeds: feeds.count || 0 },
     shopping: { used: (shopping.count || 0) > 0, count: shopping.count || 0 },
     tasks: { used: (tasks.count || 0) > 0, count: tasks.count || 0 },
     chat: { used: (chat.count || 0) > 0, count: chat.count || 0 },

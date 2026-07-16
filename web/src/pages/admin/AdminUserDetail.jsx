@@ -528,6 +528,17 @@ function FeatureSpreadPills({ spread, loading }) {
         {FEATURE_PILLS.map(({ key, label }) => {
           const used = spread[key]?.used;
           const count = spread[key]?.count || 0;
+          const feeds = spread[key]?.feeds || 0;
+          // Calendar can be "used" with zero created events (they own feed
+          // subscriptions) - show a filled pill with no number rather than
+          // a misleading "0".
+          const tooltip = !used
+            ? 'Never used'
+            : count > 0
+              ? `${count} ${count === 1 ? 'action' : 'actions'}${feeds > 0 ? ` · ${feeds} feed subscription${feeds === 1 ? '' : 's'}` : ''}`
+              : feeds > 0
+                ? `No events created, but owns ${feeds} calendar feed subscription${feeds === 1 ? '' : 's'}`
+                : 'Used';
           return (
             <span
               key={key}
@@ -536,10 +547,10 @@ function FeatureSpreadPills({ spread, loading }) {
                   ? 'bg-plum-light text-plum'
                   : 'bg-cream text-warm-grey border border-dashed border-light-grey'
               }`}
-              title={used ? `${count} ${count === 1 ? 'action' : 'actions'}` : 'Never used'}
+              title={tooltip}
             >
               {label}
-              {used && <span className="text-[10px] font-bold opacity-80">{count}</span>}
+              {used && count > 0 && <span className="text-[10px] font-bold opacity-80">{count}</span>}
             </span>
           );
         })}
