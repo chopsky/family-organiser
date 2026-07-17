@@ -195,7 +195,7 @@ function Empty() {
       <div style={{ fontSize: 44 }}>💌</div>
       <div style={{ fontSize: 17, fontWeight: 600, color: '#1A1620', marginTop: 10 }}>No notes yet</div>
       <div style={{ fontSize: 14, color: INK3, marginTop: 6, maxWidth: 320, margin: '6px auto 0' }}>
-        When your kids draw or write you a note from Kids Mode, it&apos;ll be kept here.
+        When your kids draw or write you a note from Child Mode, it&apos;ll be kept here.
       </div>
     </div>
   );
