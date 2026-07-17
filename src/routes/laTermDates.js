@@ -14,13 +14,36 @@
 const express = require('express');
 const router = express.Router();
 const laDb = require('../db/laTermDates');
+const schoolDirDb = require('../db/schoolDirectory');
 const { importAllAuthorities, importAuthority } = require('../services/laTermDatesImport');
+
+// Public projection of a directory school - ONLY aggregate, non-household
+// fields. Never expose household ids, source_text, or arbitration internals.
+function publicSchool(s) {
+  return {
+    name: s.name,
+    postcode: s.postcode,
+    local_authority: s.local_authority,
+    slug: s.slug,
+    status: s.status,
+    verified_count: s.verified_count,
+    adopted_count: s.adopted_count || 0,
+    date_count: s.date_count,
+    source_type: s.source_type,
+    last_imported_at: s.last_imported_at,
+    last_verified_at: s.last_verified_at || null,
+  };
+}
 
 // ── Read endpoints ──────────────────────────────────────────────────────────
 
 router.get('/stats', async (req, res) => {
   try {
-    res.json(await laDb.getStats());
+    const stats = await laDb.getStats();
+    // Additive: parent-seeded independent-schools section. Self-heal to null
+    // when the directory_schools migration hasn't been applied yet.
+    stats.schools = await schoolDirDb.getSchoolDirectoryStats().catch(() => null);
+    res.json(stats);
   } catch (err) {
     console.error('[la-term-dates] stats failed:', err.message);
     res.status(500).json({ error: 'Could not load stats.' });
@@ -68,6 +91,40 @@ router.get('/failures', async (req, res) => {
   } catch (err) {
     console.error('[la-term-dates] failures failed:', err.message);
     res.status(500).json({ error: 'Could not load the remedy list.' });
+  }
+});
+
+// ── Schools (parent-seeded shared records) ─────────────────────────────────
+
+router.get('/schools', async (req, res) => {
+  try {
+    const { search, status, page, pageSize } = req.query;
+    const result = await schoolDirDb.listDirectorySchools({ search, status, page, pageSize });
+    res.json({ ...result, rows: result.rows.map(publicSchool) });
+  } catch (err) {
+    console.error('[la-term-dates] schools list failed:', err.message);
+    res.status(500).json({ error: 'Could not load schools.' });
+  }
+});
+
+router.get('/schools/:slug', async (req, res) => {
+  try {
+    const school = await schoolDirDb.getDirectorySchoolBySlug(req.params.slug);
+    if (!school) return res.status(404).json({ error: 'Unknown school.' });
+    const entries = await schoolDirDb.getDirectorySchoolDates(school.id);
+
+    const byYear = {};
+    for (const e of entries) {
+      (byYear[e.academic_year] ||= []).push(e);
+    }
+    const academicYears = Object.keys(byYear)
+      .sort()
+      .map((year) => ({ academic_year: year, dates: byYear[year] }));
+
+    res.json({ school: publicSchool(school), academicYears, dateCount: entries.length });
+  } catch (err) {
+    console.error('[la-term-dates] school detail failed:', err.message);
+    res.status(500).json({ error: 'Could not load that school.' });
   }
 });
 

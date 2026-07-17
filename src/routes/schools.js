@@ -11,6 +11,8 @@ const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/a
 const cache = require('../services/cache');
 const { extractTermDatesPreview, fetchTermDatesPageText, academicYearsForCountry, VALID_EVENT_TYPES, TERM_FETCH_HEADERS } = require('../services/term-date-extract');
 const laDb = require('../db/laTermDates');
+const schoolDirDb = require('../db/schoolDirectory');
+const schoolDirectory = require('../services/schoolDirectory');
 const { findOfficialTermDatesUrl } = require('../services/ai');
 
 // Memory-storage multer for direct PDF uploads to the term-dates
@@ -1176,6 +1178,9 @@ Do NOT wrap in markdown code fences.`,
       // ~800 chars of the source text gives the admin enough context
       // to eyeball a single date by hand if a warning makes them suspicious.
       source_text_preview: pageText.substring(0, 800),
+      // Full extracted text (capped) - forwarded through confirm so the
+      // school directory can arbitrate divergent imports against the source.
+      source_text: pageText.substring(0, 16000),
     });
   } catch (err) {
     console.error('POST /api/schools/:id/import-website/preview error:', err);
@@ -1259,7 +1264,7 @@ router.post('/:schoolId/import-pdf/preview', requireAuth, requireHousehold, requ
  * the shape here because the request is now coming from an editable form.
  */
 router.post('/:schoolId/import-website/confirm', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { dates } = req.body || {};
+  const { dates, source_url, source_text, source_type } = req.body || {};
   if (!Array.isArray(dates) || dates.length === 0) {
     return res.status(400).json({ error: 'No dates to save.' });
   }
@@ -1323,6 +1328,24 @@ router.post('/:schoolId/import-website/confirm', requireAuth, requireHousehold, 
 
     cache.invalidate(`schools:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
+
+    // Seed / cross-check the shared school directory in the background so
+    // other parents at this school can adopt the same reviewed dates. Fire
+    // and forget: a directory hiccup must never fail the household's import.
+    if (school) {
+      db.getHouseholdById(req.householdId)
+        .then((household) => schoolDirectory.seedOrCrossCheck({
+          householdSchool: school,
+          dates: cleaned,
+          sourceUrl: typeof source_url === 'string' ? source_url.slice(0, 2048) : null,
+          sourceText: typeof source_text === 'string' ? source_text.slice(0, 16000) : null,
+          sourceType: source_type === 'pdf' ? 'pdf' : 'website',
+          householdId: req.householdId,
+          country: household?.country || 'GB',
+        }))
+        .catch((err) => console.error('[school-directory] seed failed:', err.message));
+    }
+
     return res.json({
       imported: cleaned.length,
       message: `Imported ${cleaned.length} term date(s) from website.`,
@@ -1330,6 +1353,93 @@ router.post('/:schoolId/import-website/confirm', requireAuth, requireHousehold, 
   } catch (err) {
     console.error('POST /api/schools/:id/import-website/confirm error:', err);
     return res.status(500).json({ error: `Failed to save term dates: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/schools/:schoolId/directory-dates
+ *
+ * The shared-directory offer for the term-dates import screen: does the
+ * central store already hold reviewed dates for this school (seeded by
+ * another parent)? Zero AI calls. Only 'ok' records are offered.
+ */
+router.get('/:schoolId/directory-dates', requireAuth, requireHousehold, async (req, res) => {
+  try {
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find(s => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+
+    const hit = await schoolDirectory.lookupDirectoryDatesForSchool(school);
+    if (!hit) return res.json({ found: false });
+
+    const years = [...new Set(hit.dates.map(d => d.academic_year))].sort();
+    return res.json({
+      found: true,
+      school: {
+        name: hit.school.name,
+        verified_count: hit.school.verified_count,
+        adopted_count: hit.school.adopted_count || 0,
+        status: hit.school.status,
+        source_type: hit.school.source_type,
+        date_count: hit.dates.length,
+        academic_years: years,
+        last_imported_at: hit.school.last_imported_at,
+        last_verified_at: hit.school.last_verified_at || null,
+      },
+      dates: hit.dates,
+    });
+  } catch (err) {
+    console.error('GET /api/schools/:id/directory-dates error:', err);
+    return res.status(500).json({ error: 'Could not check the school directory.' });
+  }
+});
+
+/**
+ * POST /api/schools/:schoolId/adopt-directory-dates
+ *
+ * One-tap import of the shared directory's dates for this school. Replaces
+ * this household's dates for the directory's academic years, links the school
+ * for future propagation, and - because adopting parents won't independently
+ * re-import - triggers the SYSTEM verification when the record has never been
+ * checked or is stale (schoolDirectory.maybeVerifyDirectorySchool).
+ * Response shape mirrors the LA import so the UI handles both identically.
+ */
+router.post('/:schoolId/adopt-directory-dates', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find(s => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+
+    const hit = await schoolDirectory.lookupDirectoryDatesForSchool(school);
+    if (!hit) return res.status(404).json({ error: 'No shared term dates found for this school yet.' });
+
+    const years = [...new Set(hit.dates.map(d => d.academic_year))];
+    for (const ay of years) {
+      await db.deleteTermDatesBySchoolAndAcademicYear(school.id, ay);
+    }
+    await db.addSchoolTermDates(school.id, hit.dates.map(d => ({ ...d, source: 'school_directory' })));
+    await db.updateHouseholdSchoolMeta(school.id, {
+      term_dates_source: 'school_directory',
+      term_dates_last_updated: new Date().toISOString(),
+    });
+    await schoolDirDb.linkHouseholdSchoolToDirectory(school.id, hit.school.id);
+    await schoolDirDb.updateDirectorySchool(hit.school.id, { adopted_count_increment: true })
+      .catch(() => {});
+
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+
+    // Adoption is the trigger for independent verification (no human will
+    // re-import) - fires only when never-verified or stale.
+    schoolDirectory.maybeVerifyDirectorySchool(hit.school);
+
+    return res.json({
+      imported: hit.dates.length,
+      message: `Imported ${hit.dates.length} term date(s) from the school directory.`,
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/adopt-directory-dates error:', err);
+    return res.status(500).json({ error: `Failed to import shared term dates: ${err.message}` });
   }
 });
 

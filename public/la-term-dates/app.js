@@ -1,7 +1,9 @@
 
     const API = '/api/la-term-dates';
     const ADMIN_KEY = new URLSearchParams(location.search).get('key') || null;
-    const state = { search: '', status: '', region: '', page: 1, pageSize: 25, total: 0 };
+    // mode: 'authorities' (council-published dates) | 'schools' (parent-seeded
+    // shared records for independent / custom-calendar schools).
+    const state = { mode: 'authorities', search: '', status: '', region: '', page: 1, pageSize: 25, total: 0 };
     const detailCache = {};
     let lastTail = '';
     let searchTimer = null;
@@ -50,14 +52,14 @@
       }
       return `${fmtDate(d)} – ${fmtDate(end)}`;
     }
-    function fmtAgo(iso) {
-      if (!iso) return 'not yet imported';
+    function fmtAgo(iso, verb = 'imported') {
+      if (!iso) return `not yet ${verb}`;
       const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-      if (days <= 0) return 'imported today';
-      if (days === 1) return 'imported yesterday';
-      if (days < 30) return `imported ${days} days ago`;
+      if (days <= 0) return `${verb} today`;
+      if (days === 1) return `${verb} yesterday`;
+      if (days < 30) return `${verb} ${days} days ago`;
       const mo = Math.floor(days / 30);
-      return `imported ${mo} month${mo > 1 ? 's' : ''} ago`;
+      return `${verb} ${mo} month${mo > 1 ? 's' : ''} ago`;
     }
 
     const TYPE = {
@@ -96,6 +98,22 @@
     async function loadStats() {
       let s;
       try { s = await fetch(`${API}/stats`).then((r) => r.json()); } catch (e) { return; }
+
+      if (state.mode === 'schools') {
+        const sc = s.schools || { total: 0, ok: 0, needsAttention: 0, dateCount: 0 };
+        lastTail = 'seeded and checked by the parents who use Housemait';
+        const chips = [
+          chip('', 'All schools', sc.total, ''),
+          chip('ok', 'Verified', sc.ok, 'ok'),
+          chip('attn', 'Need attention', sc.needsAttention, 'needs_attention'),
+          chip('', 'Dates stored', (sc.dateCount || 0).toLocaleString('en-GB'), null),
+        ];
+        chips.forEach((c, i) => { if (i >= 1 && i <= 2) c.dataset.filter = ['ok', 'needs_attention'][i - 1]; });
+        const box = $('stats'); clear(box); chips.forEach((c) => box.append(c));
+        updateMetaTail();
+        return;
+      }
+
       lastTail = s.lastRun && s.lastRun.finished_at
         ? `last full import ${fmtAgo(s.lastRun.finished_at).replace('imported ', '')}`
         : 'no import has run yet';
@@ -187,6 +205,80 @@
       clear(body); body.append(buildDetail(d, d.authority));
     }
 
+    // ── Schools (parent-seeded shared records) ─────────────────────────────
+    function buildSchoolCard(s) {
+      const families = (s.adopted_count || 0) + 1; // + the seeding household
+      const b = s.status === 'needs_attention'
+        ? { cls: 'failed', lbl: 'Needs attention' }
+        : (s.last_verified_at ? { cls: 'ok', lbl: 'Verified' } : { cls: 'ok', lbl: 'Imported' });
+      const bits = [];
+      if (s.postcode) bits.push(s.postcode);
+      if (s.local_authority) bits.push(s.local_authority);
+      bits.push(`used by ${families} famil${families === 1 ? 'y' : 'ies'}`);
+      if (s.date_count) bits.push(`${s.date_count} dates`);
+      bits.push(fmtAgo(s.last_verified_at || s.last_imported_at, 'checked'));
+      if (s.source_type === 'pdf') bits.push('from PDF');
+
+      const body = el('div', { class: 'card-body', hidden: true });
+      const head = el('button', { class: 'card-head', type: 'button', 'aria-expanded': 'false' },
+        el('span', { class: 'card-title' },
+          el('span', { class: 'name', text: s.name }),
+          el('span', { class: 'sub', text: bits.join(' · ') }),
+        ),
+        el('span', { class: `badge ${b.cls}`, text: b.lbl }),
+        el('span', { class: 'chev', 'aria-hidden': 'true', text: '›' }),
+      );
+      const li = el('li', { class: 'card', 'aria-expanded': 'false' }, head, body);
+      li.dataset.slug = s.slug;
+      head.onclick = () => toggleSchoolCard(li, head, body);
+      return li;
+    }
+
+    function buildSchoolDetail(data, school) {
+      const frag = document.createDocumentFragment();
+      if (school.status === 'needs_attention') {
+        frag.append(el('div', { class: 'err-box' },
+          el('strong', { text: 'Heads up: ' }),
+          'Recent imports for this school disagreed and could not be automatically resolved. Double-check key dates against the school’s own published calendar.',
+        ));
+      }
+      const families = (school.adopted_count || 0) + 1;
+      frag.append(el('p', { class: 'src', style: 'margin-top:14px',
+        text: `Imported and reviewed by a parent at this school · used by ${families} famil${families === 1 ? 'y' : 'ies'} · independently checked ${school.verified_count || 1} time${(school.verified_count || 1) === 1 ? '' : 's'}.` }));
+      for (const yr of data.academicYears) {
+        const tbody = el('tbody');
+        for (const d of yr.dates) {
+          const t = TYPE[d.event_type] || { cls: 't-inset', lbl: d.event_type };
+          tbody.append(el('tr',
+            null,
+            el('td', { class: 'date-col', text: fmtRange(d.date, d.end_date) }),
+            el('td', { class: 'label-col' }, d.label || t.lbl, el('span', { class: `type-tag ${t.cls}`, text: t.lbl })),
+          ));
+        }
+        frag.append(el('div', { class: 'year-block' },
+          el('h3', { text: yr.academic_year }),
+          el('table', { class: 'dates' }, tbody),
+        ));
+      }
+      return frag;
+    }
+
+    async function toggleSchoolCard(li, head, body) {
+      const open = li.getAttribute('aria-expanded') === 'true';
+      if (open) {
+        li.setAttribute('aria-expanded', 'false'); head.setAttribute('aria-expanded', 'false'); body.hidden = true; return;
+      }
+      li.setAttribute('aria-expanded', 'true'); head.setAttribute('aria-expanded', 'true'); body.hidden = false;
+      const key = `s:${li.dataset.slug}`;
+      if (!detailCache[key]) {
+        setOnly(body, el('p', { class: 'src', style: 'margin-top:14px', text: 'Loading dates…' }));
+        try { detailCache[key] = await fetch(`${API}/schools/${encodeURIComponent(li.dataset.slug)}`).then((r) => r.json()); }
+        catch (e) { setOnly(body, el('div', { class: 'err-box', text: 'Could not load dates. Please try again.' })); return; }
+      }
+      const d = detailCache[key];
+      clear(body); body.append(buildSchoolDetail(d, d.school));
+    }
+
     async function reimport(slug, btn) {
       btn.disabled = true; btn.textContent = '↻ Re-importing… (this can take ~30s)';
       try {
@@ -213,6 +305,7 @@
     }
 
     async function load() {
+      const isSchools = state.mode === 'schools';
       const list = $('list');
       clear(list);
       for (let i = 0; i < 6; i++) list.append(el('li', { class: 'skeleton' }));
@@ -221,10 +314,10 @@
       const q = new URLSearchParams({ page: String(state.page), pageSize: String(state.pageSize) });
       if (state.search) q.set('search', state.search);
       if (state.status) q.set('status', state.status);
-      if (state.region) q.set('region', state.region);
+      if (!isSchools && state.region) q.set('region', state.region);
 
       let data;
-      try { data = await fetch(`${API}/authorities?${q}`).then((r) => r.json()); }
+      try { data = await fetch(`${API}/${isSchools ? 'schools' : 'authorities'}?${q}`).then((r) => r.json()); }
       catch (e) {
         setOnly(list, el('div', { class: 'empty' }, el('div', { class: 'big', text: 'Something went wrong' }), 'Could not reach the directory. Please refresh.'));
         return;
@@ -233,18 +326,22 @@
       state.total = data.total || 0;
       if (!data.rows || !data.rows.length) {
         setOnly(list, el('div', { class: 'empty' },
-          el('div', { class: 'big', text: 'No authorities found' }),
-          state.search ? `Nothing matches "${state.search}".` : 'Try clearing the filters.'));
+          el('div', { class: 'big', text: isSchools ? 'No schools found' : 'No authorities found' }),
+          state.search
+            ? `Nothing matches "${state.search}".`
+            : (isSchools
+              ? 'Schools appear here when a Housemait parent imports their term dates - independent schools and any school with its own calendar.'
+              : 'Try clearing the filters.')));
         setMeta('');
         return;
       }
 
       clear(list);
-      data.rows.forEach((a) => list.append(buildCard(a)));
+      data.rows.forEach((a) => list.append(isSchools ? buildSchoolCard(a) : buildCard(a)));
 
       const from = (state.page - 1) * state.pageSize + 1;
       const to = Math.min(state.page * state.pageSize, state.total);
-      setMeta(`Showing ${from}–${to} of ${state.total} authorities`);
+      setMeta(`Showing ${from}–${to} of ${state.total} ${isSchools ? 'schools' : 'authorities'}`);
 
       const pages = Math.max(1, Math.ceil(state.total / state.pageSize));
       $('where').textContent = `Page ${state.page} of ${pages}`;
@@ -261,6 +358,29 @@
     $('region').addEventListener('change', (e) => { state.region = e.target.value; state.page = 1; load(); });
     $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
     $('next').addEventListener('click', () => { state.page++; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+    // Councils | Schools segmented toggle. Switching resets the search/filter
+    // state (the two sections have different status vocabularies) and swaps
+    // the lede + search placeholder + region visibility.
+    const LEDE = {
+      authorities: 'Term dates published by every UK local education authority, in one searchable place. Sourced from each council’s own pages and refreshed monthly.',
+      schools: 'Term dates for independent schools and schools with their own calendars - imported and reviewed by the parents at each school, then automatically re-checked against the school’s published dates.',
+    };
+    document.querySelectorAll('#modeToggle button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (mode === state.mode) return;
+        state.mode = mode;
+        state.search = ''; state.status = ''; state.region = ''; state.page = 1;
+        document.querySelectorAll('#modeToggle button').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+        const lede = $('ledeText'); if (lede) lede.textContent = LEDE[mode];
+        $('search').value = '';
+        $('search').placeholder = mode === 'schools' ? 'Search for a school…' : 'Search for a local authority…';
+        $('region').hidden = mode === 'schools';
+        loadStats();
+        load();
+      });
+    });
 
     if (ADMIN_KEY) setOnly($('adminFlag'), el('span', { class: 'admin-flag', text: 'admin mode' }));
     loadStats();

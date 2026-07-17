@@ -215,6 +215,10 @@ Do NOT wrap in markdown code fences.`,
       dates: validated,
       source_url: sourceLabel || null,
       source_text_preview: pageText.substring(0, 800),
+      // Full extracted text (capped): the school-directory confirm flow
+      // forwards this so divergent imports can be arbitrated against the
+      // actual source. Other callers (LA import, bot) ignore it.
+      source_text: pageText.substring(0, 16000),
     },
   };
 }

@@ -134,6 +134,9 @@
     .src a { color: var(--plum); }
 
     .pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 26px; }
+    /* display:flex above beats the UA stylesheet's [hidden]{display:none},
+       so restate it - otherwise the pager lingers over empty states. */
+    .pager[hidden] { display: none; }
     .pager button {
       height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid var(--light-grey);
       background: var(--white); color: var(--plum); font-weight: 600; font-size: 14px; font-family: inherit; cursor: pointer;
@@ -149,6 +152,19 @@
     .empty .big { font-family: 'Recoleta', serif; font-size: 26px; color: var(--charcoal); margin-bottom: 6px; }
     .admin-flag { display: inline-block; background: var(--plum-light); color: var(--plum); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 8px; margin-left: 8px; }
 
+    /* Councils | Schools segmented toggle */
+    .mode-toggle {
+      display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 20px;
+      background: var(--white); border: 1.5px solid var(--light-grey); border-radius: 12px;
+    }
+    .mode-toggle button {
+      height: 40px; padding: 0 20px; border: 0; border-radius: 9px; cursor: pointer;
+      font-family: inherit; font-size: 14px; font-weight: 600; color: var(--warm-grey); background: transparent;
+      transition: background .2s ease-out, color .2s ease-out;
+    }
+    .mode-toggle button[aria-selected="true"] { background: var(--plum-light); color: var(--plum); }
+    .mode-toggle button:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
+
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     @media (max-width: 520px) { td.date-col { width: auto; display: block; } table.dates td { padding: 5px 0; } }
   </style>
@@ -157,9 +173,14 @@
   <div class="wrap">
     <header>
       <h1>School Term &amp; Holiday Dates</h1>
-      <p class="lede">Term dates published by every UK local education authority, in one searchable place.
-        Sourced from each council's own pages and refreshed monthly.<span id="adminFlag"></span></p>
+      <p class="lede"><span id="ledeText">Term dates published by every UK local education authority, in one searchable place.
+        Sourced from each council's own pages and refreshed monthly.</span><span id="adminFlag"></span></p>
     </header>
+
+    <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="Directory section">
+      <button type="button" data-mode="authorities" role="tab" aria-selected="true">Councils</button>
+      <button type="button" data-mode="schools" role="tab" aria-selected="false">Schools</button>
+    </div>
 
     <div class="stats" id="stats" role="group" aria-label="Filter by import status"></div>
 

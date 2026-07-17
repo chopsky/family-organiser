@@ -499,6 +499,9 @@ export default function FamilySetup() {
   const [termDateSchoolName, setTermDateSchoolName] = useState('');
   const [termDateSchoolLA, setTermDateSchoolLA] = useState('');
   const [importingLA, setImportingLA] = useState(false);
+  // Shared school-directory offer for the term-dates import sheet: dates
+  // another parent at the same school already imported ({found, school, dates}).
+  const [directoryOffer, setDirectoryOffer] = useState(null);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [importingWebsite, setImportingWebsite] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
@@ -941,6 +944,33 @@ export default function FamilySetup() {
     }
   }
 
+  /**
+   * One-tap import from the shared school directory - dates another parent
+   * at this school already imported and reviewed (and the system verifies).
+   * Zero AI calls; response shape mirrors the LA import.
+   */
+  async function handleAdoptDirectoryDates() {
+    if (!termDateSchoolId) return;
+    setImportingLA(true);
+    setImportError('');
+    try {
+      const { data } = await api.post(`/schools/${termDateSchoolId}/adopt-directory-dates`);
+      setSuccess(data.message || 'Term dates imported!');
+      setTimeout(() => setSuccess(''), 3000);
+      setShowTermDateOptions(false);
+      setDirectoryOffer(null);
+      await loadSchools();
+      if (editingMember?.school_id === termDateSchoolId) {
+        const { data: tdData } = await api.get(`/schools/${termDateSchoolId}/term-dates`);
+        setEditTermDates(tdData.term_dates || []);
+      }
+    } catch (err) {
+      setImportError(err.response?.data?.error || 'Could not import the shared term dates. Try another option below.');
+    } finally {
+      setImportingLA(false);
+    }
+  }
+
   async function handleImportWebsite() {
     // Step 1 of 2: fetch a preview from the backend (no DB writes yet).
     // The admin then reviews, edits, and confirms in a separate panel -
@@ -980,6 +1010,10 @@ export default function FamilySetup() {
         schoolName: termDateSchoolName,
         sourceUrl: data.source_url || normalisedUrl,
         sourceTextPreview: data.source_text_preview || '',
+        // Full extracted text + type, forwarded on confirm so the shared
+        // school directory can arbitrate divergent imports against the source.
+        sourceText: data.source_text || '',
+        sourceType: 'website',
         dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
       });
       setShowTermDateOptions(false);
@@ -1027,6 +1061,8 @@ export default function FamilySetup() {
         schoolName: termDateSchoolName,
         sourceUrl: data.source_url || file.name,
         sourceTextPreview: data.source_text_preview || '',
+        sourceText: data.source_text || '',
+        sourceType: 'pdf',
         dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
       });
       setShowTermDateOptions(false);
@@ -1045,7 +1081,12 @@ export default function FamilySetup() {
       // Strip client-only fields before sending.
       // eslint-disable-next-line no-unused-vars
       const payload = draftImport.dates.map(({ _id, warnings, source_quote, ...rest }) => rest);
-      const { data } = await api.post(`/schools/${draftImport.schoolId}/import-website/confirm`, { dates: payload });
+      const { data } = await api.post(`/schools/${draftImport.schoolId}/import-website/confirm`, {
+        dates: payload,
+        source_url: draftImport.sourceUrl || null,
+        source_text: draftImport.sourceText || null,
+        source_type: draftImport.sourceType || 'website',
+      });
       setSuccess(data.message || 'Term dates imported!');
       setTimeout(() => setSuccess(''), 3000);
       const sid = draftImport.schoolId;
@@ -1268,6 +1309,13 @@ export default function FamilySetup() {
     setImportError('');
     setWebsiteUrl('');
     setTermImportIcalUrl('');
+    // Shared-directory offer: has another parent at this school already
+    // imported reviewed dates? Fetched async; renders a one-tap card when
+    // found. Reset first so a previous school's offer never flashes.
+    setDirectoryOffer(null);
+    api.get(`/schools/${school.id}/directory-dates`)
+      .then(({ data }) => setDirectoryOffer(data?.found ? data : null))
+      .catch(() => setDirectoryOffer(null));
     setShowTermDateOptions(true);
   }
 
@@ -2128,7 +2176,7 @@ export default function FamilySetup() {
                 const dates = school.term_dates || [];
                 const summary = getTermSummary(dates);
                 const childNames = (school.children || []).map(c => c.name).filter(Boolean);
-                const sourceLabel = { local_authority: 'Local authority', school_website: 'School website', website_scrape: 'School website', ical: 'iCal feed', ical_import: 'iCal feed', sa_national: 'National calendar', 'sa-national': 'National calendar', whatsapp_import: 'WhatsApp', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source;
+                const sourceLabel = { local_authority: 'Local authority', school_website: 'School website', website_scrape: 'School website', school_directory: 'School directory', ical: 'iCal feed', ical_import: 'iCal feed', sa_national: 'National calendar', 'sa-national': 'National calendar', whatsapp_import: 'WhatsApp', manual: 'Manual' }[school.term_dates_source] || school.term_dates_source;
                 const colour = school.colour || '#6B3FA0';
                 // Next break: the soonest future half-term / holiday in the
                 // imported dates, shown as the brand-soft reminder line.
@@ -2870,6 +2918,36 @@ export default function FamilySetup() {
                 cards (website / iCal / manual) are identical across
                 countries - they're generic over school type. */}
             <div className="space-y-3">
+              {/* Shared school directory - another parent at this school
+                  already imported + reviewed these dates (and the system
+                  re-verifies them). One tap, zero AI calls, and everyone at
+                  the school stays on identical dates. */}
+              {directoryOffer?.found && (
+                <div className="bg-primary/5 rounded-xl border-2 border-primary/40 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-bark">🏫 Use {directoryOffer.school.name}'s saved term dates</h3>
+                      <p className="text-xs text-cocoa mt-1">
+                        Another Housemait parent at this school already imported and checked these dates
+                        — {directoryOffer.school.date_count} dates ({(directoryOffer.school.academic_years || []).join(', ')}).
+                        Used by {(directoryOffer.school.adopted_count || 0) + 1} famil{(directoryOffer.school.adopted_count || 0) + 1 === 1 ? 'y' : 'ies'}
+                        {(directoryOffer.school.last_verified_at || directoryOffer.school.last_imported_at)
+                          ? ` · checked ${new Date(directoryOffer.school.last_verified_at || directoryOffer.school.last_imported_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                          : ''}
+                        {directoryOffer.school.source_type === 'pdf' ? ' · from PDF' : ''}.
+                        Your school stays in sync if the dates are ever corrected.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleAdoptDirectoryDates}
+                      disabled={importingLA}
+                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
+                    >
+                      {importingLA ? 'Importing...' : 'Import'}
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Country-specific top card - UK: LA, SA: national. */}
               {isSa ? (
                 <div className="bg-white rounded-xl border border-cream-border p-4">
