@@ -1,4 +1,5 @@
 {
+  "cleanUrls": true,
   "redirects": [
     {
       "source": "/uk",
@@ -16,7 +17,7 @@
     { "source": "/api/:path*", "destination": "https://api.housemait.com/api/:path*" },
     { "source": "/school-term-dates/", "destination": "https://api.housemait.com/school-term-dates/" },
     { "source": "/school-term-dates/:path*", "destination": "https://api.housemait.com/school-term-dates/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/app.html" }
   ],
   "headers": [
     {
