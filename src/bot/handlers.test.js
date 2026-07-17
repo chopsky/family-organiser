@@ -37,6 +37,9 @@ jest.mock('../services/ai', () => ({
 jest.mock('../services/transcribe', () => ({ transcribeVoice: jest.fn() }));
 jest.mock('../services/weather', () => ({
   getWeatherReport: jest.fn(), extractLocationFromMessage: jest.fn(), geocodeLocation: jest.fn(),
+  // Resolves null = "composition unavailable" → handlers fall back to the
+  // raw report, keeping these tests focused on the fetch/format plumbing.
+  composeWeatherAnswer: jest.fn(() => Promise.resolve(null)),
 }));
 jest.mock('../services/ai-client', () => ({ callWithFailover: jest.fn(), REASONING_TIMEOUT_MS: 90000 }));
 jest.mock('../services/push', () => ({ sendToHousehold: jest.fn(() => Promise.resolve()) }));

@@ -7,7 +7,7 @@ const { CHAT_ASSISTANT_SYSTEM, CHAT_ASSISTANT_CONTEXT } = require('../services/p
 const { formatPreferenceLines } = require('../services/preferences-format');
 const { scanImage, scanReceipt, matchReceiptToList, classify } = require('../services/ai');
 const { callWithFailover } = require('../services/ai-client');
-const { getWeatherReport, getCityFromTimezone, extractLocationFromMessage, geocodeLocation, reverseGeocode } = require('../services/weather');
+const { getWeatherReport, composeWeatherAnswer, getCityFromTimezone, extractLocationFromMessage, geocodeLocation, reverseGeocode } = require('../services/weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
@@ -763,7 +763,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             } else {
               const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: message });
               const place = geo.country ? `${geo.name}, ${geo.country}` : geo.name;
-              cleanContent += `\n\n📍 **${place}**\n\n` + report;
+              // Compose a direct answer to the user's question from the
+              // facts (with conversation context for follow-ups); the raw
+              // report remains the fallback if composition fails.
+              const composed = await composeWeatherAnswer({ question: message, place, report, history });
+              cleanContent += `\n\n📍 **${place}**\n\n` + (composed || report);
               executedActions.push({ type: 'fetch_weather' });
             }
           }

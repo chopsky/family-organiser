@@ -9,7 +9,7 @@
 const db = require('../db/queries');
 const { classify, scanReceipt, matchReceiptToList, scanImage, runWebSearch } = require('../services/ai');
 const { transcribeVoice } = require('../services/transcribe');
-const { getWeatherReport, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
+const { getWeatherReport, composeWeatherAnswer, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 const { callWithFailover } = require('../services/ai-client');
@@ -1732,8 +1732,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         return { response: `🗺️ ${hint}`, actions };
       }
       const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: text });
-      const prefix = `📍 *${geo.name}, ${geo.country}*\n\n`;
-      return { response: prefix + report, actions };
+      const place = `${geo.name}, ${geo.country}`;
+      // Answer the QUESTION ("do I need a coat?"), don't dump the forecast.
+      // Recent turns let follow-ups resolve; raw report is the fallback.
+      const composed = await composeWeatherAnswer({ question: text, place, report, history });
+      const prefix = `📍 *${place}*\n\n`;
+      return { response: prefix + (composed || report), actions };
     } catch (err) {
       console.error('[handlers] Weather fetch failed:', err.message);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };
@@ -1978,8 +1982,14 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         return { response: `🗺️ ${hint}`, actions };
       }
       const report = await getWeatherReport(geo.lat, geo.lon, geo.timezone || 'auto', { userMessage: text });
-      const prefix = `📍 *${geo.name}, ${geo.country}*\n\n`;
-      return { response: prefix + report, actions };
+      const place = `${geo.name}, ${geo.country}`;
+      // This branch catches follow-ups the pre-classifier can't see
+      // (e.g. "is that a yes or a no?" after a forecast) - composing with
+      // the conversation history answers the underlying question instead
+      // of re-dumping the forecast.
+      const composed = await composeWeatherAnswer({ question: text, place, report, history });
+      const prefix = `📍 *${place}*\n\n`;
+      return { response: prefix + (composed || report), actions };
     } catch (err) {
       console.error('[handlers] Weather fetch failed (post-classify):', err.message);
       return { response: "Sorry, I couldn't fetch the weather right now. Please try again in a moment. 🌤️", actions };

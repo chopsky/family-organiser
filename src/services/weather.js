@@ -1,5 +1,14 @@
 /**
  * Weather service using Open-Meteo (free, no API key required).
+ *
+ * Two layers:
+ *   1. getWeatherReport() - fetches the forecast and formats it as a compact
+ *      facts block (also the user-facing fallback).
+ *   2. composeWeatherAnswer() - a cheap Haiku pass that turns those facts +
+ *      the user's actual question (+ recent conversation) into a direct,
+ *      human answer. "Will I need a coat tomorrow?" deserves "Probably not -
+ *      it's mild, 15-22°C" - not a forecast dump. Callers fall back to the
+ *      raw report whenever composition fails, so weather never breaks.
  */
 
 const WMO_CODES = {
@@ -171,6 +180,82 @@ async function getWeatherReport(lat, lon, timezone = 'auto', options = {}) {
 }
 
 /**
+ * Compose a direct, human answer to a weather question from fetched facts.
+ *
+ * The user asked a QUESTION ("will I need a coat tomorrow?", "can we hang
+ * the washing out?", "is that a yes or a no?") - answering it means giving
+ * the verdict first and citing the numbers that justify it, not pasting the
+ * forecast. A Haiku pass is cheap (~300 tokens) and fast (tight timeout);
+ * on ANY failure the caller falls back to the raw report, so this can only
+ * ever improve the reply.
+ *
+ * The system prompt is static (no interpolation) so Anthropic prompt
+ * caching applies - all dynamic values live in the user message, mirroring
+ * the CLASSIFICATION_SYSTEM / CLASSIFICATION_CONTEXT discipline.
+ *
+ * @param {object} p
+ * @param {string} p.question   The user's latest message, verbatim.
+ * @param {string} p.place      Resolved place label ("London, United Kingdom").
+ * @param {string} p.report     getWeatherReport() output - doubles as the facts block.
+ * @param {Array}  p.history    Recent turns. WhatsApp shape ({body, response})
+ *                              and web-chat shape ({role, content}) both accepted.
+ * @returns {Promise<string|null>} Composed answer, or null to use the fallback.
+ */
+const WEATHER_COMPOSE_SYSTEM = `You are Housemait, a warm, practical family assistant. The user asked a weather-related question; you have the real forecast facts. Answer like a knowledgeable friend texting back.
+
+Rules:
+- Lead with the direct answer to their ACTUAL question in the first sentence. If it's a yes/no question ("do I need a coat?", "is that a yes or a no?"), open with the verdict: "Yes—", "No—", "Probably not—".
+- Justify it with the specific numbers from the facts (temperatures, rain chance). Never invent or adjust values.
+- Add one practical touch when useful (light layer for the evening, take an umbrella, sun cream for the kids).
+- If the latest message is a follow-up, resolve it from the conversation history (e.g. "is that a yes or a no?" refers to their previous question - answer THAT, don't repeat the forecast).
+- 1-3 short sentences, conversational, at most one emoji. No headings, no bullet lists, no data dumps. For WhatsApp use *single asterisks* for bold, sparingly.
+- Only if they asked a general "what's the weather?" with no decision to make: give a compact one-or-two sentence summary of the day (still prose, not a list).
+- British English.`;
+
+async function composeWeatherAnswer({ question, place, report, history = [] } = {}) {
+  try {
+    const { callClaude, CLAUDE_HAIKU_MODEL } = require('./ai-client');
+    // Normalise both history shapes into plain transcript lines, oldest
+    // first. WhatsApp rows arrive newest-first with {body, response};
+    // web-chat rows are {role, content} already oldest-first.
+    const lines = [];
+    const rows = Array.isArray(history) ? history.slice(0, 8) : [];
+    const isWhatsAppShape = rows.length > 0 && rows[0] && ('body' in rows[0] || 'response' in rows[0]);
+    const ordered = isWhatsAppShape ? [...rows].reverse() : rows;
+    for (const row of ordered) {
+      if (!row) continue;
+      if (isWhatsAppShape) {
+        if (row.body) lines.push(`User: ${String(row.body).slice(0, 300)}`);
+        if (row.response) lines.push(`Housemait: ${String(row.response).slice(0, 300)}`);
+      } else if (row.role && row.content) {
+        lines.push(`${row.role === 'assistant' ? 'Housemait' : 'User'}: ${String(row.content).slice(0, 300)}`);
+      }
+    }
+    const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    const user = [
+      lines.length ? `Conversation so far:\n${lines.join('\n')}\n` : '',
+      `Today is ${today}.`,
+      `Weather facts for ${place}:\n${report}`,
+      `\nThe user's latest message: "${question}"`,
+    ].filter(Boolean).join('\n');
+
+    const { text } = await callClaude({
+      system: WEATHER_COMPOSE_SYSTEM,
+      messages: [{ role: 'user', content: user }],
+      model: CLAUDE_HAIKU_MODEL,
+      maxTokens: 250,
+      timeoutMs: 4000, // never let a nicety block the reply for long
+    });
+    const answer = (text || '').trim();
+    if (!answer) return null;
+    return answer;
+  } catch (err) {
+    console.warn('[weather] composeWeatherAnswer fell back to raw report:', err.message);
+    return null;
+  }
+}
+
+/**
  * Extract a location name from a weather query.
  * e.g. "what's the weather in Cape Town?" → "Cape Town"
  */
@@ -325,4 +410,4 @@ function getCityFromTimezone(tz) {
   return null;
 }
 
-module.exports = { getWeatherReport, extractLocationFromMessage, geocodeLocation, reverseGeocode, getCityFromTimezone };
+module.exports = { getWeatherReport, composeWeatherAnswer, extractLocationFromMessage, geocodeLocation, reverseGeocode, getCityFromTimezone };
