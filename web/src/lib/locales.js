@@ -46,6 +46,10 @@ export const LOCALES = {
       compareReference: 'a takeaway',
     },
     features: { schoolTerms: true, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organiser UK - Calendar, Meals & School Terms | Housemait',
+      description: 'The UK family organiser app: shared calendar, meal plans, shopping lists and chores, with school term dates imported automatically and an AI assistant in WhatsApp. Free 30-day trial, no card to start.',
+    },
     audienceTagline: 'modern UK families',
     footerNote: 'Made with ❤️ for UK families',
     demo: {
@@ -102,6 +106,10 @@ export const LOCALES = {
       compareReference: 'a takeout meal',
     },
     features: { schoolTerms: false, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organizer App - Calendar, Meals, Lists & Chores | Housemait',
+      description: 'One home for your family calendar, meal plans, grocery lists and chores, with an AI assistant in WhatsApp that does the typing for you. Free 30-day trial, no card needed.',
+    },
     audienceTagline: 'modern families',
     footerNote: 'Made with ❤️ for modern families',
     demo: {
@@ -135,6 +143,10 @@ export const LOCALES = {
       compareReference: 'a takeaway',
     },
     features: { schoolTerms: false, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organiser - Calendar, Meals & Lists | Housemait',
+      description: 'One home for the family calendar, meal plans, shopping lists and chores, with an AI assistant in WhatsApp. Built for busy European families. Free 30-day trial, no card to start.',
+    },
     audienceTagline: 'modern European families',
     footerNote: 'Made with ❤️ for modern families',
     demo: {
@@ -172,6 +184,10 @@ export const LOCALES = {
       compareReference: 'a takeaway',
     },
     features: { schoolTerms: false, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organiser Australia - Calendar, Meals & Lists | Housemait',
+      description: 'The family organiser app for Australian households: shared calendar, meal plans, shopping lists and chores, with an AI assistant in WhatsApp. Free 30-day trial, no card to start.',
+    },
     audienceTagline: 'modern Australian families',
     footerNote: 'Made with ❤️ for Australian families',
     demo: {
@@ -207,6 +223,10 @@ export const LOCALES = {
       compareReference: 'takeout',
     },
     features: { schoolTerms: false, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organizer Canada - Calendar, Meals & Lists | Housemait',
+      description: 'The family organizer app for Canadian households: shared calendar, meal plans, grocery lists and chores, with an AI assistant in WhatsApp. Free 30-day trial, no card needed.',
+    },
     audienceTagline: 'modern Canadian families',
     footerNote: 'Made with ❤️ for Canadian families',
     demo: {
@@ -240,6 +260,10 @@ export const LOCALES = {
       compareReference: 'a takeaway',
     },
     features: { schoolTerms: true, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organiser South Africa - Calendar & School Terms | Housemait',
+      description: 'The family organiser app for South African households: shared calendar, meal plans, shopping lists and chores, with school terms imported automatically and an AI assistant in WhatsApp. Free 30-day trial.',
+    },
     audienceTagline: 'modern South African families',
     footerNote: 'Made with ❤️ for South African families',
     demo: {
@@ -301,6 +325,10 @@ export const LOCALES = {
       compareReference: 'a takeout meal',
     },
     features: { schoolTerms: false, whatsappBot: true },
+    seo: {
+      title: 'AI Family Organiser App - Calendar, Meals, Lists & Chores | Housemait',
+      description: 'One home for the family calendar, meal plans, shopping lists and chores, with an AI assistant in WhatsApp that does the typing for you. Free 30-day trial, no card to start.',
+    },
     audienceTagline: 'modern families',
     footerNote: 'Made with ❤️ for modern families',
     demo: {

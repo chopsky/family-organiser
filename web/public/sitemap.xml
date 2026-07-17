@@ -19,6 +19,7 @@
   <!-- Default international landing page (hreflang x-default) -->
   <url>
     <loc>https://housemait.com/</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -33,6 +34,7 @@
   <!-- United Kingdom -->
   <url>
     <loc>https://housemait.com/gb</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -47,6 +49,7 @@
   <!-- United States -->
   <url>
     <loc>https://housemait.com/us</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -61,6 +64,7 @@
   <!-- European Union (English-speakers) -->
   <url>
     <loc>https://housemait.com/eu</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -75,6 +79,7 @@
   <!-- Australia -->
   <url>
     <loc>https://housemait.com/au</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -89,6 +94,7 @@
   <!-- Canada -->
   <url>
     <loc>https://housemait.com/ca</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -103,6 +109,7 @@
   <!-- South Africa -->
   <url>
     <loc>https://housemait.com/za</loc>
+    <lastmod>2026-07-17</lastmod>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://housemait.com/" />
     <xhtml:link rel="alternate" hreflang="en-GB"    href="https://housemait.com/gb" />
     <xhtml:link rel="alternate" hreflang="en-US"    href="https://housemait.com/us" />
@@ -117,16 +124,19 @@
   <!-- Non-localised supporting pages -->
   <url>
     <loc>https://housemait.com/support</loc>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://housemait.com/privacy</loc>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://housemait.com/terms</loc>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

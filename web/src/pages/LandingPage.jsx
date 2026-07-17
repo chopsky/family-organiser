@@ -183,13 +183,67 @@ export default function LandingPage() {
   const school = schoolCard(locale)
   const p = locale.pricing
 
-  // SEO title stays the established one (indexed); smooth in-page anchors.
+  // Per-locale SEO title + meta description (locales.js seo block), so
+  // /gb, /us etc. stop presenting identical metadata to Google. The
+  // static index.html copy remains the pre-JS fallback. Also smooth
+  // in-page anchors while the landing is mounted.
   useEffect(() => {
-    document.title = 'AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait'
+    if (locale.seo?.title) document.title = locale.seo.title
+    const meta = document.querySelector('meta[name="description"]')
+    if (meta && locale.seo?.description) meta.setAttribute('content', locale.seo.description)
     const prev = document.documentElement.style.scrollBehavior
     document.documentElement.style.scrollBehavior = 'smooth'
     return () => { document.documentElement.style.scrollBehavior = prev }
-  }, [])
+  }, [locale])
+
+  // Structured data: FAQPage (rich-result eligibility for the FAQ
+  // section) + SoftwareApplication with the locale's real price. No
+  // aggregateRating - we don't publish one we can't substantiate.
+  const jsonLd = useMemo(() => {
+    const price = parseFloat((p.monthly || '').replace(/[^0-9.]/g, '')) || undefined
+    return JSON.stringify([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqs.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'Housemait',
+        applicationCategory: 'LifestyleApplication',
+        operatingSystem: 'iOS',
+        url: 'https://housemait.com',
+        installUrl: APP_STORE_URL,
+        description: locale.seo?.description,
+        offers: price ? {
+          '@type': 'Offer',
+          price,
+          priceCurrency: locale.currency,
+          description: 'Free 30-day trial, then per household per month. Annual plan available.',
+        } : undefined,
+      },
+    ])
+  }, [faqs, locale, p])
+
+  // Inject the JSON-LD as a head <script> via textContent (never
+  // innerHTML) - same managed-head-tag pattern as HreflangTags. Google
+  // reads JSON-LD from the rendered DOM regardless of where it's added.
+  useEffect(() => {
+    let tag = document.head.querySelector('script[data-housemait-jsonld]')
+    if (!tag) {
+      tag = document.createElement('script')
+      tag.type = 'application/ld+json'
+      tag.setAttribute('data-housemait-jsonld', '')
+      document.head.appendChild(tag)
+    }
+    tag.textContent = jsonLd
+    return () => { tag.remove() }
+  }, [jsonLd])
 
   // Reveal-on-scroll: tag [data-lv-reveal] elements below the fold with
   // .pre, then flip to .in the first time they intersect. The data value
@@ -420,7 +474,7 @@ export default function LandingPage() {
               <img className="lv-frame-img" src="/landing/phone-frame.webp" alt="" />
               <div className="lv-screen">
                 {COMPANIONS.map((src, i) => (
-                  <img key={src} ref={setEl(`cp${i}`)} src={src} alt={COMPANION_ALTS[i]} />
+                  <img key={src} ref={setEl(`cp${i}`)} src={src} alt={COMPANION_ALTS[i]} loading="lazy" />
                 ))}
               </div>
             </div>
@@ -433,9 +487,9 @@ export default function LandingPage() {
               <div className="lv-screen">
                 <img className="lv-s-base" src="/landing/app-home.jpg" alt="Housemait family home screen with today&rsquo;s schedule" />
                 {SCREENS.map((src, i) => (
-                  <img key={src} ref={setEl(`s${i}`)} className="lv-s-layer" src={src} alt={SCREEN_ALTS[i]} style={{ zIndex: 2 + i }} />
+                  <img key={src} ref={setEl(`s${i}`)} className="lv-s-layer" src={src} alt={SCREEN_ALTS[i]} style={{ zIndex: 2 + i }} loading="lazy" />
                 ))}
-                <img ref={setEl('chat')} className="lv-s-layer" src="/landing/app-whatsapp.jpg" alt="WhatsApp conversation with the Housemait assistant" style={{ zIndex: 6 }} />
+                <img ref={setEl('chat')} className="lv-s-layer" src="/landing/app-whatsapp.jpg" alt="WhatsApp conversation with the Housemait assistant" style={{ zIndex: 6 }} loading="lazy" />
               </div>
             </div>
           </div>
