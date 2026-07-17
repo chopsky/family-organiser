@@ -46,6 +46,7 @@ const Lists           = lazy(() => import('./pages/Lists'));
 const Calendar        = lazy(() => import('./pages/Calendar'));
 const Meals           = lazy(() => import('./pages/Meals'));
 const FamilySetup     = lazy(() => import('./pages/FamilySetup'));
+const School          = lazy(() => import('./pages/School'));
 const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
 const KidNotesArchive = lazy(() => import('./pages/KidNotesArchive'));
@@ -289,6 +290,7 @@ function AppRoutes() {
             redirects /notes to the kids' home (it's not a CHILD_OPEN route). */}
         <Route path="/notes" element={<RequireAuth><ChildGate><Layout><KidNotesArchive /></Layout></ChildGate></RequireAuth>} />
         <Route path="/family" element={<RequireAuth><ChildGate><Layout><FamilySetup /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/school" element={<RequireAuth><ChildGate><Layout><School /></Layout></ChildGate></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><ChildGate><Layout><Settings /></Layout></ChildGate></RequireAuth>} />
         <Route path="/help" element={<RequireAuth><ChildGate><Layout><Help /></Layout></ChildGate></RequireAuth>} />
         {/* Subscribe flow - Subscribe page is reachable by anyone logged in

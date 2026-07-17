@@ -2562,6 +2562,17 @@ export default function Settings() {
         </button>
       </SectionWrapper>
 
+      {/* Help & support - demoted here from the More sheet / sidebar so the
+          mobile grid stays an even 2×3 with School added. Sits just above
+          Log out, the same "foot of Settings" home Log out got when the
+          More sheet became tiles. */}
+      <button
+        onClick={() => navigate('/help')}
+        className="w-full mt-6 py-3 rounded-2xl border border-cream-border text-cocoa font-semibold text-sm hover:bg-cream transition-colors"
+      >
+        Help &amp; support
+      </button>
+
       {/* Log out - bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
           find it here. */}

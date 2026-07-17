@@ -5,9 +5,8 @@ import { useChildMode } from '../context/ChildModeContext';
 import { CHILD_VISIBLE_ROUTES } from '../lib/childMode';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconHelp, IconList, IconGift, IconStar, IconMail } from './Icons';
+import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconList, IconGift, IconStar, IconMail, IconSchool } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
-import useHasChildren from '../hooks/useHasChildren';
 import KidNoteAlert from './KidNoteAlert';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -30,6 +29,7 @@ const navGroups = [
     { to: '/rewards',  label: 'Rewards',   Icon: IconGift     },
     { to: '/lists',    label: 'Lists',     Icon: IconList     },
     { to: '/meals',    label: 'Meal Plan', Icon: IconUtensils },
+    { to: '/school',   label: 'School',    Icon: IconSchool   },
   ] },
   { label: 'Household', items: [
     { to: '/documents', label: 'Documents',  Icon: IconFileText },
@@ -37,7 +37,8 @@ const navGroups = [
     { to: '/family',    label: 'Family',     Icon: IconUsers    },
   ] },
   { label: 'Account', items: [
-    { to: '/help',     label: 'Help',     Icon: IconHelp     },
+    // Help lives at the foot of Settings (beside Log out) - one Account
+    // entry here, matching the mobile More sheet.
     { to: '/settings', label: 'Settings', Icon: IconSettings },
   ] },
 ];
@@ -62,8 +63,8 @@ const moreNav = [
   { to: '/family' },
   { to: '/documents' },
   { to: '/notes' },
+  { to: '/school' },
   { to: '/settings' },
-  { to: '/help' },
 ];
 
 // Feature tiles filling the More sheet (2 columns × 3 rows). Everything
@@ -105,12 +106,14 @@ const moreTiles = [
     fg: '#5F8F63',
   },
   {
-    to: '/help',
-    label: 'Help & Support',
-    sub: 'Guides & contact us',
-    Icon: IconHelp,
-    bg: '#FBE7E7',
-    fg: '#D25454',
+    // Replaced the Help tile (Help now lives at the foot of Settings, beside
+    // Log out) so the sheet stays an even 2×3 with School added.
+    to: '/school',
+    label: 'School',
+    sub: 'Term dates & activities',
+    Icon: IconSchool,
+    bg: '#F3EDFC',
+    fg: '#6B3FA0',
   },
   {
     to: '/settings',
@@ -159,7 +162,6 @@ export function ChildModeChip() {
 export default function Layout({ children }) {
   const { household, user, token, login, logout, isPlatformAdmin } = useAuth();
   const { enabled: childMode } = useChildMode();
-  const hasChildren = useHasChildren();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -280,12 +282,12 @@ export default function Layout({ children }) {
   const appHeight = ['/tasks', '/lists', '/rewards'].includes(location.pathname);
   const isDashboard = location.pathname === '/dashboard';
 
-  // Kid-only destinations hide until the household has a child - the app
-  // grows as the family is set up (same rule as the Child Mode card in
-  // Settings). The routes stay reachable; only the nav adapts.
-  const groupsForHousehold = hasChildren
-    ? navGroups
-    : navGroups.map((g) => ({ ...g, items: g.items.filter((i) => i.to !== '/notes') })).filter((g) => g.items.length);
+  // Navigation shows the FULL feature set regardless of household shape -
+  // hiding School / Kids' Notes made the app look basic to new users and
+  // buried the differentiators exactly during the trial window. Pages own
+  // their empty states ("add your children to get started"); only in-flow
+  // content surfaces (dashboard cards, alerts) still gate on useHasChildren.
+  const groupsForHousehold = navGroups;
 
   // Child Mode trims the nav to the kid-safe routes. Desktop groups drop empty;
   // the mobile bar swaps Lists out for Rewards and loses the More button.
@@ -492,7 +494,6 @@ export default function Layout({ children }) {
  * panel transform reads it on render.
  */
 function MoreSheet({ onClose }) {
-  const hasChildren = useHasChildren();
   const [mounted, setMounted] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
 
@@ -621,7 +622,7 @@ function MoreSheet({ onClose }) {
         <div className="flex-1 overflow-y-auto">
           {/* 2×3 feature tiles - the whole sheet */}
           <div className="grid grid-cols-2 gap-3 px-5 pt-1 pb-4">
-            {moreTiles.filter((t) => hasChildren || t.to !== '/notes').map(({ to, label, sub, Icon, bg, fg }) => (
+            {moreTiles.map(({ to, label, sub, Icon, bg, fg }) => (
               <NavLink
                 key={to}
                 to={to}
