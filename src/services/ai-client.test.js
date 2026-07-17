@@ -15,7 +15,41 @@ const {
   finalizeResult, isTransient,
   systemToText, systemToAnthropic,
   normalizeClaudeUsage, normalizeGeminiUsage, normalizeGptUsage,
+  joinTextBlocks,
 } = require('./ai-client');
+
+describe('joinTextBlocks - verbatim citation-safe concatenation', () => {
+  test('web-search citation splits (mid-sentence blocks) join without inserted newlines', () => {
+    // Real shape from the native web_search tool: the cited span is its own
+    // block and the closing punctuation opens the NEXT block. join('\n')
+    // used to render this as an orphaned ". If you fancy…" line.
+    const content = [
+      { type: 'text', text: 'Friary Park has ' },
+      { type: 'text', text: 'a playground, a skateboard park and a café' },
+      { type: 'text', text: '. If you fancy something more active, there is bowling nearby.' },
+    ];
+    expect(joinTextBlocks(content)).toBe(
+      'Friary Park has a playground, a skateboard park and a café. If you fancy something more active, there is bowling nearby.',
+    );
+  });
+
+  test('model-authored paragraph breaks inside blocks are preserved', () => {
+    const content = [
+      { type: 'text', text: 'First paragraph.\n\n' },
+      { type: 'text', text: 'Second paragraph.' },
+    ];
+    expect(joinTextBlocks(content)).toBe('First paragraph.\n\nSecond paragraph.');
+  });
+
+  test('non-text blocks are ignored; no text blocks returns null', () => {
+    const content = [
+      { type: 'server_tool_use', name: 'web_search' },
+      { type: 'web_search_tool_result', content: [] },
+    ];
+    expect(joinTextBlocks(content)).toBeNull();
+    expect(joinTextBlocks([...content, { type: 'text', text: ' answer ' }])).toBe('answer');
+  });
+});
 
 describe('finalizeResult - empty-response guard', () => {
   test('returns { text, provider } for a real completion', () => {

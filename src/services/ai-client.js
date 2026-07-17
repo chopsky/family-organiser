@@ -66,6 +66,24 @@ function isTransient(err) {
 // returning "" so callWithFailover's existing try/catch moves to the next
 // provider (e.g. Gemini). Tagged emptyResponse so isTransient() routes the
 // Claude→GPT path too. Every provider funnels its return through here.
+/**
+ * Concatenate a Claude response's text blocks VERBATIM into the visible
+ * answer. With tools enabled the model produces multiple text blocks
+ * interleaved with server_tool_use / web_search_tool_result blocks - and
+ * with web-search citations, a cited span is its own block that splits
+ * MID-SENTENCE (the closing punctuation opens the next block). Joining
+ * with '\n' manufactured orphaned ". " / ", plus…" lines in bot replies;
+ * the canonical rendering is plain concatenation - the model already
+ * emits any whitespace it intends between blocks.
+ *
+ * Returns the trimmed text, or null when the response has no text blocks.
+ */
+function joinTextBlocks(content) {
+  const textBlocks = (content || []).filter((b) => b.type === 'text');
+  if (textBlocks.length === 0) return null;
+  return textBlocks.map((b) => b.text).join('').trim();
+}
+
 function finalizeResult(text, provider, usage) {
   if (typeof text !== 'string' || text.trim() === '') {
     const err = new Error(`${provider} returned an empty response`);
@@ -282,13 +300,8 @@ async function callClaude({ system, messages, maxTokens = 2048, timeoutMs, useTh
       // through to text extraction rather than assume.
     }
 
-    // Concatenate ALL text blocks. With tools enabled the model can
-    // produce multiple text blocks interleaved with server_tool_use
-    // and web_search_tool_result blocks; the visible answer can be
-    // split across them. Joining preserves the full synthesis.
-    const textBlocks = response.content.filter((b) => b.type === 'text');
-    if (textBlocks.length === 0) throw new Error('No text in Claude response');
-    const text = textBlocks.map(b => b.text).join('\n').trim();
+    const text = joinTextBlocks(response.content);
+    if (text === null) throw new Error('No text in Claude response');
 
     return finalizeResult(text, 'claude', usage);
   } catch (err) {
@@ -489,6 +502,7 @@ module.exports = {
   REASONING_TIMEOUT_MS,
   isTransient,
   finalizeResult,
+  joinTextBlocks,
   systemToText,
   systemToAnthropic,
   normalizeClaudeUsage,
