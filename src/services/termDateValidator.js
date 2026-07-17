@@ -107,11 +107,29 @@ function checkDayOfWeek(row) {
       // No day-of-month in the quote — fall back to first weekday.
       chosen = matches[0];
     } else {
+      // Distance is measured EDGE to edge (the gap between the two tokens),
+      // not start to start. UK dates put the weekday BEFORE the number
+      // ("Monday 25"), so start-to-start distance made the whole weekday's
+      // length count against it: in "Monday 25 – Friday 29" the gap from
+      // "Monday" to "25" is 1 char, but start-to-start it scored 7 vs
+      // Friday's 5 — anchoring 25 to FRIDAY and false-flagging a correct
+      // date (real Highgate School import). Ties prefer the preceding
+      // weekday for the same convention.
       let bestDist = Infinity;
       for (const wd of matches) {
+        const wdEnd = wd.position + wd.name.length;
         for (const dp of dayPositions) {
-          const dist = Math.abs(wd.position - dp);
-          if (dist < bestDist) { bestDist = dist; chosen = wd; }
+          const numEnd = dp + dayNum.length;
+          const dist = wd.position >= numEnd
+            ? wd.position - numEnd // weekday after the number
+            : dp >= wdEnd
+              ? dp - wdEnd         // weekday before the number
+              : 0;                 // overlap (defensive)
+          const precedes = wd.position < dp;
+          if (dist < bestDist || (dist === bestDist && precedes && chosen && chosen.position > dp)) {
+            bestDist = dist;
+            chosen = wd;
+          }
         }
       }
     }

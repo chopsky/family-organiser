@@ -65,6 +65,24 @@ describe('validateTermDates', () => {
     expect(rows[1].warnings).toEqual([]);
   });
 
+  it('anchors to the weekday BEFORE the number, not the closer following one', () => {
+    // Real Highgate School import: "Half-term Monday 25 – Friday 29 May".
+    // 2026-05-25 IS a Monday, but start-to-start distance scored "Friday"
+    // (5 chars away across the dash) closer than "Monday" (7 chars, its own
+    // length counted against it) and false-flagged a correct date. Edge-to-
+    // edge distance anchors 25 to the adjacent "Monday".
+    const rows = validateTermDates(
+      [
+        { event_type: 'term_start', date: '2026-04-20', label: 'Summer term', academic_year: '2025-2026', source_quote: 'Term begins Monday 20 April' },
+        { event_type: 'half_term_start', date: '2026-05-25', end_date: '2026-05-29', label: 'Half-term', academic_year: '2025-2026', source_quote: 'Half-term Monday 25 – Friday 29 May' },
+        { event_type: 'term_end', date: '2026-07-08', label: 'Term ends', academic_year: '2025-2026', source_quote: 'Term ends Wednesday 8 July' },
+      ],
+      'Summer 2026. Term begins Monday 20 April. Half-term Monday 25 – Friday 29 May. Term ends Wednesday 8 July.',
+      NOW
+    );
+    expect(rows[1].warnings).toEqual([]);
+  });
+
   it('still flags a genuinely wrong date in an ordinal range quote', () => {
     // 2026-04-09 is a Thursday; the quote pins the 9th... nothing - the
     // quote only mentions the 5th (Monday) and 10th (Friday). A date of
